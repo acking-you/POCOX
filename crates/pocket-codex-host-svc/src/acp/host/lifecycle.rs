@@ -84,11 +84,11 @@ impl AgentHost {
 
     /// Create a host with an independent native reader. Unadmitted sessions
     /// are browsed read-only rather than implicitly loaded into the agent.
-    pub fn create_with_native_history(
+    pub fn create_with_claude_history(
         options: HostOptions,
         launch_args: Option<Vec<String>>,
         session_meta: Option<serde_json::Map<String, Value>>,
-        history: Option<crate::native_history::NativeHistory>,
+        history: Option<Arc<crate::native_history::ClaudeHistory>>,
     ) -> Self {
         Self::create_parts(options, launch_args, session_meta, history)
     }
@@ -97,7 +97,7 @@ impl AgentHost {
         options: HostOptions,
         launch_args: Option<Vec<String>>,
         session_meta: Option<serde_json::Map<String, Value>>,
-        native_history: Option<crate::native_history::NativeHistory>,
+        native_history: Option<Arc<crate::native_history::ClaudeHistory>>,
     ) -> Self {
         let (closed, closures) = mpsc::unbounded_channel();
         let store = Arc::new(options.store);
@@ -117,6 +117,7 @@ impl AgentHost {
                 store,
                 native_history,
                 native_claims: Mutex::new(HashMap::new()),
+                released_here: Mutex::new(HashMap::new()),
                 persist: Persist::spawn(apply),
                 state: Mutex::new(State::default()),
                 lifecycle: tokio::sync::Mutex::new(None),

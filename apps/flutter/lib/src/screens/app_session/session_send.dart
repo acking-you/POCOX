@@ -81,6 +81,21 @@ extension _SessionSend on _AppSessionState {
     if (ordinary && sendAttachments.any((a) => !a.ready)) {
       return;
     }
+    // No session can be created without its project folder: nothing is
+    // sent and nothing is shown as sent. The composer's own send asks for
+    // the folder and continues there; anything else says what is missing.
+    if (_needsProjectToSend) {
+      if (ordinary && queued == null) {
+        unawaited(_chooseProjectThenSend());
+      } else {
+        final l10n = AppLocalizations.of(context);
+        _updateState(() {
+          _error = l10n.agentWelcomeNeedsProject(_caps.providerName);
+          _retry = null;
+        });
+      }
+      return;
+    }
     // Take the send lock up front, before the retry probe's await below, so the
     // composer can't start a second send during that round-trip (re-entrancy).
     final api = ref.read(bridgeApiProvider);
@@ -264,9 +279,23 @@ extension _SessionSend on _AppSessionState {
       // The effort this turn runs with: a pending pick, else the thread's
       // current effort (re-asserted so a plan/permission turn can't drop it).
       final effort = _effectiveEffort;
+      // A model picked from a list the current connection has not confirmed
+      // yet (read before a reconnect) is checked against this host's own
+      // list first: a host replaced with another configuration may no longer
+      // offer it. Then nothing is sent and the message returns to its draft;
+      // an unreadable list decides nothing (the host validates as before).
+      var modelId = _model?.id;
+      if (modelId != null && _caps.modelCatalog && !_modelsCurrent) {
+        final changes = _catalogChanges;
+        await _ensureModels();
+        if (!sameLink()) throw const _LinkMoved();
+        if (_catalogChanges != changes &&
+            !_models.any((m) => m.id == modelId)) {
+          throw _ModelWithdrawn(l10n.modelWithdrawn);
+        }
+      }
       // Both plan and default collaboration settings require a concrete model
       // id; resolve one (and reflect it in the chip) if left on "default".
-      var modelId = _model?.id;
       if (collab != null && modelId == null) {
         final models = await api.appModelList(service);
         // An answer of a connection that moved names nothing for this one,
@@ -361,6 +390,15 @@ extension _SessionSend on _AppSessionState {
         // it's stored even if the first turn/start below fails.
         if (current()) _persistThreadConfig();
       }
+      // A draft's own option choices belong to the session its first send
+      // created: they apply before that message is sent (again on a retry
+      // after they could not be applied).
+      if (_caps.draftOptions && sendingDraft.options.isNotEmpty) {
+        await _applyDraftOptions(sendingDraft, service, targetThread, sameLink);
+        if (mounted && identical(_draft, sendingDraft)) {
+          _refreshAgentSettings();
+        }
+      }
       // Record what this turn puts on the wire BEFORE sending: turn/started
       // (and the stamp it takes) can arrive while the await below is still in
       // flight. Turn params override thread defaults, so on servers that never
@@ -436,7 +474,9 @@ extension _SessionSend on _AppSessionState {
       }
     } catch (e) {
       final moved = e is _LinkMoved;
-      final msg = !moved
+      final msg = e is _DraftOptionsRefused
+          ? e.message
+          : !moved
           ? friendlyError(e)
           : dispatched
           ? l10n.sendAnswerStale
@@ -449,6 +489,33 @@ extension _SessionSend on _AppSessionState {
         holdQueued(msg, uncertain: !refused);
       } else if (moved && ordinary) {
         returnToDraft(msg);
+      } else if (ordinary &&
+          (e is _DraftOptionsRefused ||
+              (isNewThread && !dispatched && !_looksDisconnected(msg)))) {
+        // Nothing of the message was sent (its session could not be
+        // created or prepared, so no turn was dispatched): it goes back to
+        // its draft (before anything typed since), its optimistic copy is
+        // withdrawn, and the session shows the options it really has.
+        // Sending again is the user's ordinary send, from the composer.
+        final sendAgain = e is _DraftOptionsRefused ? null : _submit;
+        _restoreDraft(typed, sendAttachments, into: sendingDraft);
+        if (mounted && identical(_draft, sendingDraft)) {
+          _updateState(() {
+            final index = bubble == null ? -1 : _itemIndex[bubble] ?? -1;
+            if (index >= 0 &&
+                index < _items.length &&
+                _items[index].id == bubble) {
+              _items.removeAt(index);
+              _rebuildItemIndex();
+              _cachedRows = null;
+            }
+            _undoableDraft = null;
+            if (shown()) {
+              _error = msg;
+              _retry = sendAgain;
+            }
+          });
+        }
       } else {
         if (shown()) {
           _updateState(() {

@@ -34,6 +34,7 @@ extension _SessionKeyboard on _AppSessionState {
       return false; // never consume — text paste must still fire
     }
     if (_editorOpen) return false;
+    if (_onPaletteKey(key)) return true;
     if (key == LogicalKeyboardKey.enter ||
         key == LogicalKeyboardKey.numpadEnter) {
       if (_input.value.composing.isValid &&
@@ -143,5 +144,92 @@ extension _SessionKeyboard on _AppSessionState {
         pressed.contains(LogicalKeyboardKey.controlRight) ||
         pressed.contains(LogicalKeyboardKey.metaLeft) ||
         pressed.contains(LogicalKeyboardKey.metaRight);
+  }
+
+  /// The commands the `/` list offers for the draft now; empty when it is
+  /// closed.
+  List<AgentCommand> _paletteMatches() {
+    if (!_caps.commands || _externalWriterMode || _guardianReadOnly) {
+      return const [];
+    }
+    final text = _input.text;
+    final query = commandQuery(text);
+    if (query == null || text == _paletteDismissed) return const [];
+    final commands = ref
+        .read(agentCommandsProvider(widget.serviceKey))
+        .valueOrNull;
+    if (commands == null) return const [];
+    return filterCommands(commands, query);
+  }
+
+  /// Write [command] into the draft as `/name `; the user adds its
+  /// arguments and sends it like any message.
+  void _pickCommand(AgentCommand command) {
+    final text = '/${command.name} ';
+    _input.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _updateState(() {
+      _paletteIndex = 0;
+      _paletteDismissed = null;
+    });
+    _inputFocus.requestFocus();
+  }
+
+  /// Arrows move through the open `/` list, Enter or Tab picks, Esc closes
+  /// it; `true` when the key was the list's.
+  bool _onPaletteKey(LogicalKeyboardKey key) {
+    final matches = _paletteMatches();
+    if (matches.isEmpty) return false;
+    final last = matches.length - 1;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      _updateState(
+        () => _paletteIndex = _paletteIndex >= last ? 0 : _paletteIndex + 1,
+      );
+      return true;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      _updateState(
+        () => _paletteIndex = _paletteIndex <= 0 ? last : _paletteIndex - 1,
+      );
+      return true;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      _updateState(() => _paletteDismissed = _input.text);
+      return true;
+    }
+    final pick =
+        key == LogicalKeyboardKey.tab ||
+        ((key == LogicalKeyboardKey.enter ||
+                key == LogicalKeyboardKey.numpadEnter) &&
+            !HardwareKeyboard.instance.isShiftPressed &&
+            // A full command name already typed sends with Enter.
+            !matches.any((c) => '/${c.name}' == _input.text));
+    if (!pick) return false;
+    _pickCommand(matches[_paletteIndex.clamp(0, last)]);
+    return true;
+  }
+
+  /// The `/` list above the composer, following the draft's text.
+  Widget _commandPalette() {
+    if (!_caps.commands) return const SizedBox.shrink();
+    // Read once the list is wanted; kept while the view watches it.
+    ref.watch(agentCommandsProvider(widget.serviceKey));
+    return ListenableBuilder(
+      listenable: _input,
+      builder: (context, _) {
+        final matches = _paletteMatches();
+        if (matches.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: CommandPalette(
+            commands: matches,
+            highlighted: _paletteIndex.clamp(0, matches.length - 1),
+            onSelect: _pickCommand,
+          ),
+        );
+      },
+    );
   }
 }

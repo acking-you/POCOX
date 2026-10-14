@@ -30,6 +30,7 @@ part 'hosting_editor/new_host.dart';
 part 'hosting_editor/running_host.dart';
 part 'hosting_editor/navigation.dart';
 part 'hosting_editor/sign_in.dart';
+part 'hosting_editor/opencode_host.dart';
 
 const _codexHost = AppServeStatus(
   name: 'alpha',
@@ -79,18 +80,13 @@ const _acpHost = AppServeStatus(
   incarnation: 'inc-tool',
 );
 
-/// A fake offering the bridge's two built-in ACP presets (OpenCode and the
-/// Claude adapter, as `PRESETS` in host-svc's `acp/spec.rs` defines them),
-/// with the adapter found where the fake's Claude status reports it. The
-/// default fake offers OpenCode only.
+/// A fake offering a generic ACP preset and the Claude adapter (as
+/// `PRESETS` in host-svc's `acp/spec.rs` defines it), with the adapter found
+/// where the fake's Claude status reports it. The default fake offers the
+/// generic preset only.
 FakeBridgeApi _withClaude() => FakeBridgeApi()
   ..presets = const [
-    AcpPreset(
-      id: 'opencode',
-      displayName: 'OpenCode',
-      program: 'opencode',
-      args: ['acp'],
-    ),
+    fixturePreset,
     AcpPreset(
       id: 'claude',
       displayName: 'Claude',
@@ -218,6 +214,7 @@ void main() {
   _navigationTests();
   _entryTests();
   _signInTests();
+  _openCodeHostTests();
 }
 
 extension on AppServeStatus {

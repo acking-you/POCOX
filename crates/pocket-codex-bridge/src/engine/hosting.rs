@@ -32,6 +32,8 @@ pub enum Provider {
     Codex,
     /// An owned ACP agent.
     Acp,
+    /// An owned native OpenCode server.
+    OpenCode,
 }
 
 impl Provider {
@@ -39,6 +41,7 @@ impl Provider {
         match self {
             Self::Codex => "Codex",
             Self::Acp => "an ACP agent",
+            Self::OpenCode => "OpenCode",
         }
     }
 }
@@ -85,8 +88,8 @@ impl Drop for Claim {
 /// provider claims it; the caller still checks the other providers' running
 /// hosts as before.
 pub fn claim(name: &str, provider: Provider) -> Result<Claim> {
-    if provider == Provider::Acp {
-        bail!("ACP hosting reserves its name with `reserve`");
+    if provider != Provider::Codex {
+        bail!("owned agent hosting reserves its name exclusively");
     }
     let mut held = claims();
     match held.get_mut(name) {
@@ -146,6 +149,14 @@ impl Drop for Reservation {
 /// start that already finished is seen, and one still starting
 /// holds a claim.
 pub fn reserve(name: &str) -> Result<Reservation> {
+    reserve_for(name, Provider::Acp)
+}
+
+/// Reserve a name exclusively for an owned agent engine.
+pub fn reserve_for(name: &str, provider: Provider) -> Result<Reservation> {
+    if provider == Provider::Codex {
+        bail!("Codex uses its startup claim");
+    }
     let mut held = claims();
     if let Some((owner, _)) = held.get(name) {
         return Err(taken(name, *owner));
@@ -153,7 +164,7 @@ pub fn reserve(name: &str) -> Result<Reservation> {
     if super::serve::is_hosting_codex(name) {
         return Err(taken(name, Provider::Codex));
     }
-    held.insert(name.to_string(), (Provider::Acp, 1));
+    held.insert(name.to_string(), (provider, 1));
     Ok(Reservation {
         name: name.to_string(),
         committed: false,
@@ -162,11 +173,13 @@ pub fn reserve(name: &str) -> Result<Reservation> {
 
 /// Free a committed ACP name when its host stops.
 pub fn release(name: &str) {
+    release_for(name, Provider::Acp);
+}
+
+/// Free an exclusive engine name after its owned process confirmed exit.
+pub fn release_for(name: &str, provider: Provider) {
     let mut held = claims();
-    if held
-        .get(name)
-        .is_some_and(|(owner, _)| *owner == Provider::Acp)
-    {
+    if held.get(name).is_some_and(|(owner, _)| *owner == provider) {
         held.remove(name);
     }
 }

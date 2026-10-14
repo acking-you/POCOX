@@ -39,12 +39,9 @@ use std::{
 };
 
 use serde_json::Value;
-use tokio::{io::AsyncReadExt as _, process::ChildStdout};
 
-use super::{
-    process::{self, leader_exited, Spawned},
-    spec::{is_executable, AgentSpec},
-};
+use super::spec::{is_executable, AgentSpec};
+use crate::process;
 
 /// The preset's profile id.
 pub const PROFILE_ID: &str = "claude";
@@ -68,8 +65,6 @@ const NODE_PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_NODE_PROBES: usize = 8;
 /// More than a version line is not `node --version`.
 const PROBE_OUTPUT_LIMIT: usize = 64;
-const EXIT_POLL: Duration = Duration::from_millis(20);
-const PROBE_GRACE: Duration = Duration::from_millis(100);
 
 /// A `major.minor.patch` version.
 pub type Version = (u32, u32, u32);
@@ -391,67 +386,16 @@ pub async fn node_version(path: &Path) -> Option<Version> {
     // Preloads requested for the user's own programs are not needed to print
     // a version; an empty value requests none.
     let env = [(OsString::from("NODE_OPTIONS"), OsString::new())];
-    let Spawned {
-        process,
-        stdin,
-        stdout,
-    } = process::spawn(path, &["--version".to_string()], None, &env).ok()?;
-    drop(stdin);
-    let leader = process.id();
-    match tokio::time::timeout(NODE_PROBE_TIMEOUT, probe_output(stdout, leader)).await {
-        Ok(Some(out)) => {
-            // The leader exited: kill what is left of its group and reap it.
-            let status = process.finish().await?;
-            if !status.success() {
-                return None;
-            }
-            parse_version(std::str::from_utf8(&out).ok()?)
-        },
-        Ok(None) | Err(_) => {
-            process.terminate(PROBE_GRACE).await;
-            None
-        },
-    }
-}
-
-/// What the probe printed, once its leader exited: at most
-/// [`PROBE_OUTPUT_LIMIT`] bytes (more is `None`). After the exit, output
-/// already in the pipe is read without waiting for an end a descendant may
-/// never send.
-async fn probe_output(mut stdout: ChildStdout, leader: Option<u32>) -> Option<Vec<u8>> {
-    let leader = leader?;
-    let mut out = Vec::new();
-    let mut chunk = [0u8; PROBE_OUTPUT_LIMIT + 1];
-    let mut open = true;
-    loop {
-        if leader_exited(leader) {
-            while open {
-                match tokio::time::timeout(EXIT_POLL, stdout.read(&mut chunk)).await {
-                    Ok(Ok(0)) | Err(_) => open = false,
-                    Ok(Ok(n)) => append(&mut out, &chunk[..n])?,
-                    Ok(Err(_)) => return None,
-                }
-            }
-            return Some(out);
-        }
-        if !open {
-            tokio::time::sleep(EXIT_POLL).await;
-            continue;
-        }
-        tokio::select! {
-            read = stdout.read(&mut chunk) => match read {
-                Ok(0) => open = false,
-                Ok(n) => append(&mut out, &chunk[..n])?,
-                Err(_) => return None,
-            },
-            () = tokio::time::sleep(EXIT_POLL) => {},
-        }
-    }
-}
-
-fn append(out: &mut Vec<u8>, bytes: &[u8]) -> Option<()> {
-    out.extend_from_slice(bytes);
-    (out.len() <= PROBE_OUTPUT_LIMIT).then_some(())
+    let output = process::read_output(
+        path,
+        &["--version".into()],
+        None,
+        &env,
+        NODE_PROBE_TIMEOUT,
+        PROBE_OUTPUT_LIMIT,
+    )
+    .await?;
+    parse_version(std::str::from_utf8(&output).ok()?)
 }
 
 /// What the Node.js search found.

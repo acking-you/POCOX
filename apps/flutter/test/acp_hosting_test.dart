@@ -1,4 +1,4 @@
-// ACP hosting: the agent grid, the OpenCode preset and custom agents,
+// ACP hosting: the agent grid, a generic preset and custom agents,
 // verbatim argument vectors, saved agents, host details, restore planning,
 // preference compatibility, and phone/tablet/desktop layouts in both themes.
 
@@ -27,7 +27,6 @@ import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
 import 'fake_bridge_api.dart';
 
-part 'acp_hosting/catalog_status.dart';
 part 'acp_hosting/claude_preparation.dart';
 part 'acp_hosting/lifecycle.dart';
 part 'acp_hosting/presets.dart';
@@ -141,9 +140,9 @@ Future<void> _openAdvanced(WidgetTester t, String key) async {
   );
 }
 
-/// Pick the preset tile [id] (OpenCode by default) and unfold its program
-/// and arguments.
-Future<void> _chooseAcp(WidgetTester t, [String id = 'opencode']) async {
+/// Pick the preset tile [id] (the fixture preset by default) and unfold its
+/// program and arguments.
+Future<void> _chooseAcp(WidgetTester t, [String id = 'fixture']) async {
   final tile = find.byKey(Key('agent-choice-preset:$id'));
   await t.ensureVisible(tile);
   await t.tap(tile);
@@ -202,7 +201,6 @@ const _acpHost = AppServeStatus(
 void main() {
   _registerPresets();
   _registerClaudePreparation();
-  _registerCatalogStatus();
   _registerRestore();
   _registerSelectionOwnership();
   _registerLifecycle();

@@ -3,12 +3,13 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/acp_host_details.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
+import 'package:pocket_codex/src/hosting/opencode_host_details.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
 
 /// What a running host is: for native Codex its tunnels (listen address and
 /// relay key each), runtime and project folders; for an ACP host the agent's
-/// details ([AcpHostDetails]).
+/// details ([AcpHostDetails]); for OpenCode its server ([OpenCodeHostDetails]).
 class HostStatusSection extends StatelessWidget {
   /// Creates the section for [host].
   const HostStatusSection({super.key, required this.host});
@@ -24,7 +25,9 @@ class HostStatusSection extends StatelessWidget {
       title: l10n.hostSectionStatus,
       children: [
         EditorBlock(
-          child: host.isAcp
+          child: host.isOpenCode
+              ? OpenCodeHostDetails(host: host)
+              : host.isAcp
               ? AcpHostDetails(host: host)
               : _codex(context, l10n),
         ),

@@ -62,11 +62,15 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     final host = existing;
     if (host == null) {
       runtime.suggest(_hosts());
+      openCode.suggest(_hosts());
       // Hosts may still be loading; suggest again once they arrive.
       ref.listenManual(localServeListProvider, (_, _) {
-        if (mounted) runtime.suggest(_hosts());
+        if (!mounted) return;
+        runtime.suggest(_hosts());
+        openCode.suggest(_hosts());
       });
       Future.microtask(runtime.detect);
+      Future.microtask(openCode.detect);
     }
     if (host == null || host.isCodex) unawaited(loadSetup());
   }
@@ -117,7 +121,10 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   }
 
   /// Pick the codex binary for the Codex form it was opened from.
-  void browseCodex() => runtime.browse(() => !busy && !isAcpHost);
+  void browseCodex() => runtime.browse(() => !busy && isCodexHost);
+
+  /// Pick the opencode executable for the OpenCode form it was opened from.
+  void browseOpenCode() => openCode.browse(() => !busy && isOpenCodeHost);
 
   /// This page started the adapter preparation shown (and may cancel it).
   bool get ownsClaudePrepare => _preparing != null;
@@ -146,6 +153,9 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   String hostingError(Object e) {
     final l10n = AppLocalizations.of(context);
     final raw = friendlyError(e);
+    if (raw.contains('opencode_already_hosted')) {
+      return l10n.openCodeAlreadyHosted;
+    }
     if (isHostNameConflict(raw) || isLocalNameTaken(raw)) {
       return l10n.hostNameConflict;
     }
@@ -200,7 +210,57 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   }
 
   /// Start the new host.
-  Future<void> start() => isAcpChoice(choice) ? _startAcp() : _startCodex();
+  Future<void> start() => choice == openCodeChoice
+      ? _startOpenCode()
+      : isAcpChoice(choice)
+      ? _startAcp()
+      : _startCodex();
+
+  Future<void> _startOpenCode() async {
+    final l10n = AppLocalizations.of(context);
+    openCode.pathIntent++;
+    final (value, invalid) = openCode.read(l10n);
+    if (value == null) {
+      setState(() => error = invalid);
+      return;
+    }
+    // OpenCode's own providers and sign-ins, or the custom provider the
+    // bridge supports for it ([HostConfigSupport]).
+    if (draft.problem(l10n, fresh: true) case final problem?) {
+      setState(() => error = problem);
+      return;
+    }
+    final typed = openCode.name.text.trim();
+    final input = draft.input;
+    final keyAction = draft.keyAction(fresh: true);
+    final key = draft.typedKey;
+    final op = _begin();
+    if (op == null) return;
+    final navigator = Navigator.of(context);
+    final container = ProviderScope.containerOf(context);
+    final prefs = container.read(uiPrefsProvider.notifier);
+    final life = container.read(scopeLifeProvider);
+    try {
+      final result = await api.appServeStartConfigured(
+        name: typed.isEmpty ? null : typed,
+        runtime: value,
+        input: input,
+        keyAction: keyAction,
+        key: key,
+      );
+      if (!life.alive) return;
+      prefs.setAutoHostOpenCode(
+        AutoHostOpenCodePrefs(name: result.name, binary: value.binary),
+      );
+      container.invalidate(localServeListProvider);
+      container.invalidate(servicesProvider);
+      if (_owns(op)) navigator.pop();
+    } catch (e) {
+      if (_owns(op)) setState(() => error = hostingError(e));
+    } finally {
+      _end(op);
+    }
+  }
 
   Future<void> _startCodex() async {
     final l10n = AppLocalizations.of(context);
@@ -417,6 +477,10 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   /// when they are unchanged (the saved runtime is kept).
   (HostRuntime?, String?) _editedRuntime(AppLocalizations l10n) {
     final host = existing!;
+    if (host.isOpenCode) {
+      if (!runtimeEdited) return (null, null);
+      return openCode.read(l10n);
+    }
     if (host.isCodex) {
       if (!runtimeEdited) return (null, null);
       return runtime.read(l10n, exact: true);
@@ -542,6 +606,12 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   /// The restore record follows the runtime the host now runs.
   void _remember(UiPrefsStore prefs, AppServeStatus host, HostRuntime? ran) {
     if (ran == null) return;
+    if (ran.isOpenCode) {
+      prefs.setAutoHostOpenCode(
+        AutoHostOpenCodePrefs(name: host.name, binary: ran.binary),
+      );
+      return;
+    }
     if (ran.agent case final agent?) {
       unawaited(
         prefs.setAutoHostAcp(AutoHostAcpPrefs(name: host.name, spec: agent)),
@@ -573,10 +643,12 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     final life = container.read(scopeLifeProvider);
     try {
       // Codex: codex + the API proxy and every relay key. ACP: the agent and
-      // the processes it started.
+      // the processes it started. OpenCode: the `opencode serve` it owns.
       await api.appServeStop(host.name);
       if (!life.alive) return;
-      if (host.isAcp) {
+      if (host.isOpenCode) {
+        prefs.clearAutoHostOpenCode(host.name);
+      } else if (host.isAcp) {
         prefs.clearAutoHostAcp(host.name);
       } else {
         prefs.clearAutoHost(host.name);
@@ -588,7 +660,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
             (set) => {
               ...set,
               host.appServiceKey,
-              if (!host.isAcp) host.apiServiceKey,
+              if (host.isCodex) host.apiServiceKey,
             },
           );
       container.invalidate(localServeListProvider);

@@ -365,6 +365,9 @@ pub fn sessions(service_key: &str, running_only: bool) -> Result<Vec<LocalSessio
 
 /// Inspect one remote session's liveness + would-be takeover targets.
 pub fn session_liveness(service_key: &str, thread_id: &str) -> Result<SessionLiveness> {
+    if protocol_of(service_key) == Protocol::OpenCode {
+        return super::opencode::liveness(service_key, thread_id);
+    }
     if protocol_of(service_key) == Protocol::Acp {
         return acp::native_liveness(service_key, thread_id);
     }
@@ -374,7 +377,7 @@ pub fn session_liveness(service_key: &str, thread_id: &str) -> Result<SessionLiv
 
 /// Read a remote session's transcript for read-only viewing.
 pub fn transcript(service_key: &str, thread_id: &str) -> Result<Vec<TranscriptItem>> {
-    if protocol_of(service_key) == Protocol::Acp {
+    if matches!(protocol_of(service_key), Protocol::Acp | Protocol::OpenCode) {
         return Err(anyhow!("use the paginated native history of the selected ACP host"));
     }
     let url = endpoint(service_key, &["sessions", thread_id, "transcript"])?;
@@ -391,6 +394,9 @@ pub async fn follow_session<F>(service_key: &str, thread_id: &str, mut on_update
 where
     F: FnMut(SessionFollowUpdate) -> bool,
 {
+    if protocol_of(service_key) == Protocol::OpenCode {
+        return super::opencode::follow_session(service_key, thread_id, on_update).await;
+    }
     if protocol_of(service_key) == Protocol::Acp {
         return acp::follow_native_session(service_key, thread_id, on_update).await;
     }
@@ -467,7 +473,7 @@ fn decode_follow_event(event: &[u8]) -> Result<Option<SessionFollowUpdate>> {
 
 /// Force-resume a remote session into its host's colocated app-server.
 pub fn force_resume(service_key: &str, thread_id: &str) -> Result<ForceResumeOutcome> {
-    if protocol_of(service_key) == Protocol::Acp {
+    if matches!(protocol_of(service_key), Protocol::Acp | Protocol::OpenCode) {
         return Err(anyhow!(
             "this provider has no verified safe takeover operation; continue viewing read-only"
         ));

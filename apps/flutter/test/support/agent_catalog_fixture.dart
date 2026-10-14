@@ -1,5 +1,5 @@
-// A neutral ACP model catalog for previews: the shapes an agent such as
-// OpenCode reports (`provider/model` ids, model ids that contain `/`, long
+// A neutral ACP model catalog for previews: the shapes a multi-provider
+// agent reports (`provider/model` ids, model ids that contain `/`, long
 // names, several providers, an effort option and a mode option), with
 // made-up provider and model names, so a preview never suggests that any
 // real provider or model is supported.

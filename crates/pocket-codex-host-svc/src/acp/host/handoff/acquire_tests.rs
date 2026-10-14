@@ -39,7 +39,7 @@ async fn fixture(delay: &str) -> (AgentHost, Identity, tempfile::TempDir) {
         .with_owner_probe(probe, root.clone());
     let program = mock_binary();
     let args = vec!["--profile".into(), "beta".into(), "--open-delay-ms".into(), delay.into()];
-    let host = AgentHost::create_with_native_history(
+    let host = AgentHost::create_with_claude_history(
         HostOptions {
             spec: AgentSpec {
                 profile_id: "claude".into(),
@@ -54,7 +54,7 @@ async fn fixture(delay: &str) -> (AgentHost, Identity, tempfile::TempDir) {
         },
         None,
         None,
-        Some(NativeHistory::Claude(Arc::new(history))),
+        Some(Arc::new(history)),
     );
     host.launch().await.expect("launch");
     let identity = Identity {
@@ -74,8 +74,7 @@ async fn unverified_loaded_writer_stays_blocked_until_verified_release() {
     );
     assert_eq!(host.acquire_session(SESSION, "replaced", &identity).await, Err(HostError::Stale));
     assert!(host.state().sessions.is_empty());
-    assert!(matches!(host.acquire_session(SESSION, SOURCE, &identity).await,
-        Err(HostError::Agent(message)) if message.contains("writer ownership changed")));
+    assert_eq!(host.acquire_session(SESSION, SOURCE, &identity).await, Err(HostError::ReadOnly));
     assert_eq!(
         host.prompt(SESSION, "must remain unsent", &[], None).await,
         Err(HostError::Loading)

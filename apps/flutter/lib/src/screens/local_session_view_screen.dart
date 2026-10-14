@@ -15,6 +15,9 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/hosting/host_editor_page.dart';
+import 'package:pocket_codex/src/native_hosts.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/ide_context.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/realtime_delegation.dart';
@@ -24,6 +27,7 @@ import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
 import 'package:pocket_codex/src/screens/app_session/message_actions.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
@@ -467,6 +471,9 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   /// Bottom action: a read-only note while the session is actively running, or a
   /// resume / force-takeover button once it is free / idle.
   Widget _actionBar(AppLocalizations l10n) {
+    if (_source.isNative && !widget.guardian && widget.serviceKey == null) {
+      return _nativeContinue(l10n);
+    }
     final live = _live;
     if (live == null) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
@@ -501,13 +508,70 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
                   Flexible(
                     child: Text(
                       _source.isNative
-                          ? l10n.nativeHistoryTakeoverUnavailable
+                          ? l10n.nativeHistoryReadOnly
                           : l10n.readOnlyViewing,
                       style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  /// A provider-native session continues only through a host that serves
+  /// it: open it there (its access is resolved on arrival), or host the
+  /// provider on this device. Never a fork or a copy.
+  Widget _nativeContinue(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final provider = widget.provider;
+    final name = provider == 'claude' ? 'Claude' : 'OpenCode';
+    final host = nativeContinueHost(
+      ref.watch(localServeListProvider).valueOrNull ?? const [],
+      provider,
+      preferred: ref.watch(uiPrefsProvider).valueOrNull?.lastServiceKey,
+    );
+    final canHost =
+        isDesktop && ref.read(bridgeApiProvider).acpHostingSupported();
+    final Widget body;
+    if (host != null) {
+      body = FilledButton.icon(
+        key: const Key('view-continue-native'),
+        onPressed: () => context.pushReplacement(
+          conversationRoute(
+            host.appServiceKey,
+            widget.threadId,
+            cwd: widget.cwd,
+          ),
+        ),
+        icon: const Icon(Icons.play_circle_outline),
+        label: Text(l10n.nativeContinueOn(host.name)),
+      );
+    } else if (canHost) {
+      body = OutlinedButton.icon(
+        key: const Key('view-host-native'),
+        onPressed: () => showHostingEditor(
+          context,
+          initialChoice: provider == 'claude' ? 'preset:claude' : 'opencode',
+        ),
+        icon: const Icon(Icons.dns_outlined),
+        label: Text(l10n.nativeHostToContinue(name)),
+      );
+    } else {
+      body = Text(
+        l10n.nativeContinueElsewhere(name),
+        key: const Key('view-native-elsewhere'),
+        textAlign: TextAlign.center,
+        style: TextStyle(color: scheme.onSurfaceVariant),
+      );
+    }
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        // A bottom bar gets the page's whole height: size to the action,
+        // never over the transcript.
+        child: Center(heightFactor: 1, child: body),
       ),
     );
   }

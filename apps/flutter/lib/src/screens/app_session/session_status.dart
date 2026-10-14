@@ -17,21 +17,26 @@ extension _SessionStatus on _AppSessionState {
       );
     }
     if (_externalWriterMode) {
-      if (_caps.isAcp &&
-          (_externalWriterLiveness?.turnState ?? 'unknown') == 'unknown') {
+      if (_caps.hostAccess) {
+        final view = accessView(
+          l10n,
+          _access,
+          _accessReason,
+          _caps.providerName,
+        );
         return (
-          color: infoColor(scheme),
-          label: l10n.nativeHistoryReadOnly,
-          icon: Icons.lock_outline,
+          color: view.tone == AccessTone.running
+              ? cautionColor(scheme)
+              : infoColor(scheme),
+          label: view.status,
+          icon: view.icon,
           nominal: false,
         );
       }
       final resumable = _externalWriterLiveness?.allowsResume ?? false;
-      final nativeIdle =
-          _caps.isAcp && _externalWriterLiveness?.safety == 'nativeOwnedIdle';
       return (
         color: cautionColor(scheme),
-        label: resumable || nativeIdle
+        label: resumable
             ? l10n.sessionInUseElsewhere
             : l10n.sessionRunningElsewhere,
         icon: resumable ? Icons.lock_open_outlined : Icons.lock_clock_outlined,
@@ -148,13 +153,16 @@ extension _SessionStatus on _AppSessionState {
           else
             Icon(st.icon, size: 13, color: st.color),
           const SizedBox(width: 6),
-          Text(
-            st.label,
-            style: TextStyle(
-              fontSize: 12,
-              color: st.color,
-              // Resting state reads as a label, not an alert.
-              fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
+          _withAccessScope(
+            l10n,
+            Text(
+              st.label,
+              style: TextStyle(
+                fontSize: 12,
+                color: st.color,
+                // Resting state reads as a label, not an alert.
+                fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
+              ),
             ),
           ),
           const Spacer(),
@@ -326,7 +334,12 @@ extension _SessionStatus on _AppSessionState {
       );
     }
     final caps = _caps;
-    if (caps.isAcp && caps.profileId.isNotEmpty) {
+    if (caps.isOpenCode) {
+      out[widget.serviceKey] ??= AgentIdentity(
+        provider: 'opencode',
+        name: caps.providerName,
+      );
+    } else if (caps.isAcp && caps.profileId.isNotEmpty) {
       out[widget.serviceKey] ??= AgentIdentity(
         provider: 'acp',
         profileId: caps.profileId,

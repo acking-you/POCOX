@@ -28,7 +28,7 @@ use super::{
     host_profiles::{self, Runtime},
     runtime,
     serve::{self, Binary, CodexStart},
-    serve_acp,
+    serve_acp, serve_opencode,
 };
 
 /// The outcome of an apply.
@@ -83,6 +83,16 @@ pub fn active(name: &str) -> Option<Active> {
             revision: codex.provider.revision,
         });
     }
+    if let Some(native) = serve_opencode::relaunch(name) {
+        return Some(Active {
+            incarnation: native.incarnation,
+            runtime: Runtime::OpenCode {
+                binary: Some(native.prepared.binary()),
+            },
+            source: native.prepared.provider.source,
+            revision: native.prepared.provider.revision,
+        });
+    }
     serve_acp::relaunch(name).map(|acp| Active {
         incarnation: acp.incarnation,
         runtime: Runtime::Acp(acp.spec),
@@ -110,6 +120,9 @@ pub fn apply(name: &str, expected: &Expected) -> Result<ApplyReport> {
     }
     if let Some(running) = serve_acp::relaunch(lease.name()) {
         return apply_acp(&lease, &profiles, running, expected);
+    }
+    if let Some(running) = serve_opencode::relaunch(lease.name()) {
+        return apply_opencode(&lease, &profiles, running, expected);
     }
     bail!("`{name}` is not hosting; start it")
 }
@@ -182,7 +195,7 @@ fn codex_runtime(
             port,
             proxy,
         }) => (binary.clone(), *port, proxy.clone()),
-        Some(Runtime::Acp(_)) => bail!("the saved runtime is not a Codex runtime"),
+        Some(_) => bail!("the saved runtime is not a Codex runtime"),
         None => {
             let binary = running.binary.clone().ok_or_else(|| {
                 anyhow!("the running codex executable is unknown; save one and apply again")
@@ -224,9 +237,7 @@ fn apply_acp(
         || {
             let spec = match desired.runtime.clone() {
                 Some(Runtime::Acp(spec)) => spec,
-                Some(Runtime::Codex {
-                    ..
-                }) => bail!("the saved runtime is not an agent runtime"),
+                Some(_) => bail!("the saved runtime is not an agent runtime"),
                 None => running.spec.clone(),
             };
             serve_acp::prepare(&name, spec, Some(desired.clone()), profiles)
@@ -240,6 +251,41 @@ fn apply_acp(
             let previous = previous
                 .ok_or_else(|| anyhow!("the previous launch was not kept; start the host again"))?;
             serve_acp::launch_prepared(previous).map(|_| running.provider.revision)
+        },
+    )
+}
+
+fn apply_opencode(
+    lease: &Lease,
+    profiles: &std::path::Path,
+    running: serve_opencode::Relaunch,
+    expected: &Expected,
+) -> Result<ApplyReport> {
+    let desired = host_profiles::resolve_in(profiles, lease.name())?;
+    orchestrate(
+        lease,
+        &Current {
+            incarnation: &running.incarnation,
+            desired: &desired,
+            previous: &running.prepared.provider,
+        },
+        expected,
+        || {
+            let binary = match &desired.runtime {
+                Some(Runtime::OpenCode {
+                    binary,
+                }) => binary.clone(),
+                None => Some(running.prepared.binary()),
+                Some(_) => bail!("the saved runtime is not an OpenCode runtime"),
+            };
+            serve_opencode::prepare(lease.name(), binary.as_deref(), desired.clone())
+        },
+        || serve_opencode::retire(lease.name()),
+        |prepared| serve_opencode::launch_prepared(prepared).map(drop),
+        |previous| {
+            let previous =
+                previous.ok_or_else(|| anyhow!("the previous OpenCode launch is unavailable"))?;
+            serve_opencode::launch_prepared(previous).map(|_| running.prepared.provider.revision)
         },
     )
 }

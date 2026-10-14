@@ -10,10 +10,24 @@ breaking change goes.
 ## Unreleased
 
 - Host ACP v1 agents through a configurable executable and argument list, with
-  OpenCode (`opencode acp`) as the first preset. Native Codex app-server stays
+  the Claude adapter as a preset. Native Codex app-server stays
   independent. Shared controls follow negotiated capabilities; the host owns
   agent lifecycle, permissions and bounded history, including remote control
   through the relay. See [ACP agents](docs/acp-agents.md) for verified scope.
+- Host OpenCode natively (`opencode serve`, `opencode:<name>` service keys)
+  instead of through `opencode acp`, with its own configuration and sign-ins.
+  Opening a Claude or OpenCode session resolves its access automatically
+  (write, or follow with the reason) instead of the Session control dialog.
+  **Breaking:** the `opencode acp` preset, its model-catalog plugin and its
+  custom provider routes are removed; saved OpenCode ACP agents and restore
+  records are dropped, so host OpenCode again from the hosting editor. A host
+  can use a per-host custom provider (Responses, Anthropic Messages or Chat
+  Completions), which offers every model the gateway lists, not just the
+  default model; Apply reconnects open views automatically. New ACP and
+  OpenCode conversations ask for a project folder before sending. See
+  [Native OpenCode](docs/opencode-native.md) for verified scope.
+- On macOS, Cmd+Q, the application menu and the Dock quit stop owned hosts
+  first, like the tray's Quit, instead of leaving their processes running.
 
 ## 0.2.10 — 2026-10-09
 

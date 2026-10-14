@@ -128,6 +128,14 @@ pub struct AppCapabilitiesDto {
     pub session_config: bool,
     /// Approvals carry the agent's own options, answered by option id.
     pub permission_options: bool,
+    /// Native slash-command catalog.
+    pub commands: bool,
+    /// Model, variant and agent choices before creating a session.
+    pub draft_options: bool,
+    /// Native questions can accept multiple choices.
+    pub question_multiple: bool,
+    /// The provider supports a textual permission rejection explanation.
+    pub permission_feedback: bool,
     /// Native thread metadata (Guardian pre-resume checks).
     pub native_metadata: bool,
     /// How earlier sessions reopen: `native`, `load`, `resume`, `none` or
@@ -174,6 +182,10 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
         model_catalog: c.model_catalog,
         session_config: c.session_config,
         permission_options: c.permission_options,
+        commands: c.commands,
+        draft_options: c.draft_options,
+        question_multiple: c.question_multiple,
+        permission_feedback: c.permission_feedback,
         native_metadata: c.native_metadata,
         session_reopen: c.session_reopen,
         session_list: c.session_list,

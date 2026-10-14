@@ -51,6 +51,9 @@ impl AgentHost {
             // Nothing was written: the agent never saw it.
             return Err(HostError::Timeout);
         };
+        tokio::time::timeout_at(deadline, self.recheck_native_writer(session, generation))
+            .await
+            .map_err(|_| HostError::Timeout)??;
         if self
             .steer_target(generation, session, Some(&turn), true)?
             .is_none()

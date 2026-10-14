@@ -72,10 +72,18 @@ class HostRuntime {
       port = 0,
       proxy = null;
 
-  /// `codex` or `acp`.
+  /// A native OpenCode runtime (`opencode serve`, owned by the host).
+  const HostRuntime.opencode({this.binary})
+    : kind = 'opencode',
+      port = 0,
+      proxy = null,
+      agent = null;
+
+  /// `codex`, `acp` or `opencode`.
   final String kind;
 
-  /// Codex: the executable; null uses the saved codex, then `PATH`.
+  /// Codex / OpenCode: the executable; null uses the saved one, then
+  /// `PATH`.
   final String? binary;
 
   /// Codex: the app-server port; `0` picks one.
@@ -89,6 +97,9 @@ class HostRuntime {
 
   /// Whether this is a native Codex runtime.
   bool get isCodex => kind == 'codex';
+
+  /// Whether this is a native OpenCode runtime.
+  bool get isOpenCode => kind == 'opencode';
 }
 
 /// What a running host runs with now (never the key).
@@ -225,8 +236,7 @@ class HostConfigSupport {
   /// Custom provider APIs; empty when the agent has no known mechanism.
   final List<String> protocols;
 
-  /// A custom provider must name its default model (OpenCode: otherwise
-  /// the user's own default model of another provider stays selected).
+  /// A custom provider must name its default model.
   final bool modelRequired;
 
   /// A custom provider must have a key (Claude: otherwise its own sign-in
@@ -283,10 +293,11 @@ class HostStartResult {
   /// Instance name as hosted.
   final String name;
 
-  /// `codex` or `acp`.
+  /// `codex`, `acp` or `opencode`.
   final String provider;
 
-  /// The controller key (`app:` for Codex, `acp:` for an agent).
+  /// The controller key (`app:` for Codex, `acp:` for an agent, `opencode:`
+  /// for OpenCode).
   final String serviceKey;
 
   /// An already-running host was reused.

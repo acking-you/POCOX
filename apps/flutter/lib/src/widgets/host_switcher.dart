@@ -298,10 +298,15 @@ Widget _identityIcon(
   Color color,
 ) {
   final known = identities[key];
-  final acp = sessionProtocolOf(key) == SessionProtocol.acp;
   return AgentIcon.of(
     key: Key('host-agent-icon-$key'),
-    provider: known?.provider ?? (acp ? 'acp' : 'codex'),
+    provider:
+        known?.provider ??
+        switch (sessionProtocolOf(key)) {
+          SessionProtocol.acp => 'acp',
+          SessionProtocol.opencode => 'opencode',
+          SessionProtocol.codexAppServer => 'codex',
+        },
     profileId: known?.profileId,
     name: known?.name ?? '',
     color: color,

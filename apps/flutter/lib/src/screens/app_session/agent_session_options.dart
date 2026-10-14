@@ -38,6 +38,134 @@ List<SessionConfigOption> orderedOptions(List<SessionConfigOption> options) {
   return [for (final (_, option) in indexed) option];
 }
 
+/// [base] (a service's defaults for a new session) with a draft's
+/// [choices] (option id -> value id) over them. A choice that is not one of
+/// its option's values is ignored. Every value shown is what the session
+/// gets once the choices are applied (see [draftChoiceAfter]): an option
+/// without a choice shows the default it keeps.
+///
+/// Variants depend on the model. When the variant (`thought_level`) values
+/// carry a `group`, it names the model value they belong to and only the
+/// chosen model's variants are offered; without groups the variants are the
+/// default model's, so they are withheld once another model is chosen
+/// rather than offered for a model they may not belong to. Choosing a model
+/// resets its variant (as the host does), so a chosen model's variant is
+/// its default (the empty value, named [defaultName] when the agent did not
+/// name one) until a variant is chosen.
+SessionSettings draftSessionSettings(
+  SessionSettings base,
+  Map<String, String> choices, {
+  String defaultName = 'Default',
+}) {
+  String? chosenIn(
+    SessionConfigOption option,
+    List<SessionConfigValue> values,
+  ) {
+    final chosen = choices[option.id];
+    return chosen != null && values.any((v) => v.value == chosen)
+        ? chosen
+        : null;
+  }
+
+  final model = base.configOptions
+      .where((o) => o.category == 'model')
+      .firstOrNull;
+  final modelValue = model == null
+      ? null
+      : chosenIn(model, model.values) ?? model.currentValue;
+  final modelChanged = model != null && modelValue != model.currentValue;
+  final options = <SessionConfigOption>[];
+  for (final option in base.configOptions) {
+    var values = option.values;
+    var current = option.currentValue;
+    if (option.category == 'thought_level' && model != null) {
+      final grouped = values.any((v) => v.group != null);
+      if (grouped) {
+        values = [
+          for (final v in values)
+            if (v.group == modelValue)
+              SessionConfigValue(
+                value: v.value,
+                name: v.name,
+                description: v.description,
+              ),
+        ];
+      } else if (modelChanged) {
+        values = const [];
+      }
+      if (values.isEmpty) continue;
+      if (modelChanged) {
+        // The new model starts without a variant: that is what is shown
+        // and, unless a variant is chosen, what the session gets.
+        current = '';
+        if (!values.any((v) => v.value == '')) {
+          values = [
+            SessionConfigValue(value: '', name: defaultName),
+            ...values,
+          ];
+        }
+      }
+    }
+    final chosen = chosenIn(option, values);
+    if (chosen != null) {
+      current = chosen;
+    } else if (!values.any((v) => v.value == current) && values.isNotEmpty) {
+      // A default the agent does not offer here cannot be shown truthfully
+      // as any of these values; the empty value means "not chosen".
+      current = '';
+      if (!values.any((v) => v.value == '')) {
+        values = [SessionConfigValue(value: '', name: defaultName), ...values];
+      }
+    }
+    options.add(
+      SessionConfigOption(
+        id: option.id,
+        name: option.name,
+        category: option.category,
+        description: option.description,
+        currentValue: current,
+        values: values,
+      ),
+    );
+  }
+  return SessionSettings(
+    configOptions: options,
+    currentMode: base.currentMode,
+    modes: base.modes,
+    usageUsed: base.usageUsed,
+    usageSize: base.usageSize,
+  );
+}
+
+/// A draft's [choices] after choosing [value] for option [id] of [base]: a
+/// value equal to what the option shows without a choice is no choice, and
+/// a model choice drops every variant choice (a model resets its variant).
+Map<String, String> draftChoiceAfter(
+  SessionSettings base,
+  Map<String, String> choices,
+  String id,
+  String value,
+) {
+  final category = base.configOptions
+      .where((o) => o.id == id)
+      .firstOrNull
+      ?.category;
+  final next = {...choices}..remove(id);
+  if (category == 'model') {
+    final variants = {
+      for (final o in base.configOptions)
+        if (o.category == 'thought_level') o.id,
+    };
+    next.removeWhere((key, _) => variants.contains(key));
+  }
+  final unchosen = draftSessionSettings(
+    base,
+    next,
+  ).configOptions.where((o) => o.id == id).firstOrNull?.currentValue;
+  if (value != unchosen) next[id] = value;
+  return next;
+}
+
 /// Whether the legacy `modes` should show: ACP clients that use config
 /// options ignore them once a `mode` option exists.
 bool showsLegacyModes(SessionSettings settings) =>

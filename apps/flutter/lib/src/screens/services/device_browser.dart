@@ -381,6 +381,7 @@ class _DeviceFirstServices extends ConsumerWidget {
           title: l10n.servicesChatCapability,
           provider: switch (service.kind) {
             'acp' => 'acp',
+            'opencode' => 'opencode',
             _ => 'codex',
           },
           providerName: localHosts
@@ -393,6 +394,7 @@ class _DeviceFirstServices extends ConsumerWidget {
               ?.profileId,
           protocol: protocolOf(switch (service.kind) {
             'acp' => 'ACP',
+            'opencode' => 'OpenCode HTTP',
             _ => 'App-server',
           }, service),
           localAddr: localAppAddr[service.key],

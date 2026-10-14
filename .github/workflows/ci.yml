@@ -166,14 +166,6 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
-      # Test-only prerequisite: pocket-codex-host-svc's
-      # tests/opencode_catalog.rs runs the OpenCode catalog plugin's
-      # `node --test` suite. The shipped plugin runs inside OpenCode.
-      - name: Setup Node.js (catalog plugin tests)
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
       - name: Check Android dependency boundary
         run: python3 scripts/check_mobile_dependencies.py
 

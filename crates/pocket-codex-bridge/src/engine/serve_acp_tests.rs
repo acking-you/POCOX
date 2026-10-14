@@ -101,7 +101,6 @@ fn fixture_host(name: &str, context: transport::Context) -> AcpServe {
         host,
         program: program.display().to_string(),
         context,
-        catalog: None,
         config: None,
         launch: None,
         _owner: Owner(id),
@@ -303,7 +302,7 @@ fn a_late_publication_never_replaces_a_newer_hosts_registration() {
 
 #[test]
 fn presets_resolve_only_existing_programs() {
-    assert!(locate("/definitely/not/here/agent", Some("opencode")).is_none());
+    assert!(locate("/definitely/not/here/agent", Some("fixture")).is_none());
     assert!(locate("definitely-not-an-installed-agent-xyz", None).is_none());
 }
 

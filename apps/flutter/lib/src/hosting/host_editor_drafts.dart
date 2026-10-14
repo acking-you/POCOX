@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/hosting/acp_host_form.dart';
 import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
 import 'package:pocket_codex/src/hosting/codex_runtime_section.dart';
 import 'package:pocket_codex/src/hosting/model_service_section.dart';
+import 'package:pocket_codex/src/hosting/opencode_runtime_section.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 
@@ -44,6 +45,9 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
 
   /// The Codex runtime fields (a new Codex host, or the running one).
   late final CodexRuntimeForm runtime;
+
+  /// The OpenCode runtime fields (a new OpenCode host, or the running one).
+  late final OpenCodeRuntimeForm openCode;
 
   final Map<String, ModelServiceDraft> _drafts = {};
 
@@ -108,15 +112,28 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   ModelServiceDraft _draftFor(String target) => _drafts.putIfAbsent(target, () {
     final draft = ModelServiceDraft()..addListener(rebuild);
     draft.restrict(
-      isAcpChoice(target) ? const HostConfigSupport() : _codexSupport,
+      target == openCodeChoice
+          ? _openCodeSupport
+          : isAcpChoice(target)
+          ? const HostConfigSupport()
+          : _codexSupport,
     );
     return draft;
   });
 
   HostConfigSupport get _codexSupport => api.hostConfigSupported();
 
+  HostConfigSupport get _openCodeSupport =>
+      api.hostConfigSupported(engine: 'opencode');
+
   /// Whether the edited host (or the new host's agent) is an ACP agent.
   bool get isAcpHost => existing?.isAcp ?? isAcpChoice(choice);
+
+  /// Whether the edited host (or the new host) is a native OpenCode host.
+  bool get isOpenCodeHost => existing?.isOpenCode ?? choice == openCodeChoice;
+
+  /// Whether the edited host (or the new host) is a native Codex host.
+  bool get isCodexHost => !isAcpHost && !isOpenCodeHost;
 
   /// The running host as last reported, or null once it is gone. Never a
   /// stale snapshot: a stopped host is not operated on by name.
@@ -185,12 +202,13 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
     return true;
   }
 
-  /// The running Codex host's runtime fields were edited.
-  bool get runtimeEdited =>
-      existing != null &&
-      existing!.isCodex &&
-      load == EditorLoad.ready &&
-      runtime.differs(AppLocalizations.of(context));
+  /// The running Codex or OpenCode host's runtime fields were edited.
+  bool get runtimeEdited {
+    final host = existing;
+    if (host == null || load != EditorLoad.ready) return false;
+    if (host.isOpenCode) return openCode.differs;
+    return host.isCodex && runtime.differs(AppLocalizations.of(context));
+  }
 
   /// Anything is edited and unsaved: runtime, agent, model service or key.
   bool get editorDirty {
@@ -198,7 +216,10 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
       return load == EditorLoad.ready &&
           (draft.dirty || runtimeEdited || agentEdited);
     }
-    return _drafts.values.any((d) => d.dirty) || runtime.touched || agentEdited;
+    return _drafts.values.any((d) => d.dirty) ||
+        runtime.touched ||
+        openCode.touched ||
+        agentEdited;
   }
 
   /// Instance names this device already hosts.
@@ -219,6 +240,7 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   void initDrafts() {
     api = ref.read(bridgeApiProvider);
     runtime = CodexRuntimeForm(api)..addListener(rebuild);
+    openCode = OpenCodeRuntimeForm(api)..addListener(rebuild);
     final host = existing;
     if (host == null) return;
     load = EditorLoad.loading;
@@ -234,6 +256,8 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
     }
     runtime.removeListener(rebuild);
     runtime.dispose();
+    openCode.removeListener(rebuild);
+    openCode.dispose();
   }
 
   /// Rebuild while mounted.
@@ -278,7 +302,15 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
     config = loaded;
     newerConfig = null;
     final desired = loaded.runtime ?? loaded.active?.runtime;
-    if (host.isCodex) {
+    if (host.isOpenCode) {
+      openCode.name.text = host.name;
+      openCode.prefill(
+        desired != null && desired.isOpenCode
+            ? desired
+            : HostRuntime.opencode(binary: host.codexBinary),
+      );
+      draft.restrict(_openCodeSupport);
+    } else if (host.isCodex) {
       runtime.name.text = host.name;
       runtime.prefill(
         desired != null && desired.isCodex
@@ -336,6 +368,7 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
       // The restored form reports it again once built.
       acp = _acpDrafts[next];
       runtime.pathIntent++;
+      openCode.pathIntent++;
     });
   }
 

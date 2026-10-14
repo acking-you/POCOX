@@ -10,6 +10,8 @@ extension _SessionLayout on _AppSessionState {
     final needsCodexSetup = _codexNeedsSetup(watch: true);
     // A new ACP conversation opens its agent session by itself.
     if (_threadId == null && _caps.isAcp) _scheduleAgentSessionCheck();
+    // A draft that keeps its own options reads them; it opens nothing.
+    _scheduleDraftOptionsCheck();
 
     // Phones: classic Scaffold — the sessions list is a slide-in drawer, the
     // bar is a plain AppBar naming the conversation.
@@ -79,13 +81,14 @@ extension _SessionLayout on _AppSessionState {
                 tooltip: l10n.moreActions,
                 onSelected: (v) {
                   if (v == 'compact') _compact();
-                  if (v == 'session-control') _showSessionControl();
+                  if (v == 'session-release') unawaited(_releaseSession());
                 },
                 itemBuilder: (c) => [
-                  if (_caps.isAcp && !_guardianReadOnly)
+                  if (_canReleaseSession)
                     PopupMenuItem(
-                      value: 'session-control',
-                      child: Text(l10n.sessionControlTitle),
+                      key: const Key('session-release'),
+                      value: 'session-release',
+                      child: Text(l10n.sessionHandBack),
                     ),
                   PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
                 ],

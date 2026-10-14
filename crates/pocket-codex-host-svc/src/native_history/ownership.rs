@@ -85,6 +85,16 @@ impl Probe {
     /// Fresh positive/negative evidence for an explicit handoff, never the
     /// display cache's failure-as-unknown projection.
     pub(super) async fn idle_owners(&self, session: &str) -> anyhow::Result<Vec<ProcessIdentity>> {
+        self.owners(session, false).await
+    }
+
+    /// Verify all holders, optionally permitting a known running owner. This
+    /// still refuses unknown statuses and never uses the display cache.
+    pub(super) async fn owners(
+        &self,
+        session: &str,
+        allow_running: bool,
+    ) -> anyhow::Result<Vec<ProcessIdentity>> {
         anyhow::ensure!(uuid::Uuid::parse_str(session).is_ok(), "invalid native session id");
         let records = self.inventory().await.ok_or_else(|| {
             anyhow::anyhow!("Claude ownership could not be inspected; keep the session read-only")
@@ -102,7 +112,8 @@ impl Probe {
             let mut owners = Vec::new();
             for record in records {
                 anyhow::ensure!(
-                    record.status == "idle",
+                    record.status == "idle"
+                        || allow_running && matches!(record.status.as_str(), "busy" | "running"),
                     "Claude still has an active or unknown turn"
                 );
                 let process = process_identity(record.pid)
@@ -208,7 +219,10 @@ fn inspect_records(
         states.push(record.status.as_str());
     }
     result.held_open = true;
-    if states.contains(&"running") {
+    if states
+        .iter()
+        .any(|state| matches!(*state, "busy" | "running"))
+    {
         result.turn_state = "running".into();
         result.safety = "nativeOwnedRunning".into();
     } else if states.iter().all(|state| *state == "idle") {

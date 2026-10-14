@@ -47,7 +47,7 @@ impl AgentHost {
             return Err(HostError::NotReady);
         }
         let (generation, _, caps) = self.ready_for(Some(expected))?;
-        let Some(NativeHistory::Claude(reader)) = &self.inner.native_history else {
+        let Some(reader) = &self.inner.native_history else {
             return Err(HostError::Unsupported(
                 "this provider needs its existing engine; a second ACP engine cannot safely take \
                  over its session"
@@ -93,13 +93,9 @@ impl AgentHost {
             let owners = reader
                 .idle_owners(session)
                 .await
-                .map_err(|e| HostError::Agent(e.to_string()))?;
+                .map_err(|_| HostError::ReadOnly)?;
             if !owners.is_empty() {
-                return Err(HostError::Unsupported(
-                    "Claude is idle in another client, but that client still owns the session. \
-                     Release or exit that client, then retry; it will not be stopped automatically"
-                        .into(),
-                ));
+                return Err(HostError::ReadOnly);
             }
             let stamp = reader
                 .revision(session)

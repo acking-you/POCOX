@@ -253,13 +253,14 @@ extension _SessionTitle on _AppSessionState {
                   onSelected: (v) {
                     if (v == 'compact') _compact();
                     if (v == 'rename') _beginTitleEdit();
-                    if (v == 'session-control') _showSessionControl();
+                    if (v == 'session-release') unawaited(_releaseSession());
                   },
                   itemBuilder: (c) => [
-                    if (_caps.isAcp && !_guardianReadOnly)
+                    if (_canReleaseSession)
                       PopupMenuItem(
-                        value: 'session-control',
-                        child: Text(l10n.sessionControlTitle),
+                        key: const Key('session-release'),
+                        value: 'session-release',
+                        child: Text(l10n.sessionHandBack),
                       ),
                     PopupMenuItem(
                       value: 'rename',

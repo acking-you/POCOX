@@ -167,6 +167,18 @@ class AppCapabilitiesDto {
   /// Approvals carry the agent's own options, answered by option id.
   final bool permissionOptions;
 
+  /// Native slash-command catalog.
+  final bool commands;
+
+  /// Model, variant and agent choices before creating a session.
+  final bool draftOptions;
+
+  /// Native questions can accept multiple choices.
+  final bool questionMultiple;
+
+  /// The provider supports a textual permission rejection explanation.
+  final bool permissionFeedback;
+
   /// Native thread metadata (Guardian pre-resume checks).
   final bool nativeMetadata;
 
@@ -211,6 +223,10 @@ class AppCapabilitiesDto {
     required this.modelCatalog,
     required this.sessionConfig,
     required this.permissionOptions,
+    required this.commands,
+    required this.draftOptions,
+    required this.questionMultiple,
+    required this.permissionFeedback,
     required this.nativeMetadata,
     required this.sessionReopen,
     required this.sessionList,
@@ -245,6 +261,10 @@ class AppCapabilitiesDto {
       modelCatalog.hashCode ^
       sessionConfig.hashCode ^
       permissionOptions.hashCode ^
+      commands.hashCode ^
+      draftOptions.hashCode ^
+      questionMultiple.hashCode ^
+      permissionFeedback.hashCode ^
       nativeMetadata.hashCode ^
       sessionReopen.hashCode ^
       sessionList.hashCode ^
@@ -281,6 +301,10 @@ class AppCapabilitiesDto {
           modelCatalog == other.modelCatalog &&
           sessionConfig == other.sessionConfig &&
           permissionOptions == other.permissionOptions &&
+          commands == other.commands &&
+          draftOptions == other.draftOptions &&
+          questionMultiple == other.questionMultiple &&
+          permissionFeedback == other.permissionFeedback &&
           nativeMetadata == other.nativeMetadata &&
           sessionReopen == other.sessionReopen &&
           sessionList == other.sessionList &&

@@ -30,6 +30,7 @@ class ProviderBadge extends StatelessWidget {
     key: badgeKey,
     provider: switch (sessionProtocolOf(key)) {
       SessionProtocol.acp => 'acp',
+      SessionProtocol.opencode => 'opencode',
       SessionProtocol.codexAppServer => 'codex',
     },
     name: name,
@@ -37,7 +38,7 @@ class ProviderBadge extends StatelessWidget {
     showIcon: showIcon,
   );
 
-  /// `codex` or `acp`.
+  /// `codex`, `opencode` or `acp`.
   final String provider;
 
   /// Agent name for ACP badges (empty or null falls back to "ACP agent").
@@ -63,6 +64,7 @@ class ProviderBadge extends StatelessWidget {
     final agentName = name?.trim() ?? '';
     final label = switch (provider) {
       'acp' => agentName.isNotEmpty ? agentName : l10n.providerAcpAgent,
+      'opencode' => l10n.providerOpenCode,
       _ => l10n.providerCodex,
     };
     final style = TextStyle(
@@ -83,7 +85,7 @@ class ProviderBadge extends StatelessWidget {
         children: [
           if (showIcon) ...[
             AgentIcon.of(
-              provider: acp ? 'acp' : 'codex',
+              provider: provider,
               profileId: profileId,
               name: label,
               size: 11,

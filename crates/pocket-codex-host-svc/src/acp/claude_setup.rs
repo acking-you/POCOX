@@ -37,13 +37,11 @@ use tokio::sync::watch;
 #[path = "claude_download.rs"]
 mod download;
 
-use super::{
-    claude::{
-        check_installation, package_root, prepared_adapter, ready_marker, version_dir,
-        ADAPTER_PACKAGE, ADAPTER_VERSION, READY_MARKER,
-    },
-    process::{self, leader_exited, Spawned},
+use super::claude::{
+    check_installation, package_root, prepared_adapter, ready_marker, version_dir, ADAPTER_PACKAGE,
+    ADAPTER_VERSION, READY_MARKER,
 };
+use crate::process::{self, leader_exited, Spawned};
 
 /// Longest a preparation may run.
 pub const PREPARE_TIMEOUT: Duration = Duration::from_secs(15 * 60);

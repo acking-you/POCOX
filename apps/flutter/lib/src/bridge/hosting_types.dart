@@ -78,7 +78,7 @@ class AppServeStatus {
     this.agentPhase,
     this.agentError,
     this.authRequired = false,
-    this.catalog,
+    this.opencode,
     this.configSource,
     this.configRevision,
     this.incarnation,
@@ -134,15 +134,15 @@ class AppServeStatus {
   /// they inherit the app's environment.
   final String? proxy;
 
-  /// Service provider family of this host: `codex` or `acp`. For
-  /// `acp` the `app*` fields describe the gateway and `api*` are
-  /// empty.
+  /// Service provider family of this host: `codex`, `acp` or `opencode`.
+  /// For `acp` and `opencode` the `app*` fields describe the host's gateway
+  /// and `api*` are empty.
   final String provider;
 
   /// Provider version when known (ACP agents).
   final String? providerVersion;
 
-  /// Wire protocol (`codex-app-server`, `acp`); empty from
+  /// Wire protocol (`codex-app-server`, `acp`, `opencode-http`); empty from
   /// an older bridge, where [provider] decides.
   final String protocol;
 
@@ -161,9 +161,9 @@ class AppServeStatus {
   /// The ACP agent reported that authentication is required.
   final bool authRequired;
 
-  /// The OpenCode model catalog, for an ACP host of the `opencode` profile.
-  /// Null for every other host.
-  final AcpCatalogStatus? catalog;
+  /// The native OpenCode summary, for an `opencode` host. Null for every
+  /// other host and while it is not reported.
+  final OpenCodeHostStatus? opencode;
 
   /// Where the running host gets its model service, as launched:
   /// `inherited`, `official` or `custom`. Null from an older bridge.
@@ -188,95 +188,62 @@ class AppServeStatus {
   /// Whether this host owns an ACP agent.
   bool get isAcp => provider == 'acp';
 
+  /// Whether this host owns a native `opencode serve`.
+  bool get isOpenCode => provider == 'opencode';
+
   /// The relay kind of this host's session service.
   String get sessionKind => switch (provider) {
     'acp' => 'acp',
+    'opencode' => 'opencode',
     _ => 'app',
   };
 }
 
-/// What the OpenCode model catalog plugin found for one host. Holds provider
-/// ids, counts and fixed reason codes, plus the plugin's own local file URL;
-/// never a provider endpoint, key or header.
-class AcpCatalogStatus {
-  /// Creates a catalog report.
-  const AcpCatalogStatus({
-    required this.state,
-    this.reason,
-    this.plugin,
-    this.providers = const [],
-    this.routeState,
-    this.routeReasons = const [],
-    this.routeProjects = const [],
+/// A running native OpenCode host's catalog summary: counts and names only,
+/// never a provider endpoint, option, key or header.
+class OpenCodeHostStatus {
+  /// Creates a summary.
+  const OpenCodeHostStatus({
+    required this.version,
+    this.providersConnected = 0,
+    this.models = 0,
+    this.defaultModel,
+    this.agents = const [],
+    this.problem,
   });
 
-  /// `waiting` (no session opened yet), `reported` or `unavailable`.
-  final String state;
+  /// The running `opencode` version.
+  final String version;
 
-  /// How the plugin left the host's own provider in OpenCode's merged
-  /// configuration: `waiting`, `selected` (nothing to change), `enforced`
-  /// (settings were reset to it), `overridden` (an older plugin only
-  /// reported it) or `unverified`; `null` without an own provider.
-  final String? routeState;
+  /// Providers OpenCode can use now (signed in or configured).
+  final int providersConnected;
 
-  /// What was reset or found (`model`, `small-model`, `agent-model`,
-  /// `enabled-providers`, `disabled-providers`, `provider`, `missing`), or
-  /// why the route is `unverified` (a catalog reason).
-  final List<String> routeReasons;
+  /// Chat models those providers offer.
+  final int models;
 
-  /// The project directories the verdict covers, as OpenCode loaded them.
-  final List<String> routeProjects;
+  /// OpenCode's default model (`provider/model`), when it has one.
+  final String? defaultModel;
 
-  /// Why it is unavailable: `plugins-disabled`, `config-env-taken` or
-  /// `install-failed`.
-  final String? reason;
+  /// Selectable primary agents.
+  final List<String> agents;
 
-  /// The plugin's local `file://` URL, shown when it is unavailable so it
-  /// can be added to an OpenCode config by hand.
-  final String? plugin;
-
-  /// One entry per listed provider.
-  final List<AcpCatalogProvider> providers;
+  /// Why the host cannot serve turns (`no_provider`, …), when it cannot.
+  final String? problem;
 }
 
-/// One provider's model listing.
-class AcpCatalogProvider {
-  /// Creates a provider listing.
-  const AcpCatalogProvider({
-    required this.id,
-    required this.status,
-    this.reason,
-    required this.listed,
-    required this.added,
-    required this.excluded,
-    required this.unsafeIds,
-    required this.keySource,
-  });
+/// The OpenCode executable found on this device.
+class OpenCodeEnvironment {
+  /// Creates a detection result.
+  const OpenCodeEnvironment({this.path, this.version, this.problem});
 
-  /// Provider id from the OpenCode config.
-  final String id;
+  /// The resolved executable.
+  final String? path;
 
-  /// `complete`, `partial` (bounded), `failed` (nothing added) or `skipped`.
-  final String status;
+  /// Its reported version.
+  final String? version;
 
-  /// Reason code (`http-401`, `timeout`, `model-limit`, …).
-  final String? reason;
-
-  /// Chat models listed.
-  final int listed;
-
-  /// Models added beyond the configured ones.
-  final int added;
-
-  /// Entries left out for an explicit non-chat type.
-  final int excluded;
-
-  /// Ids OpenCode cannot hold, left out.
-  final int unsafeIds;
-
-  /// Where the credential came from: `config`, `env`, `headers` (configured
-  /// request headers) or `none`.
-  final String keySource;
+  /// Why it cannot be hosted (`not_found`, `unsupported_version`, …).
+  final String? problem;
 }
 
 /// One ACP agent configuration: profile identity plus executable and the
@@ -290,7 +257,7 @@ class AcpAgentSpec {
     this.args = const [],
   });
 
-  /// Profile id (`opencode` for the preset, or a custom id).
+  /// Profile id (a preset id such as `claude`, or a custom id).
   final String profileId;
 
   /// Name shown in the UI.

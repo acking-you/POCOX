@@ -3,13 +3,15 @@
 Pocket-Codex can host any agent that speaks the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP) v1 over stdio.
 An agent is configured as a program plus an argument list; it is never run
-through a shell. OpenCode (`opencode acp`) is the first preset; Claude is a
-second preset that runs the
+through a shell. Claude is the built-in preset; it runs the
 [`@agentclientprotocol/claude-agent-acp`](https://www.npmjs.com/package/@agentclientprotocol/claude-agent-acp)
 adapter (`claude-agent-acp`, no arguments), found on this computer or
 prepared on request (see [Claude](#claude)). Codex
-app-server stays the native, first-class engine. OpenCode uses the same ACP
-engine, host lifecycle and negotiated UI as other ACP agents.
+app-server stays the native, first-class engine. OpenCode is not an ACP
+preset: it is hosted natively through its own HTTP server (`opencode serve`),
+see [Native OpenCode](opencode-native.md). Its former `opencode acp` preset,
+model-catalog plugin and custom provider routes are removed; their saved
+records are dropped on load and never relaunched as a generic agent.
 
 Decision record: [ADR-0003](adr/0003-generic-acp-agents.md).
 
@@ -24,7 +26,7 @@ flowchart LR
   C <-->|"app: via relay / native WebSocket"| N[External codex app-server]
   A <-->|"acp: via relay / HTTP + SSE"| G[Pocket-Codex /acp/v1 gateway]
   G --> H[AgentHost: lifecycle and history]
-  H <-->|ACP v1 stdio| P[External ACP agent: OpenCode or custom]
+  H <-->|ACP v1 stdio| P[External ACP agent: Claude adapter or custom]
   API <-->|"meta: via relay"| M[Host meta: files and uploads]
 ```
 
@@ -100,8 +102,7 @@ add an agent-specific HTTP client or another `SessionEngine` implementation.
 - Tool lookup uses a child-only PATH (`pocket_codex_codex::external_tool_path()`,
   the macOS login-shell PATH); the controller's environment is not changed.
   An explicit program path is never replaced; a bare name is searched on
-  PATH and then in the preset's fallback directories (OpenCode:
-  `~/.opencode/bin`).
+  PATH and then in the preset's fallback directories.
 - **Windows is gated.** `acp_hosting_supported()` returns false and the
   dialog explains why; a correct job-object implementation is future work.
 
@@ -188,8 +189,7 @@ it cannot leave a consumed request unresolved on a live generation.
   retried or turned into a prompt. The UI offers **Supplement** only for
   such agents; for others it shows **Queue only**, with a clickable explanation
   of the connected agent's missing capability. Messages queue for the next
-  turn. OpenCode 1.18.35 does not advertise this extension; changing its
-  selected model does not enable it. Before changing anything the screen
+  turn. Before changing anything the screen
   checks that the answer still owns its input: the same service, host connection and
   generation, conversation view, draft and request (leaving the
   conversation drops the request, so returning to the same session does
@@ -405,9 +405,10 @@ stores (`sessions.json`) are not read.
    connect. Codex hosting runs on Windows, macOS and Linux; ACP agent hosting
    is Unix-only (on Windows, choosing an ACP tile explains that it is
    unavailable).
-2. Click the agent's tile. **Built-in presets** hold **Codex** and the ACP
-   presets (**OpenCode**, **Claude**): launch templates with default
-   settings, run from the agent's own installation. **Saved
+2. Click the agent's tile. **Built-in presets** hold **Codex**, native
+   **OpenCode** (see [Native OpenCode](opencode-native.md)) and the ACP
+   preset **Claude**: launch templates with default settings, run from the
+   agent's own installation. **Saved
    configurations** hold the launch settings you saved, then **Custom**,
    which creates a new one (with nothing saved yet, that section is
    **Custom configuration**). Each tile shows the agent's mark; a saved
@@ -419,9 +420,10 @@ stores (`sessions.json`) are not read.
    open: enter the program (name or full path) and one argument per row.
 4. The dialog locates the program before starting. Start hosting.
 
-A device hosts several instances side by side — Codex hosts, OpenCode and
-custom agents — each under its own name. A second Codex host defaults to an
-automatic port (`0`); its port is under **Advanced**. A name or port another
+A device hosts several instances side by side — Codex hosts, one native
+OpenCode host, Claude and custom agents — each under its own name. A second
+Codex host defaults to an automatic port (`0`); its port is under
+**Advanced**. A name or port another
 host owns is refused with guidance rather than taken over.
 
 Started hosts are remembered by name for "restore hosting on launch": up to
@@ -441,8 +443,8 @@ older build still restores one host.
 Agent marks are bundled vector glyphs (OpenAI and Claude from Simple Icons 15,
 CC0-1.0; OpenCode from its v1.18.35 favicon, MIT — full notices in
 `apps/flutter/lib/src/widgets/agent_icon.NOTICE.txt`). They are chosen by the
-host's reported profile id (`opencode`, `claude`), never by the instance name
-the user typed. Any other agent shows a letter tile. A remote host's mark is
+host's engine (`codex`, `opencode`) or reported ACP profile id (`claude`),
+never by the instance name the user typed. Any other agent shows a letter tile. A remote host's mark is
 known once connected (its profile is part of the host info).
 
 ### Claude
@@ -556,20 +558,20 @@ Session config options are shown in category order — `model`, then
 tooltip and accessible name carry the option name and the full value label.
 Values with up to eight entries open a menu; longer catalogs open a
 searchable list grouped by the agent's value groups, matching label, group
-and raw id. Value ids are opaque and sent back verbatim: OpenCode's model
-values are `provider/model`, and a model id may itself contain `/`
+and raw id. Value ids are opaque and sent back verbatim: model values may be
+`provider/model`, and a model id may itself contain `/`
 (`openrouter/openai/gpt-5`). A chip shows progress while its change is in
-flight; a refused change (OpenCode answers an unknown effort with *Effort not
-found*) leaves the agent's previous value and reports the error.
+flight; a refused change leaves the agent's previous value and reports the
+error.
 
 The agent's answer to every change is its complete option set and replaces
-the previous one. With OpenCode, choosing a model recomputes its variants:
-the `effort` option appears when the model has variants, falls back to
+the previous one. When an agent ties effort to models, choosing a model
+recomputes it: the `effort` option appears when the model has variants, falls back to
 `default` when the previous effort is not one of them, and disappears for a
 model without variants. A `mode` config option takes precedence over legacy
 `modes`, as ACP asks of clients that read config options.
 
-The catalog is per session (OpenCode resolves it for the session's
+The catalog is per session (an agent may resolve it for the session's
 directory), so it exists only once a session does. A new conversation
 prepares its agent session automatically when it has a project. Model,
 effort and mode share one control group with opening, ready and retry states;
@@ -580,99 +582,16 @@ hidden from this controller's sidebar until the first send; it may still
 appear in another controller's inventory. With no projects, the folder
 picker offers a typed host path and, on the host computer, native directory
 selection. Choosing a directory never sends a message. Native Codex keeps
-its own catalog and creates its thread on first send.
+its own catalog and creates its thread on first send. Native OpenCode keeps
+the draft's choices locally and applies them to the session its first send
+creates ([Native OpenCode](opencode-native.md#draft-options)).
 
-Existing Claude/OpenCode histories can instead open through the independent
+Existing Claude histories can instead open through the independent
 [provider-native history reader](native-agent-history.md), without restoring
-them through ACP. Browsing remains read-only. The connected host's separate
-Session control dialog offers verified Claude release/acquisition and reuse of
-an admitted OpenCode session on its existing engine; the native-history guide
-records the exact ownership and external-client limits.
-
-### OpenCode gateway models by default
-
-OpenCode lists only the models its configuration or the models.dev database
-declares, so a gateway provider configured with a `baseURL` and key would
-otherwise offer just the few models typed into `opencode.json`. For the
-`opencode` profile the host loads a server plugin through one of OpenCode's
-own config layers
-(`crates/pocket-codex-host-svc/src/acp/catalog.rs`, `opencode_catalog.mjs`):
-
-- the layer is `OPENCODE_CONFIG_CONTENT` (merged last, `config/config.ts:482`),
-  or — when the host's environment already sets that — a generated file named
-  by `OPENCODE_CONFIG` (merged after the global config, `:415`). It holds only
-  `plugin: [[<file-url>, {report: <path>}]]`; the plugin file is written under
-  the Pocket-Codex state directory (`<state>/opencode/`) and holds no
-  configuration. The user's own layer is passed through untouched, and
-  OpenCode combines the `plugin` lists of every layer
-  (`config/config.ts` `mergePluginOrigins`), so a provider URL and key set in
-  the user's `OPENCODE_CONFIG_CONTENT` still apply;
-- when both variables are already set, or plugins are disabled, nothing is
-  injected. The host reports the catalog `unavailable` with the
-  reason (`config-env-taken`, `plugins-disabled`, `install-failed`) and the
-  plugin's `file://` URL, so it can be added to the user's config by hand.
-  Plugins are disabled by a true `OPENCODE_PURE` or by OpenCode's global
-  `--pure` argument (`src/index.ts`; `plugin/index.ts` then loads no external
-  plugin). The arguments are read as OpenCode's yargs parser reads them,
-  without changing them: the last of `--pure`, `--pure true|false`,
-  `--pure=<value>` (on only for `true`) and `--no-pure` wins, nothing after
-  `--` counts, and `--no-pure` does not clear an inherited `OPENCODE_PURE`.
-
-OpenCode 1.18.35 runs a plugin's `config` hook after merging and substituting
-every config layer and before it builds providers (`provider.ts`: "load
-plugins first so config() hook runs before reading cfg.provider"). The hook,
-for every config provider with an `http(s)` `options.baseURL` that
-`enabled_providers` / `disabled_providers` allow:
-
-- lists `GET <baseURL>/models` with the provider's configured headers and key
-  (`options.apiKey`, else its `env` variables; `x-api-key` + `anthropic-version`
-  for an `@ai-sdk/anthropic` provider, otherwise a bearer token), following
-  Anthropic-style `has_more` / `last_id` pages. The body is read as a stream
-  and cancelled past its byte bound; the whole listing is bounded in time and
-  providers are listed a few at a time;
-- adds each chat model (`type` absent, `chat` or `model`) whose id is not
-  already declared (by key or by an alias's `id`) as `{}` or `{name}`.
-  Declared and `disabled` models, `whitelist` / `blacklist` and ids stay as
-  configured. Explicit other types are left out and counted. No reasoning,
-  effort variant or limit is inferred: an undeclared entry is built by
-  OpenCode with `limit.context` / `limit.output` of 0, and
-  `ProviderTransform.maxOutputTokens` then falls back to its own
-  `OUTPUT_TOKEN_MAX` (32 000). A listing does not say a model can generate;
-- leaves out ids OpenCode cannot hold as a model key. Its provider build looks
-  every configured model up with `parsed.models[id]` on an ordinary object and
-  reads `.api.id` from a hit (`provider.ts:1545`), so any name an ordinary
-  object inherits (`__proto__`, `constructor`, `toString`, `hasOwnProperty`,
-  …) would resolve to the inherited value and break provider construction.
-  Such ids are counted and the listing is `partial` (`unsafe-id`); every other
-  id, slashes and all, is kept verbatim;
-- reports the outcome. A well-formed listing larger than the model or page
-  bound adds the bounded prefix and is `partial`; a failed request, an
-  oversized or malformed page, or a missing, repeated or cyclic cursor adds
-  nothing and is `failed`. `listed` and `added` are reported apart: a listed
-  model the configuration already declares is not added.
-
-The report (provider ids, counts, fixed reason codes — never a URL, key,
-header or response) is written to the host's state directory and shown in
-the ACP host details, so a full listing, a bounded one and a failed one read
-differently. Nothing is printed (the agent's stdout is the ACP channel) and
-nothing is cached by the plugin. OpenCode runs the hook when it loads a
-project's configuration — for the first session in a directory of a running
-agent — with the URL, key and headers loaded then. A running agent does not
-pick up a changed URL, key or header; after changing them, use **Restart** in
-the ACP host details (or stop and start the host) so the next session lists
-again. Each launch has its own report, removed when the host stops. The
-report classifies each provider's credential source (`config`, `env`,
-configured `headers` or `none`) without any value; the host details use it
-only to add the "no key found" hint to a failed listing with `none`. They
-say when no enabled provider has an explicit `baseURL`, and show the
-plugin's `file://` URL only when the catalog is `unavailable`.
-
-Not covered (the provider's declared models are shown, and the reason is
-reported): providers without an explicit `baseURL` (the models.dev catalog
-applies), keys stored only through `opencode auth login` (OpenCode applies
-them after the config hook, so a listing that needs one fails with `http-401`
-and says no key was found in the config or environment), and gateways that do
-not serve a `/models` listing. Other ACP agents get no catalog.
+them through ACP. Browsing remains read-only. Opening a session on a connected
+host resolves its access automatically: it opens for writing when the host
+admits it, and is followed read-only, with the reason, while another client
+holds it ([session access](native-agent-history.md#session-access)).
 
 ### Per-host model service
 
@@ -718,35 +637,15 @@ Flutter suite (1,404 passed, 5 existing skips). The first-party Rust checks and
 macOS profile build also passed. These screenshots are Flutter-renderer
 previews; they do not claim a new native interaction check of the running app.
 
-A host may save a custom provider for the OpenCode preset (Responses,
-Anthropic Messages or Chat Completions, as a per-instance provider in the
-config layer whose `env` names the child-only `POCKET_CODEX_PROVIDER_KEY`,
-with a required default model) or the Claude preset (Anthropic Messages, with
-a required key, as `ANTHROPIC_*` environment and session settings). With the
-OpenCode catalog plugin the provider layer is merged into the same
-configuration. Other ACP agents launch with their own configuration only. The
-record's authority generation (never the key) joins the session source key,
-so a changed provider inherits no session history. A running agent's program
-and arguments, including a generic agent without a preset, can be saved from
+A host may save a custom provider for the Claude preset (Anthropic Messages,
+with a required key, as `ANTHROPIC_*` environment and session settings). Other
+ACP agents launch with their own configuration only. The record's authority
+generation (never the key) joins the session source key, so a changed
+provider inherits no session history. A running agent's program and
+arguments, including a generic agent without a preset, can be saved from
 what it runs; they and the provider take effect only on an explicit,
 confirmed restart, whose rollback relaunches the exact launch the agent ran.
-The OpenCode provider id includes the random authority generation, which
-makes an accidental match unlikely but does not stop another layer or a
-stored login from naming it. The catalog plugin's `config` hook, which
-OpenCode runs before it builds providers, puts the route back per project
-(default, small and agent models, `enabled_providers` set to exactly that
-provider, `disabled_providers`, and the provider's exact definition), pins
-the supplied key in memory as `options.apiKey` — OpenCode's SDK options take
-it before the `provider.key` a login stored for the same id with `opencode
-auth login` sets (pinned `provider.ts`, "load apikeys" and `resolveSDK`) —
-and reports what it reset. A route whose key is missing in the agent is
-reported `refused` and leaves no usable provider. The key is never written
-into the layer, the report or the arguments. Another plugin's own provider
-or auth loader for the same id, and a later plugin's `config` hook, stay
-outside it; the project directory the report names is the plugin input's
-`directory`, which the pinned public source (no plugin loader) does not
-verify. See
-[hosting configuration](hosting-configuration.md), including its evidence
+See [hosting configuration](hosting-configuration.md), including its evidence
 gaps.
 
 ## Accounts and older backends
@@ -826,78 +725,42 @@ groups, `waitid` exit detection) have been run on macOS; other Unix desktops
 share the code, but their lifecycle and runtime paths have not all been
 exercised. Windows hosting stays disabled.
 
-### Real OpenCode acceptance (2026-10-10)
+### Earlier ACP acceptance (historical, former OpenCode preset)
 
-OpenCode **1.18.35** (official macOS ARM64 npm binary, package SHA-512
-verified) was launched as `opencode acp --pure --cwd <disposable-project>`
-by the production Pocket-Codex host. A separate bridge controller process
-connected through a public pb-mapper relay; it had no in-process host and
-could not use the loopback shortcut. Both used private, independent support
-directories. This is a real network round trip between two processes on
-one Mac, not a test on a second physical device.
-
-The model was `claude-haiku-4-5-20251001` through an explicitly authorized
-Anthropic-compatible gateway. OpenCode used `@ai-sdk/anthropic` with its
-base URL ending in `/v1`; the API key came from a private file. An initial
-`@ai-sdk/openai-compatible` configuration failed because this gateway
-does not implement `/v1/chat/completions`. Choosing the provider matching
-the gateway's actual API resolved that failure; no Pocket-Codex protocol
-change was needed.
-
-The live run verified:
-
-- ACP initialization, capability negotiation, session creation and inventory;
-- advertised model and mode configuration, including restoring the original
-  selection;
-- streamed model output and completed-turn history;
-- controller disconnect/reconnect with unchanged retained item IDs and text;
-- exact permission choices: rejecting a write leaves no file, approving a
-  write creates only the disposable fixture, and its content can be previewed
-  through the separately published meta service;
-- cancelling a real streamed model turn produces an interrupted, idle session;
-- restarting the actual agent increments its generation, lists and loads the
-  previous session, replays its history and accepts a new prompt;
-- stopping the host withdraws both owned relay registrations, and no owned
-  OpenCode process remains afterwards.
-
-The test uses the same host and `SessionEngine` operations called by Flutter.
-The main application and existing user sessions were not opened. Real GUI
-interaction with this agent, hosted-account transport, image understanding,
-other model providers and non-macOS lifecycle behavior are not covered by
-this live run. Shared Flutter behavior is covered separately by widget tests,
-real-font layout snapshots and the native theme fixture.
-
-### Plugin-enabled OpenCode catalog run
-
-The 2026-10-10 run above used `--pure`, so the catalog plugin did not load.
-A later run on the same Mac launched the production OpenCode preset with the
-catalog plugin enabled and a configuration declaring a single model of one
-gateway provider. The plugin reported that provider `complete`: 83 chat
-models listed, 82 added beyond the declared one. The ACP model option then
-advertised exactly those 83 values, and each of the 83 was set and read back
-through the host. Two prompts got real model replies. This catalog advertised
-no `thought_level` option, so no effort was offered or exercised; none is
-inferred. The separate-process relay test above was re-run and passed.
+On 2026-10-10 the ACP engine was exercised end to end through the since-removed
+OpenCode ACP preset, hosted by the production Pocket-Codex host and driven by
+a separate bridge controller process through a public pb-mapper relay (two
+processes on one Mac, not a second physical device). It covered
+initialization and capability negotiation, session inventory and
+configuration, streamed output, reconnect with unchanged item IDs, exact
+permission rejection/approval, cancellation, agent restart with history
+replay, and relay-key withdrawal on stop. That preset is no longer offered and
+the run has not been repeated with another agent: it is historical evidence
+for the generic ACP engine paths only, not for the Claude preset and not for
+native OpenCode hosting.
 
 ### Same-process hosting coexistence
 
 The opt-in test `engine::hosting_live_tests::hosting_live_coexistence` hosts
-two native Codex app-servers and two ACP OpenCode hosts in one process
+two native Codex app-servers and two ACP hosts in one process
 through the production start, stop, restart and session-engine paths. It
 refuses to run unless `HOME`, `CODEX_HOME` and any `XDG_*` directory lie
 inside its fixture. It checks:
 
 - native hosts with the real `initialize` handshake only (no model prompt and
   no Codex login copied);
-- disposable ACP sessions on the full expected catalog with isolated model
+- disposable ACP sessions of the fixture's agent (`agent.json`), advertising
+  exactly its expected models (`expected-models.json`), with isolated model
   selections (no prompt);
 - that stopping, restarting or recreating any one host by name leaves every
   other host's process or incarnation, generation, listener, selections,
   sessions and relay keys unchanged;
 - that each stop withdraws only that host's keys.
 
-It runs on one Mac only. It says nothing about other operating systems,
-second physical devices, the Claude adapter or hosted-account transport.
+The agent is whatever the fixture names; the test assumes no particular
+one. It runs on one Mac only, and no run with the generic fixture is recorded
+here. It says nothing about other operating systems, second physical devices,
+the Claude adapter or hosted-account transport.
 
 ### Repeating the remote-control test
 

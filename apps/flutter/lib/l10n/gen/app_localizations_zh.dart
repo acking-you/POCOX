@@ -429,6 +429,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noModelForMode => '无法切换模式：没有可用的模型';
 
   @override
+  String get modelWithdrawn => '此主机已不再提供所选模型。请重新选择模型后再发送。';
+
+  @override
   String get effort => '思考强度';
 
   @override
@@ -2409,131 +2412,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get acpFeatures => '智能体功能';
 
   @override
-  String get acpCatalog => '模型目录';
-
-  @override
-  String get acpCatalogWaiting => '智能体打开第一个会话时才会读取模型目录。';
-
-  @override
-  String get acpRouteWaiting => '智能体打开第一个会话时才会检查 OpenCode 是否使用此主机的提供方。';
-
-  @override
-  String get acpRouteSelected => 'OpenCode 使用此主机的提供方和模型。';
-
-  @override
-  String acpRouteOverridden(String reasons) {
-    return '其他 OpenCode 配置覆盖了此主机的提供方：$reasons。请求可能发往别处。';
-  }
-
-  @override
-  String acpRouteUnverified(String reasons) {
-    return '无法检查 OpenCode 是否使用此主机的提供方：$reasons。';
-  }
-
-  @override
-  String get acpRouteReasonModel => '它选择了另一个模型';
-
-  @override
-  String get acpRouteReasonEnabled => 'enabled_providers 未包含它';
-
-  @override
-  String get acpRouteReasonDisabled => 'disabled_providers 列出了它';
-
-  @override
-  String get acpRouteReasonMissing => '合并后的配置中没有该提供方';
-
-  @override
-  String get acpRouteReasonSmallModel => 'small_model 指向其他提供方';
-
-  @override
-  String get acpRouteReasonAgentModel => '某个智能体或模式的模型指向其他提供方';
-
-  @override
-  String get acpRouteReasonProvider => '其他配置层修改了该提供方的定义';
-
-  @override
-  String acpRouteEnforced(String reasons) {
-    return '其他 OpenCode 配置与此主机不同，已重置为此主机的提供方：$reasons。';
-  }
-
-  @override
-  String get acpRouteRefused =>
-      'OpenCode 没有可用的提供方：智能体环境中缺少此主机的密钥，因此无法发送任何提示。请重新保存密钥并重启主机。';
-
-  @override
-  String get acpRouteReasonKey => '智能体中缺少此主机的密钥';
-
-  @override
-  String acpRouteProjects(String projects) {
-    return '已检查的项目（按插件输入给出的名称，未对照 OpenCode 源码核实）：$projects';
-  }
-
-  @override
-  String get acpRouteScope =>
-      '这覆盖 OpenCode 合并后的配置，并用此主机的密钥覆盖用 `opencode auth login` 为同一提供方保存的密钥。其他插件为同一提供方提供的提供方或认证加载器，以及之后运行的插件钩子，不在此范围内。';
-
-  @override
-  String acpCatalogUnavailable(String reason) {
-    return '无法为智能体加入模型目录：$reason';
-  }
-
-  @override
-  String get acpCatalogReasonPluginsDisabled =>
-      '智能体在禁用插件的模式下运行（--pure 或 OPENCODE_PURE）';
-
-  @override
-  String get acpCatalogReasonConfigTaken =>
-      '智能体的环境同时设置了 OPENCODE_CONFIG 和 OPENCODE_CONFIG_CONTENT；请把下面的插件加入你的配置';
-
-  @override
-  String get acpCatalogReasonInstallFailed => '目录插件无法写入';
-
-  @override
-  String get acpCatalogPlugin => '插件';
-
-  @override
-  String acpCatalogProviderComplete(String id, int listed, int added) {
-    return '$id：列出 $listed 个模型，新增 $added 个';
-  }
-
-  @override
-  String acpCatalogProviderPartial(
-    String id,
-    int listed,
-    int added,
-    String reason,
-  ) {
-    return '$id：列出 $listed 个模型，新增 $added 个；列表不完整（$reason）';
-  }
-
-  @override
-  String get acpCatalogNoProviders =>
-      '没有找到设置了明确 baseURL 的已启用提供方，因此没有读取模型列表；只提供配置中的模型。';
-
-  @override
-  String acpCatalogProviderFailed(String id, String reason) {
-    return '$id：模型列表无法读取（$reason）；使用配置中的模型';
-  }
-
-  @override
-  String acpCatalogProviderSkipped(String id, String reason) {
-    return '$id：未读取（$reason）';
-  }
-
-  @override
-  String acpCatalogExcluded(int count) {
-    return '排除了 $count 个非对话条目';
-  }
-
-  @override
-  String acpCatalogUnsafe(int count) {
-    return '排除了 $count 个智能体无法保存其标识的条目';
-  }
-
-  @override
-  String get acpCatalogNoKey => '在提供方的配置和环境变量中都没有找到密钥；通过智能体自己的登录保存的密钥在这里不可见';
-
-  @override
   String get acpFeatureReopen => '重新打开以前的会话';
 
   @override
@@ -3022,10 +2900,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nativeHistoryReadOnly => '本地历史 · 只读';
 
   @override
-  String get nativeHistoryTakeoverUnavailable =>
-      '历史会自动更新，当前为只读。此智能体无法保证独占交接，暂不支持接管；如需发送消息，请新建对话。';
-
-  @override
   String agentWelcomeTitle(String agent) {
     return '与 $agent 开始对话';
   }
@@ -3131,64 +3005,288 @@ class AppLocalizationsZh extends AppLocalizations {
   String get nativeHistoryWindowHint => '当前显示有限的历史窗口，部分内容已省略或位于窗口之外。';
 
   @override
-  String get sessionControlTitle => '会话控制';
+  String get providerOpenCode => 'OpenCode';
 
   @override
-  String get sessionControlChecking => '正在检查会话归属…';
+  String get agentChoiceNativeServer => '原生服务';
 
   @override
-  String get sessionControlOwned => '当前主机已持有此会话，可直接复用同一写入方继续对话。';
+  String agentChoiceRunningAs(String name) {
+    return '正在以 $name 运行';
+  }
 
   @override
-  String get sessionControlSameEngine =>
-      '可通过当前 OpenCode 引擎继续会话，它会串行处理已连接设备的消息。另启一个引擎处理同一会话可能造成并发写入。';
+  String get hostInheritedOpenCode => '使用这台电脑上 OpenCode 自己的提供方和登录。';
 
   @override
-  String get sessionControlReleased =>
-      '未发现仍持有此会话的 Claude 进程。可以在此获取原会话，启用发送前会再次核实归属。';
+  String get openCodeRuntimeHint =>
+      'Pocket 在这台电脑上启动并管理一个 opencode serve，只能通过这个主机访问。';
 
   @override
-  String get sessionControlExternalIdle =>
-      'Claude 在另一客户端中空闲，但仍持有此会话。请在原 Pocket 主机中释放，或退出原 Claude 客户端，然后在这里刷新。';
+  String get openCodeDetecting => '正在查找 OpenCode…';
 
   @override
-  String get sessionControlExternalRunning =>
-      '另一 Claude 客户端仍在执行一轮对话。请等待结束，再在原客户端释放会话。';
+  String openCodeFoundAt(String version, String path) {
+    return 'OpenCode $version · $path';
+  }
 
   @override
-  String get sessionControlReleasePending =>
-      '尚未确认释放完成，发送保持禁用。可以重试释放，核实写入方是否已退出。';
+  String get openCodeNotFound => '未找到 OpenCode。请安装它或选择其可执行文件。';
 
   @override
-  String get sessionControlLoading => '当前主机正在恢复会话，请完成后刷新。';
+  String get openCodeUnsupportedVersion => '不支持此 OpenCode 版本，请更新 OpenCode。';
 
   @override
-  String get sessionControlEngineRequired =>
-      'OpenCode 的运行归属保存在各自引擎内部。独立 ACP 进程无法附加到外部引擎，也无法确认它已释放此会话。请连接正在运行它的 Pocket 主机继续；这里不会另启写入方或停止其他引擎。';
+  String get openCodeNoProvider =>
+      '没有已登录的提供方。请在这台电脑上运行 `opencode auth login`，然后刷新。';
 
   @override
-  String get sessionControlStopped => '所选主机尚未就绪，请启动或重新连接该主机后刷新。';
+  String get openCodeAlreadyHosted => '这台电脑已经托管了 OpenCode，请打开那个主机。';
 
   @override
-  String get sessionControlUnknown => '暂时无法核实写入归属，或此智能体不支持交接。可以继续查看，稍后刷新重试。';
+  String get openCodePath => 'OpenCode 可执行文件';
 
   @override
-  String get sessionControlExclusiveNote =>
-      '在这里使用期间，请勿在其他原生客户端中再次打开同一会话。Pocket 主机之间有写入互斥，独立原生客户端不会遵守该互斥。';
+  String get openCodePathRequired => '请填写 OpenCode 可执行文件。';
 
   @override
-  String get sessionControlReleaseNote =>
-      '释放会关闭当前主机的空闲写入方，其连接设备将转为只读。历史保留在磁盘，本页面保留未发送的草稿、附件和队列。';
+  String openCodeRunning(String version) {
+    return 'OpenCode $version 运行中';
+  }
 
   @override
-  String get sessionControlChanged => '主机或会话已变化，请为当前页面重新打开会话控制。';
+  String get openCodeProviders => '可用提供方';
 
   @override
-  String get sessionControlRelease => '释放到只读';
+  String get openCodeModels => '模型';
 
   @override
-  String get sessionControlContinue => '在此主机继续';
+  String get openCodeDefaultModel => '默认模型';
 
   @override
-  String get sessionControlAcquire => '获取原会话';
+  String get openCodeAgents => '智能体';
+
+  @override
+  String get openCodeNone => '无';
+
+  @override
+  String get openCodeConfigNote =>
+      '提供方、模型和智能体来自这台电脑上 OpenCode 自己的配置，以及此主机模型服务可能添加的自定义提供方。请在那里修改 OpenCode 的配置后点刷新；如果没有生效，请重启这个主机。';
+
+  @override
+  String get openCodeScopeNote =>
+      '所有 Pocket 设备都通过这一个服务写入，因此它们的回合不会重叠。这台电脑上的 OpenCode 窗口和其他 OpenCode 进程不受阻止。';
+
+  @override
+  String get refresh => '刷新';
+
+  @override
+  String get draftOptionDefault => '默认';
+
+  @override
+  String openCodeRefreshFailed(String error) {
+    return '无法刷新：$error';
+  }
+
+  @override
+  String get sessionHandBack => '交还给其他客户端';
+
+  @override
+  String accessQueueHeld(int count) {
+    return '跟随期间有 $count 条排队消息在等待。重试会发送它们。';
+  }
+
+  @override
+  String accessScopeEngine(String agent) {
+    return '通过这个主机写入。这台电脑上其他 $agent 客户端不受阻止。';
+  }
+
+  @override
+  String get accessScopePocket => '由这个主机持有。其他 Pocket 主机不能写入；原生客户端不受阻止。';
+
+  @override
+  String get accessScopeNone => '通过这个主机写入。其他客户端不受阻止。';
+
+  @override
+  String get accessClientClaude => 'Claude Code';
+
+  @override
+  String get accessClientOpenCode => '另一个 OpenCode 进程';
+
+  @override
+  String get accessClientPocketHost => '另一个 Pocket 主机';
+
+  @override
+  String get accessClientOther => '另一个客户端';
+
+  @override
+  String get accessStatusOpening => '正在打开';
+
+  @override
+  String get accessStatusHandedBack => '已交还';
+
+  @override
+  String get accessStatusChanging => '正在交接';
+
+  @override
+  String get accessStatusUnavailable => '不可用';
+
+  @override
+  String get accessStatusUnknown => '写入方未知';
+
+  @override
+  String get accessOpening => '正在打开原会话…';
+
+  @override
+  String get accessHandedBackTitle => '已交还给其他客户端';
+
+  @override
+  String get accessHandedBackDetail => '这个主机已关闭它的写入方，其他应用可以继续原会话。不会自动收回。';
+
+  @override
+  String get accessTransitionTitle => '这个会话正在交接';
+
+  @override
+  String get accessTransitionDetail => '主机正在加载或关闭它。';
+
+  @override
+  String accessHostStoppedTitle(String agent) {
+    return '$agent 主机没有运行';
+  }
+
+  @override
+  String get accessHostStoppedDetail => '启动它以继续这个会话。';
+
+  @override
+  String accessExternalRunningTitle(String client) {
+    return '$client 正在这个会话中运行一个回合';
+  }
+
+  @override
+  String get accessExternalRunningDetail => '正在实时跟随。在此期间这里无法发送。';
+
+  @override
+  String accessExternalIdleTitle(String client) {
+    return '$client 仍打开着这个会话';
+  }
+
+  @override
+  String get accessExternalIdleDetail => '没有正在运行的回合。请在那里关闭会话，然后重新检查。';
+
+  @override
+  String get accessSourceOpenTitle => '另一个 OpenCode 进程打开了这个历史来源';
+
+  @override
+  String get accessSourceOpenDetail =>
+      'Pocket 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。';
+
+  @override
+  String accessPocketHostTitle(String client) {
+    return '$client 正在写入这个会话';
+  }
+
+  @override
+  String get accessPocketHostRunning => '它正在运行一个回合。';
+
+  @override
+  String get accessPocketHostIdle => '那里没有正在运行的回合，但它仍持有这个会话。';
+
+  @override
+  String accessUnsupportedTitle(String agent) {
+    return '$agent 无法重新打开这个会话';
+  }
+
+  @override
+  String get accessNotFoundTitle => '这个会话已不在主机上';
+
+  @override
+  String get accessUnknownTitle => '无法判断还有谁在写入这个会话';
+
+  @override
+  String get accessUnknownDetail => '主机无法检查这个会话的其他客户端。';
+
+  @override
+  String get accessNextAutomatic => '情况变化后，这里会自动继续。';
+
+  @override
+  String get accessNextWhenClosed => '当没有其他人持有它时，这里会自动继续。';
+
+  @override
+  String accessHolderPid(int pid) {
+    return 'pid $pid';
+  }
+
+  @override
+  String accessHolderSince(String time) {
+    return '自 $time';
+  }
+
+  @override
+  String accessOpenIn(String host) {
+    return '在 $host 中打开';
+  }
+
+  @override
+  String get accessStartHost => '打开主机';
+
+  @override
+  String get accessCheckNow => '立即检查';
+
+  @override
+  String get accessContinueHere => '在这里继续';
+
+  @override
+  String get sessionAccessChanged => '打开时会话已变化，请重试。';
+
+  @override
+  String get permissionAllowOnce => '允许一次';
+
+  @override
+  String get permissionAllowAlways => '始终允许';
+
+  @override
+  String get permissionRejectOnce => '拒绝';
+
+  @override
+  String get permissionRejectAlways => '始终拒绝';
+
+  @override
+  String permissionAlwaysAllows(String patterns) {
+    return '“始终允许”涵盖：$patterns';
+  }
+
+  @override
+  String get userInputChooseAny => '可多选。';
+
+  @override
+  String commandPaletteLabel(int count) {
+    return '$count 个命令';
+  }
+
+  @override
+  String get commandSourceMcp => 'MCP';
+
+  @override
+  String get commandSourceSkill => '技能';
+
+  @override
+  String get nativeSessionFree => '未在别处打开';
+
+  @override
+  String get nativeSessionUnknown => '持有者未知';
+
+  @override
+  String nativeContinueOn(String host) {
+    return '在 $host 中继续';
+  }
+
+  @override
+  String nativeHostToContinue(String agent) {
+    return '托管 $agent 以继续';
+  }
+
+  @override
+  String nativeContinueElsewhere(String agent) {
+    return '请在托管 $agent 的电脑上继续。';
+  }
 }

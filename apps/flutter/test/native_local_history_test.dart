@@ -214,8 +214,16 @@ void main() {
         ),
       );
       await settle(t);
-      expect(find.text('claude s r1'), findsOneWidget);
+      expect(find.text('claude s r1').hitTestable(), findsOneWidget);
       expect(find.byKey(const Key('view-resume')), findsNothing);
+      // The continue bar sizes to its content, below the transcript.
+      final bar = t.getRect(find.byKey(const Key('view-native-elsewhere')));
+      final older = t.getRect(find.byKey(const Key('native-history-older')));
+      expect(bar.top, greaterThan(older.bottom));
+      expect(
+        find.byKey(const Key('native-history-older')).hitTestable(),
+        findsOneWidget,
+      );
       await t.tap(find.byKey(const Key('native-history-older')));
       await settle(t);
       expect(find.text('message 1'), findsOneWidget);
@@ -231,9 +239,31 @@ void main() {
       expect(find.text('message 1'), findsNothing);
       expect(api.localSessionCalls, 0);
       expect(api.lastForceResumedThread, isNull);
+      // Without a serving host nothing continues it here.
+      expect(find.byKey(const Key('view-continue-native')), findsNothing);
+      expect(find.byKey(const Key('view-native-elsewhere')), findsOneWidget);
       await t.pumpWidget(const SizedBox.shrink());
     },
   );
+  testWidgets('a running OpenCode host continues the native session there', (
+    t,
+  ) async {
+    final api = NativeFake();
+    api.serveHosts.add(FakeBridgeApi.openCodeHost('studio'));
+    await t.pumpWidget(
+      host(
+        const LocalSessionViewScreen(threadId: 's', provider: 'opencode'),
+        api,
+      ),
+    );
+    await settle(t);
+    expect(find.byKey(const Key('view-continue-native')), findsOneWidget);
+    expect(find.byKey(const Key('view-resume')), findsNothing);
+    // Reading it opened, forked or resumed nothing.
+    expect(api.sessionOpenCalls, isEmpty);
+    expect(api.lastForceResumedThread, isNull);
+    await t.pumpWidget(const SizedBox.shrink());
+  });
   testWidgets('late older page cannot mutate a newly selected source', (
     t,
   ) async {

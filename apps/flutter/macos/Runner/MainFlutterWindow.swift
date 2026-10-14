@@ -33,6 +33,9 @@ class MainFlutterWindow: NSWindow {
       self?.layoutTrafficLights()
       result(nil)
     }
+    // Before Dart runs, so a native quit is never answered by the default
+    // handler (see NativeQuitGate).
+    NativeQuitGate.shared.attach(binaryMessenger: flutterViewController.engine.binaryMessenger)
 
     super.awakeFromNib()
     observeTrafficLights()

@@ -374,7 +374,7 @@ void _registerLocalHostLifecycle() {
     }
   });
 
-  testWidgets('Codex and an ACP agent are hosted side by side', (t) async {
+  testWidgets('Codex and native OpenCode are hosted side by side', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     t.view.physicalSize = const Size(1200, 1600);
     t.view.devicePixelRatio = 1;
@@ -394,7 +394,7 @@ void _registerLocalHostLifecycle() {
 
       await t.tap(find.byKey(const Key('add-local-host-card')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('agent-choice-preset:opencode')));
+      await t.tap(find.byKey(const Key('agent-choice-opencode')));
       await t.pump(const Duration(milliseconds: 400));
       await t.pumpAndSettle();
       await t.ensureVisible(find.byKey(const Key('start-hosting-btn')));
@@ -403,9 +403,9 @@ void _registerLocalHostLifecycle() {
 
       expect(api.serveHosts.map((h) => (h.name, h.provider)), [
         ('default', 'codex'),
-        ('opencode', 'acp'),
+        ('opencode', 'opencode'),
       ]);
-      // Each card leads with its own agent's mark, from its profile.
+      // Each card leads with its own agent's mark, from its engine.
       expect(
         find.descendant(
           of: find.byKey(const Key('local-host-icon-default')),

@@ -16,7 +16,7 @@ use crate::engine::{
 
 /// A host's runtime: what runs, not its model service.
 pub struct HostRuntimeDto {
-    /// `codex` or `acp`.
+    /// `codex`, `opencode` or `acp`.
     pub kind: String,
     /// Codex: the executable (`None`: the app's saved codex, then `PATH`).
     pub binary: Option<String>,
@@ -36,6 +36,14 @@ impl HostRuntimeDto {
                 port: self.port,
                 proxy: self.proxy,
             }),
+            "opencode" => {
+                if self.port != 0 || self.proxy.is_some() || self.agent.is_some() {
+                    bail!("OpenCode uses private automatic ports and its native configuration");
+                }
+                Ok(Runtime::OpenCode {
+                    binary: self.binary,
+                })
+            },
             "acp" => Ok(Runtime::Acp(
                 self.agent
                     .ok_or_else(|| anyhow!("an agent runtime needs its agent"))?
@@ -56,6 +64,15 @@ impl HostRuntimeDto {
                 binary,
                 port,
                 proxy,
+                agent: None,
+            },
+            Runtime::OpenCode {
+                binary,
+            } => Self {
+                kind: "opencode".into(),
+                binary,
+                port: 0,
+                proxy: None,
                 agent: None,
             },
             Runtime::Acp(spec) => Self {
@@ -186,9 +203,9 @@ pub struct HostApplyDto {
 pub struct HostStartedDto {
     /// Instance name as hosted.
     pub name: String,
-    /// `codex` or `acp`.
+    /// `codex`, `opencode` or `acp`.
     pub provider: String,
-    /// The controller key (`app:` for Codex, `acp:` for an agent).
+    /// The controller key (`app:`, `opencode:` or `acp:`).
     pub service_key: String,
     /// An already-running host was reused.
     pub reused: bool,
@@ -275,9 +292,35 @@ pub fn host_config_get(name: String) -> Result<HostConfigDto> {
     Ok(dto(profile, active_of(&name)))
 }
 
-/// What a Codex host (`spec` = `None`) or the ACP agent `spec` can select.
+/// Model-service choices for the selected native engine or ACP agent.
 #[frb(sync)]
-pub fn host_config_supported(spec: Option<AcpAgentSpecDto>) -> HostConfigSupportDto {
+pub fn host_config_supported(
+    spec: Option<AcpAgentSpecDto>,
+    engine: Option<String>,
+) -> HostConfigSupportDto {
+    if engine
+        .as_deref()
+        .is_some_and(|engine| engine != "codex" && engine != "acp")
+    {
+        return HostConfigSupportDto {
+            claude_variables: Vec::new(),
+            sources: if engine.as_deref() == Some("opencode") {
+                vec!["inherited".into(), "custom".into()]
+            } else {
+                Vec::new()
+            },
+            protocols: if engine.as_deref() == Some("opencode") {
+                ApiProtocol::ALL
+                    .iter()
+                    .map(|p| p.as_str().to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            },
+            model_required: engine.as_deref() == Some("opencode"),
+            key_required: engine.as_deref() == Some("opencode"),
+        };
+    }
     use pocket_codex_host_svc::acp::provider;
     let claude_variables = if spec.as_ref().is_some_and(|s| s.profile_id == "claude") {
         host_profiles::environment::VARIABLES
@@ -319,8 +362,8 @@ pub fn host_config_supported(spec: Option<AcpAgentSpecDto>) -> HostConfigSupport
     }
 }
 
-/// Save host `name`'s configuration for a Codex host (`spec` = `None`) or
-/// the ACP agent `spec`, and, with `runtime`, its desired runtime (an
+/// Save host `name`'s configuration for its saved engine or the ACP agent
+/// `spec`, and, with `runtime`, its desired runtime (an
 /// agent runtime is checked as that agent). `key_action` is `keep`,
 /// `replace` (with `key`) or `remove`. With `expected_revision`, a save
 /// made elsewhere meanwhile is refused. Nothing that runs changes until
@@ -336,16 +379,42 @@ pub fn host_config_save(
 ) -> Result<HostConfigDto> {
     let mut change = change_of(input, &key_action, key)?;
     let runtime = runtime.map(HostRuntimeDto::into_runtime).transpose()?;
-    let spec = match &runtime {
-        Some(Runtime::Acp(agent)) => Some(agent.clone()),
-        _ => spec.map(AcpAgentSpecDto::into_spec),
-    };
+    let spec = spec.map(AcpAgentSpecDto::into_spec);
     if let Some(runtime) = runtime {
         change.runtime = RuntimeChange::Set(runtime);
     }
-    let engine = spec.as_ref().map_or(Engine::Codex, Engine::Acp);
-    let profile = host_profiles::save_change(&name, &change, expected_revision, engine)?;
+    let profile =
+        save_profile(&host_profiles::root()?, &name, &change, expected_revision, spec.as_ref())?;
     Ok(dto(profile, active_of(&name)))
+}
+
+fn save_profile(
+    root: &std::path::Path,
+    name: &str,
+    change: &Change,
+    expected: Option<u64>,
+    spec: Option<&pocket_codex_host_svc::acp::AgentSpec>,
+) -> Result<host_profiles::HostProfile> {
+    let saved = host_profiles::get_in(root, name)?;
+    // Editors omit an unchanged runtime. Its saved engine still decides
+    // which APIs are valid; absence of an ACP spec does not imply Codex.
+    let runtime = match &change.runtime {
+        RuntimeChange::Set(runtime) => Some(runtime),
+        RuntimeChange::Keep if spec.is_none() => saved.runtime.as_ref(),
+        _ => None,
+    };
+    let engine = match runtime {
+        Some(Runtime::OpenCode {
+            ..
+        }) => Engine::OpenCode,
+        Some(Runtime::Acp(agent)) => Engine::Acp(agent),
+        Some(Runtime::Codex {
+            ..
+        }) => Engine::Codex,
+        None => spec.map_or(Engine::Codex, Engine::Acp),
+    };
+    // The runtime used for validation must still be the one we read.
+    host_profiles::save_in(root, name, change, expected.or(Some(saved.revision)), engine)
 }
 
 /// Restart the running host `name` with its saved configuration and
@@ -396,6 +465,11 @@ pub fn app_serve_start_configured(
             proxy,
         },
         Runtime::Acp(spec) => NewHost::Acp(spec),
+        Runtime::OpenCode {
+            binary,
+        } => NewHost::OpenCode {
+            binary,
+        },
     };
     Ok(match host_start::start_configured(name.as_deref(), host, change)? {
         Started::Codex(r) => HostStartedDto {
@@ -403,6 +477,12 @@ pub fn app_serve_start_configured(
             provider: "codex".into(),
             service_key: r.app_service_key,
             reused: r.reused,
+        },
+        Started::OpenCode(r) => HostStartedDto {
+            name: r.name,
+            provider: "opencode".into(),
+            service_key: r.service_key,
+            reused: false,
         },
         Started::Acp(r) => HostStartedDto {
             name: r.name,
@@ -493,20 +573,53 @@ mod tests {
 
     #[test]
     fn the_editor_is_offered_only_real_mappings() {
-        let codex = host_config_supported(None);
+        let codex = host_config_supported(None, None);
         assert_eq!(codex.sources, ["inherited", "official", "custom"]);
         assert_eq!(codex.protocols, ["responses"]);
-        let opencode = host_config_supported(Some(spec("opencode")));
+        let opencode = host_config_supported(None, Some("opencode".into()));
         assert_eq!(opencode.sources, ["inherited", "custom"]);
         assert_eq!(opencode.protocols, ["responses", "anthropic-messages", "chat-completions"]);
-        assert!(opencode.model_required && !opencode.key_required);
-        let claude = host_config_supported(Some(spec("claude")));
+        assert!(opencode.model_required && opencode.key_required);
+        let claude = host_config_supported(Some(spec("claude")), None);
         assert_eq!(claude.protocols, ["anthropic-messages"]);
         assert!(claude.key_required && !claude.model_required);
         assert!(!codex.model_required && !codex.key_required);
-        let generic = host_config_supported(Some(spec("custom-x-1")));
+        let generic = host_config_supported(Some(spec("custom-x-1")), None);
         assert_eq!(generic.sources, ["inherited"]);
         assert!(generic.protocols.is_empty());
+    }
+
+    #[test]
+    fn editing_only_the_model_service_keeps_the_saved_native_engine() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut change = Change {
+            input: ProfileInput {
+                source: Source::Custom,
+                protocol: Some(ApiProtocol::Responses),
+                base_url: Some("https://model.example/v1".into()),
+                model: Some("model-one".into()),
+                claude_env: None,
+            },
+            key: KeyChange::Replace(Secret::new("stored-key")),
+            runtime: RuntimeChange::Set(Runtime::OpenCode {
+                binary: None,
+            }),
+        };
+        let mut saved =
+            save_profile(dir.path(), "native", &change, Some(0), None).expect("start config");
+        change.runtime = RuntimeChange::Keep;
+        change.key = KeyChange::Keep;
+        for protocol in ApiProtocol::ALL {
+            change.input.protocol = Some(protocol);
+            saved = save_profile(dir.path(), "native", &change, Some(saved.revision), None)
+                .expect("save model service without resending runtime");
+            assert_eq!(saved.protocol, Some(protocol));
+            assert!(saved.key_set);
+            assert!(matches!(saved.runtime, Some(Runtime::OpenCode { .. })));
+        }
+        change.input.source = Source::Official;
+        assert!(save_profile(dir.path(), "native", &change, Some(saved.revision), None).is_err());
+        assert_eq!(host_profiles::get_in(dir.path(), "native").expect("unchanged"), saved);
     }
 
     #[test]

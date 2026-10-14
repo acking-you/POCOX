@@ -1,6 +1,6 @@
 //! Launching an owned ACP agent in two steps: [`prepare`] checks and builds
 //! everything a start needs (the spec, the executable or adapter, the
-//! model-service launch, the catalog layer and the session source) without
+//! model-service launch and the session source) without
 //! touching any running host; [`launch_prepared`] reserves the name, starts
 //! the agent and publishes it. An apply prepares the new launch before it
 //! stops the old host, so an unusable configuration interrupts nothing.
@@ -15,7 +15,6 @@ pub(crate) struct Prepared {
     pub(super) claude: Option<claude::Launch>,
     pub(super) provider_launch: acp::provider::AcpProviderLaunch,
     pub(super) source: SourceId,
-    pub(super) catalog: Option<acp::catalog::Launch>,
     pub(super) provider: host_profiles::Resolved,
     pub(super) state: PathBuf,
 }
@@ -33,12 +32,11 @@ pub(crate) struct Captured {
 }
 
 impl Prepared {
-    /// The launch `captured` ran, again, with its catalog files.
+    /// The exact launch `captured` ran, again.
     pub(super) fn again(
         name: &str,
         spec: AgentSpec,
         captured: Captured,
-        catalog: Option<acp::catalog::Launch>,
         provider: host_profiles::Resolved,
     ) -> Self {
         Self {
@@ -48,7 +46,6 @@ impl Prepared {
             claude: captured.claude,
             provider_launch: captured.provider_launch,
             source: captured.source,
-            catalog,
             provider,
             state: captured.state,
         }
@@ -124,12 +121,6 @@ pub(crate) fn prepare(
     // or profile label.
     let source = source_of(&state.join("acp"), &program, &spec.args, authority.as_deref())
         .context("preparing the agent's session record")?;
-    let catalog = match provider_launch.layer.clone() {
-        Some(layer) => {
-            acp::catalog::launch_with(&spec, &state, layer).map_err(|error| anyhow!("{error}"))?
-        },
-        None => acp::catalog::launch(&spec, &state),
-    };
     Ok(Prepared {
         name: name.to_string(),
         spec,
@@ -137,7 +128,6 @@ pub(crate) fn prepare(
         claude,
         provider_launch,
         source,
-        catalog,
         provider,
         state,
     })
@@ -158,7 +148,6 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
         claude,
         provider_launch,
         source,
-        catalog,
         provider,
         state,
     } = prepared;
@@ -175,10 +164,7 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
     let rt = runtime::runtime();
     let host = {
         let _runtime = rt.enter();
-        let mut env = catalog
-            .as_ref()
-            .map(acp::catalog::Launch::env)
-            .unwrap_or_default();
+        let mut env = Vec::new();
         let path = pocket_codex_codex::external_tool_path();
         let native_history = match &claude {
             Some(launch) => {
@@ -211,31 +197,7 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
                 if let (Some(cli), Some(home)) = (cli, std::env::var_os("HOME")) {
                     history = history.with_owner_probe(cli, home.into());
                 }
-                Some(pocket_codex_host_svc::native_history::NativeHistory::Claude(Arc::new(
-                    history,
-                )))
-            },
-            None if spec.profile_id == "opencode" => {
-                let effective = |name: &str| {
-                    provider_launch
-                        .env
-                        .iter()
-                        .rev()
-                        .chain(env.iter().rev())
-                        .find(|(key, _)| key == name)
-                        .map(|(_, value)| value.clone())
-                        .or_else(|| std::env::var_os(name))
-                };
-                let home = effective("HOME")
-                    .or_else(|| effective("USERPROFILE"))
-                    .map(PathBuf::from)
-                    .context("OpenCode home is unavailable")?;
-                let path = crate::engine::native_sessions::opencode_path_with(
-                    &home,
-                    effective("XDG_DATA_HOME"),
-                    effective("OPENCODE_DB"),
-                )?;
-                Some(crate::engine::native_sessions::open_code(path)?)
+                Some(Arc::new(history))
             },
             None => None,
         };
@@ -249,7 +211,7 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
         };
         // Last, so the instance's provider wins over inherited values.
         env.extend(provider_launch.env);
-        AgentHost::create_with_native_history(
+        AgentHost::create_with_claude_history(
             HostOptions {
                 spec: spec.clone(),
                 program,
@@ -276,7 +238,6 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
     }
     let serving = match publish(&name, &host, &program, uploads, owner) {
         Ok(mut serving) => {
-            serving.catalog = catalog;
             serving.config = Some(provider);
             serving.launch = Some(captured);
             serving
@@ -412,7 +373,6 @@ fn publish(
         host: host.clone(),
         program: program.display().to_string(),
         context: transport::Context::of(&transport),
-        catalog: None,
         config: None,
         launch: None,
         _owner: owner,

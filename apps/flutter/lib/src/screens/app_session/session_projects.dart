@@ -57,7 +57,17 @@ extension _SessionProjects on _AppSessionState {
 
   void _newConversationInProject(String? cwd, BuildContext paneContext) {
     if (!mounted || !paneContext.mounted) return;
-    if (_threadId != null || _cwd != cwd) _openThread(null, cwd);
+    if (_threadId != null || _cwd != cwd) {
+      _openThread(null, cwd);
+    } else if (!_sending && _queue.isEmpty && _error != null) {
+      // Already this new conversation: a banner left by a send that was
+      // refused before anything was created belongs to that attempt. The
+      // draft it returned stays in the composer.
+      _updateState(() {
+        _error = null;
+        _retry = null;
+      });
+    }
     final scaffold = Scaffold.maybeOf(paneContext);
     if (scaffold?.isDrawerOpen ?? false) {
       _newDraftFocusAfterDrawer = _threadLoadGeneration;
@@ -89,6 +99,58 @@ extension _SessionProjects on _AppSessionState {
     if (mounted && generation == _threadLoadGeneration && picked != null) {
       _selectProject(picked);
     }
+  }
+
+  /// A new conversation of an engine that creates its session only in a
+  /// project folder (ACP agents, native OpenCode), with none chosen yet:
+  /// nothing could be created, so nothing may be sent. Codex works outside
+  /// a project.
+  bool get _needsProjectToSend =>
+      _caps.hostAccess && _threadId == null && (_cwd?.trim().isEmpty ?? true);
+
+  /// A send without the project it needs: ask for the folder first. The
+  /// draft stays as it is until a folder is chosen (cancelling changes
+  /// nothing); then its text and attachments move to that project's new
+  /// conversation, which is sent once, as the user asked. When that project
+  /// already holds an unsent draft, both stay in the composer unsent.
+  Future<void> _chooseProjectThenSend() async {
+    final from = _draft;
+    final generation = _threadLoadGeneration;
+    final picked = await showFolderPicker(
+      context,
+      serviceKey: widget.serviceKey,
+      recent: _knownProjects(),
+    );
+    final project = picked?.trim();
+    if (!mounted ||
+        project == null ||
+        project.isEmpty ||
+        generation != _threadLoadGeneration ||
+        !identical(_draft, from) ||
+        !_needsProjectToSend ||
+        from.sendPending) {
+      return;
+    }
+    final value = from.value;
+    final attachments = List<_Attachment>.of(from.attachments);
+    final options = Map<String, String>.of(from.options);
+    _selectProject(project);
+    final into = _draft;
+    if (!mounted || _cwd != project || identical(into, from)) return;
+    // That project's own unsent draft is kept, never sent on its behalf:
+    // the input joins it and the user sends the result.
+    final merging = into.hasDraft || into.queue.isNotEmpty;
+    // The draft left behind is emptied, so its input lives in one place.
+    from
+      ..value = TextEditingValue.empty
+      ..attachments.clear()
+      ..options.clear();
+    _drafts.save(from, changed: true);
+    // Options chosen for this message go with it, unless the project's
+    // draft already holds its own.
+    if (into.options.isEmpty) into.options.addAll(options);
+    _restoreDraft(value.text, attachments);
+    if (!merging) _submit();
   }
 
   /// The project name rendered as a dropdown trigger, wired to [ProjectMenu].

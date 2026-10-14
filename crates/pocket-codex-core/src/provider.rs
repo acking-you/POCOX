@@ -3,7 +3,7 @@
 //!
 //! These are engine-neutral values. Each engine maps them onto its own,
 //! actually supported configuration mechanism (`pocket-codex-codex` for
-//! native Codex, the ACP host for OpenCode and the Claude adapter); an
+//! native Codex and the Claude adapter); an
 //! engine that cannot speak a protocol refuses it there.
 
 use std::fmt;

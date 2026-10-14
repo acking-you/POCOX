@@ -18,7 +18,7 @@ impl AgentHost {
         id: &str,
         generation: u64,
     ) -> Result<(), HostError> {
-        let Some(NativeHistory::Claude(reader)) = &self.inner.native_history else { return Ok(()) };
+        let Some(reader) = &self.inner.native_history else { return Ok(()) };
         let state = self.state();
         if state.generation != generation {
             return Err(HostError::Stale);
@@ -30,9 +30,10 @@ impl AgentHost {
         if claims.len() >= crate::acp::state::MAX_SESSIONS {
             return Err(HostError::Capacity);
         }
-        let claim = reader
-            .claim_session(id)
-            .map_err(|e| HostError::Unsupported(e.to_string()))?;
+        let claim = reader.claim_session(id).map_err(|e| match e {
+            crate::native_history::ClaimError::Busy => HostError::PocketOwned,
+            crate::native_history::ClaimError::Unavailable => HostError::ReadOnly,
+        })?;
         claims.insert(id.to_owned(), HeldClaim {
             generation,
             _claim: claim,
@@ -49,11 +50,41 @@ impl AgentHost {
         generation: u64,
         root: (u32, u64),
     ) -> Result<(), HostError> {
-        let Some(NativeHistory::Claude(reader)) = &self.inner.native_history else { return Ok(()) };
-        let owners = reader
-            .idle_owners(id)
-            .await
-            .map_err(|e| HostError::Agent(e.to_string()))?;
+        self.verify_writer(id, generation, root, false).await
+    }
+
+    /// Revalidate immediately before new input. A native client may have
+    /// opened the same UUID after Pocket's original admission.
+    pub(in crate::acp::host) async fn recheck_native_writer(
+        &self,
+        id: &str,
+        generation: u64,
+    ) -> Result<(), HostError> {
+        if self.inner.native_history.is_none() {
+            return Ok(());
+        }
+        let lifecycle = self.inner.lifecycle.lock().await;
+        if self.state().generation != generation || self.stopping() {
+            return Err(HostError::Stale);
+        }
+        let root = Self::native_claim_root(lifecycle.as_ref())?;
+        self.verify_writer(id, generation, root, true).await
+    }
+
+    async fn verify_writer(
+        &self,
+        id: &str,
+        generation: u64,
+        root: (u32, u64),
+        allow_running: bool,
+    ) -> Result<(), HostError> {
+        let Some(reader) = &self.inner.native_history else { return Ok(()) };
+        let owners = if allow_running {
+            reader.writer_owners(id).await
+        } else {
+            reader.idle_owners(id).await
+        }
+        .map_err(|_| HostError::ReadOnly)?;
         let checked = owners.clone();
         let owns = tokio::task::spawn_blocking(move || {
             checked.len() == 1
@@ -63,17 +94,16 @@ impl AgentHost {
         .await
         .unwrap_or(false);
         if !owns {
-            return Err(HostError::Agent(
-                "Claude writer ownership changed; sending remains blocked. Release this session \
-                 and retry after closing the other client"
-                    .into(),
-            ));
+            return Err(HostError::ReadOnly);
         }
         let mut claims = lock(&self.inner.native_claims);
         let claim = claims
             .get_mut(id)
             .filter(|c| c.generation == generation)
             .ok_or(HostError::Stale)?;
+        if !claim.owners.is_empty() && claim.owners != owners {
+            return Err(HostError::ReadOnly);
+        }
         claim.owners = owners;
         Ok(())
     }
@@ -98,7 +128,7 @@ impl AgentHost {
     /// A bounded, fresh probe follows actual process teardown. A failed probe
     /// retains the claim instead of treating missing evidence as release.
     pub(in crate::acp::host) async fn release_stopped_claims(&self, generation: u64) {
-        let Some(NativeHistory::Claude(reader)) = &self.inner.native_history else { return };
+        let Some(reader) = &self.inner.native_history else { return };
         let ids: Vec<String> = lock(&self.inner.native_claims)
             .iter()
             .filter(|(_, c)| c.generation == generation)

@@ -93,9 +93,12 @@ fn only_the_presets_bare_program_is_discovered() {
     assert!(applies(&spec));
     spec.program = "/opt/tools/claude-agent-acp".into();
     assert!(!applies(&spec), "an explicit path is launched verbatim");
-    let mut other = super::super::spec::preset("opencode")
-        .expect("preset")
-        .spec();
+    let mut other = super::super::spec::AgentSpec {
+        profile_id: "fixture".into(),
+        display_name: "Fixture".into(),
+        program: "fixture-agent".into(),
+        args: Vec::new(),
+    };
     assert!(!applies(&other));
     other.program = ADAPTER_BIN.into();
     assert!(!applies(&other), "another profile is launched verbatim");

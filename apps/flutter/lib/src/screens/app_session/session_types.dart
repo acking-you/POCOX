@@ -79,6 +79,22 @@ class _LinkMoved implements Exception {
   const _LinkMoved();
 }
 
+/// The host refused a draft's option choice before its first message was
+/// sent (see `_applyDraftOptions`): nothing of the message reached the host.
+class _DraftOptionsRefused implements Exception {
+  const _DraftOptionsRefused(this.message);
+
+  /// Why, safe to show.
+  final String message;
+}
+
+/// The picked model is not in the current host's model list (the host was
+/// replaced with another configuration): checked before anything of the
+/// message is sent, so it is handled like a refused draft option.
+class _ModelWithdrawn extends _DraftOptionsRefused {
+  const _ModelWithdrawn(super.message);
+}
+
 /// The exact wire content of one send (text with file references, image
 /// data URLs), kept by its retry.
 class _Resend {

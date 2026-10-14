@@ -46,8 +46,8 @@
 //! connect reaches the new one. Disconnecting drops only this controller's
 //! view: turns and permissions belong to the host and keep running.
 
+mod access;
 mod connection;
-mod control;
 mod events;
 #[cfg(test)]
 mod live_tests;
@@ -60,8 +60,8 @@ use std::{
     time::Duration,
 };
 
+pub use access::{session_access, session_open, session_release};
 use anyhow::{anyhow, bail, Context as _, Result};
-pub use control::{control_session, session_control};
 use futures::StreamExt;
 pub use native_history::{follow_native_session, native_liveness};
 use once_cell::sync::OnceCell;

@@ -62,6 +62,20 @@ impl AgentHost {
         valid_id(session)?;
         check_message(text, images)?;
         let (generation, peer, caps) = self.ready_for(expected)?;
+        {
+            let state = self.state();
+            let entry = state
+                .sessions
+                .get(session)
+                .ok_or(HostError::UnknownSession)?;
+            if entry.pending {
+                return Err(HostError::Loading);
+            }
+            if entry.active.is_some() {
+                return Err(HostError::Busy);
+            }
+        }
+        self.recheck_native_writer(session, generation).await?;
         let blocks = content_blocks(text, images, &caps)?;
         let turn = uuid::Uuid::new_v4().to_string();
         {
@@ -111,6 +125,19 @@ impl AgentHost {
                     });
                     return;
                 };
+                let checked = tokio::time::timeout_at(
+                    deadline,
+                    host.recheck_native_writer(&session_id, generation),
+                )
+                .await;
+                if !matches!(checked, Ok(Ok(()))) {
+                    host.finish_turn(generation, &session_id, &turn_id, TurnOutcome::Failed {
+                        message: "Writer ownership could not be confirmed; the message was not \
+                                  sent"
+                            .into(),
+                    });
+                    return;
+                }
                 if !host.mark_dispatched(generation, &session_id, &turn_id) {
                     // Cancelled before it was sent (or the generation is
                     // gone): the agent never sees this turn.

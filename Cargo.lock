@@ -2570,6 +2570,7 @@ dependencies = [
  "chrono",
  "flutter_rust_bridge",
  "futures",
+ "json5",
  "once_cell",
  "pocket-codex-account-proto",
  "pocket-codex-api-proxy",

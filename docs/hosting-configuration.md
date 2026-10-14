@@ -4,19 +4,27 @@ The hosting editor (`apps/flutter/lib/src/hosting/host_editor_page.dart`) is one
 page for creating a local host and for editing a running one. Each host has a
 saved configuration for its instance name on this device: a **model service**
 (where its agent sends model requests) and, optionally, a **desired runtime**
-(Codex executable, port and proxy, or an ACP program and arguments).
+(Codex executable, port and proxy, an OpenCode executable, or an ACP program
+and arguments).
 
 ## Sources
 
 | Agent | Existing configuration | Official account | Custom provider | Required |
 | --- | --- | --- | --- | --- |
 | Codex (native app-server) | yes | yes | OpenAI Responses | base URL |
-| OpenCode preset (`profile_id` `opencode`) | yes | no | Responses, Anthropic Messages, Chat Completions | base URL, default model |
+| OpenCode (native `opencode serve`) | yes | no | OpenAI Responses, Anthropic Messages, OpenAI Chat Completions | base URL, model, key |
 | Claude preset (`profile_id` `claude`) | yes | no | Anthropic Messages | base URL, key |
 | Any other ACP agent | yes (only choice) | no | no | — |
 
-Only these mappings exist (`host_config_supported`). ACP has no provider
-schema, so no protocol support is invented for other agents. A saved source or
+Only these mappings exist (`host_config_supported`, which takes the engine
+for native OpenCode). Native OpenCode's existing configuration is its own
+configuration and sign-ins (`opencode.json`, `opencode auth login`), unchanged;
+a custom provider is added by the bridge for that host only, with its key in
+private host storage (live evidence per API in
+[Native OpenCode](opencode-native.md#verification)). There is no official
+account for it.
+The former OpenCode ACP preset's custom provider routes are removed. ACP has
+no provider schema, so no protocol support is invented for other agents. A saved source or
 custom API that an agent cannot use is shown as incompatible and blocks saving
 until another one is chosen; the editor never swaps it for a supported one.
 
@@ -60,15 +68,16 @@ until another one is chosen; the editor never swaps it for a supported one.
     authority generation is part of the id, which makes an accidental match
     unlikely; a layer naming it anyway is caught by the effective-route check
     below.
-  - OpenCode: a per-instance provider `pocket-codex-<hex(name)>-<authority>`
-    in the inline config layer with the matching AI SDK package, its `env`
-    naming the child-only `POCKET_CODEX_PROVIDER_KEY` (never an `{env:}`
-    reference), and its model selected
-    (`crates/pocket-codex-host-svc/src/acp/provider.rs`).
   - Claude: `ANTHROPIC_BASE_URL`, `ANTHROPIC_API_KEY` and optional
     `ANTHROPIC_MODEL` in the child environment and in each session's
     `_meta.claudeCode.options.{env,settings}`; other routing variables,
     including `ANTHROPIC_CUSTOM_HEADERS`, are reset.
+  - Native OpenCode: a host-only provider in the child's
+    `OPENCODE_CONFIG_CONTENT`, restricted with `enabled_providers` and
+    selected as `model` / `small_model`. Its models are every model the
+    gateway lists at start and Apply, plus the default model; if the list
+    cannot be read, only the default model is registered and the host
+    reports it ([gateway models](opencode-native.md#hosting)).
 
 ### Effective route
 
@@ -80,32 +89,9 @@ until another one is chosen; the editor never swaps it for a supported one.
   headers, query parameters, a bearer token or auth to our provider
   (`verify_effective`). An adopted app-server is not checked (it is never
   ours to launch).
-- **OpenCode.** OpenCode 1.18.35 runs every plugin's `config` hook before it
-  reads `cfg.provider`, `enabled_providers` and `disabled_providers`
-  (`provider.ts`), and reads `model`, `small_model` and agent models when it
-  picks one. The catalog plugin's hook puts the host's route back into the
-  merged configuration before that (`enforce` in `opencode_catalog.mjs`): the
-  default model, a `small_model` or agent/mode model naming another provider,
-  `enabled_providers` set to exactly our provider, our id removed from
-  `disabled_providers`, and our provider entry replaced by the host's exact
-  definition (no other layer's endpoint, key, headers or per-model route
-  remains). The definition's key is pinned in memory as `options.apiKey`,
-  read from the child-only variable its `env` names: a login stored for the
-  same id with `opencode auth login` overwrites only `provider.key` ("load
-  apikeys"), and `resolveSDK` uses that only while `options.apiKey` is
-  undefined. The key is not written into the layer, the report or argv. A
-  route whose key is missing in the agent is `refused`: its provider is
-  removed while only it is enabled, so no prompt can be sent. The host
-  details show, per project, `selected` (nothing to change), `enforced` with
-  what was reset or `refused`; `waiting` until a project loaded,
-  `unverified` when the plugin cannot run. Not covered: another plugin's
-  provider or auth loader for the same id (its options other than the key),
-  and a later plugin's `config` hook. The project name is the plugin input's
-  `directory`; the pinned public source has no plugin loader, so it is not
-  verified, and the verdict is reported unnamed without it.
-
-The model here is the **provider default** for new sessions. It is not a
-per-conversation choice: each session's own model/effort controls still
+The model here is the **provider default** for new sessions, not the only
+model a provider offers (native OpenCode lists the gateway's models). It is
+not a per-conversation choice: each session's own model/effort controls still
 decide that, and this page persists none of them.
 
 The `api:<name>` service of a Codex host is a separate official Responses API
@@ -209,14 +195,29 @@ effective-route, registration and commit failures keep their child there
 too. Apply never starts after a failed stop.
 
 Quitting sets a fence first: a start that has not recorded its host yet
-tears it down itself. Admission then closes, ACP agents and sign-in servers
-stop, the quit waits up to the lease bound (120 s) for operations in
-progress, stops every recorded host under its own lease, and stops what the
-ledger kept. When anything it owns may still run (a host still busy, a kept
+tears it down itself. Admission then closes (native OpenCode's too), ACP
+agents and sign-in servers stop, the quit waits up to the lease bound
+(120 s) for operations in progress, stops every native OpenCode and Codex
+host under its own lease, and stops what the ledger kept. An OpenCode
+startup still stopping counts as something that may still run. When anything it owns may still run (a host still busy, a kept
 codex, a sign-in child) the quit fails with what remains: the app stays
 open, shows the reason with "Quit again" (`quit_status.dart`), and a later
 quit retries. What it cannot see (a process this app never identified) is
 not claimed.
+
+On macOS every native quit (Cmd+Q, the application menu, the Dock, an Apple
+Event) takes the same path as the tray's Quit: `NativeQuitGate`
+(`apps/flutter/macos/Runner/AppDelegate.swift`) cancels the request and
+hands it to Dart over `pocket_codex/app_quit` (`lib/src/native_quit.dart`),
+and the app exits only after the cleanup succeeded and Dart approved the
+next terminate. A quit arriving before Dart listens is held and run once it
+does; repeated quits join the one in progress; a failed cleanup keeps the
+app open with its reason. Because the request is cancelled, a logout or
+shutdown is cancelled too while hosts are stopping. Closing the window only
+hides it to the tray. Signals and Force Quit bypass the gate, and if Dart
+never finishes starting, a native quit stays held (Force Quit is the
+escape). On one Mac, Cmd+Q with a running native OpenCode host stopped its
+owned `opencode serve` and exited with status 0, without a manual signal.
 
 - **Prepare ACP environment** installs the missing Claude adapter into the
   app cache and refreshes the environment panel. It does not save configuration,
@@ -239,9 +240,12 @@ not claimed.
   is validated before the stop. If the new start fails, the previous runtime
   is started again: Codex with its previous spawn options and provider, an
   ACP agent with the exact launch it ran (resolved program, adapter, provider
-  launch, session source), never a fresh lookup. The page says so; if that
-  fails too, it reports both errors and that the host is stopped. An adopted
-  `codex app-server` is never restarted.
+  launch, session source), native OpenCode with its prepared previous launch,
+  never a fresh lookup. The page says so; if that fails too, it reports both
+  errors and that the host is stopped. An adopted `codex app-server` is never
+  restarted. Stopping a native OpenCode host ends the controller event
+  streams it serves, so open views see the host reconnecting, reconnect to
+  the new incarnation and reopen their session without a manual disconnect.
 
 The editor loads the saved configuration before anything that depends on it
 can be saved or applied, offers a retry when the read fails, keeps edits when
@@ -258,12 +262,6 @@ started; a run joined from another caller is not cancelled by it.
 
 - Claude Code settings-tier precedence is taken from the adapter source only;
   our session `settings` replace the adapter's `modelConfig` for that session.
-- OpenCode's route is enforced only inside its `config` hook and only after
-  a project's configuration loaded; another plugin's provider or auth loader
-  for the same id and later hooks are outside it. The stored-login
-  precedence is modelled from the pinned `provider.ts` in a test fixture,
-  not observed in OpenCode; the `directory` input is not in the pinned
-  source. An unkeyed custom route pins an empty `apiKey`.
 - A quit whose host operation outlives the lease bound fails instead of
   stopping it; the app stays open. The quit itself is tested only in parts
   (its state is process-wide).
@@ -296,18 +294,33 @@ format checks, clippy and Flutter analysis passing:
 
 - native Codex with a custom Responses provider: real replies from two
   models across a save and an explicit apply, the applied model reported;
-- OpenCode with Responses and with Anthropic Messages: real replies before
-  and after changing the saved model;
-- OpenCode with Chat Completions: only against a deterministic local
-  fixture (path, auth and streaming checked), not a real upstream;
+- the former OpenCode ACP preset's custom routes (since removed) with
+  Responses and Anthropic Messages against real models, and Chat Completions
+  against a local fixture;
 - the official `api:` Responses proxy over HTTP/SSE and WebSocket through a
   public relay, reusing an existing sign-in without changing its bytes;
 - save leaving a host running, stale save/apply refused, apply starting a
   new incarnation with the key kept, for native and Claude hosts; official
   sign-in start, cancel and close (the browser sign-in was not completed).
 
-Observed, not a gap in testing: OpenCode did not keep a conversation's
+Observed with the former ACP preset: OpenCode did not keep a conversation's
 chosen model across a host restart.
+
+The ACP preset evidence above is not evidence for native OpenCode. Native
+OpenCode hosting was verified separately with the later suites (latest:
+Rust 815 passed, 24 ignored; Flutter 1503 passed, 5 skipped) and macOS Debug
+builds:
+custom Chat Completions and Anthropic Messages providers answered, Apply
+reconnected the open conversation, existing configuration was restored in
+the same original session, and Cmd+Q and relaunch restored hosting and
+history. On the current build a custom Anthropic Messages host listed every
+model the gateway returned and a non-default listed model answered; applying
+existing configuration then replaced the catalog in the running app, cleared
+the draft's stale model choice, kept its text unsent, and an explicit send
+answered. A
+Responses request reached the provider but the model was refused (HTTP 403,
+region), so no Responses reply is recorded; see
+[Native OpenCode](opencode-native.md#verification).
 
 Not exercised: completing an interactive OAuth sign-in, other platforms,
 hosted-account mode, generic provider compatibility and effort options.

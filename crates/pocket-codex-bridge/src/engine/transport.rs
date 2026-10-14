@@ -157,6 +157,7 @@ pub struct Owned {
 fn drop_owned_locked() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
     super::acp::context_changed();
+    super::opencode::context_changed();
     super::meta::context_changed();
 }
 

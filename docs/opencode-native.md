@@ -1,0 +1,221 @@
+# Native OpenCode
+
+OpenCode is Pocket-Codex's third engine, beside native Codex app-server and
+generic ACP agents. The host runs the user's installed `opencode serve` and
+speaks OpenCode's own v1 HTTP + SSE API; controllers reach it through the
+relay under `pcx:<device>:opencode:<name>` (`pcxu:<user>:…` in account
+mode). Nothing is bundled: a missing `opencode` is an installation/path
+error.
+
+It replaces the former `opencode acp` preset, whose model-catalog plugin and
+custom provider routes are removed. Saved records of that preset are dropped
+when preferences load and are never relaunched as a generic ACP agent.
+
+## Hosting
+
+- **One host per history source.** The host owns its `opencode serve`
+  process. One OpenCode host runs per real database source across Pocket
+  processes on a device; a second start is refused and the editor's
+  OpenCode tile reads "Running as <name>" and opens that host instead.
+- **Desired runtime:** the executable only (`HostRuntime.opencode`, kind
+  `opencode` with `binary`). The editor detects it (`opencode_detect`:
+  path, version, problem) and offers a path override with Browse and
+  re-detect. A detection problem (not found, a version that cannot be
+  read or used) is said before anything starts; a running host without a
+  connected provider says so on its details page.
+- **Model service:** OpenCode's own
+  configuration (providers, keys and sign-ins in `opencode.json` and
+  `opencode auth login`, unchanged), or a custom provider for this host only:
+  OpenAI Responses, Anthropic Messages or OpenAI Chat Completions, with a
+  base URL, default model and key (`host_config_supported(engine: "opencode")`;
+  the editor honors its `modelRequired` / `keyRequired`). It uses the shared
+  model-service form: a stored key is never read back and is kept, replaced
+  or removed; Save changes nothing that runs, and Apply restarts this host.
+  No official account, plugin or ACP route.
+- **Gateway models.** The model entered is the default, not the only model.
+  Each start and Apply of a custom-provider host asks the gateway for its
+  models with the saved key (`GET <base URL>/models`; Anthropic Messages with
+  `x-api-key` and `after_id` paging, the OpenAI APIs with a bearer token and
+  one list) and registers every returned ID and name with the host's
+  provider; entries marked retired are skipped. The default model is always
+  kept, even when the list omits it (an alias may still be callable). Only
+  IDs and names are taken, never provider options, headers or overrides; the
+  read is bounded (15 s, 4 MiB, 32 pages, 4096 models) and follows no
+  redirects. When the list cannot be read, the host still starts with only
+  the default model and its details page says so; applying the configuration
+  again retries. **Refresh** re-reads OpenCode's catalog only; it does not
+  query the gateway again and keeps that warning.
+- **Apply** prepares the new launch before stopping the running host, and
+  restarts the previous launch (executable and model service) when the new
+  one fails. Stopping a host ends every controller event stream it serves,
+  so no controller keeps a stale stream to the old incarnation: the bridge
+  reports the host as reconnecting (`acp/host/state {"connected": false}`),
+  withdraws pending permission cards, and the screen reconnects to the new
+  incarnation and reopens the same original session ID without a manual
+  disconnect. Drafts, attachments and queues are kept.
+- **Quit** stops native OpenCode hosts with the other owned hosts
+  (`serve_stop_all`): admission closes first, each host stops under its
+  lifecycle lease, and a host that did not stop, or a startup still
+  stopping, fails the quit and keeps the app open with "Quit again". On
+  macOS every native quit (Cmd+Q, menu, Dock) takes this path
+  ([Hosting configuration](hosting-configuration.md#identity-save-and-apply)).
+  Closing the window hides the app to the tray and leaves hosts running.
+- **Restore on launch:** a single record (`autoHostOpenCode`: name, optional
+  executable), not restored beside a running OpenCode host. It starts with
+  the host's saved model service and desired runtime (`host_config_get`,
+  stored key kept); an unreadable configuration restores nothing rather than
+  replace it.
+- **New conversations need a project folder.** OpenCode creates a session
+  only in a folder: without one the welcome asks for it, and a send opens
+  the folder picker instead of sending (nothing is shown as sent; button,
+  desktop Enter and queue alike). Choosing a folder moves the draft (text,
+  attachments, draft options) there and sends it once; when that project
+  already holds an unsent draft, both stay in the composer unsent.
+  Cancelling keeps everything. A session that could not be created returns
+  the message to the composer with Retry (an ordinary send of what the
+  composer holds), and New conversation clears that banner. The same holds
+  for ACP agents; Codex still works outside a project.
+- **Host details** show the version, connected providers, model count,
+  default model and agents from the host status. **Refresh**, offered for a
+  healthy host too because models and sign-ins change outside Pocket, asks
+  that running host by name (`opencode_refresh`) to re-read OpenCode's
+  catalog; a read that fails is kept as the status problem, and a result
+  from a host restarted meanwhile is discarded. The provider catalog is
+  read through a field whitelist: `/provider` options can hold credentials.
+
+## Capabilities
+
+The host reports protocol `opencode-http`, provider `opencode`. The session
+UI is driven by capabilities, not by engine name:
+
+| Capability | Meaning in the UI |
+| --- | --- |
+| `draft_options` | model / agent / variant chips work on an unsent draft |
+| `commands` | the `/` command list above the composer |
+| `question_multiple` | questions may allow several answers |
+| `permission_feedback` | a permission answer may carry text (off for now) |
+| `session_config`, `permission_options`, `steer`, `rename` | as for ACP agents |
+
+## Draft options
+
+A new conversation creates its OpenCode session on first send, not ahead.
+Its option chips read the service's defaults for a new session (the settings
+lookup with an empty thread id) and keep the user's choices on the draft
+itself. What a chip shows is exactly what the first send applies:
+
+- Only a chosen model's variants are offered (values grouped by model).
+  Choosing a model resets its variant, as the host does, so a newly chosen
+  model shows its default (no variant) until a variant is chosen; a variant
+  chosen for another model is dropped, even one of the same name.
+- Choosing the value an option shows without a choice (the default model,
+  the default variant) records no choice.
+- Nothing is sent for these choices and no host-wide default changes.
+
+On the first send the session is created, the choices are applied to it
+(model first, then variant, then the rest), and only then is the message
+sent. If the host refuses a choice, the message is not sent: it returns to
+the composer (before anything typed since), its sent copy is withdrawn and
+the refusal is shown. From then on the conversation shows the session's own
+options, and choices that were not applied are not applied later behind
+the user's back; sending again sends the message with the options shown.
+
+OpenCode v1 selects model, variant and agent per message; the bridge keeps
+the session's pending choices for its next prompt.
+
+## Commands
+
+With `commands`, typing `/` at the start of the composer lists the host's
+commands (`app_command_list`: name, description, source, hints), prefix
+matches first. Arrow keys move, Tab or Enter picks, Escape closes; picking
+writes `/name ` into the draft and sends nothing. The message is sent as
+typed; the host recognizes exact known command names, and any other `/text`
+is ordinary text.
+
+## Permissions and questions
+
+Permission requests use the ACP permission card: the offered options in
+their order (a localized label when one has no name), answered by option id,
+with the patterns an "always" answer allows. Questions use the existing
+question card, with multiple choice and a free-text "Other…" where allowed.
+Cancel answers the question as rejected. A request resolved elsewhere
+removes its card.
+
+## Sending
+
+The default send while a turn runs is the local queue. **Supplement** sends
+into the running turn (`prompt_async`) when `steer` is negotiated. A message
+ID is not an idempotency key, so a send whose outcome is uncertain stays
+queued and marked and is sent again only by an explicit Retry.
+
+## Session access
+
+Opening an existing OpenCode session resolves its access through the host,
+as for Claude ACP hosts ([session access](native-agent-history.md#session-access)).
+OpenCode's events and status are process-local, and its TUI exposes no TCP
+server by default, so another OpenCode process on the same database cannot
+be observed per session: the host reports `external_source_open` and the
+view follows read-only until that process closes or releases the source and
+the user checks again. Quiet time never grants write access.
+
+## Local history
+
+Desktop Local sessions reads OpenCode's database directly and read-only
+([provider-native history](native-agent-history.md)). A session there is
+continued by opening it on the running OpenCode host (**Continue in
+<host>**), or by hosting OpenCode first.
+
+## Verification
+
+On one Mac with installed OpenCode 1.19.0, the full Rust (815 passed, 24
+ignored) and Flutter (1503 passed, 5 skipped) suites passed with format,
+clippy and analysis, and macOS Debug builds were run against the user's real
+configuration, database and sign-ins. The app checks below ran on successive
+builds; those before gateway model discovery are historical for the current
+build.
+
+- Three opt-in integration tests against a real `opencode serve` passed:
+  source ownership (a second Pocket server is refused, another process
+  holding the database is detected), exact original-session admission and
+  the gateway's closed mutation routes, the host's live stream, options,
+  permissions, questions, commands and cancellation, and a stopped host
+  ending its controller event streams.
+- A real bridge lifecycle test covered local probing, catalog refresh in the
+  same incarnation, meta services, a prompt, release and reopen, the
+  one-host-per-source rule, apply with original history kept, stop and quit.
+- In the app: a send without a project (desktop Enter) opened the folder
+  picker and showed nothing as sent; cancelling kept the draft; choosing the
+  worktree created exactly one session. The user's own running turn was
+  cancelled, a new conversation started, and the original reopened with its
+  history. The native catalog's model picker applied a chosen model, which
+  answered.
+- A per-host custom provider with OpenAI Chat Completions answered after
+  Save and Apply. Apply reconnected the open conversation without a manual
+  disconnect. Restoring existing configuration and applying again answered
+  in the same original session ID.
+- A per-host custom provider with Anthropic Messages, pointed at the user's
+  existing Anthropic-compatible gateway, answered a message sent in the app;
+  OpenCode's own record shows the turn finished normally with no error.
+- On the current build, the same gateway's host listed every model ID the
+  gateway returned, with none omitted, and a non-default model chosen from
+  the conversation's model menu answered.
+- Also on the current build, applying existing configuration to that host in
+  the running app (same app process, new `opencode serve`) cleared the draft's
+  previously chosen gateway model back to the default, replaced the model
+  menu with the inherited catalog without an app restart, and kept the draft
+  text unsent. An explicit send then received a real reply. Draft
+  attachments across Apply are covered by tests only.
+- Cmd+Q stopped the owned `opencode serve` and the app exited with status 0,
+  with no manual signal. After relaunch, automatic hosting and history
+  restored, and the same original session ID answered. Closing the window
+  kept the app and host running; reopening showed the history.
+
+Not verified:
+
+- OpenAI Responses: a request reached the provider's `/responses` endpoint,
+  but the only model tried was refused by the provider (HTTP 403, region),
+  so no successful Responses reply is recorded. The UI recovered to ready;
+  further live Responses testing was waived.
+- Controllers through a relay, several controllers on one host, a second
+  physical device, hosted-account mode and platforms other than macOS.
+- Evidence from the removed `opencode acp` preset is not evidence for this
+  engine.

@@ -18,7 +18,7 @@ impl Drop for ServerGuard {
 fn host(reader: ClaudeHistory) -> AgentHost {
     let program = PathBuf::from("/must-never-start-an-agent");
     let store = SessionStore::memory(SourceId::with_key(&"x".repeat(32), &program, &[]));
-    AgentHost::create_with_native_history(
+    AgentHost::create_with_claude_history(
         HostOptions {
             spec: AgentSpec {
                 profile_id: "fixture".into(),
@@ -33,7 +33,7 @@ fn host(reader: ClaudeHistory) -> AgentHost {
         },
         None,
         None,
-        Some(crate::native_history::NativeHistory::Claude(Arc::new(reader))),
+        Some(Arc::new(reader)),
     )
 }
 

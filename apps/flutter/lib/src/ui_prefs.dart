@@ -25,6 +25,7 @@ class UiPrefs {
     this.autoHostCodex = const [],
     this.acpAgents = const [],
     this.autoHostAcp = const [],
+    this.autoHostOpenCode,
     this.guideSeen = false,
     this.themeMode,
     this.composerHeight,
@@ -37,6 +38,11 @@ class UiPrefs {
 
   /// The ACP agents the user left hosted, restored on a desktop cold start.
   final List<AutoHostAcpPrefs> autoHostAcp;
+
+  /// The native OpenCode host the user left running, restored on a desktop
+  /// cold start. One per device: Pocket hosts one `opencode serve` per
+  /// OpenCode database.
+  final AutoHostOpenCodePrefs? autoHostOpenCode;
 
   /// Full relay key of the app service explicitly chosen as the default host.
   final String? preferredAppServiceKey;
@@ -103,6 +109,8 @@ class UiPrefs {
     List<AutoHostPrefs>? autoHostCodex,
     List<AcpAgentSpec>? acpAgents,
     List<AutoHostAcpPrefs>? autoHostAcp,
+    AutoHostOpenCodePrefs? autoHostOpenCode,
+    bool clearAutoHostOpenCode = false,
     bool? guideSeen,
     String? themeMode,
     bool clearThemeMode = false,
@@ -117,6 +125,9 @@ class UiPrefs {
     autoHostCodex: autoHostCodex ?? this.autoHostCodex,
     acpAgents: acpAgents ?? this.acpAgents,
     autoHostAcp: autoHostAcp ?? this.autoHostAcp,
+    autoHostOpenCode: clearAutoHostOpenCode
+        ? null
+        : (autoHostOpenCode ?? this.autoHostOpenCode),
     guideSeen: guideSeen ?? this.guideSeen,
     themeMode: clearThemeMode ? null : (themeMode ?? this.themeMode),
     composerHeight: composerHeight ?? this.composerHeight,
@@ -141,13 +152,20 @@ class UiPrefs {
       acpAgents: [
         if (rawAgents is List)
           for (final agent in rawAgents.take(maxSavedAgents))
-            ?AcpAgentSpec.fromJson(agent),
+            if (AcpAgentSpec.fromJson(agent) case final spec?
+                when !_retiredAcpProfile(spec))
+              spec,
       ],
       autoHostAcp: [
         if (rawAcpHosts is List)
           for (final host in rawAcpHosts.take(maxAutoHosts))
-            ?AutoHostAcpPrefs.fromJson(host),
+            if (AutoHostAcpPrefs.fromJson(host) case final record?
+                when !_retiredAcpProfile(record.spec))
+              record,
       ],
+      autoHostOpenCode: AutoHostOpenCodePrefs.fromJson(
+        json['autoHostOpenCode'],
+      ),
       preferredAppServiceKey: json['preferredAppServiceKey'] is String
           ? json['preferredAppServiceKey'] as String
           : null,
@@ -200,6 +218,8 @@ class UiPrefs {
       'acpAgents': [for (final agent in acpAgents) agent.toJson()],
     if (autoHostAcp.isNotEmpty)
       'autoHostAcp': [for (final host in autoHostAcp) host.toJson()],
+    if (autoHostOpenCode != null)
+      'autoHostOpenCode': autoHostOpenCode!.toJson(),
     if (guideSeen) 'guideSeen': true,
     if (themeMode != null) 'themeMode': themeMode,
     if (composerHeight != null) 'composerHeight': composerHeight,
@@ -207,6 +227,11 @@ class UiPrefs {
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
   };
 }
+
+/// The removed OpenCode ACP preset (`opencode acp`): its records are
+/// dropped, never relaunched as a generic agent. OpenCode is hosted natively
+/// ([AutoHostOpenCodePrefs]).
+bool _retiredAcpProfile(AcpAgentSpec spec) => spec.profileId == 'opencode';
 
 /// [hosts] with later duplicates of a name dropped.
 List<AutoHostPrefs> _uniqueByName(List<AutoHostPrefs> hosts) {
@@ -287,6 +312,36 @@ class AutoHostAcpPrefs {
 
   /// JSON for persistence.
   Map<String, dynamic> toJson() => {'name': name, 'spec': spec.toJson()};
+}
+
+/// The native OpenCode host the user left running under [name].
+class AutoHostOpenCodePrefs {
+  /// Creates an OpenCode auto-host record.
+  const AutoHostOpenCodePrefs({required this.name, this.binary});
+
+  /// Instance name.
+  final String name;
+
+  /// Explicit `opencode` executable, when the user chose one.
+  final String? binary;
+
+  /// From persisted JSON; `null` when malformed.
+  static AutoHostOpenCodePrefs? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final name = json['name'];
+    final binary = json['binary'];
+    if (name is! String || name.isEmpty) return null;
+    return AutoHostOpenCodePrefs(
+      name: name,
+      binary: binary is String && binary.isNotEmpty ? binary : null,
+    );
+  }
+
+  /// JSON for persistence.
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    if (binary != null) 'binary': binary,
+  };
 }
 
 /// One preference change: the next snapshot from [prefs], or null when it
@@ -563,6 +618,21 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
     if (others.length >= UiPrefs.maxAutoHosts) return (null, false);
     return (p.copyWith(autoHostAcp: [...others, host]), true);
   });
+
+  /// Remember the native OpenCode host the user just started; it replaces
+  /// any earlier record (one OpenCode host per device).
+  void setAutoHostOpenCode(AutoHostOpenCodePrefs host) => _mutate((p) {
+    final saved = p.autoHostOpenCode;
+    if (saved?.name == host.name && saved?.binary == host.binary) return null;
+    return p.copyWith(autoHostOpenCode: host);
+  });
+
+  /// Forget the OpenCode auto-host record when it names [name].
+  void clearAutoHostOpenCode(String name) => _mutate(
+    (p) => p.autoHostOpenCode?.name == name
+        ? p.copyWith(clearAutoHostOpenCode: true)
+        : null,
+  );
 
   /// Forget the ACP auto-host record of [name] (stopped on purpose).
   void clearAutoHostAcp(String name) => _mutate((p) {

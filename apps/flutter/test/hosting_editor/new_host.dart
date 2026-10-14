@@ -14,7 +14,7 @@ void _newHostTests() {
         'claude-env-value-ANTHROPIC_DEFAULT_OPUS_MODEL',
         'provider.exact-opus',
       );
-      await _choosePreset(t, 'opencode');
+      await _choosePreset(t, 'fixture');
       expect(find.byKey(const Key('claude-environment-section')), findsNothing);
       await _choosePreset(t, 'claude');
       final draft = t
@@ -128,12 +128,6 @@ void _newHostTests() {
     await _tapKey(t, 'host-source-custom');
     expect(find.text(l10n.hostBaseUrlRequired), findsOneWidget);
 
-    // OpenCode needs a default model, or the user's own one stays active.
-    await _choosePreset(t, 'opencode');
-    await _tapKey(t, 'host-source-custom');
-    await _enter(t, 'host-base-url', 'https://models.example/v1');
-    expect(find.text(l10n.hostModelRequired), findsOneWidget);
-
     // Claude needs a key, or its own sign-in would reach the gateway.
     await _choosePreset(t, 'claude');
     await _tapKey(t, 'host-source-custom');
@@ -156,15 +150,22 @@ void _newHostTests() {
     );
     expect(find.byKey(const Key('host-protocol-responses')), findsNothing);
 
-    await _choosePreset(t, 'opencode');
+    // Native OpenCode: its own providers and sign-ins, or a custom provider
+    // of any of its three APIs; never the official account.
+    await _tapKey(t, 'agent-choice-opencode');
+    expect(find.byKey(const Key('host-inherited-opencode')), findsOneWidget);
+    expect(find.byKey(const Key('host-source-official')), findsNothing);
     await _tapKey(t, 'host-source-custom');
-    for (final protocol in [
+    for (final protocol in const [
       'responses',
       'anthropic-messages',
       'chat-completions',
     ]) {
       expect(find.byKey(Key('host-protocol-$protocol')), findsOneWidget);
     }
+
+    await _choosePreset(t, 'fixture');
+    expect(find.byKey(const Key('host-source-custom')), findsNothing);
 
     await _tapKey(t, 'agent-choice-custom');
     expect(find.byKey(const Key('host-source-inherited')), findsOneWidget);
@@ -180,9 +181,8 @@ void _newHostTests() {
     await _enter(t, 'host-api-key', 'sk-codex');
 
     // Another agent starts from its own (inherited) draft: nothing carries.
-    await _choosePreset(t, 'opencode');
+    await _choosePreset(t, 'fixture');
     expect(find.byKey(const Key('host-base-url')), findsNothing);
-    expect(find.byKey(const Key('host-inherited-status')), findsNothing);
 
     // Back to Codex: its draft is still there.
     await _tapKey(t, 'agent-choice-codex');
@@ -196,30 +196,30 @@ void _newHostTests() {
   testWidgets('switching agents and back keeps each agent form', (t) async {
     final api = _withClaude();
     await _pumpEditor(t, api);
-    await _choosePreset(t, 'opencode');
+    await _choosePreset(t, 'fixture');
     await _openAdvanced(t, 'acp-advanced-toggle');
-    await _enter(t, 'acp-program-field', '/opt/opencode/custom');
+    await _enter(t, 'acp-program-field', '/opt/fixture/custom');
 
     await _choosePreset(t, 'claude');
-    expect(find.text('/opt/opencode/custom'), findsNothing);
-    await _tapKey(t, 'agent-choice-preset:opencode');
+    expect(find.text('/opt/fixture/custom'), findsNothing);
+    await _tapKey(t, 'agent-choice-preset:fixture');
     await t.pump(const Duration(milliseconds: 400));
     await t.pumpAndSettle();
 
     // A preset reopens with Advanced closed; the restored program (not the
-    // preset's `opencode` default) is what its field holds once shown.
+    // preset's `fixture-agent` default) is what its field holds once shown.
     await _openAdvanced(t, 'acp-advanced-toggle');
     expect(
       t
           .widget<TextField>(find.byKey(const Key('acp-program-field')))
           .controller!
           .text,
-      '/opt/opencode/custom',
+      '/opt/fixture/custom',
     );
     await _tapKey(t, 'start-hosting-btn');
     expect(
       api.startConfiguredCalls.single.$2.agent!.program,
-      '/opt/opencode/custom',
+      '/opt/fixture/custom',
     );
   });
 
@@ -227,8 +227,8 @@ void _newHostTests() {
       'kept on a choice switched away from', (t) async {
     final api = FakeBridgeApi();
     await _pumpEditor(t, api);
-    await _choosePreset(t, 'opencode');
-    await _enter(t, 'acp-instance-name-field', 'my-opencode');
+    await _choosePreset(t, 'fixture');
+    await _enter(t, 'acp-instance-name-field', 'my-fixture');
     // Another agent is shown; the edited one is not.
     await _tapKey(t, 'agent-choice-codex');
     await t.binding.handlePopRoute();
@@ -237,8 +237,8 @@ void _newHostTests() {
     await _tapKey(t, 'host-leave-stay');
     expect(find.byType(HostingEditor), findsOneWidget);
     // Switching back restores the typed name.
-    await _choosePreset(t, 'opencode');
-    expect(find.text('my-opencode'), findsOneWidget);
+    await _choosePreset(t, 'fixture');
+    expect(find.text('my-fixture'), findsOneWidget);
     // Leave this editor (discarding its edits), then take the whole tree
     // down: the next mount gets a new navigator, not this one's routes.
     await t.binding.handlePopRoute();
@@ -268,7 +268,9 @@ void _newHostTests() {
     final api = FakeBridgeApi();
     await _pumpEditor(t, api);
     expect(find.text(_l10n(t).hostApiProxyNote), findsOneWidget);
-    await _choosePreset(t, 'opencode');
+    await _choosePreset(t, 'fixture');
+    expect(find.text(_l10n(t).hostApiProxyNote), findsNothing);
+    await _tapKey(t, 'agent-choice-opencode');
     expect(find.text(_l10n(t).hostApiProxyNote), findsNothing);
   });
 }

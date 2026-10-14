@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:pocket_codex/src/bridge_api_rust.dart';
+import 'package:pocket_codex/src/native_quit.dart';
 import 'package:pocket_codex/src/quit_status.dart';
 import 'package:pocket_codex/src/window_geometry.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -57,6 +58,7 @@ class DesktopTray with TrayListener, WindowListener {
   TrayMenuLabels? _labels;
   VoidCallback? _onOpenSettings;
   Future<void>? _quitting;
+  late final NativeQuitChannel _nativeQuit = NativeQuitChannel(onQuit: quit);
 
   /// Where a quit stands, shown by the app ([QuitStatusBanner]).
   final ValueNotifier<QuitStatus?> quitStatus = ValueNotifier(null);
@@ -88,7 +90,16 @@ class DesktopTray with TrayListener, WindowListener {
     if (!supported || _initialised) return;
     _initialised = true;
     _onOpenSettings = onOpenSettings;
+    try {
+      await _initWindowAndTray();
+    } finally {
+      // The native gate holds Cmd+Q / menu / Dock quits until this runs, so
+      // it must run even when tray setup failed.
+      if (_isMacOS) await _nativeQuit.attach();
+    }
+  }
 
+  Future<void> _initWindowAndTray() async {
     await windowManager.ensureInitialized();
     // Frameless on macOS + Windows: hide the native title bar so the app's own
     // bar sits flush at the top edge (WindowTitleBar handles the button
@@ -170,8 +181,9 @@ class DesktopTray with TrayListener, WindowListener {
     _onOpenSettings?.call();
   }
 
-  /// Quit the app (the tray's Quit, and the retry of a blocked quit). A
-  /// second call while one runs joins it.
+  /// Quit the app (the tray's Quit, the retry of a blocked quit, and on macOS
+  /// every native quit: Cmd+Q, the application menu and the Dock). A second
+  /// call while one runs joins it.
   Future<void> quit() =>
       _quitting ??= _quit().whenComplete(() => _quitting = null);
 
@@ -193,8 +205,12 @@ class DesktopTray with TrayListener, WindowListener {
     // again, then tear the window down. window_manager.destroy() ends the app —
     // Windows posts WM_QUIT to break the runner's message loop, macOS/Linux
     // close the last window — so the process exits cleanly.
+    //
+    // On macOS destroy() goes through NSApp.terminate, which the native quit
+    // gate cancels until it has been told that this cleanup succeeded.
     await trayManager.destroy();
     await windowManager.setPreventClose(false);
+    if (_isMacOS) await _nativeQuit.allowTerminate();
     await windowManager.destroy();
   }
 

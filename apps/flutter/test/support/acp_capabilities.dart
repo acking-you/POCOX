@@ -31,3 +31,42 @@ AppCapabilities negotiatedAcpCapabilities({
   sessionList: 'agent',
   runningInventory: 'engine',
 );
+
+/// A connected native OpenCode host's capabilities. The bridge also reports
+/// [modelCatalog] (the composer's model menu); it is off by default so the
+/// per-draft option capsule stays under test.
+AppCapabilities negotiatedOpenCodeCapabilities({
+  int generation = 1,
+  bool imageInput = false,
+  bool steer = true,
+  bool commands = true,
+  bool modelCatalog = false,
+}) => AppCapabilities(
+  provider: 'opencode',
+  fast: false,
+  permissionPresets: false,
+  guardian: false,
+  rateLimits: false,
+  takeover: false,
+  externalWriterMonitor: false,
+  localSessions: false,
+  planMode: false,
+  protocol: 'opencode-http',
+  providerName: 'OpenCode',
+  profileId: 'opencode',
+  negotiated: true,
+  generation: generation,
+  imageInput: imageInput,
+  steer: steer,
+  rename: true,
+  sessionConfig: true,
+  permissionOptions: true,
+  sessionReopen: 'native',
+  sessionList: 'native',
+  historyScope: 'full',
+  runningInventory: 'engine',
+  commands: commands,
+  modelCatalog: modelCatalog,
+  draftOptions: true,
+  questionMultiple: true,
+);

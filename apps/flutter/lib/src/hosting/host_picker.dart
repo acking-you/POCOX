@@ -79,6 +79,8 @@ class _HostPicker extends StatelessWidget {
       ? host.providerName
       : host.isCodex
       ? 'Codex'
+      : host.isOpenCode
+      ? 'OpenCode'
       : host.profileId ?? host.provider;
 
   @override

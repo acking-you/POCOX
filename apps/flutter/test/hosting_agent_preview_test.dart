@@ -2,9 +2,9 @@
 // tablet and a 1440 desktop, light and dark, English and Chinese, with the
 // app's real themes: the new-host dialog (Codex beside a running host; the
 // chooser scrolled to the saved and custom agents and their forms; the
-// OpenCode preset beside a saved OpenCode configuration, also under 3×
-// text; the OpenCode preset unfolded down to its program, arguments and
-// Start), the
+// an ACP preset beside a saved configuration of the same name, also under 3×
+// text; the preset unfolded down to its program, arguments and Start;
+// native OpenCode beside them), the
 // manage page with Codex and an ACP agent hosted, the ACP composer chips
 // (each brought on screen), and the model list searched with a phone
 // keyboard up. Each captured control is checked on screen and operable.
@@ -45,8 +45,8 @@ const _devices = [
 ];
 
 final _caps = negotiatedAcpCapabilities(
-  providerName: 'OpenCode',
-  profileId: 'opencode',
+  providerName: 'Fixture Agent',
+  profileId: 'fixture',
 );
 
 const _savedAgent = AcpAgentSpec(
@@ -56,15 +56,15 @@ const _savedAgent = AcpAgentSpec(
   args: ['--audit'],
 );
 
-/// A saved configuration with the OpenCode preset's own id and name.
-const _savedOpenCode = AcpAgentSpec(
-  profileId: 'opencode',
-  displayName: 'OpenCode',
-  program: '/opt/oc/bin/opencode',
+/// A saved configuration with the fixture preset's own id and name.
+const _savedFixture = AcpAgentSpec(
+  profileId: 'fixture',
+  displayName: 'Fixture Agent',
+  program: '/opt/fx/bin/fixture-agent',
   args: ['acp', '--port', '4100'],
 );
 
-/// The chooser with a saved configuration named like the OpenCode preset:
+/// The chooser with a saved configuration named like the fixture preset:
 /// each section revealed in turn, its heading and both tiles' source
 /// subtitles whole on screen; frames are `$name-presets` and `$name-saved`.
 Future<void> _captureSameName(
@@ -80,20 +80,20 @@ Future<void> _captureSameName(
       'presets',
       'agent-choice-builtin',
       l10n.agentChoiceBuiltinTitle,
-      'agent-choice-preset:opencode',
+      'agent-choice-preset:fixture',
       l10n.agentChoicePreset,
     ),
     (
       'saved',
       'agent-choice-mine',
       l10n.agentChoiceSavedTitle,
-      'agent-choice-saved:opencode',
+      'agent-choice-saved:fixture',
       l10n.agentChoiceSaved,
     ),
   ];
   for (final (frame, section, heading, tile, source) in sections) {
     // Scroll the section's top edge to the top of the dialog's scroll view
-    // (as far as it can scroll); the OpenCode tile is then checked within it.
+    // (as far as it can scroll); the preset's tile is then checked within it.
     final group = find.byKey(Key(section));
     await _reveal(t, group);
     final shownTile = find.byKey(Key(tile));
@@ -114,7 +114,7 @@ Future<void> _captureSameName(
     _usable(t, shownTile, size);
     for (final text in [
       if (together) find.descendant(of: group, matching: find.text(heading)),
-      find.descendant(of: shownTile, matching: find.text('OpenCode')),
+      find.descendant(of: shownTile, matching: find.text('Fixture Agent')),
       find.descendant(of: shownTile, matching: find.text(source)),
     ]) {
       expect(text, findsOneWidget, reason: '$text');
@@ -131,7 +131,7 @@ Future<void> _captureSameName(
       );
     }
     expect(
-      find.bySemanticsLabel('OpenCode, $source'),
+      find.bySemanticsLabel('Fixture Agent, $source'),
       findsOneWidget,
       reason: 'one node names the tile and its source',
     );
@@ -263,12 +263,7 @@ Future<FakeBridgeApi> _hostedApi() async {
     config: const ConfigInfo(relay: 'relay.example:7666', hasKey: true),
   );
   api.presets = const [
-    AcpPreset(
-      id: 'opencode',
-      displayName: 'OpenCode',
-      program: 'opencode',
-      args: ['acp'],
-    ),
+    fixturePreset,
     AcpPreset(
       id: 'claude',
       displayName: 'Claude',
@@ -278,11 +273,11 @@ Future<FakeBridgeApi> _hostedApi() async {
   ];
   await api.appServeStart(port: 18080, name: 'default', embedded: false);
   await api.appServeStartAcp(
-    name: 'opencode',
+    name: 'fixture',
     spec: const AcpAgentSpec(
-      profileId: 'opencode',
-      displayName: 'OpenCode',
-      program: 'opencode',
+      profileId: 'fixture',
+      displayName: 'Fixture Agent',
+      program: 'fixture-agent',
       args: ['acp'],
     ),
   );
@@ -412,7 +407,8 @@ void main() {
           // The full production chooser.
           for (final choice in [
             'codex',
-            'preset:opencode',
+            'opencode',
+            'preset:fixture',
             'preset:claude',
             'saved:custom-audit',
             'custom',
@@ -485,7 +481,7 @@ void main() {
           await capturePreview(t, 'hosting-custom-save-$variant');
         });
 
-        testWidgets('OpenCode preset beside a saved OpenCode configuration '
+        testWidgets('an ACP preset beside a same-name saved configuration '
             '($variant)', (t) async {
           _size(t, size);
           final api = await _hostedApi();
@@ -494,16 +490,16 @@ void main() {
             api,
             locale,
             brightness,
-            saved: const [_savedOpenCode, _savedAgent],
+            saved: const [_savedFixture, _savedAgent],
           );
           await _captureSameName(t, size, locale, 'hosting-same-name-$variant');
         });
 
-        testWidgets('OpenCode preset unfolded ($variant)', (t) async {
+        testWidgets('an ACP preset unfolded ($variant)', (t) async {
           _size(t, size);
           final api = await _hostedApi();
           await _openDialog(t, api, locale, brightness);
-          final tile = find.byKey(const Key('agent-choice-preset:opencode'));
+          final tile = find.byKey(const Key('agent-choice-preset:fixture'));
           await t.ensureVisible(tile);
           await t.tap(tile);
           await t.pump(const Duration(milliseconds: 400));
@@ -519,16 +515,36 @@ void main() {
           expect(find.byKey(const Key('acp-arg-field-0')), findsOneWidget);
           expect(t.takeException(), isNull, reason: 'no overflow');
           _withinWidth(t, find.byKey(const Key('acp-host-form')), size);
-          await capturePreview(t, 'hosting-opencode-$variant');
+          await capturePreview(t, 'hosting-acp-preset-$variant');
           await _captureProgram(
             t,
             size,
-            'hosting-opencode-program-$variant',
-            program: 'opencode',
+            'hosting-acp-preset-program-$variant',
+            program: 'fixture-agent',
             firstArg: 'acp',
             l10n: lookupAppLocalizations(locale),
             short: true,
           );
+        });
+
+        testWidgets('native OpenCode chosen ($variant)', (t) async {
+          _size(t, size);
+          final api = await _hostedApi();
+          await _openDialog(t, api, locale, brightness);
+          final tile = find.byKey(const Key('agent-choice-opencode'));
+          await t.ensureVisible(tile);
+          await t.tap(tile);
+          await t.pumpAndSettle();
+          final section = find.byKey(const Key('opencode-runtime-section'));
+          await _reveal(t, section);
+          expect(t.takeException(), isNull, reason: 'no overflow');
+          _withinWidth(t, section, size);
+          _usable(t, find.byKey(const Key('opencode-name-field')), size);
+          final start = find.byKey(const Key('start-hosting-btn'));
+          await t.ensureVisible(start);
+          await t.pumpAndSettle();
+          _operable(t, start);
+          await capturePreview(t, 'hosting-opencode-native-$variant');
         });
 
         testWidgets('manage page with Codex and an ACP agent ($variant)', (
@@ -685,7 +701,7 @@ void main() {
   }
 
   // The agent chooser under 3× text on a phone: section headings and tile
-  // subtitles wrap instead of clipping, and both same-name OpenCode tiles
+  // subtitles wrap instead of clipping, and both same-name preset tiles
   // still say where they come from.
   for (final brightness in Brightness.values) {
     for (final language in ['en', 'zh']) {
@@ -702,7 +718,7 @@ void main() {
           api,
           locale,
           brightness,
-          saved: const [_savedOpenCode, _savedAgent],
+          saved: const [_savedFixture, _savedAgent],
         );
         _withinWidth(t, find.byKey(const Key('agent-choice-grid')), size);
         await _captureSameName(

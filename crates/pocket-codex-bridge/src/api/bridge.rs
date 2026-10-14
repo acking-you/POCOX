@@ -30,8 +30,8 @@ pub mod hosted_account;
 pub mod hosting;
 pub mod native_sessions;
 pub mod services;
+pub mod session_access;
 pub mod session_config;
-pub mod session_control;
 pub mod threads;
 
 pub use self::{
@@ -76,9 +76,9 @@ pub use self::{
         acp_claude_prepare_state, acp_claude_status, acp_hosting_supported, acp_locate,
         acp_presets, app_serve_deregister, app_serve_reregister, app_serve_restart_acp,
         app_serve_start, app_serve_start_acp, app_serve_status, app_serve_stop, app_serve_stop_all,
-        codex_locate, embedded_codex_version, AcpAgentSpecDto, AcpCatalogProviderDto,
-        AcpCatalogStatusDto, AcpClaudeSetupDto, AcpClaudeStatusDto, AcpPresetDto, AcpServeDto,
-        AppServeDto, AppServeStatusDto,
+        codex_locate, embedded_codex_version, opencode_detect, opencode_refresh, AcpAgentSpecDto,
+        AcpClaudeSetupDto, AcpClaudeStatusDto, AcpPresetDto, AcpServeDto, AppServeDto,
+        AppServeStatusDto, OpenCodeEnvironmentDto, OpenCodeHostStatusDto,
     },
     native_sessions::{
         app_native_session_page, app_native_session_revision, app_native_sessions,
@@ -92,7 +92,6 @@ pub use self::{
         app_session_settings, app_set_session_config, app_set_session_mode, SessionConfigOptionDto,
         SessionConfigValueDto, SessionModeDto, SessionSettingsDto,
     },
-    session_control::{app_acp_control_session, app_acp_session_control, SessionControlDto},
     threads::{
         app_compact, app_git_diff, app_history_cached, app_history_focus, app_history_prefetch,
         app_history_sync_prepare, app_model_list, app_rate_limits, app_realtime_request,

@@ -24,7 +24,7 @@ pub const MAX_ARG_BYTES: usize = 4096;
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentSpec {
-    /// Stable profile id (a preset id such as `opencode`, or a custom id).
+    /// Stable profile id (a preset id such as `claude`, or a custom id).
     /// Persisted session associations are only reused for the same id.
     pub profile_id: String,
     /// Name shown in the UI.
@@ -52,6 +52,9 @@ pub enum SpecError {
     /// The profile id is empty, too long, or not `[A-Za-z0-9._-]`.
     #[error("the agent profile id is invalid")]
     ProfileId,
+    /// OpenCode uses the independent native engine.
+    #[error("OpenCode requires its native engine; this ACP profile is unsupported")]
+    NativeEngine,
     /// The display name is empty, too long or contains control characters.
     #[error("the agent name is invalid")]
     DisplayName,
@@ -82,29 +85,15 @@ pub struct Preset {
     pub fallback_dirs: &'static [&'static str],
 }
 
-/// Built-in presets. OpenCode documents `opencode acp` as its stdio ACP
-/// agent; Claude is reached through the `@agentclientprotocol/claude-agent-acp`
-/// adapter, whose `claude-agent-acp` binary speaks ACP on stdio without
-/// arguments — never through the native `claude` CLI, which the adapter
-/// drives itself. How the adapter, its Node.js runtime and that CLI are
-/// found is [`super::claude`]'s. Nothing else about either agent's ACP
-/// feature set is assumed: capabilities are negotiated.
-pub const PRESETS: &[Preset] = &[
-    Preset {
-        id: "opencode",
-        display_name: "OpenCode",
-        program: "opencode",
-        args: &["acp"],
-        fallback_dirs: &[".opencode/bin"],
-    },
-    Preset {
-        id: "claude",
-        display_name: "Claude",
-        program: "claude-agent-acp",
-        args: &[],
-        fallback_dirs: &[],
-    },
-];
+/// Built-in ACP presets. Claude uses its stdio ACP adapter; capabilities
+/// are negotiated with the external executable.
+pub const PRESETS: &[Preset] = &[Preset {
+    id: "claude",
+    display_name: "Claude",
+    program: "claude-agent-acp",
+    args: &[],
+    fallback_dirs: &[],
+}];
 
 /// The preset with `id`.
 pub fn preset(id: &str) -> Option<&'static Preset> {
@@ -131,6 +120,9 @@ impl AgentSpec {
     /// Check sizes and characters. Does not touch the filesystem.
     pub fn validate(&self) -> Result<(), SpecError> {
         let id = &self.profile_id;
+        if id == "opencode" {
+            return Err(SpecError::NativeEngine);
+        }
         if id.is_empty()
             || id.len() > 64
             || !id
@@ -252,11 +244,11 @@ mod tests {
     }
 
     #[test]
-    fn the_opencode_preset_is_opencode_acp() {
-        let preset = preset("opencode").expect("preset");
-        let spec = preset.spec();
-        assert_eq!(spec.program, "opencode");
-        assert_eq!(spec.args, vec!["acp".to_string()]);
+    fn opencode_is_not_an_acp_preset_or_supported_saved_profile() {
+        assert!(preset("opencode").is_none());
+        let mut old = spec("opencode", &["acp"]);
+        old.profile_id = "opencode".into();
+        assert_eq!(old.validate(), Err(SpecError::NativeEngine));
     }
 
     #[test]

@@ -364,7 +364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  /// Restore the Codex and ACP hosting the user left running, each
+  /// Restore the Codex, ACP and OpenCode hosting the user left running, each
   /// at most once per run and only what this machine does not host already
   /// (see [planHostRestore]). True when at least one restore succeeded
   /// (discovery is stale).
@@ -403,6 +403,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     // load on the first pass doesn't forfeit the restore.
     _autoHostAttempted.addAll(plan.codex.map((saved) => saved.name));
     _autoHostAcpAttempted.addAll(plan.acp.map((saved) => saved.name));
+    // OpenCode hosts share the agent set: instance names are per device.
+    if (plan.opencode case final saved?) _autoHostAcpAttempted.add(saved.name);
     if (!background) setState(() => _rehosting = true);
     try {
       return await runHostRestore(api, plan);

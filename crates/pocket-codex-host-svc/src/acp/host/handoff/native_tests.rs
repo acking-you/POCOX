@@ -44,7 +44,7 @@ fn fixture_host(root: &Path) -> AgentHost {
         ("CLAUDE_CODE_SIMPLE".into(), "1".into()),
         ("CLAUDE_CODE_SAFE_MODE".into(), "1".into()),
     ];
-    AgentHost::create_with_native_history(
+    AgentHost::create_with_claude_history(
         HostOptions {
             spec: AgentSpec {
                 profile_id: "claude".into(),
@@ -59,7 +59,7 @@ fn fixture_host(root: &Path) -> AgentHost {
         },
         None,
         None,
-        Some(NativeHistory::Claude(Arc::new(reader))),
+        Some(Arc::new(reader)),
     )
 }
 
@@ -119,13 +119,55 @@ async fn native_claude_release_and_contended_original_session_acquire() {
             .expect("new");
         let session = opened["sessionId"].as_str().expect("session");
         reply(owner, session, "SEED").await;
-        let Some(NativeHistory::Claude(reader)) = &owner.inner.native_history else {
-            panic!("reader")
-        };
+        let admitted = owner
+            .session_access(session, &identity(owner))
+            .await
+            .expect("fresh admission");
+        assert_eq!(admitted.mode, "write");
+        assert!(admitted.can_release);
+        let outside = hosts[1]
+            .session_open(session, &identity(&hosts[1]))
+            .await
+            .expect("external idle follow");
+        assert_eq!(outside.mode, "follow");
+        assert_eq!(outside.reason, "external_idle");
+        assert!(hosts[1].state().sessions.is_empty());
+        let Some(reader) = &owner.inner.native_history else { panic!("reader") };
         let page = reader
             .read_page(session, None, 1)
             .await
             .expect("native page");
+        // Bypass Pocket admission in this disposable fixture to reproduce an
+        // independent native client opening an already admitted UUID.
+        let (_, outside_peer, _) = hosts[1].ready().expect("outside fixture peer");
+        outside_peer
+            .request(
+                "session/load",
+                json!({"sessionId":session,
+            "cwd":root.join("work"),"mcpServers":[]}),
+                Some(Duration::from_secs(20)),
+            )
+            .await
+            .expect("independent original-session load");
+        assert_eq!(
+            owner
+                .prompt(session, "MUST NOT SEND", &[], Some(&identity(owner)))
+                .await,
+            Err(HostError::ReadOnly)
+        );
+        assert_eq!(
+            owner
+                .session_access(session, &identity(owner))
+                .await
+                .expect("second owner access")
+                .mode,
+            "follow"
+        );
+        outside_peer
+            .request("session/close", json!({"sessionId":session}), Some(Duration::from_secs(20)))
+            .await
+            .expect("close only the fixture's outside writer");
+        reply(owner, session, "AFTER_EXTERNAL_RELEASE").await;
         assert!(matches!(
             SessionClaim::acquire(&root.join("config"), session),
             Err(ClaimError::Busy)
@@ -135,10 +177,23 @@ async fn native_claude_release_and_contended_original_session_acquire() {
             .await
             .is_err());
         assert!(hosts[1].state().sessions.is_empty());
-        owner
-            .release_session(session, &identity(owner))
+        let admitted = owner
+            .session_access(session, &identity(owner))
+            .await
+            .expect("owner access");
+        let released = owner
+            .session_release(&admitted)
             .await
             .expect("owner release");
+        assert_eq!(released.reason, "released_here");
+        assert_eq!(
+            owner
+                .session_access(session, &identity(owner))
+                .await
+                .expect("read released access")
+                .reason,
+            "released_here"
+        );
         assert!(reader
             .idle_owners(session)
             .await
@@ -153,13 +208,15 @@ async fn native_claude_release_and_contended_original_session_acquire() {
         assert!(hosts[1].state().sessions.is_empty());
         let ids = [identity(&hosts[1]), identity(&hosts[2])];
         let (a, b) = tokio::join!(
-            hosts[1].acquire_session(session, &page.generation, &ids[0]),
-            hosts[2].acquire_session(session, &page.generation, &ids[1])
+            hosts[1].session_open(session, &ids[0]),
+            hosts[2].session_open(session, &ids[1])
         );
-        assert_ne!(a.is_ok(), b.is_ok(), "exactly one successor: {a:?}, {b:?}");
+        let a = a.expect("first automatic opener");
+        let b = b.expect("second automatic opener");
+        assert_ne!(a.mode == "write", b.mode == "write", "exactly one successor: {a:?}, {b:?}");
         let (winner, loser, answer) =
-            if a.is_ok() { (&hosts[1], &hosts[2], a) } else { (&hosts[2], &hosts[1], b) };
-        assert_eq!(answer.expect("winner")["sessionId"], session);
+            if a.mode == "write" { (&hosts[1], &hosts[2], a) } else { (&hosts[2], &hosts[1], b) };
+        assert_eq!(answer.session_id, session);
         assert!(loser.state().sessions.is_empty());
         assert_eq!(
             reader
@@ -174,10 +231,25 @@ async fn native_claude_release_and_contended_original_session_acquire() {
             owner.prompt(session, "must not send", &[], None).await,
             Err(HostError::UnknownSession)
         );
+        let admitted = winner
+            .session_access(session, &identity(winner))
+            .await
+            .expect("successor access");
         winner
-            .release_session(session, &identity(winner))
+            .session_release(&admitted)
             .await
             .expect("successor release");
+        let reopened = owner
+            .session_open(session, &identity(owner))
+            .await
+            .expect("explicit continue here");
+        assert_eq!(reopened.mode, "write");
+        assert_eq!(reopened.session_id, session);
+        reply(owner, session, "AUTOMATIC_ORIGINAL_RESUME").await;
+        owner
+            .session_release(&reopened)
+            .await
+            .expect("final owner release");
         assert!(reader
             .idle_owners(session)
             .await
@@ -190,6 +262,7 @@ async fn native_claude_release_and_contended_original_session_acquire() {
                 "session_id":session, "original_session_restored":true,
                 "exact_seed_and_successor_reply":true, "one_contender_admitted":true,
                 "old_writer_rejected":true, "verified_release":true,
+                "automatic_open":true,"released_here_preserved":true,"external_idle_follow":true,
             })
             .to_string(),
         )

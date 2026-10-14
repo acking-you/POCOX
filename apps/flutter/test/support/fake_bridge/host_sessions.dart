@@ -1,18 +1,90 @@
 part of '../../fake_bridge_api.dart';
 
 mixin _FakeHostSessions on _FakeBridgeState {
-  @override
-  Future<SessionControl> appAcpSessionControl(
-    String serviceKey,
-    String threadId,
-  ) async => throw UnsupportedError('No session control fixture');
+  /// The access a session of a host-access engine gets: a fixture by
+  /// thread id, else this host already writing it.
+  SessionAccess _accessFor(String serviceKey, String threadId) =>
+      sessionAccess[threadId] ??
+      SessionAccess(
+        sessionId: threadId,
+        hostId: 'host-1',
+        generation: 1,
+        provider: sessionProtocolOf(serviceKey) == SessionProtocol.opencode
+            ? 'opencode'
+            : 'acp',
+        mode: 'write',
+        writer: 'this_host',
+        turn: 'idle',
+        exclusion: 'engine',
+        reason: 'owned',
+      );
 
   @override
-  Future<void> appAcpControlSession(
+  Future<SessionAccess> appSessionOpen(
     String serviceKey,
-    SessionControl snapshot,
-    String action,
-  ) async => throw UnsupportedError('No session control fixture');
+    String threadId,
+  ) async {
+    sessionOpenCalls.add(threadId);
+    final gate = sessionOpenGate;
+    if (gate != null) {
+      sessionOpenGate = null;
+      await gate.future;
+    }
+    final next = sessionOpenResults.isEmpty
+        ? null
+        : sessionOpenResults.removeAt(0);
+    final access = next ?? _accessFor(serviceKey, threadId);
+    if (access.writable) {
+      // Opening for writing loads the session, so the resume fixtures
+      // (a failure, a held load) apply to it as they did to a resume.
+      if (appThreadResumeError != null) throw appThreadResumeError!;
+      lastResumed = threadId;
+      final pending = pendingResumes[threadId];
+      if (pending != null && pending.isNotEmpty) await pending.removeAt(0);
+    }
+    return access;
+  }
+
+  @override
+  Future<SessionAccess> appSessionAccess(
+    String serviceKey,
+    String threadId,
+  ) async {
+    sessionAccessCalls.add(threadId);
+    final next = sessionAccessResults.isEmpty
+        ? null
+        : sessionAccessResults.removeAt(0);
+    return next ?? _accessFor(serviceKey, threadId);
+  }
+
+  @override
+  Future<SessionAccess> appSessionRelease(
+    String serviceKey,
+    SessionAccess snapshot,
+  ) async {
+    sessionReleaseCalls.add(snapshot);
+    final err = sessionReleaseError;
+    if (err != null) {
+      sessionReleaseError = null;
+      throw err;
+    }
+    return SessionAccess(
+      sessionId: snapshot.sessionId,
+      hostId: snapshot.hostId,
+      generation: snapshot.generation,
+      provider: snapshot.provider,
+      mode: 'follow',
+      writer: 'none',
+      turn: 'idle',
+      reason: 'released_here',
+    );
+  }
+
+  @override
+  Future<List<AgentCommand>> appCommandList(String serviceKey) async {
+    commandListCalls.add(serviceKey);
+    return agentCommands;
+  }
 
   @override
   Future<NativeSessionList> appNativeSessions(

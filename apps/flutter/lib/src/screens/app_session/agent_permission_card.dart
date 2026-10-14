@@ -1,8 +1,10 @@
-/// The permission card for an ACP agent's `session/request_permission`.
+/// The permission card for an ACP agent's `session/request_permission`, and
+/// for OpenCode's native permission requests in the same shape.
 ///
 /// Unlike the Codex approval card it has no fixed decisions: it shows the
 /// options the agent offered, in the agent's order and with the agent's own
-/// labels, and answers with the chosen option id exactly as received.
+/// labels (a localized label of its kind when it gave none), and answers
+/// with the chosen option id exactly as received.
 /// Option kinds only pick a visual weight; an unknown kind is shown neutrally
 /// and still answered with its own id.
 library;
@@ -39,6 +41,18 @@ class AgentPermissionOption {
 
   /// Whether choosing it asks the agent to remember the decision.
   bool get remembers => kind == 'allow_always' || kind == 'reject_always';
+
+  /// The agent's label, else the localized label of its kind.
+  String label(AppLocalizations l10n) {
+    if (name.trim().isNotEmpty) return name;
+    return switch (kind) {
+      'allow_once' => l10n.permissionAllowOnce,
+      'allow_always' => l10n.permissionAllowAlways,
+      'reject_once' => l10n.permissionRejectOnce,
+      'reject_always' => l10n.permissionRejectAlways,
+      _ => id,
+    };
+  }
 }
 
 /// A parsed ACP permission request.
@@ -48,6 +62,7 @@ class AgentPermissionRequest {
     required this.title,
     required this.detail,
     required this.options,
+    this.always = const [],
   });
 
   /// The tool call's title.
@@ -58,6 +73,9 @@ class AgentPermissionRequest {
 
   /// Offered options, in the agent's order.
   final List<AgentPermissionOption> options;
+
+  /// The patterns an "always" answer allows (OpenCode), display only.
+  final List<String> always;
 
   /// Parse an [agentPermissionKind] event; options that are not well-formed
   /// are left out, never repaired.
@@ -82,7 +100,10 @@ class AgentPermissionRequest {
       if (id is! String || name is! String || kind is! String) continue;
       options.add(AgentPermissionOption(id: id, name: name, kind: kind));
     }
-    final lines = <String>[];
+    final lines = <String>[
+      for (final pattern in _list(raw['patterns']))
+        if (pattern is String && pattern.isNotEmpty) pattern,
+    ];
     for (final location in _list(tool['locations'])) {
       if (location case {'path': final String path}) lines.add(path);
     }
@@ -95,6 +116,10 @@ class AgentPermissionRequest {
       title: title is String ? title : event.title ?? '',
       detail: lines.join('\n'),
       options: options,
+      always: [
+        for (final pattern in _list(raw['always']))
+          if (pattern is String && pattern.isNotEmpty) pattern,
+      ],
     );
   }
 
@@ -138,7 +163,7 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(l10n.permissionRememberTitle),
-          content: Text(l10n.permissionRememberBody(option.name)),
+          content: Text(l10n.permissionRememberBody(option.label(l10n))),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
@@ -147,7 +172,7 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
             FilledButton(
               key: const Key('agent-permission-remember-confirm'),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: Text(option.name),
+              child: Text(option.label(l10n)),
             ),
           ],
         ),
@@ -165,7 +190,10 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
   Widget _button(AgentPermissionOption option, int index) {
     final key = Key('agent-permission-option-$index');
     final onPressed = _sending ? null : () => _choose(option);
-    final label = Text(option.name, overflow: TextOverflow.ellipsis);
+    final label = Text(
+      option.label(AppLocalizations.of(context)),
+      overflow: TextOverflow.ellipsis,
+    );
     return switch (option.kind) {
       'allow_once' => FilledButton(
         key: key,
@@ -246,6 +274,15 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
                     ),
                   ),
                 ),
+              ),
+            ],
+            if (request.always.isNotEmpty &&
+                request.options.any((o) => o.kind == 'allow_always')) ...[
+              const SizedBox(height: 6),
+              Text(
+                l10n.permissionAlwaysAllows(request.always.join(', ')),
+                key: const Key('agent-permission-always'),
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
               ),
             ],
             const SizedBox(height: 8),

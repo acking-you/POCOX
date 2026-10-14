@@ -20,6 +20,8 @@ pub mod fs;
 pub mod history_sync;
 mod history_sync_revision;
 pub mod native_history;
+pub mod opencode;
+pub mod process;
 pub mod resume;
 pub mod sessions;
 pub mod store;
@@ -261,3 +263,6 @@ async fn put_projects(
     state.host.put(config).await?;
     Ok(Json(state.host.get().await))
 }
+
+/// Original-session access shared by native engines and ACP.
+pub mod session_access;

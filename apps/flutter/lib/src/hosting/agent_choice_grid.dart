@@ -6,22 +6,27 @@ import 'package:pocket_codex/src/widgets/agent_icon.dart';
 
 /// The agent a new host runs, as picked in [AgentChoiceGrid].
 ///
-/// `codex` (native app-server), `preset:<id>` (a built-in ACP preset),
-/// `saved:<profileId>` (a saved configuration) or `custom` (a new ACP
-/// agent).
+/// `codex` (native app-server), `opencode` (native `opencode serve`),
+/// `preset:<id>` (a built-in ACP preset), `saved:<profileId>` (a saved
+/// configuration) or `custom` (a new ACP agent).
 typedef AgentChoice = String;
 
 /// The native Codex choice.
 const AgentChoice codexChoice = 'codex';
 
+/// The native OpenCode choice.
+const AgentChoice openCodeChoice = 'opencode';
+
 /// A new custom ACP agent.
 const AgentChoice customAgentChoice = 'custom';
 
 /// Whether [choice] hosts an ACP agent.
-bool isAcpChoice(AgentChoice choice) => choice != codexChoice;
+bool isAcpChoice(AgentChoice choice) =>
+    choice != codexChoice && choice != openCodeChoice;
 
 /// One tile per agent this device can host, grouped by launch source:
-/// built-in presets (Codex and the ACP presets) and saved configurations
+/// built-in presets (Codex, OpenCode and the ACP presets) and saved
+/// configurations
 /// (then "custom", which creates one). Each tile's subtitle names its source,
 /// so a saved agent sharing a preset's name and mark stays distinguishable.
 /// Tiles are identified by profile id, never by a host name.
@@ -36,6 +41,8 @@ class AgentChoiceGrid extends StatelessWidget {
     required this.presets,
     required this.saved,
     required this.onChanged,
+    this.openCodeHost,
+    this.onOpenHost,
   });
 
   /// The selected choice.
@@ -50,6 +57,13 @@ class AgentChoiceGrid extends StatelessWidget {
   /// Called with a new choice; null disables every tile.
   final ValueChanged<AgentChoice>? onChanged;
 
+  /// The OpenCode host this device already runs. One OpenCode host serves
+  /// a device, so its tile opens that host instead of selecting a new one.
+  final AppServeStatus? openCodeHost;
+
+  /// Opens a running host's editor (the OpenCode tile of [openCodeHost]).
+  final ValueChanged<AppServeStatus>? onOpenHost;
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -62,6 +76,7 @@ class AgentChoiceGrid extends StatelessWidget {
         icon: const AgentIcon(kind: AgentKind.codex, size: 22),
         onTap: onChanged,
       ),
+      _openCodeTile(l10n),
       for (final preset in presets)
         _AgentTile(
           choice: 'preset:${preset.id}',
@@ -133,6 +148,27 @@ class AgentChoiceGrid extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+extension on AgentChoiceGrid {
+  Widget _openCodeTile(AppLocalizations l10n) {
+    final running = openCodeHost;
+    final open = onOpenHost;
+    return _AgentTile(
+      choice: openCodeChoice,
+      selected: running == null && value == openCodeChoice,
+      title: l10n.providerOpenCode,
+      subtitle: running == null
+          ? l10n.agentChoiceNativeServer
+          : l10n.agentChoiceRunningAs(running.name),
+      icon: const AgentIcon(kind: AgentKind.opencode, size: 22),
+      onTap: running == null
+          ? onChanged
+          : onChanged == null || open == null
+          ? null
+          : (_) => open(running),
     );
   }
 }

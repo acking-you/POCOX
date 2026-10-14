@@ -7,7 +7,7 @@
 //! transport; it does not require a hosted-account sign-in. Stopping hosting
 //! (or quitting the app) stops the agent and cleans up its process tree.
 //! Owned ACP hosting is only available on Unix desktops (see
-//! `pocket_codex_host_svc::acp::process`); controllers on any platform can
+//! `pocket_codex_host_svc::process`); controllers on any platform can
 //! use a remote ACP host.
 //!
 //! # Ownership and quitting
@@ -48,8 +48,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::OnceCell;
 use pocket_codex_core::service::{default_device_id, ServiceId, ServiceKind};
 use pocket_codex_host_svc::{
-    acp::{self, claude, process, spec, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId},
+    acp::{self, claude, spec, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId},
     file_links::SessionDirResolver,
+    process,
 };
 use pocket_codex_pb::Published;
 use tokio::task::JoinHandle;
@@ -86,9 +87,6 @@ struct AcpServe {
     /// The transport context the services were published under: only a
     /// controller in the same context may reach them on loopback.
     context: transport::Context,
-    /// The OpenCode model catalog attached to this agent's launch; its
-    /// files are removed when this is dropped.
-    catalog: Option<acp::catalog::Launch>,
     /// The model-service configuration the agent was launched with, kept so
     /// an apply that fails can restart it as it was.
     config: Option<host_profiles::Resolved>,
@@ -412,7 +410,7 @@ pub(super) fn status() -> Vec<ServeStatus> {
                 agent_phase: Some(phase),
                 agent_error: info["phase"]["reason"].as_str().map(str::to_string),
                 auth_required: info["authRequired"] == true,
-                catalog: host.catalog.as_ref().map(acp::catalog::Launch::status),
+                opencode: None,
                 config_source: host.config.as_ref().map(|c| c.source.as_str().to_string()),
                 config_revision: host.config.as_ref().map(|c| c.revision),
                 incarnation: Some(host.host.host_id().to_string()),
@@ -575,8 +573,8 @@ pub(super) fn stop(name: &str) {
     }
 }
 
-/// [`stop`], handing back the exact launch the host ran with (its catalog
-/// files kept alive by the move) so a failed apply can start it again as it
+/// [`stop`], handing back the exact launch the host ran with so a failed
+/// apply can start it again as it
 /// was; `None` when it was not hosting or its launch was not kept.
 pub(super) fn retire(name: &str) -> Option<Prepared> {
     let mut host = hosts().remove(name)?;
@@ -585,7 +583,7 @@ pub(super) fn retire(name: &str) -> Option<Prepared> {
             .config
             .clone()
             .unwrap_or_else(host_profiles::Resolved::inherited);
-        Prepared::again(name, host.host.spec().clone(), captured, host.catalog.take(), provider)
+        Prepared::again(name, host.host.spec().clone(), captured, provider)
     });
     pause_point("retire");
     stop_host(host);

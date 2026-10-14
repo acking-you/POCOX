@@ -1,20 +1,34 @@
 part of '../app_session_screen.dart';
 
 extension _SessionModelPicker on _AppSessionState {
+  /// The host connection a model list belongs to: the link (lost, replaced,
+  /// another generation) and the subscription a reconnect opens on it. A
+  /// list read before a reconnect may be the previous host's catalog.
+  Object get _modelsLinkKey =>
+      (widget.serviceKey, _linkEpoch, _subscriptionEpoch);
+
+  /// Whether [_models] was read from the current host connection.
+  bool get _modelsCurrent => _modelsKey == _modelsLinkKey;
+
   Future<List<ModelInfo>> _ensureModels() async {
-    if (_models.isNotEmpty) return _models;
+    final key = _modelsLinkKey;
+    if (_models.isNotEmpty && _modelsKey == key) return _models;
     final pending = _modelsLoading;
-    if (pending != null) return pending;
-    final request = _fetchModels();
+    if (pending != null && _modelsLoadingKey == key) return pending;
+    final request = _fetchModels(key);
     _modelsLoading = request;
+    _modelsLoadingKey = key;
     try {
       return await request;
     } finally {
-      _modelsLoading = null;
+      if (identical(_modelsLoading, request)) {
+        _modelsLoading = null;
+        _modelsLoadingKey = null;
+      }
     }
   }
 
-  Future<List<ModelInfo>> _fetchModels() async {
+  Future<List<ModelInfo>> _fetchModels(Object key) async {
     // No service-wide catalog (ACP): nothing to fetch, and nothing invented.
     if (!_caps.modelCatalog) {
       if (mounted) _openLoadDone(_kModelsLoad);
@@ -24,14 +38,52 @@ extension _SessionModelPicker on _AppSessionState {
       final models = await ref
           .read(bridgeApiProvider)
           .appModelList(widget.serviceKey);
-      if (mounted) {
-        _updateState(() => _models = models);
+      // An answer of a connection that moved meanwhile may describe the
+      // previous host: the next read (the reconnect's) asks the current one.
+      if (mounted && key == _modelsLinkKey) {
+        _adoptModels(models, key);
         _openLoadDone(_kModelsLoad);
       }
     } catch (_) {
-      if (mounted) _retryOpenLoad(_kModelsLoad);
+      if (mounted && key == _modelsLinkKey) _retryOpenLoad(_kModelsLoad);
     }
     return _models;
+  }
+
+  /// Install [models], read from connection [key]. When they differ from the
+  /// catalog last seen for this service (the host now runs another
+  /// configuration), a model it no longer offers is no longer selected —
+  /// neither here nor as the default new conversations inherit — and the
+  /// effort chosen for it goes with it. Nothing is sent: the composer keeps
+  /// its text, attachments and queue, and shows the host's default instead.
+  void _adoptModels(List<ModelInfo> models, Object key) {
+    final service = widget.serviceKey;
+    final ids = {for (final m in models) m.id};
+    final previous = _AppSessionState._catalogByService[service];
+    _AppSessionState._catalogByService[service] = ids;
+    final changed = previous != null && !setEquals(previous, ids);
+    _updateState(() {
+      _models = models;
+      _modelsKey = key;
+      if (!changed) return;
+      _catalogChanges++;
+      final picked = _model;
+      if (picked != null && !ids.contains(picked.id)) {
+        _model = null;
+        _modelPickPending = false;
+        _effort = null;
+      }
+    });
+    if (!changed) return;
+    final defaults = ref.read(sessionDefaultsProvider(service).notifier);
+    final inherited = defaults.state.model;
+    if (inherited != null && !ids.contains(inherited.id)) {
+      defaults.state = SessionDefaults(
+        mode: defaults.state.mode,
+        plan: defaults.state.plan,
+        serviceTier: defaults.state.serviceTier,
+      );
+    }
   }
 
   /// Shared bottom-sheet picker: a titled list of soft option rows (icon +

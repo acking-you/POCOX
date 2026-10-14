@@ -25,14 +25,14 @@ const _otherCodex = AutoHostPrefs(
   embedded: false,
 );
 
-const _otherAcp = AutoHostAcpPrefs(name: 'other-acp', spec: _openCodeSpec);
+const _otherAcp = AutoHostAcpPrefs(name: 'other-acp', spec: _fixtureSpec);
 
 Future<_Held> _hold(WidgetTester t, _Op op) async {
   final api = FakeBridgeApi();
   if (op == _Op.codexStop) {
     await api.appServeStart(port: 18080, name: 'alpha', embedded: false);
   } else if (op == _Op.acpStop) {
-    await api.appServeStartAcp(name: 'beta', spec: _openCodeSpec);
+    await api.appServeStartAcp(name: 'beta', spec: _fixtureSpec);
   }
   final prefs = _HeldPrefs(
     UiPrefs(
@@ -44,7 +44,7 @@ Future<_Held> _hold(WidgetTester t, _Op op) async {
       autoHostAcp: [
         _otherAcp,
         if (op == _Op.acpStop)
-          const AutoHostAcpPrefs(name: 'beta', spec: _openCodeSpec),
+          const AutoHostAcpPrefs(name: 'beta', spec: _fixtureSpec),
       ],
     ),
   );
@@ -176,7 +176,7 @@ Future<(FakeBridgeApi, ProviderContainer, Completer<void>)> _holdRestart(
   WidgetTester t,
 ) async {
   final api = FakeBridgeApi();
-  await api.appServeStartAcp(name: 'beta', spec: _openCodeSpec);
+  await api.appServeStartAcp(name: 'beta', spec: _fixtureSpec);
   final host = api.serveHosts.single;
   final container = await _pumpDialog(t, api, existing: host);
   container.listen(localServeListProvider, (_, _) {});

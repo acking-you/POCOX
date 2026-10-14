@@ -11,7 +11,7 @@ part 'bridge/native_session_types.dart';
 part 'bridge/hosting_types.dart';
 part 'bridge/provider_types.dart';
 part 'bridge/thread_types.dart';
-part 'bridge/session_control_types.dart';
+part 'bridge/session_access_types.dart';
 
 abstract interface class BridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
@@ -191,8 +191,17 @@ abstract interface class BridgeApi {
   /// Ids of sessions executing now, from the engine itself (ACP).
   Future<List<String>> appRunningThreads(String serviceKey);
 
-  /// Built-in ACP agent presets (OpenCode: `opencode` + `acp`).
+  /// Built-in ACP agent presets.
   List<AcpPreset> acpPresets();
+
+  /// Detect the OpenCode executable ([binary] null: `PATH`) and its
+  /// version; nothing is started or changed.
+  Future<OpenCodeEnvironment> openCodeDetect({String? binary});
+
+  /// Re-read the running OpenCode host [name]'s native catalog (providers,
+  /// models, agents) into its status; a failure is kept as the status
+  /// problem. Nothing is configured or restarted.
+  Future<void> openCodeRefresh({required String name});
 
   /// Whether this device can host ACP agents (Unix desktops).
   bool acpHostingSupported();
@@ -233,8 +242,9 @@ abstract interface class BridgeApi {
   /// The saved configuration of host [name] (inherited when never saved).
   Future<HostConfig> hostConfigGet(String name);
 
-  /// What a Codex host ([spec] null) or the ACP agent [spec] can select.
-  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec});
+  /// What a Codex host ([spec] and [engine] null), the ACP agent [spec] or
+  /// the engine [engine] (`opencode`) can select.
+  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec, String? engine});
 
   /// Save host [name]'s configuration for a Codex host ([spec] null) or the
   /// ACP agent [spec], and with [runtime] its desired runtime (an agent
@@ -634,18 +644,25 @@ abstract interface class BridgeApi {
   /// confirmation; do not call while a turn is actively running.
   Future<ForceResumeReport> metaForceResume(String serviceKey, String threadId);
 
-  /// An ownership snapshot. Inspecting it never starts or restores a writer.
-  Future<SessionControl> appAcpSessionControl(
+  /// Open session [threadId] of a host-access engine (ACP, OpenCode) for
+  /// writing when that is safe now: a released original session is acquired
+  /// and loaded in this call. Never forks, copies or creates a session; a
+  /// refused open answers follow/blocked access instead of failing.
+  Future<SessionAccess> appSessionOpen(String serviceKey, String threadId);
+
+  /// Where this controller stands with [threadId] now, with no side effects.
+  Future<SessionAccess> appSessionAccess(String serviceKey, String threadId);
+
+  /// Hand this host's idle writer of [snapshot]'s session back to other
+  /// clients; a replaced host or generation is refused.
+  Future<SessionAccess> appSessionRelease(
     String serviceKey,
-    String threadId,
+    SessionAccess snapshot,
   );
 
-  /// Apply the action to the exact displayed host, generation and source.
-  Future<void> appAcpControlSession(
-    String serviceKey,
-    SessionControl snapshot,
-    String action,
-  );
+  /// Native slash commands of the engine behind [serviceKey]
+  /// ([AppCapabilities.commands]).
+  Future<List<AgentCommand>> appCommandList(String serviceKey);
 
   /// Upload a document/file attachment to the host behind [serviceKey] (over
   /// its meta tunnel — loopback when this app is the host). Returns the

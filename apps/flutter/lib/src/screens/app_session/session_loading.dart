@@ -173,6 +173,7 @@ extension _SessionLoading on _AppSessionState {
       _guardianReadOnly = false;
       _parentThreadId = null;
       _externalWriterLiveness = null;
+      _access = null;
       _takingOver = false;
       // An open rename belongs to the thread being left, so drop it rather
       // than let it commit the old title onto the new conversation.

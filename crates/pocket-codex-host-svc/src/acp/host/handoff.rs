@@ -2,8 +2,8 @@
 //! never enters this path, and an idle turn alone is not release evidence.
 
 use super::*;
-use crate::native_history::NativeHistory;
 
+mod access;
 mod acquire;
 mod claims;
 mod status;
@@ -53,18 +53,7 @@ impl AgentHost {
                     .into(),
             ));
         }
-        let reader = match &self.inner.native_history {
-            Some(NativeHistory::Claude(reader)) => Some(reader),
-            None => None,
-            #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-            Some(NativeHistory::OpenCode(_)) => {
-                return Err(HostError::Unsupported(
-                    "OpenCode session close does not release its database engine; continue \
-                     through that engine or stop it first"
-                        .into(),
-                ))
-            },
-        };
+        let reader = self.inner.native_history.as_ref();
         {
             let mut state = self.state();
             let entry = state

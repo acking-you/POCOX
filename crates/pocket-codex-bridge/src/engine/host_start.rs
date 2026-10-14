@@ -15,6 +15,7 @@ use super::{
     runtime,
     serve::{self, Binary, CodexStart, ServeReport},
     serve_acp::{self, AcpServeReport},
+    serve_opencode,
 };
 
 /// What a new host runs.
@@ -32,6 +33,11 @@ pub enum NewHost {
     },
     /// An ACP agent.
     Acp(AgentSpec),
+    /// An owned native OpenCode server.
+    OpenCode {
+        /// Explicit executable or child PATH.
+        binary: Option<String>,
+    },
 }
 
 /// A started host.
@@ -41,6 +47,8 @@ pub enum Started {
     Codex(ServeReport),
     /// An ACP agent.
     Acp(AcpServeReport),
+    /// A native OpenCode gateway and meta service.
+    OpenCode(serve_opencode::Report),
 }
 
 /// Save `change` (with `host`'s runtime) for `name` and start it.
@@ -60,10 +68,16 @@ fn start_in(
             ..
         } => "default",
         NewHost::Acp(spec) => spec.profile_id.as_str(),
+        NewHost::OpenCode {
+            ..
+        } => "opencode",
     };
     let requested = host_names::requested(name, fallback);
     let lease = host_lease::acquire(&requested, Op::Start)?;
-    if serve::codex_relaunch(&requested).is_some() || serve_acp::is_hosting(lease.name()) {
+    if serve::codex_relaunch(&requested).is_some()
+        || serve_acp::is_hosting(lease.name())
+        || serve_opencode::is_hosting(lease.name())
+    {
         bail!("`{requested}` is already hosting; edit it instead, or choose another name");
     }
     let runtime = match &host {
@@ -77,6 +91,11 @@ fn start_in(
             proxy: proxy.clone(),
         },
         NewHost::Acp(spec) => Runtime::Acp(spec.clone()),
+        NewHost::OpenCode {
+            binary,
+        } => Runtime::OpenCode {
+            binary: binary.clone(),
+        },
     };
     let change = Change {
         runtime: RuntimeChange::Set(runtime),
@@ -87,6 +106,9 @@ fn start_in(
             ..
         } => Engine::Codex,
         NewHost::Acp(spec) => Engine::Acp(spec),
+        NewHost::OpenCode {
+            ..
+        } => Engine::OpenCode,
     };
     // No host runs under the name, so whatever was saved for it before is
     // replaced; it comes back if the start fails.
@@ -126,6 +148,11 @@ fn launch(
     provider: host_profiles::Resolved,
 ) -> Result<Started> {
     match host {
+        NewHost::OpenCode {
+            binary,
+        } => {
+            serve_opencode::start_locked(lease, binary.as_deref(), provider).map(Started::OpenCode)
+        },
         NewHost::Codex {
             port,
             binary,

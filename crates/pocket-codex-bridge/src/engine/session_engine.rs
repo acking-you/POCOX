@@ -34,6 +34,8 @@ pub enum Protocol {
     CodexAppServer,
     /// The Pocket-Codex gateway to a host-owned ACP agent.
     Acp,
+    /// External OpenCode native HTTP/SSE gateway.
+    OpenCode,
 }
 
 impl Protocol {
@@ -42,6 +44,7 @@ impl Protocol {
         match self {
             Self::CodexAppServer => "codex-app-server",
             Self::Acp => "acp",
+            Self::OpenCode => "opencode-http",
         }
     }
 }
@@ -63,6 +66,7 @@ pub fn logical_key(service_key: &str) -> Option<String> {
 pub fn protocol_of(service_key: &str) -> Protocol {
     match service_id_of(service_key).map(|id| id.kind) {
         Some(ServiceKind::Acp) => Protocol::Acp,
+        Some(ServiceKind::OpenCode) => Protocol::OpenCode,
         _ => Protocol::CodexAppServer,
     }
 }
@@ -137,7 +141,7 @@ pub struct Capabilities {
     pub provider: String,
     /// Human-readable agent name.
     pub provider_name: String,
-    /// ACP agent profile id reported by the host (`opencode` for the preset,
+    /// ACP agent profile id reported by the host (`claude` for the preset,
     /// or a custom id); empty for Codex and before the host answered.
     pub profile_id: String,
     /// Protocol id (see [`Protocol::id`]).
@@ -197,6 +201,14 @@ pub struct Capabilities {
     pub running_inventory: String,
     /// The agent reported that authentication is required.
     pub auth_required: bool,
+    /// Native slash command catalog.
+    pub commands: bool,
+    /// Choices may be retained locally before creating a session.
+    pub draft_options: bool,
+    /// Structured questions accept multiple labels.
+    pub question_multiple: bool,
+    /// Permission responses accept textual feedback.
+    pub permission_feedback: bool,
 }
 
 impl Capabilities {
@@ -413,6 +425,7 @@ pub fn engine(service_key: &str) -> &'static dyn SessionEngine {
     match protocol_of(service_key) {
         Protocol::CodexAppServer => &CodexEngine,
         Protocol::Acp => &AcpEngine,
+        Protocol::OpenCode => &super::opencode::OpenCodeEngine,
     }
 }
 
@@ -724,6 +737,8 @@ mod tests {
     fn protocols_follow_the_key_kind_in_both_namespaces() {
         assert_eq!(protocol_of("pcx:mac:app:default"), Protocol::CodexAppServer);
         assert_eq!(protocol_of("pcx:mac:acp:agent"), Protocol::Acp);
+        assert_eq!(protocol_of("pcx:mac:opencode:agent"), Protocol::OpenCode);
+        assert_eq!(protocol_of("pcxu:alice:mac:opencode:agent"), Protocol::OpenCode);
         assert_eq!(protocol_of("pcxu:alice:mac:acp:agent"), Protocol::Acp);
         // An instance name equal to a kind does not change the protocol.
         assert_eq!(protocol_of("pcx:mac:app:acp"), Protocol::CodexAppServer);

@@ -6,7 +6,7 @@ use anyhow::{bail, Context, Result};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::acp::process::{self, Spawned};
+use crate::process::{self, Spawned};
 
 const MAX_INPUT: usize = 64 * 1024;
 pub(super) const MAX_OUTPUT: usize = 10 * 1024 * 1024;

@@ -9,12 +9,14 @@ import 'package:pocket_codex/src/widgets/session_tree_row.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/native_hosts.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart'
     show appLocalPort;
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/time_ago.dart';
+import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/search_field.dart';
@@ -567,9 +569,33 @@ class _SessionRow extends StatelessWidget {
           key: Key('local-${session.threadId}'),
           mouseCursor: clickable,
           borderRadius: BorderRadius.circular(kControlRadius),
-          // Tapping any row opens the read-only transcript viewer (works even
-          // for a session another client owns — it reads the on-disk rollout).
+          // A native Claude/OpenCode row opens the live conversation on the
+          // host of this device that serves it, which resolves its access.
+          // Any other row (or with no such host) opens the read-only
+          // transcript viewer (works even for a session another client owns
+          // — it reads the history on disk).
           onTap: () {
+            if (serviceKey == null &&
+                provider != 'codex' &&
+                !session.isGuardian) {
+              final container = ProviderScope.containerOf(context);
+              final prefs = container.read(uiPrefsProvider).valueOrNull;
+              final host = nativeContinueHost(
+                container.read(localServeListProvider).valueOrNull ?? const [],
+                provider,
+                preferred: prefs?.lastServiceKey,
+              );
+              if (host != null) {
+                context.push(
+                  conversationRoute(
+                    host.appServiceKey,
+                    session.threadId,
+                    cwd: session.cwd,
+                  ),
+                );
+                return;
+              }
+            }
             final q = <String>[
               'tid=${Uri.encodeComponent(session.threadId)}',
               if (serviceKey == null)
@@ -655,15 +681,20 @@ class _SessionRow extends StatelessWidget {
       'resumableUnfinished' => (cautionColor(scheme), l10n.sessionUnfinished),
       'ownedRunning' => (scheme.error, l10n.sessionRunningElsewhere),
       'ownedIdle' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
+      'nativeOwnedRunning' => (scheme.error, l10n.sessionRunningElsewhere),
+      'nativeOwnedIdle' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
+      'nativeUnowned' => (successColor(scheme), l10n.nativeSessionFree),
       _ => (
         scheme.outline,
-        provider == 'codex' ? session.safety : l10n.nativeHistoryReadOnly,
+        provider == 'codex' ? session.safety : l10n.nativeSessionUnknown,
       ),
     };
     return StatusChip(
       color: color,
       label: label,
-      pulsing: session.safety == 'ownedRunning',
+      pulsing:
+          session.safety == 'ownedRunning' ||
+          session.safety == 'nativeOwnedRunning',
     );
   }
 }

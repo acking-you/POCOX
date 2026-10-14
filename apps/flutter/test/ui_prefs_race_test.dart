@@ -19,7 +19,7 @@ AcpAgentSpec _agent(String id, {String program = 'agent'}) =>
 
 AutoHostAcpPrefs _acp(String name) => AutoHostAcpPrefs(
   name: name,
-  spec: _agent('opencode', program: 'opencode'),
+  spec: _agent('fixture', program: 'fixture-agent'),
 );
 
 /// A store over a temporary file holding [saved], whose lookup waits for

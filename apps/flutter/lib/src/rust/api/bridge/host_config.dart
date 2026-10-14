@@ -16,10 +16,13 @@ Future<HostConfigDto> hostConfigGet({required String name}) =>
     RustLib.instance.api.crateApiBridgeHostConfigHostConfigGet(name: name);
 
 /// What a Codex host (`spec` = `None`) or the ACP agent `spec` can select.
-HostConfigSupportDto hostConfigSupported({AcpAgentSpecDto? spec}) => RustLib
-    .instance
-    .api
-    .crateApiBridgeHostConfigHostConfigSupported(spec: spec);
+HostConfigSupportDto hostConfigSupported({
+  AcpAgentSpecDto? spec,
+  String? engine,
+}) => RustLib.instance.api.crateApiBridgeHostConfigHostConfigSupported(
+  spec: spec,
+  engine: engine,
+);
 
 /// Save host `name`'s configuration for a Codex host (`spec` = `None`) or
 /// the ACP agent `spec`, and, with `runtime`, its desired runtime (an

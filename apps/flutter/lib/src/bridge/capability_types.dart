@@ -162,6 +162,10 @@ class AppCapabilities {
     this.historyScope = 'retained',
     this.runningInventory = 'none',
     this.authRequired = false,
+    this.commands = false,
+    this.draftOptions = false,
+    this.questionMultiple = false,
+    this.permissionFeedback = false,
   });
 
   /// The Codex app-server's capabilities.
@@ -209,14 +213,32 @@ class AppCapabilities {
     runningInventory: 'engine',
   );
 
-  /// Wire protocol: `codex-app-server` or `acp`.
+  /// A native OpenCode service before its host answered: nothing optional.
+  static const opencode = AppCapabilities(
+    provider: 'opencode',
+    fast: false,
+    permissionPresets: false,
+    guardian: false,
+    rateLimits: false,
+    takeover: false,
+    externalWriterMonitor: false,
+    localSessions: false,
+    planMode: false,
+    protocol: 'opencode-http',
+    providerName: 'OpenCode',
+    permissionOptions: true,
+    runningInventory: 'engine',
+  );
+
+  /// Wire protocol: `codex-app-server`, `acp` or `opencode-http`.
   final String protocol;
 
   /// Human-readable agent name.
   final String providerName;
 
-  /// ACP agent profile id reported by the host (`opencode` for the preset);
-  /// empty for Codex and before the host answered. Identity only: it never
+  /// Agent profile id reported by the host: `claude` for the Claude preset,
+  /// a saved ACP agent's own id, `opencode` for native OpenCode; empty for
+  /// Codex and before the host answered. Identity only: it never
   /// selects transport behaviour.
   final String profileId;
 
@@ -275,10 +297,37 @@ class AppCapabilities {
   /// The agent reported that authentication is required.
   final bool authRequired;
 
+  /// Native slash commands the engine lists ([BridgeApi.appCommandList]).
+  final bool commands;
+
+  /// Session options exist before a session does: a draft keeps its own
+  /// choices and they are applied when its session is created.
+  final bool draftOptions;
+
+  /// Questions may allow several answers each.
+  final bool questionMultiple;
+
+  /// A rejected permission may carry a message to the agent.
+  final bool permissionFeedback;
+
   /// Whether this is an ACP connection.
   bool get isAcp => protocol == 'acp' || provider == 'acp';
 
-  /// `codex` or `acp`.
+  /// Whether this is a native OpenCode connection.
+  bool get isOpenCode => protocol == 'opencode-http' || provider == 'opencode';
+
+  /// The session engine: `codex`, `acp` or `opencode`.
+  String get engine => isOpenCode
+      ? 'opencode'
+      : isAcp
+      ? 'acp'
+      : 'codex';
+
+  /// Whether the host decides session access ([BridgeApi.appSessionOpen])
+  /// instead of the Codex takeover path.
+  bool get hostAccess => isAcp || isOpenCode;
+
+  /// `codex`, `acp` or `opencode`.
   final String provider;
 
   /// Fast service tier toggle.

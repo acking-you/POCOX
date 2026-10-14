@@ -1,25 +1,26 @@
 part of '../acp_hosting_test.dart';
 
 void _registerPresets() {
-  testWidgets('the OpenCode preset hosts `opencode` with argv [acp]', (
+  testWidgets('a built-in ACP preset hosts its program with its argv', (
     t,
   ) async {
     final api = FakeBridgeApi();
     final c = await _pumpDialog(t, api);
     // One tile per agent, each with its own mark; Codex is preselected.
+    // Native OpenCode has its own tile, apart from the ACP presets.
     expect(find.byKey(const Key('agent-choice-codex')), findsOneWidget);
+    expect(find.byKey(const Key('agent-choice-opencode')), findsOneWidget);
     expect(
-      find.byKey(const Key('agent-choice-preset:opencode')),
+      find.byKey(const Key('agent-choice-preset:fixture')),
       findsOneWidget,
     );
     expect(find.byKey(const Key('agent-choice-custom')), findsOneWidget);
-    expect(find.byKey(const Key('agent-icon-opencode')), findsOneWidget);
     await _chooseAcp(t);
     expect(find.byKey(const Key('acp-host-form')), findsOneWidget);
     final program = t.widget<TextField>(
       find.byKey(const Key('acp-program-field')),
     );
-    expect(program.controller!.text, 'opencode');
+    expect(program.controller!.text, 'fixture-agent');
     expect(find.byKey(const Key('acp-program-found')), findsOneWidget);
     final arg = t.widget<TextField>(find.byKey(const Key('acp-arg-field-0')));
     expect(arg.controller!.text, 'acp');
@@ -29,25 +30,20 @@ void _registerPresets() {
     await _start(t);
     expect(api.acpServeCalls, hasLength(1));
     final (name, spec) = api.acpServeCalls.single;
-    expect(name, 'opencode');
-    expect(spec.profileId, 'opencode');
-    expect(spec.program, 'opencode');
+    expect(name, 'fixture');
+    expect(spec.profileId, 'fixture');
+    expect(spec.program, 'fixture-agent');
     expect(spec.args, ['acp']);
     final prefs = await c.read(uiPrefsProvider.future);
-    expect(prefs.autoHostAcp.single.name, 'opencode');
+    expect(prefs.autoHostAcp.single.name, 'fixture');
     expect(prefs.acpAgents, isEmpty, reason: 'presets are not saved');
   });
 
-  testWidgets('agent chooser shows OpenCode, Claude adapter, saved long names '
+  testWidgets('agent chooser shows a preset, Claude adapter, saved long names '
       'and Custom, wrapping safely at 320px with reachable Start', (t) async {
     final api = FakeBridgeApi();
     api.presets = const [
-      AcpPreset(
-        id: 'opencode',
-        displayName: 'OpenCode',
-        program: 'opencode',
-        args: ['acp'],
-      ),
+      fixturePreset,
       AcpPreset(
         id: 'claude',
         displayName: 'Claude',
@@ -70,7 +66,7 @@ void _registerPresets() {
     );
     expect(find.byKey(const Key('agent-choice-codex')), findsOneWidget);
     expect(
-      find.byKey(const Key('agent-choice-preset:opencode')),
+      find.byKey(const Key('agent-choice-preset:fixture')),
       findsOneWidget,
     );
     expect(find.byKey(const Key('agent-choice-preset:claude')), findsOneWidget);
@@ -81,7 +77,7 @@ void _registerPresets() {
     );
     expect(find.byKey(const Key('agent-choice-custom')), findsOneWidget);
 
-    // The program and arguments sit behind Advanced, as for OpenCode.
+    // The program and arguments sit behind Advanced, as for any preset.
     await _chooseAcp(t, 'claude');
     expect(find.byKey(const Key('acp-host-form')), findsOneWidget);
     final program = t.widget<TextField>(
@@ -199,14 +195,15 @@ void _registerPresets() {
         final remove = t.getSize(find.byKey(const Key('acp-arg-remove-0')));
         expect(remove.height, greaterThanOrEqualTo(48));
         final tile = t.getSize(
-          find.byKey(const Key('agent-choice-preset:opencode')),
+          find.byKey(const Key('agent-choice-preset:fixture')),
         );
         expect(tile.height, greaterThanOrEqualTo(48));
       });
     }
   }
 
-  testWidgets('agent marks follow the profile, never the host name', (t) async {
+  testWidgets('agent marks follow the profile or engine, never the host '
+      'name', (t) async {
     await t.pumpWidget(
       MaterialApp(
         home: Row(
@@ -218,25 +215,29 @@ void _registerPresets() {
               name: 'opencode',
             ),
             AgentIcon.of(
-              key: const Key('preset'),
+              key: const Key('retired-preset'),
               provider: 'acp',
               profileId: 'opencode',
             ),
+            AgentIcon.of(key: const Key('native'), provider: 'opencode'),
             AgentIcon.of(key: const Key('codex'), provider: 'codex'),
           ],
         ),
       ),
     );
+    for (final key in ['named-opencode', 'retired-preset']) {
+      expect(
+        find.descendant(
+          of: find.byKey(Key(key)),
+          matching: find.byKey(const Key('agent-icon-letter')),
+        ),
+        findsOneWidget,
+        reason: key,
+      );
+    }
     expect(
       find.descendant(
-        of: find.byKey(const Key('named-opencode')),
-        matching: find.byKey(const Key('agent-icon-letter')),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: find.byKey(const Key('preset')),
+        of: find.byKey(const Key('native')),
         matching: find.byKey(const Key('agent-icon-opencode')),
       ),
       findsOneWidget,
@@ -249,6 +250,7 @@ void _registerPresets() {
       findsOneWidget,
     );
     expect(agentKindOf(provider: 'acp', profileId: 'claude'), AgentKind.claude);
+    expect(agentKindOf(provider: 'opencode'), AgentKind.opencode);
     expect(agentKindOf(provider: 'acp'), AgentKind.other);
   });
 
@@ -264,7 +266,7 @@ void _registerPresets() {
   testWidgets('a name another host owns gets localized guidance', (t) async {
     final api = FakeBridgeApi()
       ..acpServeError = StateError(
-        '`opencode` is already hosting Codex on this device; choose another name',
+        '`fixture` is already hosting Codex on this device; choose another name',
       );
     await _pumpDialog(t, api);
     await _chooseAcp(t);
@@ -280,6 +282,11 @@ void _registerPresets() {
       SessionProtocol.codexAppServer,
     );
     expect(isSessionKind('acp'), isTrue);
+    expect(
+      sessionProtocolOf('pcx:mac:opencode:opencode'),
+      SessionProtocol.opencode,
+    );
+    expect(isSessionKind('opencode'), isTrue);
     expect(
       customProfileId('My Agent!', '0a1b2c3d'),
       'custom-my-agent-0a1b2c3d',

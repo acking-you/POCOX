@@ -6,7 +6,7 @@
 //!                      │      │          │        └── instance name
 //!                      │      │          │            (e.g. "default", "work")
 //!                      │      │          └─────────── ServiceKind::as_key_segment
-//!                      │      │                       ("app" | "api" | "meta" | "acp")
+//!                      │      │                       ("app" | "api" | "meta" | "acp" | "opencode")
 //!                      │      └────────────────────── sanitised host id
 //!                      │                              (default: hostname)
 //!                      └───────────────────────────── SERVICE_KEY_PREFIX
@@ -43,6 +43,8 @@ pub enum ServiceKind {
     /// Pocket-Codex ACP gateway (`/acp/v1`) in front of a host-owned ACP
     /// agent. The agent's identity is host metadata, never part of the key.
     Acp,
+    /// Pocket-Codex native OpenCode HTTP/SSE gateway (`/opencode/v1`).
+    OpenCode,
     /// Host-side meta service (session inventory + per-thread config), exposed
     /// alongside an `app`/`api` host so its local sessions are remote-viewable.
     Meta,
@@ -63,6 +65,7 @@ impl ServiceKind {
             Self::App => "app",
             Self::Api => "api",
             Self::Acp => "acp",
+            Self::OpenCode => "opencode",
             Self::Meta => "meta",
             Self::Unknown => "unknown",
         }
@@ -83,6 +86,7 @@ impl FromStr for ServiceKind {
             "app" => Ok(Self::App),
             "api" => Ok(Self::Api),
             "acp" => Ok(Self::Acp),
+            "opencode" => Ok(Self::OpenCode),
             "meta" => Ok(Self::Meta),
             _ => Err(()),
         }
@@ -194,6 +198,7 @@ mod tests {
     fn acp_keys_round_trip_alongside_native_services() {
         for key in [
             "pcx:studio:acp:work",
+            "pcx:studio:opencode:work",
             "pcx:studio:app:work",
             "pcx:studio:api:work",
             "pcx:studio:meta:work",

@@ -271,12 +271,15 @@ async fn me(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Json
 struct ServicesQuery {
     #[serde(default)]
     include_acp: bool,
+    #[serde(default)]
+    include_opencode: bool,
 }
 
 /// Which opt-in kinds a caller asked to see.
 #[derive(Clone, Copy, Default)]
 struct OptInKinds {
     acp: bool,
+    opencode: bool,
 }
 
 /// List the caller's own services, as the relay sees them.
@@ -308,6 +311,7 @@ async fn services(
     Ok(Json(ServicesResponse {
         services: own_services(&all, namespace, &claims.sub, OptInKinds {
             acp: query.include_acp,
+            opencode: query.include_opencode,
         }),
     }))
 }
@@ -339,6 +343,7 @@ fn own_services(
         .filter(|nsid| match nsid.service.kind {
             ServiceKind::App | ServiceKind::Api => true,
             ServiceKind::Acp => opt_in.acp,
+            ServiceKind::OpenCode => opt_in.opencode,
             ServiceKind::Meta | ServiceKind::Unknown => false,
         })
         .map(|nsid| ServiceEntry {
@@ -475,15 +480,17 @@ mod tests {
     }
 
     #[test]
-    fn acp_services_are_opt_in_and_still_namespace_scoped() {
+    fn agent_services_are_independently_opt_in_and_still_namespace_scoped() {
         const ALICE_NS: u64 = 7;
         const BOB_NS: u64 = 8;
         let all = vec![
             record(ALICE_NS, "pcxu:alice:mac:app:default"),
             record(ALICE_NS, "pcxu:alice:mac:acp:agent"),
+            record(ALICE_NS, "pcxu:alice:mac:opencode:native"),
             record(ALICE_NS, "pcxu:alice:mac:meta:agent"),
             // Bob's namespace carrying Alice's prefix must never be attributed.
             record(BOB_NS, "pcxu:alice:mac:acp:phantom"),
+            record(BOB_NS, "pcxu:alice:mac:opencode:phantom"),
         ];
         let kinds = |opt_in| {
             let mut kinds: Vec<String> = own_services(&all, ALICE_NS, "alice", opt_in)
@@ -497,8 +504,16 @@ mod tests {
         assert_eq!(
             kinds(OptInKinds {
                 acp: true,
+                ..OptInKinds::default()
             }),
             vec!["acp:agent", "app:default"]
+        );
+        assert_eq!(
+            kinds(OptInKinds {
+                opencode: true,
+                ..OptInKinds::default()
+            }),
+            vec!["app:default", "opencode:native"]
         );
     }
 }

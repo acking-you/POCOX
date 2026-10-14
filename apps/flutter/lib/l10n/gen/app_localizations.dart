@@ -872,6 +872,12 @@ abstract class AppLocalizations {
   /// **'Can\'t switch mode: no model is available'**
   String get noModelForMode;
 
+  /// No description provided for @modelWithdrawn.
+  ///
+  /// In en, this message translates to:
+  /// **'This host no longer offers the selected model. Choose a model and send again.'**
+  String get modelWithdrawn;
+
   /// No description provided for @effort.
   ///
   /// In en, this message translates to:
@@ -4514,197 +4520,6 @@ abstract class AppLocalizations {
   /// **'Agent features'**
   String get acpFeatures;
 
-  /// No description provided for @acpCatalog.
-  ///
-  /// In en, this message translates to:
-  /// **'Model catalog'**
-  String get acpCatalog;
-
-  /// No description provided for @acpCatalogWaiting.
-  ///
-  /// In en, this message translates to:
-  /// **'The agent\'s model catalog is listed when its first session opens.'**
-  String get acpCatalogWaiting;
-
-  /// No description provided for @acpRouteWaiting.
-  ///
-  /// In en, this message translates to:
-  /// **'Whether OpenCode uses this host\'s provider is checked when its first session opens.'**
-  String get acpRouteWaiting;
-
-  /// No description provided for @acpRouteSelected.
-  ///
-  /// In en, this message translates to:
-  /// **'OpenCode uses this host\'s provider and model.'**
-  String get acpRouteSelected;
-
-  /// No description provided for @acpRouteOverridden.
-  ///
-  /// In en, this message translates to:
-  /// **'Another OpenCode configuration overrides this host\'s provider: {reasons}. Requests may go elsewhere.'**
-  String acpRouteOverridden(String reasons);
-
-  /// No description provided for @acpRouteUnverified.
-  ///
-  /// In en, this message translates to:
-  /// **'Whether OpenCode uses this host\'s provider cannot be checked: {reasons}.'**
-  String acpRouteUnverified(String reasons);
-
-  /// No description provided for @acpRouteReasonModel.
-  ///
-  /// In en, this message translates to:
-  /// **'it selects another model'**
-  String get acpRouteReasonModel;
-
-  /// No description provided for @acpRouteReasonEnabled.
-  ///
-  /// In en, this message translates to:
-  /// **'enabled_providers leaves it out'**
-  String get acpRouteReasonEnabled;
-
-  /// No description provided for @acpRouteReasonDisabled.
-  ///
-  /// In en, this message translates to:
-  /// **'disabled_providers names it'**
-  String get acpRouteReasonDisabled;
-
-  /// No description provided for @acpRouteReasonMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'the provider is missing from the merged configuration'**
-  String get acpRouteReasonMissing;
-
-  /// No description provided for @acpRouteReasonSmallModel.
-  ///
-  /// In en, this message translates to:
-  /// **'small_model names another provider'**
-  String get acpRouteReasonSmallModel;
-
-  /// No description provided for @acpRouteReasonAgentModel.
-  ///
-  /// In en, this message translates to:
-  /// **'an agent or mode model names another provider'**
-  String get acpRouteReasonAgentModel;
-
-  /// No description provided for @acpRouteReasonProvider.
-  ///
-  /// In en, this message translates to:
-  /// **'another layer changed the provider\'s definition'**
-  String get acpRouteReasonProvider;
-
-  /// No description provided for @acpRouteEnforced.
-  ///
-  /// In en, this message translates to:
-  /// **'Other OpenCode configuration differed and was reset to this host\'s provider: {reasons}.'**
-  String acpRouteEnforced(String reasons);
-
-  /// No description provided for @acpRouteRefused.
-  ///
-  /// In en, this message translates to:
-  /// **'OpenCode was given no usable provider: this host\'s key is missing in the agent\'s environment, so no prompt can be sent. Save the key again and restart the host.'**
-  String get acpRouteRefused;
-
-  /// No description provided for @acpRouteReasonKey.
-  ///
-  /// In en, this message translates to:
-  /// **'the host\'s key is missing in the agent'**
-  String get acpRouteReasonKey;
-
-  /// No description provided for @acpRouteProjects.
-  ///
-  /// In en, this message translates to:
-  /// **'Projects checked, as the plugin input names them (not verified against OpenCode\'s source): {projects}'**
-  String acpRouteProjects(String projects);
-
-  /// No description provided for @acpRouteScope.
-  ///
-  /// In en, this message translates to:
-  /// **'This covers OpenCode\'s merged configuration, with this host\'s key pinned over a key saved for the same provider with `opencode auth login`. Another plugin\'s provider or auth loader for the same provider, or a later plugin\'s hook, is not covered.'**
-  String get acpRouteScope;
-
-  /// No description provided for @acpCatalogUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'The model catalog could not be added to the agent: {reason}'**
-  String acpCatalogUnavailable(String reason);
-
-  /// No description provided for @acpCatalogReasonPluginsDisabled.
-  ///
-  /// In en, this message translates to:
-  /// **'the agent runs with plugins disabled (--pure or OPENCODE_PURE)'**
-  String get acpCatalogReasonPluginsDisabled;
-
-  /// No description provided for @acpCatalogReasonConfigTaken.
-  ///
-  /// In en, this message translates to:
-  /// **'the agent\'s environment sets both OPENCODE_CONFIG and OPENCODE_CONFIG_CONTENT; add the plugin below to your config'**
-  String get acpCatalogReasonConfigTaken;
-
-  /// No description provided for @acpCatalogReasonInstallFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'the catalog plugin could not be written'**
-  String get acpCatalogReasonInstallFailed;
-
-  /// No description provided for @acpCatalogPlugin.
-  ///
-  /// In en, this message translates to:
-  /// **'Plugin'**
-  String get acpCatalogPlugin;
-
-  /// No description provided for @acpCatalogProviderComplete.
-  ///
-  /// In en, this message translates to:
-  /// **'{id}: {listed} models listed, {added} added'**
-  String acpCatalogProviderComplete(String id, int listed, int added);
-
-  /// No description provided for @acpCatalogProviderPartial.
-  ///
-  /// In en, this message translates to:
-  /// **'{id}: {listed} models listed, {added} added; the listing is incomplete ({reason})'**
-  String acpCatalogProviderPartial(
-    String id,
-    int listed,
-    int added,
-    String reason,
-  );
-
-  /// No description provided for @acpCatalogNoProviders.
-  ///
-  /// In en, this message translates to:
-  /// **'No enabled provider with an explicit baseURL was found, so nothing was listed; only the configured models are offered.'**
-  String get acpCatalogNoProviders;
-
-  /// No description provided for @acpCatalogProviderFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'{id}: the model list could not be read ({reason}); the configured models are used'**
-  String acpCatalogProviderFailed(String id, String reason);
-
-  /// No description provided for @acpCatalogProviderSkipped.
-  ///
-  /// In en, this message translates to:
-  /// **'{id}: not listed ({reason})'**
-  String acpCatalogProviderSkipped(String id, String reason);
-
-  /// No description provided for @acpCatalogExcluded.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} non-chat entries left out'**
-  String acpCatalogExcluded(int count);
-
-  /// No description provided for @acpCatalogUnsafe.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} entries left out because the agent cannot hold their ids'**
-  String acpCatalogUnsafe(int count);
-
-  /// No description provided for @acpCatalogNoKey.
-  ///
-  /// In en, this message translates to:
-  /// **'no key was found in the provider\'s config or environment; a key saved through the agent\'s own sign-in is not visible here'**
-  String get acpCatalogNoKey;
-
   /// No description provided for @acpFeatureReopen.
   ///
   /// In en, this message translates to:
@@ -5587,12 +5402,6 @@ abstract class AppLocalizations {
   /// **'Local history · Read-only'**
   String get nativeHistoryReadOnly;
 
-  /// No description provided for @nativeHistoryTakeoverUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Live history is read-only. This agent cannot guarantee an exclusive handover, so takeover is unavailable. Start a new conversation to send messages.'**
-  String get nativeHistoryTakeoverUnavailable;
-
   /// No description provided for @agentWelcomeTitle.
   ///
   /// In en, this message translates to:
@@ -5779,113 +5588,491 @@ abstract class AppLocalizations {
   /// **'A bounded history window is shown. Some content is omitted or outside this window.'**
   String get nativeHistoryWindowHint;
 
-  /// No description provided for @sessionControlTitle.
+  /// No description provided for @providerOpenCode.
   ///
   /// In en, this message translates to:
-  /// **'Session access'**
-  String get sessionControlTitle;
+  /// **'OpenCode'**
+  String get providerOpenCode;
 
-  /// No description provided for @sessionControlChecking.
+  /// No description provided for @agentChoiceNativeServer.
   ///
   /// In en, this message translates to:
-  /// **'Checking the current writer…'**
-  String get sessionControlChecking;
+  /// **'Native server'**
+  String get agentChoiceNativeServer;
 
-  /// No description provided for @sessionControlOwned.
+  /// No description provided for @agentChoiceRunningAs.
   ///
   /// In en, this message translates to:
-  /// **'This host already runs this session. Continue here using the same writer.'**
-  String get sessionControlOwned;
+  /// **'Running as {name}'**
+  String agentChoiceRunningAs(String name);
 
-  /// No description provided for @sessionControlSameEngine.
+  /// No description provided for @hostInheritedOpenCode.
   ///
   /// In en, this message translates to:
-  /// **'Continue through this OpenCode engine. It serializes messages from connected devices. Starting another engine for this session can cause concurrent writes.'**
-  String get sessionControlSameEngine;
+  /// **'Uses OpenCode\'s own providers and sign-ins on this computer.'**
+  String get hostInheritedOpenCode;
 
-  /// No description provided for @sessionControlReleased.
+  /// No description provided for @openCodeRuntimeHint.
   ///
   /// In en, this message translates to:
-  /// **'No registered Claude writer was found. You can acquire the original session here; ownership will be checked again before sending is enabled.'**
-  String get sessionControlReleased;
+  /// **'Pocket starts and owns one opencode serve on this computer, reachable only through this host.'**
+  String get openCodeRuntimeHint;
 
-  /// No description provided for @sessionControlExternalIdle.
+  /// No description provided for @openCodeDetecting.
   ///
   /// In en, this message translates to:
-  /// **'Claude is idle in another client, but that client still holds the session. Release it in the owning Pocket host, or exit the original Claude client, then refresh here.'**
-  String get sessionControlExternalIdle;
+  /// **'Looking for OpenCode…'**
+  String get openCodeDetecting;
 
-  /// No description provided for @sessionControlExternalRunning.
+  /// No description provided for @openCodeFoundAt.
   ///
   /// In en, this message translates to:
-  /// **'Another Claude client is still running a turn. Wait for it to finish, then release the session in that client.'**
-  String get sessionControlExternalRunning;
+  /// **'OpenCode {version} · {path}'**
+  String openCodeFoundAt(String version, String path);
 
-  /// No description provided for @sessionControlReleasePending.
+  /// No description provided for @openCodeNotFound.
   ///
   /// In en, this message translates to:
-  /// **'Release has not been confirmed. Sending remains blocked. Retry release to verify that the writer has exited.'**
-  String get sessionControlReleasePending;
+  /// **'OpenCode was not found. Install it or choose its executable.'**
+  String get openCodeNotFound;
 
-  /// No description provided for @sessionControlLoading.
+  /// No description provided for @openCodeUnsupportedVersion.
   ///
   /// In en, this message translates to:
-  /// **'This host is restoring the session. Refresh when it finishes.'**
-  String get sessionControlLoading;
+  /// **'This OpenCode version is not supported. Update OpenCode.'**
+  String get openCodeUnsupportedVersion;
 
-  /// No description provided for @sessionControlEngineRequired.
+  /// No description provided for @openCodeNoProvider.
   ///
   /// In en, this message translates to:
-  /// **'OpenCode keeps turn ownership inside its running engine. A separate ACP process cannot attach to an external engine or prove that it released this session. Connect to the Pocket host already running it to continue; this view will not start a second writer or stop another engine.'**
-  String get sessionControlEngineRequired;
+  /// **'No provider is signed in. Run `opencode auth login` on this computer, then refresh.'**
+  String get openCodeNoProvider;
 
-  /// No description provided for @sessionControlStopped.
+  /// No description provided for @openCodeAlreadyHosted.
   ///
   /// In en, this message translates to:
-  /// **'The selected host is not ready. Start or reconnect that host, then refresh.'**
-  String get sessionControlStopped;
+  /// **'OpenCode is already hosted on this computer. Open that host instead.'**
+  String get openCodeAlreadyHosted;
 
-  /// No description provided for @sessionControlUnknown.
+  /// No description provided for @openCodePath.
   ///
   /// In en, this message translates to:
-  /// **'Writer ownership could not be verified, or this agent does not support handoff. Viewing remains available; refresh to check again.'**
-  String get sessionControlUnknown;
+  /// **'OpenCode executable'**
+  String get openCodePath;
 
-  /// No description provided for @sessionControlExclusiveNote.
+  /// No description provided for @openCodePathRequired.
   ///
   /// In en, this message translates to:
-  /// **'Keep this session closed in other native clients while using it here. Pocket hosts share a writer lock, but independent native clients do not honor it.'**
-  String get sessionControlExclusiveNote;
+  /// **'Enter the OpenCode executable.'**
+  String get openCodePathRequired;
 
-  /// No description provided for @sessionControlReleaseNote.
+  /// No description provided for @openCodeRunning.
   ///
   /// In en, this message translates to:
-  /// **'Release closes this host’s idle writer and switches all its connected devices to read-only. History stays on disk; this screen keeps its unsent draft, attachments and queue.'**
-  String get sessionControlReleaseNote;
+  /// **'OpenCode {version} is running'**
+  String openCodeRunning(String version);
 
-  /// No description provided for @sessionControlChanged.
+  /// No description provided for @openCodeProviders.
   ///
   /// In en, this message translates to:
-  /// **'The host or conversation changed. Reopen session access for the current view.'**
-  String get sessionControlChanged;
+  /// **'Providers ready'**
+  String get openCodeProviders;
 
-  /// No description provided for @sessionControlRelease.
+  /// No description provided for @openCodeModels.
   ///
   /// In en, this message translates to:
-  /// **'Release to read-only'**
-  String get sessionControlRelease;
+  /// **'Models'**
+  String get openCodeModels;
 
-  /// No description provided for @sessionControlContinue.
+  /// No description provided for @openCodeDefaultModel.
   ///
   /// In en, this message translates to:
-  /// **'Continue on this host'**
-  String get sessionControlContinue;
+  /// **'Default model'**
+  String get openCodeDefaultModel;
 
-  /// No description provided for @sessionControlAcquire.
+  /// No description provided for @openCodeAgents.
   ///
   /// In en, this message translates to:
-  /// **'Acquire original session'**
-  String get sessionControlAcquire;
+  /// **'Agents'**
+  String get openCodeAgents;
+
+  /// No description provided for @openCodeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get openCodeNone;
+
+  /// No description provided for @openCodeConfigNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Providers, models and agents come from OpenCode\'s own configuration on this computer, plus the custom provider this host\'s model service may add. Change OpenCode\'s configuration there, then Refresh; restart this host if a change does not show.'**
+  String get openCodeConfigNote;
+
+  /// No description provided for @openCodeScopeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Every Pocket device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.'**
+  String get openCodeScopeNote;
+
+  /// No description provided for @refresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh'**
+  String get refresh;
+
+  /// A draft option left to the agent's own default (for example no variant for a newly chosen model).
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get draftOptionDefault;
+
+  /// No description provided for @openCodeRefreshFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t refresh: {error}'**
+  String openCodeRefreshFailed(String error);
+
+  /// No description provided for @sessionHandBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand back to other clients'**
+  String get sessionHandBack;
+
+  /// No description provided for @accessQueueHeld.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 queued message is waiting while this session was followed. Retry sends it.} other{{count} queued messages are waiting while this session was followed. Retry sends them.}}'**
+  String accessQueueHeld(int count);
+
+  /// No description provided for @accessScopeEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing through this host. Other {agent} clients on this computer are not blocked.'**
+  String accessScopeEngine(String agent);
+
+  /// No description provided for @accessScopePocket.
+  ///
+  /// In en, this message translates to:
+  /// **'Held by this host. Other Pocket hosts cannot write; native clients are not blocked.'**
+  String get accessScopePocket;
+
+  /// No description provided for @accessScopeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Writing through this host. Other clients are not blocked.'**
+  String get accessScopeNone;
+
+  /// No description provided for @accessClientClaude.
+  ///
+  /// In en, this message translates to:
+  /// **'Claude Code'**
+  String get accessClientClaude;
+
+  /// No description provided for @accessClientOpenCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Another OpenCode process'**
+  String get accessClientOpenCode;
+
+  /// No description provided for @accessClientPocketHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Another Pocket host'**
+  String get accessClientPocketHost;
+
+  /// No description provided for @accessClientOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Another client'**
+  String get accessClientOther;
+
+  /// No description provided for @accessStatusOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening'**
+  String get accessStatusOpening;
+
+  /// No description provided for @accessStatusHandedBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Handed back'**
+  String get accessStatusHandedBack;
+
+  /// No description provided for @accessStatusChanging.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing hands'**
+  String get accessStatusChanging;
+
+  /// No description provided for @accessStatusUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get accessStatusUnavailable;
+
+  /// No description provided for @accessStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Writer unknown'**
+  String get accessStatusUnknown;
+
+  /// No description provided for @accessOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the original session…'**
+  String get accessOpening;
+
+  /// No description provided for @accessHandedBackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Handed back to other clients'**
+  String get accessHandedBackTitle;
+
+  /// No description provided for @accessHandedBackDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'This host closed its writer, so another app can continue the original session. Nothing is taken back by itself.'**
+  String get accessHandedBackDetail;
+
+  /// No description provided for @accessTransitionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This session is changing hands'**
+  String get accessTransitionTitle;
+
+  /// No description provided for @accessTransitionDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The host is loading or closing it.'**
+  String get accessTransitionDetail;
+
+  /// No description provided for @accessHostStoppedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The {agent} host is not running'**
+  String accessHostStoppedTitle(String agent);
+
+  /// No description provided for @accessHostStoppedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Start it to continue this session.'**
+  String get accessHostStoppedDetail;
+
+  /// No description provided for @accessExternalRunningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} is running a turn in this session'**
+  String accessExternalRunningTitle(String client);
+
+  /// No description provided for @accessExternalRunningDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Following it live. Nothing can be sent from here meanwhile.'**
+  String get accessExternalRunningDetail;
+
+  /// No description provided for @accessExternalIdleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} still has this session open'**
+  String accessExternalIdleTitle(String client);
+
+  /// No description provided for @accessExternalIdleDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'No turn is running. Close the session there, then check again.'**
+  String get accessExternalIdleDetail;
+
+  /// No description provided for @accessSourceOpenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Another OpenCode process has this history source open'**
+  String get accessSourceOpenTitle;
+
+  /// No description provided for @accessSourceOpenDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.'**
+  String get accessSourceOpenDetail;
+
+  /// No description provided for @accessPocketHostTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} is writing this session'**
+  String accessPocketHostTitle(String client);
+
+  /// No description provided for @accessPocketHostRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'It is running a turn now.'**
+  String get accessPocketHostRunning;
+
+  /// No description provided for @accessPocketHostIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'No turn is running there, but it still holds the session.'**
+  String get accessPocketHostIdle;
+
+  /// No description provided for @accessUnsupportedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} cannot reopen this session'**
+  String accessUnsupportedTitle(String agent);
+
+  /// No description provided for @accessNotFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This session is no longer on the host'**
+  String get accessNotFoundTitle;
+
+  /// No description provided for @accessUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot tell who else writes this session'**
+  String get accessUnknownTitle;
+
+  /// No description provided for @accessUnknownDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The host could not inspect the session\'s other clients.'**
+  String get accessUnknownDetail;
+
+  /// No description provided for @accessNextAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'This view continues here by itself when that changes.'**
+  String get accessNextAutomatic;
+
+  /// No description provided for @accessNextWhenClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'When nobody else holds it, this view continues here by itself.'**
+  String get accessNextWhenClosed;
+
+  /// No description provided for @accessHolderPid.
+  ///
+  /// In en, this message translates to:
+  /// **'pid {pid}'**
+  String accessHolderPid(int pid);
+
+  /// No description provided for @accessHolderSince.
+  ///
+  /// In en, this message translates to:
+  /// **'since {time}'**
+  String accessHolderSince(String time);
+
+  /// No description provided for @accessOpenIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in {host}'**
+  String accessOpenIn(String host);
+
+  /// No description provided for @accessStartHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Open host'**
+  String get accessStartHost;
+
+  /// No description provided for @accessCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check now'**
+  String get accessCheckNow;
+
+  /// No description provided for @accessContinueHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue here'**
+  String get accessContinueHere;
+
+  /// No description provided for @sessionAccessChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The session changed while it was being opened. Try again.'**
+  String get sessionAccessChanged;
+
+  /// No description provided for @permissionAllowOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow once'**
+  String get permissionAllowOnce;
+
+  /// No description provided for @permissionAllowAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always allow'**
+  String get permissionAllowAlways;
+
+  /// No description provided for @permissionRejectOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get permissionRejectOnce;
+
+  /// No description provided for @permissionRejectAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always reject'**
+  String get permissionRejectAlways;
+
+  /// No description provided for @permissionAlwaysAllows.
+  ///
+  /// In en, this message translates to:
+  /// **'\"Always allow\" covers: {patterns}'**
+  String permissionAlwaysAllows(String patterns);
+
+  /// No description provided for @userInputChooseAny.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose any that apply.'**
+  String get userInputChooseAny;
+
+  /// No description provided for @commandPaletteLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 command} other{{count} commands}}'**
+  String commandPaletteLabel(int count);
+
+  /// No description provided for @commandSourceMcp.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP'**
+  String get commandSourceMcp;
+
+  /// No description provided for @commandSourceSkill.
+  ///
+  /// In en, this message translates to:
+  /// **'Skill'**
+  String get commandSourceSkill;
+
+  /// No description provided for @nativeSessionFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Not open elsewhere'**
+  String get nativeSessionFree;
+
+  /// No description provided for @nativeSessionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Holder unknown'**
+  String get nativeSessionUnknown;
+
+  /// No description provided for @nativeContinueOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in {host}'**
+  String nativeContinueOn(String host);
+
+  /// No description provided for @nativeHostToContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Host {agent} to continue'**
+  String nativeHostToContinue(String agent);
+
+  /// No description provided for @nativeContinueElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue on the computer that hosts {agent}.'**
+  String nativeContinueElsewhere(String agent);
 }
 
 class _AppLocalizationsDelegate

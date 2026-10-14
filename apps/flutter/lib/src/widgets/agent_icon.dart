@@ -11,7 +11,7 @@ enum AgentKind {
   /// Native Codex app-server.
   codex,
 
-  /// OpenCode (`opencode acp`, preset id `opencode`).
+  /// Native OpenCode (`opencode serve`).
   opencode,
 
   /// Claude through the `claude-agent-acp` adapter (preset id `claude`).
@@ -21,12 +21,12 @@ enum AgentKind {
   other,
 }
 
-/// The mark for a host of [provider] (`codex` or `acp`) running the agent
-/// profile [profileId].
+/// The mark for a host of [provider] (`codex`, `opencode` or `acp`) running
+/// the agent profile [profileId].
 AgentKind agentKindOf({required String provider, String? profileId}) {
   if (provider == 'codex') return AgentKind.codex;
+  if (provider == 'opencode') return AgentKind.opencode;
   return switch (profileId) {
-    'opencode' => AgentKind.opencode,
     'claude' => AgentKind.claude,
     _ => AgentKind.other,
   };
@@ -157,10 +157,10 @@ class AgentIcon extends StatelessWidget {
 /// connected host's reported profile; empty fields mean "not known yet".
 @immutable
 class AgentIdentity {
-  /// An identity for [provider] (`codex` or `acp`).
+  /// An identity for [provider] (`codex`, `opencode` or `acp`).
   const AgentIdentity({required this.provider, this.profileId, this.name});
 
-  /// `codex` or `acp`.
+  /// `codex`, `opencode` or `acp`.
   final String provider;
 
   /// ACP profile id, when the host reported one.

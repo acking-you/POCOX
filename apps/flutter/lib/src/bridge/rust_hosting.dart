@@ -60,28 +60,15 @@ mixin _RustHosting implements BridgeApi {
             agentPhase: s.agentPhase,
             agentError: s.agentError,
             authRequired: s.authRequired,
-            catalog: s.catalog == null
+            opencode: s.opencode == null
                 ? null
-                : AcpCatalogStatus(
-                    state: s.catalog!.state,
-                    reason: s.catalog!.reason,
-                    plugin: s.catalog!.plugin,
-                    routeState: s.catalog!.routeState,
-                    routeReasons: s.catalog!.routeReasons,
-                    routeProjects: s.catalog!.routeProjects,
-                    providers: [
-                      for (final p in s.catalog!.providers)
-                        AcpCatalogProvider(
-                          id: p.id,
-                          status: p.status,
-                          reason: p.reason,
-                          listed: p.listed,
-                          added: p.added,
-                          excluded: p.excluded,
-                          unsafeIds: p.unsafeIds,
-                          keySource: p.keySource,
-                        ),
-                    ],
+                : OpenCodeHostStatus(
+                    version: s.opencode!.version,
+                    providersConnected: s.opencode!.providersConnected,
+                    models: s.opencode!.models,
+                    defaultModel: s.opencode!.defaultModel,
+                    agents: s.opencode!.agents,
+                    problem: s.opencode!.problem,
                   ),
             configSource: s.configSource,
             configRevision: s.configRevision?.toInt(),
@@ -126,6 +113,20 @@ mixin _RustHosting implements BridgeApi {
         args: p.args,
       ),
   ];
+
+  @override
+  Future<OpenCodeEnvironment> openCodeDetect({String? binary}) async {
+    final e = await frb.opencodeDetect(binary: binary);
+    return OpenCodeEnvironment(
+      path: e.path,
+      version: e.version,
+      problem: e.problem,
+    );
+  }
+
+  @override
+  Future<void> openCodeRefresh({required String name}) =>
+      frb.opencodeRefresh(name: name);
 
   @override
   bool acpHostingSupported() => frb.acpHostingSupported();
@@ -203,8 +204,8 @@ mixin _RustHosting implements BridgeApi {
       _hostConfig(await frb.hostConfigGet(name: name));
 
   @override
-  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec}) {
-    final s = frb.hostConfigSupported(spec: _specDto(spec));
+  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec, String? engine}) {
+    final s = frb.hostConfigSupported(spec: _specDto(spec), engine: engine);
     return HostConfigSupport(
       claudeVariables: s.claudeVariables
           .map(
@@ -365,9 +366,11 @@ AcpAgentSpec _spec(frb.AcpAgentSpecDto s) => AcpAgentSpec(
   args: s.args,
 );
 
-HostRuntime _runtime(frb.HostRuntimeDto r) => r.agent != null
-    ? HostRuntime.acp(_spec(r.agent!))
-    : HostRuntime.codex(binary: r.binary, port: r.port, proxy: r.proxy);
+HostRuntime _runtime(frb.HostRuntimeDto r) => switch (r.kind) {
+  'opencode' => HostRuntime.opencode(binary: r.binary),
+  _ when r.agent != null => HostRuntime.acp(_spec(r.agent!)),
+  _ => HostRuntime.codex(binary: r.binary, port: r.port, proxy: r.proxy),
+};
 
 frb.HostRuntimeDto _runtimeDto(HostRuntime r) => frb.HostRuntimeDto(
   kind: r.kind,

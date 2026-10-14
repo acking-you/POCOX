@@ -437,6 +437,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noModelForMode => 'Can\'t switch mode: no model is available';
 
   @override
+  String get modelWithdrawn =>
+      'This host no longer offers the selected model. Choose a model and send again.';
+
+  @override
   String get effort => 'Effort';
 
   @override
@@ -2506,139 +2510,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get acpFeatures => 'Agent features';
 
   @override
-  String get acpCatalog => 'Model catalog';
-
-  @override
-  String get acpCatalogWaiting =>
-      'The agent\'s model catalog is listed when its first session opens.';
-
-  @override
-  String get acpRouteWaiting =>
-      'Whether OpenCode uses this host\'s provider is checked when its first session opens.';
-
-  @override
-  String get acpRouteSelected =>
-      'OpenCode uses this host\'s provider and model.';
-
-  @override
-  String acpRouteOverridden(String reasons) {
-    return 'Another OpenCode configuration overrides this host\'s provider: $reasons. Requests may go elsewhere.';
-  }
-
-  @override
-  String acpRouteUnverified(String reasons) {
-    return 'Whether OpenCode uses this host\'s provider cannot be checked: $reasons.';
-  }
-
-  @override
-  String get acpRouteReasonModel => 'it selects another model';
-
-  @override
-  String get acpRouteReasonEnabled => 'enabled_providers leaves it out';
-
-  @override
-  String get acpRouteReasonDisabled => 'disabled_providers names it';
-
-  @override
-  String get acpRouteReasonMissing =>
-      'the provider is missing from the merged configuration';
-
-  @override
-  String get acpRouteReasonSmallModel => 'small_model names another provider';
-
-  @override
-  String get acpRouteReasonAgentModel =>
-      'an agent or mode model names another provider';
-
-  @override
-  String get acpRouteReasonProvider =>
-      'another layer changed the provider\'s definition';
-
-  @override
-  String acpRouteEnforced(String reasons) {
-    return 'Other OpenCode configuration differed and was reset to this host\'s provider: $reasons.';
-  }
-
-  @override
-  String get acpRouteRefused =>
-      'OpenCode was given no usable provider: this host\'s key is missing in the agent\'s environment, so no prompt can be sent. Save the key again and restart the host.';
-
-  @override
-  String get acpRouteReasonKey => 'the host\'s key is missing in the agent';
-
-  @override
-  String acpRouteProjects(String projects) {
-    return 'Projects checked, as the plugin input names them (not verified against OpenCode\'s source): $projects';
-  }
-
-  @override
-  String get acpRouteScope =>
-      'This covers OpenCode\'s merged configuration, with this host\'s key pinned over a key saved for the same provider with `opencode auth login`. Another plugin\'s provider or auth loader for the same provider, or a later plugin\'s hook, is not covered.';
-
-  @override
-  String acpCatalogUnavailable(String reason) {
-    return 'The model catalog could not be added to the agent: $reason';
-  }
-
-  @override
-  String get acpCatalogReasonPluginsDisabled =>
-      'the agent runs with plugins disabled (--pure or OPENCODE_PURE)';
-
-  @override
-  String get acpCatalogReasonConfigTaken =>
-      'the agent\'s environment sets both OPENCODE_CONFIG and OPENCODE_CONFIG_CONTENT; add the plugin below to your config';
-
-  @override
-  String get acpCatalogReasonInstallFailed =>
-      'the catalog plugin could not be written';
-
-  @override
-  String get acpCatalogPlugin => 'Plugin';
-
-  @override
-  String acpCatalogProviderComplete(String id, int listed, int added) {
-    return '$id: $listed models listed, $added added';
-  }
-
-  @override
-  String acpCatalogProviderPartial(
-    String id,
-    int listed,
-    int added,
-    String reason,
-  ) {
-    return '$id: $listed models listed, $added added; the listing is incomplete ($reason)';
-  }
-
-  @override
-  String get acpCatalogNoProviders =>
-      'No enabled provider with an explicit baseURL was found, so nothing was listed; only the configured models are offered.';
-
-  @override
-  String acpCatalogProviderFailed(String id, String reason) {
-    return '$id: the model list could not be read ($reason); the configured models are used';
-  }
-
-  @override
-  String acpCatalogProviderSkipped(String id, String reason) {
-    return '$id: not listed ($reason)';
-  }
-
-  @override
-  String acpCatalogExcluded(int count) {
-    return '$count non-chat entries left out';
-  }
-
-  @override
-  String acpCatalogUnsafe(int count) {
-    return '$count entries left out because the agent cannot hold their ids';
-  }
-
-  @override
-  String get acpCatalogNoKey =>
-      'no key was found in the provider\'s config or environment; a key saved through the agent\'s own sign-in is not visible here';
-
-  @override
   String get acpFeatureReopen => 'Reopen earlier sessions';
 
   @override
@@ -3173,10 +3044,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nativeHistoryReadOnly => 'Local history · Read-only';
 
   @override
-  String get nativeHistoryTakeoverUnavailable =>
-      'Live history is read-only. This agent cannot guarantee an exclusive handover, so takeover is unavailable. Start a new conversation to send messages.';
-
-  @override
   String agentWelcomeTitle(String agent) {
     return 'Start with $agent';
   }
@@ -3292,69 +3159,317 @@ class AppLocalizationsEn extends AppLocalizations {
       'A bounded history window is shown. Some content is omitted or outside this window.';
 
   @override
-  String get sessionControlTitle => 'Session access';
+  String get providerOpenCode => 'OpenCode';
 
   @override
-  String get sessionControlChecking => 'Checking the current writer…';
+  String get agentChoiceNativeServer => 'Native server';
 
   @override
-  String get sessionControlOwned =>
-      'This host already runs this session. Continue here using the same writer.';
+  String agentChoiceRunningAs(String name) {
+    return 'Running as $name';
+  }
 
   @override
-  String get sessionControlSameEngine =>
-      'Continue through this OpenCode engine. It serializes messages from connected devices. Starting another engine for this session can cause concurrent writes.';
+  String get hostInheritedOpenCode =>
+      'Uses OpenCode\'s own providers and sign-ins on this computer.';
 
   @override
-  String get sessionControlReleased =>
-      'No registered Claude writer was found. You can acquire the original session here; ownership will be checked again before sending is enabled.';
+  String get openCodeRuntimeHint =>
+      'Pocket starts and owns one opencode serve on this computer, reachable only through this host.';
 
   @override
-  String get sessionControlExternalIdle =>
-      'Claude is idle in another client, but that client still holds the session. Release it in the owning Pocket host, or exit the original Claude client, then refresh here.';
+  String get openCodeDetecting => 'Looking for OpenCode…';
 
   @override
-  String get sessionControlExternalRunning =>
-      'Another Claude client is still running a turn. Wait for it to finish, then release the session in that client.';
+  String openCodeFoundAt(String version, String path) {
+    return 'OpenCode $version · $path';
+  }
 
   @override
-  String get sessionControlReleasePending =>
-      'Release has not been confirmed. Sending remains blocked. Retry release to verify that the writer has exited.';
+  String get openCodeNotFound =>
+      'OpenCode was not found. Install it or choose its executable.';
 
   @override
-  String get sessionControlLoading =>
-      'This host is restoring the session. Refresh when it finishes.';
+  String get openCodeUnsupportedVersion =>
+      'This OpenCode version is not supported. Update OpenCode.';
 
   @override
-  String get sessionControlEngineRequired =>
-      'OpenCode keeps turn ownership inside its running engine. A separate ACP process cannot attach to an external engine or prove that it released this session. Connect to the Pocket host already running it to continue; this view will not start a second writer or stop another engine.';
+  String get openCodeNoProvider =>
+      'No provider is signed in. Run `opencode auth login` on this computer, then refresh.';
 
   @override
-  String get sessionControlStopped =>
-      'The selected host is not ready. Start or reconnect that host, then refresh.';
+  String get openCodeAlreadyHosted =>
+      'OpenCode is already hosted on this computer. Open that host instead.';
 
   @override
-  String get sessionControlUnknown =>
-      'Writer ownership could not be verified, or this agent does not support handoff. Viewing remains available; refresh to check again.';
+  String get openCodePath => 'OpenCode executable';
 
   @override
-  String get sessionControlExclusiveNote =>
-      'Keep this session closed in other native clients while using it here. Pocket hosts share a writer lock, but independent native clients do not honor it.';
+  String get openCodePathRequired => 'Enter the OpenCode executable.';
 
   @override
-  String get sessionControlReleaseNote =>
-      'Release closes this host’s idle writer and switches all its connected devices to read-only. History stays on disk; this screen keeps its unsent draft, attachments and queue.';
+  String openCodeRunning(String version) {
+    return 'OpenCode $version is running';
+  }
 
   @override
-  String get sessionControlChanged =>
-      'The host or conversation changed. Reopen session access for the current view.';
+  String get openCodeProviders => 'Providers ready';
 
   @override
-  String get sessionControlRelease => 'Release to read-only';
+  String get openCodeModels => 'Models';
 
   @override
-  String get sessionControlContinue => 'Continue on this host';
+  String get openCodeDefaultModel => 'Default model';
 
   @override
-  String get sessionControlAcquire => 'Acquire original session';
+  String get openCodeAgents => 'Agents';
+
+  @override
+  String get openCodeNone => 'None';
+
+  @override
+  String get openCodeConfigNote =>
+      'Providers, models and agents come from OpenCode\'s own configuration on this computer, plus the custom provider this host\'s model service may add. Change OpenCode\'s configuration there, then Refresh; restart this host if a change does not show.';
+
+  @override
+  String get openCodeScopeNote =>
+      'Every Pocket device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.';
+
+  @override
+  String get refresh => 'Refresh';
+
+  @override
+  String get draftOptionDefault => 'Default';
+
+  @override
+  String openCodeRefreshFailed(String error) {
+    return 'Couldn\'t refresh: $error';
+  }
+
+  @override
+  String get sessionHandBack => 'Hand back to other clients';
+
+  @override
+  String accessQueueHeld(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other:
+          '$count queued messages are waiting while this session was followed. Retry sends them.',
+      one:
+          '1 queued message is waiting while this session was followed. Retry sends it.',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String accessScopeEngine(String agent) {
+    return 'Writing through this host. Other $agent clients on this computer are not blocked.';
+  }
+
+  @override
+  String get accessScopePocket =>
+      'Held by this host. Other Pocket hosts cannot write; native clients are not blocked.';
+
+  @override
+  String get accessScopeNone =>
+      'Writing through this host. Other clients are not blocked.';
+
+  @override
+  String get accessClientClaude => 'Claude Code';
+
+  @override
+  String get accessClientOpenCode => 'Another OpenCode process';
+
+  @override
+  String get accessClientPocketHost => 'Another Pocket host';
+
+  @override
+  String get accessClientOther => 'Another client';
+
+  @override
+  String get accessStatusOpening => 'Opening';
+
+  @override
+  String get accessStatusHandedBack => 'Handed back';
+
+  @override
+  String get accessStatusChanging => 'Changing hands';
+
+  @override
+  String get accessStatusUnavailable => 'Unavailable';
+
+  @override
+  String get accessStatusUnknown => 'Writer unknown';
+
+  @override
+  String get accessOpening => 'Opening the original session…';
+
+  @override
+  String get accessHandedBackTitle => 'Handed back to other clients';
+
+  @override
+  String get accessHandedBackDetail =>
+      'This host closed its writer, so another app can continue the original session. Nothing is taken back by itself.';
+
+  @override
+  String get accessTransitionTitle => 'This session is changing hands';
+
+  @override
+  String get accessTransitionDetail => 'The host is loading or closing it.';
+
+  @override
+  String accessHostStoppedTitle(String agent) {
+    return 'The $agent host is not running';
+  }
+
+  @override
+  String get accessHostStoppedDetail => 'Start it to continue this session.';
+
+  @override
+  String accessExternalRunningTitle(String client) {
+    return '$client is running a turn in this session';
+  }
+
+  @override
+  String get accessExternalRunningDetail =>
+      'Following it live. Nothing can be sent from here meanwhile.';
+
+  @override
+  String accessExternalIdleTitle(String client) {
+    return '$client still has this session open';
+  }
+
+  @override
+  String get accessExternalIdleDetail =>
+      'No turn is running. Close the session there, then check again.';
+
+  @override
+  String get accessSourceOpenTitle =>
+      'Another OpenCode process has this history source open';
+
+  @override
+  String get accessSourceOpenDetail =>
+      'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.';
+
+  @override
+  String accessPocketHostTitle(String client) {
+    return '$client is writing this session';
+  }
+
+  @override
+  String get accessPocketHostRunning => 'It is running a turn now.';
+
+  @override
+  String get accessPocketHostIdle =>
+      'No turn is running there, but it still holds the session.';
+
+  @override
+  String accessUnsupportedTitle(String agent) {
+    return '$agent cannot reopen this session';
+  }
+
+  @override
+  String get accessNotFoundTitle => 'This session is no longer on the host';
+
+  @override
+  String get accessUnknownTitle => 'Cannot tell who else writes this session';
+
+  @override
+  String get accessUnknownDetail =>
+      'The host could not inspect the session\'s other clients.';
+
+  @override
+  String get accessNextAutomatic =>
+      'This view continues here by itself when that changes.';
+
+  @override
+  String get accessNextWhenClosed =>
+      'When nobody else holds it, this view continues here by itself.';
+
+  @override
+  String accessHolderPid(int pid) {
+    return 'pid $pid';
+  }
+
+  @override
+  String accessHolderSince(String time) {
+    return 'since $time';
+  }
+
+  @override
+  String accessOpenIn(String host) {
+    return 'Open in $host';
+  }
+
+  @override
+  String get accessStartHost => 'Open host';
+
+  @override
+  String get accessCheckNow => 'Check now';
+
+  @override
+  String get accessContinueHere => 'Continue here';
+
+  @override
+  String get sessionAccessChanged =>
+      'The session changed while it was being opened. Try again.';
+
+  @override
+  String get permissionAllowOnce => 'Allow once';
+
+  @override
+  String get permissionAllowAlways => 'Always allow';
+
+  @override
+  String get permissionRejectOnce => 'Reject';
+
+  @override
+  String get permissionRejectAlways => 'Always reject';
+
+  @override
+  String permissionAlwaysAllows(String patterns) {
+    return '\"Always allow\" covers: $patterns';
+  }
+
+  @override
+  String get userInputChooseAny => 'Choose any that apply.';
+
+  @override
+  String commandPaletteLabel(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count commands',
+      one: '1 command',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get commandSourceMcp => 'MCP';
+
+  @override
+  String get commandSourceSkill => 'Skill';
+
+  @override
+  String get nativeSessionFree => 'Not open elsewhere';
+
+  @override
+  String get nativeSessionUnknown => 'Holder unknown';
+
+  @override
+  String nativeContinueOn(String host) {
+    return 'Continue in $host';
+  }
+
+  @override
+  String nativeHostToContinue(String agent) {
+    return 'Host $agent to continue';
+  }
+
+  @override
+  String nativeContinueElsewhere(String agent) {
+    return 'Continue on the computer that hosts $agent.';
+  }
 }

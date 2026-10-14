@@ -10,6 +10,48 @@ pub(super) struct FollowQuery {
     generation: u64,
 }
 
+pub(super) async fn access(
+    State(state): State<ApiState>,
+    Query(query): Query<FollowQuery>,
+) -> Result<Json<crate::session_access::SessionAccess>, ApiError> {
+    state
+        .host
+        .session_access(&query.session_id, &Identity {
+            host_id: Some(query.host_id),
+            generation: Some(query.generation),
+        })
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+pub(super) async fn auto_open(
+    State(state): State<ApiState>,
+    Json(query): Json<FollowQuery>,
+) -> Result<Json<crate::session_access::SessionAccess>, ApiError> {
+    state
+        .host
+        .session_open(&query.session_id, &Identity {
+            host_id: Some(query.host_id),
+            generation: Some(query.generation),
+        })
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+pub(super) async fn access_release(
+    State(state): State<ApiState>,
+    Json(snapshot): Json<crate::session_access::SessionAccess>,
+) -> Result<Json<crate::session_access::SessionAccess>, ApiError> {
+    state
+        .host
+        .session_release(&snapshot)
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
 pub(super) async fn control(
     State(state): State<ApiState>,
     Query(query): Query<FollowQuery>,

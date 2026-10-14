@@ -14,6 +14,8 @@ extension _SessionAgentPrepare on _AppSessionState {
   String? get _agentSessionThread {
     final tid = _threadId;
     if (tid != null) return tid;
+    // A draft that keeps its own options has no session to point at.
+    if (_caps.draftOptions) return null;
     return _preparedFor(_draft);
   }
 
@@ -29,9 +31,13 @@ extension _SessionAgentPrepare on _AppSessionState {
   /// Where the shown new conversation's session stands.
   AgentSessionPhase get _agentPhase {
     final caps = _caps;
-    if (_threadId != null || !caps.isAcp) return AgentSessionPhase.idle;
+    if (_threadId != null || !caps.hostAccess) return AgentSessionPhase.idle;
     final draft = _draft;
+    // ACP agents and native OpenCode create a session only in a project
+    // folder (see [_needsProjectToSend]).
     if (draft.project == null) return AgentSessionPhase.needsProject;
+    // OpenCode creates its session on the first send, never ahead of it.
+    if (!caps.isAcp) return AgentSessionPhase.idle;
     if (!caps.negotiated || !caps.sessionConfig) return AgentSessionPhase.idle;
     if (draft.preparing != null) return AgentSessionPhase.opening;
     if (_preparedFor(draft) != null) return AgentSessionPhase.ready;
@@ -165,11 +171,15 @@ extension _SessionAgentPrepare on _AppSessionState {
     final phase = _agentPhase;
     final hasProject = _cwd?.trim().isNotEmpty ?? false;
     return AgentWelcome(
-      agentKind: agentKindOf(provider: 'acp', profileId: caps.profileId),
+      agentKind: agentKindOf(
+        provider: caps.isOpenCode ? 'opencode' : 'acp',
+        profileId: caps.profileId,
+      ),
       agentName: caps.providerName,
       project: _projectSwitcher(
         l10n,
-        label: hasProject ? _projectName() : l10n.workOutsideProject,
+        // These engines cannot work outside a project.
+        label: hasProject ? _projectName() : l10n.chooseFolder,
         style: Theme.of(
           context,
         ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
@@ -186,7 +196,10 @@ extension _SessionAgentPrepare on _AppSessionState {
           ? _openAgentHostSettings
           : null,
       connecting: _reconnecting || _connectionLost || !caps.negotiated,
-      opensOnFirstMessage: caps.negotiated && !caps.sessionConfig,
+      // OpenCode creates its session on the first message; its options are
+      // the draft's own until then.
+      opensOnFirstMessage:
+          caps.negotiated && (!caps.sessionConfig || caps.draftOptions),
     );
   }
 }

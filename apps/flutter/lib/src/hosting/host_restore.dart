@@ -4,7 +4,11 @@ import 'package:pocket_codex/src/ui_prefs.dart';
 /// Which saved hosting to bring back on a desktop cold start.
 class HostRestorePlan {
   /// Creates a plan.
-  const HostRestorePlan({this.codex = const [], this.acp = const []});
+  const HostRestorePlan({
+    this.codex = const [],
+    this.acp = const [],
+    this.opencode,
+  });
 
   /// Codex hosts to restore, each under its own instance name.
   final List<AutoHostPrefs> codex;
@@ -12,8 +16,11 @@ class HostRestorePlan {
   /// ACP agents to restore, each under its own instance name.
   final List<AutoHostAcpPrefs> acp;
 
+  /// The native OpenCode host to restore, if any.
+  final AutoHostOpenCodePrefs? opencode;
+
   /// Whether nothing needs restoring.
-  bool get isEmpty => codex.isEmpty && acp.isEmpty;
+  bool get isEmpty => codex.isEmpty && acp.isEmpty && opencode == null;
 }
 
 /// Plan the restore: each saved record at most once per run (callers track
@@ -42,7 +49,17 @@ HostRestorePlan planHostRestore(
                 !hostedNames.contains(saved.name))
               saved,
         ];
-  return HostRestorePlan(codex: codex, acp: acp);
+  final saved = prefs.autoHostOpenCode;
+  // One OpenCode host per device: none is restored beside a running one.
+  final opencode =
+      saved == null ||
+          !acpSupported ||
+          acpAttempted.contains(saved.name) ||
+          hostedNames.contains(saved.name) ||
+          local.any((h) => h.isOpenCode)
+      ? null
+      : saved;
+  return HostRestorePlan(codex: codex, acp: acp, opencode: opencode);
 }
 
 /// Run [plan]; a failed restore is left to the start-hosting fallback.
@@ -70,6 +87,35 @@ Future<bool> runHostRestore(BridgeApi api, HostRestorePlan plan) async {
       restored = true;
     } catch (_) {
       // The agent may have been uninstalled; its record stays for next time.
+    }
+  }
+  if (plan.opencode case final saved?) {
+    try {
+      // Started again with what is saved for it: its model service (its own
+      // configuration or a custom provider, whose stored key is kept) and
+      // its desired runtime. A start saves what it is given, so nothing
+      // starts from a configuration that is unreadable, reported damaged
+      // (its fields are then only defaults) or saved for another engine:
+      // the record and that configuration stay for the editor to resolve.
+      final config = await api.hostConfigGet(saved.name);
+      final desired = config.runtime;
+      if (config.problem != null || (desired != null && !desired.isOpenCode)) {
+        return restored;
+      }
+      await api.appServeStartConfigured(
+        name: saved.name,
+        runtime: desired ?? HostRuntime.opencode(binary: saved.binary),
+        input: HostConfigInput(
+          source: config.source,
+          protocol: config.protocol,
+          baseUrl: config.baseUrl,
+          model: config.model,
+        ),
+        keyAction: HostKeyAction.keep,
+      );
+      restored = true;
+    } catch (_) {
+      // OpenCode may have been uninstalled; its record stays for next time.
     }
   }
   return restored;

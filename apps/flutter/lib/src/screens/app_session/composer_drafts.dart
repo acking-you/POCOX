@@ -39,6 +39,12 @@ class _ComposerDraft {
   /// it is not retried by itself on that generation.
   ({String message, int generation})? prepareFailure;
 
+  /// Session options chosen for this unsent draft (option id -> value id),
+  /// for an engine whose options exist before its session
+  /// ([AppCapabilities.draftOptions]). Applied to the session its first send
+  /// creates, before that message is sent; nothing is sent for them before.
+  final Map<String, String> options = {};
+
   (String?, String?) get key => (threadId, threadId == null ? project : null);
   TextEditingValue value = TextEditingValue.empty;
   final List<_Attachment> attachments = [];

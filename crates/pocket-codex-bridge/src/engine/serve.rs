@@ -276,8 +276,8 @@ pub struct ServeStatus {
     pub agent_error: Option<String>,
     /// The agent reported that authentication is required (ACP).
     pub auth_required: bool,
-    /// The OpenCode model catalog for this host (ACP, `opencode` profile).
-    pub catalog: Option<pocket_codex_host_svc::acp::catalog::CatalogStatus>,
+    /// Native OpenCode runtime and catalog status.
+    pub opencode: Option<super::serve_opencode::OpenCodeStatus>,
     /// Where the running host gets its model service (`inherited`,
     /// `official`, `custom`), as launched. `None` when unknown.
     pub config_source: Option<String>,
@@ -819,6 +819,7 @@ pub fn serve_status() -> Vec<ServeStatus> {
     republish_refused();
     let mut out = codex_status();
     out.extend(super::serve_acp::status());
+    out.extend(super::serve_opencode::status());
     out.sort_by(|a, b| a.name.cmp(&b.name));
     out
 }
@@ -898,7 +899,9 @@ pub(super) fn local_endpoints(service_key: &str) -> Option<(String, String)> {
         .values()
         .find(|host| host.app_key == service_key)
         .map(|host| (host.app_local.to_string(), host.meta_local.to_string()));
-    codex.or_else(|| super::serve_acp::local_endpoints(service_key))
+    codex
+        .or_else(|| super::serve_acp::local_endpoints(service_key))
+        .or_else(|| super::serve_opencode::local_endpoints(service_key))
 }
 
 /// `true` if something is accepting TCP on a `host:port` listen address.

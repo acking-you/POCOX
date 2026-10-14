@@ -7,7 +7,7 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'threads.dart';
 
-// These functions are ignored because they are not marked as `pub`: `holder_dto`, `meta_follow_update_dto`, `meta_holder_dto`, `meta_liveness_dto`, `meta_thread_item_dto`, `project_config_dto`, `thread_config_dto`, `thread_config_from_dto`
+// These functions are ignored because they are not marked as `pub`: `holder_dto`, `local_session_dto`, `meta_follow_update_dto`, `meta_holder_dto`, `meta_liveness_dto`, `meta_thread_item_dto`, `project_config_dto`, `thread_config_dto`, `thread_config_from_dto`
 
 /// List every codex session under the shared `CODEX_HOME`, newest first,
 /// each annotated with whether it is safe to resume.

@@ -44,15 +44,23 @@ library;
 /// discovered key (it is derived from an app host), but it is a real kind and a
 /// key carrying it must still parse.
 bool _isKind(String part) =>
-    part == 'app' || part == 'api' || part == 'meta' || part == 'acp';
+    part == 'app' ||
+    part == 'api' ||
+    part == 'meta' ||
+    part == 'acp' ||
+    part == 'opencode';
 
 /// Whether [kind] is a conversation service the session UI can open: a Codex
-/// app-server (`app`) or an ACP agent
-/// gateway (`acp`).
-bool isSessionKind(String kind) => kind == 'app' || kind == 'acp';
+/// app-server (`app`), an ACP agent gateway (`acp`) or a native OpenCode
+/// host (`opencode`).
+bool isSessionKind(String kind) =>
+    kind == 'app' || kind == 'acp' || kind == 'opencode';
 
 /// Whether [key] names an ACP agent service.
 bool isAcpKey(String key) => parseServiceKey(key).kind == 'acp';
+
+/// Whether [key] names a native OpenCode service.
+bool isOpenCodeKey(String key) => parseServiceKey(key).kind == 'opencode';
 
 /// The wire protocol a session service key selects (its kind, never a
 /// provider name).
@@ -62,6 +70,9 @@ enum SessionProtocol {
 
   /// The Pocket-Codex gateway to a host-owned ACP agent.
   acp,
+
+  /// The Pocket-Codex gateway to a host-owned native `opencode serve`.
+  opencode,
 }
 
 /// The protocol of [key]. Keys that are not session keys keep the historical
@@ -69,6 +80,7 @@ enum SessionProtocol {
 SessionProtocol sessionProtocolOf(String key) =>
     switch (parseServiceKey(key).kind) {
       'acp' => SessionProtocol.acp,
+      'opencode' => SessionProtocol.opencode,
       _ => SessionProtocol.codexAppServer,
     };
 
@@ -88,4 +100,14 @@ String serviceKeyLabel(String key) {
   final parsed = parseServiceKey(key);
   if (parsed.device.isEmpty) return key;
   return '${parsed.device} · ${parsed.name}';
+}
+
+/// The route of conversation [threadId] on the session service [key].
+String conversationRoute(String key, String threadId, {String? cwd}) {
+  final q = <String>[
+    'tid=${Uri.encodeComponent(threadId)}',
+    if (cwd != null && cwd.trim().isNotEmpty)
+      'cwd=${Uri.encodeComponent(cwd.trim())}',
+  ];
+  return '/app/${Uri.encodeComponent(key)}/session?${q.join('&')}';
 }

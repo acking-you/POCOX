@@ -9,7 +9,15 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 // These functions are ignored because they are not marked as `pub`: `into_spec`, `setup_dto`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
 
-/// Built-in ACP agent presets (OpenCode: `opencode acp`).
+/// Refresh one running OpenCode host's sanitized native catalog summary.
+Future<void> opencodeRefresh({required String name}) =>
+    RustLib.instance.api.crateApiBridgeHostingOpencodeRefresh(name: name);
+
+/// Inspect an explicit OpenCode executable or the host's child PATH.
+Future<OpenCodeEnvironmentDto> opencodeDetect({String? binary}) =>
+    RustLib.instance.api.crateApiBridgeHostingOpencodeDetect(binary: binary);
+
+/// Built-in ACP agent presets (Claude through its external stdio adapter).
 List<AcpPresetDto> acpPresets() =>
     RustLib.instance.api.crateApiBridgeHostingAcpPresets();
 
@@ -131,7 +139,7 @@ Future<String?> codexLocate() =>
 /// An ACP agent executable and argument vector, passed verbatim without a
 /// shell.
 class AcpAgentSpecDto {
-  /// Profile id (`opencode` for the preset, or a custom id).
+  /// Profile id (`claude` for the preset, or a custom id).
   final String profileId;
 
   /// Name shown in the UI.
@@ -166,137 +174,6 @@ class AcpAgentSpecDto {
           displayName == other.displayName &&
           program == other.program &&
           args == other.args;
-}
-
-/// One provider's model listing.
-class AcpCatalogProviderDto {
-  /// Provider id from the OpenCode config.
-  final String id;
-
-  /// `complete`, `partial` (bounded), `failed` (nothing added) or
-  /// `skipped`.
-  final String status;
-
-  /// Reason code (`http-401`, `timeout`, `model-limit`, …).
-  final String? reason;
-
-  /// Chat models listed.
-  final int listed;
-
-  /// Models added beyond the configured ones.
-  final int added;
-
-  /// Entries left out for an explicit non-chat type.
-  final int excluded;
-
-  /// Ids OpenCode cannot hold, left out.
-  final int unsafeIds;
-
-  /// Where the credential came from: `config`, `env`, `headers`
-  /// (configured request headers) or `none`.
-  final String keySource;
-
-  const AcpCatalogProviderDto({
-    required this.id,
-    required this.status,
-    this.reason,
-    required this.listed,
-    required this.added,
-    required this.excluded,
-    required this.unsafeIds,
-    required this.keySource,
-  });
-
-  @override
-  int get hashCode =>
-      id.hashCode ^
-      status.hashCode ^
-      reason.hashCode ^
-      listed.hashCode ^
-      added.hashCode ^
-      excluded.hashCode ^
-      unsafeIds.hashCode ^
-      keySource.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AcpCatalogProviderDto &&
-          runtimeType == other.runtimeType &&
-          id == other.id &&
-          status == other.status &&
-          reason == other.reason &&
-          listed == other.listed &&
-          added == other.added &&
-          excluded == other.excluded &&
-          unsafeIds == other.unsafeIds &&
-          keySource == other.keySource;
-}
-
-/// What the OpenCode model catalog plugin found for one host. Holds provider
-/// ids, counts and fixed reason codes, plus the plugin's own local file URL;
-/// never a provider endpoint, key or header.
-class AcpCatalogStatusDto {
-  /// `waiting` (no session opened yet), `reported` or `unavailable`.
-  final String state;
-
-  /// Why it is unavailable: `plugins-disabled`, `config-env-taken` or
-  /// `install-failed`.
-  final String? reason;
-
-  /// The plugin's local `file://` URL, shown when it is unavailable so it
-  /// can be added to an OpenCode config by hand.
-  final String? plugin;
-
-  /// One entry per listed provider.
-  final List<AcpCatalogProviderDto> providers;
-
-  /// How the plugin left the host's own provider in OpenCode's merged
-  /// configuration: `waiting`, `selected` (nothing to change), `enforced`
-  /// (settings were reset to it), `overridden` (an older plugin only
-  /// reported it) or `unverified`; `None` when the host has no own provider.
-  final String? routeState;
-
-  /// What was reset or found (`model`, `small-model`, `agent-model`,
-  /// `enabled-providers`, `disabled-providers`, `provider`, `missing`), or
-  /// why it is `unverified` (the catalog reason).
-  final List<String> routeReasons;
-
-  /// The project directories the verdict covers, as OpenCode loaded them.
-  final List<String> routeProjects;
-
-  const AcpCatalogStatusDto({
-    required this.state,
-    this.reason,
-    this.plugin,
-    required this.providers,
-    this.routeState,
-    required this.routeReasons,
-    required this.routeProjects,
-  });
-
-  @override
-  int get hashCode =>
-      state.hashCode ^
-      reason.hashCode ^
-      plugin.hashCode ^
-      providers.hashCode ^
-      routeState.hashCode ^
-      routeReasons.hashCode ^
-      routeProjects.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AcpCatalogStatusDto &&
-          runtimeType == other.runtimeType &&
-          state == other.state &&
-          reason == other.reason &&
-          plugin == other.plugin &&
-          providers == other.providers &&
-          routeState == other.routeState &&
-          routeReasons == other.routeReasons &&
-          routeProjects == other.routeProjects;
 }
 
 /// The preparation of Claude's pinned ACP adapter, mirrored for Dart.
@@ -698,8 +575,8 @@ class AppServeStatusDto {
   /// The ACP agent reported that authentication is required.
   final bool authRequired;
 
-  /// The OpenCode model catalog (ACP hosts of the `opencode` profile).
-  final AcpCatalogStatusDto? catalog;
+  /// Native OpenCode runtime and sanitized catalog summary.
+  final OpenCodeHostStatusDto? opencode;
 
   /// Where the running host gets its model service, as launched:
   /// `inherited`, `official` or `custom`.
@@ -742,7 +619,7 @@ class AppServeStatusDto {
     this.agentPhase,
     this.agentError,
     required this.authRequired,
-    this.catalog,
+    this.opencode,
     this.configSource,
     this.configRevision,
     this.incarnation,
@@ -775,7 +652,7 @@ class AppServeStatusDto {
       agentPhase.hashCode ^
       agentError.hashCode ^
       authRequired.hashCode ^
-      catalog.hashCode ^
+      opencode.hashCode ^
       configSource.hashCode ^
       configRevision.hashCode ^
       incarnation.hashCode ^
@@ -810,9 +687,86 @@ class AppServeStatusDto {
           agentPhase == other.agentPhase &&
           agentError == other.agentError &&
           authRequired == other.authRequired &&
-          catalog == other.catalog &&
+          opencode == other.opencode &&
           configSource == other.configSource &&
           configRevision == other.configRevision &&
           incarnation == other.incarnation &&
           busy == other.busy;
+}
+
+/// Installed external OpenCode; detection never starts or resumes a session.
+class OpenCodeEnvironmentDto {
+  /// Resolved executable path.
+  final String? path;
+
+  /// Native executable version.
+  final String? version;
+
+  /// Installation or inspection failure, safe to show.
+  final String? problem;
+
+  const OpenCodeEnvironmentDto({this.path, this.version, this.problem});
+
+  @override
+  int get hashCode => path.hashCode ^ version.hashCode ^ problem.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OpenCodeEnvironmentDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          version == other.version &&
+          problem == other.problem;
+}
+
+/// Native OpenCode runtime and sanitized service-default catalog summary.
+class OpenCodeHostStatusDto {
+  /// Installed executable version.
+  final String version;
+
+  /// Connected native provider count.
+  final int providersConnected;
+
+  /// Usable native model count.
+  final int models;
+
+  /// Global default when actually exposed by the native API.
+  final String? defaultModel;
+
+  /// Visible primary native agents.
+  final List<String> agents;
+
+  /// Safe runtime or catalog diagnostic.
+  final String? problem;
+
+  const OpenCodeHostStatusDto({
+    required this.version,
+    required this.providersConnected,
+    required this.models,
+    this.defaultModel,
+    required this.agents,
+    this.problem,
+  });
+
+  @override
+  int get hashCode =>
+      version.hashCode ^
+      providersConnected.hashCode ^
+      models.hashCode ^
+      defaultModel.hashCode ^
+      agents.hashCode ^
+      problem.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OpenCodeHostStatusDto &&
+          runtimeType == other.runtimeType &&
+          version == other.version &&
+          providersConnected == other.providersConnected &&
+          models == other.models &&
+          defaultModel == other.defaultModel &&
+          agents == other.agents &&
+          problem == other.problem;
 }

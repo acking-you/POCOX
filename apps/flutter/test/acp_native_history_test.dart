@@ -37,6 +37,20 @@ ThreadHistory history(String text, String epoch) => ThreadHistory(
   ],
 );
 
+// The host's answer while a native Claude client keeps the session open.
+const heldByNative = SessionAccess(
+  sessionId: thread,
+  hostId: 'host-1',
+  generation: 1,
+  provider: 'claude',
+  mode: 'follow',
+  writer: 'native_client',
+  turn: 'idle',
+  reason: 'external_idle',
+  holder: AccessHolder(client: 'claude_code'),
+  recheck: true,
+);
+
 Future<void> frames(WidgetTester t) async {
   for (var i = 0; i < 12; i++) {
     await t.pump(const Duration(milliseconds: 100));
@@ -71,6 +85,22 @@ void main() {
       nativeHistory: true,
     );
     api.liveness[thread] = ownership;
+    // Writing here first; once withdrawn, the host answers that the native
+    // client holds it.
+    api.sessionOpenResults.add(
+      const SessionAccess(
+        sessionId: thread,
+        hostId: 'host-1',
+        generation: 1,
+        provider: 'claude',
+        mode: 'write',
+        writer: 'this_host',
+        turn: 'idle',
+        exclusion: 'engine',
+        reason: 'owned',
+      ),
+    );
+    api.sessionAccess[thread] = heldByNative;
     await api.appConnect(service, 28080);
     await t.pumpWidget(
       host(const AppSessionScreen(serviceKey: service, threadId: thread), api),
@@ -91,7 +121,8 @@ void main() {
     nativeRead.completeError(StateError('temporary native read failure'));
     await frames(t);
     expect(find.text(message), findsOneWidget);
-    expect(find.byKey(const Key('chat-read-only-action')), findsOneWidget);
+    expect(find.byKey(const Key('access-panel-external_idle')), findsOneWidget);
+    expect(find.byKey(const Key('composer-input')), findsNothing);
 
     api.readResult = history(message, 'source-one');
     api.pushMetaSessionUpdate(
@@ -122,7 +153,7 @@ void main() {
     await frames(t);
   });
   testWidgets(
-    'native ACP history remains read-only and follows source replacement',
+    'a held native session is followed and tracks source replacement',
     (t) async {
       t.view.physicalSize = const Size(1280, 900);
       t.view.devicePixelRatio = 1;
@@ -132,15 +163,13 @@ void main() {
               config: const ConfigInfo(relay: 'relay:7666', hasKey: true),
             )
             ..metadataOnlyFollow = true
-            ..appThreadResumeError = StateError(
-              'native history is read-only; explicitly acquire the session before sending',
-            )
             ..readResult = history('Original native message', 'source-one');
       api.acpCapabilities[service] = negotiatedAcpCapabilities(
         providerName: 'Claude',
         nativeHistory: true,
       );
       api.liveness[thread] = ownership;
+      api.sessionAccess[thread] = heldByNative;
       await api.appConnect(service, 28080);
       await t.pumpWidget(
         host(
@@ -150,15 +179,16 @@ void main() {
       );
       await frames(t);
       expect(find.text('Original native message'), findsOneWidget);
-      expect(find.byKey(const Key('chat-read-only-action')), findsOneWidget);
+      expect(
+        find.byKey(const Key('access-panel-external_idle')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('chat-takeover-action')), findsNothing);
       final l10n = AppLocalizations.of(
         t.element(find.byType(AppSessionScreen)),
       );
       expect(find.text(l10n.sessionRunningElsewhere), findsNothing);
       expect(find.text(l10n.readOnlyViewing), findsNothing);
-      expect(find.text(l10n.nativeHistoryReadOnly), findsNWidgets(2));
-      expect(find.byKey(const Key('chat-session-control')), findsOneWidget);
       expect(api.turnStartCount, 0);
       expect(api.lastResumed, isNull);
       expect(api.lastMetaResumedThread, isNull);
@@ -176,8 +206,13 @@ void main() {
       await frames(t);
       expect(find.text('Original native message'), findsNothing);
       expect(find.text('Replacement native message'), findsOneWidget);
-      expect(find.byKey(const Key('chat-read-only-action')), findsOneWidget);
+      expect(
+        find.byKey(const Key('access-panel-external_idle')),
+        findsOneWidget,
+      );
       expect(api.turnStartCount, 0);
+      // Follow liveness never relabels the session: only the host's access
+      // answer says who writes it and whether a turn runs.
       for (final state in ['idle', 'running', 'unknown']) {
         api.pushMetaSessionUpdate(
           thread,
@@ -200,19 +235,18 @@ void main() {
           ),
         );
         await frames(t);
+        expect(find.text(l10n.sessionRunningElsewhere), findsNothing);
         expect(
-          find.text(l10n.sessionRunningElsewhere),
-          state == 'running' ? findsOneWidget : findsNothing,
-        );
-        expect(
-          find.text(l10n.sessionInUseElsewhere),
-          state == 'idle' ? findsOneWidget : findsNothing,
+          find.byKey(const Key('access-panel-external_idle')),
+          findsOneWidget,
         );
         expect(find.byKey(const Key('chat-takeover-action')), findsNothing);
         expect(api.turnStartCount, 0);
         expect(api.lastResumed, isNull);
         expect(api.lastMetaResumedThread, isNull);
       }
+      // Quiet time alone opens nothing.
+      expect(api.sessionOpenCalls, [thread]);
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());
       await frames(t);

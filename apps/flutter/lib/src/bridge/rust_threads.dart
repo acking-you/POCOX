@@ -72,6 +72,10 @@ mixin _RustThreads implements BridgeApi {
       historyScope: c.historyScope,
       runningInventory: c.runningInventory,
       authRequired: c.authRequired,
+      commands: c.commands,
+      draftOptions: c.draftOptions,
+      questionMultiple: c.questionMultiple,
+      permissionFeedback: c.permissionFeedback,
     );
   }
 

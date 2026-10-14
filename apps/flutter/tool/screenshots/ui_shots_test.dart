@@ -489,7 +489,7 @@ void heroShots() {
   }
 }
 
-const _acp = 'pcx:lb7666:acp:opencode';
+const _acp = 'pcx:lb7666:acp:agent';
 
 /// The ACP composer chips, and the model list searched with the phone
 /// keyboard up.
@@ -517,8 +517,8 @@ void agentPickerShots() {
                 localSessions: false,
                 planMode: false,
                 protocol: 'acp',
-                providerName: 'OpenCode',
-                profileId: 'opencode',
+                providerName: 'Fixture Agent',
+                profileId: 'fixture',
                 negotiated: true,
                 generation: 1,
                 sessionConfig: true,
@@ -566,8 +566,9 @@ void agentPickerShots() {
   }
 }
 
-/// Hosting management: the manage page with Codex and OpenCode hosted and a
-/// remote device selected, and the new-host dialog's agent grid.
+/// Hosting management: the manage page with Codex and native OpenCode
+/// hosted and a remote device selected, and the new-host dialog's agent
+/// grid.
 void hostingShots() {
   for (final d in [_devices[0], _devices[1]]) {
     for (final b in Brightness.values) {
@@ -594,14 +595,11 @@ void hostingShots() {
               name: 'default',
               embedded: false,
             );
-            await api.appServeStartAcp(
+            await api.appServeStartConfigured(
               name: 'opencode',
-              spec: const AcpAgentSpec(
-                profileId: 'opencode',
-                displayName: 'OpenCode',
-                program: 'opencode',
-                args: ['acp'],
-              ),
+              runtime: const HostRuntime.opencode(),
+              input: const HostConfigInput(source: 'inherited'),
+              keyAction: HostKeyAction.keep,
             );
             await t.pumpWidget(
               _app(

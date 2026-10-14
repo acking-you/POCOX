@@ -138,6 +138,8 @@ mixin _FakeHosting on _FakeBridgeState {
     capabilityCalls.add(serviceKey);
     return switch (sessionProtocolOf(serviceKey)) {
       SessionProtocol.acp => acpCapabilities[serviceKey] ?? AppCapabilities.acp,
+      SessionProtocol.opencode =>
+        acpCapabilities[serviceKey] ?? AppCapabilities.opencode,
       SessionProtocol.codexAppServer => AppCapabilities.codex,
     };
   }
@@ -148,6 +150,74 @@ mixin _FakeHosting on _FakeBridgeState {
 
   @override
   List<AcpPreset> acpPresets() => presets;
+
+  @override
+  Future<OpenCodeEnvironment> openCodeDetect({String? binary}) async {
+    openCodeDetectCalls.add(binary);
+    final gate = openCodeDetectGate;
+    if (gate != null) {
+      openCodeDetectGate = null;
+      await gate.future;
+    }
+    if (binary == null) return openCodeEnvironment;
+    return OpenCodeEnvironment(
+      path: binary,
+      version: openCodeEnvironment.version,
+    );
+  }
+
+  @override
+  Future<void> openCodeRefresh({required String name}) async {
+    openCodeRefreshCalls.add(name);
+    final gate = openCodeRefreshGate;
+    if (gate != null) {
+      openCodeRefreshGate = null;
+      await gate.future;
+    }
+    final err = openCodeRefreshError;
+    if (err != null) {
+      openCodeRefreshError = null;
+      throw err;
+    }
+    final status = openCodeRefreshStatus;
+    openCodeRefreshStatus = null;
+    final i = serveHosts.indexWhere((h) => h.name == name && h.isOpenCode);
+    if (i < 0) throw StateError('no running OpenCode host named $name');
+    if (status == null) return;
+    final h = serveHosts[i];
+    // Same host, same incarnation: only the catalog summary changes.
+    serveHosts[i] = AppServeStatus(
+      name: h.name,
+      device: h.device,
+      pid: h.pid,
+      alive: h.alive,
+      appListenAddr: h.appListenAddr,
+      appServiceKey: h.appServiceKey,
+      appRegistered: h.appRegistered,
+      apiListenAddr: h.apiListenAddr,
+      apiServiceKey: h.apiServiceKey,
+      apiRegistered: h.apiRegistered,
+      metaListenAddr: h.metaListenAddr,
+      metaServiceKey: h.metaServiceKey,
+      metaRegistered: h.metaRegistered,
+      embedded: h.embedded,
+      codexBinary: h.codexBinary,
+      proxy: h.proxy,
+      provider: h.provider,
+      providerVersion: h.providerVersion,
+      protocol: h.protocol,
+      providerName: h.providerName,
+      profileId: h.profileId,
+      agentPhase: h.agentPhase,
+      agentError: h.agentError,
+      authRequired: h.authRequired,
+      opencode: status,
+      configSource: h.configSource,
+      configRevision: h.configRevision,
+      incarnation: h.incarnation,
+      busy: h.busy,
+    );
+  }
 
   @override
   bool acpHostingSupported() {
@@ -327,8 +397,17 @@ mixin _FakeHosting on _FakeBridgeState {
   }
 
   @override
-  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec}) {
-    // Mirrors the bridge's matrix (`host_config_supported`).
+  HostConfigSupport hostConfigSupported({AcpAgentSpec? spec, String? engine}) {
+    // Mirrors the bridge's matrix (`host_config_supported`). OpenCode uses
+    // its own configuration or a custom provider (no official account).
+    if (engine == 'opencode') {
+      return const HostConfigSupport(
+        sources: ['inherited', 'custom'],
+        protocols: ['responses', 'anthropic-messages', 'chat-completions'],
+        modelRequired: true,
+        keyRequired: true,
+      );
+    }
     if (spec == null) {
       return const HostConfigSupport(
         sources: ['inherited', 'official', 'custom'],
@@ -336,11 +415,6 @@ mixin _FakeHosting on _FakeBridgeState {
       );
     }
     return switch (spec.profileId) {
-      'opencode' => const HostConfigSupport(
-        sources: ['inherited', 'custom'],
-        protocols: ['responses', 'anthropic-messages', 'chat-completions'],
-        modelRequired: true,
-      ),
       'claude' => const HostConfigSupport(
         claudeVariables: [
           ClaudeVariable(
@@ -454,10 +528,37 @@ mixin _FakeHosting on _FakeBridgeState {
         '`$n` is already hosting; edit it instead, or choose another name',
       );
     }
+    if (runtime.isOpenCode && serveHosts.any((h) => h.isOpenCode)) {
+      throw StateError('opencode_already_hosted');
+    }
     final previous = hostConfigs[n];
     hostConfigs.remove(n);
     final saved = _store(n, input, keyAction, null, agent, runtime);
     try {
+      if (runtime.isOpenCode) {
+        final err = openCodeServeError;
+        if (err != null) {
+          openCodeServeError = null;
+          throw err;
+        }
+        final host = FakeBridgeApi.openCodeHost(n, binary: runtime.binary);
+        serveHosts.add(relaunched(host, runtime: runtime, config: saved));
+        if (!_services.any((s) => s.key == host.appServiceKey)) {
+          _services.add(
+            ServiceEntry(
+              device: host.device,
+              kind: 'opencode',
+              name: n,
+              key: host.appServiceKey,
+            ),
+          );
+        }
+        return HostStartResult(
+          name: n,
+          provider: 'opencode',
+          serviceKey: host.appServiceKey,
+        );
+      }
       if (agent != null) {
         final r = await appServeStartAcp(name: name, spec: agent);
         final i = serveHosts.indexWhere((h) => h.name == r.name);

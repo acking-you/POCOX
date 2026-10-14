@@ -5,11 +5,11 @@ void _registerSelectionOwnership() {
     testWidgets('an old lookup finishing late does not mark the new agent '
         'found', (t) async {
       final api = FakeBridgeApi();
-      // OpenCode's lookup hangs; the user switches to a custom agent.
+      // The preset's lookup hangs; the user switches to a custom agent.
       final slow = Completer<void>();
-      api.acpLocateGates['opencode'] = slow;
+      api.acpLocateGates['fixture-agent'] = slow;
       await _pumpDialog(t, api);
-      await t.tap(find.byKey(const Key('agent-choice-preset:opencode')));
+      await t.tap(find.byKey(const Key('agent-choice-preset:fixture')));
       await t.pump(const Duration(milliseconds: 400));
       await _chooseCustom(t);
       await t.enterText(
@@ -29,7 +29,7 @@ void _registerSelectionOwnership() {
     testWidgets('a failed lookup is shown with a retry that settles', (
       t,
     ) async {
-      final api = FakeBridgeApi()..acpLocateFailures.add('opencode');
+      final api = FakeBridgeApi()..acpLocateFailures.add('fixture-agent');
       await _pumpDialog(t, api);
       await _chooseAcp(t);
       expect(
@@ -61,7 +61,7 @@ void _registerSelectionOwnership() {
       final program = t.widget<TextField>(
         find.byKey(const Key('acp-program-field')),
       );
-      expect(program.controller!.text, 'opencode');
+      expect(program.controller!.text, 'fixture-agent');
     });
 
     testWidgets('a suggested name moves off hosts that load later; a typed '
@@ -71,20 +71,12 @@ void _registerSelectionOwnership() {
       await _chooseAcp(t);
       TextField name() =>
           t.widget(find.byKey(const Key('acp-instance-name-field')));
-      expect(name().controller!.text, 'opencode');
-      // A host named `opencode` turns up (status loaded late).
-      await api.appServeStartAcp(
-        name: 'opencode',
-        spec: const AcpAgentSpec(
-          profileId: 'opencode',
-          displayName: 'OpenCode',
-          program: 'opencode',
-          args: ['acp'],
-        ),
-      );
+      expect(name().controller!.text, 'fixture');
+      // A host named `fixture` turns up (status loaded late).
+      await api.appServeStartAcp(name: 'fixture', spec: _fixtureSpec);
       c.invalidate(localServeListProvider);
       await t.pumpAndSettle();
-      expect(name().controller!.text, 'opencode-2');
+      expect(name().controller!.text, 'fixture-2');
       await t.enterText(
         find.byKey(const Key('acp-instance-name-field')),
         'mine',
@@ -267,12 +259,12 @@ void _registerSelectionOwnership() {
   });
 }
 
-/// A saved configuration with the OpenCode preset's own profile id and name,
+/// A saved configuration with the fixture preset's own profile id and name,
 /// launched differently.
-const _savedOpenCode = AcpAgentSpec(
-  profileId: 'opencode',
-  displayName: 'OpenCode',
-  program: '/opt/oc/bin/opencode',
+const _savedFixture = AcpAgentSpec(
+  profileId: 'fixture',
+  displayName: 'Fixture Agent',
+  program: '/opt/fx/bin/fixture-agent',
   args: ['acp', '--port', '4100'],
 );
 
@@ -313,21 +305,29 @@ void _sameNameTests() {
     final handle = t.ensureSemantics();
     final l10n = lookupAppLocalizations(const Locale('en'));
     final api = FakeBridgeApi();
-    final prefs = _HeldPrefs(const UiPrefs(acpAgents: [_savedOpenCode]));
+    final prefs = _HeldPrefs(const UiPrefs(acpAgents: [_savedFixture]));
     final c = await _pumpDialog(t, api, prefs: prefs);
-    final preset = find.byKey(const Key('agent-choice-preset:opencode'));
-    final saved = find.byKey(const Key('agent-choice-saved:opencode'));
+    final preset = find.byKey(const Key('agent-choice-preset:fixture'));
+    final saved = find.byKey(const Key('agent-choice-saved:fixture'));
     final builtIn = find.byKey(const Key('agent-choice-builtin'));
     final mine = find.byKey(const Key('agent-choice-mine'));
 
     // Same name and mark, in different sections with their own headings.
-    expect(find.byKey(const Key('agent-icon-opencode')), findsNWidgets(2));
+    for (final tile in [preset, saved]) {
+      expect(
+        find.descendant(
+          of: tile,
+          matching: find.byKey(const Key('agent-icon-letter')),
+        ),
+        findsOneWidget,
+      );
+    }
     expect(find.descendant(of: builtIn, matching: preset), findsOneWidget);
     expect(find.descendant(of: mine, matching: saved), findsOneWidget);
     expect(find.descendant(of: builtIn, matching: saved), findsNothing);
     expect(find.descendant(of: mine, matching: preset), findsNothing);
     // ...and a distinct name for each, announced once.
-    final name = _savedOpenCode.displayName;
+    final name = _savedFixture.displayName;
     final presetLabel = '$name, ${l10n.agentChoicePreset}';
     final savedLabel = '$name, ${l10n.agentChoiceSaved}';
     expect(presetLabel, isNot(savedLabel));
@@ -352,21 +352,21 @@ void _sameNameTests() {
     // Both are reached by Tab, the preset first; Enter picks the saved one,
     // which brings its own program and arguments.
     final reached = <String>[];
-    for (var i = 0; i < 12 && !reached.contains('saved:opencode'); i++) {
+    for (var i = 0; i < 12 && !reached.contains('saved:fixture'); i++) {
       await t.sendKeyEvent(LogicalKeyboardKey.tab);
       await t.pump();
       final choice = _focusedChoice();
       if (choice != null && !reached.contains(choice)) reached.add(choice);
     }
-    expect(reached, containsAllInOrder(['preset:opencode', 'saved:opencode']));
+    expect(reached, containsAllInOrder(['preset:fixture', 'saved:fixture']));
     await t.sendKeyEvent(LogicalKeyboardKey.enter);
     await t.pump(const Duration(milliseconds: 400));
     await t.pumpAndSettle();
     expect(t.getSemantics(saved), isSemantics(isSelected: true));
     expect(t.getSemantics(preset), isSemantics(isSelected: false));
     var (program, args) = await _launchFields(t);
-    expect(program, _savedOpenCode.program);
-    expect(args, _savedOpenCode.args);
+    expect(program, _savedFixture.program);
+    expect(args, _savedFixture.args);
 
     // The preset, picked through its semantics action, brings its defaults.
     // Unfolding Advanced scrolled the form; bring the tile back first.
@@ -377,7 +377,7 @@ void _sameNameTests() {
     await t.pumpAndSettle();
     expect(t.getSemantics(preset), isSemantics(isSelected: true));
     (program, args) = await _launchFields(t);
-    expect(program, 'opencode');
+    expect(program, 'fixture-agent');
     expect(args, ['acp']);
     // Cancelling starts nothing and writes nothing.
     final cancel = find.text(l10n.cancel);
@@ -400,14 +400,14 @@ void _sameNameTests() {
     await t.pumpAndSettle();
     await _start(t);
     final (_, spec) = api.acpServeCalls.single;
-    expect(spec.profileId, _savedOpenCode.profileId);
-    expect(spec.program, _savedOpenCode.program);
-    expect(spec.args, _savedOpenCode.args);
+    expect(spec.profileId, _savedFixture.profileId);
+    expect(spec.program, _savedFixture.program);
+    expect(spec.args, _savedFixture.args);
     final kept = (await c.read(uiPrefsProvider.future)).acpAgents;
     expect(kept, hasLength(1));
-    expect(kept.single.displayName, _savedOpenCode.displayName);
-    expect(kept.single.program, _savedOpenCode.program);
-    expect(kept.single.args, _savedOpenCode.args);
+    expect(kept.single.displayName, _savedFixture.displayName);
+    expect(kept.single.program, _savedFixture.program);
+    expect(kept.single.args, _savedFixture.args);
     handle.dispose();
   });
 }
@@ -425,10 +425,10 @@ extension on AppServeStatus {
   );
 }
 
-const _openCodeSpec = AcpAgentSpec(
-  profileId: 'opencode',
-  displayName: 'OpenCode',
-  program: 'opencode',
+const _fixtureSpec = AcpAgentSpec(
+  profileId: 'fixture',
+  displayName: 'Fixture Agent',
+  program: 'fixture-agent',
   args: ['acp'],
 );
 
@@ -438,7 +438,7 @@ enum _Op { codexStart, acpStart, codexStop, acpStop }
 /// The instance each operation acts on.
 String _opName(_Op op) => switch (op) {
   _Op.codexStart => 'default',
-  _Op.acpStart => 'opencode',
+  _Op.acpStart => 'fixture',
   _Op.codexStop => 'alpha',
   _Op.acpStop => 'beta',
 };

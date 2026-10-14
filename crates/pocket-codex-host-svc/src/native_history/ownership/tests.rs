@@ -57,6 +57,7 @@ fn verified_activity_never_implies_an_exclusive_write_lease() {
     };
     for (state, expected) in [
         ("idle", "nativeOwnedIdle"),
+        ("busy", "nativeOwnedRunning"),
         ("running", "nativeOwnedRunning"),
         ("future-state", "nativeUnknown"),
     ] {

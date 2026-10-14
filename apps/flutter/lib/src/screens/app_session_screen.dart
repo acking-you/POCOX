@@ -6,7 +6,7 @@ import 'dart:math' as math;
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector/file_selector.dart' show openFiles;
 import 'package:flutter/foundation.dart'
-    show listEquals, defaultTargetPlatform, TargetPlatform, kIsWeb;
+    show listEquals, setEquals, defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
@@ -44,10 +44,13 @@ import 'package:pocket_codex/src/screens/app_session/agent_welcome.dart';
 import 'package:pocket_codex/src/screens/app_session/attachment_gate.dart';
 import 'package:pocket_codex/src/screens/app_session/async_questions.dart';
 import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
+import 'package:pocket_codex/src/screens/app_session/command_palette.dart';
 import 'package:pocket_codex/src/screens/app_session/composer_cards.dart';
 import 'package:pocket_codex/src/screens/app_session/expanded_composer.dart';
 import 'package:pocket_codex/src/screens/app_session/message_editor.dart';
+import 'package:pocket_codex/src/screens/app_session/session_access_panel.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
+import 'package:pocket_codex/src/screens/app_session/user_input_card.dart';
 import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
 import 'package:pocket_codex/src/screens/app_session/history_merge.dart';
 import 'package:pocket_codex/src/screens/app_session/history_rows.dart';
@@ -74,7 +77,6 @@ import 'package:pocket_codex/src/widgets/project_menu.dart';
 import 'package:pocket_codex/src/widgets/project_section_header.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 import 'package:pocket_codex/src/widgets/takeover_dialog.dart';
-import 'package:pocket_codex/src/widgets/session_control_dialog.dart';
 import 'package:pocket_codex/src/widgets/theme_toggle.dart';
 import 'package:pocket_codex/src/widgets/turn_minimap.dart';
 import 'package:pocket_codex/src/widgets/turn_outline.dart';
@@ -82,12 +84,13 @@ import 'package:pocket_codex/src/screens/app_session/approval_review.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
 
 part 'app_session/composer_drafts.dart';
+part 'app_session/session_access.dart';
 part 'app_session/session_agent_prepare.dart';
 part 'app_session/session_attachments.dart';
 part 'app_session/session_capabilities.dart';
 part 'app_session/session_composer.dart';
 part 'app_session/session_configuration.dart';
-part 'app_session/session_control.dart';
+part 'app_session/session_draft_options.dart';
 part 'app_session/session_conversations.dart';
 part 'app_session/session_events.dart';
 part 'app_session/session_external_writer.dart';
@@ -194,6 +197,7 @@ class AppSessionScreen extends ConsumerStatefulWidget {
   static void debugResetThreadMemory() {
     _AppSessionState._planByThread.clear();
     _AppSessionState._effortByThread.clear();
+    _AppSessionState._catalogByService.clear();
   }
 
   /// The clipboard image read behind Ctrl/Cmd+V. A test seam: the plugin's
@@ -265,6 +269,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   /// The ACP agent's state for the open session (options, modes, usage).
   SessionSettings? _agentSettings;
+
+  /// What the shown draft's own options were last read for (see
+  /// `_scheduleDraftOptionsCheck`).
+  Object? _draftOptionsKey;
 
   StreamSubscription<AppEvent>? _sub;
   int _subscriptionEpoch = 0;
@@ -512,8 +520,16 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _externalHistoryDirty = false;
   bool _externalWriterLegacy = false;
   int _externalWriterEpoch = 0;
-  bool _sessionControlOpen = false;
   bool _takingOver = false;
+  // The `/` command list: keyboard selection, and the text it was closed at.
+  int _paletteIndex = 0;
+  String? _paletteDismissed;
+  // Where this view stands with a host-access session (ACP, OpenCode), as
+  // the host decided it; re-checked while following.
+  SessionAccess? _access;
+  Timer? _accessTimer;
+  DateTime? _followSince;
+  bool _accessChecking = false;
 
   /// The local operation (a send, a supplement, an answer) holding the
   /// composer's send lock. Each releases only its own hold, so a superseded
@@ -864,6 +880,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     _healthTimer?.cancel();
     _reconnectCooldown?.cancel();
     _externalHistoryTimer?.cancel();
+    _accessTimer?.cancel();
     _externalWriterReconnect?.cancel();
     final externalWriterSub = _externalWriterSub;
     if (externalWriterSub != null) unawaited(externalWriterSub.cancel());
@@ -945,9 +962,20 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   static const _dictationInlineWidth = 440.0;
 
   // Cached model list (carries each model's supportedReasoningEfforts), fetched
-  // lazily and shared by the model + effort pickers.
+  // lazily and shared by the model + effort pickers. It belongs to the host
+  // connection it was read from ([_modelsKey]); a reconnect reads it again.
   List<ModelInfo> _models = const [];
   Future<List<ModelInfo>>? _modelsLoading;
+  Object? _modelsKey;
+  Object? _modelsLoadingKey;
+
+  /// Moves whenever a fresh model list differs from the one last seen for
+  /// this service (a host replaced with another configuration).
+  int _catalogChanges = 0;
+
+  /// The model ids last read per service. STATIC: a catalog change is told
+  /// apart from a first read even by a screen created after the change.
+  static final Map<String, Set<String>> _catalogByService = {};
 
   void _updateState(VoidCallback change) => setState(change);
 }

@@ -22,11 +22,10 @@ impl AgentHost {
             host_id: self.host_id().into(),
             generation,
             source_generation: None,
-            provider: match &self.inner.native_history {
-                Some(NativeHistory::Claude(_)) => "claude".into(),
-                #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-                Some(NativeHistory::OpenCode(_)) => "opencode".into(),
-                None => self.inner.spec.profile_id.clone(),
+            provider: if self.inner.native_history.is_some() {
+                "claude".into()
+            } else {
+                self.inner.spec.profile_id.clone()
             },
             status: "unsupported".into(),
             can_continue: false,
@@ -35,28 +34,20 @@ impl AgentHost {
         };
         let admitted = self.state().sessions.contains_key(session);
         if !admitted {
-            match &self.inner.native_history {
-                Some(NativeHistory::Claude(reader)) => {
-                    view.provider = "claude".into();
-                    view.status = "unknown".into();
-                    if let Ok(stamp) = reader.revision(session).await {
-                        view.source_generation = stamp["generation"].as_str().map(str::to_owned);
-                        let live = reader.handoff_liveness(session).await;
-                        view.status = match live.safety.as_str() {
-                            "nativeUnowned" => "released",
-                            "nativeOwnedIdle" => "external_idle",
-                            "nativeOwnedRunning" => "external_running",
-                            _ => "unknown",
-                        }
-                        .into();
+            if let Some(reader) = &self.inner.native_history {
+                view.provider = "claude".into();
+                view.status = "unknown".into();
+                if let Ok(stamp) = reader.revision(session).await {
+                    view.source_generation = stamp["generation"].as_str().map(str::to_owned);
+                    let live = reader.handoff_liveness(session).await;
+                    view.status = match live.safety.as_str() {
+                        "nativeUnowned" => "released",
+                        "nativeOwnedIdle" => "external_idle",
+                        "nativeOwnedRunning" => "external_running",
+                        _ => "unknown",
                     }
-                },
-                #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
-                Some(NativeHistory::OpenCode(_)) => {
-                    view.provider = "opencode".into();
-                    view.status = "engine_required".into();
-                },
-                None => {},
+                    .into();
+                }
             }
         }
         let state = self.state();
@@ -87,7 +78,7 @@ impl AgentHost {
             }
             .into();
             view.can_continue = !entry.pending;
-            view.can_release = matches!(self.inner.native_history, Some(NativeHistory::Claude(_)))
+            view.can_release = self.inner.native_history.is_some()
                 && caps.close_session
                 && entry.active.is_none()
                 && (!entry.pending || entry.releasing);

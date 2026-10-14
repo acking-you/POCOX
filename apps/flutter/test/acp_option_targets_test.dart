@@ -30,8 +30,8 @@ import 'support/screen_harness.dart';
 const _acp = 'pcx:dev:acp:agent';
 
 final _caps = negotiatedAcpCapabilities(
-  providerName: 'OpenCode',
-  profileId: 'opencode',
+  providerName: 'Fixture Agent',
+  profileId: 'fixture',
 );
 
 /// A model option with [count] values `p/vendor/m<i>` and an effort option.

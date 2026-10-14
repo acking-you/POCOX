@@ -213,7 +213,7 @@ extension _SessionTranscript on _AppSessionState {
                                   // guidance view with tappable starter prompts; an empty
                                   // resumed thread keeps the plain hint.
                                   ? (_threadId == null
-                                        ? (_caps.isAcp
+                                        ? (_caps.hostAccess
                                               ? _agentWelcome(l10n)
                                               : _newSessionGuidance(l10n))
                                         : Center(

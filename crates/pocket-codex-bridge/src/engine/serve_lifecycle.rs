@@ -104,7 +104,9 @@ pub(in crate::engine) fn serve_stop_locked(lease: &Lease, name: &str) -> Result<
     debug_assert!(host_names::same(lease.name(), name), "the lease names this host");
     // The ACP table is keyed canonically, the native one by the started
     // spelling: resolve each table's own key, never the caller's spelling.
-    if super::super::serve_acp::is_hosting(lease.name()) {
+    if super::super::serve_opencode::is_hosting(lease.name()) {
+        super::super::serve_opencode::stop(lease.name())?;
+    } else if super::super::serve_acp::is_hosting(lease.name()) {
         super::super::serve_acp::stop(lease.name());
     } else if let Some(key) = table_name(lease.name()) {
         stop_codex(&key);
@@ -161,6 +163,7 @@ pub fn serve_stop_all() -> Result<()> {
         QUITTING.store(true, Ordering::SeqCst);
     }
     host_lease::close_admission();
+    super::super::serve_opencode::close_admission();
     super::super::serve_acp::stop_all();
     let mut left = Vec::new();
     if let Err(error) = super::super::codex_login::close_all() {
@@ -169,6 +172,7 @@ pub fn serve_stop_all() -> Result<()> {
     // Held past the wait: those operations still own their processes (a
     // start records or tears down its host itself, behind the fence).
     let drained = host_lease::drain(QUIT_WAIT);
+    left.extend(super::super::serve_opencode::stop_all(drained));
     let names: Vec<String> = hosts_locked().keys().cloned().collect();
     for name in names {
         let wait = if drained { QUIT_WAIT } else { Duration::ZERO };

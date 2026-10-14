@@ -62,6 +62,8 @@ use super::host_names;
 pub mod environment;
 #[path = "host_profiles_files.rs"]
 mod files;
+#[path = "host_profiles_opencode.rs"]
+pub(super) mod opencode;
 #[path = "host_profiles_secrets.rs"]
 mod secrets;
 
@@ -311,20 +313,9 @@ pub fn get_in(root: &Path, name: &str) -> Result<HostProfile> {
     Ok(profile_of(root, &name, profiles.hosts.get(&name)))
 }
 
-/// Save `change` for `name`, validated for `engine` (for an ACP runtime,
-/// the agent being saved). With `expected` set, refuses unless the saved
-/// revision is still that one, so an editor never silently overwrites a
-/// save made elsewhere. Never touches a running host.
-pub fn save_change(
-    name: &str,
-    change: &Change,
-    expected: Option<u64>,
-    engine: Engine<'_>,
-) -> Result<HostProfile> {
-    save_in(&root()?, name, change, expected, engine)
-}
-
-/// [`save_change`] in the store at `root`.
+/// Save `change` for `name` in the store at `root`, validated for `engine`.
+/// With `expected` set, refuses unless the saved revision is still that
+/// one. Never touches a running host.
 pub fn save_in(
     root: &Path,
     name: &str,
@@ -436,6 +427,9 @@ pub fn stage_in(
         bail!("the default model name contains a control character");
     }
     let protocol = input.protocol.filter(|_| custom);
+    if custom && matches!(engine, Engine::OpenCode) {
+        opencode::validate_fields(base_url.as_deref(), model.as_deref())?;
+    }
     let key = match &change.key {
         KeyChange::Replace(secret) if secret.expose().trim().is_empty() => {
             bail!("the new key is empty; leave it blank to keep the stored one")
@@ -463,6 +457,19 @@ pub fn stage_in(
     let current = previous.as_ref().map_or(0, |r| r.revision);
     if expected.is_some_and(|expected| expected != current) {
         bail!("this host's configuration was changed elsewhere; reload it before saving");
+    }
+    if custom && matches!(engine, Engine::OpenCode) {
+        let present = match &key {
+            KeyChange::Replace(secret) => {
+                opencode::validate_key(secret.expose())?;
+                true
+            },
+            KeyChange::Keep => previous.as_ref().is_some_and(|r| r.key.is_some()),
+            KeyChange::Remove => false,
+        };
+        if !present {
+            bail!("OpenCode needs the custom provider's API key");
+        }
     }
     let revision = current
         .checked_add(1)
@@ -718,13 +725,12 @@ pub fn acp(
         (Source::Official, _) => bail!("only native Codex offers an official-account sign-in here"),
         (Source::Custom, None) => bail!("the saved provider is incomplete; edit the host"),
         (Source::Custom, Some(endpoint)) => {
-            let instance = host_names::canonical(name)?;
+            host_names::canonical(name)?;
             let authority = resolved
                 .authority
                 .clone()
                 .ok_or_else(|| anyhow!("the saved provider has no authority; save it again"))?;
-            let launch = acp_provider::launch(spec, endpoint, &instance, &authority)
-                .map_err(|e| anyhow!("{e}"))?;
+            let launch = acp_provider::launch(spec, endpoint).map_err(|e| anyhow!("{e}"))?;
             Ok(Some((launch, authority)))
         },
     }

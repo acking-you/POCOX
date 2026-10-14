@@ -1,5 +1,13 @@
 part of '../../fake_bridge_api.dart';
 
+/// The fake's generic ACP preset.
+const fixturePreset = AcpPreset(
+  id: 'fixture',
+  displayName: 'Fixture Agent',
+  program: 'fixture-agent',
+  args: ['acp'],
+);
+
 abstract class _FakeBridgeState implements BridgeApi {
   /// Creates a fake seeded with an optional [config] and [services].
   _FakeBridgeState({ConfigInfo? config, List<ServiceEntry>? services})
@@ -159,15 +167,37 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Running session ids per ACP service key.
   final Map<String, List<String>> runningThreads = {};
 
-  /// Presets the fake reports.
-  List<AcpPreset> presets = const [
-    AcpPreset(
-      id: 'opencode',
-      displayName: 'OpenCode',
-      program: 'opencode',
-      args: ['acp'],
-    ),
-  ];
+  /// Presets the fake reports: one generic ACP preset, so preset handling
+  /// is tested apart from any real agent's own rules.
+  List<AcpPreset> presets = const [fixturePreset];
+
+  /// What [openCodeDetect] reports without an explicit executable.
+  OpenCodeEnvironment openCodeEnvironment = const OpenCodeEnvironment(
+    path: '/Users/me/.opencode/bin/opencode',
+    version: '1.19.0',
+  );
+
+  /// Every [openCodeDetect] call's executable.
+  final List<String?> openCodeDetectCalls = [];
+
+  /// Holds the next [openCodeDetect] until it completes (then cleared).
+  Completer<void>? openCodeDetectGate;
+
+  /// Thrown by the next OpenCode start (then cleared).
+  Object? openCodeServeError;
+
+  /// Every [openCodeRefresh] call's host name.
+  final List<String> openCodeRefreshCalls = [];
+
+  /// Holds the next [openCodeRefresh] until it completes (then cleared).
+  Completer<void>? openCodeRefreshGate;
+
+  /// Thrown by the next [openCodeRefresh] (then cleared).
+  Object? openCodeRefreshError;
+
+  /// The catalog summary the next [openCodeRefresh] stores on its host
+  /// (then cleared); `null` keeps the host's status.
+  OpenCodeHostStatus? openCodeRefreshStatus;
 
   /// Whether this fake device can host ACP agents.
   bool acpHosting = true;
@@ -177,7 +207,7 @@ abstract class _FakeBridgeState implements BridgeApi {
 
   /// Programs [acpLocate] resolves, by program text.
   final Map<String, String> acpPrograms = {
-    'opencode': '/Users/me/.opencode/bin/opencode',
+    'fixture-agent': '/Users/me/.local/bin/fixture-agent',
   };
 
   /// Holds lookups of a program until its completer completes.
@@ -366,7 +396,11 @@ abstract class _FakeBridgeState implements BridgeApi {
     if (expectedRevision != null && expectedRevision != current.revision) {
       throw StateError('changed elsewhere');
     }
-    final support = hostConfigSupported(spec: runtime?.agent ?? spec);
+    final effective = runtime ?? current.runtime;
+    final support = hostConfigSupported(
+      spec: runtime?.agent ?? spec,
+      engine: effective != null && effective.isOpenCode ? 'opencode' : null,
+    );
     if (!support.sources.contains(input.source) ||
         (input.source == 'custom' &&
             (!support.protocols.contains(input.protocol) ||
@@ -436,6 +470,7 @@ abstract class _FakeBridgeState implements BridgeApi {
       providerName: agent?.displayName ?? h.providerName,
       profileId: agent?.profileId ?? h.profileId,
       agentPhase: h.agentPhase,
+      opencode: h.opencode,
       configSource: config?.source ?? h.configSource ?? 'inherited',
       configRevision: config?.revision ?? h.configRevision ?? 0,
       incarnation: nextIncarnation(),
@@ -618,6 +653,13 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// When true, [appModelList] returns no models, to exercise the
   /// "can't switch collaboration mode without a model" path.
   bool emptyModelList = false;
+
+  /// Per-service model lists [appModelList] returns instead of its default
+  /// pair; replacing an entry models a host restarted with another catalog.
+  final Map<String, List<ModelInfo>> modelLists = {};
+
+  /// Every [appModelList] call's service key.
+  final List<String> modelListServices = [];
   Completer<void>? modelListGate;
   Completer<void>? configReadGate;
 
@@ -646,6 +688,33 @@ abstract class _FakeBridgeState implements BridgeApi {
   final Map<String, List<Future<ThreadHistory>>> pendingReads = {};
   final List<String> threadReads = [];
   final List<bool> threadReadIncludesPages = [];
+
+  /// Access fixtures by thread id ([appSessionOpen], [appSessionAccess]).
+  final Map<String, SessionAccess> sessionAccess = {};
+
+  /// Answers of the next [appSessionOpen] calls, in order, before
+  /// [sessionAccess].
+  final List<SessionAccess> sessionOpenResults = [];
+
+  /// Answers of the next [appSessionAccess] calls, in order.
+  final List<SessionAccess> sessionAccessResults = [];
+
+  /// Holds the next [appSessionOpen] until completed (then cleared).
+  Completer<void>? sessionOpenGate;
+
+  /// Every [appSessionOpen] / [appSessionAccess] thread id.
+  final List<String> sessionOpenCalls = [];
+  final List<String> sessionAccessCalls = [];
+
+  /// Every [appSessionRelease] snapshot.
+  final List<SessionAccess> sessionReleaseCalls = [];
+
+  /// Thrown by the next [appSessionRelease] (then cleared).
+  Object? sessionReleaseError;
+
+  /// What [appCommandList] reports, and its calls.
+  List<AgentCommand> agentCommands = const [];
+  final List<String> commandListCalls = [];
 
   /// Optional failure thrown by [appThreadResume].
   Object? appThreadResumeError;

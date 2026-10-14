@@ -13,7 +13,7 @@ extension _SessionCapabilities on _AppSessionState {
     final cached = _capsCache;
     if (_capsKey != widget.serviceKey ||
         cached == null ||
-        (cached.isAcp && !cached.negotiated)) {
+        (cached.hostAccess && !cached.negotiated)) {
       _capsKey = widget.serviceKey;
       _capsCache = ref
           .read(bridgeApiProvider)
@@ -44,8 +44,11 @@ extension _SessionCapabilities on _AppSessionState {
   /// menu opened and refused if any part moved (conversation, its load,
   /// capabilities/host generation, event connection).
   _AgentTarget? _agentTarget() {
-    // The open conversation, or the session opened ahead for its draft.
-    final tid = _agentSessionThread;
+    // The open conversation, the session opened ahead for its draft, or the
+    // draft itself when it keeps its own options.
+    final tid =
+        _agentSessionThread ??
+        (_editsDraftOptions ? _draftTargetId(_draft) : null);
     if (tid == null) return null;
     return (
       service: widget.serviceKey,
@@ -80,8 +83,10 @@ extension _SessionCapabilities on _AppSessionState {
 
   void _refreshAgentSettings() {
     final tid = _agentSessionThread;
-    final next = tid == null || !_caps.sessionConfig
+    final next = !_caps.sessionConfig
         ? null
+        : tid == null
+        ? (_editsDraftOptions ? _draftSettings() : null)
         : ref
               .read(bridgeApiProvider)
               .appSessionSettings(widget.serviceKey, tid);
@@ -135,6 +140,11 @@ extension _SessionCapabilities on _AppSessionState {
     String configId,
     String value,
   ) async {
+    // A draft's own choice is kept, not sent (see [_applyDraftOptions]).
+    if (target != null && target.thread.startsWith('#draft:')) {
+      _setDraftOption(target, configId, value);
+      return;
+    }
     if (!_agentTargetCurrent(target)) return;
     final offered = _agentSettings?.configOptions
         .where((o) => o.id == configId)
@@ -159,6 +169,8 @@ extension _SessionCapabilities on _AppSessionState {
   /// Switch the agent's legacy mode for [target]; refused like
   /// [_setAgentConfig].
   Future<void> _setAgentMode(_AgentTarget? target, String modeId) async {
+    // Legacy modes exist only on a session, never on a draft.
+    if (target?.thread.startsWith('#draft:') ?? false) return;
     if (!_agentTargetCurrent(target)) return;
     final settings = _agentSettings;
     if (settings == null ||

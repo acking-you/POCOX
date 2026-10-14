@@ -87,12 +87,12 @@ use super::{
     fold::{session_signal, SessionSignal},
     jsonrpc::{RequestId, RpcError},
     peer::{CallError, CloseReason, Inbound, Peer},
-    process::{self, AgentProcess},
     schema::{self, AgentCapabilities, SessionSettings, TurnOutcome},
     spec::AgentSpec,
     state::{ActiveTurn, LogEntry, Permission, Phase, State, MAX_PERMISSIONS},
     store::{Change, Pending, SessionStore},
 };
+use crate::process::{self, AgentProcess};
 
 mod handoff;
 mod inbound;
@@ -179,6 +179,9 @@ pub enum HostError {
     /// Browsing native history does not acquire another session's writer.
     #[error("native history is read-only; explicitly acquire the session before sending")]
     ReadOnly,
+    /// Another cooperative Pocket host retains the original session claim.
+    #[error("another Pocket host owns this original session")]
+    PocketOwned,
     /// A turn is running in the session.
     #[error("a turn is already running in this session")]
     Busy,
@@ -236,6 +239,7 @@ impl HostError {
             Self::Stale => "stale_host",
             Self::UnknownSession => "unknown_session",
             Self::ReadOnly => "native_read_only",
+            Self::PocketOwned => "pocket_host",
             Self::Busy => "busy",
             Self::TurnChanged => "turn_changed",
             Self::Loading => "loading",
@@ -280,7 +284,7 @@ pub struct HostOptions {
     pub program: PathBuf,
     /// `PATH` for the child only, when it must differ from the inherited one.
     pub path: Option<OsString>,
-    /// Extra environment for the child (see [`super::catalog`]).
+    /// Extra environment for the owned child.
     pub env: Vec<(OsString, OsString)>,
     /// Admitted-session record of this agent source.
     pub store: SessionStore,
@@ -306,13 +310,15 @@ struct Inner {
     path: Option<OsString>,
     env: Vec<(OsString, OsString)>,
     store: Arc<SessionStore>,
-    native_history: Option<crate::native_history::NativeHistory>,
+    native_history: Option<Arc<crate::native_history::ClaudeHistory>>,
     persist: Persist,
     state: Mutex<State>,
     lifecycle: tokio::sync::Mutex<Option<Running>>,
     /// Separate from replay state and dropped after the process owner. A
     /// normal teardown retains these claims until native exit is verified.
     native_claims: Mutex<HashMap<String, handoff::HeldClaim>>,
+    /// Explicit release suppresses background automatic admission.
+    released_here: Mutex<HashMap<String, std::time::Instant>>,
     /// Orders every prompt dispatch and `session/cancel` (see the module
     /// docs).
     dispatch: tokio::sync::Mutex<()>,

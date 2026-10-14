@@ -143,6 +143,9 @@ pub(super) fn republish_refused() {
 /// until its lease expired unless the backend was asked to retire it. With the
 /// app registering directly there is no second party holding anything.
 pub fn serve_deregister(name: &str, kind: &str) -> Result<()> {
+    if crate::engine::serve_opencode::is_hosting(name) {
+        return crate::engine::serve_opencode::deregister(name, kind);
+    }
     if crate::engine::serve_acp::is_hosting(name) {
         return crate::engine::serve_acp::deregister(name, kind);
     }
@@ -174,6 +177,9 @@ pub fn serve_deregister(name: &str, kind: &str) -> Result<()> {
 /// Re-publish a previously [`serve_deregister`]'d service, forwarding to the
 /// still-running process. No-op if already published.
 pub fn serve_reregister(name: &str, kind: &str) -> Result<()> {
+    if crate::engine::serve_opencode::is_hosting(name) {
+        return crate::engine::serve_opencode::reregister(name, kind);
+    }
     if crate::engine::serve_acp::is_hosting(name) {
         return crate::engine::serve_acp::reregister(name, kind);
     }

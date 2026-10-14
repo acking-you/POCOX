@@ -1,5 +1,5 @@
-// ACP model / effort controls against the option shapes OpenCode 1.18.35
-// reports (packages/opencode/src/acp/config-option.ts): a `model` option whose
+// ACP model / effort controls against option shapes a generic ACP agent
+// may report: a `model` option whose
 // values are `provider/model` (model ids may themselves contain `/`), an
 // `effort` option (category `thought_level`) that exists only while the
 // selected model has variants, and a `mode` option. Every change answers
@@ -23,8 +23,8 @@ import 'support/screen_harness.dart';
 const _acp = 'pcx:dev:acp:agent';
 
 final _caps = negotiatedAcpCapabilities(
-  providerName: 'OpenCode',
-  profileId: 'opencode',
+  providerName: 'Fixture Agent',
+  profileId: 'fixture',
 );
 
 /// Models: provider id → [(model id, label, variants)]. OpenRouter-style ids
@@ -40,8 +40,8 @@ const _catalog = {
   ],
 };
 
-/// The options OpenCode reports for [model] (and [effort]).
-SessionSettings _opencode(String model, {String? effort}) {
+/// The options the agent reports for [model] (and [effort]).
+SessionSettings _agentOptions(String model, {String? effort}) {
   final values = <SessionConfigValue>[
     for (final MapEntry(key: provider, value: models) in _catalog.entries)
       for (final (id, name, _) in models)
@@ -96,12 +96,12 @@ SessionSettings _opencode(String model, {String? effort}) {
   );
 }
 
-/// A fake that answers changes the way OpenCode's `setSessionConfigOption`
+/// A fake that answers changes the way an ACP agent's `setSessionConfigOption`
 /// does: a model change recomputes the effort option; an effort change keeps
 /// the model.
 FakeBridgeApi _api(String model, {String? effort, String thread = 'ses-1'}) {
   final api = FakeBridgeApi()..acpCapabilities[_acp] = _caps;
-  api.sessionSettings['$_acp|$thread'] = _opencode(model, effort: effort);
+  api.sessionSettings['$_acp|$thread'] = _agentOptions(model, effort: effort);
   api.onSessionConfig = (id, value, current) {
     final model = current?.configOptions
         .firstWhere((o) => o.id == 'model')
@@ -111,8 +111,8 @@ FakeBridgeApi _api(String model, {String? effort, String thread = 'ses-1'}) {
         .firstOrNull
         ?.currentValue;
     return switch (id) {
-      'model' => _opencode(value, effort: effort),
-      'effort' => _opencode(model!, effort: value),
+      'model' => _agentOptions(value, effort: effort),
+      'effort' => _agentOptions(model!, effort: value),
       _ => current,
     };
   };
@@ -150,14 +150,16 @@ void main() {
 
   group('option ordering and filtering', () {
     test('model, then effort, then mode, whatever order the agent used', () {
-      final options = _opencode('anthropic/claude-sonnet-4-5').configOptions;
+      final options = _agentOptions(
+        'anthropic/claude-sonnet-4-5',
+      ).configOptions;
       final reversed = orderedOptions(options.reversed.toList());
       expect(reversed.map((o) => o.id), ['model', 'effort', 'mode']);
     });
 
     test('a mode config option hides legacy modes; without one they show', () {
       expect(
-        showsLegacyModes(_opencode('anthropic/claude-haiku-4-5')),
+        showsLegacyModes(_agentOptions('anthropic/claude-haiku-4-5')),
         isFalse,
       );
       expect(
@@ -171,7 +173,7 @@ void main() {
     });
 
     test('search matches labels, groups and slash-containing ids verbatim', () {
-      final values = _opencode(
+      final values = _agentOptions(
         'anthropic/claude-haiku-4-5',
       ).configOptions.first.values;
       expect(filterOptionValues(values, 'openai/gpt').map((v) => v.value), [
@@ -361,7 +363,7 @@ void main() {
       t,
     ) async {
       final api = _api('anthropic/claude-haiku-4-5', thread: 'unused')
-        ..newSessionSettings = _opencode('anthropic/claude-haiku-4-5');
+        ..newSessionSettings = _agentOptions('anthropic/claude-haiku-4-5');
       await _open(t, api, cwd: '/work/alpha');
       // No setup step: the session is open and its options are real.
       expect(api.threadStartCalls, [_acp]);
@@ -404,10 +406,9 @@ void main() {
       expect(find.byKey(const Key('agent-session-options')), findsNothing);
     });
 
-    // UI-only: the catalog below stands in for what OpenCode reports after
-    // the host's catalog plugin listed a gateway (that boundary is tested in
-    // crates/pocket-codex-host-svc/tests/opencode_catalog.test.mjs). Effort
-    // comes only from the agent's own per-model option, as on the wire.
+    // UI-only: the catalog below stands in for a large agent-reported model
+    // list (a gateway's models). Effort comes only from the agent's own
+    // per-model option, as on the wire.
     group('a large agent-reported model catalog (fake bridge)', () {
       testWidgets(
         'every reported model is searchable and selectable; effort follows the '

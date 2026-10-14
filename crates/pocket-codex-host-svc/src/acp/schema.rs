@@ -523,7 +523,7 @@ mod tests {
     #[test]
     fn a_long_model_catalog_keeps_every_value() {
         // The 32 limit counts option definitions; a provider catalog can have
-        // hundreds of values (OpenCode lists every model of every provider).
+        // hundreds of values when agents list all configured providers.
         let values: Vec<_> = (0..300)
             .map(|i| json!({"value": format!("p/vendor/m{i}"), "name": format!("M{i}")}))
             .collect();

@@ -78,7 +78,7 @@ fn an_unsaved_instance_inherits_its_agent_configuration() {
     let resolved = resolve_in(dir.path(), "codex-a").expect("resolve");
     assert_eq!(resolved, Resolved::inherited());
     assert!(codex(&resolved, "codex-a").expect("launch").args.is_empty());
-    assert!(acp(&resolved, &spec("opencode"), "codex-a")
+    assert!(acp(&resolved, &spec("claude"), "codex-a")
         .expect("acp")
         .is_none());
     assert!(!dir.path().join("profiles.lock").exists(), "a read creates nothing");
@@ -144,10 +144,8 @@ fn a_custom_provider_round_trips_without_reading_the_key_back() {
 #[test]
 fn keep_replace_and_remove_change_only_the_key() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let input = custom(ApiProtocol::AnthropicMessages, "https://gw.example.com");
-    let opencode = spec("opencode");
-    let save =
-        |key, expected| save(dir.path(), "oc", &input, key, expected, Engine::Acp(&opencode));
+    let input = custom(ApiProtocol::Responses, "https://gw.example.com");
+    let save = |key, expected| save(dir.path(), "oc", &input, key, expected, Engine::Codex);
     assert!(
         save(KeyChange::Replace(Secret::new("one")), None)
             .expect("1")
@@ -494,7 +492,19 @@ fn only_real_mappings_are_accepted() {
         source: Source::Official,
         ..inherited()
     };
-    refused("oc", official.clone(), Engine::Acp(&spec("opencode")));
+    refused("oc", official.clone(), Engine::OpenCode);
+    for protocol in ApiProtocol::ALL {
+        let profile = save(
+            dir.path(),
+            "oc-custom",
+            &custom(protocol, url),
+            KeyChange::Replace(Secret::new("native-key")),
+            None,
+            Engine::OpenCode,
+        )
+        .expect("native OpenCode supports each custom API");
+        assert_eq!(profile.protocol, Some(protocol));
+    }
     let mut no_api = custom(ApiProtocol::Responses, url);
     no_api.protocol = None;
     refused("c3", no_api, Engine::Codex);
@@ -510,7 +520,7 @@ fn only_real_mappings_are_accepted() {
     save(dir.path(), "c8", &inherited(), KeyChange::Replace(Secret::new("k")), None, Engine::Codex)
         .expect_err("no key for inherited");
 
-    for engine in [Engine::Codex, Engine::Acp(&generic)] {
+    for engine in [Engine::Codex, Engine::Acp(&generic), Engine::OpenCode] {
         save(dir.path(), "inherit", &inherited(), KeyChange::Keep, None, engine).expect("ok");
     }
     let saved = save(dir.path(), "codex-o", &official, KeyChange::Keep, None, Engine::Codex)
@@ -552,8 +562,8 @@ fn leaving_the_custom_provider_forgets_its_key_and_fields() {
 #[test]
 fn the_authority_moves_with_the_service_and_its_key_only() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let opencode = spec("opencode");
-    let input = custom(ApiProtocol::ChatCompletions, "https://gw.example.com/v1");
+    let claude = spec("claude");
+    let input = custom(ApiProtocol::AnthropicMessages, "https://gw.example.com/v1");
     // The argument only labels which save is being looked at.
     let authority = |_after_save: u64| resolve_in(dir.path(), "oc").expect("resolve").authority;
     save(
@@ -562,7 +572,7 @@ fn the_authority_moves_with_the_service_and_its_key_only() {
         &input,
         KeyChange::Replace(Secret::new("sk-1")),
         None,
-        Engine::Acp(&opencode),
+        Engine::Acp(&claude),
     )
     .expect("1");
     let first = authority(1).expect("custom has an authority");
@@ -570,9 +580,9 @@ fn the_authority_moves_with_the_service_and_its_key_only() {
     let runtime = Change {
         input: input.clone(),
         key: KeyChange::Keep,
-        runtime: RuntimeChange::Set(Runtime::Acp(opencode.clone())),
+        runtime: RuntimeChange::Set(Runtime::Acp(claude.clone())),
     };
-    save_in(dir.path(), "oc", &runtime, Some(1), Engine::Acp(&opencode)).expect("2");
+    save_in(dir.path(), "oc", &runtime, Some(1), Engine::Acp(&claude)).expect("2");
     assert_eq!(authority(2).as_deref(), Some(first.as_str()));
     // A replaced key is another account: a new authority.
     save(
@@ -581,17 +591,17 @@ fn the_authority_moves_with_the_service_and_its_key_only() {
         &input,
         KeyChange::Replace(Secret::new("sk-2")),
         Some(2),
-        Engine::Acp(&opencode),
+        Engine::Acp(&claude),
     )
     .expect("3");
     let second = authority(3).expect("authority");
     assert_ne!(second, first);
     // So does another URL.
-    let moved = custom(ApiProtocol::ChatCompletions, "https://other.example.com/v1");
-    save(dir.path(), "oc", &moved, KeyChange::Keep, Some(3), Engine::Acp(&opencode)).expect("4");
+    let moved = custom(ApiProtocol::AnthropicMessages, "https://other.example.com/v1");
+    save(dir.path(), "oc", &moved, KeyChange::Keep, Some(3), Engine::Acp(&claude)).expect("4");
     assert_ne!(authority(4).as_deref(), Some(second.as_str()));
     // Inherited has none.
-    save(dir.path(), "oc", &inherited(), KeyChange::Keep, Some(4), Engine::Acp(&opencode))
+    save(dir.path(), "oc", &inherited(), KeyChange::Keep, Some(4), Engine::Acp(&claude))
         .expect("5");
     assert!(authority(5).is_none());
 
@@ -602,15 +612,13 @@ fn the_authority_moves_with_the_service_and_its_key_only() {
             &input,
             KeyChange::Replace(Secret::new("sk-oc")),
             Some(5),
-            Engine::Acp(&opencode),
+            Engine::Acp(&claude),
         )
         .expect("6");
         resolve_in(dir.path(), "oc").expect("resolve")
     };
-    let (launch, keyed) = acp(&resolved, &opencode, "oc")
-        .expect("acp")
-        .expect("custom");
-    assert!(launch.layer.is_some());
+    let (launch, keyed) = acp(&resolved, &claude, "oc").expect("acp").expect("custom");
+    assert!(launch.session_meta.is_some());
     assert!(!keyed.contains("sk-oc"), "the authority is opaque");
 }
 
@@ -669,7 +677,7 @@ fn a_runtime_is_saved_validated_and_kind_checked() {
         };
         save_in(dir.path(), "r", &change, None, engine).expect_err("refused");
     };
-    let agent = spec("opencode");
+    let agent = spec("claude");
     refuse(Runtime::Acp(agent.clone()), Engine::Codex);
     refuse(
         Runtime::Codex {

@@ -3,9 +3,9 @@ part of '../acp_hosting_test.dart';
 void _registerRestore() {
   test('restore plans by what hosts are, never by what they are not', () {
     const acpSpec = AcpAgentSpec(
-      profileId: 'opencode',
-      displayName: 'OpenCode',
-      program: 'opencode',
+      profileId: 'fixture',
+      displayName: 'Fixture Agent',
+      program: 'fixture-agent',
       args: ['acp'],
     );
     const prefs = UiPrefs(
@@ -166,6 +166,118 @@ void _registerRestore() {
     );
     expect(restored, isTrue);
     expect(api.serveHosts.map((h) => h.name), ['a', 'b']);
+  });
+
+  test('OpenCode is restored with its saved model service and runtime, '
+      'its stored key kept', () async {
+    final api = FakeBridgeApi();
+    api.hostConfigs['studio'] = const HostConfig(
+      source: 'custom',
+      protocol: 'anthropic-messages',
+      baseUrl: 'https://gateway.example',
+      model: 'claude-sonnet',
+      keySet: true,
+      revision: 4,
+      runtime: HostRuntime.opencode(binary: '/opt/opencode'),
+    );
+    final restored = await runHostRestore(
+      api,
+      const HostRestorePlan(
+        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/old/oc'),
+      ),
+    );
+    expect(restored, isTrue);
+    final (name, runtime, input, action, key) = api.startConfiguredCalls.single;
+    expect(name, 'studio');
+    expect(runtime.isOpenCode, isTrue);
+    expect(runtime.binary, '/opt/opencode', reason: 'the desired runtime');
+    expect(input.source, 'custom');
+    expect(input.protocol, 'anthropic-messages');
+    expect(input.baseUrl, 'https://gateway.example');
+    expect(input.model, 'claude-sonnet');
+    expect(action, HostKeyAction.keep);
+    expect(key, isNull, reason: 'no key is read back or resent');
+  });
+
+  test('an unreadable OpenCode configuration restores nothing and replaces '
+      'nothing', () async {
+    final api = FakeBridgeApi()
+      ..hostConfigGetError = StateError('profile unreadable');
+    api.hostConfigs['studio'] = const HostConfig(
+      source: 'custom',
+      protocol: 'responses',
+      baseUrl: 'https://models.example/v1',
+      model: 'm',
+      keySet: true,
+    );
+    final restored = await runHostRestore(
+      api,
+      const HostRestorePlan(
+        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
+      ),
+    );
+    expect(restored, isFalse);
+    expect(api.startConfiguredCalls, isEmpty);
+    expect(api.hostConfigs['studio']!.source, 'custom');
+  });
+
+  // A damaged record is reported, not thrown: its fields are only defaults
+  // (source inherited), and starting from them would save over it.
+  test('a damaged OpenCode configuration restores nothing and replaces '
+      'nothing', () async {
+    const damaged = HostConfig(revision: 7, problem: 'unreadable profile');
+    final api = FakeBridgeApi();
+    api.hostConfigs['studio'] = damaged;
+    final restored = await runHostRestore(
+      api,
+      const HostRestorePlan(
+        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
+      ),
+    );
+    expect(restored, isFalse);
+    expect(api.startConfiguredCalls, isEmpty);
+    expect(api.serveHosts, isEmpty);
+    expect(identical(api.hostConfigs['studio'], damaged), isTrue);
+  });
+
+  test('an OpenCode record whose saved runtime is another engine restores '
+      'nothing and replaces nothing', () async {
+    const other = HostConfig(
+      source: 'custom',
+      protocol: 'responses',
+      baseUrl: 'https://models.example/v1',
+      keySet: true,
+      revision: 3,
+      runtime: HostRuntime.codex(binary: '/usr/local/bin/codex'),
+    );
+    final api = FakeBridgeApi();
+    api.hostConfigs['studio'] = other;
+    final restored = await runHostRestore(
+      api,
+      const HostRestorePlan(
+        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
+      ),
+    );
+    expect(restored, isFalse);
+    expect(api.startConfiguredCalls, isEmpty);
+    expect(api.serveHosts, isEmpty);
+    expect(identical(api.hostConfigs['studio'], other), isTrue);
+  });
+
+  test('a skipped OpenCode restore keeps its restore record', () {
+    // The plan is made from the record; nothing in a refused restore
+    // touches preferences, so the next launch plans it again.
+    const prefs = UiPrefs(
+      autoHostOpenCode: AutoHostOpenCodePrefs(name: 'studio', binary: '/oc'),
+    );
+    final plan = planHostRestore(
+      prefs,
+      const [],
+      codexAttempted: const {},
+      acpAttempted: const {},
+      acpSupported: true,
+    );
+    expect(plan.opencode?.name, 'studio');
   });
 
   group('restore records decided on the loaded file', () {

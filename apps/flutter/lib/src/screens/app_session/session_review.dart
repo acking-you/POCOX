@@ -488,7 +488,7 @@ extension _SessionReview on _AppSessionState {
   /// from there — never from a sign-in here). Null for other failures.
   String? _agentErrorHint(AppLocalizations l10n, String error) {
     final caps = _caps;
-    if (!caps.isAcp) return null;
+    if (!caps.hostAccess) return null;
     if (caps.authRequired) return l10n.agentAuthHint;
     final m = error.toLowerCase();
     return m.startsWith('the agent rejected the request') ||

@@ -335,6 +335,53 @@ impl GatewayClient {
         serde_json::from_value(body).map_err(|_| ClientError::Protocol)
     }
 
+    /// Fresh provider-neutral access; reads never acquire a native writer.
+    pub async fn session_access(
+        &self,
+        session: &str,
+        expected: &Identity,
+    ) -> Result<crate::session_access::SessionAccess, ClientError> {
+        let host = expected.host_id.as_deref().ok_or(ClientError::Protocol)?;
+        let generation = expected
+            .generation
+            .ok_or(ClientError::Protocol)?
+            .to_string();
+        let body = self
+            .get("acp/v1/sessions/access", &[
+                ("sessionId", session),
+                ("hostId", host),
+                ("generation", &generation),
+            ])
+            .await?;
+        serde_json::from_value(body).map_err(|_| ClientError::Protocol)
+    }
+
+    /// Automatically admit the original UUID only after fresh host-side checks.
+    pub async fn session_open(
+        &self,
+        session: &str,
+        expected: &Identity,
+    ) -> Result<crate::session_access::SessionAccess, ClientError> {
+        let body = self
+            .post(
+                "acp/v1/sessions/auto-open",
+                with_identity(json!({"sessionId":session}), Some(expected)),
+            )
+            .await?;
+        serde_json::from_value(body).map_err(|_| ClientError::Protocol)
+    }
+
+    /// Release the writer on its owning connection using the displayed
+    /// identity.
+    pub async fn session_release(
+        &self,
+        snapshot: &crate::session_access::SessionAccess,
+    ) -> Result<crate::session_access::SessionAccess, ClientError> {
+        let body = serde_json::to_value(snapshot).map_err(|_| ClientError::Protocol)?;
+        let body = self.post("acp/v1/sessions/access-release", body).await?;
+        serde_json::from_value(body).map_err(|_| ClientError::Protocol)
+    }
+
     /// Restore the exact native source the user viewed, after its old client
     /// has released it. Refuses changed identity, source or ownership.
     pub async fn acquire_session(

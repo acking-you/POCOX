@@ -81,7 +81,13 @@ mixin _FakeThreads on _FakeBridgeState {
 
   @override
   Future<List<ModelInfo>> appModelList(String serviceKey) async {
-    await modelListGate?.future;
+    modelListServices.add(serviceKey);
+    // Read when asked, like the bridge's connection catalog: an answer held
+    // by the gate still reports the list of the host it was asked of.
+    final listed = modelLists[serviceKey];
+    final gate = modelListGate;
+    await gate?.future;
+    if (listed != null) return listed;
     return emptyModelList
         ? const []
         : const [

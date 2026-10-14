@@ -38,14 +38,20 @@ pub enum Engine<'a> {
     Codex,
     /// An ACP agent.
     Acp(&'a AgentSpec),
+    /// Native OpenCode using inherited or instance-owned configuration.
+    OpenCode,
 }
 
 impl Engine<'_> {
-    pub(super) fn allows(&self, source: Source, protocol: Option<ApiProtocol>) -> Result<()> {
+    pub(in crate::engine) fn allows(
+        &self,
+        source: Source,
+        protocol: Option<ApiProtocol>,
+    ) -> Result<()> {
         match (self, source) {
             (_, Source::Inherited) => Ok(()),
             (Engine::Codex, Source::Official) => Ok(()),
-            (Engine::Acp(_), Source::Official) => {
+            (Engine::Acp(_) | Engine::OpenCode, Source::Official) => {
                 bail!("only native Codex offers an official-account sign-in here")
             },
             (engine, Source::Custom) => {
@@ -53,6 +59,7 @@ impl Engine<'_> {
                 let supported: &[ApiProtocol] = match engine {
                     Engine::Codex => &[ApiProtocol::Responses],
                     Engine::Acp(spec) => acp_provider::supported_protocols(spec),
+                    Engine::OpenCode => &ApiProtocol::ALL,
                 };
                 if supported.is_empty() {
                     bail!(
@@ -73,6 +80,12 @@ impl Engine<'_> {
             (
                 Engine::Codex,
                 Runtime::Codex {
+                    ..
+                },
+            ) => Ok(()),
+            (
+                Engine::OpenCode,
+                Runtime::OpenCode {
                     ..
                 },
             ) => Ok(()),
@@ -102,6 +115,13 @@ pub enum Runtime {
     },
     /// An ACP agent: its profile and exact command line.
     Acp(AgentSpec),
+    /// Native OpenCode; the server and gateway choose private loopback ports.
+    #[serde(rename = "opencode")]
+    OpenCode {
+        /// Explicit executable, or the child PATH when absent.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        binary: Option<String>,
+    },
 }
 
 impl std::fmt::Debug for Runtime {
@@ -118,6 +138,9 @@ impl std::fmt::Debug for Runtime {
                 .field("port", port)
                 .field("proxy", &proxy.is_some())
                 .finish(),
+            Self::OpenCode {
+                binary,
+            } => f.debug_struct("OpenCode").field("binary", binary).finish(),
             Self::Acp(spec) => f.debug_tuple("Acp").field(spec).finish(),
         }
     }
@@ -142,6 +165,11 @@ impl Runtime {
                     proxy,
                 })
             },
+            Self::OpenCode {
+                binary,
+            } => Ok(Self::OpenCode {
+                binary: trimmed(binary.as_deref()),
+            }),
             Self::Acp(spec) => {
                 spec.validate().map_err(|e| anyhow!("{e}"))?;
                 Ok(Self::Acp(spec.clone()))

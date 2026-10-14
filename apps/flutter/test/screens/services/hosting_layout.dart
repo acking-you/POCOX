@@ -25,12 +25,9 @@ void _registerHostingLayout() {
       expect(find.byKey(const Key('host-this-device-btn')), findsOneWidget);
       await t.tap(find.byKey(const Key('host-this-device-btn')));
       await t.pumpAndSettle();
-      // The agent grid offers Codex and the OpenCode preset, each by mark.
+      // The agent grid offers Codex and native OpenCode, each by mark.
       expect(find.byKey(const Key('agent-choice-codex')), findsOneWidget);
-      expect(
-        find.byKey(const Key('agent-choice-preset:opencode')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('agent-choice-opencode')), findsOneWidget);
       expect(find.byKey(const Key('agent-icon-codex')), findsWidgets);
       expect(find.byKey(const Key('agent-icon-opencode')), findsOneWidget);
       await t.tap(find.byKey(const Key('start-hosting-btn')));

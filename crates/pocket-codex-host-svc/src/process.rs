@@ -23,11 +23,14 @@ use tokio::process::{Child, ChildStdin, ChildStdout};
 #[cfg(unix)]
 use tokio::{io::AsyncReadExt, process::Command};
 
+mod output;
+pub use output::read_output;
+
 /// Why the agent could not be started.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum SpawnError {
-    /// Owned ACP hosting is not available on this platform.
-    #[error("hosting ACP agents is not supported on this platform yet")]
+    /// Owned process hosting is not available on this platform.
+    #[error("hosting external agents is not supported on this platform yet")]
     UnsupportedPlatform,
     /// The operating system refused to start the program.
     #[error("the agent executable could not be started")]
@@ -146,7 +149,7 @@ pub fn spawn_isolated(
     Err(SpawnError::UnsupportedPlatform)
 }
 
-/// Whether this platform can host ACP agents.
+/// Whether this platform can host external agents.
 pub const fn hosting_supported() -> bool {
     cfg!(unix)
 }
@@ -166,6 +169,31 @@ impl AgentProcess {
     /// The leader's process id, while it has not been reaped.
     pub fn id(&self) -> Option<u32> {
         self.child.as_ref().and_then(Child::id)
+    }
+
+    /// Stop the owned process group and confirm the leader was reaped. On
+    /// failure this object retains ownership so its caller can keep admission
+    /// claims and retry cleanup without handing the source to another writer.
+    pub async fn stop(&mut self, grace: Duration) -> bool {
+        if self.child.is_none() {
+            return true;
+        }
+        #[cfg(unix)]
+        {
+            self.signal_group(nix::sys::signal::Signal::SIGTERM);
+            tokio::time::sleep(grace).await;
+            self.signal_group(nix::sys::signal::Signal::SIGKILL);
+        }
+        #[cfg(not(unix))]
+        let _ = grace;
+        let Some(child) = self.child.as_mut() else { return true };
+        let _ = child.start_kill();
+        if !matches!(tokio::time::timeout(Duration::from_secs(5), child.wait()).await, Ok(Ok(_))) {
+            return false;
+        }
+        self.child = None;
+        self.group = None;
+        true
     }
 
     #[cfg(unix)]
@@ -206,7 +234,7 @@ impl AgentProcess {
             .await
             .is_err()
         {
-            tracing::warn!("the ACP agent did not exit after SIGKILL; leaving it to the reaper");
+            tracing::warn!("the owned agent did not exit after SIGKILL; leaving it to the reaper");
         }
         self.group = None;
     }

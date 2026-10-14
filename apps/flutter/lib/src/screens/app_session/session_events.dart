@@ -49,6 +49,8 @@ extension _SessionEvents on _AppSessionState {
       unawaited(_resumeAndLoad());
     }
     _refreshAgentSettings();
+    // Another generation may offer another model catalog.
+    if (moved) unawaited(_ensureModels());
   }
 
   void _dropResolvedRequest(AppEvent e) {
@@ -79,6 +81,12 @@ extension _SessionEvents on _AppSessionState {
       _dropResolvedRequest(e);
       return;
     }
+    // The host's view of a session's access changed (a load finished, a
+    // writer left, a turn ended): a following view asks again at once.
+    if (e.kind == 'session/access/changed') {
+      if (e.threadId case final thread?) _onAccessChanged(thread);
+      return;
+    }
     // The ACP host changed phase or generation (restart, crash, reconnect):
     // what the agent supports may have changed with it.
     if (e.kind == 'acp/host/state') {
@@ -89,13 +97,12 @@ extension _SessionEvents on _AppSessionState {
     if (e.kind == 'acp/session/updated') {
       // A release by any controller withdraws write admission immediately.
       // Keep the draft and queue in their slot, even if close later fails.
-      if (_caps.isAcp && e.threadId == _threadId) {
+      if (_caps.hostAccess && e.threadId == _threadId) {
         try {
           final raw = jsonDecode(e.raw);
           if (raw is Map &&
-              (raw['admitted'] == false || raw['releasing'] == true) &&
-              !_externalWriterMode) {
-            _enterExternalWriterMode(_threadId!);
+              (raw['admitted'] == false || raw['releasing'] == true)) {
+            _onWriteWithdrawn(_threadId!);
           }
         } catch (_) {}
       }

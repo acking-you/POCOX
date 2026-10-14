@@ -10,6 +10,9 @@ extension _SessionExternalWriter on _AppSessionState {
   void _cancelExternalWriterSubscription() {
     _externalHistoryTimer?.cancel();
     _externalHistoryTimer = null;
+    _accessTimer?.cancel();
+    _accessTimer = null;
+    _accessChecking = false;
     _externalHistoryRevision = null;
     _externalHistoryLoading = false;
     _externalHistoryDirty = false;
@@ -27,7 +30,10 @@ extension _SessionExternalWriter on _AppSessionState {
     _externalWriterEpoch++;
   }
 
-  void _enterExternalWriterMode(String threadId) {
+  /// Show [threadId] read-only. [follow] keeps its transcript live through
+  /// the host meta stream; without it (a blocked session) history is read
+  /// once.
+  void _enterExternalWriterMode(String threadId, {bool follow = true}) {
     _cancelExternalWriterSubscription();
     // Read-only from now on (another writer, or a Guardian reviewer):
     // attachments still being picked or read for this view are refused.
@@ -50,7 +56,7 @@ extension _SessionExternalWriter on _AppSessionState {
       _asyncQuestions.clear();
     });
     _loadGit();
-    _subscribeExternalWriter(threadId, epoch);
+    if (follow) _subscribeExternalWriter(threadId, epoch);
     // Read-only history does not need to wait for the slower ownership probe.
     _scheduleExternalHistory(threadId, epoch);
   }
@@ -407,6 +413,9 @@ extension _SessionExternalWriter on _AppSessionState {
       );
     }
 
+    // The host decides a host-access session; its panel says how.
+    if (_caps.hostAccess) return _accessPanelBar(l10n);
+
     final scheme = Theme.of(context).colorScheme;
     final liveness = _externalWriterLiveness;
     final canResume = liveness?.allowsResume ?? false;
@@ -449,10 +458,7 @@ extension _SessionExternalWriter on _AppSessionState {
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      _caps.isAcp &&
-                              (liveness?.turnState ?? 'unknown') == 'unknown'
-                          ? l10n.nativeHistoryReadOnly
-                          : l10n.readOnlyViewing,
+                      l10n.readOnlyViewing,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -476,35 +482,9 @@ extension _SessionExternalWriter on _AppSessionState {
               mainAxisSize: MainAxisSize.min,
               children: [
                 stateControl,
-                if (_caps.isAcp && !canResume) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    key: const Key('chat-session-control'),
-                    onPressed: _takingOver ? null : _showSessionControl,
-                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                    label: Text(l10n.sessionControlTitle),
-                  ),
-                ],
                 if (hasCwd) ...[
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 42,
-                    child: OutlinedButton.icon(
-                      key: const Key('chat-external-diff-action'),
-                      onPressed: _diffLoading ? _cancelDiff : _showDiff,
-                      icon: _diffLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.difference_outlined, size: 18),
-                      label: Text(
-                        _diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff,
-                      ),
-                    ),
-                  ),
+                  _externalDiffButton(l10n),
                 ],
               ],
             ),
@@ -513,4 +493,47 @@ extension _SessionExternalWriter on _AppSessionState {
       ),
     );
   }
+
+  /// The access panel in place of the composer, with the diff action.
+  Widget _accessPanelBar(AppLocalizations l10n) {
+    final hasCwd = _cwd?.trim().isNotEmpty ?? false;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 820),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _accessPanel(l10n),
+                if (hasCwd) ...[
+                  const SizedBox(height: 8),
+                  _externalDiffButton(l10n),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _externalDiffButton(AppLocalizations l10n) => SizedBox(
+    width: double.infinity,
+    height: 42,
+    child: OutlinedButton.icon(
+      key: const Key('chat-external-diff-action'),
+      onPressed: _diffLoading ? _cancelDiff : _showDiff,
+      icon: _diffLoading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.difference_outlined, size: 18),
+      label: Text(_diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff),
+    ),
+  );
 }

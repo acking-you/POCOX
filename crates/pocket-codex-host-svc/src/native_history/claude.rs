@@ -86,6 +86,17 @@ impl ClaudeHistory {
         }
     }
 
+    pub(crate) async fn writer_owners(
+        &self,
+        session: &str,
+    ) -> Result<Vec<pocket_codex_core::process::ProcessIdentity>> {
+        self.ownership
+            .as_ref()
+            .context("this Claude source has no ownership probe")?
+            .owners(session, true)
+            .await
+    }
+
     pub(crate) fn claim_session(
         &self,
         session: &str,

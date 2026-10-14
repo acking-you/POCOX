@@ -68,7 +68,7 @@ impl IntoResponse for ApiError {
             | HostError::AlreadyResolved
             | HostError::NotReopenable
             | HostError::Stale => StatusCode::CONFLICT,
-            HostError::ReadOnly => StatusCode::CONFLICT,
+            HostError::ReadOnly | HostError::PocketOwned => StatusCode::CONFLICT,
             HostError::Capacity => StatusCode::TOO_MANY_REQUESTS,
             HostError::InvalidOption | HostError::Unsupported(_) => {
                 StatusCode::UNPROCESSABLE_ENTITY
@@ -103,6 +103,9 @@ pub fn router(host: AgentHost) -> Router {
         .route("/acp/v1/sessions/native-events", get(native::follow))
         .route("/acp/v1/sessions/native-status", get(native::status))
         .route("/acp/v1/sessions/control", get(native::control))
+        .route("/acp/v1/sessions/access", get(native::access))
+        .route("/acp/v1/sessions/auto-open", post(native::auto_open))
+        .route("/acp/v1/sessions/access-release", post(native::access_release))
         .route("/acp/v1/sessions/release", post(native::release))
         .route("/acp/v1/sessions/acquire", post(native::acquire))
         .route(

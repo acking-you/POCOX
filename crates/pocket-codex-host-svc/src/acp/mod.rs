@@ -21,7 +21,6 @@
 //! answers such requests with "method not found" without touching any file.
 
 pub mod api;
-pub mod catalog;
 pub mod claude;
 pub mod claude_setup;
 pub mod client;
@@ -29,7 +28,6 @@ pub mod fold;
 pub mod host;
 pub mod jsonrpc;
 pub mod peer;
-pub mod process;
 pub mod provider;
 pub mod replica;
 pub mod schema;

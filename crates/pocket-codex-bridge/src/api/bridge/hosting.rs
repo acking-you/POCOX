@@ -84,8 +84,8 @@ pub struct AppServeStatusDto {
     pub agent_error: Option<String>,
     /// The ACP agent reported that authentication is required.
     pub auth_required: bool,
-    /// The OpenCode model catalog (ACP hosts of the `opencode` profile).
-    pub catalog: Option<AcpCatalogStatusDto>,
+    /// Native OpenCode runtime and sanitized catalog summary.
+    pub opencode: Option<OpenCodeHostStatusDto>,
     /// Where the running host gets its model service, as launched:
     /// `inherited`, `official` or `custom`.
     pub config_source: Option<String>,
@@ -100,90 +100,69 @@ pub struct AppServeStatusDto {
     pub busy: Option<String>,
 }
 
-/// What the OpenCode model catalog plugin found for one host. Holds provider
-/// ids, counts and fixed reason codes, plus the plugin's own local file URL;
-/// never a provider endpoint, key or header.
-pub struct AcpCatalogStatusDto {
-    /// `waiting` (no session opened yet), `reported` or `unavailable`.
-    pub state: String,
-    /// Why it is unavailable: `plugins-disabled`, `config-env-taken` or
-    /// `install-failed`.
-    pub reason: Option<String>,
-    /// The plugin's local `file://` URL, shown when it is unavailable so it
-    /// can be added to an OpenCode config by hand.
-    pub plugin: Option<String>,
-    /// One entry per listed provider.
-    pub providers: Vec<AcpCatalogProviderDto>,
-    /// How the plugin left the host's own provider in OpenCode's merged
-    /// configuration: `waiting`, `selected` (nothing to change), `enforced`
-    /// (settings were reset to it), `overridden` (an older plugin only
-    /// reported it) or `unverified`; `None` when the host has no own provider.
-    pub route_state: Option<String>,
-    /// What was reset or found (`model`, `small-model`, `agent-model`,
-    /// `enabled-providers`, `disabled-providers`, `provider`, `missing`), or
-    /// why it is `unverified` (the catalog reason).
-    pub route_reasons: Vec<String>,
-    /// The project directories the verdict covers, as OpenCode loaded them.
-    pub route_projects: Vec<String>,
+/// Native OpenCode runtime and sanitized service-default catalog summary.
+pub struct OpenCodeHostStatusDto {
+    /// Installed executable version.
+    pub version: String,
+    /// Connected native provider count.
+    pub providers_connected: u32,
+    /// Usable native model count.
+    pub models: u32,
+    /// Global default when actually exposed by the native API.
+    pub default_model: Option<String>,
+    /// Visible primary native agents.
+    pub agents: Vec<String>,
+    /// Safe runtime or catalog diagnostic.
+    pub problem: Option<String>,
 }
-
-/// One provider's model listing.
-pub struct AcpCatalogProviderDto {
-    /// Provider id from the OpenCode config.
-    pub id: String,
-    /// `complete`, `partial` (bounded), `failed` (nothing added) or
-    /// `skipped`.
-    pub status: String,
-    /// Reason code (`http-401`, `timeout`, `model-limit`, …).
-    pub reason: Option<String>,
-    /// Chat models listed.
-    pub listed: u32,
-    /// Models added beyond the configured ones.
-    pub added: u32,
-    /// Entries left out for an explicit non-chat type.
-    pub excluded: u32,
-    /// Ids OpenCode cannot hold, left out.
-    pub unsafe_ids: u32,
-    /// Where the credential came from: `config`, `env`, `headers`
-    /// (configured request headers) or `none`.
-    pub key_source: String,
-}
-
-impl From<pocket_codex_host_svc::acp::catalog::CatalogStatus> for AcpCatalogStatusDto {
-    fn from(s: pocket_codex_host_svc::acp::catalog::CatalogStatus) -> Self {
-        let (route_state, route_reasons, route_projects) = match s.route {
-            Some(route) => (Some(route.state.to_string()), route.reasons, route.projects),
-            None => (None, Vec::new(), Vec::new()),
-        };
+impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusDto {
+    fn from(s: crate::engine::serve_opencode::OpenCodeStatus) -> Self {
         Self {
-            state: s.state.to_string(),
-            reason: s.reason.map(str::to_string),
-            plugin: s.plugin,
-            route_state,
-            route_reasons,
-            route_projects,
-            providers: s
-                .providers
-                .into_iter()
-                .map(|p| AcpCatalogProviderDto {
-                    id: p.id,
-                    status: p.status,
-                    reason: p.reason,
-                    listed: p.listed,
-                    added: p.added,
-                    excluded: p.excluded,
-                    unsafe_ids: p.unsafe_ids,
-                    key_source: p.key_source,
-                })
-                .collect(),
+            version: s.version,
+            providers_connected: s.providers_connected,
+            models: s.models,
+            default_model: s.default_model,
+            agents: s.agents,
+            problem: s.problem,
         }
+    }
+}
+
+/// Refresh one running OpenCode host's sanitized native catalog summary.
+pub fn opencode_refresh(name: String) -> Result<()> {
+    crate::engine::serve_opencode::refresh_catalog(&name)
+}
+
+/// Installed external OpenCode; detection never starts or resumes a session.
+pub struct OpenCodeEnvironmentDto {
+    /// Resolved executable path.
+    pub path: Option<String>,
+    /// Native executable version.
+    pub version: Option<String>,
+    /// Installation or inspection failure, safe to show.
+    pub problem: Option<String>,
+}
+
+/// Inspect an explicit OpenCode executable or the host's child PATH.
+pub fn opencode_detect(binary: Option<String>) -> OpenCodeEnvironmentDto {
+    match crate::engine::serve_opencode::detect(binary.as_deref()) {
+        Ok((path, version)) => OpenCodeEnvironmentDto {
+            path: Some(path),
+            version: Some(version),
+            problem: None,
+        },
+        Err(error) => OpenCodeEnvironmentDto {
+            path: None,
+            version: None,
+            problem: Some(error.to_string()),
+        },
     }
 }
 
 /// An ACP agent executable and argument vector, passed verbatim without a
 /// shell.
 pub struct AcpAgentSpecDto {
-    /// Profile id (`opencode` for the preset, or a custom id).
+    /// Profile id (`claude` for the preset, or a custom id).
     pub profile_id: String,
     /// Name shown in the UI.
     pub display_name: String,
@@ -236,7 +215,7 @@ pub struct AcpServeDto {
     pub reused: bool,
 }
 
-/// Built-in ACP agent presets (OpenCode: `opencode acp`).
+/// Built-in ACP agent presets (Claude through its external stdio adapter).
 #[frb(sync)]
 pub fn acp_presets() -> Vec<AcpPresetDto> {
     pocket_codex_host_svc::acp::PRESETS
@@ -456,7 +435,7 @@ pub fn app_serve_status() -> Vec<AppServeStatusDto> {
             agent_phase: s.agent_phase,
             agent_error: s.agent_error,
             auth_required: s.auth_required,
-            catalog: s.catalog.map(Into::into),
+            opencode: s.opencode.map(Into::into),
             config_source: s.config_source,
             config_revision: s.config_revision,
             incarnation: s.incarnation,

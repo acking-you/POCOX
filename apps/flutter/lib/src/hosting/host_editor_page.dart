@@ -12,23 +12,31 @@ import 'package:pocket_codex/src/hosting/host_editor_drafts.dart';
 import 'package:pocket_codex/src/hosting/host_status_section.dart';
 import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/hosting/official_login_panel.dart';
+import 'package:pocket_codex/src/hosting/opencode_runtime_section.dart';
+import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
 
 /// Open the hosting editor: a new host, or the running [existing] one.
+/// [initialChoice] preselects a new host's agent ([AgentChoice]).
 Future<void> showHostingEditor(
   BuildContext context, {
   AppServeStatus? existing,
+  AgentChoice? initialChoice,
 }) => Navigator.of(context).push(
-  MaterialPageRoute<void>(builder: (_) => HostingEditor(existing: existing)),
+  MaterialPageRoute<void>(
+    builder: (_) =>
+        HostingEditor(existing: existing, initialChoice: initialChoice),
+  ),
 );
 
 /// The hosting editor, one page for creating and editing a local host.
 ///
 /// A new host: pick the agent ([AgentChoiceGrid]), fill its runtime (Codex:
-/// [CodexRuntimeSection]; ACP: [AcpHostForm]) and its model service
+/// [CodexRuntimeSection]; OpenCode: [OpenCodeRuntimeSection]; ACP:
+/// [AcpHostForm]) and its model service
 /// ([ModelServiceSection]), then Start: saved and started as one operation
 /// ([BridgeApi.appServeStartConfigured]), so a failed start leaves no new
 /// configuration behind.
@@ -43,10 +51,13 @@ Future<void> showHostingEditor(
 /// shortcuts alike.
 class HostingEditor extends ConsumerStatefulWidget {
   /// Creates the editor; [existing] edits a running host.
-  const HostingEditor({super.key, this.existing});
+  const HostingEditor({super.key, this.existing, this.initialChoice});
 
   /// The running host edited, or null for a new host.
   final AppServeStatus? existing;
+
+  /// A new host's preselected agent; Codex when null.
+  final AgentChoice? initialChoice;
 
   @override
   ConsumerState<HostingEditor> createState() => _HostingEditorState();
@@ -60,6 +71,9 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
   @override
   void initState() {
     super.initState();
+    if (widget.initialChoice case final initial? when existing == null) {
+      choice = initial;
+    }
     initEditor();
   }
 
@@ -73,6 +87,9 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
     final saved =
         ref.watch(uiPrefsProvider).valueOrNull?.acpAgents ??
         const <AcpAgentSpec>[];
+    final hosts =
+        ref.watch(localServeListProvider).valueOrNull ??
+        const <AppServeStatus>[];
     return GroupCard(
       key: const Key('host-agent-section'),
       title: AppLocalizations.of(context).hostSectionAgent,
@@ -83,15 +100,32 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
             presets: api.acpPresets(),
             saved: saved,
             onChanged: busy ? null : selectChoice,
+            openCodeHost: hosts.where((h) => h.isOpenCode).firstOrNull,
+            onOpenHost: _openRunning,
           ),
         ),
       ],
     );
   }
 
+  /// Open the running [host]'s own editor in place of this new-host page,
+  /// once this page may close.
+  Future<void> _openRunning(AppServeStatus host) async {
+    if (!await confirmLeave() || !mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(builder: (_) => HostingEditor(existing: host)),
+    );
+  }
+
   /// What the agent's existing configuration provides, in words.
   Widget _inherited(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
+    if (isOpenCodeHost) {
+      return EditorNote(
+        l10n.hostInheritedOpenCode,
+        key: const Key('host-inherited-opencode'),
+      );
+    }
     if (isAcpHost) return EditorNote(l10n.hostInheritedAcp);
     final s = setup;
     if (s == null) return const LinearProgressIndicator();
@@ -170,7 +204,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
 
   /// Codex hosts also publish `api:<name>`; say what it uses.
   Widget? _apiNote(AppLocalizations l10n) =>
-      isAcpHost ? null : EditorNote(l10n.hostApiProxyNote);
+      isCodexHost ? EditorNote(l10n.hostApiProxyNote) : null;
 
   Widget _footer(AppLocalizations l10n, AppServeStatus? live) {
     final note = _apiNote(l10n);
@@ -190,7 +224,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
         draft: draft,
         enabled: !busy,
         inherited: _inherited(l10n),
-        official: isAcpHost
+        official: !isCodexHost
             ? null
             : OfficialLoginPanel(
                 status: setup,
@@ -199,7 +233,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
                 proxy: officialProxy,
                 onChanged: loadSetup,
               ),
-        footer: existing == null && isAcpHost ? null : _footer(l10n, live),
+        footer: existing == null && !isCodexHost ? null : _footer(l10n, live),
       );
 
   /// The running host's state notes: gone, replaced, a newer saved
@@ -282,6 +316,15 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
   }
 
   Widget _runningRuntime(AppLocalizations l10n, AppServeStatus host) {
+    if (host.isOpenCode) {
+      return OpenCodeRuntimeSection(
+        form: openCode,
+        enabled: !busy,
+        onBrowse: browseOpenCode,
+        fixedName: true,
+        hint: l10n.hostRuntimeEditNote,
+      );
+    }
     if (host.isCodex) {
       return CodexRuntimeSection(
         form: runtime,
@@ -339,7 +382,13 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
     }
     return [
       _agentGrid(),
-      if (isAcpChoice(choice))
+      if (choice == openCodeChoice)
+        OpenCodeRuntimeSection(
+          form: openCode,
+          enabled: !busy,
+          onBrowse: browseOpenCode,
+        )
+      else if (isAcpChoice(choice))
         GroupCard(
           key: const Key('acp-runtime-section'),
           title: l10n.hostRuntimeInfo,
