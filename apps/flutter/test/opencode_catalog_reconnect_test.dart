@@ -1,42 +1,46 @@
 // A native OpenCode host replaced with another model configuration (Apply
-// restarts it): after the controller reconnects, the composer's model menu
-// offers the new host's catalog, a model the new host no longer offers is no
-// longer selected (here or as the default new conversations inherit), and a
-// send goes to the replacement connection without it. Text and attachments
-// stay; nothing is sent by itself. A model list answered by the previous
+// restarts it), with the capabilities the bridge reports (a model catalog
+// together with session and draft options): after the controller
+// reconnects, the draft's options offer the new host's catalog, a choice
+// the new host no longer offers is neither shown nor applied, and a send
+// goes to the replacement without it. The composer shows no Codex model
+// menu and sends no model, effort or collaboration mode of its own. Text
+// stays; nothing is sent by itself. A read answered by the previous
 // connection after the reconnect changes nothing.
 
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
+import 'support/screen_harness.dart';
 
 const _svc = 'pcx:local:opencode:opencode';
+const _cwd = '/work';
 
-const _mimo = ModelInfo(
-  id: 'opencode/mimo-free',
-  displayName: 'MiMo Free',
-  description: 'OpenCode Zen',
+SessionSettings _catalog(List<(String, String)> models) => SessionSettings(
+  configOptions: [
+    SessionConfigOption(
+      id: 'model',
+      name: 'Model',
+      category: 'model',
+      currentValue: '',
+      values: [
+        const SessionConfigValue(value: '', name: 'Inherited'),
+        for (final (value, name) in models)
+          SessionConfigValue(value: value, name: name),
+      ],
+    ),
+  ],
 );
-const _other = ModelInfo(
-  id: 'opencode/other-free',
-  displayName: 'Other Free',
-  description: 'OpenCode Zen',
-);
-const _claude = ModelInfo(
-  id: 'anthropic/claude-opus',
-  displayName: 'Claude Opus',
-  description: 'Anthropic',
-);
+
+const _mimo = ('opencode/mimo-free', 'MiMo Free');
+const _other = ('opencode/other-free', 'Other Free');
+const _claude = ('anthropic/claude-opus', 'Claude Opus');
 
 Future<void> _frames(WidgetTester t, [int count = 12]) async {
   for (var i = 0; i < count; i++) {
@@ -44,51 +48,48 @@ Future<void> _frames(WidgetTester t, [int count = 12]) async {
   }
 }
 
-/// A desktop composer on a connected OpenCode host whose catalog offers
-/// MiMo, picked earlier on this service (the inherited new-conversation
-/// default).
-Future<(FakeBridgeApi, ProviderContainer)> _open(WidgetTester t) async {
+/// A desktop draft on a connected OpenCode host whose catalog offers MiMo
+/// and Other.
+Future<FakeBridgeApi> _open(WidgetTester t) async {
   t.view.physicalSize = const Size(1400, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
   final api = FakeBridgeApi();
-  api.acpCapabilities[_svc] = negotiatedOpenCodeCapabilities(
-    modelCatalog: true,
-  );
-  api.modelLists[_svc] = const [_mimo, _other];
+  api.acpCapabilities[_svc] = negotiatedOpenCodeCapabilities();
+  api.draftSettings['$_svc|$_cwd'] = _catalog(const [_mimo, _other]);
   await api.appConnect(_svc, 28080);
-  final container = ProviderContainer(
-    overrides: [bridgeApiProvider.overrideWithValue(api)],
-  );
-  addTearDown(container.dispose);
-  container.read(sessionDefaultsProvider(_svc).notifier).state =
-      const SessionDefaults(model: _mimo);
   await t.pumpWidget(
-    UncontrolledProviderScope(
-      container: container,
-      child: const MaterialApp(
-        locale: Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: AppSessionScreen(serviceKey: _svc, cwd: '/work'),
-      ),
+    host(
+      const AppSessionScreen(serviceKey: _svc, cwd: _cwd),
+      api,
+      locale: const Locale('en'),
     ),
   );
   await _frames(t);
-  return (api, container);
+  return api;
 }
 
-Finder _chipText(String text) => find.descendant(
-  of: find.byKey(const Key('model-chip')),
-  matching: find.textContaining(text),
+Finder _choice(String value) {
+  final listed = find.byKey(Key('agent-option-value-$value'));
+  return listed.evaluate().isNotEmpty
+      ? listed
+      : find.byWidgetPredicate(
+          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
+        );
+}
+
+Future<void> _pick(WidgetTester t, (String, String) model) async {
+  await t.tap(find.byKey(const Key('agent-config-model')));
+  await t.pumpAndSettle();
+  await t.tap(_choice(model.$1));
+  await t.pumpAndSettle();
+}
+
+/// The model option shows [label].
+Finder _shown(String label) => find.descendant(
+  of: find.byKey(const Key('agent-config-model')),
+  matching: find.text(label),
 );
-
-Finder _menuItem(ModelInfo m) => find.byKey(Key('model-menu-item-${m.id}'));
-
-Future<void> _toggleMenu(WidgetTester t) async {
-  await t.tap(find.byKey(const Key('model-chip')));
-  await _frames(t, 4);
-}
 
 Future<void> _type(WidgetTester t, String text) async {
   await t.enterText(find.byKey(const Key('composer-input')), text);
@@ -105,9 +106,9 @@ String _composer(WidgetTester t) => t
 Future<void> _replaceHost(
   WidgetTester t,
   FakeBridgeApi api,
-  List<ModelInfo> models,
+  List<(String, String)> models,
 ) async {
-  api.modelLists[_svc] = models;
+  api.draftSettings['$_svc|$_cwd'] = _catalog(models);
   api.pushEvent(
     _svc,
     const AppEvent(kind: 'acp/host/state', raw: '{"connected":false}'),
@@ -115,141 +116,126 @@ Future<void> _replaceHost(
   await _frames(t);
 }
 
+void _nextGeneration(FakeBridgeApi api) => api.pushEvent(
+  _svc,
+  const AppEvent(
+    kind: 'acp/host/state',
+    raw: '{"generation":2,"connected":true}',
+  ),
+);
+
+/// Nothing of the composer's own model menu went out with the turn.
+void _noMenuSettings(FakeBridgeApi api) {
+  expect(api.lastModel, isNull);
+  expect(api.lastTurnModel, isNull);
+  expect(api.lastReasoningEffort, isNull);
+  expect(api.lastCollaborationMode, isNull);
+}
+
 void main() {
   setUp(AppSessionScreen.debugResetThreadMemory);
 
-  testWidgets('after the host is replaced the menu shows its catalog and a '
-      'withdrawn model is no longer selected or sent', (t) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      final (api, container) = await _open(t);
-      expect(_chipText('MiMo Free'), findsOneWidget);
-      await _type(t, 'keep this');
-      final connects = api.appConnectCount;
+  testWidgets('after the host is replaced the draft offers its catalog and a '
+      'withdrawn choice is neither shown nor applied', (t) async {
+    final api = await _open(t);
+    expect(find.byKey(const Key('model-chip')), findsNothing);
+    await _pick(t, _other);
+    expect(_shown('Other Free'), findsOneWidget);
+    await _type(t, 'keep this');
+    final connects = api.appConnectCount;
 
-      await _replaceHost(t, api, const [_claude]);
-      expect(api.appConnectCount, greaterThan(connects));
+    await _replaceHost(t, api, const [_claude]);
+    expect(api.appConnectCount, greaterThan(connects));
+    expect(_shown('Other Free'), findsNothing);
+    await t.tap(find.byKey(const Key('agent-config-model')));
+    await t.pumpAndSettle();
+    expect(_choice(_claude.$1), findsOneWidget);
+    expect(_choice(_mimo.$1), findsNothing);
+    expect(_choice(_other.$1), findsNothing);
+    await t.tapAt(Offset.zero);
+    await t.pumpAndSettle();
+    expect(_composer(t), 'keep this');
+    expect(api.threadStartCalls, isEmpty);
+    expect(api.turnStartCount, 0);
 
-      // The new host's catalog, without the previous selection.
-      expect(_chipText('MiMo Free'), findsNothing);
-      expect(_chipText('Default model'), findsOneWidget);
-      await _toggleMenu(t);
-      expect(_menuItem(_claude), findsOneWidget);
-      expect(_menuItem(_mimo), findsNothing);
-      expect(_menuItem(_other), findsNothing);
-      await _toggleMenu(t);
-      // New conversations no longer inherit it either.
-      expect(container.read(sessionDefaultsProvider(_svc)).model, isNull);
-      // The draft is untouched and nothing was sent by itself.
-      expect(_composer(t), 'keep this');
-      expect(api.threadStartCalls, isEmpty);
-      expect(api.turnStartCount, 0);
-
-      await t.tap(find.byKey(const Key('send-btn')));
-      await _frames(t);
-      expect(api.threadStartCalls, [_svc]);
-      expect(api.lastModel, isNull);
-      expect(api.turnStartCount, 1);
-      expect(api.lastTurnModel, isNull);
-      expect(api.lastTurnText, 'keep this');
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
+    await t.tap(find.byKey(const Key('send-btn')));
+    await _frames(t);
+    expect(api.threadStartCalls, [_svc]);
+    expect(api.sessionConfigCalls, isEmpty);
+    expect(api.turnStartCount, 1);
+    expect(api.lastTurnText, 'keep this');
+    _noMenuSettings(api);
   });
 
-  testWidgets('a model the replacement still offers stays selected and is '
-      'sent', (t) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      final (api, container) = await _open(t);
-      await _replaceHost(t, api, const [_mimo, _claude]);
-      expect(_chipText('MiMo Free'), findsOneWidget);
-      expect(container.read(sessionDefaultsProvider(_svc)).model, _mimo);
-      await _type(t, 'hi');
-      await t.tap(find.byKey(const Key('send-btn')));
-      await _frames(t);
-      expect(api.lastModel, _mimo.id);
-      expect(api.lastTurnModel, _mimo.id);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
+  testWidgets('a choice the replacement still offers stays and is applied', (
+    t,
+  ) async {
+    final api = await _open(t);
+    await _pick(t, _other);
+    await _replaceHost(t, api, const [_mimo, _other, _claude]);
+    expect(_shown('Other Free'), findsOneWidget);
+    await _type(t, 'hi');
+    await t.tap(find.byKey(const Key('send-btn')));
+    await _frames(t);
+    final thread = api.threadStartResults.single!;
+    expect(api.sessionConfigCalls, [(thread, 'model', _other.$1)]);
+    expect(api.lastTurnText, 'hi');
+    _noMenuSettings(api);
   });
 
-  testWidgets('a model list answered by the previous connection after the '
+  testWidgets('a draft read answered by the previous connection after the '
       'reconnect changes nothing', (t) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      final (api, _) = await _open(t);
-      // Another generation answers: the screen asks for its catalog, but
-      // this answer still comes from the previous host and is held.
-      final stale = Completer<void>();
-      api.modelListGate = stale;
-      api.pushEvent(
-        _svc,
-        const AppEvent(
-          kind: 'acp/host/state',
-          raw: '{"generation":2,"connected":true}',
-        ),
-      );
-      await _frames(t, 2);
-      final asked = api.modelListServices.length;
-      // The host is then replaced; the reconnect's own read answers first.
-      api.modelListGate = null;
-      await _replaceHost(t, api, const [_claude]);
-      expect(api.modelListServices.length, greaterThan(asked));
-      expect(_chipText('MiMo Free'), findsNothing);
-      // The previous connection's answer arrives last.
-      stale.complete();
-      await _frames(t);
-      // The menu shows the list it holds (any further read is held): the
-      // replacement's, untouched by the late answer.
-      final held = Completer<void>();
-      addTearDown(held.complete);
-      api.modelListGate = held;
-      await _toggleMenu(t);
-      expect(_menuItem(_claude), findsOneWidget);
-      expect(_menuItem(_mimo), findsNothing);
-      await _toggleMenu(t);
-      expect(_chipText('MiMo Free'), findsNothing);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
+    final api = await _open(t);
+    // Another generation answers; its read still describes the previous
+    // host and is held.
+    final stale = Completer<void>();
+    addTearDown(() {
+      if (!stale.isCompleted) stale.complete();
+    });
+    api.draftSettingsGates[_cwd] = stale;
+    _nextGeneration(api);
+    await _frames(t, 2);
+    // The host is then replaced; the reconnect's own read answers first.
+    api.draftSettingsGates.remove(_cwd);
+    await _replaceHost(t, api, const [_claude]);
+    expect(_shown('Inherited'), findsOneWidget);
+    // The previous connection's answer arrives last.
+    stale.complete();
+    await _frames(t);
+    await t.tap(find.byKey(const Key('agent-config-model')));
+    await t.pumpAndSettle();
+    expect(_choice(_claude.$1), findsOneWidget);
+    expect(_choice(_mimo.$1), findsNothing);
+    await t.tapAt(Offset.zero);
+    await t.pumpAndSettle();
+    expect(api.turnStartCount, 0);
   });
 
-  testWidgets('a send racing the reconnect\'s catalog read returns a '
-      'withdrawn model\'s message to its draft', (t) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      final (api, _) = await _open(t);
-      // The connection moved (another generation) and its catalog read is
-      // still out when the user sends.
-      final gate = Completer<void>();
-      api.modelListGate = gate;
-      api.modelLists[_svc] = const [_claude];
-      api.pushEvent(
-        _svc,
-        const AppEvent(
-          kind: 'acp/host/state',
-          raw: '{"generation":2,"connected":true}',
-        ),
-      );
-      await _frames(t, 2);
-      expect(_chipText('MiMo Free'), findsOneWidget);
-      await _type(t, 'hold on');
-      await t.tap(find.byKey(const Key('send-btn')));
-      await _frames(t, 2);
-      gate.complete();
-      await _frames(t);
-      expect(api.threadStartCalls, isEmpty);
-      expect(api.turnStartCount, 0);
-      expect(_composer(t), 'hold on');
-      expect(
-        find.textContaining('no longer offers the selected model'),
-        findsWidgets,
-      );
-      expect(_chipText('MiMo Free'), findsNothing);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
+  testWidgets('a send racing the reconnect\'s read applies only what the '
+      'replacement offers', (t) async {
+    final api = await _open(t);
+    await _pick(t, _other);
+    // The connection moved (another generation, offering only Claude) and
+    // every read of it is still out when the user sends.
+    final gate = Completer<void>();
+    addTearDown(() {
+      if (!gate.isCompleted) gate.complete();
+    });
+    api.draftSettings['$_svc|$_cwd'] = _catalog(const [_claude]);
+    api.draftSettingsGates[_cwd] = gate;
+    _nextGeneration(api);
+    await _frames(t, 2);
+    await _type(t, 'hold on');
+    await t.tap(find.byKey(const Key('send-btn')));
+    await _frames(t, 2);
+    // The session exists; the choices wait for that project's defaults.
+    expect(api.threadStartCalls, [_svc]);
+    expect(api.turnStartCount, 0);
+    gate.complete();
+    await _frames(t);
+    expect(api.sessionConfigCalls, isEmpty);
+    expect(api.turnStartCount, 1);
+    expect(api.lastTurnText, 'hold on');
+    _noMenuSettings(api);
   });
 }

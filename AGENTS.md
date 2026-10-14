@@ -844,9 +844,21 @@ this file's roadmap so the source of truth stays in sync.
       copy); a session that could not be created returns its message to
       the composer. Codex may still work outside a project.
     - Draft sessions are created on first send; draft model/agent/variant
-      choices stay on the draft (settings read with an empty thread id),
-      are applied to the created session before the message, and never
-      mutate host-wide defaults or send a config change with an empty id.
+      choices stay on the draft (ACP reads its cached draft settings with an
+      empty thread id; OpenCode reads its project's asynchronously through
+      `app_draft_session_settings`), are applied to the created session
+      before the message, and never mutate host-wide defaults or send a
+      config change with an empty id.
+    - Models, agents, variants and commands are per project
+      (`app_draft_session_settings`, `app_command_list_for_project`; a real
+      session resolves its own directory). OpenCode's model is a session
+      option: with `session_config` the Codex model menu, effort and Plan
+      are off and a turn sends no model, effort or collaboration mode. FRB
+      reads of these settings are async (`app_session_settings_refresh`;
+      ACP keeps the cached sync path): coalesce, drop answers for a moved
+      project/thread/link, never let an older answer replace a newer choice.
+    - The Codex setup gate applies only to a Codex app-server, never to
+      OpenCode or ACP hosts.
     - `/` commands only write `/name ` text; the host interprets exact known
       names. Permissions keep the option-id card; questions add `multiple`
       and `isOther`, and cancel means reject. A message ID is not an
@@ -858,6 +870,12 @@ this file's roadmap so the source of truth stays in sync.
       process on the source is `external_source_open` (turn unknown). An
       idle native Claude client still holds its session. `released_here`
       suppresses reacquisition until Continue here. No override.
+    - The host retains at most 256 sessions and evicts only idle ones
+      OpenCode confirms idle with no pending request (released first, then
+      least recently used); an evicted session is `not_opened` until
+      explicitly reopened. A typed 404 from the same host identity evicts
+      only that controller thread; other errors stay failures. An abort
+      answered `false` ends the turn only on a fresh idle status.
     - Session UI gates on capabilities (`hostAccess`, `draft_options`,
       `commands`, `question_multiple`, `permission_feedback`), not names.
     - A custom provider's model is its default, not the only model: start
@@ -872,18 +890,20 @@ this file's roadmap so the source of truth stays in sync.
     - Quit (`serve_stop_all`) closes OpenCode admission and stops each host
       under its lease; a failed stop or pending startup cleanup fails the
       quit. macOS native quits go through `NativeQuitGate` to the same path.
-    - Verified on one Mac (OpenCode 1.19.0): Rust 815 passed/24 ignored,
-      Flutter 1503 passed/5 skipped, real-server and bridge lifecycle tests,
-      and the macOS app (no-project picker, native catalog reply, custom Chat
-      Completions and Anthropic Messages replies, Apply reconnect, restore to existing configuration
-      in the same original session, clean Cmd+Q, relaunch restore, close to
-      tray; earlier builds), and on the current build the full gateway model
-      list with a non-default listed model answering, plus Apply back to
-      existing configuration (catalog replaced in place, stale draft model
-      cleared, draft text kept unsent, explicit send answered). Not verified:
-      a successful Responses reply (provider refused the model; further
-      testing waived), draft attachments across Apply in the app (tests
-      only), relay/multi-controller use, other platforms. Former ACP-preset evidence is not native evidence.
+    - Verified on one Mac (OpenCode 1.19.0): Rust 823 passed/24 ignored,
+      Flutter 1516 passed/5 skipped, real-server and bridge lifecycle tests.
+      The current macOS build showed per-project model names for one model
+      ID, agents and commands across Alpha/Beta switches without sending,
+      and a first send and an existing session's agent change answered;
+      extra variants, retention, 404 and `false` abort by tests only.
+      Earlier builds: no-project picker, native catalog reply, custom Chat
+      Completions and Anthropic Messages replies, a 110-model gateway list
+      with a non-default model answering, Apply reconnect and back to
+      existing configuration (draft kept unsent), clean Cmd+Q, relaunch
+      restore, close to tray. Not verified: a successful Responses reply
+      (provider refused the model; further testing waived), draft
+      attachments across Apply in the app (tests only), relay/multi-controller
+      use, other platforms. Former ACP-preset evidence is not native evidence.
     See [Native OpenCode](docs/opencode-native.md) and
     [session access](docs/native-agent-history.md#session-access).
 

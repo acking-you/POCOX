@@ -168,13 +168,21 @@ pub struct AgentCommandDto {
 
 /// List genuine native commands for the command palette.
 pub fn app_command_list(service_key: String) -> Result<Vec<AgentCommandDto>> {
+    app_command_list_for_project(service_key, None)
+}
+
+/// List commands from the selected project without creating a session.
+pub fn app_command_list_for_project(
+    service_key: String,
+    directory: Option<String>,
+) -> Result<Vec<AgentCommandDto>> {
     if session_engine::protocol_of(&service_key) != Protocol::OpenCode {
         return Err(session_engine::unsupported(
             session_engine::protocol_of(&service_key),
             "commands",
         ));
     }
-    Ok(opencode::commands(&service_key)?
+    Ok(opencode::commands(&service_key, directory.as_deref())?
         .into_iter()
         .map(|c| AgentCommandDto {
             name: c.name,

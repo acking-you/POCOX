@@ -100,6 +100,7 @@ part 'app_session/session_layout.dart';
 part 'app_session/session_loading.dart';
 part 'app_session/session_model_controls.dart';
 part 'app_session/session_model_picker.dart';
+part 'app_session/session_native_settings.dart';
 part 'app_session/session_navigation.dart';
 part 'app_session/session_projects.dart';
 part 'app_session/session_queue.dart';
@@ -269,6 +270,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   /// The ACP agent's state for the open session (options, modes, usage).
   SessionSettings? _agentSettings;
+  final _nativeSettings = _NativeSettingsReads();
 
   /// What the shown draft's own options were last read for (see
   /// `_scheduleDraftOptionsCheck`).
@@ -963,7 +965,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   // Cached model list (carries each model's supportedReasoningEfforts), fetched
   // lazily and shared by the model + effort pickers. It belongs to the host
-  // connection it was read from ([_modelsKey]); a reconnect reads it again.
+  // connection and project it was read for ([_modelsKey]); a reconnect or
+  // another project reads it again.
   List<ModelInfo> _models = const [];
   Future<List<ModelInfo>>? _modelsLoading;
   Object? _modelsKey;

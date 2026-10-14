@@ -117,6 +117,7 @@ extension _SessionSend on _AppSessionState {
     bool current() => shown() && sameLink();
     var targetThread = _threadId;
     final targetCwd = _cwd;
+    final catalogProject = _catalogProject;
     final isNewThread = targetThread == null;
     final l10n = AppLocalizations.of(context);
     final preview = typed.isNotEmpty
@@ -273,23 +274,32 @@ extension _SessionSend on _AppSessionState {
       // our view of the server mode is stale), or when the desired toggle
       // differs from the known mode; otherwise leave it unchanged (null) so
       // ordinary turns don't force a model.
-      final collab = (_planToggledByUser || _plan != _planActive)
+      // None of the model menu's settings go out where the session's own
+      // options replace it (see [_usesModelMenu]).
+      final menu = _usesModelMenu;
+      final collab = menu && (_planToggledByUser || _plan != _planActive)
           ? (_plan ? 'plan' : 'default')
           : null;
       // The effort this turn runs with: a pending pick, else the thread's
       // current effort (re-asserted so a plan/permission turn can't drop it).
-      final effort = _effectiveEffort;
+      final effort = menu ? _effectiveEffort : null;
       // A model picked from a list the current connection has not confirmed
       // yet (read before a reconnect) is checked against this host's own
       // list first: a host replaced with another configuration may no longer
       // offer it. Then nothing is sent and the message returns to its draft;
       // an unreadable list decides nothing (the host validates as before).
-      var modelId = _model?.id;
-      if (modelId != null && _caps.modelCatalog && !_modelsCurrent) {
+      // Only the list of this message's project decides: one read after the
+      // view moved to another project decides nothing for it.
+      var modelId = menu ? _model?.id : null;
+      if (modelId != null &&
+          !_modelsCurrent &&
+          _catalogProject == catalogProject) {
         final changes = _catalogChanges;
+        final modelsKey = _modelsLinkKey;
         await _ensureModels();
         if (!sameLink()) throw const _LinkMoved();
-        if (_catalogChanges != changes &&
+        if (_modelsKey == modelsKey &&
+            _catalogChanges != changes &&
             !_models.any((m) => m.id == modelId)) {
           throw _ModelWithdrawn(l10n.modelWithdrawn);
         }
@@ -297,7 +307,10 @@ extension _SessionSend on _AppSessionState {
       // Both plan and default collaboration settings require a concrete model
       // id; resolve one (and reflect it in the chip) if left on "default".
       if (collab != null && modelId == null) {
-        final models = await api.appModelList(service);
+        final models = await api.appModelListForProject(
+          service,
+          catalogProject,
+        );
         // An answer of a connection that moved names nothing for this one,
         // and nothing more is asked of whichever host answers now.
         if (!sameLink()) throw const _LinkMoved();

@@ -50,7 +50,15 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let mut config = pocket_codex_core::config::Config::default();
     config.pb_mapper.relay = Some("127.0.0.1:9".into());
     config.pb_mapper.key = Some("f".repeat(32));
-    assert_eq!(config.pb_mapper.key.as_ref().unwrap().len(), 32);
+    assert_eq!(
+        config
+            .pb_mapper
+            .key
+            .as_ref()
+            .expect("valid test fixture")
+            .len(),
+        32
+    );
     config::save_config(&root.join("support"), &config).expect("isolated offline relay");
     let _cleanup = Cleanup;
     let Started::OpenCode(report) = host_start::start_configured(
@@ -87,7 +95,9 @@ fn native_bridge_hosting_controller_and_original_resume() {
     assert!(duplicate.to_string().contains("opencode_already_hosted"), "{duplicate}");
     assert!(!is_hosting("native-second"));
     assert_eq!(
-        host_profiles::get("native-second").unwrap().revision,
+        host_profiles::get("native-second")
+            .expect("valid test fixture")
+            .revision,
         0,
         "failed start restores saved record"
     );
@@ -113,7 +123,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let refreshed = serve::serve_status()
         .into_iter()
         .find(|row| &row.name == name)
-        .unwrap();
+        .expect("valid test fixture");
     assert_eq!(refreshed.incarnation.as_deref(), Some(incarnation.as_str()));
     assert!(refreshed
         .opencode
@@ -130,7 +140,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     assert_eq!(access.mode, "write");
     assert!(engine
         .thread_list(key)
-        .unwrap()
+        .expect("valid test fixture")
         .iter()
         .any(|s| s.id == original));
     let settings = engine
@@ -149,7 +159,8 @@ fn native_bridge_hosting_controller_and_original_resume() {
             loop {
                 let event = events.recv().await.expect("live native event");
                 if event.thread_id.as_deref() == Some(&original) && event.kind == "turn/completed" {
-                    let raw: serde_json::Value = serde_json::from_str(&event.raw).unwrap();
+                    let raw: serde_json::Value =
+                        serde_json::from_str(&event.raw).expect("valid test fixture");
                     assert_eq!(raw["turn"]["status"], "completed", "{raw}");
                     break;
                 }
@@ -168,20 +179,35 @@ fn native_bridge_hosting_controller_and_original_resume() {
             .any(|item| item.text.contains("BRIDGE_NATIVE_REPLY")),
         "{history:?}"
     );
-    let view = controller::access(key, &original).unwrap();
+    let view = controller::access(key, &original).expect("valid test fixture");
     let released = controller::release(key, &view).expect("release only this original");
     assert_eq!(released.reason, "released_here");
-    assert_eq!(controller::access(key, &original).unwrap().mode, "follow");
-    assert_eq!(controller::open(key, &original).unwrap().mode, "write");
+    assert_eq!(
+        controller::access(key, &original)
+            .expect("valid test fixture")
+            .mode,
+        "follow"
+    );
+    assert_eq!(
+        controller::open(key, &original)
+            .expect("valid test fixture")
+            .mode,
+        "write"
+    );
     // The selected native session is a safe generic-meta file-link authority.
-    let hosted = hosts().hosts.get(name).unwrap().host.clone();
+    let hosted = hosts()
+        .hosts
+        .get(name)
+        .expect("valid test fixture")
+        .host
+        .clone();
     assert_eq!(
         runtime::runtime()
             .block_on(hosted.session_dir(&original))
-            .unwrap(),
+            .expect("valid test fixture"),
         Some(project.display().to_string())
     );
-    let previous = host_profiles::get(name).unwrap();
+    let previous = host_profiles::get(name).expect("valid test fixture");
     let bad = Change {
         runtime: RuntimeChange::Set(Runtime::OpenCode {
             binary: Some(root.join("missing-binary").display().to_string()),
@@ -189,19 +215,19 @@ fn native_bridge_hosting_controller_and_original_resume() {
         ..change()
     };
     let bad = host_profiles::save_in(
-        &host_profiles::root().unwrap(),
+        &host_profiles::root().expect("valid test fixture"),
         name,
         &bad,
         Some(previous.revision),
         Engine::OpenCode,
     )
-    .unwrap();
+    .expect("valid test fixture");
     let expected = host_apply::Expected {
         incarnation: Some(incarnation.clone()),
         revision: Some(bad.revision),
     };
     assert!(host_apply::apply(name, &expected).is_err(), "preflight fails before any stop");
-    assert_eq!(relaunch(name).unwrap().incarnation, incarnation);
+    assert_eq!(relaunch(name).expect("valid test fixture").incarnation, incarnation);
     assert!(pocket_codex_core::process::pid_running(pid));
     let desired = Change {
         runtime: RuntimeChange::Set(Runtime::OpenCode {
@@ -210,20 +236,20 @@ fn native_bridge_hosting_controller_and_original_resume() {
         ..change()
     };
     let desired = host_profiles::save_in(
-        &host_profiles::root().unwrap(),
+        &host_profiles::root().expect("valid test fixture"),
         name,
         &desired,
         Some(bad.revision),
         Engine::OpenCode,
     )
-    .unwrap();
+    .expect("valid test fixture");
     let applied = host_apply::apply(name, &host_apply::Expected {
         incarnation: Some(incarnation.clone()),
         revision: Some(desired.revision),
     })
     .expect("apply native runtime");
     assert!(applied.applied);
-    assert_ne!(relaunch(name).unwrap().incarnation, incarnation);
+    assert_ne!(relaunch(name).expect("valid test fixture").incarnation, incarnation);
     assert!(!pocket_codex_core::process::pid_running(pid), "previous owned child exited");
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while controller::is_connected(key) && std::time::Instant::now() < deadline {
@@ -233,10 +259,15 @@ fn native_bridge_hosting_controller_and_original_resume() {
     engine
         .connect(key.clone(), 0)
         .expect("new native host connection");
-    assert_eq!(controller::open(key, &original).unwrap().session_id, original);
+    assert_eq!(
+        controller::open(key, &original)
+            .expect("valid test fixture")
+            .session_id,
+        original
+    );
     assert!(engine
         .thread_read(key, &original, false)
-        .unwrap()
+        .expect("valid test fixture")
         .items
         .iter()
         .any(|item| item.text.contains("BRIDGE_NATIVE_REPLY")));
@@ -246,5 +277,27 @@ fn native_bridge_hosting_controller_and_original_resume() {
     assert!(local_endpoints(key).is_none());
     serve::serve_stop_all().expect("quit drained all owned work");
     assert_eq!(opencode::runtime::pending_cleanup(), 0);
-    std::fs::write(root.join("result.json"), serde_json::to_vec_pretty(&json!({"originalSession":original,"nativeProtocol":caps.protocol,"localWithoutRelay":true,"sourceSingleton":true,"originalHistoryAfterApply":true,"ownedProcessesStopped":true})).unwrap()).unwrap();
+    std::fs::write(root.join("result.json"), serde_json::to_vec_pretty(&json!({"originalSession":original,"nativeProtocol":caps.protocol,"localWithoutRelay":true,"sourceSingleton":true,"originalHistoryAfterApply":true,"ownedProcessesStopped":true})).expect("valid test fixture")).expect("valid test fixture");
+}
+
+#[test]
+fn configured_default_survives_catalog_failure_and_inherited_stays_unknown() {
+    let catalog = || {
+        serde_json::from_value(
+            json!({"models":[],"agents":[],"commands":[],"defaults":{},"providersConnected":0}),
+        )
+        .expect("valid test fixture")
+    };
+    let custom = OpenCodeStatus::new("fixture".into(), Ok(catalog()), Some("chosen-model".into()));
+    assert_eq!(custom.default_model.as_deref(), Some("chosen-model"));
+    let failed = OpenCodeStatus::new(
+        "fixture".into(),
+        Err(opencode::host::Error::NotReady),
+        custom.default_model,
+    );
+    assert_eq!(failed.default_model.as_deref(), Some("chosen-model"));
+    assert!(failed.problem.is_some());
+    assert!(OpenCodeStatus::new("fixture".into(), Ok(catalog()), None)
+        .default_model
+        .is_none());
 }

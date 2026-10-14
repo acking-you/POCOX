@@ -13,10 +13,14 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/providers.dart';
 
-/// The commands of the session service [key], read once per use.
+/// The commands of the session service in a project (null: outside one),
+/// read once per use. Each project is its own entry: a list read for a
+/// project the view has left is never shown for another.
 final agentCommandsProvider = FutureProvider.autoDispose
-    .family<List<AgentCommand>, String>(
-      (ref, key) => ref.read(bridgeApiProvider).appCommandList(key),
+    .family<List<AgentCommand>, ({String service, String? project})>(
+      (ref, key) => ref
+          .read(bridgeApiProvider)
+          .appCommandListForProject(key.service, key.project),
     );
 
 /// The command name being typed in [text] (without `/`), or null when

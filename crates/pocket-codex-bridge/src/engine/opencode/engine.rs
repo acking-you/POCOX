@@ -89,23 +89,7 @@ impl SessionEngine for OpenCodeEngine {
             .collect())
     }
     fn model_list(&self, service: &str) -> Result<Vec<ModelInfo>> {
-        let link = conn(service)?;
-        let view = lock(&link.shared);
-        Ok(view
-            .catalog
-            .models
-            .iter()
-            .map(|model| ModelInfo {
-                id: model.key(),
-                display_name: model.name.clone(),
-                description: model.provider_name.clone(),
-                supported_reasoning_efforts: vec![],
-                default_reasoning_effort: None,
-                supported_service_tiers: vec![],
-                default_service_tier: None,
-                is_default: false,
-            })
-            .collect())
+        models_for_project(service, None)
     }
     fn thread_start(&self, service: &str, options: StartOptions) -> Result<String> {
         ops::start(service, options)
@@ -206,4 +190,22 @@ impl SessionEngine for OpenCodeEngine {
     ) -> Result<()> {
         settings::set(service, session, id, value)
     }
+}
+
+/// Read the native model catalog in a draft or session's project scope.
+pub fn models_for_project(service: &str, directory: Option<&str>) -> Result<Vec<ModelInfo>> {
+    Ok(super::catalog(service, directory)?
+        .models
+        .into_iter()
+        .map(|model| ModelInfo {
+            id: model.key(),
+            display_name: model.name,
+            description: model.provider_name,
+            supported_reasoning_efforts: vec![],
+            default_reasoning_effort: None,
+            supported_service_tiers: vec![],
+            default_service_tier: None,
+            is_default: false,
+        })
+        .collect())
 }

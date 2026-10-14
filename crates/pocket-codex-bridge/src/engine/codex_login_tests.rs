@@ -256,7 +256,14 @@ fn a_fake_server_left_unfinished_is_cancelled_and_joined() {
     let idle = fake_server(serde_json::json!({}));
     let idle_addr = idle.url.trim_start_matches("ws://").to_string();
     dropped_within(idle, None);
-    std::net::TcpListener::bind(&idle_addr).expect("the idle listener was released");
+    // A released ephemeral port may already be reserved by a concurrent test
+    // or retained in TIME_WAIT. Verify closure, not immediate port reuse.
+    let error = std::net::TcpStream::connect_timeout(
+        &idle_addr.parse().expect("socket address"),
+        Duration::from_secs(1),
+    )
+    .expect_err("the cancelled idle server accepts no new connections");
+    assert_eq!(error.kind(), std::io::ErrorKind::ConnectionRefused);
 
     let connected = fake_server(serde_json::json!({}));
     let addr = connected.url.trim_start_matches("ws://").to_string();

@@ -1,11 +1,28 @@
 part of '../app_session_screen.dart';
 
 extension _SessionModelPicker on _AppSessionState {
+  /// Whether the composer's own model menu (model, effort, Plan) applies:
+  /// a service-wide model catalog whose sessions have no options of their
+  /// own (Codex). Where the session's options carry the model (native
+  /// OpenCode: model, agent, variant), those options replace the menu, and
+  /// nothing of it is sent.
+  bool get _usesModelMenu => _caps.modelCatalog && !_caps.sessionConfig;
+
+  /// The project the shown view's catalog (models, commands) is read for:
+  /// native OpenCode offers each project its own. Null for engines whose
+  /// catalog is the same everywhere, and outside a project.
+  String? get _catalogProject {
+    if (!_caps.isOpenCode) return null;
+    final cwd = _cwd;
+    return cwd == null || cwd.trim().isEmpty ? null : cwd;
+  }
+
   /// The host connection a model list belongs to: the link (lost, replaced,
-  /// another generation) and the subscription a reconnect opens on it. A
-  /// list read before a reconnect may be the previous host's catalog.
+  /// another generation) and the subscription a reconnect opens on it, and
+  /// the project it was read for. A list read before a reconnect may be the
+  /// previous host's catalog; one read for another project, that project's.
   Object get _modelsLinkKey =>
-      (widget.serviceKey, _linkEpoch, _subscriptionEpoch);
+      (widget.serviceKey, _linkEpoch, _subscriptionEpoch, _catalogProject);
 
   /// Whether [_models] was read from the current host connection.
   bool get _modelsCurrent => _modelsKey == _modelsLinkKey;
@@ -15,7 +32,7 @@ extension _SessionModelPicker on _AppSessionState {
     if (_models.isNotEmpty && _modelsKey == key) return _models;
     final pending = _modelsLoading;
     if (pending != null && _modelsLoadingKey == key) return pending;
-    final request = _fetchModels(key);
+    final request = _fetchModels(key, _catalogProject);
     _modelsLoading = request;
     _modelsLoadingKey = key;
     try {
@@ -28,18 +45,20 @@ extension _SessionModelPicker on _AppSessionState {
     }
   }
 
-  Future<List<ModelInfo>> _fetchModels(Object key) async {
-    // No service-wide catalog (ACP): nothing to fetch, and nothing invented.
-    if (!_caps.modelCatalog) {
+  Future<List<ModelInfo>> _fetchModels(Object key, String? project) async {
+    // No model menu (ACP, or session options that carry the model): nothing
+    // to fetch, and nothing invented.
+    if (!_usesModelMenu) {
       if (mounted) _openLoadDone(_kModelsLoad);
       return _models;
     }
     try {
       final models = await ref
           .read(bridgeApiProvider)
-          .appModelList(widget.serviceKey);
+          .appModelListForProject(widget.serviceKey, project);
       // An answer of a connection that moved meanwhile may describe the
-      // previous host: the next read (the reconnect's) asks the current one.
+      // previous host, and one for the project the view left, that project:
+      // the next read (the reconnect's, the new project's) asks again.
       if (mounted && key == _modelsLinkKey) {
         _adoptModels(models, key);
         _openLoadDone(_kModelsLoad);

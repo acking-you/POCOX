@@ -21,6 +21,7 @@ use super::{
 use crate::session_access::{AccessHolder, SessionAccess};
 
 mod operations;
+mod retention;
 pub use operations::{Answer, Input, Options};
 
 /// Host identity which must accompany every controller mutation.
@@ -83,6 +84,7 @@ impl Error {
 #[derive(Default)]
 struct Entry {
     directory: String,
+    last_used: Option<std::time::Instant>,
     options: Options,
     options_pending: bool,
     released: bool,
@@ -391,6 +393,11 @@ impl Host {
                 if entry.is_some_and(|entry| entry.released) {
                     access.reason = "released_here".into();
                     access.writer = "none".into();
+                } else if entry.is_none() {
+                    // Cache eviction never grants write admission. A controller
+                    // must explicitly reopen the original ID, as after release.
+                    access.reason = "not_opened".into();
+                    access.writer = "none".into();
                 } else {
                     access.mode = "write".into();
                     access.writer = "this_host".into();
@@ -414,10 +421,8 @@ impl Host {
                 .client
                 .messages(session, &metadata.directory, None)
                 .await?;
+            self.reserve_session_slot(Some(session)).await?;
             let mut entries = self.0.sessions.lock().await;
-            if entries.len() >= 256 && !entries.contains_key(session) {
-                return Err(Error::Capacity);
-            }
             let entry = entries.entry(session.into()).or_insert_with(|| Entry {
                 options: Options::restore(&page.messages),
                 ..Entry::default()
@@ -425,6 +430,7 @@ impl Host {
             if !entry.options_pending && entry.turn.is_none() {
                 entry.options = Options::restore(&page.messages);
             }
+            entry.last_used = Some(std::time::Instant::now());
             entry.directory = metadata.directory.clone();
             entry.released = false;
         }

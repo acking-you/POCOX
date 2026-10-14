@@ -9,6 +9,8 @@ mod follow;
 mod ops;
 mod paging;
 mod projection;
+#[cfg(test)]
+mod reconciliation_tests;
 mod settings;
 #[cfg(test)]
 mod tests;
@@ -20,7 +22,7 @@ use std::{
 
 use anyhow::{anyhow, bail, Result};
 pub use connection::{connect, context_changed, disconnect, is_connected, probe_reason};
-pub use engine::OpenCodeEngine;
+pub use engine::{models_for_project, OpenCodeEngine};
 pub use follow::{follow_session, liveness};
 use once_cell::sync::Lazy;
 pub use ops::{access, commands, open, release};
@@ -30,6 +32,7 @@ use pocket_codex_host_svc::opencode::{
     gateway::Gateway,
     host::{Identity, Info, Snapshot},
 };
+pub use settings::draft_settings;
 use tokio::{sync::broadcast, task::JoinHandle};
 
 use super::{
@@ -40,6 +43,17 @@ use super::{
 };
 
 type Key = (String, String);
+
+fn catalog(service: &str, directory: Option<&str>) -> Result<Catalog> {
+    catalog_for_link(&conn(service)?, directory)
+}
+
+fn catalog_for_link(link: &Link, directory: Option<&str>) -> Result<Catalog> {
+    let identity = link.identity();
+    let catalog = block(link.client.catalog(directory, &identity))?;
+    link.commit(&identity, |_| ())?;
+    Ok(catalog)
+}
 static CONNS: Lazy<Mutex<HashMap<Key, Conn>>> = Lazy::new(Mutex::default);
 
 struct Shared {

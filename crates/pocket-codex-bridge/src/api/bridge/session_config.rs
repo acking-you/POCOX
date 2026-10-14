@@ -152,13 +152,36 @@ fn settings_dto(body: &serde_json::Value) -> SessionSettingsDto {
     }
 }
 
-/// The ACP agent's latest per-session state as this controller saw it (no
-/// network), or `None` for other protocols or unknown sessions.
+/// Latest native session choices in that session's project, or the ACP
+/// controller's cached state. Unknown or unavailable settings return `None`.
 #[frb(sync)]
 pub fn app_session_settings(service_key: String, thread_id: String) -> Option<SessionSettingsDto> {
     engine(&service_key)
         .session_settings(&service_key, &thread_id)
         .map(|body| settings_dto(&body))
+}
+
+/// Refresh native session choices off the UI thread, or read cached ACP state.
+/// OpenCode may perform network requests; UI callers should use this entry
+/// point.
+pub fn app_session_settings_refresh(
+    service_key: String,
+    thread_id: String,
+) -> Option<SessionSettingsDto> {
+    app_session_settings(service_key, thread_id)
+}
+
+/// Read draft choices in the selected native project without opening a session.
+pub fn app_draft_session_settings(
+    service_key: String,
+    directory: Option<String>,
+) -> Option<SessionSettingsDto> {
+    if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
+        crate::engine::opencode::draft_settings(&service_key, directory.as_deref())
+            .map(|body| settings_dto(&body))
+    } else {
+        app_session_settings(service_key, String::new())
+    }
 }
 
 /// Set an ACP select configuration option to one of its advertised values.

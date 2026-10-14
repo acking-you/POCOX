@@ -142,10 +142,24 @@ fn pending_opt(snapshot: Option<&Snapshot>, identity: &Identity) -> HashMap<Stri
         .unwrap_or_default()
 }
 
-async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
+pub(super) async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
     let sessions: Vec<_> = lock(&link.shared).sessions.keys().cloned().collect();
     for session in sessions {
-        let next = link.client.snapshot(&session, None).await?;
+        let next = match link.client.snapshot(&session, None).await {
+            Ok(snapshot) => snapshot,
+            Err(ClientError::Gateway {
+                status: 404,
+                code,
+            }) if code == "native_request_failed" => {
+                // A replacement listener must not erase the previous host's cache.
+                if &link.client.info().await?.identity != identity {
+                    bail!("the OpenCode host changed; reconnect");
+                }
+                forget_deleted(link, identity, &session)?;
+                continue;
+            },
+            Err(error) => return Err(error.into()),
+        };
         validate_snapshot(identity, &next)?;
         let old = link.commit(identity, |view| view.sessions.get(&session).cloned())?;
         if old
@@ -159,6 +173,42 @@ async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
         }
         announce(link, identity, old.as_ref(), &next);
     }
+    Ok(())
+}
+
+fn forget_deleted(link: &Link, identity: &Identity, session: &str) -> Result<()> {
+    let old = link.commit(identity, |view| {
+        view.bytes.remove(session);
+        view.cursors.remove(session);
+        view.turn_pages.retain(|(id, _), _| id != session);
+        view.sessions.remove(session)
+    })?;
+    let Some(old) = old else { return Ok(()) };
+    for request in pending(&old, identity).keys() {
+        let _ = link.tx.send(projection::event(
+            "serverRequest/resolved",
+            Some(session),
+            json!({"threadId":session,"requestId":request}),
+        ));
+    }
+    let _ = link.tx.send(projection::event(
+        "acp/session/updated",
+        Some(session),
+        json!({"sessionId":session,"admitted":false,"runningTurnId":null}),
+    ));
+    if let Some(turn) = old.turn_id {
+        let _ = link.tx.send(projection::event(
+            "turn/completed",
+            Some(session),
+            json!({"threadId":session,"turn":{"id":turn,"status":"failed",
+                "error":{"message":"The native OpenCode session was deleted."}}}),
+        ));
+    }
+    let _ = link.tx.send(projection::event(
+        "thread/deleted",
+        Some(session),
+        json!({"threadId":session}),
+    ));
     Ok(())
 }
 

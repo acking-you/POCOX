@@ -82,11 +82,13 @@ extension _SessionCapabilities on _AppSessionState {
       _agentControlsEnabled;
 
   void _refreshAgentSettings() {
+    if (_readsNativeSettings) {
+      _readNativeSettings();
+      return;
+    }
     final tid = _agentSessionThread;
-    final next = !_caps.sessionConfig
+    final next = !_caps.sessionConfig || tid == null
         ? null
-        : tid == null
-        ? (_editsDraftOptions ? _draftSettings() : null)
         : ref
               .read(bridgeApiProvider)
               .appSessionSettings(widget.serviceKey, tid);

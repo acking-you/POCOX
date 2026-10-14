@@ -32,15 +32,18 @@ AppCapabilities negotiatedAcpCapabilities({
   runningInventory: 'engine',
 );
 
-/// A connected native OpenCode host's capabilities. The bridge also reports
-/// [modelCatalog] (the composer's model menu); it is off by default so the
-/// per-draft option capsule stays under test.
+/// A connected native OpenCode host's capabilities, as the bridge reports
+/// them: a model catalog together with per-session and draft options (the
+/// options carry the model, so the composer shows them, not a model menu).
+/// A local host's bridge also reports [localSessions] (its native history
+/// on this device).
 AppCapabilities negotiatedOpenCodeCapabilities({
   int generation = 1,
   bool imageInput = false,
   bool steer = true,
   bool commands = true,
-  bool modelCatalog = false,
+  bool modelCatalog = true,
+  bool localSessions = false,
 }) => AppCapabilities(
   provider: 'opencode',
   fast: false,
@@ -49,7 +52,7 @@ AppCapabilities negotiatedOpenCodeCapabilities({
   rateLimits: false,
   takeover: false,
   externalWriterMonitor: false,
-  localSessions: false,
+  localSessions: localSessions,
   planMode: false,
   protocol: 'opencode-http',
   providerName: 'OpenCode',

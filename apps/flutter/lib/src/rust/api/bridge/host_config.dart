@@ -8,14 +8,14 @@ import 'codex_setup.dart';
 import 'hosting.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `active_of`, `change_of`, `dto`, `into_runtime`, `of`, `parse_protocol`
+// These functions are ignored because they are not marked as `pub`: `active_of`, `change_of`, `dto`, `into_runtime`, `of`, `parse_protocol`, `save_profile`
 
 /// The saved configuration of host `name` (inherited when never saved) and
 /// what it runs with now.
 Future<HostConfigDto> hostConfigGet({required String name}) =>
     RustLib.instance.api.crateApiBridgeHostConfigHostConfigGet(name: name);
 
-/// What a Codex host (`spec` = `None`) or the ACP agent `spec` can select.
+/// Model-service choices for the selected native engine or ACP agent.
 HostConfigSupportDto hostConfigSupported({
   AcpAgentSpecDto? spec,
   String? engine,
@@ -24,8 +24,8 @@ HostConfigSupportDto hostConfigSupported({
   engine: engine,
 );
 
-/// Save host `name`'s configuration for a Codex host (`spec` = `None`) or
-/// the ACP agent `spec`, and, with `runtime`, its desired runtime (an
+/// Save host `name`'s configuration for its saved engine or the ACP agent
+/// `spec`, and, with `runtime`, its desired runtime (an
 /// agent runtime is checked as that agent). `key_action` is `keep`,
 /// `replace` (with `key`) or `remove`. With `expected_revision`, a save
 /// made elsewhere meanwhile is refused. Nothing that runs changes until
@@ -493,7 +493,7 @@ class HostEnvironmentEntryDto {
 
 /// A host's runtime: what runs, not its model service.
 class HostRuntimeDto {
-  /// `codex` or `acp`.
+  /// `codex`, `opencode` or `acp`.
   final String kind;
 
   /// Codex: the executable (`None`: the app's saved codex, then `PATH`).
@@ -541,10 +541,10 @@ class HostStartedDto {
   /// Instance name as hosted.
   final String name;
 
-  /// `codex` or `acp`.
+  /// `codex`, `opencode` or `acp`.
   final String provider;
 
-  /// The controller key (`app:` for Codex, `acp:` for an agent).
+  /// The controller key (`app:`, `opencode:` or `acp:`).
   final String serviceKey;
 
   /// An already-running host was reused.

@@ -76,7 +76,10 @@ when preferences load and are never relaunched as a generic ACP agent.
   composer holds), and New conversation clears that banner. The same holds
   for ACP agents; Codex still works outside a project.
 - **Host details** show the version, connected providers, model count,
-  default model and agents from the host status. **Refresh**, offered for a
+  default model and agents from the host status. The default model is the
+  custom provider's captured default; on existing configuration (inherited)
+  it is currently unknown, since no global selection is queried.
+  **Refresh**, offered for a
   healthy host too because models and sign-ins change outside Pocket, asks
   that running host by name (`opencode_refresh`) to re-read OpenCode's
   catalog; a read that fails is kept as the status problem, and a result
@@ -96,12 +99,24 @@ UI is driven by capabilities, not by engine name:
 | `permission_feedback` | a permission answer may carry text (off for now) |
 | `session_config`, `permission_options`, `steer`, `rename` | as for ACP agents |
 
+The host reports a model catalog together with session and draft options.
+The options carry the model, so the composer shows them (model, agent,
+variant) instead of the Codex model menu, and a turn sends no model, effort
+or collaboration mode of its own.
+
+The Codex setup banner and send guard apply only to a Codex app-server: an
+OpenCode host (its own configuration and sign-ins, or a custom provider)
+never waits on Codex's sign-in, even where it also reports local history.
+
 ## Draft options
 
 A new conversation creates its OpenCode session on first send, not ahead.
-Its option chips read the service's defaults for a new session (the settings
-lookup with an empty thread id) and keep the user's choices on the draft
-itself. What a chip shows is exactly what the first send applies:
+Its option chips read the defaults of a new session in the draft's project
+(`app_draft_session_settings`; OpenCode offers each project its own models
+and agents) and keep the user's choices on the draft itself. Drafts are per
+project, so a choice made in one project is neither shown nor applied in
+another, and switching projects sends nothing. What a chip shows is exactly
+what the first send applies:
 
 - Only a chosen model's variants are offered (values grouped by model).
   Choosing a model resets its variant, as the host does, so a newly chosen
@@ -122,12 +137,27 @@ the user's back; sending again sends the message with the options shown.
 OpenCode v1 selects model, variant and agent per message; the bridge keeps
 the session's pending choices for its next prompt.
 
+Draft and session settings are read from the host asynchronously
+(`app_draft_session_settings`, `app_session_settings_refresh`), since
+OpenCode answers them from its HTTP catalog; ACP agents keep their cached
+state. The composer and menus stay usable while a read runs. A refresh of
+the same session or draft keeps what is shown; options of another session,
+draft or project are never shown meanwhile. An answer for a view, project
+or connection that has since changed is dropped, and requests made while a
+read runs coalesce into one following read, so an older answer never
+replaces a newer choice. A send applies its draft's choices after reading
+that project's defaults again, before the message.
+
 ## Commands
 
 With `commands`, typing `/` at the start of the composer lists the host's
-commands (`app_command_list`: name, description, source, hints), prefix
-matches first. Arrow keys move, Tab or Enter picks, Escape closes; picking
-writes `/name ` into the draft and sends nothing. The message is sent as
+commands for the shown project (`app_command_list_for_project`: name,
+description, source, hints), prefix matches first; a list answered for a
+project the view has left is not shown. OpenCode's models come from the same
+project's session or draft settings (above), not from the generic composer
+model menu (`app_model_list_for_project`), which is off whenever
+`session_config` is negotiated. Arrow keys move, Tab or Enter picks, Escape
+closes; picking writes `/name ` into the draft and sends nothing. The message is sent as
 typed; the host recognizes exact known command names, and any other `/text`
 is ordinary text.
 
@@ -147,6 +177,11 @@ into the running turn (`prompt_async`) when `steer` is negotiated. A message
 ID is not an idempotency key, so a send whose outcome is uncertain stays
 queued and marked and is sent again only by an explicit Retry.
 
+Cancel clears the host's running turn when OpenCode confirms the abort. If
+OpenCode answers `false`, the turn counts as ended only when a fresh status
+read right after it reports the session idle; a failed read, a busy status
+or a transport error leaves the turn uncertain, and exact-turn checks stay.
+
 ## Session access
 
 Opening an existing OpenCode session resolves its access through the host,
@@ -157,6 +192,23 @@ be observed per session: the host reports `external_source_open` and the
 view follows read-only until that process closes or releases the source and
 the user checks again. Quiet time never grants write access.
 
+The host retains admission state for at most 256 sessions. To open or
+create another it forgets one (released sessions first, then the least
+recently used), and only one that OpenCode reports idle with no pending
+permission or question; a running turn or unapplied options are never
+forgotten, and a pending request without a session ID fails the open as
+not ready rather than guess.
+A forgotten session, released or not, reports `not_opened`: it never
+regains write access by itself and must be opened again explicitly. When no
+session can be forgotten, the open or create fails.
+
+When the bridge reconciles its open sessions and the host answers that one
+was deleted (a typed 404 from the current host identity), only that session
+leaves the controller: its pending requests are withdrawn, a running turn
+ends as failed, and the view is told the thread was deleted. The other
+sessions keep reconciling. Any other error, or a different host answering,
+remains a failure and the cache is kept.
+
 ## Local history
 
 Desktop Local sessions reads OpenCode's database directly and read-only
@@ -166,12 +218,10 @@ continued by opening it on the running OpenCode host (**Continue in
 
 ## Verification
 
-On one Mac with installed OpenCode 1.19.0, the full Rust (815 passed, 24
-ignored) and Flutter (1503 passed, 5 skipped) suites passed with format,
-clippy and analysis, and macOS Debug builds were run against the user's real
-configuration, database and sign-ins. The app checks below ran on successive
-builds; those before gateway model discovery are historical for the current
-build.
+On one Mac with installed OpenCode 1.19.0, the full Rust (823 passed, 24
+ignored) and Flutter (1516 passed, 5 skipped) suites passed with format,
+clippy and analysis, and a coherent macOS build was run against the user's
+real configuration, database and sign-ins. With this round's Rust:
 
 - Three opt-in integration tests against a real `opencode serve` passed:
   source ownership (a second Pocket server is refused, another process
@@ -182,12 +232,33 @@ build.
 - A real bridge lifecycle test covered local probing, catalog refresh in the
   same incarnation, meta services, a prompt, release and reopen, the
   one-host-per-source rule, apply with original history kept, stop and quit.
-- In the app: a send without a project (desktop Enter) opened the folder
-  picker and showed nothing as sent; cancelling kept the draft; choosing the
-  worktree created exactly one session. The user's own running turn was
-  cancelled, a new conversation started, and the original reopened with its
-  history. The native catalog's model picker applied a chosen model, which
-  answered.
+- Session retention, the deleted-session 404 and a `false` abort are covered
+  by tests only.
+
+In the current app build, with two real projects (Alpha, Beta) whose
+OpenCode configurations give the same model ID different names and each
+their own agent and command:
+
+- The draft showed the native model, agent and variant options, not the
+  Codex model menu. Switching Alpha → Beta → Alpha showed each project's own
+  model name for the same ID, kept each draft's choices, and listed each
+  project's own commands; switching projects and picking a command sent
+  nothing.
+- Alpha's first explicit send created one session with its project agent
+  and received the expected reply.
+- An existing session switched to Beta's project agent and the next message
+  received the expected reply with that agent.
+- The model offered only its default variant, so other variant choices are
+  covered by tests only.
+
+These app checks ran on earlier builds of this branch and were not repeated
+on the current one:
+
+- A send without a project (desktop Enter) opened the folder picker and
+  showed nothing as sent; cancelling kept the draft; choosing the worktree
+  created exactly one session. The user's own running turn was cancelled, a
+  new conversation started, and the original reopened with its history. A
+  model chosen from the native catalog answered.
 - A per-host custom provider with OpenAI Chat Completions answered after
   Save and Apply. Apply reconnected the open conversation without a manual
   disconnect. Restoring existing configuration and applying again answered
@@ -195,15 +266,15 @@ build.
 - A per-host custom provider with Anthropic Messages, pointed at the user's
   existing Anthropic-compatible gateway, answered a message sent in the app;
   OpenCode's own record shows the turn finished normally with no error.
-- On the current build, the same gateway's host listed every model ID the
-  gateway returned, with none omitted, and a non-default model chosen from
-  the conversation's model menu answered.
-- Also on the current build, applying existing configuration to that host in
-  the running app (same app process, new `opencode serve`) cleared the draft's
-  previously chosen gateway model back to the default, replaced the model
-  menu with the inherited catalog without an app restart, and kept the draft
-  text unsent. An explicit send then received a real reply. Draft
-  attachments across Apply are covered by tests only.
+- The same gateway's host listed all 110 model IDs the gateway returned,
+  with none omitted, and a non-default model chosen in the conversation
+  answered.
+- Applying existing configuration to that host in the running app (same app
+  process, new `opencode serve`) cleared the draft's previously chosen
+  gateway model back to the default, replaced the offered models with the
+  inherited catalog without an app restart, and kept the draft text unsent.
+  An explicit send then received a real reply. Draft attachments across
+  Apply are covered by tests only.
 - Cmd+Q stopped the owned `opencode serve` and the app exited with status 0,
   with no manual signal. After relaunch, automatic hosting and history
   restored, and the same original session ID answered. Closing the window

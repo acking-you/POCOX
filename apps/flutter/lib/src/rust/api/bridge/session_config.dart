@@ -8,14 +8,33 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `opt_str`, `settings_dto`
 
-/// The ACP agent's latest per-session state as this controller saw it (no
-/// network), or `None` for other protocols or unknown sessions.
+/// Latest native session choices in that session's project, or the ACP
+/// controller's cached state. Unknown or unavailable settings return `None`.
 SessionSettingsDto? appSessionSettings({
   required String serviceKey,
   required String threadId,
 }) => RustLib.instance.api.crateApiBridgeSessionConfigAppSessionSettings(
   serviceKey: serviceKey,
   threadId: threadId,
+);
+
+/// Refresh native session choices off the UI thread, or read cached ACP state.
+/// OpenCode may perform network requests; UI callers should use this entry point.
+Future<SessionSettingsDto?> appSessionSettingsRefresh({
+  required String serviceKey,
+  required String threadId,
+}) => RustLib.instance.api.crateApiBridgeSessionConfigAppSessionSettingsRefresh(
+  serviceKey: serviceKey,
+  threadId: threadId,
+);
+
+/// Read draft choices in the selected native project without opening a session.
+Future<SessionSettingsDto?> appDraftSessionSettings({
+  required String serviceKey,
+  String? directory,
+}) => RustLib.instance.api.crateApiBridgeSessionConfigAppDraftSessionSettings(
+  serviceKey: serviceKey,
+  directory: directory,
 );
 
 /// Set an ACP select configuration option to one of its advertised values.

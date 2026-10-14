@@ -49,6 +49,15 @@ Future<List<ModelInfoDto>> appModelList({required String serviceKey}) => RustLib
     .api
     .crateApiBridgeThreadsAppModelList(serviceKey: serviceKey);
 
+/// List native project models; other engines retain their existing catalog.
+Future<List<ModelInfoDto>> appModelListForProject({
+  required String serviceKey,
+  String? directory,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppModelListForProject(
+  serviceKey: serviceKey,
+  directory: directory,
+);
+
 /// Send a thread realtime control request; returns the upstream JSON result.
 /// Accepts the six `thread/realtime/*` methods, `thread/timeline/list`,
 /// marked voice `thread/start` (and ephemeral dictation `thread/start`), and

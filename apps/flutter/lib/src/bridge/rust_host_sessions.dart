@@ -31,12 +31,19 @@ mixin _RustHostSessions implements BridgeApi {
   @override
   Future<List<AgentCommand>> appCommandList(String serviceKey) async => [
     for (final c in await frb.appCommandList(serviceKey: serviceKey))
-      AgentCommand(
-        name: c.name,
-        description: c.description,
-        source: c.source,
-        hints: c.hints,
-      ),
+      _command(c),
+  ];
+
+  @override
+  Future<List<AgentCommand>> appCommandListForProject(
+    String serviceKey,
+    String? directory,
+  ) async => [
+    for (final c in await frb.appCommandListForProject(
+      serviceKey: serviceKey,
+      directory: directory,
+    ))
+      _command(c),
   ];
 
   @override
@@ -376,6 +383,13 @@ mixin _RustHostSessions implements BridgeApi {
     bytes: bytes,
   );
 }
+
+AgentCommand _command(frb.AgentCommandDto c) => AgentCommand(
+  name: c.name,
+  description: c.description,
+  source: c.source,
+  hints: c.hints,
+);
 
 ThreadConfig _threadConfig(frb.ThreadConfigDto c) => ThreadConfig(
   model: c.model,

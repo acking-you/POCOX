@@ -80,6 +80,17 @@ mixin _FakeThreads on _FakeBridgeState {
   }
 
   @override
+  Future<List<ModelInfo>> appModelListForProject(
+    String serviceKey,
+    String? directory,
+  ) async {
+    modelListProjects.add(directory);
+    final listed = projectModelLists['$serviceKey|${directory ?? ''}'];
+    await projectModelListGates[directory]?.future;
+    return listed ?? await appModelList(serviceKey);
+  }
+
+  @override
   Future<List<ModelInfo>> appModelList(String serviceKey) async {
     modelListServices.add(serviceKey);
     // Read when asked, like the bridge's connection catalog: an answer held

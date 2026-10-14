@@ -128,9 +128,7 @@ impl Host {
         self.writable_source(identity).await?;
         let catalog = self.catalog(Some(directory)).await?;
         options.validate(&catalog)?;
-        if self.0.sessions.lock().await.len() >= 256 {
-            return Err(Error::Capacity);
-        }
+        self.reserve_session_slot(None).await?;
         self.writable_source(identity).await?;
         let session: Session = self
             .0
@@ -143,6 +141,7 @@ impl Host {
             .await
             .insert(session.id.clone(), Entry {
                 directory: session.directory.clone(),
+                last_used: Some(std::time::Instant::now()),
                 options,
                 options_pending: true,
                 ..Entry::default()
@@ -161,6 +160,7 @@ impl Host {
         let session = self.admitted(session, identity).await?;
         options.validate(&self.catalog(Some(&session.directory)).await?)?;
         if let Some(entry) = self.0.sessions.lock().await.get_mut(&session.id) {
+            entry.last_used = Some(std::time::Instant::now());
             entry.options = options.clone();
             entry.options_pending = true;
         }
@@ -343,23 +343,15 @@ impl Host {
         {
             return Err(Error::TurnChanged);
         }
-        let cancelled = self
-            .0
-            .client
-            .mutate::<bool>(
-                Method::POST,
-                &["session", session, "abort"],
-                Some(&metadata.directory),
-                &json!({}),
-            )
-            .await?;
-        if cancelled {
+        let resolved = abort_execution(&self.0.client, &metadata).await?;
+        if resolved {
             if let Some(entry) = self.0.sessions.lock().await.get_mut(session) {
                 entry.turn = None;
+                entry.operation_error = None;
             }
         }
         self.0.live.invalidate(session).await;
-        Ok(cancelled)
+        Ok(resolved)
     }
 
     /// Rename an admitted original session through the native session route.
@@ -475,6 +467,26 @@ fn message_id() -> String {
     format!("msg_{number:012x}{}", &uuid::Uuid::new_v4().simple().to_string()[..14])
 }
 
+async fn abort_execution(client: &super::Client, session: &Session) -> Result<bool, Error> {
+    let cancelled = client
+        .mutate::<bool>(
+            Method::POST,
+            &["session", &session.id, "abort"],
+            Some(&session.directory),
+            &json!({}),
+        )
+        .await?;
+    if cancelled {
+        return Ok(true);
+    }
+    // A false acknowledgement alone says nothing about an uncertain prompt.
+    // A fresh idle response after abort is required before permitting Retry.
+    let statuses: super::Statuses = client
+        .get(&["session", "status"], Some(&session.directory), &[])
+        .await?;
+    Ok(matches!(statuses.get(&session.id).unwrap_or(&Status::Idle), Status::Idle))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,5 +512,49 @@ mod tests {
         let second = message_id();
         assert_eq!(first.len(), 30);
         assert!(first < second);
+    }
+
+    #[tokio::test]
+    async fn abort_false_resolves_only_with_fresh_positive_idle_evidence() {
+        use axum::{
+            routing::{get, post},
+            Json, Router,
+        };
+        for (status, expected) in [
+            (json!({}), true),
+            (json!({"ses_test":{"type":"busy"}}), false),
+            (json!({"ses_test":{"type":"future"}}), false),
+        ] {
+            let router = Router::new()
+                .route("/session/ses_test/abort", post(|| async { Json(false) }))
+                .route(
+                    "/session/status",
+                    get(move || {
+                        let status = status.clone();
+                        async { Json(status) }
+                    }),
+                );
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("valid test fixture");
+            let client = super::super::Client::new(
+                &format!("http://{}/", listener.local_addr().expect("valid test fixture")),
+                None,
+            )
+            .expect("valid test fixture");
+            let task = tokio::spawn(async move {
+                axum::serve(listener, router)
+                    .await
+                    .expect("valid test fixture");
+            });
+            let session = serde_json::from_value(json!({"id":"ses_test","title":"Test","directory":"/project","time":{"created":0,"updated":0}})).expect("valid test fixture");
+            assert_eq!(
+                abort_execution(&client, &session)
+                    .await
+                    .expect("valid test fixture"),
+                expected
+            );
+            task.abort();
+        }
     }
 }

@@ -26,15 +26,18 @@ fn identity() -> Identity {
     }
 }
 
-struct Fixture {
-    link: Link,
+pub(super) struct Fixture {
+    pub(super) link: Link,
     _runtime: tokio::runtime::Runtime,
 }
 
 impl Fixture {
     fn new() -> Self {
+        Self::with_client(Gateway::new("http://127.0.0.1:9/").expect("client"))
+    }
+
+    pub(super) fn with_client(client: Gateway) -> Self {
         let key = (uuid::Uuid::new_v4().to_string(), "pcx:fixture:opencode:test".into());
-        let client = Gateway::new("http://127.0.0.1:9/").expect("client");
         let info = Info {
             api: 1,
             protocol: "opencode-http".into(),

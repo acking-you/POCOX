@@ -74,7 +74,7 @@ pub struct OpenCodeStatus {
     pub providers_connected: u32,
     /// Number of usable native models.
     pub models: u32,
-    /// An actual global default when the native API exposes one.
+    /// Captured custom default, or an authoritative native global selection.
     pub default_model: Option<String>,
     /// Visible primary agents.
     pub agents: Vec<String>,
@@ -82,12 +82,16 @@ pub struct OpenCodeStatus {
     pub problem: Option<String>,
 }
 impl OpenCodeStatus {
-    fn new(version: String, catalog: Result<Catalog, opencode::host::Error>) -> Self {
+    fn new(
+        version: String,
+        catalog: Result<Catalog, opencode::host::Error>,
+        default_model: Option<String>,
+    ) -> Self {
         let mut out = Self {
             version,
             providers_connected: 0,
             models: 0,
-            default_model: None,
+            default_model,
             agents: Vec::new(),
             problem: None,
         };
@@ -133,6 +137,13 @@ pub(super) struct Relaunch {
     pub(super) incarnation: String,
 }
 impl Prepared {
+    fn default_model(&self) -> Option<String> {
+        self.provider
+            .endpoint
+            .as_ref()
+            .and_then(|endpoint| endpoint.model.clone())
+    }
+
     pub(super) fn binary(&self) -> String {
         self.launch.program.display().to_string()
     }
@@ -222,7 +233,11 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
         let pid = server.pid;
         Ok::<_, anyhow::Error>((Host::new(server).await?, pid))
     })?;
-    let mut status = OpenCodeStatus::new(host.info().version, rt.block_on(host.catalog(None)));
+    let mut status = OpenCodeStatus::new(
+        host.info().version,
+        rt.block_on(host.catalog(None)),
+        prepared.default_model(),
+    );
     status.problem = status
         .problem
         .or_else(|| prepared.discovery_problem.clone());
@@ -362,15 +377,18 @@ pub(super) fn stop_all(drained: bool) -> Vec<String> {
 /// changes a replacement host or erases its stop failure.
 pub fn refresh_catalog(name: &str) -> Result<()> {
     let name = super::host_names::canonical(name)?;
-    let host = hosts()
+    let (host, default_model) = hosts()
         .hosts
         .get(&name)
         .filter(|host| !host.stopped)
-        .map(|host| host.host.clone())
+        .map(|host| (host.host.clone(), host.prepared.default_model()))
         .ok_or_else(|| anyhow!("OpenCode host is not running"))?;
     let identity = host.info().identity;
-    let status =
-        OpenCodeStatus::new(host.info().version, runtime::runtime().block_on(host.catalog(None)));
+    let status = OpenCodeStatus::new(
+        host.info().version,
+        runtime::runtime().block_on(host.catalog(None)),
+        default_model,
+    );
     let mut registry = hosts();
     let current = registry
         .hosts

@@ -8,11 +8,12 @@ extension _SessionSetup on _AppSessionState {
   /// `watch: true` from `build` (so it rebuilds when the status resolves),
   /// `watch: false` from callbacks.
   bool _codexNeedsSetup({required bool watch}) {
-    // Only a provider whose sessions live on this device's Codex install
-    // (local rollouts) has a Codex login to set up.
-    if (!_caps.localSessions) return false;
+    // Only a Codex app-server uses Codex's login. Native OpenCode (its own
+    // sign-ins) and ACP agents never depend on it, whatever else they share
+    // with Codex (local session history, for one).
+    if (_caps.engine != 'codex') return false;
     final host = _localHost(watch: watch);
-    if (host == null) return false;
+    if (host == null || !host.isCodex) return false;
     // Launched with its own provider, the host does not use Codex's own
     // setup at all.
     if (host.configSource == 'custom') return false;

@@ -146,6 +146,10 @@ extension _SessionKeyboard on _AppSessionState {
         pressed.contains(LogicalKeyboardKey.metaRight);
   }
 
+  /// The command list of the shown view's project.
+  ({String service, String? project}) get _commandsKey =>
+      (service: widget.serviceKey, project: _catalogProject);
+
   /// The commands the `/` list offers for the draft now; empty when it is
   /// closed.
   List<AgentCommand> _paletteMatches() {
@@ -155,9 +159,7 @@ extension _SessionKeyboard on _AppSessionState {
     final text = _input.text;
     final query = commandQuery(text);
     if (query == null || text == _paletteDismissed) return const [];
-    final commands = ref
-        .read(agentCommandsProvider(widget.serviceKey))
-        .valueOrNull;
+    final commands = ref.read(agentCommandsProvider(_commandsKey)).valueOrNull;
     if (commands == null) return const [];
     return filterCommands(commands, query);
   }
@@ -215,7 +217,7 @@ extension _SessionKeyboard on _AppSessionState {
   Widget _commandPalette() {
     if (!_caps.commands) return const SizedBox.shrink();
     // Read once the list is wanted; kept while the view watches it.
-    ref.watch(agentCommandsProvider(widget.serviceKey));
+    ref.watch(agentCommandsProvider(_commandsKey));
     return ListenableBuilder(
       listenable: _input,
       builder: (context, _) {

@@ -247,7 +247,20 @@ pub fn app_thread_metadata(service_key: String, thread_id: String) -> Result<Thr
 
 /// List the models the app-server offers.
 pub fn app_model_list(service_key: String) -> Result<Vec<ModelInfoDto>> {
-    let models = engine(&service_key).model_list(&service_key)?;
+    app_model_list_for_project(service_key, None)
+}
+
+/// List native project models; other engines retain their existing catalog.
+pub fn app_model_list_for_project(
+    service_key: String,
+    directory: Option<String>,
+) -> Result<Vec<ModelInfoDto>> {
+    let models = if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode
+    {
+        crate::engine::opencode::models_for_project(&service_key, directory.as_deref())?
+    } else {
+        engine(&service_key).model_list(&service_key)?
+    };
     Ok(models
         .into_iter()
         .map(|m| ModelInfoDto {

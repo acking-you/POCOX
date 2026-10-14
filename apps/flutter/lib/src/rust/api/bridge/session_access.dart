@@ -43,6 +43,15 @@ Future<List<AgentCommandDto>> appCommandList({required String serviceKey}) =>
       serviceKey: serviceKey,
     );
 
+/// List commands from the selected project without creating a session.
+Future<List<AgentCommandDto>> appCommandListForProject({
+  required String serviceKey,
+  String? directory,
+}) => RustLib.instance.api.crateApiBridgeSessionAccessAppCommandListForProject(
+  serviceKey: serviceKey,
+  directory: directory,
+);
+
 /// Positive holder evidence without command lines or environments.
 class AccessHolderDto {
   /// Observed client family.

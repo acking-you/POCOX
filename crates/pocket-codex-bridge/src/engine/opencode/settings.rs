@@ -11,24 +11,44 @@ pub(super) fn settings(service: &str, session: &str) -> Option<Value> {
     let snapshot = link
         .commit(&identity, |view| view.sessions.get(session).cloned())
         .ok()?;
+    let snapshot = if snapshot.is_none() && !session.is_empty() {
+        let snapshot = block(link.client.snapshot(session, None)).ok()?;
+        validate_snapshot(&identity, &snapshot).ok()?;
+        if snapshot.session.id != session {
+            return None;
+        }
+        Some(snapshot)
+    } else {
+        snapshot
+    };
     let directory = snapshot.as_ref().map(|s| s.session.directory.as_str());
     let catalog = block(link.client.catalog(directory, &identity)).ok()?;
     link.commit(&identity, |_| ()).ok()?;
+    Some(project_settings(&catalog, snapshot.as_ref()))
+}
+
+/// Read draft choices for the selected project without creating a session.
+pub fn draft_settings(service: &str, directory: Option<&str>) -> Option<Value> {
+    let catalog = super::catalog(service, directory).ok()?;
+    Some(project_settings(&catalog, None))
+}
+
+fn project_settings(catalog: &Catalog, snapshot: Option<&Snapshot>) -> Value {
     let selected = snapshot
         .as_ref()
         .map(|s| s.options.clone())
         .unwrap_or_default();
     let model = selected.model.as_ref();
-    let variants:Vec<_>=catalog.models.iter().filter(|m|session.is_empty() || model==Some(&m.key()))
+    let variants:Vec<_>=catalog.models.iter().filter(|m|snapshot.is_none() || model==Some(&m.key()))
         .map(|m|json!({"group":m.key(),"name":m.key(),"options":
             std::iter::once(json!({"value":"","name":"Default"})).chain(m.variants.iter().map(|v|json!({"value":v,"name":v}))).collect::<Vec<_>>()})).collect();
-    Some(json!({"runningTurnId":snapshot.as_ref().and_then(|s|s.turn_id.as_ref()),"configOptions":[
+    json!({"runningTurnId":snapshot.as_ref().and_then(|s|s.turn_id.as_ref()),"configOptions":[
         {"id":"model","name":"Model","category":"model","currentValue":model.cloned().unwrap_or_default(),
          "options":std::iter::once(json!({"value":"","name":"Inherited"})).chain(catalog.models.iter().map(|m|json!({"value":m.key(),"name":m.name,"description":m.provider_name}))).collect::<Vec<_>>()},
         {"id":"agent","name":"Agent","category":"mode","currentValue":selected.agent.unwrap_or_default(),
          "options":std::iter::once(json!({"value":"","name":"Default"})).chain(catalog.agents.iter().map(|a|json!({"value":a.name,"name":a.name,"description":a.description}))).collect::<Vec<_>>()},
         {"id":"variant","name":"Variant","category":"thought_level","currentValue":selected.variant.unwrap_or_default(),"options":variants}
-    ]}))
+    ]})
 }
 
 pub(super) fn set(service: &str, session: &str, id: &str, value: &str) -> Result<()> {

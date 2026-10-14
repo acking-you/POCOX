@@ -310,6 +310,24 @@ abstract interface class BridgeApi {
   /// The ACP agent's latest per-session state (no network), or `null`.
   SessionSettings? appSessionSettings(String serviceKey, String threadId);
 
+  /// Session [threadId]'s current state, read again from the host where the
+  /// engine has to ask it (native OpenCode reads its catalog over HTTP), or
+  /// `null`. Other engines answer as [appSessionSettings].
+  Future<SessionSettings?> appSessionSettingsRefresh(
+    String serviceKey,
+    String threadId,
+  );
+
+  /// The options a new session in [directory] would start with, for an
+  /// engine whose options exist before its session
+  /// ([AppCapabilities.draftOptions]); `null` when there are none. Native
+  /// OpenCode reads that project's catalog; other engines answer as
+  /// [appSessionSettings] with an empty thread id.
+  Future<SessionSettings?> appDraftSessionSettings(
+    String serviceKey,
+    String? directory,
+  );
+
   /// Set an ACP select option to one of its advertised values.
   Future<void> appSetSessionConfig(
     String serviceKey,
@@ -401,6 +419,13 @@ abstract interface class BridgeApi {
 
   /// List the models the app-server offers.
   Future<List<ModelInfo>> appModelList(String serviceKey);
+
+  /// The models offered in project [directory]. Native OpenCode reads that
+  /// project's catalog; other engines answer as [appModelList].
+  Future<List<ModelInfo>> appModelListForProject(
+    String serviceKey,
+    String? directory,
+  );
 
   /// Read the account rate-limit / quota snapshot as raw JSON (5h + weekly
   /// windows). Parsed on the Dart side since the shape is nested and volatile.
@@ -663,6 +688,13 @@ abstract interface class BridgeApi {
   /// Native slash commands of the engine behind [serviceKey]
   /// ([AppCapabilities.commands]).
   Future<List<AgentCommand>> appCommandList(String serviceKey);
+
+  /// Native slash commands offered in project [directory]. Native OpenCode
+  /// reads that project's list; other engines answer as [appCommandList].
+  Future<List<AgentCommand>> appCommandListForProject(
+    String serviceKey,
+    String? directory,
+  );
 
   /// Upload a document/file attachment to the host behind [serviceKey] (over
   /// its meta tunnel — loopback when this app is the host). Returns the

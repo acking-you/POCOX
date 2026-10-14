@@ -87,6 +87,17 @@ mixin _FakeHostSessions on _FakeBridgeState {
   }
 
   @override
+  Future<List<AgentCommand>> appCommandListForProject(
+    String serviceKey,
+    String? directory,
+  ) async {
+    commandListProjects.add(directory);
+    final listed = projectCommands['$serviceKey|${directory ?? ''}'];
+    await projectCommandGates[directory]?.future;
+    return listed ?? await appCommandList(serviceKey);
+  }
+
+  @override
   Future<NativeSessionList> appNativeSessions(
     String provider, {
     String? cursor,

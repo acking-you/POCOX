@@ -226,6 +226,31 @@ mixin _FakeConnection on _FakeBridgeState {
       sessionSettings['$serviceKey|$threadId'];
 
   @override
+  Future<SessionSettings?> appSessionSettingsRefresh(
+    String serviceKey,
+    String threadId,
+  ) async {
+    sessionSettingsRefreshCalls.add(threadId);
+    // Read when asked: an answer held by the gate is what the host had then.
+    final settings = appSessionSettings(serviceKey, threadId);
+    await sessionSettingsRefreshGate?.future;
+    return settings;
+  }
+
+  @override
+  Future<SessionSettings?> appDraftSessionSettings(
+    String serviceKey,
+    String? directory,
+  ) async {
+    draftSettingsProjects.add(directory);
+    final settings =
+        draftSettings['$serviceKey|${directory ?? ''}'] ??
+        appSessionSettings(serviceKey, '');
+    await draftSettingsGates[directory]?.future;
+    return settings;
+  }
+
+  @override
   Future<void> appSetSessionConfig(
     String serviceKey,
     String threadId,

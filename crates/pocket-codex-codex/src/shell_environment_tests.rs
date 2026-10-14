@@ -105,6 +105,54 @@ fn assert_stopped(pid_file: &Path) {
     }
 }
 
+fn ready_startup_probe(shell: &Path, root: &Path) -> Probe {
+    let child = Command::new(shell)
+        .args(["-ilc", "exit 0"])
+        .env_clear()
+        .envs(environment(root))
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .process_group(0)
+        .spawn()
+        .expect("startup probe");
+    let probe = Probe(child);
+    // Test cleanup after startup separately from the scheduler's launch latency.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if fs::read_to_string(root.join("child.pid"))
+            .ok()
+            .is_some_and(|pid| pid.trim().parse::<u32>().is_ok())
+        {
+            return probe;
+        }
+        assert!(Instant::now() < deadline, "startup child did not become ready");
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn assert_probe_times_out(mut probe: Probe) {
+    let start = Instant::now();
+    let result = probe.wait(Duration::from_millis(100));
+    assert!(result
+        .expect_err("timeout")
+        .to_string()
+        .contains("timed out"));
+    assert!(start.elapsed() < Duration::from_secs(2));
+    drop(probe);
+}
+
+#[test]
+fn path_probe_timeout_does_not_require_startup_to_finish() {
+    let root = tempfile::tempdir().expect("tempdir");
+    let shell = script(root.path(), "shell", "exec /bin/sleep 60");
+    let result = resolve_path(&shell, &environment(root.path()), None, Duration::ZERO);
+    assert!(result
+        .expect_err("timeout")
+        .to_string()
+        .contains("timed out"));
+}
+
 #[test]
 fn timeout_kills_foreground_and_background_startup_children_only() {
     let root = tempfile::tempdir().expect("tempdir");
@@ -122,14 +170,7 @@ fn timeout_kills_foreground_and_background_startup_children_only() {
         "echo $$ > \"$HOME/child.pid\"\ntrap '' TERM\nwhile :; do :; done",
     ] {
         let shell = script(root.path(), "shell", body);
-        let start = Instant::now();
-        let result =
-            resolve_path(&shell, &environment(root.path()), None, Duration::from_millis(500));
-        assert!(result
-            .expect_err("timeout")
-            .to_string()
-            .contains("timed out"));
-        assert!(start.elapsed() < Duration::from_secs(2));
+        assert_probe_times_out(ready_startup_probe(&shell, root.path()));
         assert_stopped(&root.path().join("child.pid"));
         assert!(sentinel.0.try_wait().expect("sentinel status").is_none());
         fs::remove_file(root.path().join("child.pid")).expect("remove pid");
@@ -175,7 +216,7 @@ fn real_zsh_startup_is_isolated_and_its_blocked_child_is_terminated() {
     assert_eq!(std::env::split_paths(&path).next(), Some(root.path().join("custom node")));
     fs::write(root.path().join(".zshrc"), "/bin/sleep 60 &\necho $! > \"$HOME/child.pid\"\nwait\n")
         .expect("blocking zshrc");
-    assert!(resolve_path(zsh, &environment(root.path()), None, Duration::from_millis(500)).is_err());
+    assert_probe_times_out(ready_startup_probe(zsh, root.path()));
     assert_stopped(&root.path().join("child.pid"));
 }
 

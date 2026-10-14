@@ -396,9 +396,10 @@ extension _SessionComposer on _AppSessionState {
               Expanded(
                 child: Align(
                   alignment: Alignment.centerRight,
-                  // A model catalog exists only where the protocol has one;
-                  // an ACP agent's own per-session options replace it.
-                  child: _caps.modelCatalog
+                  // The model menu exists only where the protocol has a
+                  // catalog and no per-session options; an agent's own
+                  // options (ACP, native OpenCode) replace it.
+                  child: _usesModelMenu
                       ? _modelChip(l10n)
                       : AgentSessionOptions(
                           settings: _agentSettings,

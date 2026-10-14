@@ -84,43 +84,32 @@ mixin _RustThreads implements BridgeApi {
       frb.appRunningThreads(serviceKey: serviceKey);
 
   @override
-  SessionSettings? appSessionSettings(String serviceKey, String threadId) {
-    final s = frb.appSessionSettings(
+  SessionSettings? appSessionSettings(String serviceKey, String threadId) =>
+      _sessionSettings(
+        frb.appSessionSettings(serviceKey: serviceKey, threadId: threadId),
+      );
+
+  @override
+  Future<SessionSettings?> appSessionSettingsRefresh(
+    String serviceKey,
+    String threadId,
+  ) async => _sessionSettings(
+    await frb.appSessionSettingsRefresh(
       serviceKey: serviceKey,
       threadId: threadId,
-    );
-    if (s == null) return null;
-    return SessionSettings(
-      configOptions: [
-        for (final o in s.configOptions)
-          SessionConfigOption(
-            id: o.id,
-            name: o.name,
-            category: o.category,
-            description: o.description,
-            currentValue: o.currentValue,
-            values: [
-              for (final v in o.values)
-                SessionConfigValue(
-                  value: v.value,
-                  name: v.name,
-                  group: v.group,
-                  description: v.description,
-                ),
-            ],
-          ),
-      ],
-      currentMode: s.currentMode,
-      modes: [
-        for (final m in s.modes)
-          SessionMode(id: m.id, name: m.name, description: m.description),
-      ],
-      usageUsed: s.usageUsed?.toInt(),
-      usageSize: s.usageSize?.toInt(),
-      running: s.running,
-      cancelRequested: s.cancelRequested,
-    );
-  }
+    ),
+  );
+
+  @override
+  Future<SessionSettings?> appDraftSessionSettings(
+    String serviceKey,
+    String? directory,
+  ) async => _sessionSettings(
+    await frb.appDraftSessionSettings(
+      serviceKey: serviceKey,
+      directory: directory,
+    ),
+  );
 
   @override
   Future<void> appSetSessionConfig(
@@ -176,23 +165,17 @@ mixin _RustThreads implements BridgeApi {
   );
 
   @override
-  Future<List<ModelInfo>> appModelList(String serviceKey) async {
-    final list = await frb.appModelList(serviceKey: serviceKey);
-    return list
-        .map(
-          (m) => ModelInfo(
-            id: m.id,
-            displayName: m.displayName,
-            description: m.description,
-            supportedReasoningEfforts: m.supportedReasoningEfforts,
-            defaultReasoningEffort: m.defaultReasoningEffort,
-            supportedServiceTiers: m.supportedServiceTiers,
-            defaultServiceTier: m.defaultServiceTier,
-            isDefault: m.isDefault,
-          ),
-        )
-        .toList();
-  }
+  Future<List<ModelInfo>> appModelList(String serviceKey) async =>
+      (await frb.appModelList(serviceKey: serviceKey)).map(_model).toList();
+
+  @override
+  Future<List<ModelInfo>> appModelListForProject(
+    String serviceKey,
+    String? directory,
+  ) async => (await frb.appModelListForProject(
+    serviceKey: serviceKey,
+    directory: directory,
+  )).map(_model).toList();
 
   @override
   Future<String> appThreadStart(
@@ -425,6 +408,51 @@ mixin _RustThreads implements BridgeApi {
     answersJson: answersJson,
   );
 }
+
+SessionSettings? _sessionSettings(frb.SessionSettingsDto? s) {
+  if (s == null) return null;
+  return SessionSettings(
+    configOptions: [
+      for (final o in s.configOptions)
+        SessionConfigOption(
+          id: o.id,
+          name: o.name,
+          category: o.category,
+          description: o.description,
+          currentValue: o.currentValue,
+          values: [
+            for (final v in o.values)
+              SessionConfigValue(
+                value: v.value,
+                name: v.name,
+                group: v.group,
+                description: v.description,
+              ),
+          ],
+        ),
+    ],
+    currentMode: s.currentMode,
+    modes: [
+      for (final m in s.modes)
+        SessionMode(id: m.id, name: m.name, description: m.description),
+    ],
+    usageUsed: s.usageUsed?.toInt(),
+    usageSize: s.usageSize?.toInt(),
+    running: s.running,
+    cancelRequested: s.cancelRequested,
+  );
+}
+
+ModelInfo _model(frb.ModelInfoDto m) => ModelInfo(
+  id: m.id,
+  displayName: m.displayName,
+  description: m.description,
+  supportedReasoningEfforts: m.supportedReasoningEfforts,
+  defaultReasoningEffort: m.defaultReasoningEffort,
+  supportedServiceTiers: m.supportedServiceTiers,
+  defaultServiceTier: m.defaultServiceTier,
+  isDefault: m.isDefault,
+);
 
 ThreadHistory _history(frb.ThreadHistoryDto h) => ThreadHistory(
   items: h.items.map(_item).toList(),

@@ -75,10 +75,8 @@ pub fn release(service: &str, snapshot: &SessionAccess) -> Result<SessionAccess>
 }
 
 /// Public native command names, with no templates or implementation settings.
-pub fn commands(service: &str) -> Result<Vec<Command>> {
-    let link = conn(service)?;
-    let commands = lock(&link.shared).catalog.commands.clone();
-    Ok(commands)
+pub fn commands(service: &str, directory: Option<&str>) -> Result<Vec<Command>> {
+    Ok(super::catalog(service, directory)?.commands)
 }
 
 pub(super) fn start(service: &str, options: StartOptions) -> Result<String> {

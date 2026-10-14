@@ -3,8 +3,12 @@ part of '../app_session_screen.dart';
 /// Session options of an unsent draft, for an engine whose options exist
 /// before its session ([AppCapabilities.draftOptions], native OpenCode).
 ///
-/// The service's defaults for a new session are read with an empty thread
-/// id; the draft keeps its own choices over them ([_ComposerDraft.options]).
+/// The service's defaults for a new session in the draft's project are read
+/// without a session ([BridgeApi.appDraftSessionSettings], asynchronously:
+/// see [_SessionNativeSettings]): OpenCode offers each project its own
+/// models and agents. The draft keeps its own choices
+/// over them ([_ComposerDraft.options]); drafts are per project, so a choice
+/// made in one project is never shown or applied in another.
 /// Nothing is sent for a choice until the draft's first send creates its
 /// session: the choices are applied to that session, then the message is
 /// sent. A host-wide default is never changed from here.
@@ -19,14 +23,20 @@ extension _SessionDraftOptions on _AppSessionState {
       '#draft:${identityHashCode(draft)}';
 
   /// After this frame, read the shown draft's options when what they depend
-  /// on (the draft, the capabilities and their host generation) changed
-  /// since they were last read. Such a draft opens no session ahead, so
-  /// nothing else reads them when the view first shows it or when the
-  /// capabilities are negotiated. Only reads: nothing is sent.
+  /// on (the draft and its project, the capabilities and their host
+  /// generation) changed since they were last read. Such a draft opens no
+  /// session ahead, so nothing else reads them when the view first shows it
+  /// or when the capabilities are negotiated. Only reads: nothing is sent.
   void _scheduleDraftOptionsCheck() {
     if (!_editsDraftOptions) return;
     final caps = _caps;
-    final key = (_draft, _capsEpoch, caps.negotiated, caps.generation);
+    final key = (
+      _draft,
+      _draft.project,
+      _capsEpoch,
+      caps.negotiated,
+      caps.generation,
+    );
     if (key == _draftOptionsKey) return;
     _draftOptionsKey = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -46,9 +56,6 @@ extension _SessionDraftOptions on _AppSessionState {
       defaultName: AppLocalizations.of(context).draftOptionDefault,
     );
   }
-
-  SessionSettings? _draftBase() =>
-      ref.read(bridgeApiProvider).appSessionSettings(widget.serviceKey, '');
 
   /// Record [value] for option [configId] in the draft [target] names. What
   /// the draft shows is what its first send applies: choosing the value an
@@ -72,13 +79,14 @@ extension _SessionDraftOptions on _AppSessionState {
       return;
     }
     final next = draftChoiceAfter(base, draft.options, configId, value);
+    // Shown from the defaults already read: a choice needs no host read.
     _updateState(() {
       draft.options
         ..clear()
         ..addAll(next);
+      _agentSettings = _draftSettings();
     });
     _drafts.save(draft, changed: true);
-    _refreshAgentSettings();
   }
 
   /// Apply [draft]'s choices to [thread], the session its first send just
@@ -97,35 +105,42 @@ extension _SessionDraftOptions on _AppSessionState {
     bool Function() sameLink,
   ) async {
     if (draft.options.isEmpty) return;
-    final base = ref.read(bridgeApiProvider).appSessionSettings(service, '');
-    final categories = {
-      for (final option in base?.configOptions ?? const <SessionConfigOption>[])
-        option.id: option.category,
-    };
-    int rank(String id) => switch (categories[id]) {
-      'model' => 0,
-      'thought_level' => 1,
-      _ => 2,
-    };
-    // Only what the draft shows is applied: a choice the current catalog no
-    // longer offers (the host was replaced with another configuration) is
-    // shown as the default, so it is dropped rather than applied.
-    final shown = base == null
-        ? null
-        : {
-            for (final o in draftSessionSettings(
-              base,
-              draft.options,
-            ).configOptions)
-              o.id: o.currentValue,
-          };
-    final choices =
-        draft.options.entries
-            .where((e) => shown == null || shown[e.key] == e.value)
-            .toList()
-          ..sort((a, b) => rank(a.key).compareTo(rank(b.key)));
     final api = ref.read(bridgeApiProvider);
     try {
+      // The defaults of the project the session was created in: the
+      // draft's. An unreadable answer filters nothing (the host validates).
+      SessionSettings? base;
+      try {
+        base = await api.appDraftSessionSettings(service, draft.project);
+      } catch (_) {}
+      if (!sameLink()) throw const _LinkMoved();
+      final categories = {
+        for (final option
+            in base?.configOptions ?? const <SessionConfigOption>[])
+          option.id: option.category,
+      };
+      int rank(String id) => switch (categories[id]) {
+        'model' => 0,
+        'thought_level' => 1,
+        _ => 2,
+      };
+      // Only what the draft shows is applied: a choice the current catalog
+      // no longer offers (the host was replaced with another configuration)
+      // is shown as the default, so it is dropped rather than applied.
+      final shown = base == null
+          ? null
+          : {
+              for (final o in draftSessionSettings(
+                base,
+                draft.options,
+              ).configOptions)
+                o.id: o.currentValue,
+            };
+      final choices =
+          draft.options.entries
+              .where((e) => shown == null || shown[e.key] == e.value)
+              .toList()
+            ..sort((a, b) => rank(a.key).compareTo(rank(b.key)));
       for (final MapEntry(key: id, value: value) in choices) {
         try {
           await api.appSetSessionConfig(service, thread, id, value);

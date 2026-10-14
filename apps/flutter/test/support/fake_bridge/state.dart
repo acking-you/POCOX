@@ -660,6 +660,35 @@ abstract class _FakeBridgeState implements BridgeApi {
 
   /// Every [appModelList] call's service key.
   final List<String> modelListServices = [];
+
+  /// Per-project model lists (`service|directory`) of
+  /// [appModelListForProject]; without one it answers as [appModelList].
+  final Map<String, List<ModelInfo>> projectModelLists = {};
+
+  /// Holds [appModelListForProject] answers for a directory until completed.
+  final Map<String?, Completer<void>> projectModelListGates = {};
+
+  /// Every [appModelListForProject] call's directory.
+  final List<String?> modelListProjects = [];
+
+  /// Per-project draft defaults (`service|directory`) of
+  /// [appDraftSessionSettings]; without one it answers as
+  /// [appSessionSettings] with an empty thread id.
+  final Map<String, SessionSettings> draftSettings = {};
+
+  /// Every [appDraftSessionSettings] call's directory.
+  final List<String?> draftSettingsProjects = [];
+
+  /// Holds [appDraftSessionSettings] answers for a directory until
+  /// completed (each answers what was seeded when it was asked).
+  final Map<String?, Completer<void>> draftSettingsGates = {};
+
+  /// Every [appSessionSettingsRefresh] call's thread id.
+  final List<String> sessionSettingsRefreshCalls = [];
+
+  /// Holds [appSessionSettingsRefresh] answers until completed (each
+  /// answers what was seeded when it was asked).
+  Completer<void>? sessionSettingsRefreshGate;
   Completer<void>? modelListGate;
   Completer<void>? configReadGate;
 
@@ -715,6 +744,17 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// What [appCommandList] reports, and its calls.
   List<AgentCommand> agentCommands = const [];
   final List<String> commandListCalls = [];
+
+  /// Per-project commands (`service|directory`) of
+  /// [appCommandListForProject]; without one it answers as [appCommandList].
+  final Map<String, List<AgentCommand>> projectCommands = {};
+
+  /// Holds [appCommandListForProject] answers for a directory until
+  /// completed.
+  final Map<String?, Completer<void>> projectCommandGates = {};
+
+  /// Every [appCommandListForProject] call's directory.
+  final List<String?> commandListProjects = [];
 
   /// Optional failure thrown by [appThreadResume].
   Object? appThreadResumeError;
