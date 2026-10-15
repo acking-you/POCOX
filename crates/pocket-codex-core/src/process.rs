@@ -779,10 +779,12 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("dir");
         let codex = dir.join("codex");
         copy_fake_codex(&codex);
-        let port = free_port();
-        let url = format!("ws://127.0.0.1:{port}");
         // Someone else's server: this test process, not in the child's tree.
-        let foreign = std::net::TcpListener::bind(("127.0.0.1", port)).expect("bind");
+        // Retain the port reservation: a dropped ephemeral listener can be
+        // reused by another parallel fixture before a second bind.
+        let foreign = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+        let port = foreign.local_addr().expect("addr").port();
+        let url = format!("ws://127.0.0.1:{port}");
         let mut ours = fake_codex(&codex, &url, false);
         let ours_started = started(ours.id());
         let deadline = std::time::Instant::now() + Duration::from_secs(5);

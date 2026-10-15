@@ -28,11 +28,23 @@ pub fn liveness(service: &str, session: &str) -> Result<SessionLiveness> {
 }
 
 /// Follow only this captured host/source and original ID until the UI leaves.
-pub async fn follow_session<F>(service: &str, session: &str, mut on_update: F) -> Result<()>
+pub async fn follow_session<F>(service: &str, session: &str, on_update: F) -> Result<()>
 where
     F: FnMut(SessionFollowUpdate) -> bool,
 {
     let link = conn(service)?;
+    follow_link(link, service, session, on_update).await
+}
+
+pub(super) async fn follow_link<F>(
+    link: Link,
+    service: &str,
+    session: &str,
+    mut on_update: F,
+) -> Result<()>
+where
+    F: FnMut(SessionFollowUpdate) -> bool,
+{
     let identity = link.identity();
     let mut updates = link.tx.subscribe();
     let mut tick = tokio::time::interval(Duration::from_secs(2));
@@ -52,7 +64,15 @@ where
                 while updates.try_recv().is_ok() {}
             },
         }
-        let snapshot = link.client.snapshot(session, None).await?;
+        let snapshot = match link.client.snapshot(session, None).await {
+            Ok(snapshot) => snapshot,
+            Err(error) => {
+                if events::deleted_session(&link, &identity, session, &error).await? {
+                    return Ok(());
+                }
+                return Err(error.into());
+            },
+        };
         if snapshot.session.id != session {
             bail!("OpenCode follow returned another session");
         }

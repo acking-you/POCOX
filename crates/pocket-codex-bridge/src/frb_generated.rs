@@ -997,15 +997,16 @@ fn wire__crate__api__bridge__session_config__app_draft_session_settings_impl(
             let api_directory = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::bridge::session_config::app_draft_session_settings(
-                            api_service_key,
-                            api_directory,
-                        ),
-                    )?;
-                    Ok(output_ok)
-                })())
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::session_config::app_draft_session_settings(
+                                api_service_key,
+                                api_directory,
+                            )?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )
@@ -2487,15 +2488,16 @@ fn wire__crate__api__bridge__session_config__app_session_settings_refresh_impl(
             let api_thread_id = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok(
-                        crate::api::bridge::session_config::app_session_settings_refresh(
-                            api_service_key,
-                            api_thread_id,
-                        ),
-                    )?;
-                    Ok(output_ok)
-                })())
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::session_config::app_session_settings_refresh(
+                                api_service_key,
+                                api_thread_id,
+                            )?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )

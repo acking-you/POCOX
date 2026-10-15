@@ -87,7 +87,7 @@ extension _SessionCapabilities on _AppSessionState {
       return;
     }
     final tid = _agentSessionThread;
-    final next = !_caps.sessionConfig || tid == null
+    final next = !_caps.sessionConfig || tid == null || _isDeleted(tid)
         ? null
         : ref
               .read(bridgeApiProvider)

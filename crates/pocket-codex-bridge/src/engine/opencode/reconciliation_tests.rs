@@ -60,7 +60,7 @@ fn deleted_session_is_removed_without_blocking_other_session_updates() {
             return (200, info());
         }
         if path.contains("ses_deleted") {
-            return (404, json!({"code":"native_request_failed"}));
+            return (404, json!({"code":"session_not_found"}));
         }
         let mut snapshot = tests::snapshot();
         snapshot.window.sequence = 9;
@@ -110,7 +110,7 @@ fn unavailable_or_replaced_host_never_looks_like_a_deleted_session() {
                 info["hostId"] = json!("replacement");
                 return (200, info);
             }
-            (status, json!({"code":"native_request_failed"}))
+            (status, json!({"code":"session_not_found"}))
         });
         let fixture = tests::Fixture::with_client(client);
         let link = &fixture.link;
@@ -120,6 +120,44 @@ fn unavailable_or_replaced_host_never_looks_like_a_deleted_session() {
             .block_on(events::refresh(link, &link.identity()))
             .is_err());
         assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
+    }
+}
+
+#[test]
+fn a_missing_native_subroute_never_deletes_a_session() {
+    let (client, _server) = server(|path| {
+        if path.ends_with("/info") {
+            return (200, info());
+        }
+        (404, json!({"code":"native_request_failed"}))
+    });
+    let fixture = tests::Fixture::with_client(client);
+    let link = &fixture.link;
+    let mut events = link.tx.subscribe();
+    link.accept(&link.identity(), tests::snapshot(), true)
+        .expect("valid test fixture");
+    assert!(runtime::runtime()
+        .block_on(events::refresh(link, &link.identity()))
+        .is_err());
+    assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
+    assert!(events.try_recv().is_err());
+}
+
+#[test]
+fn failed_settings_refresh_preserves_errors_and_cached_session() {
+    for cached in [false, true] {
+        let (client, _server) = server(|_| (503, json!({"code":"not_ready"})));
+        let fixture = tests::Fixture::with_client(client);
+        let link = &fixture.link;
+        if cached {
+            link.accept(&link.identity(), tests::snapshot(), true)
+                .expect("valid test fixture");
+        }
+        let error = settings::settings_for_link(link, "ses_fixture")
+            .expect_err("a failed snapshot or catalog read is not empty settings");
+        assert!(error.downcast_ref::<ClientError>().is_some());
+        assert_eq!(lock(&link.shared).sessions.contains_key("ses_fixture"), cached);
+        assert!(catalog_for_link(link, Some("/project")).is_err());
     }
 }
 
@@ -155,4 +193,98 @@ fn project_catalog_reads_never_reuse_the_connection_global_catalog() {
         assert_eq!(catalog.agents[0].name, project);
     }
     assert!(lock(&fixture.link.shared).catalog.models.is_empty());
+}
+
+#[test]
+fn access_detects_deletion_without_sse_including_uncached_sessions() {
+    for cached in [false, true] {
+        let (client, _server) = server(|path| {
+            if path.ends_with("/info") {
+                return (200, info());
+            }
+            (404, json!({"code":"session_not_found"}))
+        });
+        let fixture = tests::Fixture::with_client(client);
+        let link = &fixture.link;
+        let mut events = link.tx.subscribe();
+        if cached {
+            let mut released = tests::snapshot();
+            released.access.reason = "released_here".into();
+            link.accept(&link.identity(), released, true)
+                .expect("fixture");
+        }
+        let access = ops::access_for_link(link, "ses_fixture").expect("confirmed missing");
+        assert_eq!(access.reason, "not_found");
+        assert_eq!(access.mode, "blocked");
+        assert!(!access.recheck && !access.can_release);
+        assert!(!lock(&link.shared).sessions.contains_key("ses_fixture"));
+        assert!(lock(&link.shared).healthy);
+        let mut deleted = false;
+        while let Ok(event) = events.try_recv() {
+            deleted |=
+                event.kind == "thread/deleted" && event.thread_id.as_deref() == Some("ses_fixture");
+        }
+        assert!(deleted, "even a never-cached displayed session must close");
+    }
+}
+
+#[test]
+fn access_failure_or_replaced_host_preserves_session_and_error() {
+    for (status, code, replaced) in [
+        (404, "native_request_failed", false),
+        (503, "session_not_found", false),
+        (404, "session_not_found", true),
+    ] {
+        let (client, _server) = server(move |path| {
+            if path.ends_with("/info") {
+                let mut info = info();
+                if replaced {
+                    info["hostId"] = json!("replacement");
+                }
+                return (200, info);
+            }
+            (status, json!({"code":code}))
+        });
+        let fixture = tests::Fixture::with_client(client);
+        let link = &fixture.link;
+        let mut events = link.tx.subscribe();
+        link.accept(&link.identity(), tests::snapshot(), true)
+            .expect("fixture");
+        assert!(ops::access_for_link(link, "ses_fixture").is_err());
+        assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
+        assert!(events.try_recv().is_err());
+    }
+}
+
+#[test]
+fn follow_detects_external_deletion_without_an_sse_invalidation() {
+    let (client, _server) = server(|path| {
+        if path.ends_with("/info") {
+            return (200, info());
+        }
+        (404, json!({"code":"session_not_found"}))
+    });
+    let fixture = tests::Fixture::with_client(client);
+    let link = &fixture.link;
+    let mut events = link.tx.subscribe();
+    link.accept(&link.identity(), tests::snapshot(), true)
+        .expect("fixture");
+    runtime::runtime()
+        .block_on(async {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                follow::follow_link(link.clone(), "unused", "ses_fixture", |_| {
+                    panic!("deleted history is never delivered")
+                }),
+            )
+            .await
+        })
+        .expect("follow ends after the persisted read")
+        .expect("confirmed deletion is not a failed stream");
+    assert!(!lock(&link.shared).sessions.contains_key("ses_fixture"));
+    let mut deleted = false;
+    while let Ok(event) = events.try_recv() {
+        deleted |= event.kind == "thread/deleted";
+    }
+    assert!(deleted);
 }

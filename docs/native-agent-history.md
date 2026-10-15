@@ -71,7 +71,11 @@ and the view follows its answer.
   next step. Unsent drafts, attachments and queued messages stay; a queue is
   held, and when writing becomes possible the user is offered to send it.
 - **Blocked.** The session cannot be written here at all (`unsupported`,
-  `not_found`): the view stays read-only with the reason.
+  `not_found`): the view stays read-only with the reason. For OpenCode,
+  `not_found` also means deleted: from the host's event, or, for a deletion
+  by another process that sends no event, from an access check or follow
+  read the same host answers with `session_not_found`. The view then stays
+  terminal, with no Check now or Continue here.
 
 | Reason | Shown as | Next step |
 | --- | --- | --- |
@@ -79,9 +83,10 @@ and the view follows its answer.
 | `external_idle` | the named client still has the session open; no turn runs | close it there; an idle native Claude client still holds the session until it really closes or exits |
 | `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown) | close or release it there, then **Check now** |
 | `pocket_host` | another Pocket host writes it | **Open in <host>** only when that host's service key is known |
-| `transition` | the session is changing hands | wait; never taken as free |
+| `transition` | the session is changing hands | wait; never taken as free; a later free answer opens by itself only where the host keeps an admission (see `not_opened`) |
 | `host_stopped` | this host is not running | **Open host** for a local host |
 | `released_here` | handed back by this host | **Continue here** is the only way back |
+| `not_opened` | the host holds no admission for the session (OpenCode only: never opened there, or forgotten by a host restart or to make room) | **Check now** opens it when that fresh check finds no writer and no running turn; **Continue here**; background checks never open it |
 | `source_unknown` | the host cannot inspect other clients | **Check now** |
 
 Rules the UI keeps:
@@ -92,6 +97,18 @@ Rules the UI keeps:
 - While following, the view asks again every 3 s for the first minute and
   every 15 s afterwards, only in the foreground on the visible route, and the
   host may push `session/access/changed`; **Check now** asks immediately.
+- Background checks (the timer and host events) open a session only when the
+  host still keeps an admission for it and reports no other writer. An
+  explicit **Check now** additionally opens a `not_opened` session through a
+  fresh `appSessionOpen` when its own answer, asked after the press, reports
+  no writer and an idle turn. A session handed back here (`released_here`)
+  opens only through **Continue here**, whatever a check answers or has in
+  flight, and other blocked reasons stay read-only.
+- When a written view turns read-only, each host user message the view did
+  not show before replaces the earliest optimistic copy of its turn. Host
+  messages already shown confirm nothing, so reading the same history again
+  changes nothing and a message the host does not show yet stays. Matching is
+  by turn and host item ID, never by text, so a repeated message stays.
 - **Hand back to other clients** (the conversation menu) releases this
   host's writer and shows `released_here`; nothing reacquires that session
   by itself.

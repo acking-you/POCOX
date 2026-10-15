@@ -190,6 +190,45 @@ extension _SessionHistory on _AppSessionState {
     _cachedRows = null;
   }
 
+  /// Drop optimistic user messages (`local-user-*`) that [items], read from
+  /// the host, newly hold under the same turn: each host user message not
+  /// shown yet confirms the earliest local copy of its turn. One already
+  /// shown confirms nothing, so a repeated read drops nothing more and an
+  /// unconfirmed local copy stays. Identity is the turn and the host's item
+  /// id, never the text, so a repeated message stays. Call before splicing
+  /// [items].
+  void _dropHostHeldLocalPrompts(List<ThreadItem> items) {
+    final held = <String, int>{};
+    final seen = <String>{};
+    for (final item in items) {
+      if (item.itemType != 'userMessage' ||
+          item.turnId.isEmpty ||
+          item.id.isEmpty ||
+          // Never shown, so it would confirm again on every read.
+          isContextFragment(item.text) ||
+          _itemIndex.containsKey(item.id) ||
+          !seen.add(item.id)) {
+        continue;
+      }
+      held.update(item.turnId, (n) => n + 1, ifAbsent: () => 1);
+    }
+    if (held.isEmpty) return;
+    final before = _items.length;
+    _items.removeWhere((item) {
+      if (!item.isUser || !item.id.startsWith('local-user-')) return false;
+      final left = held[item.turnId] ?? 0;
+      if (left == 0) return false;
+      held[item.turnId] = left - 1;
+      return true;
+    });
+    if (_items.length == before) return;
+    _itemIndex.clear();
+    for (var i = 0; i < _items.length; i++) {
+      _itemIndex[_items[i].id] = i;
+    }
+    _cachedRows = null;
+  }
+
   /// Splice [items] into the transcript by turn order, skipping ids already
   /// present, and rebuild the id→index map.
   ///

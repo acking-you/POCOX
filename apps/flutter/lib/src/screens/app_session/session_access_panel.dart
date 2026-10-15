@@ -75,6 +75,14 @@ AccessView accessView(
       icon: Icons.output_rounded,
       tone: AccessTone.blocked,
     ),
+    'not_opened' => (
+      status: l10n.accessStatusNotOpen,
+      title: l10n.accessNotOpenedTitle,
+      detail: l10n.accessNotOpenedDetail,
+      next: null,
+      icon: Icons.inventory_2_outlined,
+      tone: AccessTone.blocked,
+    ),
     'transition' => (
       status: l10n.accessStatusChanging,
       title: l10n.accessTransitionTitle,

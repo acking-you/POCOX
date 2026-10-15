@@ -3294,6 +3294,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accessStatusHandedBack => 'Handed back';
 
   @override
+  String get accessStatusNotOpen => 'Not open here';
+
+  @override
   String get accessStatusChanging => 'Changing hands';
 
   @override
@@ -3311,6 +3314,18 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accessHandedBackDetail =>
       'This host closed its writer, so another app can continue the original session. Nothing is taken back by itself.';
+
+  @override
+  String get accessNotOpenedTitle =>
+      'This host is not keeping this session open';
+
+  @override
+  String get accessNotOpenedDetail =>
+      'The host holds no admission for it: it may never have been opened there, or the host restarted or let it go to make room. Nothing opens it by itself; Check now or Continue here opens it when nobody else writes it.';
+
+  @override
+  String get accessDeletedDetail =>
+      'It was deleted on the host. Your unsent draft and queued messages stay here.';
 
   @override
   String get accessTransitionTitle => 'This session is changing hands';
@@ -3381,11 +3396,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accessNextAutomatic =>
-      'This view continues here by itself when that changes.';
+      'When that changes, this view continues by itself if the host still keeps it open here; otherwise Check now opens it.';
 
   @override
   String get accessNextWhenClosed =>
-      'When nobody else holds it, this view continues here by itself.';
+      'When nobody else holds it, this view continues by itself if the host still keeps it open here; otherwise Check now opens it.';
 
   @override
   String accessHolderPid(int pid) {

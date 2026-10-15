@@ -147,18 +147,12 @@ pub(super) async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
     for session in sessions {
         let next = match link.client.snapshot(&session, None).await {
             Ok(snapshot) => snapshot,
-            Err(ClientError::Gateway {
-                status: 404,
-                code,
-            }) if code == "native_request_failed" => {
-                // A replacement listener must not erase the previous host's cache.
-                if &link.client.info().await?.identity != identity {
-                    bail!("the OpenCode host changed; reconnect");
+            Err(error) => {
+                if deleted_session(link, identity, &session, &error).await? {
+                    continue;
                 }
-                forget_deleted(link, identity, &session)?;
-                continue;
+                return Err(error.into());
             },
-            Err(error) => return Err(error.into()),
         };
         validate_snapshot(identity, &next)?;
         let old = link.commit(identity, |view| view.sessions.get(&session).cloned())?;
@@ -176,6 +170,25 @@ pub(super) async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
     Ok(())
 }
 
+/// Native events are process-local. Access and follow reads must also report
+/// a deletion by another process, even when this server emits no SSE change.
+pub(super) async fn deleted_session(
+    link: &Link,
+    identity: &Identity,
+    session: &str,
+    error: &ClientError,
+) -> Result<bool> {
+    if !matches!(error, ClientError::Gateway { status: 404, code } if code == "session_not_found") {
+        return Ok(false);
+    }
+    // A replacement listener must not erase the previous host's cache.
+    if &link.client.info().await?.identity != identity {
+        bail!("the OpenCode host changed; reconnect");
+    }
+    forget_deleted(link, identity, session)?;
+    Ok(true)
+}
+
 fn forget_deleted(link: &Link, identity: &Identity, session: &str) -> Result<()> {
     let old = link.commit(identity, |view| {
         view.bytes.remove(session);
@@ -183,8 +196,7 @@ fn forget_deleted(link: &Link, identity: &Identity, session: &str) -> Result<()>
         view.turn_pages.retain(|(id, _), _| id != session);
         view.sessions.remove(session)
     })?;
-    let Some(old) = old else { return Ok(()) };
-    for request in pending(&old, identity).keys() {
+    for request in pending_opt(old.as_ref(), identity).keys() {
         let _ = link.tx.send(projection::event(
             "serverRequest/resolved",
             Some(session),
@@ -196,7 +208,7 @@ fn forget_deleted(link: &Link, identity: &Identity, session: &str) -> Result<()>
         Some(session),
         json!({"sessionId":session,"admitted":false,"runningTurnId":null}),
     ));
-    if let Some(turn) = old.turn_id {
+    if let Some(turn) = old.and_then(|old| old.turn_id) {
         let _ = link.tx.send(projection::event(
             "turn/completed",
             Some(session),

@@ -350,6 +350,7 @@ async fn decode_bounded<T: DeserializeOwned>(
                         | "turn_changed"
                         | "invalid_input"
                         | "capacity"
+                        | "session_not_found"
                         | "native_request_failed"
                 )
             })

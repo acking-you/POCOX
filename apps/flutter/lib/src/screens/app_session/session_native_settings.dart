@@ -39,6 +39,8 @@ extension _SessionNativeSettings on _AppSessionState {
   Object? _nativeSettingsKey() {
     final target = _agentTarget();
     if (target == null) return null;
+    // A session the host deleted has no settings to read.
+    if (_isDeleted(target.thread)) return null;
     final draft = _agentSessionThread == null;
     return (
       target.service,

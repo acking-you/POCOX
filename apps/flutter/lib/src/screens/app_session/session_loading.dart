@@ -25,11 +25,18 @@ extension _SessionLoading on _AppSessionState {
       var mine = (widget.home || cwd == null || cwd.isEmpty)
           ? all
           : all.where((t) => t.cwd.trim() == cwd).toList();
+      // A session the host deleted stays out, even from a stale listing.
+      if (_deletedThreads.isNotEmpty) {
+        mine = [
+          for (final t in mine)
+            if (!_isDeleted(t.id)) t,
+        ];
+      }
       // Keep the freshly-started conversation visible even if `thread/list`
       // hasn't caught up with `thread/start` yet, so it doesn't flicker out of
       // the pane after the optimistic insert in [_send].
       final tid = _threadId;
-      if (tid != null && !mine.any((t) => t.id == tid)) {
+      if (tid != null && !_isDeleted(tid) && !mine.any((t) => t.id == tid)) {
         ThreadMeta? local;
         for (final t in _threads) {
           if (t.id == tid) {

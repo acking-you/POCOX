@@ -19,9 +19,29 @@ use super::{
 
 /// Inspect fresh writer evidence without acquiring a session.
 pub fn access(service: &str, session: &str) -> Result<SessionAccess> {
-    let link = conn(service)?;
+    access_for_link(&conn(service)?, session)
+}
+
+pub(super) fn access_for_link(link: &Link, session: &str) -> Result<SessionAccess> {
     let identity = link.identity();
-    let access = block(link.client.access(session))?;
+    let access = match runtime::runtime().block_on(link.client.access(session)) {
+        Ok(access) => access,
+        Err(error) => {
+            if !runtime::runtime()
+                .block_on(events::deleted_session(link, &identity, session, &error))?
+            {
+                return Err(error.into());
+            }
+            let mut access =
+                SessionAccess::unknown(session, &identity.host_id, identity.generation, "opencode");
+            access.source_generation = Some(identity.source_generation.clone());
+            access.mode = "blocked".into();
+            access.reason = "not_found".into();
+            access.writer = "none".into();
+            access.recheck = false;
+            access
+        },
+    };
     validate_access(&identity, &access, session)?;
     link.commit(&identity, |_| ())?;
     Ok(access)

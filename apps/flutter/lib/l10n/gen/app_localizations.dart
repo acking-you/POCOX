@@ -5798,6 +5798,12 @@ abstract class AppLocalizations {
   /// **'Handed back'**
   String get accessStatusHandedBack;
 
+  /// No description provided for @accessStatusNotOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Not open here'**
+  String get accessStatusNotOpen;
+
   /// No description provided for @accessStatusChanging.
   ///
   /// In en, this message translates to:
@@ -5833,6 +5839,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This host closed its writer, so another app can continue the original session. Nothing is taken back by itself.'**
   String get accessHandedBackDetail;
+
+  /// No description provided for @accessNotOpenedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This host is not keeping this session open'**
+  String get accessNotOpenedTitle;
+
+  /// No description provided for @accessNotOpenedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The host holds no admission for it: it may never have been opened there, or the host restarted or let it go to make room. Nothing opens it by itself; Check now or Continue here opens it when nobody else writes it.'**
+  String get accessNotOpenedDetail;
+
+  /// No description provided for @accessDeletedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It was deleted on the host. Your unsent draft and queued messages stay here.'**
+  String get accessDeletedDetail;
 
   /// No description provided for @accessTransitionTitle.
   ///
@@ -5939,13 +5963,13 @@ abstract class AppLocalizations {
   /// No description provided for @accessNextAutomatic.
   ///
   /// In en, this message translates to:
-  /// **'This view continues here by itself when that changes.'**
+  /// **'When that changes, this view continues by itself if the host still keeps it open here; otherwise Check now opens it.'**
   String get accessNextAutomatic;
 
   /// No description provided for @accessNextWhenClosed.
   ///
   /// In en, this message translates to:
-  /// **'When nobody else holds it, this view continues here by itself.'**
+  /// **'When nobody else holds it, this view continues by itself if the host still keeps it open here; otherwise Check now opens it.'**
   String get accessNextWhenClosed;
 
   /// No description provided for @accessHolderPid.

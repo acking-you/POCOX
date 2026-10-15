@@ -199,6 +199,7 @@ class AppSessionScreen extends ConsumerStatefulWidget {
     _AppSessionState._planByThread.clear();
     _AppSessionState._effortByThread.clear();
     _AppSessionState._catalogByService.clear();
+    _releasedHereThreads.clear();
   }
 
   /// The clipboard image read behind Ctrl/Cmd+V. A test seam: the plugin's
@@ -433,6 +434,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   List<ThreadMeta> _threads = const [];
   final Map<String, ThreadMeta> _discoveredThreads = {};
 
+  /// Sessions the host reported deleted (`thread/deleted`), by
+  /// [_threadKey]: never listed or opened again by this view.
+  final Set<String> _deletedThreads = {};
+
   /// Cold-open loads still waiting to succeed → attempts spent so far, plus
   /// each one's pending timer. A key present means "not settled yet"; the
   /// loader removes its key on success. See [_retryOpenLoad].
@@ -532,6 +537,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   Timer? _accessTimer;
   DateTime? _followSince;
   bool _accessChecking = false;
+  // Check now was pressed while an earlier check was still out.
+  bool _accessCheckAsked = false;
 
   /// The local operation (a send, a supplement, an answer) holding the
   /// composer's send lock. Each releases only its own hold, so a superseded
@@ -722,6 +729,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       if (!_caps.externalWriterMonitor) return;
       setState(() {
         for (final session in sessions) {
+          if (_isDeleted(session.threadId)) continue;
           _discoveredThreads[session.threadId] = ThreadMeta(
             id: session.threadId,
             preview: session.preview,

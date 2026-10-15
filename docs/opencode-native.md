@@ -145,8 +145,12 @@ the same session or draft keeps what is shown; options of another session,
 draft or project are never shown meanwhile. An answer for a view, project
 or connection that has since changed is dropped, and requests made while a
 read runs coalesce into one following read, so an older answer never
-replaces a newer choice. A send applies its draft's choices after reading
-that project's defaults again, before the message.
+replaces a newer choice. A read that fails (an unreachable host or
+gateway) is reported as a failure, not as empty settings: the same session
+or draft keeps what is shown, its menus and choices, and the next refresh
+asks again; another session, draft or project shows none of the previous
+one's. A send applies its draft's choices after reading that project's
+defaults again, before the message.
 
 ## Commands
 
@@ -190,24 +194,50 @@ OpenCode's events and status are process-local, and its TUI exposes no TCP
 server by default, so another OpenCode process on the same database cannot
 be observed per session: the host reports `external_source_open` and the
 view follows read-only until that process closes or releases the source and
-the user checks again. Quiet time never grants write access.
+the user checks again. A session this host never admitted then reports
+`not_opened`, so the recovery is the explicit **Check now**, not a background
+check. Quiet time never grants write access.
 
 The host retains admission state for at most 256 sessions. To open or
 create another it forgets one (released sessions first, then the least
 recently used), and only one that OpenCode reports idle with no pending
 permission or question; a running turn or unapplied options are never
-forgotten, and a pending request without a session ID fails the open as
-not ready rather than guess.
-A forgotten session, released or not, reports `not_opened`: it never
-regains write access by itself and must be opened again explicitly. When no
-session can be forgotten, the open or create fails.
+forgotten. Candidates are checked per project directory: a directory whose
+state cannot be verified (a failed status or request read, or a pending
+request without a valid session ID) is skipped and the next safe directory
+is tried; the open or create fails only when no directory is safe.
+A session the host holds no admission for reports `not_opened`: one it never
+admitted (for example while another process held the source), one it forgot
+here, or any session after the host restarted. It never regains write
+access by a background check. A view following it says the host is not
+keeping it open; **Check now** opens it afresh when that check finds no
+writer and no running turn, and **Continue here** opens it explicitly. A
+forgotten released session stays handed back until **Continue here**. Drafts
+and queues stay. Navigating to a session still opens it as before.
 
 When the bridge reconciles its open sessions and the host answers that one
-was deleted (a typed 404 from the current host identity), only that session
-leaves the controller: its pending requests are withdrawn, a running turn
-ends as failed, and the view is told the thread was deleted. The other
-sessions keep reconciling. Any other error, or a different host answering,
-remains a failure and the cache is kept.
+was deleted, only that session leaves the controller. Deletion needs a 404
+`session_not_found` from the session's own metadata route, answered by the
+current host identity; a 404 from an ancillary route
+(`native_request_failed`) keeps the cache like any other failure. Its
+pending requests are withdrawn, a running turn ends as failed, and the
+bridge sends `thread/deleted`. The conversation
+list drops it (a later listing that still names it does not bring it back);
+a view showing it stops following and checking it, shows that the session
+is no longer on the host, and opens it no more, while its unsent draft and
+queue stay in their slot. Nothing said about it afterwards (an answer still
+in flight, a turn, a request, an access change or a host refresh) acts on
+it: no access, open, history or settings read follows. The other sessions
+keep reconciling. Any other error, or a different host answering, remains a
+failure and the cache is kept.
+
+OpenCode's events are process-local, so a deletion by another process (for
+example the official CLI) sends nothing on this server's event stream. The
+same exact 404 answered to an access check or a follow read is therefore
+also a deletion, with the same withdrawal and `thread/deleted`: the access
+answer becomes `not_found`, blocked and not re-checked, and the follow ends.
+A replaced host identity answering instead is a reconnect error, not a
+deletion.
 
 ## Local history
 
@@ -218,10 +248,11 @@ continued by opening it on the running OpenCode host (**Continue in
 
 ## Verification
 
-On one Mac with installed OpenCode 1.19.0, the full Rust (823 passed, 24
-ignored) and Flutter (1516 passed, 5 skipped) suites passed with format,
-clippy and analysis, and a coherent macOS build was run against the user's
-real configuration, database and sign-ins. With this round's Rust:
+On one Mac with installed OpenCode 1.19.0, the full Rust (829 passed, 24
+ignored) and Flutter (1533 passed, 5 skipped, plus 127 focused) suites
+passed with format, clippy and analysis, and a coherent macOS build (source
+hash `4011bbdb…`) was run against the user's real configuration, database
+and sign-ins. With this round's Rust:
 
 - Three opt-in integration tests against a real `opencode serve` passed:
   source ownership (a second Pocket server is refused, another process
@@ -229,13 +260,28 @@ real configuration, database and sign-ins. With this round's Rust:
   the gateway's closed mutation routes, the host's live stream, options,
   permissions, questions, commands and cancellation, and a stopped host
   ending its controller event streams.
-- A real bridge lifecycle test covered local probing, catalog refresh in the
+- A real bridge lifecycle test (138 s) covered local probing, catalog refresh in the
   same incarnation, meta services, a prompt, release and reopen, the
   one-host-per-source rule, apply with original history kept, stop and quit.
-- Session retention, the deleted-session 404 and a `false` abort are covered
-  by tests only.
+- Session retention and a `false` abort are covered by tests only.
 
-In the current app build, with two real projects (Alpha, Beta) whose
+In the final app build, against the user's inherited host configuration and
+a disposable session:
+
+- With another OpenCode process holding the source, the session stayed
+  read-only (`external_source_open`). Once that process closed, the view did
+  not open it by itself; one **Check now** opened the original ID, and a
+  message there received a real reply.
+- **Release** showed the user's message once and offered only **Continue
+  here**. **Continue here** kept an unsent draft and sent nothing.
+- The official OpenCode CLI, in another process, deleted that session. The
+  view showed it as no longer on the host, with no Continue, Check, composer
+  or error, and its sidebar row was removed. Another original session still
+  received a real reply.
+- This covers desktop-local access and follow recovery only; no relay or
+  multi-device run was repeated. Only the disposable session was deleted.
+
+In an earlier build of this round, with two real projects (Alpha, Beta) whose
 OpenCode configurations give the same model ID different names and each
 their own agent and command:
 
@@ -252,7 +298,7 @@ their own agent and command:
   covered by tests only.
 
 These app checks ran on earlier builds of this branch and were not repeated
-on the current one:
+on the final one:
 
 - A send without a project (desktop Enter) opened the folder picker and
   showed nothing as sent; cancelling kept the draft; choosing the worktree

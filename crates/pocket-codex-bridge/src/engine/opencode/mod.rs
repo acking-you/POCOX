@@ -32,7 +32,7 @@ use pocket_codex_host_svc::opencode::{
     gateway::Gateway,
     host::{Identity, Info, Snapshot},
 };
-pub use settings::draft_settings;
+pub use settings::{draft_settings, refresh_settings};
 use tokio::{sync::broadcast, task::JoinHandle};
 
 use super::{

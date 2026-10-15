@@ -71,6 +71,14 @@ extension _SessionEvents on _AppSessionState {
     // BEFORE the other-thread guard below: a sidebar row's rename would
     // otherwise be dropped and the list would keep the old title until the
     // next reload (nothing polls `_loadThreads`).
+    // The host deleted a session: whichever it names leaves the list, and
+    // nothing said about it afterwards (a turn, a request, an access change)
+    // acts on it again.
+    if (e.kind == 'thread/deleted') {
+      if (e.threadId case final thread?) _onThreadDeleted(thread);
+      return;
+    }
+    if (e.threadId case final thread? when _isDeleted(thread)) return;
     if (e.kind == 'thread/name/updated') {
       _applyRemoteName(e);
       return;
@@ -127,6 +135,11 @@ extension _SessionEvents on _AppSessionState {
         _invalidateSummary(e.threadId);
       }
       return;
+    }
+    // A deleted conversation shown here takes no request, even one that
+    // names no thread.
+    if (_threadId case final shown? when _isDeleted(shown)) {
+      if (e.requestId != null || e.threadId != null) return;
     }
     // Server-initiated approval prompt (carries a request id to answer).
     if (e.requestId != null) {

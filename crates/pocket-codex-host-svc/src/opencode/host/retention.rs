@@ -42,21 +42,32 @@ async fn reserve_slot(
         candidates(&entries)
     };
     let mut checked = BTreeSet::new();
+    let mut unavailable = None;
     for (_, directory) in &candidates {
         if !checked.insert(directory) {
             continue;
         }
-        let (statuses, permissions, questions) = tokio::try_join!(
+        let state = tokio::try_join!(
             client.get::<Statuses>(&["session", "status"], Some(directory), &[]),
             client.get::<Vec<Value>>(&["permission"], Some(directory), &[]),
             client.get::<Vec<Value>>(&["question"], Some(directory), &[]),
-        )?;
+        );
+        let (statuses, permissions, questions) = match state {
+            Ok(state) => state,
+            Err(error) => {
+                // Unverifiable state protects this directory, not every other
+                // project's independently confirmed idle session.
+                unavailable.get_or_insert(Error::Native(error));
+                continue;
+            },
+        };
         if permissions
             .iter()
             .chain(&questions)
             .any(|request| request["sessionID"].as_str().is_none())
         {
-            return Err(Error::NotReady);
+            unavailable.get_or_insert(Error::NotReady);
+            continue;
         }
         for (id, candidate_directory) in &candidates {
             if candidate_directory != directory
@@ -86,7 +97,7 @@ async fn reserve_slot(
             return Ok(Some(id.clone()));
         }
     }
-    Err(Error::Capacity)
+    Err(unavailable.unwrap_or(Error::Capacity))
 }
 
 #[cfg(test)]
@@ -176,5 +187,80 @@ mod tests {
             .expect("valid test fixture")
             .is_none());
         server.abort();
+    }
+
+    #[tokio::test]
+    async fn an_unverifiable_directory_does_not_block_other_safe_candidates() {
+        use axum::{
+            extract::Query, http::StatusCode, response::IntoResponse, routing::get, Json, Router,
+        };
+        use serde_json::json;
+        for malformed in [false, true] {
+            let router = Router::new()
+                .route(
+                    "/session/status",
+                    get(move |Query(query): Query<BTreeMap<String, String>>| async move {
+                        if !malformed && query.get("directory").map(String::as_str) == Some("/bad")
+                        {
+                            return (StatusCode::SERVICE_UNAVAILABLE, Json(json!({})))
+                                .into_response();
+                        }
+                        Json(json!({})).into_response()
+                    }),
+                )
+                .route(
+                    "/permission",
+                    get(move |Query(query): Query<BTreeMap<String, String>>| async move {
+                        Json(
+                            if malformed
+                                && query.get("directory").map(String::as_str) == Some("/bad")
+                            {
+                                json!([{"id":"missing-session-id"}])
+                            } else {
+                                json!([])
+                            },
+                        )
+                    }),
+                )
+                .route("/question", get(|| async { Json(json!([])) }));
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+                .await
+                .expect("fixture");
+            let client = super::super::Client::new(
+                &format!("http://{}/", listener.local_addr().expect("fixture")),
+                None,
+            )
+            .expect("fixture");
+            let server = tokio::spawn(async move {
+                axum::serve(listener, router).await.expect("fixture");
+            });
+            let entries = tokio::sync::Mutex::new(
+                (0..LIMIT)
+                    .map(|n| {
+                        (format!("{n:03}"), Entry {
+                            directory: if n == 0 { "/bad" } else { "/good" }.into(),
+                            ..Entry::default()
+                        })
+                    })
+                    .collect(),
+            );
+            assert_eq!(
+                reserve_slot(&client, &entries, None)
+                    .await
+                    .expect("healthy project provides room")
+                    .as_deref(),
+                Some("001")
+            );
+            let mut remaining = entries.lock().await;
+            assert!(remaining.contains_key("000"), "unverifiable entry stays protected");
+            remaining.insert("001".into(), Entry::default());
+            for entry in remaining.values_mut() {
+                entry.directory = "/bad".into();
+            }
+            drop(remaining);
+            assert!(reserve_slot(&client, &entries, None).await.is_err());
+            assert_eq!(entries.lock().await.len(), LIMIT, "no unverified eviction");
+            server.abort();
+        }
     }
 }

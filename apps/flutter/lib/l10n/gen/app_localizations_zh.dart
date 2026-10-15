@@ -3126,6 +3126,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accessStatusHandedBack => '已交还';
 
   @override
+  String get accessStatusNotOpen => '未在这里打开';
+
+  @override
   String get accessStatusChanging => '正在交接';
 
   @override
@@ -3142,6 +3145,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accessHandedBackDetail => '这个主机已关闭它的写入方，其他应用可以继续原会话。不会自动收回。';
+
+  @override
+  String get accessNotOpenedTitle => '这个主机没有为该会话保持打开';
+
+  @override
+  String get accessNotOpenedDetail =>
+      '主机没有为它保留准入：它可能从未在这个主机上打开过，或主机已重启，或为了腾出空间而放开了它。不会自动打开；没有其他人写入时，点“立即检查”或“在这里继续”即可打开。';
+
+  @override
+  String get accessDeletedDetail => '它已在主机上被删除。未发送的草稿和排队消息保留在这里。';
 
   @override
   String get accessTransitionTitle => '这个会话正在交接';
@@ -3206,10 +3219,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accessUnknownDetail => '主机无法检查这个会话的其他客户端。';
 
   @override
-  String get accessNextAutomatic => '情况变化后，这里会自动继续。';
+  String get accessNextAutomatic => '情况变化后，如果主机仍为这里保持打开，会自动继续；否则点“立即检查”即可打开。';
 
   @override
-  String get accessNextWhenClosed => '当没有其他人持有它时，这里会自动继续。';
+  String get accessNextWhenClosed =>
+      '当没有其他人持有它时，如果主机仍为这里保持打开，会自动继续；否则点“立即检查”即可打开。';
 
   @override
   String accessHolderPid(int pid) {

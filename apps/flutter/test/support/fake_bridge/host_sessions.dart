@@ -51,6 +51,11 @@ mixin _FakeHostSessions on _FakeBridgeState {
     String threadId,
   ) async {
     sessionAccessCalls.add(threadId);
+    final gate = sessionAccessGate;
+    if (gate != null) {
+      sessionAccessGate = null;
+      await gate.future;
+    }
     final next = sessionAccessResults.isEmpty
         ? null
         : sessionAccessResults.removeAt(0);

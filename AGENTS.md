@@ -872,10 +872,25 @@ this file's roadmap so the source of truth stays in sync.
       suppresses reacquisition until Continue here. No override.
     - The host retains at most 256 sessions and evicts only idle ones
       OpenCode confirms idle with no pending request (released first, then
-      least recently used); an evicted session is `not_opened` until
-      explicitly reopened. A typed 404 from the same host identity evicts
-      only that controller thread; other errors stay failures. An abort
-      answered `false` ends the turn only on a fresh idle status.
+      least recently used); an unverifiable directory is skipped and fails
+      the open only when no directory is safe. A session without a
+      retained admission (never admitted, evicted, or after a host restart)
+      is `not_opened`: background checks never open it; an explicit Check
+      now opens it afresh when its own answer says no writer and idle, and
+      Continue here opens it; `released_here` still waits for Continue here.
+    - Only a 404 `session_not_found` from the session metadata route of the
+      same host identity evicts that controller thread (ancillary
+      `native_request_failed` 404s keep the cache). OpenCode events are
+      process-local, so an access check or follow read answered that way
+      also counts as deletion (another process deleted it): access becomes
+      blocked `not_found` without recheck and the follow ends.
+      `thread/deleted` drops it from the list, and the view treats the ID as
+      terminal for its events, follow checks and settings reads; a replaced
+      host identity and other errors stay failures.
+    - An abort answered `false` ends the turn only on a fresh idle status.
+    - Follow history replaces the optimistic copies of messages sent here
+      only by host user messages it newly shows in the same turn (never by
+      text); re-reading the same history changes nothing.
     - Session UI gates on capabilities (`hostAccess`, `draft_options`,
       `commands`, `question_multiple`, `permission_feedback`), not names.
     - A custom provider's model is its default, not the only model: start
@@ -890,12 +905,17 @@ this file's roadmap so the source of truth stays in sync.
     - Quit (`serve_stop_all`) closes OpenCode admission and stops each host
       under its lease; a failed stop or pending startup cleanup fails the
       quit. macOS native quits go through `NativeQuitGate` to the same path.
-    - Verified on one Mac (OpenCode 1.19.0): Rust 823 passed/24 ignored,
-      Flutter 1516 passed/5 skipped, real-server and bridge lifecycle tests.
-      The current macOS build showed per-project model names for one model
-      ID, agents and commands across Alpha/Beta switches without sending,
-      and a first send and an existing session's agent change answered;
-      extra variants, retention, 404 and `false` abort by tests only.
+    - Verified on one Mac (OpenCode 1.19.0): Rust 829 passed/24 ignored,
+      Flutter 1533 passed/5 skipped, real-server and bridge lifecycle tests.
+      The final macOS build (`4011bbdb…`): a source held by another process
+      stayed read-only and, once free, opened only on Check now and
+      answered; Release showed the sent message once with only Continue
+      here, which kept the draft unsent; an official-CLI deletion in another
+      process became terminal and left the list, another session answered.
+      An earlier build of this round showed per-project model names for one
+      model ID, agents and commands across Alpha/Beta switches without
+      sending, and a first send and an existing session's agent change
+      answered; extra variants, retention and `false` abort by tests only.
       Earlier builds: no-project picker, native catalog reply, custom Chat
       Completions and Anthropic Messages replies, a 110-model gateway list
       with a non-default model answering, Apply reconnect and back to

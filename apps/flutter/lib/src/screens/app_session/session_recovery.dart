@@ -57,6 +57,10 @@ extension _SessionRecovery on _AppSessionState {
     // arrive after switching to a new, unsaved conversation — don't `_threadId!`
     // through a null here.
     if (_threadId == null || _externalWriterMode) return;
+    if (_isDeleted(_threadId!)) {
+      _showDeleted(_threadId!);
+      return;
+    }
     _updateState(() {
       _loading = _items.isEmpty;
       _historySyncing = true;

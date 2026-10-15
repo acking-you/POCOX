@@ -288,4 +288,97 @@ void main() {
     expect(api.threadStartCalls, isEmpty);
     expect(api.turnStartCount, 0);
   });
+
+  testWidgets('a failed read of the same draft keeps its options and choice', (
+    t,
+  ) async {
+    final api = _api();
+    await _mount(t, api);
+    await _pick(t, 'alpha/two');
+    final failing = Completer<void>();
+    api.draftSettingsGates[_alpha] = failing;
+    final reads = api.draftSettingsProjects.length;
+    _hostState(api);
+    await _frames(t, 2);
+    expect(api.draftSettingsProjects.length, reads + 1);
+    failing.completeError(StateError('gateway unavailable'));
+    await _frames(t);
+    expect(t.takeException(), isNull);
+    // What was shown stays, with the choice, and stays usable.
+    expect(_shown('Alpha Two'), findsOneWidget);
+    await t.tap(find.byKey(const Key('agent-config-model')));
+    await t.pumpAndSettle();
+    expect(_choice('alpha/one'), findsOneWidget);
+    await t.tapAt(Offset.zero);
+    await t.pumpAndSettle();
+
+    api.draftSettingsGates.remove(_alpha);
+    await _type(t, 'still mine');
+    await _send(t);
+    final thread = api.threadStartResults.single!;
+    expect(api.sessionConfigCalls, [(thread, 'model', 'alpha/two')]);
+    expect(api.lastTurnText, 'still mine');
+  });
+
+  testWidgets('a failed read for another project shows nothing of the '
+      'previous one', (t) async {
+    final api = _api();
+    await _mount(t, api);
+    expect(_shown('Alpha One'), findsOneWidget);
+    final failing = Completer<void>();
+    api.draftSettingsGates[_beta] = failing;
+    await _pickProject(t, _beta);
+    failing.completeError(StateError('gateway unavailable'));
+    await _frames(t);
+    expect(t.takeException(), isNull);
+    expect(find.byKey(const Key('agent-config-model')), findsNothing);
+    expect(_shown('Alpha One'), findsNothing);
+    expect(api.threadStartCalls, isEmpty);
+    expect(api.turnStartCount, 0);
+  });
+
+  testWidgets('a failed refresh of a session keeps its options', (t) async {
+    final api = _api()
+      ..sessionOpenResults.add(
+        const SessionAccess(
+          sessionId: _thread,
+          hostId: 'host-1',
+          generation: 1,
+          provider: 'opencode',
+          mode: 'write',
+          writer: 'this_host',
+          turn: 'idle',
+          exclusion: 'pocket',
+          reason: 'owned',
+          canRelease: true,
+          recheck: false,
+        ),
+      )
+      ..readResult = const ThreadHistory(
+        running: false,
+        cwd: _alpha,
+        items: [],
+      );
+    api.sessionSettings['$_svc|$_thread'] = _models(const [
+      ('alpha/one', 'Alpha One'),
+      ('alpha/two', 'Alpha Two'),
+    ], current: 'alpha/two');
+    await _mount(t, api, threadId: _thread);
+    expect(_shown('Alpha Two'), findsOneWidget);
+    final failing = Completer<void>();
+    api.sessionSettingsRefreshGate = failing;
+    api.pushEvent(
+      _svc,
+      const AppEvent(kind: 'acp/session/updated', threadId: _thread, raw: '{}'),
+    );
+    await _frames(t, 2);
+    api.sessionSettingsRefreshGate = null;
+    failing.completeError(StateError('gateway unavailable'));
+    await _frames(t);
+    expect(t.takeException(), isNull);
+    expect(_shown('Alpha Two'), findsOneWidget);
+    await t.tap(find.byKey(const Key('agent-config-model')));
+    await t.pumpAndSettle();
+    expect(_choice('alpha/one'), findsOneWidget);
+  });
 }

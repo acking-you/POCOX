@@ -731,6 +731,10 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Holds the next [appSessionOpen] until completed (then cleared).
   Completer<void>? sessionOpenGate;
 
+  /// Holds the next [appSessionAccess] until completed (then cleared); its
+  /// answer is taken when it is released.
+  Completer<void>? sessionAccessGate;
+
   /// Every [appSessionOpen] / [appSessionAccess] thread id.
   final List<String> sessionOpenCalls = [];
   final List<String> sessionAccessCalls = [];

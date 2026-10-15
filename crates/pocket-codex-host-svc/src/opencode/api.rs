@@ -50,7 +50,7 @@ impl IntoResponse for Failure {
             Error::NotReady => StatusCode::SERVICE_UNAVAILABLE,
             Error::InvalidInput => StatusCode::BAD_REQUEST,
             Error::Capacity => StatusCode::TOO_MANY_REQUESTS,
-            Error::Native(ClientError::Http(404)) => StatusCode::NOT_FOUND,
+            Error::SessionNotFound | Error::Native(ClientError::Http(404)) => StatusCode::NOT_FOUND,
             Error::Native(_) => StatusCode::BAD_GATEWAY,
         };
         (status, Json(json!({"code":self.0.code(),"message":self.0.to_string()}))).into_response()

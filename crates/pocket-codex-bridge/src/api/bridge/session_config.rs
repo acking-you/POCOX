@@ -163,24 +163,29 @@ pub fn app_session_settings(service_key: String, thread_id: String) -> Option<Se
 
 /// Refresh native session choices off the UI thread, or read cached ACP state.
 /// OpenCode may perform network requests; UI callers should use this entry
-/// point.
+/// point. Read failures are errors, never authoritative empty settings.
 pub fn app_session_settings_refresh(
     service_key: String,
     thread_id: String,
-) -> Option<SessionSettingsDto> {
-    app_session_settings(service_key, thread_id)
+) -> Result<Option<SessionSettingsDto>> {
+    if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
+        crate::engine::opencode::refresh_settings(&service_key, &thread_id)
+            .map(|body| Some(settings_dto(&body)))
+    } else {
+        Ok(app_session_settings(service_key, thread_id))
+    }
 }
 
 /// Read draft choices in the selected native project without opening a session.
 pub fn app_draft_session_settings(
     service_key: String,
     directory: Option<String>,
-) -> Option<SessionSettingsDto> {
+) -> Result<Option<SessionSettingsDto>> {
     if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
         crate::engine::opencode::draft_settings(&service_key, directory.as_deref())
-            .map(|body| settings_dto(&body))
+            .map(|body| Some(settings_dto(&body)))
     } else {
-        app_session_settings(service_key, String::new())
+        Ok(app_session_settings(service_key, String::new()))
     }
 }
 

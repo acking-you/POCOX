@@ -6,31 +6,37 @@ use serde_json::{json, Value};
 use super::*;
 
 pub(super) fn settings(service: &str, session: &str) -> Option<Value> {
-    let link = conn(service).ok()?;
+    refresh_settings(service, session).ok()
+}
+
+/// Refresh native session choices, preserving read failures for async callers.
+pub fn refresh_settings(service: &str, session: &str) -> Result<Value> {
+    settings_for_link(&conn(service)?, session)
+}
+
+pub(super) fn settings_for_link(link: &Link, session: &str) -> Result<Value> {
     let identity = link.identity();
-    let snapshot = link
-        .commit(&identity, |view| view.sessions.get(session).cloned())
-        .ok()?;
+    let snapshot = link.commit(&identity, |view| view.sessions.get(session).cloned())?;
     let snapshot = if snapshot.is_none() && !session.is_empty() {
-        let snapshot = block(link.client.snapshot(session, None)).ok()?;
-        validate_snapshot(&identity, &snapshot).ok()?;
+        let snapshot = block(link.client.snapshot(session, None))?;
+        validate_snapshot(&identity, &snapshot)?;
         if snapshot.session.id != session {
-            return None;
+            bail!("the OpenCode session changed; refresh before trying again");
         }
         Some(snapshot)
     } else {
         snapshot
     };
     let directory = snapshot.as_ref().map(|s| s.session.directory.as_str());
-    let catalog = block(link.client.catalog(directory, &identity)).ok()?;
-    link.commit(&identity, |_| ()).ok()?;
-    Some(project_settings(&catalog, snapshot.as_ref()))
+    let catalog = block(link.client.catalog(directory, &identity))?;
+    link.commit(&identity, |_| ())?;
+    Ok(project_settings(&catalog, snapshot.as_ref()))
 }
 
 /// Read draft choices for the selected project without creating a session.
-pub fn draft_settings(service: &str, directory: Option<&str>) -> Option<Value> {
-    let catalog = super::catalog(service, directory).ok()?;
-    Some(project_settings(&catalog, None))
+pub fn draft_settings(service: &str, directory: Option<&str>) -> Result<Value> {
+    let catalog = super::catalog(service, directory)?;
+    Ok(project_settings(&catalog, None))
 }
 
 fn project_settings(catalog: &Catalog, snapshot: Option<&Snapshot>) -> Value {

@@ -238,6 +238,7 @@ impl Host {
         let turn = expected_turn.unwrap_or(&message_id).to_owned();
         let sequence = self.0.live.sequence().await;
         if let Some(entry) = self.0.sessions.lock().await.get_mut(session) {
+            entry.last_used = Some(std::time::Instant::now());
             if expected_turn.is_none() {
                 entry.turn = Some(turn.clone());
                 entry.dispatched = sequence;

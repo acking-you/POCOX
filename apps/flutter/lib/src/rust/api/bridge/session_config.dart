@@ -19,7 +19,8 @@ SessionSettingsDto? appSessionSettings({
 );
 
 /// Refresh native session choices off the UI thread, or read cached ACP state.
-/// OpenCode may perform network requests; UI callers should use this entry point.
+/// OpenCode may perform network requests; UI callers should use this entry
+/// point. Read failures are errors, never authoritative empty settings.
 Future<SessionSettingsDto?> appSessionSettingsRefresh({
   required String serviceKey,
   required String threadId,

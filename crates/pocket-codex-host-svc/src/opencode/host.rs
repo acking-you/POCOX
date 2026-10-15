@@ -60,6 +60,10 @@ pub enum Error {
     /// Bounded host resources are already in use.
     #[error("The OpenCode host has reached its session limit")]
     Capacity,
+    /// The native session metadata route confirmed that the original ID is
+    /// gone.
+    #[error("The native OpenCode session no longer exists")]
+    SessionNotFound,
     /// The native request failed; mutations are not retried.
     #[error(transparent)]
     Native(#[from] ClientError),
@@ -76,6 +80,7 @@ impl Error {
             Self::TurnChanged => "turn_changed",
             Self::InvalidInput => "invalid_input",
             Self::Capacity => "capacity",
+            Self::SessionNotFound => "session_not_found",
             Self::Native(_) => "native_request_failed",
         }
     }
@@ -308,7 +313,14 @@ impl Host {
         if session.is_empty() || session.len() > 256 {
             return Err(Error::InvalidInput);
         }
-        Ok(self.0.client.get(&["session", session], None, &[]).await?)
+        self.0
+            .client
+            .get(&["session", session], None, &[])
+            .await
+            .map_err(|error| match error {
+                ClientError::Http(404) => Error::SessionNotFound,
+                error => Error::Native(error),
+            })
     }
 
     /// Real native model, agent and command inventory for a selected project.
@@ -502,7 +514,7 @@ impl crate::file_links::SessionDirResolver for Host {
                 Ok(Some(session.directory))
             },
             Ok(_) => anyhow::bail!("OpenCode session has no absolute project directory"),
-            Err(Error::Native(ClientError::Http(404))) => Ok(None),
+            Err(Error::SessionNotFound) => Ok(None),
             Err(error) => Err(error.into()),
         }
     }

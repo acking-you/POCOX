@@ -1544,7 +1544,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_session_settings_dto,
-          decodeErrorData: null,
+          decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiBridgeSessionConfigAppDraftSessionSettingsConstMeta,
         argValues: [serviceKey, directory],
@@ -2878,7 +2878,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_session_settings_dto,
-          decodeErrorData: null,
+          decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta:
             kCrateApiBridgeSessionConfigAppSessionSettingsRefreshConstMeta,

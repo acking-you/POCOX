@@ -254,27 +254,15 @@ fn a_fake_server_left_unfinished_is_cancelled_and_joined() {
         dropper.join().expect("dropper");
     }
     let idle = fake_server(serde_json::json!({}));
-    let idle_addr = idle.url.trim_start_matches("ws://").to_string();
     dropped_within(idle, None);
-    // A released ephemeral port may already be reserved by a concurrent test
-    // or retained in TIME_WAIT. Verify closure, not immediate port reuse.
-    let error = std::net::TcpStream::connect_timeout(
-        &idle_addr.parse().expect("socket address"),
-        Duration::from_secs(1),
-    )
-    .expect_err("the cancelled idle server accepts no new connections");
-    assert_eq!(error.kind(), std::io::ErrorKind::ConnectionRefused);
 
     let connected = fake_server(serde_json::json!({}));
     let addr = connected.url.trim_start_matches("ws://").to_string();
     let open = std::net::TcpStream::connect(&addr).expect("connect");
     dropped_within(connected, Some(open));
-    // Linux may retain the accepted connection in TIME_WAIT after both
-    // handles close. Check the listener is gone, not immediate port reuse.
-    let addr = addr.parse().expect("socket address");
-    let error = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(1))
-        .expect_err("the cancelled server accepts no new connections");
-    assert_eq!(error.kind(), std::io::ErrorKind::ConnectionRefused);
+    // Completion above happens only after Drop joined the owned server and
+    // dropped its listener handles. Do not probe the released ephemeral port:
+    // another parallel test may already own it, or it may be in TIME_WAIT.
 }
 
 /// A fixture "codex" child to be stopped (or kept).

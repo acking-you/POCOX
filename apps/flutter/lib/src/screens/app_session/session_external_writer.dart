@@ -13,6 +13,7 @@ extension _SessionExternalWriter on _AppSessionState {
     _accessTimer?.cancel();
     _accessTimer = null;
     _accessChecking = false;
+    _accessCheckAsked = false;
     _externalHistoryRevision = null;
     _externalHistoryLoading = false;
     _externalHistoryDirty = false;
@@ -202,6 +203,9 @@ extension _SessionExternalWriter on _AppSessionState {
         _firstTurnId = history.firstTurnId;
         _hasOlder = history.hasOlder;
         _sequentialHistoryIds.addAll(history.items.map((item) => item.id));
+        // Messages this view sent while it wrote are in the host's history
+        // now (a release or another writer turned it read-only).
+        _dropHostHeldLocalPrompts(history.items);
         for (final item in history.items) {
           final index = _itemIndex[item.id];
           if (index == null) continue;

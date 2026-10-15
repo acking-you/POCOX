@@ -61,6 +61,8 @@ extension _SessionAccess on _AppSessionState {
     final access = _access;
     if (access == null) return 'source_unknown';
     final thread = _threadId;
+    // A deleted session is gone, whoever handed it back.
+    if (thread != null && _isDeleted(thread)) return access.reason;
     final releasedHere =
         thread != null &&
         _releasedHereThreads.contains(_threadKey(thread)) &&
@@ -70,15 +72,27 @@ extension _SessionAccess on _AppSessionState {
 
   /// The host reports nobody writes [access]'s session (or this view may
   /// already), so a fresh open may admit this view. A session this host
-  /// handed back, or one changing hands, is never taken by itself.
+  /// handed back, one it holds no admission for (`not_opened`: never opened
+  /// there, or forgotten by a restart or to make room) or one changing hands
+  /// is never taken by itself.
   bool _accessAdmissible(SessionAccess access) =>
       access.mode != 'blocked' &&
       access.reason != 'released_here' &&
+      access.reason != 'not_opened' &&
       access.reason != 'transition' &&
       (access.writable || access.writer == 'none');
 
+  /// The host holds no admission for [access]'s session, and nobody writes
+  /// it or runs a turn: an explicit Check now opens it afresh.
+  bool _accessOpenableOnRequest(SessionAccess access) =>
+      access.mode != 'blocked' &&
+      access.reason == 'not_opened' &&
+      access.writer == 'none' &&
+      access.turn == 'idle';
+
   bool _followCurrent(String thread, int epoch) =>
       mounted &&
+      !_isDeleted(thread) &&
       _externalWriterMode &&
       !_guardianReadOnly &&
       _threadId == thread &&
@@ -110,9 +124,21 @@ extension _SessionAccess on _AppSessionState {
     });
   }
 
-  /// Ask the host again (a tick, a host event or Check now).
-  Future<void> _checkAccess(String thread, int epoch) async {
-    if (!_followCurrent(thread, epoch) || _accessChecking) return;
+  /// Ask the host again (a tick, a host event or Check now, which is
+  /// [explicit]). Only an explicit check opens a free session the host
+  /// holds no admission for, and only from an answer asked after it; a
+  /// session handed back here waits for Continue here either way.
+  Future<void> _checkAccess(
+    String thread,
+    int epoch, {
+    bool explicit = false,
+  }) async {
+    if (!_followCurrent(thread, epoch)) return;
+    if (_accessChecking) {
+      // The answer in flight was asked before; ask once more after it.
+      if (explicit) _accessCheckAsked = true;
+      return;
+    }
     _accessChecking = true;
     try {
       final access = await ref
@@ -120,7 +146,10 @@ extension _SessionAccess on _AppSessionState {
           .appSessionAccess(widget.serviceKey, thread);
       if (!_followCurrent(thread, epoch) || access.sessionId != thread) return;
       _updateState(() => _access = access);
-      if (_accessAdmissible(access) && _accessReason != 'released_here') {
+      final openable =
+          _accessAdmissible(access) ||
+          (explicit && _accessOpenableOnRequest(access));
+      if (openable && _accessReason != 'released_here') {
         await _openFromFollow(thread);
         return;
       }
@@ -131,14 +160,21 @@ extension _SessionAccess on _AppSessionState {
     } finally {
       if (_followCurrent(thread, epoch)) {
         _accessChecking = false;
-        _scheduleAccessCheck(thread, epoch);
+        if (_accessCheckAsked) {
+          _accessCheckAsked = false;
+          unawaited(_checkAccess(thread, epoch, explicit: true));
+        } else {
+          _scheduleAccessCheck(thread, epoch);
+        }
       }
     }
   }
 
   /// The host announced that a session's access changed.
   void _onAccessChanged(String thread) {
-    if (!_externalWriterMode || _threadId != thread) return;
+    if (!_externalWriterMode || _threadId != thread || _isDeleted(thread)) {
+      return;
+    }
     unawaited(_checkAccess(thread, _externalWriterEpoch));
   }
 
@@ -161,7 +197,12 @@ extension _SessionAccess on _AppSessionState {
   /// Leave following and open [thread] again through a fresh admission; a
   /// refused open follows again.
   Future<void> _openFromFollow(String thread) async {
-    if (!mounted || _threadId != thread || !_externalWriterMode) return;
+    if (!mounted ||
+        _threadId != thread ||
+        !_externalWriterMode ||
+        _isDeleted(thread)) {
+      return;
+    }
     _cancelExternalWriterSubscription();
     _updateState(() {
       _externalWriterMode = false;
@@ -177,10 +218,11 @@ extension _SessionAccess on _AppSessionState {
     }
   }
 
-  /// Continue a session this view handed back.
+  /// Continue a session this view handed back, or one the host no longer
+  /// keeps open.
   Future<void> _continueHere() async {
     final thread = _threadId;
-    if (thread == null || _takingOver) return;
+    if (thread == null || _takingOver || _isDeleted(thread)) return;
     _releasedHereThreads.remove(_threadKey(thread));
     await _openFromFollow(thread);
   }
@@ -192,7 +234,7 @@ extension _SessionAccess on _AppSessionState {
     _accessTimer?.cancel();
     _accessTimer = null;
     _followSince = DateTime.now();
-    unawaited(_checkAccess(thread, _externalWriterEpoch));
+    unawaited(_checkAccess(thread, _externalWriterEpoch, explicit: true));
   }
 
   /// Hand this host's idle writer back to other clients. Admissions freeze
@@ -312,7 +354,9 @@ extension _SessionAccess on _AppSessionState {
           const {'released_here', 'unsupported', 'not_found'}.contains(reason)
           ? null
           : _checkAccessNow,
-      onContinue: reason == 'released_here' ? _continueHere : null,
+      onContinue: const {'released_here', 'not_opened'}.contains(reason)
+          ? _continueHere
+          : null,
       onOpenHolder: holderKey == null || holderKey.isEmpty || thread == null
           ? null
           : () => context.push(conversationRoute(holderKey, thread, cwd: _cwd)),
@@ -320,5 +364,62 @@ extension _SessionAccess on _AppSessionState {
           ? () => showHostingEditor(context, existing: host)
           : null,
     );
+  }
+
+  bool _isDeleted(String thread) =>
+      _deletedThreads.contains(_threadKey(thread));
+
+  /// The host deleted [thread] (`thread/deleted`): it leaves the list and,
+  /// when shown, is neither followed nor opened again. Its draft and queue
+  /// stay in their slot, and other sessions are untouched.
+  void _onThreadDeleted(String thread) {
+    _deletedThreads.add(_threadKey(thread));
+    _releasedHereThreads.remove(_threadKey(thread));
+    _invalidateSummary(thread);
+    _updateState(() {
+      _discoveredThreads.remove(thread);
+      _threads = [
+        for (final t in _threads)
+          if (t.id != thread) t,
+      ];
+    });
+    if (_threadId == thread) _showDeleted(thread);
+  }
+
+  /// Show [thread] as gone: read-only, with nothing in flight for it.
+  void _showDeleted(String thread) {
+    _cancelExternalWriterSubscription();
+    _revokeOnScreenAdmissions();
+    // A load, open or access check already under way answers to nothing.
+    _threadLoadGeneration++;
+    _elapsedTicker?.cancel();
+    _elapsedTicker = null;
+    _turnStartedAt = null;
+    final previous = _access;
+    final detail = AppLocalizations.of(context).accessDeletedDetail;
+    _updateState(() {
+      _externalWriterMode = true;
+      _externalWriterLiveness = null;
+      _takingOver = false;
+      _loading = false;
+      _historySyncing = false;
+      _streaming = false;
+      _approvals.clear();
+      _asyncQuestions.clear();
+      _error = null;
+      _retry = null;
+      _access = SessionAccess(
+        sessionId: thread,
+        hostId: previous?.hostId ?? '',
+        generation: previous?.generation ?? 0,
+        provider: previous?.provider ?? _caps.provider,
+        mode: 'blocked',
+        writer: 'none',
+        turn: 'unknown',
+        reason: 'not_found',
+        detail: detail,
+      );
+      if (_queue.isNotEmpty) _draft.queuePaused = true;
+    });
   }
 }
