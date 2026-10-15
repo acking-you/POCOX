@@ -356,6 +356,7 @@ pub fn acp_claude_prepare_cancel_run(run: u64) -> AcpClaudeSetupDto {
 /// self-host and account mode. Stopping hosting stops the agent.
 pub fn app_serve_start_acp(name: Option<String>, spec: AcpAgentSpecDto) -> Result<AcpServeDto> {
     let r = serve_acp::start(name, spec.into_spec())?;
+    crate::engine::management::enable_after_hosting();
     Ok(AcpServeDto {
         device: r.device,
         name: r.name,
@@ -392,6 +393,7 @@ pub fn app_serve_start(
     embedded: bool,
 ) -> Result<AppServeDto> {
     let r = serve::serve_start(port, binary_override, name, proxy, embedded)?;
+    crate::engine::management::enable_after_hosting();
     Ok(AppServeDto {
         device: r.device,
         name: r.name,
@@ -408,9 +410,12 @@ pub fn app_serve_start(
 
 /// Snapshot of every local host (for the status cards + periodic re-probe).
 pub fn app_serve_status() -> Vec<AppServeStatusDto> {
-    serve::serve_status()
-        .into_iter()
-        .map(|s| AppServeStatusDto {
+    serve::serve_status().into_iter().map(Into::into).collect()
+}
+
+impl From<serve::ServeStatus> for AppServeStatusDto {
+    fn from(s: serve::ServeStatus) -> Self {
+        Self {
             name: s.name,
             device: s.device,
             pid: s.pid,
@@ -440,8 +445,8 @@ pub fn app_serve_status() -> Vec<AppServeStatusDto> {
             config_revision: s.config_revision,
             incarnation: s.incarnation,
             busy: s.busy,
-        })
-        .collect()
+        }
+    }
 }
 
 /// Take one tunnel (`kind` = `"app"`/`"api"`/`"meta"`) of a local host off the
@@ -460,7 +465,7 @@ pub fn app_serve_reregister(name: String, kind: String) -> Result<()> {
 /// Fully stop one local host by name (both tunnels + watchdog + API proxy, and
 /// stops codex).
 pub fn app_serve_stop(name: String) -> Result<()> {
-    serve::serve_stop(&name)
+    serve::serve_stop_remembered(&name, None)
 }
 
 /// Stop every local host (called on app quit so a real quit leaves no orphan

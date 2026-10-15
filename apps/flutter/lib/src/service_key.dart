@@ -42,13 +42,18 @@ library;
 
 /// The service kinds the relay namespaces by. `meta` never appears in a
 /// discovered key (it is derived from an app host), but it is a real kind and a
-/// key carrying it must still parse.
+/// key carrying it must still parse. `host` is a computer's management entry,
+/// never a conversation or model service.
 bool _isKind(String part) =>
     part == 'app' ||
     part == 'api' ||
     part == 'meta' ||
     part == 'acp' ||
-    part == 'opencode';
+    part == 'opencode' ||
+    part == 'host';
+
+/// Whether [key] names a computer's device-management service.
+bool isManagementKey(String key) => parseServiceKey(key).kind == 'host';
 
 /// Whether [kind] is a conversation service the session UI can open: a Codex
 /// app-server (`app`), an ACP agent gateway (`acp`) or a native OpenCode
@@ -111,3 +116,13 @@ String conversationRoute(String key, String threadId, {String? cwd}) {
   ];
   return '/app/${Uri.encodeComponent(key)}/session?${q.join('&')}';
 }
+
+/// The relay service key a subscription's [subscriptionKey] names.
+///
+/// Bridge subscriptions are identified by a composite of their family, the
+/// transport context (relay and key fingerprint) and the service key, joined
+/// by U+001F. That identity is internal: it shows as control-character boxes
+/// and fingerprints. People recognise the service key, which is its last
+/// part; a plain key is returned as is.
+String subscriptionServiceKey(String subscriptionKey) =>
+    subscriptionKey.split('\u001f').last;

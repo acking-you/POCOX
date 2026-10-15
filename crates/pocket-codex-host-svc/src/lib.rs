@@ -22,6 +22,7 @@ mod history_sync_revision;
 pub mod native_history;
 pub mod opencode;
 pub mod process;
+pub mod projects;
 pub mod resume;
 pub mod sessions;
 pub mod store;
@@ -52,7 +53,8 @@ use crate::{
         session_transcript,
     },
     file_routes::{list_dir, list_files_in, read_file, upload_file, write_file, UPLOAD_BODY_LIMIT},
-    store::{ConfigStore, HostConfig, HostStore, ThreadConfig},
+    projects::{EnsuredProject, ProjectError, ProjectsUpdate, ProjectsView},
+    store::{ConfigStore, HostStore, ThreadConfig},
 };
 
 /// Shared handler state.
@@ -142,6 +144,7 @@ fn generic_routes() -> Router<Arc<AppState>> {
         // Project-folder browser: the configured roots + default, and a
         // root-confined directory listing to drill the host's project tree.
         .route("/projects", get(get_projects).put(put_projects))
+        .route("/projects/default/ensure", post(ensure_default_project))
         .route("/fs/list", get(list_dir))
         // File-transfer panel: list the files in a chosen dir, download a
         // file's bytes, upload a local file into a chosen dir — root-confined.
@@ -196,6 +199,18 @@ struct ApiError(anyhow::Error);
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if let Some(error) = self.0.downcast_ref::<ProjectError>() {
+            let (status, code, current) = match error {
+                ProjectError::Conflict {
+                    current,
+                } => (StatusCode::CONFLICT, "revision_conflict", Some(current.as_ref())),
+                ProjectError::Missing(_) => {
+                    (StatusCode::NOT_FOUND, "default_project_missing", None)
+                },
+                ProjectError::Invalid(_) => (StatusCode::BAD_REQUEST, "invalid_project", None),
+            };
+            return (status, Json(serde_json::json!({ "code": code, "message": error.to_string(), "current": current }))).into_response();
+        }
         let msg = format!("{:#}", self.0);
         // Map the two well-known client-input conditions to their proper status
         // (a missing session → 404, a turn running elsewhere → 409) so the
@@ -249,8 +264,8 @@ async fn put_config(
 }
 
 /// `GET /projects` — the host's configured project roots + default project.
-async fn get_projects(State(state): State<Arc<AppState>>) -> Json<HostConfig> {
-    Json(state.host.get().await)
+async fn get_projects(State(state): State<Arc<AppState>>) -> Result<Json<ProjectsView>, ApiError> {
+    Ok(Json(state.host.view().await?))
 }
 
 /// `PUT /projects` — replace the project roots + default. The desktop host
@@ -258,10 +273,15 @@ async fn get_projects(State(state): State<Arc<AppState>>) -> Json<HostConfig> {
 /// every device (a phone reads it to seed a new session's folder browser).
 async fn put_projects(
     State(state): State<Arc<AppState>>,
-    Json(config): Json<HostConfig>,
-) -> Result<Json<HostConfig>, ApiError> {
-    state.host.put(config).await?;
-    Ok(Json(state.host.get().await))
+    Json(update): Json<ProjectsUpdate>,
+) -> Result<Json<ProjectsView>, ApiError> {
+    Ok(Json(state.host.update(update).await?))
+}
+
+async fn ensure_default_project(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<EnsuredProject>, ApiError> {
+    Ok(Json(state.host.ensure_default().await?))
 }
 
 /// Original-session access shared by native engines and ACP.

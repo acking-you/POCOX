@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/theme.dart';
@@ -15,7 +16,6 @@ import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/brand_logo.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
-import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 
 /// First-run welcome guide, shown once per device right after the first
@@ -189,7 +189,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                 key: const Key('welcome-folders-locked'),
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
               )
-            : ProjectFoldersEditor(serviceKey: host.appServiceKey),
+            : DefaultProjectTile(serviceKey: host.appServiceKey, local: true),
       ),
       const SizedBox(height: 12),
       // Step 3: 配置 codex 的模型访问 (provider / 官方登录) + 非降智 prompt。
@@ -281,6 +281,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                   '${found.first.device} · ${found.first.name}',
                 ),
                 filled: true,
+                wrap: true,
               ),
       ),
     ];

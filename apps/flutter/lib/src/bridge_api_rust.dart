@@ -7,6 +7,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/codex_setup.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/connection.dart' as frb;
+import 'package:pocket_codex/src/rust/api/bridge/device_management.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/events.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/host_config.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/host_sessions.dart' as frb;
@@ -21,10 +22,11 @@ import 'package:pocket_codex/src/rust/api/bridge/threads.dart' as frb;
 part 'bridge/rust_hosting.dart';
 part 'bridge/rust_threads.dart';
 part 'bridge/rust_host_sessions.dart';
+part 'bridge/rust_management.dart';
 
 /// Real [BridgeApi] backed by generated Rust bindings.
 class RustBridgeApi
-    with _RustHosting, _RustThreads, _RustHostSessions
+    with _RustHosting, _RustThreads, _RustHostSessions, _RustManagement
     implements BridgeApi {
   /// Creates the real bridge.
   const RustBridgeApi();

@@ -35,7 +35,13 @@ extension _SessionAgentPrepare on _AppSessionState {
     final draft = _draft;
     // ACP agents and native OpenCode create a session only in a project
     // folder (see [_needsProjectToSend]).
-    if (draft.project == null) return AgentSessionPhase.needsProject;
+    // The host's automatic default counts once the first message creates
+    // the session there; nothing is opened (or created) ahead of it.
+    if (draft.project == null) {
+      return _automaticProject == null
+          ? AgentSessionPhase.needsProject
+          : AgentSessionPhase.idle;
+    }
     // OpenCode creates its session on the first send, never ahead of it.
     if (!caps.isAcp) return AgentSessionPhase.idle;
     if (!caps.negotiated || !caps.sessionConfig) return AgentSessionPhase.idle;
@@ -179,12 +185,12 @@ extension _SessionAgentPrepare on _AppSessionState {
       project: _projectSwitcher(
         l10n,
         // These engines cannot work outside a project.
-        label: hasProject ? _projectName() : l10n.chooseFolder,
+        label: _newProjectLabel(l10n, l10n.chooseFolder),
         style: Theme.of(
           context,
         ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
       ),
-      cwd: _cwd,
+      cwd: hasProject ? _cwd : _automaticProject,
       phase: phase,
       failure: _draft.prepareFailure?.message,
       modelLabel: _agentModelLabel,
@@ -199,7 +205,10 @@ extension _SessionAgentPrepare on _AppSessionState {
       // OpenCode creates its session on the first message; its options are
       // the draft's own until then.
       opensOnFirstMessage:
-          caps.negotiated && (!caps.sessionConfig || caps.draftOptions),
+          caps.negotiated &&
+          (!caps.sessionConfig ||
+              caps.draftOptions ||
+              (!hasProject && _automaticProject != null)),
     );
   }
 }

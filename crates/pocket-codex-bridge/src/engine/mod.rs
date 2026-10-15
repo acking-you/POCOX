@@ -9,6 +9,7 @@ pub mod config;
 pub mod discovery;
 pub mod host_apply;
 mod host_lease;
+pub mod host_lifecycle;
 mod host_names;
 pub mod host_profiles;
 mod host_services;
@@ -17,6 +18,9 @@ pub mod hosting;
 #[cfg(test)]
 mod hosting_live_tests;
 pub mod logging;
+pub mod management;
+pub mod management_client;
+pub mod management_runtimes;
 pub mod meta;
 pub mod native_sessions;
 pub mod opencode;

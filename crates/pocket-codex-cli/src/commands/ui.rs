@@ -213,7 +213,7 @@ pub(crate) fn kind_cell(label: &str, kind: ServiceKind) -> Cell {
         ServiceKind::App => Color::Blue,
         ServiceKind::Api => Color::Magenta,
         ServiceKind::Acp | ServiceKind::OpenCode => Color::Green,
-        ServiceKind::Meta => Color::Cyan,
+        ServiceKind::Meta | ServiceKind::Host => Color::Cyan,
         ServiceKind::Unknown => Color::Grey,
     })
 }

@@ -266,7 +266,14 @@ class _FileLinkDialogState extends State<_FileLinkDialog> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 96),
+                // Less on a short screen (a phone in landscape), so the
+                // preview below keeps room; the path scrolls.
+                constraints: BoxConstraints(
+                  maxHeight: math.min(
+                    96,
+                    MediaQuery.sizeOf(context).height * 0.15,
+                  ),
+                ),
                 child: SingleChildScrollView(
                   child: SelectableText(widget.link.path),
                 ),

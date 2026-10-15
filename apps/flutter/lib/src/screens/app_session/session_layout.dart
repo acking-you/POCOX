@@ -13,90 +13,19 @@ extension _SessionLayout on _AppSessionState {
     // A draft that keeps its own options reads them; it opens nothing.
     _scheduleDraftOptionsCheck();
 
-    // Phones: classic Scaffold — the sessions list is a slide-in drawer, the
-    // bar is a plain AppBar naming the conversation.
+    // Phones: the sessions list lies under the conversation, full screen,
+    // and the conversation slides aside to uncover it (see LayeredNavigation).
     if (width < 720) {
-      return Scaffold(
-        onDrawerChanged: (open) {
+      return LayeredNavigation(
+        sidebarLabel: l10n.conversationsSection,
+        onOpenChanged: (open) {
           if (open) return;
           final generation = _newDraftFocusAfterDrawer;
           _newDraftFocusAfterDrawer = null;
           if (generation != null) _focusNewComposer(generation);
         },
-        drawer: Drawer(
-          // The same ground as the desktop sidebar, so the list looks like one
-          // component on every form factor. Composited onto the page surface
-          // so it stays opaque over the scrim whatever the scheme's alpha.
-          backgroundColor: Color.alphaBlend(
-            surfaceSidebar(scheme),
-            scheme.surface,
-          ),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.horizontal(
-              right: Radius.circular(kDialogRadius),
-            ),
-          ),
-          surfaceTintColor: Colors.transparent,
-          child: SafeArea(
-            child: Column(
-              children: [
-                _voiceStatus(l10n),
-                Expanded(child: _sessionsPane(l10n, inDrawer: true)),
-              ],
-            ),
-          ),
-        ),
-        // Widen the edge-swipe-to-open zone (default ~20px). The narrow
-        // default sits under Android's system back-gesture strip, so a
-        // left-edge swipe almost always triggered "back" instead of the
-        // drawer; a 56px zone lets the swipe start just inside that strip.
-        drawerEdgeDragWidth: 56,
-        appBar: WindowTitleBar(
-          bottom: needsCodexSetup ? _codexSetupBar(l10n) : null,
-          leading: Builder(
-            builder: (ctx) => IconButton(
-              tooltip: l10n.conversationsSection,
-              icon: const Icon(Icons.menu),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-            ),
-          ),
-          title: Text(
-            _barTitle(l10n),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-          actions: [
-            if (_ctx != null)
-              ContextGauge(
-                status: _ctx!,
-                onTap: _showContextDetail,
-                tooltip: _contextTooltip(l10n),
-              ),
-            // Same place as on desktop. It has to be here rather than in the
-            // sessions pane, which on a phone lives behind the drawer.
-            const ThemeToggle(),
-            if (_threadId != null)
-              PopupMenuButton<String>(
-                tooltip: l10n.moreActions,
-                onSelected: (v) {
-                  if (v == 'compact') _compact();
-                  if (v == 'session-release') unawaited(_releaseSession());
-                },
-                itemBuilder: (c) => [
-                  if (_canReleaseSession)
-                    PopupMenuItem(
-                      key: const Key('session-release'),
-                      value: 'session-release',
-                      child: Text(l10n.sessionHandBack),
-                    ),
-                  PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
-                ],
-              ),
-            const SizedBox(width: 4),
-          ],
-        ),
-        body: _dropWrap(_chatPane(l10n), l10n),
+        sidebar: _phoneSidebar(l10n),
+        body: _phoneConversation(l10n, needsCodexSetup: needsCodexSetup),
       );
     }
 
@@ -106,8 +35,13 @@ extension _SessionLayout on _AppSessionState {
     // header with the conversation title and the session actions.
     final canRight = width >= 1100; // inline review split
     // Keep the transcript from being squeezed out when the window is narrow:
-    // the panes give up width before the chat does.
-    final maxLeft = ((width - 420) / 2).clamp(200.0, 520.0);
+    // the panes give up width before the chat does. A touch tablet keeps a
+    // 480 px chat and lets the sidebar have the rest, so its finger-sized
+    // rows and pill stay readable at the default width (an 834 px portrait
+    // tablet shows the full 280 px instead of the desktop rule's 207 px).
+    final maxLeft = isDesktop
+        ? ((width - 420) / 2).clamp(200.0, 520.0)
+        : (width - 480).clamp(200.0, 520.0);
     final maxReview = (width - 360).clamp(400.0, 1200.0);
     final sidebarWidth = _leftWidth.clamp(200.0, maxLeft);
     return Scaffold(
@@ -194,6 +128,112 @@ extension _SessionLayout on _AppSessionState {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// The phone's conversation page: a plain app bar naming the conversation
+  /// over the chat. It slides aside to uncover [_phoneSidebar].
+  Widget _phoneConversation(
+    AppLocalizations l10n, {
+    required bool needsCodexSetup,
+  }) {
+    return Scaffold(
+      appBar: WindowTitleBar(
+        bottom: needsCodexSetup ? _codexSetupBar(l10n) : null,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            key: const Key('sidebar-open-btn'),
+            tooltip: l10n.conversationsSection,
+            icon: const Icon(Icons.menu),
+            onPressed: () => LayeredNavigation.maybeOf(ctx)?.open(),
+          ),
+        ),
+        title: Text(
+          _barTitle(l10n),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          if (_ctx != null)
+            ContextGauge(
+              status: _ctx!,
+              onTap: _showContextDetail,
+              tooltip: _contextTooltip(l10n),
+            ),
+          // Same place as on desktop. It has to be here rather than in the
+          // sessions pane, which on a phone lies under the conversation.
+          const ThemeToggle(),
+          if (_threadId != null)
+            PopupMenuButton<String>(
+              tooltip: l10n.moreActions,
+              onSelected: (v) {
+                if (v == 'compact') _compact();
+                if (v == 'session-release') unawaited(_releaseSession());
+              },
+              itemBuilder: (c) => [
+                if (_canReleaseSession)
+                  PopupMenuItem(
+                    key: const Key('session-release'),
+                    value: 'session-release',
+                    child: Text(l10n.sessionHandBack),
+                  ),
+                PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
+              ],
+            ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      body: _dropWrap(_chatPane(l10n), l10n),
+    );
+  }
+
+  /// The phone's full-screen sessions list, lying under the conversation:
+  /// the brand and a close control on top, then the same pane the desktop
+  /// sidebar shows.
+  Widget _phoneSidebar(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      key: const Key('phone-sidebar'),
+      // The desktop sidebar's ground, composited onto the page so it stays
+      // opaque whatever the scheme's alpha.
+      color: Color.alphaBlend(surfaceSidebar(scheme), scheme.surface),
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
+              child: Row(
+                children: [
+                  const BrandLogo(size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.appTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Builder(
+                    builder: (ctx) => IconButton(
+                      key: const Key('sidebar-close-btn'),
+                      tooltip: l10n.hideSidebar,
+                      icon: const Icon(Icons.close),
+                      onPressed: () => LayeredNavigation.maybeOf(ctx)?.close(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _voiceStatus(l10n),
+            Expanded(child: _sessionsPane(l10n, inDrawer: true)),
+          ],
+        ),
       ),
     );
   }

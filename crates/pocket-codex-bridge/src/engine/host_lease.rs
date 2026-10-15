@@ -184,6 +184,18 @@ pub(super) fn acquire(name: &str, op: Op) -> Result<Lease> {
     acquire_within(name, op, LEASE_WAIT)
 }
 
+/// Acquire then validate the caller's still-current authority before any
+/// effect.
+pub(super) fn acquire_checked(
+    name: &str,
+    op: Op,
+    check: impl FnOnce() -> Result<()>,
+) -> Result<Lease> {
+    let lease = acquire(name, op)?;
+    check()?;
+    Ok(lease)
+}
+
 /// [`acquire`] with its own bound. Refused once the app is quitting.
 pub(super) fn acquire_within(name: &str, op: Op, wait: Duration) -> Result<Lease> {
     TABLE.acquire(name, op, wait, false)
@@ -217,6 +229,40 @@ mod tests {
     use std::sync::{mpsc, Arc, Barrier};
 
     use super::*;
+
+    #[test]
+    fn a_revoked_waiter_cannot_act_when_the_lease_is_released() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        let first = acquire("management-revoked-waiter", Op::Stop).expect("hold");
+        let permitted = Arc::new(AtomicBool::new(true));
+        let (ready, begun) = mpsc::channel();
+        let worker = std::thread::spawn({
+            let permitted = permitted.clone();
+            move || {
+                ready.send(()).expect("signal");
+                acquire_checked("management-revoked-waiter", Op::Start, || {
+                    if permitted.load(Ordering::SeqCst) {
+                        Ok(())
+                    } else {
+                        anyhow::bail!("revoked")
+                    }
+                })
+                .map(drop)
+            }
+        });
+        begun.recv_timeout(Duration::from_secs(5)).expect("worker");
+        permitted.store(false, Ordering::SeqCst);
+        drop(first);
+        assert_eq!(
+            worker
+                .join()
+                .expect("worker")
+                .expect_err("refused")
+                .to_string(),
+            "revoked"
+        );
+        assert!(holder("management-revoked-waiter").is_none());
+    }
 
     #[test]
     fn a_lease_is_exclusive_per_canonical_name() {

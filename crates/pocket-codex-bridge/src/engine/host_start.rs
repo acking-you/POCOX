@@ -40,6 +40,28 @@ pub enum NewHost {
     },
 }
 
+impl From<Runtime> for NewHost {
+    fn from(runtime: Runtime) -> Self {
+        match runtime {
+            Runtime::Codex {
+                port,
+                binary,
+                proxy,
+            } => Self::Codex {
+                port,
+                binary,
+                proxy,
+            },
+            Runtime::OpenCode {
+                binary,
+            } => Self::OpenCode {
+                binary,
+            },
+            Runtime::Acp(spec) => Self::Acp(spec),
+        }
+    }
+}
+
 /// A started host.
 #[derive(Debug, Clone)]
 pub enum Started {
@@ -53,15 +75,47 @@ pub enum Started {
 
 /// Save `change` (with `host`'s runtime) for `name` and start it.
 pub fn start_configured(name: Option<&str>, host: NewHost, change: Change) -> Result<Started> {
-    start_in(&runtime::support_dir()?, &host_profiles::root()?, name, host, change)
+    start_configured_checked(name, host, change, None, &|| Ok(()))
 }
 
+/// Remote start, rechecking authorization after waiting for the name/store.
+pub(super) fn start_configured_checked(
+    name: Option<&str>,
+    host: NewHost,
+    change: Change,
+    expected_revision: Option<u64>,
+    check: &dyn Fn() -> Result<()>,
+) -> Result<Started> {
+    start_checked_in(
+        &runtime::support_dir()?,
+        &host_profiles::root()?,
+        name,
+        host,
+        change,
+        expected_revision,
+        check,
+    )
+}
+
+#[cfg(test)]
 fn start_in(
     support: &std::path::Path,
     profiles: &std::path::Path,
     name: Option<&str>,
     host: NewHost,
     change: Change,
+) -> Result<Started> {
+    start_checked_in(support, profiles, name, host, change, None, &|| Ok(()))
+}
+
+fn start_checked_in(
+    support: &std::path::Path,
+    profiles: &std::path::Path,
+    name: Option<&str>,
+    host: NewHost,
+    change: Change,
+    expected_revision: Option<u64>,
+    check: &dyn Fn() -> Result<()>,
 ) -> Result<Started> {
     let fallback = match &host {
         NewHost::Codex {
@@ -73,7 +127,7 @@ fn start_in(
         } => "opencode",
     };
     let requested = host_names::requested(name, fallback);
-    let lease = host_lease::acquire(&requested, Op::Start)?;
+    let lease = host_lease::acquire_checked(&requested, Op::Start, check)?;
     if serve::codex_relaunch(&requested).is_some()
         || serve_acp::is_hosting(lease.name())
         || serve_opencode::is_hosting(lease.name())
@@ -98,7 +152,7 @@ fn start_in(
         },
     };
     let change = Change {
-        runtime: RuntimeChange::Set(runtime),
+        runtime: RuntimeChange::Set(runtime.clone()),
         ..change
     };
     let engine = match &host {
@@ -112,7 +166,14 @@ fn start_in(
     };
     // No host runs under the name, so whatever was saved for it before is
     // replaced; it comes back if the start fails.
-    let (_, staged) = host_profiles::stage_in(profiles, &requested, &change, None, engine)?;
+    let (_, staged) = host_profiles::stage_checked_in(
+        profiles,
+        &requested,
+        &change,
+        expected_revision,
+        engine,
+        check,
+    )?;
     #[cfg(test)]
     tests::after_stage(&staged);
     // Exactly what this stage committed: a save made meanwhile (saves do
@@ -120,11 +181,13 @@ fn start_in(
     let started = staged.resolved().cloned().and_then(|provider| {
         #[cfg(test)]
         tests::launching(&provider);
+        check()?;
         launch(&lease, support, profiles, &requested, host, provider)
     });
     match started {
         Ok(started) => {
             staged.finish();
+            super::host_lifecycle::record_running_in(profiles, lease.name(), runtime);
             Ok(started)
         },
         Err(error) => {
@@ -176,6 +239,35 @@ fn launch(
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
+    #[test]
+    fn revoked_start_does_not_save_a_profile_or_launch() {
+        let root = tempfile::tempdir().expect("temp");
+        let error = super::start_checked_in(
+            root.path(),
+            &root.path().join("profiles"),
+            Some("revoked-new-host"),
+            super::NewHost::OpenCode {
+                binary: None,
+            },
+            super::Change {
+                input: super::host_profiles::ProfileInput {
+                    source: super::host_profiles::Source::Inherited,
+                    protocol: None,
+                    base_url: None,
+                    model: None,
+                    claude_env: None,
+                },
+                key: super::host_profiles::KeyChange::Keep,
+                runtime: super::RuntimeChange::Keep,
+            },
+            None,
+            &|| anyhow::bail!("revoked"),
+        )
+        .expect_err("refused");
+        assert_eq!(error.to_string(), "revoked");
+        assert!(!root.path().join("profiles").exists());
+    }
+
 
     use pocket_codex_core::provider::{ApiProtocol, Secret};
 

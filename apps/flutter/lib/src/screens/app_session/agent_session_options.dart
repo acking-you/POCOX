@@ -20,6 +20,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/screens/app_session/option_picker.dart';
+import 'package:pocket_codex/src/text_measure.dart';
 
 /// [options] in display order: model, thought level, mode, then the others,
 /// each group in agent order.
@@ -192,7 +193,7 @@ enum AgentSessionPhase {
 }
 
 /// The capsule; selecting a value calls back with the opaque ids verbatim.
-class AgentSessionOptions extends StatelessWidget {
+class AgentSessionOptions extends StatefulWidget {
   /// Creates the controls from [settings].
   const AgentSessionOptions({
     super.key,
@@ -203,6 +204,7 @@ class AgentSessionOptions extends StatelessWidget {
     this.phase = AgentSessionPhase.idle,
     this.agentName = '',
     this.onRetry,
+    this.wrap = false,
   });
 
   /// The agent's current session state, or null before a session exists.
@@ -226,80 +228,191 @@ class AgentSessionOptions extends StatelessWidget {
   /// Opens the session again after [AgentSessionPhase.failed].
   final VoidCallback? onRetry;
 
-  // The segments scroll horizontally inside the space the composer leaves;
-  // each one is bounded by that space too, so a revealed segment is always
-  // entirely visible and a long label ellipsizes inside it instead.
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => _build(context, constraints.maxWidth),
-  );
+  /// Whether segments that cannot share one line readably may take a
+  /// second line (where the composer gives them a line of their own).
+  final bool wrap;
 
-  Widget _build(BuildContext context, double room) {
+  /// A segment's icon, chevron and padding (10 + 15 + 4 + 15 + 10): the
+  /// narrowest a segment gets.
+  static const double _segmentChrome = 54;
+
+  /// The capsule's own edge and inner padding.
+  static const double _capsuleChrome = 6;
+
+  /// Each segment's label and widest width, in display order.
+  static List<({String label, double cap})> _segments(
+    SessionSettings? settings,
+    String modeTitle,
+  ) => [
+    if (settings != null)
+      for (final option in orderedOptions(settings.configOptions))
+        (
+          label: option.currentLabel,
+          cap: option.category == 'model' ? 220 : 160,
+        ),
+    if (settings != null && showsLegacyModes(settings))
+      (
+        label:
+            settings.modes
+                .where((m) => m.id == settings.currentMode)
+                .firstOrNull
+                ?.name ??
+            modeTitle,
+        cap: 160,
+      ),
+  ];
+
+  static double _naturalWidth(BuildContext context, String label, double cap) =>
+      math.min(
+        cap,
+        _segmentChrome +
+            measureTextLine(
+              context,
+              label,
+              const TextStyle(fontSize: 12.5),
+            ).width.ceilToDouble(),
+      );
+
+  /// The width the capsule takes with every label of [settings] whole (each
+  /// within its segment's widest width); 0 when it has no segments. Lets the
+  /// composer give the capsule its own line where the toolbar cannot.
+  static double preferredWidth(
+    BuildContext context,
+    SessionSettings? settings,
+  ) {
+    final segments = _segments(
+      settings,
+      AppLocalizations.of(context).agentMode,
+    );
+    if (segments.isEmpty) return 0;
+    return _capsuleChrome +
+        segments.length -
+        1 +
+        segments.fold(
+          0.0,
+          (sum, s) => sum + _naturalWidth(context, s.label, s.cap),
+        );
+  }
+
+  @override
+  State<AgentSessionOptions> createState() => _AgentSessionOptionsState();
+
+  /// [segmentKey] keeps each segment's state (an open menu or list, a
+  /// change in flight) while the segments move between lines.
+  Widget _build(
+    BuildContext context,
+    double room,
+    GlobalKey Function(Object id) segmentKey,
+  ) {
     final l10n = AppLocalizations.of(context);
     final settings = this.settings;
-    // The capsule's own edge and inner padding come out of the room first.
-    final inner = room.isFinite ? math.max(room - 6, 0.0) : room;
-    // Never below a segment's icon, chevron and padding (10 + 15 + 4 + 15 +
-    // 10).
-    double fit(double width) =>
-        inner.isFinite ? math.min(width, math.max(inner, 54)) : width;
+    final segments = _segments(settings, l10n.agentMode);
+    final natural = [
+      for (final s in segments) _naturalWidth(context, s.label, s.cap),
+    ];
+    // The segments of one capsule line: whole labels where they fit, shared
+    // room where they do not, or each bounded by the room (and scrolling)
+    // when not even their icons and chevrons fit.
+    List<double> line(List<double> natural) {
+      // The capsule's own edge, inner padding and dividers come out first.
+      final inner = room.isFinite
+          ? math.max(room - _capsuleChrome - (natural.length - 1), 0.0)
+          : room;
+      return _shares(natural, inner) ??
+          [
+            for (final w in natural)
+              inner.isFinite ? math.min(w, math.max(inner, _segmentChrome)) : w,
+          ];
+    }
+
+    var widths = line(natural);
+    // Sharing that cuts a label to under half (long labels or large text on
+    // a phone) gives the first segment, the model, a line of its own and
+    // the rest the line below, where the composer allows it.
+    final wrapped =
+        wrap &&
+        segments.length > 1 &&
+        [
+          for (var i = 0; i < natural.length; i++)
+            widths[i] - _segmentChrome < (natural[i] - _segmentChrome) / 2,
+        ].any((cut) => cut);
+    if (wrapped) {
+      final first = _naturalWidth(
+        context,
+        segments.first.label,
+        double.infinity,
+      );
+      widths = [
+        math.max(math.min(first, room - _capsuleChrome), _segmentChrome),
+        ...line(natural.sublist(1)),
+      ];
+    }
+    var index = 0;
+    double fit(double _) => widths[index++];
+
     final chips = <Widget>[
       if (settings != null)
         for (final option in orderedOptions(settings.configOptions))
-          _OptionChip(
-            key: Key('agent-config-${option.id}'),
-            title: option.name,
-            description: option.description,
-            label: option.currentLabel,
-            fullLabel:
-                option.values
-                    .where((v) => v.value == option.currentValue)
-                    .map(optionValueLabel)
-                    .firstOrNull ??
-                option.currentValue,
-            icon: switch (option.category) {
-              'model' => Icons.auto_awesome,
-              'thought_level' => Icons.psychology_outlined,
-              'mode' => Icons.swap_horiz,
-              _ => Icons.tune,
-            },
-            maxWidth: fit(option.category == 'model' ? 220 : 160),
-            enabled: enabled,
-            entries: [
-              for (final value in option.values)
-                (
-                  id: value.value,
-                  label: optionValueLabel(value),
-                  selected: value.value == option.currentValue,
-                ),
-            ],
-            onSearch: option.values.length > kOptionMenuLimit
-                ? (context) => showOptionPicker(context, option)
-                : null,
-            onSelected: (value) => onSelectConfig(option.id, value),
+          KeyedSubtree(
+            key: segmentKey(option.id),
+            child: _OptionChip(
+              key: Key('agent-config-${option.id}'),
+              title: option.name,
+              description: option.description,
+              label: option.currentLabel,
+              fullLabel:
+                  option.values
+                      .where((v) => v.value == option.currentValue)
+                      .map(optionValueLabel)
+                      .firstOrNull ??
+                  option.currentValue,
+              icon: switch (option.category) {
+                'model' => Icons.auto_awesome,
+                'thought_level' => Icons.psychology_outlined,
+                'mode' => Icons.swap_horiz,
+                _ => Icons.tune,
+              },
+              maxWidth: fit(option.category == 'model' ? 220 : 160),
+              enabled: enabled,
+              entries: [
+                for (final value in option.values)
+                  (
+                    id: value.value,
+                    label: optionValueLabel(value),
+                    selected: value.value == option.currentValue,
+                  ),
+              ],
+              onSearch: option.values.length > kOptionMenuLimit
+                  ? (context) => showOptionPicker(context, option)
+                  : null,
+              onSelected: (value) => onSelectConfig(option.id, value),
+            ),
           ),
       if (settings != null && showsLegacyModes(settings))
-        _OptionChip(
-          key: const Key('agent-mode'),
-          title: l10n.agentMode,
-          label:
-              settings.modes
-                  .where((m) => m.id == settings.currentMode)
-                  .firstOrNull
-                  ?.name ??
-              l10n.agentMode,
-          icon: Icons.swap_horiz,
-          maxWidth: fit(160),
-          enabled: enabled,
-          entries: [
-            for (final mode in settings.modes)
-              (
-                id: mode.id,
-                label: mode.name,
-                selected: mode.id == settings.currentMode,
-              ),
-          ],
-          onSelected: onSelectMode,
+        KeyedSubtree(
+          key: segmentKey(_legacyModeSegment),
+          child: _OptionChip(
+            key: const Key('agent-mode'),
+            title: l10n.agentMode,
+            label:
+                settings.modes
+                    .where((m) => m.id == settings.currentMode)
+                    .firstOrNull
+                    ?.name ??
+                l10n.agentMode,
+            icon: Icons.swap_horiz,
+            maxWidth: fit(160),
+            enabled: enabled,
+            entries: [
+              for (final mode in settings.modes)
+                (
+                  id: mode.id,
+                  label: mode.name,
+                  selected: mode.id == settings.currentMode,
+                ),
+            ],
+            onSelected: onSelectMode,
+          ),
         ),
     ];
     final scheme = Theme.of(context).colorScheme;
@@ -311,40 +424,75 @@ class AgentSessionOptions extends StatelessWidget {
       height: 18,
       color: scheme.outlineVariant.withValues(alpha: 0.7),
     );
-    return Semantics(
-      container: true,
-      label: l10n.agentOptions,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: room),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
-            border: Border.all(color: scheme.outlineVariant),
+    Widget capsule(List<Widget> chips, {Key? key}) => ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: room),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
+          border: Border.all(color: scheme.outlineVariant),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(2),
+          child: ClipRRect(
             borderRadius: BorderRadius.circular(999),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: SingleChildScrollView(
-                key: const Key('agent-session-options'),
-                scrollDirection: Axis.horizontal,
-                reverse: true,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < chips.length; i++) ...[
-                      if (i > 0) divider,
-                      chips[i],
-                    ],
+            child: SingleChildScrollView(
+              key: key,
+              scrollDirection: Axis.horizontal,
+              reverse: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = 0; i < chips.length; i++) ...[
+                    if (i > 0) divider,
+                    chips[i],
                   ],
-                ),
+                ],
               ),
             ),
           ),
         ),
       ),
     );
+    return Semantics(
+      container: true,
+      label: l10n.agentOptions,
+      child: wrapped
+          ? Column(
+              key: const Key('agent-session-options'),
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                capsule([chips.first]),
+                const SizedBox(height: 6),
+                capsule(chips.sublist(1)),
+              ],
+            )
+          : capsule(chips, key: const Key('agent-session-options')),
+    );
+  }
+
+  /// Each segment's width, from its [natural] one, when the labels do not
+  /// all fit in [inner] but every segment's minimum does: the narrow ones
+  /// keep their natural width and the rest share what is left equally. Null when no sharing is
+  /// needed (everything fits) or possible (the segments must scroll).
+  static List<double>? _shares(List<double> natural, double inner) {
+    if (natural.isEmpty || !inner.isFinite) return null;
+    final total = natural.fold(0.0, (sum, w) => sum + w);
+    if (total <= inner || inner < natural.length * _segmentChrome) {
+      return null;
+    }
+    final order = List.generate(natural.length, (i) => i)
+      ..sort((a, b) => natural[a].compareTo(natural[b]));
+    final shares = List<double>.filled(natural.length, 0);
+    var left = inner;
+    for (var k = 0; k < order.length; k++) {
+      final i = order[k];
+      final share = (left / (order.length - k)).floorToDouble();
+      shares[i] = math.min(natural[i], share);
+      left -= shares[i];
+    }
+    return shares;
   }
 
   /// The single segment shown while the session has no options yet:
@@ -436,6 +584,27 @@ class AgentSessionOptions extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Identifies the legacy mode segment among option ids, which are strings.
+const Object _legacyModeSegment = Object();
+
+class _AgentSessionOptionsState extends State<AgentSessionOptions> {
+  final _segmentKeys = <Object, GlobalKey>{};
+
+  // Where every segment's label fits, each takes its own width. Otherwise
+  // the room is shared so the short labels stay whole and the long ones
+  // ellipsize their start; only when not even each segment's icon and
+  // chevron fit do the segments scroll horizontally, each bounded by the
+  // room so a revealed segment is always entirely visible.
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => widget._build(
+      context,
+      constraints.maxWidth,
+      (id) => _segmentKeys.putIfAbsent(id, GlobalKey.new),
+    ),
+  );
 }
 
 /// One option's trigger. Short lists open a menu; long ones the searchable

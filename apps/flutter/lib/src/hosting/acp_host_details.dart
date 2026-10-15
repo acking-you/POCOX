@@ -3,14 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
+import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
 /// A running ACP host: its agent's state (starting, running, not running and
-/// why, sign-in needed), what the agent negotiated, the gateway and meta
-/// service, a restart action and the project folders.
+/// why, sign-in needed), a restart action, what the agent negotiated and the
+/// default project folder; the gateway, meta service and program are folded
+/// into diagnostics.
 ///
 /// Feature rows are shown only from a live negotiation; before it they say
 /// so instead of guessing.
@@ -142,8 +144,6 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
           ),
         ],
         const SizedBox(height: 8),
-        Text(l10n.acpStopNote, style: small),
-        const SizedBox(height: 4),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: OutlinedButton.icon(
@@ -155,12 +155,7 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
         ),
         if (_error != null)
           Text(_error!, style: small?.copyWith(color: scheme.error)),
-        const Divider(height: 24),
-        Text(
-          l10n.acpFeatures,
-          style: small?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         if (!negotiated)
           Text(
             l10n.acpFeatureUnknown,
@@ -176,23 +171,14 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
           ),
           _feature(l10n.acpFeatureImages, supported(caps.imageInput), small),
         ],
-        const Divider(height: 24),
-        Text(l10n.acpGatewayLabel, style: small),
-        Text(l10n.localHostListening(host.appListenAddr), style: small),
-        SelectableText(host.appServiceKey, style: muted),
-        const SizedBox(height: 8),
-        Text(l10n.hostMetaLabel, style: small),
-        Text(l10n.localHostListening(host.metaListenAddr), style: small),
-        SelectableText(host.metaServiceKey, style: muted),
-        if (host.codexBinary != null) ...[
-          const SizedBox(height: 8),
-          SelectableText(
-            '${l10n.acpProgram}: ${host.codexBinary}',
-            style: muted,
-          ),
-        ],
-        const Divider(height: 24),
-        ProjectFoldersEditor(serviceKey: host.appServiceKey),
+        const SizedBox(height: 12),
+        DefaultProjectTile(serviceKey: host.appServiceKey, local: true),
+        const SizedBox(height: 4),
+        HostDiagnostics(
+          host: host,
+          binaryLabel: l10n.acpProgram,
+          notes: [Text(l10n.acpStopNote, style: muted)],
+        ),
       ],
     );
   }

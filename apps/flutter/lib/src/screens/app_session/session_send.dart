@@ -126,6 +126,9 @@ extension _SessionSend on _AppSessionState {
     bool current() => shown() && sameLink();
     var targetThread = _threadId;
     final targetCwd = _cwd;
+    // Where the host will create a conversation sent without a folder; only
+    // labels the optimistic list entry until the host's list answers.
+    final automaticCwd = targetCwd == null ? _automaticProject : null;
     final catalogProject = _catalogProject;
     final isNewThread = targetThread == null;
     final l10n = AppLocalizations.of(context);
@@ -382,6 +385,10 @@ extension _SessionSend on _AppSessionState {
         // The user may have reopened this same draft while thread/start waited.
         if (mounted && identical(_draft, sendingDraft)) {
           _threadId = targetThread;
+          // Created where the host chose; the host's list names the folder.
+          _automaticThread = automaticCwd == null
+              ? null
+              : (key: service, thread: targetThread);
           ref
               .read(uiPrefsProvider.notifier)
               .setLastThread(service, targetThread);
@@ -402,7 +409,7 @@ extension _SessionSend on _AppSessionState {
                 // Preview the TYPED text (never the appended file-reference
                 // block); an attachment-only first message gets a placeholder.
                 preview: preview,
-                cwd: targetCwd ?? '',
+                cwd: targetCwd ?? automaticCwd ?? '',
                 updatedAt: 0,
               ),
               ..._threads,

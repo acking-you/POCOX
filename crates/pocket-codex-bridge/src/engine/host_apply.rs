@@ -32,7 +32,8 @@ use super::{
 };
 
 /// The outcome of an apply.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ApplyReport {
     /// Instance name.
     pub name: String,
@@ -57,7 +58,8 @@ pub fn is_applying(name: &str) -> bool {
 }
 
 /// What a running host runs with now (never its key).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Active {
     /// Its run identity, to pass back as [`Expected::incarnation`].
     pub incarnation: String,
@@ -113,16 +115,38 @@ pub struct Expected {
 /// Restart the running host `name` with its saved configuration and saved
 /// runtime (the running one when none was saved).
 pub fn apply(name: &str, expected: &Expected) -> Result<ApplyReport> {
+    apply_checked(name, expected, &|| Ok(()))
+}
+
+/// Apply after revalidating authority under the lifecycle lease.
+pub(super) fn apply_checked(
+    name: &str,
+    expected: &Expected,
+    check: &dyn Fn() -> Result<()>,
+) -> Result<ApplyReport> {
     let profiles = host_profiles::root()?;
-    let lease = host_lease::acquire(name, Op::Apply)?;
+    let lease = host_lease::acquire_checked(name, Op::Apply, check)?;
+    let report = apply_locked(&lease, &profiles, name, expected)?;
+    if let Some(active) = active(lease.name()) {
+        super::host_lifecycle::record_running_in(&profiles, lease.name(), active.runtime);
+    }
+    Ok(report)
+}
+
+fn apply_locked(
+    lease: &Lease,
+    profiles: &std::path::Path,
+    name: &str,
+    expected: &Expected,
+) -> Result<ApplyReport> {
     if let Some(running) = serve::codex_relaunch(name) {
-        return apply_codex(&lease, &profiles, running, expected);
+        return apply_codex(lease, profiles, running, expected);
     }
     if let Some(running) = serve_acp::relaunch(lease.name()) {
-        return apply_acp(&lease, &profiles, running, expected);
+        return apply_acp(lease, profiles, running, expected);
     }
     if let Some(running) = serve_opencode::relaunch(lease.name()) {
-        return apply_opencode(&lease, &profiles, running, expected);
+        return apply_opencode(lease, profiles, running, expected);
     }
     bail!("`{name}` is not hosting; start it")
 }
@@ -325,7 +349,10 @@ fn orchestrate<P, R>(
         .revision
         .is_some_and(|seen| seen != current.desired.revision)
     {
-        bail!("`{name}`'s saved configuration changed since you opened it; reload it first");
+        return Err(host_profiles::RevisionConflict {
+            current: current.desired.revision,
+        }
+        .into());
     }
     // Nothing has been interrupted when this fails.
     let next = prepare().map_err(|e| anyhow!(redacted(&e, current)))?;

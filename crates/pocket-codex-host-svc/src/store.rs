@@ -15,6 +15,8 @@ use pocket_codex_codex::rollout;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
+pub use crate::projects::HostStore;
+
 /// The default config-store path: a file under `CODEX_HOME`, so per-thread
 /// config lives alongside the sessions it annotates and is shared by every host
 /// on this machine (app or CLI, any service name) — they share one
@@ -44,70 +46,10 @@ pub struct HostConfig {
     #[serde(default)]
     pub project_roots: Vec<String>,
     /// Absolute host path new conversations default their working directory to
-    /// (a configured root, or a folder within one). `None` = the codex default.
+    /// (also a browsable root). `None` uses the host's automatic project
+    /// folder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default_project: Option<String>,
-}
-
-/// A JSON-file store holding the singleton [`HostConfig`]. Mirrors
-/// [`ConfigStore`]'s robustness (async mutex, atomic temp+rename, corrupt file
-/// starts empty) — it shares the same `CODEX_HOME` and the same cross-host
-/// merge concern.
-pub struct HostStore {
-    path: PathBuf,
-    inner: Mutex<HostConfig>,
-}
-
-impl HostStore {
-    /// Open the store at `path`, loading the existing config. A missing or
-    /// corrupt file starts from defaults (logged) rather than wedging hosting.
-    pub async fn open(path: PathBuf) -> Result<Self> {
-        if let Some(parent) = path.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .with_context(|| format!("creating host-config dir {}", parent.display()))?;
-        }
-        let inner = match tokio::fs::read(&path).await {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_else(|e| {
-                tracing::warn!(
-                    error = %e,
-                    path = %path.display(),
-                    "host-config store unreadable; starting from defaults"
-                );
-                HostConfig::default()
-            }),
-            Err(_) => HostConfig::default(),
-        };
-        Ok(Self {
-            path,
-            inner: Mutex::new(inner),
-        })
-    }
-
-    /// The current host config.
-    pub async fn get(&self) -> HostConfig {
-        self.inner.lock().await.clone()
-    }
-
-    /// Replace the host config and persist it atomically (temp + rename).
-    /// Unlike the per-thread map this is a single record with no cross-host
-    /// merge to preserve — the last writer wins, which is the intended
-    /// semantics for a setting the user edits on the host itself.
-    pub async fn put(&self, config: HostConfig) -> Result<()> {
-        let mut guard = self.inner.lock().await;
-        let bytes = serde_json::to_vec_pretty(&config).context("serializing host config")?;
-        let tmp = self
-            .path
-            .with_extension(format!("{}.tmp", std::process::id()));
-        tokio::fs::write(&tmp, &bytes)
-            .await
-            .with_context(|| format!("writing host-config temp {}", tmp.display()))?;
-        tokio::fs::rename(&tmp, &self.path)
-            .await
-            .with_context(|| format!("replacing host-config store {}", self.path.display()))?;
-        *guard = config;
-        Ok(())
-    }
 }
 
 /// Persisted per-thread session config. Every field is optional: an unset field

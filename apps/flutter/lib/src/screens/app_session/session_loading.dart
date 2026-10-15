@@ -7,10 +7,11 @@ extension _SessionLoading on _AppSessionState {
   /// project-scoped view (the project tree it was opened from already gives
   /// the full picture there).
   Future<void> _loadThreads() async {
+    final key = widget.serviceKey;
+    final epoch = _linkEpoch;
     try {
-      final all = await ref
-          .read(bridgeApiProvider)
-          .appThreadList(widget.serviceKey);
+      final all = await ref.read(bridgeApiProvider).appThreadList(key);
+      _adoptAutomaticFolder(key, epoch, all);
       // Every project this service has ever been used in, newest first. Taken
       // from the UNFILTERED list on purpose: the project switcher has to offer
       // the projects you're not in, which is exactly what `mine` drops below.
@@ -98,6 +99,34 @@ extension _SessionLoading on _AppSessionState {
     }
   }
 
+  /// A conversation created in the host's automatic default folder takes
+  /// its folder from [listed], the host's own answer (never guessed), so
+  /// its project label and catalog follow it. Only for the conversation
+  /// still shown, on the host and connection the list was read from, while
+  /// it has no folder of its own.
+  void _adoptAutomaticFolder(String key, int epoch, List<ThreadMeta> listed) {
+    final created = _automaticThread;
+    if (!mounted ||
+        created == null ||
+        key != widget.serviceKey ||
+        epoch != _linkEpoch ||
+        created.key != key ||
+        created.thread != _threadId ||
+        (_cwd?.trim().isNotEmpty ?? false)) {
+      return;
+    }
+    final cwd = listed
+        .where((t) => t.id == created.thread)
+        .firstOrNull
+        ?.cwd
+        .trim();
+    if (cwd == null || cwd.isEmpty) return; // not listed yet: a later list
+    _updateState(() {
+      _cwd = cwd;
+      _automaticThread = null;
+    });
+  }
+
   /// Re-attempt a cold-open load that failed, with a widening backoff.
   ///
   /// Every load kicked off in `initState` races the connection: the screen
@@ -141,7 +170,23 @@ extension _SessionLoading on _AppSessionState {
 
   /// Switch the screen to another conversation (or a new one when [tid] is
   /// null) in place, resetting per-thread state. Used by the left sessions pane.
+  /// Remember [settings]' automatic default for [key] (an empty path when
+  /// the host has none), from read [read]: an older read's late answer never
+  /// replaces a newer one.
+  void _noteHostDefault(String key, ProjectSettings settings, int read) {
+    if (!mounted || key != widget.serviceKey || read != _hostDefaultRead) {
+      return;
+    }
+    final automatic =
+        !settings.legacy &&
+        settings.defaultProject == null &&
+        settings.automatic;
+    final path = automatic ? settings.effectiveDefault?.trim() ?? '' : '';
+    _updateState(() => _hostDefault = (key: key, path: path));
+  }
+
   void _openThread(String? tid, String? cwd) {
+    _automaticThread = null;
     // Leaving the call's conversation ends the call: capture never outlives
     // the conversation it was started in (AGENTS.md, live voice controls).
     if (_voice.threadId != null && _voice.threadId != tid) {
@@ -280,6 +325,12 @@ extension _SessionLoading on _AppSessionState {
       // A draft shown again keeps the session opened ahead for it.
       _refreshAgentSettings();
     }
+    // Every new conversation reads the host's current default (it may have
+    // changed since this screen opened): a chosen one seeds the folder, an
+    // automatic one is shown.
+    if (tid == null && (cwd?.trim().isEmpty ?? true)) {
+      unawaited(_seedDefaultCwd());
+    }
   }
 
   /// Leave a pushed conversation for the list it came from — the session
@@ -299,19 +350,26 @@ extension _SessionLoading on _AppSessionState {
   /// default project. Best-effort + guarded: only sets `_cwd` while it is still
   /// empty and the thread is still new, so it never overrides a folder the user
   /// picked or a resumed thread's cwd.
+  ///
+  /// A host's automatic default is only noted for display
+  /// ([_automaticProject]): the send then passes no folder, and the host
+  /// creates that folder when the conversation is created, not before.
   Future<void> _seedDefaultCwd() async {
     final generation = _threadLoadGeneration;
     final selectionGeneration = _projectSelectionGeneration;
     final draft = _draft;
+    final key = widget.serviceKey;
+    final read = ++_hostDefaultRead;
     try {
-      final cfg = await ref
+      final settings = await ref
           .read(bridgeApiProvider)
-          .metaProjectConfig(widget.serviceKey);
+          .metaProjectSettings(key);
       // Answered, so there is nothing left to retry — whether or not a default
       // is configured. Settling here (not only on the happy path) stops a host
       // that legitimately has no default from being asked five times.
       _openLoadDone(_kCwdSeed);
-      final def = cfg.defaultProject?.trim();
+      _noteHostDefault(key, settings, read);
+      final def = settings.defaultProject?.trim();
       if (!mounted || def == null || def.isEmpty) return;
       if (generation == _threadLoadGeneration &&
           selectionGeneration == _projectSelectionGeneration &&

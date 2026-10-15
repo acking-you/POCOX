@@ -1,5 +1,5 @@
-// Project-folder feature: the host directory-tree picker (mobile) and the
-// desktop project-folders editor.
+// Project-folder feature: the host directory-tree picker (mobile); see the
+// default project tile tests in managed_ui_test.dart.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +8,6 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
-import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
 
 import 'fake_bridge_api.dart';
 
@@ -243,50 +242,6 @@ void main() {
       expect(find.byKey(const Key('folder-row-/w/app/lib')), findsOneWidget);
       expect(find.byKey(const Key('folder-crumb-1')), findsOneWidget);
       expect(find.byKey(const Key('folder-outside-note')), findsNothing);
-    });
-  });
-
-  group('project folders editor', () {
-    testWidgets('lists roots, marks the default, and removes one', (t) async {
-      final api = FakeBridgeApi();
-      api.projectConfigs[_svc] = const ProjectConfig(
-        projectRoots: [r'D:\work', r'D:\play'],
-        defaultProject: r'D:\work',
-      );
-      await t.pumpWidget(
-        _host(
-          const Scaffold(body: ProjectFoldersEditor(serviceKey: _svc)),
-          api,
-        ),
-      );
-      await t.pumpAndSettle();
-
-      expect(find.byKey(const Key(r'project-root-D:\work')), findsOneWidget);
-      expect(find.byKey(const Key(r'project-root-D:\play')), findsOneWidget);
-
-      // Promote play to default, then verify it persisted on the fake host.
-      await t.tap(find.byKey(const Key(r'default-project-D:\play')));
-      await t.pumpAndSettle();
-      expect(api.projectConfigs[_svc]?.defaultProject, r'D:\play');
-
-      // Remove work; the fake host reflects a single remaining root.
-      await t.tap(find.byKey(const Key(r'remove-project-D:\work')));
-      await t.pumpAndSettle();
-      expect(api.projectConfigs[_svc]?.projectRoots, [r'D:\play']);
-      expect(find.byKey(const Key(r'project-root-D:\work')), findsNothing);
-    });
-
-    testWidgets('empty state shows the no-folders hint', (t) async {
-      final api = FakeBridgeApi();
-      api.projectConfigs[_svc] = const ProjectConfig();
-      await t.pumpWidget(
-        _host(
-          const Scaffold(body: ProjectFoldersEditor(serviceKey: _svc)),
-          api,
-        ),
-      );
-      await t.pumpAndSettle();
-      expect(find.text('还没有项目文件夹。'), findsOneWidget);
     });
   });
 }

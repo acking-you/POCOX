@@ -27,7 +27,7 @@
 
 use std::path::PathBuf;
 
-use directories::ProjectDirs;
+use directories::{ProjectDirs, UserDirs};
 
 use crate::{
     error::{Error, Result},
@@ -93,6 +93,25 @@ pub fn api_proxy_log_file(key: &str) -> Result<PathBuf> {
 /// Default config file location (`config.toml` next to the state dir).
 pub fn config_file() -> Result<PathBuf> {
     Ok(config_dir()?.join("config.toml"))
+}
+
+/// The host user's automatic project directory, without creating it.
+///
+/// macOS uses the home directory to avoid a Documents consent prompt on an
+/// unattended host. Other platforms use the OS's Documents directory when
+/// available, including Windows redirected folders and Linux XDG settings.
+/// Only the `PocketCodex` child becomes browsable, never its parent.
+pub fn default_project_dir() -> Result<PathBuf> {
+    let user = UserDirs::new()
+        .ok_or_else(|| Error::Path("cannot determine the host user's home directory".into()))?;
+    let parent = if cfg!(target_os = "macos") {
+        user.home_dir()
+    } else {
+        user.document_dir()
+            .filter(|path| path.is_dir())
+            .unwrap_or_else(|| user.home_dir())
+    };
+    Ok(parent.join("PocketCodex"))
 }
 
 fn safe_file_component(raw: &str) -> String {

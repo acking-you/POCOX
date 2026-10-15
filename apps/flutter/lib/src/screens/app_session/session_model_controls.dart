@@ -34,15 +34,7 @@ extension _SessionModelControls on _AppSessionState {
     Widget pill(VoidCallback onTap) => _pill(
       pillKey: const Key('model-chip'),
       icon: Icons.auto_awesome,
-      // With no explicit pick, show the model the server actually runs (the
-      // thread default) rather than an opaque "default".
-      label: [
-        _model?.displayName ??
-            _modelDisplayLabel(_runtime?.model) ??
-            l10n.modelDefault,
-        if (_effectiveEffort != null) _effectiveEffort!.label(l10n),
-        if (_plan) l10n.planMode,
-      ].join(' · '),
+      label: _modelChipLabel(l10n),
       // Plan is the one setting here that changes what a turn *does*, and a
       // long model name can ellipsize its label away — so it tints the chip.
       active: _plan,
@@ -68,6 +60,29 @@ extension _SessionModelControls on _AppSessionState {
       }),
     );
   }
+
+  /// The model chip's label. With no explicit pick it shows the model the
+  /// server actually runs (the thread default) rather than an opaque
+  /// "default".
+  String _modelChipLabel(AppLocalizations l10n) => [
+    _model?.displayName ??
+        _modelDisplayLabel(_runtime?.model) ??
+        l10n.modelDefault,
+    if (_effectiveEffort != null) _effectiveEffort!.label(l10n),
+    if (_plan) l10n.planMode,
+  ].join(' · ');
+
+  /// A [_pill]'s width with [label] whole: padding, icon, gap, label and
+  /// the [chevron] when it has one.
+  double _pillWidth(String label, {bool chevron = false}) =>
+      (isDesktop ? 16 : 20) +
+      20 +
+      (chevron ? 18 : 0) +
+      measureTextLine(
+        context,
+        label,
+        const TextStyle(fontSize: 12.5),
+      ).width.ceilToDouble();
 
   /// The desktop model/effort picker, with uncommon modes in a secondary sheet.
   Widget _turnSettingsPanel(AppLocalizations l10n) {

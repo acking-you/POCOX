@@ -12,6 +12,7 @@ part 'bridge/hosting_types.dart';
 part 'bridge/provider_types.dart';
 part 'bridge/thread_types.dart';
 part 'bridge/session_access_types.dart';
+part 'bridge/management_types.dart';
 
 abstract interface class BridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
@@ -738,6 +739,99 @@ abstract interface class BridgeApi {
     List<String> projectRoots,
     String? defaultProject,
   );
+
+  /// Read the project settings, including the effective (possibly automatic)
+  /// default folder. Never creates the folder. Works on `meta:` and `host:`
+  /// keys; a legacy host answers with a null revision.
+  Future<ProjectSettings> metaProjectSettings(String serviceKey);
+
+  /// Save reviewed project settings; new hosts require [expectedRevision].
+  /// A null [defaultProject] restores the automatic folder.
+  Future<ProjectSettings> metaSaveProjectSettings(
+    String serviceKey, {
+    required List<String> projectRoots,
+    String? defaultProject,
+    String? expectedRevision,
+  });
+
+  // --- remote device management (kind `host`) ---
+
+  /// This computer's own remote-management switch.
+  Future<DeviceManagement> deviceManagementStatus();
+
+  /// Enable or disable remote management of this computer only.
+  Future<DeviceManagement> deviceManagementSetEnabled(bool enabled);
+
+  /// Authoritative boot-restore choices; a failure must block restore.
+  Future<List<HostRestoreOverride>> hostRestoreOverrides();
+
+  /// Restore one host under revalidation. Pass the override's revision, or
+  /// (for a legacy preference with no override) null and its runtime.
+  Future<void> hostRestoreService(
+    String name, {
+    int? expectedRevision,
+    HostRuntime? legacyRuntime,
+  });
+
+  /// A restart-persistence warning for [name] (any host when null), separate
+  /// from whether its start/apply succeeded.
+  Future<String?> hostRestoreProblem({String? name});
+
+  /// Read a remote computer's management view.
+  Future<ManagedDevice> managedDevice(String serviceKey);
+
+  /// Read one remote host.
+  Future<ManagedHost> managedHost(String serviceKey, String name);
+
+  /// Create and start a remote service. A lost response needs a refresh,
+  /// never an automatic retry.
+  Future<ManagedHost> managedHostStart(
+    String serviceKey, {
+    required String name,
+    required ManagedRuntime runtime,
+    required HostConfigInput input,
+    required HostKeyAction keyAction,
+    String? key,
+  });
+
+  /// Save a reviewed revision without touching the live service.
+  Future<ManagedHost> managedHostSave(
+    String serviceKey,
+    String name,
+    ManagedHostEdit edit,
+  );
+
+  /// Apply the reviewed revision to the observed incarnation.
+  Future<HostApplyResult> managedHostApply(
+    String serviceKey,
+    String name, {
+    required String expectedIncarnation,
+    required int expectedRevision,
+  });
+
+  /// Stop the observed incarnation; the computer stays manageable.
+  Future<void> managedHostStop(
+    String serviceKey,
+    String name, {
+    required String expectedIncarnation,
+  });
+
+  /// Start a stopped service from its reviewed saved revision.
+  Future<ManagedHost> managedHostStartSaved(
+    String serviceKey,
+    String name, {
+    required int expectedRevision,
+  });
+
+  /// Runtimes installed on the remote computer. Never installs or signs in.
+  Future<List<ManagedRuntimeAvailability>> managedRuntimes(String serviceKey);
+
+  /// Read (or, with [start], explicitly begin) Claude adapter preparation on
+  /// the remote computer.
+  Future<AcpClaudeSetup> managedClaudePrepare(
+    String serviceKey, {
+    required bool start,
+  });
 
   /// List the sub-directories of [path] on the host behind [serviceKey], for
   /// the remote project-folder browser. Throws if [path] is outside the host's

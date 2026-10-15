@@ -143,25 +143,16 @@ Future<void> _mount(
 
 void main() {
   setUpAll(() async {
+    // Bundled fonts only: Figtree also stands in for the Apple system face,
+    // and the source-tree Noto Sans SC for the Apple CJK face, so previews
+    // do not depend on the fonts installed on this machine.
     await loadPreviewFonts(always: true);
-    // Headless tests do not resolve the Apple system font automatically.
-    // Use the installed SF Pro on macOS; CI elsewhere uses bundled Figtree.
-    await (FontLoader('CupertinoSystemText')..addFont(
-          Platform.isMacOS
-              ? File(
-                  '/System/Library/Fonts/SFNS.ttf',
-                ).readAsBytes().then((bytes) => bytes.buffer.asByteData())
-              : rootBundle.load('assets/fonts/Figtree-Regular.ttf'),
+    await (FontLoader('PingFang SC')..addFont(
+          File(
+            'assets/fonts/NotoSansSC-VariableFont_wght.ttf',
+          ).readAsBytes().then(ByteData.sublistView),
         ))
         .load();
-    if (Platform.isMacOS) {
-      await (FontLoader('PingFang SC')..addFont(
-            File(
-              '/System/Library/Fonts/PingFang.ttc',
-            ).readAsBytes().then(ByteData.sublistView),
-          ))
-          .load();
-    }
   });
   for (final width in [320.0, 390.0, 800.0, 1440.0]) {
     for (final language in ['en', 'zh']) {

@@ -8,6 +8,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/managed/device_management_switch.dart';
+import 'package:pocket_codex/src/managed/managed_device_panel.dart';
+import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/dismissed_services.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/providers.dart';
@@ -100,6 +103,10 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     ref.invalidate(appReachableLocalProvider);
     ref.invalidate(apiReachableLocalProvider);
     ref.invalidate(localServeListProvider);
+    // Reads only: a stopped service is never restarted by a refresh.
+    ref.invalidate(managedDeviceProvider);
+    ref.invalidate(deviceManagementProvider);
+    ref.invalidate(hostRestoreProblemProvider);
   }
 
   @override
@@ -116,7 +123,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
         IconButton(
           key: const Key('refresh-btn'),
           icon: const Icon(Icons.refresh),
-          tooltip: l10n.refreshStatus,
+          tooltip: l10n.refreshServices,
           // Re-discover services, re-read subscription health, and re-probe
           // every app-server's backend reachability, then rebuild so each
           // status re-evaluates.

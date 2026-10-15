@@ -5,7 +5,8 @@ part of '../services_screen.dart';
 bool _largeText(BuildContext context) =>
     MediaQuery.textScalerOf(context).scale(14) > 14 * 1.5;
 
-/// [leading], the expanded [body] and [trailing] on one row; with large text
+/// [leading], the expanded [body] and [trailing] on one row; with large text,
+/// or where the row is narrower than [stackBelow] (scaled with the text),
 /// [trailing] goes under them instead, end-aligned and wrapping, so the body
 /// keeps its width and nothing overflows.
 Widget _rowOrStacked(
@@ -13,17 +14,16 @@ Widget _rowOrStacked(
   required List<Widget> leading,
   required Widget body,
   required List<Widget> trailing,
+  double stackBelow = 0,
 }) {
-  if (!_largeText(context)) {
-    return Row(
-      children: [
-        ...leading,
-        Expanded(child: body),
-        ...trailing,
-      ],
-    );
-  }
-  return Column(
+  Widget inline() => Row(
+    children: [
+      ...leading,
+      Expanded(child: body),
+      ...trailing,
+    ],
+  );
+  Widget stacked() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     mainAxisSize: MainAxisSize.min,
     children: [
@@ -43,6 +43,13 @@ Widget _rowOrStacked(
         ),
       ],
     ],
+  );
+  if (_largeText(context)) return stacked();
+  if (stackBelow <= 0) return inline();
+  final threshold = MediaQuery.textScalerOf(context).scale(stackBelow);
+  return LayoutBuilder(
+    builder: (context, constraints) =>
+        constraints.maxWidth < threshold ? stacked() : inline(),
   );
 }
 
@@ -118,6 +125,10 @@ class _CapabilityRow extends StatelessWidget {
       ),
       child: _rowOrStacked(
         context,
+        // Default, status, the action and the overflow take ~260 px; below
+        // this the title and provider would be squeezed to a fragment
+        // beside them (every phone width).
+        stackBelow: 440,
         leading: [
           IconBadge(icon: icon, size: 36, accent: true),
           const SizedBox(width: 11),
@@ -126,24 +137,25 @@ class _CapabilityRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
+            // The provider badge follows the title, or goes under it where
+            // both do not fit, so neither is cut to a fragment.
+            Wrap(
+              spacing: 6,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Flexible(
-                  child: Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (provider != null) ...[
-                  const SizedBox(width: 6),
+                if (provider != null)
                   ProviderBadge(
                     provider: provider!,
                     name: providerName,
                     profileId: profileId,
                   ),
-                ],
               ],
             ),
             // One rich line rather than a Row, so a long address ellipsises
@@ -194,26 +206,32 @@ class _CapabilityRow extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           if (status != null) ...[status!, const SizedBox(width: 6)],
-          TextButton(onPressed: onAction, child: Text(actionLabel)),
-          if (_overflow.isNotEmpty)
-            PopupMenuButton<VoidCallback>(
-              key: menuKey,
-              tooltip: l10n.moreActions,
-              icon: const Icon(Icons.more_horiz),
-              onSelected: (action) => action(),
-              itemBuilder: (_) => [
-                for (final item in _overflow)
-                  PopupMenuItem<VoidCallback>(
-                    value: item.action,
-                    child: Text(
-                      item.label(l10n),
-                      style: item.danger
-                          ? TextStyle(color: scheme.error)
-                          : null,
-                    ),
-                  ),
-              ],
-            ),
+          // The action and its overflow wrap together, never apart.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextButton(onPressed: onAction, child: Text(actionLabel)),
+              if (_overflow.isNotEmpty)
+                PopupMenuButton<VoidCallback>(
+                  key: menuKey,
+                  tooltip: l10n.moreActions,
+                  icon: const Icon(Icons.more_horiz),
+                  onSelected: (action) => action(),
+                  itemBuilder: (_) => [
+                    for (final item in _overflow)
+                      PopupMenuItem<VoidCallback>(
+                        value: item.action,
+                        child: Text(
+                          item.label(l10n),
+                          style: item.danger
+                              ? TextStyle(color: scheme.error)
+                              : null,
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
         ],
       ),
     );

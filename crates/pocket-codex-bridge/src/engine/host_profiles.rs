@@ -61,7 +61,7 @@ use super::host_names;
 #[path = "host_profiles_environment.rs"]
 pub mod environment;
 #[path = "host_profiles_files.rs"]
-mod files;
+pub(super) mod files;
 #[path = "host_profiles_opencode.rs"]
 pub(super) mod opencode;
 #[path = "host_profiles_secrets.rs"]
@@ -410,6 +410,19 @@ pub fn stage_in(
     expected: Option<u64>,
     engine: Engine<'_>,
 ) -> Result<(HostProfile, Staged)> {
+    stage_checked_in(root, name, change, expected, engine, &|| Ok(()))
+}
+
+/// Stage a remote save only if its admission is still valid under the file
+/// lock.
+pub(super) fn stage_checked_in(
+    root: &Path,
+    name: &str,
+    change: &Change,
+    expected: Option<u64>,
+    engine: Engine<'_>,
+    check: &dyn Fn() -> Result<()>,
+) -> Result<(HostProfile, Staged)> {
     let name = host_names::canonical(name)?;
     let input = &change.input;
     engine.allows(input.source, input.protocol)?;
@@ -452,11 +465,15 @@ pub fn stage_in(
     };
 
     let lock = lock(root, true)?;
+    check()?;
     let mut profiles = lock.load(root)?;
     let previous = profiles.hosts.get(&name).cloned();
     let current = previous.as_ref().map_or(0, |r| r.revision);
     if expected.is_some_and(|expected| expected != current) {
-        bail!("this host's configuration was changed elsewhere; reload it before saving");
+        return Err(RevisionConflict {
+            current,
+        }
+        .into());
     }
     if custom && matches!(engine, Engine::OpenCode) {
         let present = match &key {

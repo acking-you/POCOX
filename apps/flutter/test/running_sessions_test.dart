@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';
@@ -141,8 +142,9 @@ void main() {
         );
         await frames(t);
         if (width < 720) {
-          final scaffold = t.state<ScaffoldState>(find.byType(Scaffold).first);
-          scaffold.openDrawer();
+          t
+              .state<LayeredNavigationState>(find.byType(LayeredNavigation))
+              .open();
           await frames(t);
         }
         expect(find.text('进行中'), findsOneWidget);

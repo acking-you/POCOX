@@ -66,7 +66,8 @@ struct Serving {
 }
 
 /// Public startup/catalog status without native credentials or private URL.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OpenCodeStatus {
     /// Installed executable version.
     pub version: String,

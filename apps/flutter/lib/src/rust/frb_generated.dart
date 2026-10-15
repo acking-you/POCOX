@@ -6,6 +6,7 @@
 import 'api/bridge.dart';
 import 'api/bridge/codex_setup.dart';
 import 'api/bridge/connection.dart';
+import 'api/bridge/device_management.dart';
 import 'api/bridge/events.dart';
 import 'api/bridge/host_config.dart';
 import 'api/bridge/host_sessions.dart';
@@ -79,7 +80,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1023458439;
+  int get rustContentHash => -798268692;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -548,6 +549,14 @@ abstract class RustLibApi extends BaseApi {
 
   Future<CodexSetupStatusDto> crateApiBridgeCodexSetupCodexSetupStatus();
 
+  Future<DeviceManagementDto>
+  crateApiBridgeDeviceManagementDeviceManagementSetEnabled({
+    required bool enabled,
+  });
+
+  Future<DeviceManagementDto>
+  crateApiBridgeDeviceManagementDeviceManagementStatus();
+
   Future<List<ServiceIdDto>> crateApiBridgeServicesDiscoverServices();
 
   Future<String> crateApiBridgeHostingEmbeddedCodexVersion();
@@ -583,6 +592,19 @@ abstract class RustLibApi extends BaseApi {
     String? engine,
   });
 
+  Future<List<HostRestoreOverrideDto>>
+  crateApiBridgeDeviceManagementHostRestoreOverrides();
+
+  Future<String?> crateApiBridgeDeviceManagementHostRestoreProblem({
+    String? name,
+  });
+
+  Future<void> crateApiBridgeDeviceManagementHostRestoreService({
+    required String name,
+    BigInt? expectedRevision,
+    HostRuntimeDto? legacyRuntime,
+  });
+
   Future<String> crateApiBridgeImportConfig({required String text});
 
   Future<void> crateApiSimpleInitApp();
@@ -590,6 +612,61 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiBridgeInitBridge({required String supportDir});
 
   Stream<LogLineDto> crateApiBridgeEventsLogEvents();
+
+  Future<AcpClaudeSetupDto> crateApiBridgeDeviceManagementManagedClaudePrepare({
+    required String serviceKey,
+    required bool start,
+  });
+
+  Future<ManagedDeviceDto> crateApiBridgeDeviceManagementManagedDevice({
+    required String serviceKey,
+  });
+
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHost({
+    required String serviceKey,
+    required String name,
+  });
+
+  Future<HostApplyDto> crateApiBridgeDeviceManagementManagedHostApply({
+    required String serviceKey,
+    required String name,
+    required String expectedIncarnation,
+    required BigInt expectedRevision,
+  });
+
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostSave({
+    required String serviceKey,
+    required String name,
+    required ManagedHostSaveDto edit,
+  });
+
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostStart({
+    required String serviceKey,
+    required String name,
+    required ManagedRuntimeDto runtime,
+    required HostConfigInputDto input,
+    required String keyAction,
+    String? key,
+  });
+
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostStartSaved({
+    required String serviceKey,
+    required String name,
+    required BigInt expectedRevision,
+  });
+
+  Future<void> crateApiBridgeDeviceManagementManagedHostStop({
+    required String serviceKey,
+    required String name,
+    required String expectedIncarnation,
+  });
+
+  Future<List<ManagedRuntimeAvailabilityDto>>
+  crateApiBridgeDeviceManagementManagedRuntimes({required String serviceKey});
+
+  Future<String?> crateApiBridgeHostSessionsMetaEnsureDefaultProject({
+    required String serviceKey,
+  });
 
   Future<void> crateApiBridgeHostSessionsMetaFileDownload({
     required String serviceKey,
@@ -627,6 +704,10 @@ abstract class RustLibApi extends BaseApi {
     required String serviceKey,
   });
 
+  Future<ProjectSettingsDto> crateApiBridgeHostSessionsMetaProjectSettings({
+    required String serviceKey,
+  });
+
   Future<Uint8List> crateApiBridgeHostSessionsMetaReadFile({
     required String serviceKey,
     required String path,
@@ -639,6 +720,13 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Stream<RetryProgressDto> crateApiBridgeEventsMetaRetryEvents();
+
+  Future<ProjectSettingsDto> crateApiBridgeHostSessionsMetaSaveProjectSettings({
+    required String serviceKey,
+    required List<String> projectRoots,
+    String? defaultProject,
+    String? expectedRevision,
+  });
 
   Stream<SessionFollowUpdateDto> crateApiBridgeHostSessionsMetaSessionEvents({
     required String serviceKey,
@@ -4056,6 +4144,72 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "codex_setup_status", argNames: []);
 
   @override
+  Future<DeviceManagementDto>
+  crateApiBridgeDeviceManagementDeviceManagementSetEnabled({
+    required bool enabled,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(enabled, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 99,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_device_management_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta:
+            kCrateApiBridgeDeviceManagementDeviceManagementSetEnabledConstMeta,
+        argValues: [enabled],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementDeviceManagementSetEnabledConstMeta =>
+      const TaskConstMeta(
+        debugName: "device_management_set_enabled",
+        argNames: ["enabled"],
+      );
+
+  @override
+  Future<DeviceManagementDto>
+  crateApiBridgeDeviceManagementDeviceManagementStatus() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 100,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_device_management_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta:
+            kCrateApiBridgeDeviceManagementDeviceManagementStatusConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementDeviceManagementStatusConstMeta =>
+      const TaskConstMeta(debugName: "device_management_status", argNames: []);
+
+  @override
   Future<List<ServiceIdDto>> crateApiBridgeServicesDiscoverServices() {
     return handler.executeNormal(
       NormalTask(
@@ -4064,7 +4218,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 99,
+            funcId: 101,
             port: port_,
           );
         },
@@ -4091,7 +4245,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 100,
+            funcId: 102,
             port: port_,
           );
         },
@@ -4118,7 +4272,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 101,
+            funcId: 103,
             port: port_,
           );
         },
@@ -4145,7 +4299,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 102,
+            funcId: 104,
             port: port_,
           );
         },
@@ -4173,7 +4327,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 103,
+            funcId: 105,
           )!;
         },
         codec: SseCodec(
@@ -4202,7 +4356,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 104,
+            funcId: 106,
             port: port_,
           );
         },
@@ -4232,7 +4386,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 105,
+            funcId: 107,
             port: port_,
           );
         },
@@ -4262,7 +4416,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 106,
+            funcId: 108,
             port: port_,
           );
         },
@@ -4304,7 +4458,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 107,
+            funcId: 109,
             port: port_,
           );
         },
@@ -4355,7 +4509,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 108,
+            funcId: 110,
           )!;
         },
         codec: SseCodec(
@@ -4376,6 +4530,110 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<List<HostRestoreOverrideDto>>
+  crateApiBridgeDeviceManagementHostRestoreOverrides() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 111,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_host_restore_override_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementHostRestoreOverridesConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementHostRestoreOverridesConstMeta =>
+      const TaskConstMeta(debugName: "host_restore_overrides", argNames: []);
+
+  @override
+  Future<String?> crateApiBridgeDeviceManagementHostRestoreProblem({
+    String? name,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 112,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementHostRestoreProblemConstMeta,
+        argValues: [name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementHostRestoreProblemConstMeta =>
+      const TaskConstMeta(
+        debugName: "host_restore_problem",
+        argNames: ["name"],
+      );
+
+  @override
+  Future<void> crateApiBridgeDeviceManagementHostRestoreService({
+    required String name,
+    BigInt? expectedRevision,
+    HostRuntimeDto? legacyRuntime,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(name, serializer);
+          sse_encode_opt_box_autoadd_u_64(expectedRevision, serializer);
+          sse_encode_opt_box_autoadd_host_runtime_dto(
+            legacyRuntime,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 113,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementHostRestoreServiceConstMeta,
+        argValues: [name, expectedRevision, legacyRuntime],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementHostRestoreServiceConstMeta =>
+      const TaskConstMeta(
+        debugName: "host_restore_service",
+        argNames: ["name", "expectedRevision", "legacyRuntime"],
+      );
+
+  @override
   Future<String> crateApiBridgeImportConfig({required String text}) {
     return handler.executeNormal(
       NormalTask(
@@ -4385,7 +4643,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 109,
+            funcId: 114,
             port: port_,
           );
         },
@@ -4412,7 +4670,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 110,
+            funcId: 115,
             port: port_,
           );
         },
@@ -4440,7 +4698,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 111,
+            funcId: 116,
             port: port_,
           );
         },
@@ -4470,7 +4728,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 112,
+              funcId: 117,
               port: port_,
             );
           },
@@ -4491,6 +4749,383 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "log_events", argNames: ["sink"]);
 
   @override
+  Future<AcpClaudeSetupDto> crateApiBridgeDeviceManagementManagedClaudePrepare({
+    required String serviceKey,
+    required bool start,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_bool(start, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 118,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_acp_claude_setup_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedClaudePrepareConstMeta,
+        argValues: [serviceKey, start],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementManagedClaudePrepareConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_claude_prepare",
+        argNames: ["serviceKey", "start"],
+      );
+
+  @override
+  Future<ManagedDeviceDto> crateApiBridgeDeviceManagementManagedDevice({
+    required String serviceKey,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 119,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_managed_device_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedDeviceConstMeta,
+        argValues: [serviceKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedDeviceConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_device",
+        argNames: ["serviceKey"],
+      );
+
+  @override
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHost({
+    required String serviceKey,
+    required String name,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 120,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_managed_host_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedHostConstMeta,
+        argValues: [serviceKey, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedHostConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host",
+        argNames: ["serviceKey", "name"],
+      );
+
+  @override
+  Future<HostApplyDto> crateApiBridgeDeviceManagementManagedHostApply({
+    required String serviceKey,
+    required String name,
+    required String expectedIncarnation,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_String(expectedIncarnation, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 121,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_host_apply_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedHostApplyConstMeta,
+        argValues: [serviceKey, name, expectedIncarnation, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedHostApplyConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host_apply",
+        argNames: [
+          "serviceKey",
+          "name",
+          "expectedIncarnation",
+          "expectedRevision",
+        ],
+      );
+
+  @override
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostSave({
+    required String serviceKey,
+    required String name,
+    required ManagedHostSaveDto edit,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_box_autoadd_managed_host_save_dto(edit, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 122,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_managed_host_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedHostSaveConstMeta,
+        argValues: [serviceKey, name, edit],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedHostSaveConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host_save",
+        argNames: ["serviceKey", "name", "edit"],
+      );
+
+  @override
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostStart({
+    required String serviceKey,
+    required String name,
+    required ManagedRuntimeDto runtime,
+    required HostConfigInputDto input,
+    required String keyAction,
+    String? key,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_box_autoadd_managed_runtime_dto(runtime, serializer);
+          sse_encode_box_autoadd_host_config_input_dto(input, serializer);
+          sse_encode_String(keyAction, serializer);
+          sse_encode_opt_String(key, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 123,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_managed_host_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedHostStartConstMeta,
+        argValues: [serviceKey, name, runtime, input, keyAction, key],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedHostStartConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host_start",
+        argNames: [
+          "serviceKey",
+          "name",
+          "runtime",
+          "input",
+          "keyAction",
+          "key",
+        ],
+      );
+
+  @override
+  Future<ManagedHostDto> crateApiBridgeDeviceManagementManagedHostStartSaved({
+    required String serviceKey,
+    required String name,
+    required BigInt expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_u_64(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 124,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_managed_host_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta:
+            kCrateApiBridgeDeviceManagementManagedHostStartSavedConstMeta,
+        argValues: [serviceKey, name, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeDeviceManagementManagedHostStartSavedConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host_start_saved",
+        argNames: ["serviceKey", "name", "expectedRevision"],
+      );
+
+  @override
+  Future<void> crateApiBridgeDeviceManagementManagedHostStop({
+    required String serviceKey,
+    required String name,
+    required String expectedIncarnation,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_String(expectedIncarnation, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 125,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedHostStopConstMeta,
+        argValues: [serviceKey, name, expectedIncarnation],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedHostStopConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_host_stop",
+        argNames: ["serviceKey", "name", "expectedIncarnation"],
+      );
+
+  @override
+  Future<List<ManagedRuntimeAvailabilityDto>>
+  crateApiBridgeDeviceManagementManagedRuntimes({required String serviceKey}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 126,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_managed_runtime_availability_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeDeviceManagementManagedRuntimesConstMeta,
+        argValues: [serviceKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeDeviceManagementManagedRuntimesConstMeta =>
+      const TaskConstMeta(
+        debugName: "managed_runtimes",
+        argNames: ["serviceKey"],
+      );
+
+  @override
+  Future<String?> crateApiBridgeHostSessionsMetaEnsureDefaultProject({
+    required String serviceKey,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 127,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeHostSessionsMetaEnsureDefaultProjectConstMeta,
+        argValues: [serviceKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeHostSessionsMetaEnsureDefaultProjectConstMeta =>
+      const TaskConstMeta(
+        debugName: "meta_ensure_default_project",
+        argNames: ["serviceKey"],
+      );
+
+  @override
   Future<void> crateApiBridgeHostSessionsMetaFileDownload({
     required String serviceKey,
     String? threadId,
@@ -4508,7 +5143,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 113,
+            funcId: 128,
             port: port_,
           );
         },
@@ -4545,7 +5180,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 114,
+            funcId: 129,
             port: port_,
           );
         },
@@ -4580,7 +5215,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 115,
+            funcId: 130,
             port: port_,
           );
         },
@@ -4613,7 +5248,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 116,
+            funcId: 131,
             port: port_,
           );
         },
@@ -4648,7 +5283,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 117,
+            funcId: 132,
             port: port_,
           );
         },
@@ -4683,7 +5318,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 118,
+            funcId: 133,
             port: port_,
           );
         },
@@ -4716,7 +5351,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 119,
+            funcId: 134,
             port: port_,
           );
         },
@@ -4738,6 +5373,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<ProjectSettingsDto> crateApiBridgeHostSessionsMetaProjectSettings({
+    required String serviceKey,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 135,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_project_settings_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeHostSessionsMetaProjectSettingsConstMeta,
+        argValues: [serviceKey],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeHostSessionsMetaProjectSettingsConstMeta =>
+      const TaskConstMeta(
+        debugName: "meta_project_settings",
+        argNames: ["serviceKey"],
+      );
+
+  @override
   Future<Uint8List> crateApiBridgeHostSessionsMetaReadFile({
     required String serviceKey,
     required String path,
@@ -4751,7 +5419,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 120,
+            funcId: 136,
             port: port_,
           );
         },
@@ -4788,7 +5456,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 121,
+            funcId: 137,
             port: port_,
           );
         },
@@ -4821,7 +5489,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 122,
+              funcId: 138,
               port: port_,
             );
           },
@@ -4840,6 +5508,51 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiBridgeEventsMetaRetryEventsConstMeta =>
       const TaskConstMeta(debugName: "meta_retry_events", argNames: ["sink"]);
+
+  @override
+  Future<ProjectSettingsDto> crateApiBridgeHostSessionsMetaSaveProjectSettings({
+    required String serviceKey,
+    required List<String> projectRoots,
+    String? defaultProject,
+    String? expectedRevision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(serviceKey, serializer);
+          sse_encode_list_String(projectRoots, serializer);
+          sse_encode_opt_String(defaultProject, serializer);
+          sse_encode_opt_String(expectedRevision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 139,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_project_settings_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeHostSessionsMetaSaveProjectSettingsConstMeta,
+        argValues: [serviceKey, projectRoots, defaultProject, expectedRevision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeHostSessionsMetaSaveProjectSettingsConstMeta =>
+      const TaskConstMeta(
+        debugName: "meta_save_project_settings",
+        argNames: [
+          "serviceKey",
+          "projectRoots",
+          "defaultProject",
+          "expectedRevision",
+        ],
+      );
 
   @override
   Stream<SessionFollowUpdateDto> crateApiBridgeHostSessionsMetaSessionEvents({
@@ -4861,7 +5574,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 123,
+              funcId: 140,
               port: port_,
             );
           },
@@ -4898,7 +5611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 124,
+            funcId: 141,
             port: port_,
           );
         },
@@ -4933,7 +5646,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 125,
+            funcId: 142,
             port: port_,
           );
         },
@@ -4968,7 +5681,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 126,
+            funcId: 143,
             port: port_,
           );
         },
@@ -5005,7 +5718,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 127,
+            funcId: 144,
             port: port_,
           );
         },
@@ -5040,7 +5753,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 128,
+            funcId: 145,
             port: port_,
           );
         },
@@ -5077,7 +5790,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 129,
+            funcId: 146,
             port: port_,
           );
         },
@@ -5107,7 +5820,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 130,
+            funcId: 147,
           )!;
         },
         codec: SseCodec(
@@ -5140,7 +5853,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 131,
+            funcId: 148,
             port: port_,
           );
         },
@@ -5179,7 +5892,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 132,
+            funcId: 149,
             port: port_,
           );
         },
@@ -5218,7 +5931,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 133,
+            funcId: 150,
             port: port_,
           );
         },
@@ -5251,7 +5964,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 134,
+            funcId: 151,
             port: port_,
           );
         },
@@ -5279,7 +5992,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 135,
+            funcId: 152,
             port: port_,
           );
         },
@@ -5307,7 +6020,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 136,
+            funcId: 153,
             port: port_,
           );
         },
@@ -5335,7 +6048,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 137,
+            funcId: 154,
             port: port_,
           );
         },
@@ -5363,7 +6076,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 138,
+            funcId: 155,
             port: port_,
           );
         },
@@ -5390,7 +6103,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 139,
+            funcId: 156,
             port: port_,
           );
         },
@@ -5762,6 +6475,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AppServeStatusDto dco_decode_box_autoadd_app_serve_status_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_app_serve_status_dto(raw);
+  }
+
+  @protected
   bool dco_decode_box_autoadd_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
@@ -5789,6 +6508,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_i_64(raw);
+  }
+
+  @protected
+  ManagedHostSaveDto dco_decode_box_autoadd_managed_host_save_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_managed_host_save_dto(raw);
+  }
+
+  @protected
+  ManagedRuntimeDto dco_decode_box_autoadd_managed_runtime_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_managed_runtime_dto(raw);
   }
 
   @protected
@@ -5948,6 +6679,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       intervalSecs: dco_decode_u_64(arr[3]),
       expiresInSecs: dco_decode_u_64(arr[4]),
       backend: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  DeviceManagementDto dco_decode_device_management_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return DeviceManagementDto(
+      supported: dco_decode_bool(arr[0]),
+      enabled: dco_decode_bool(arr[1]),
+      registered: dco_decode_bool(arr[2]),
+      serviceKey: dco_decode_opt_String(arr[3]),
+      problem: dco_decode_opt_String(arr[4]),
     );
   }
 
@@ -6122,6 +6868,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HostRestoreOverrideDto dco_decode_host_restore_override_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return HostRestoreOverrideDto(
+      name: dco_decode_String(arr[0]),
+      revision: dco_decode_u_64(arr[1]),
+      runtime: dco_decode_opt_box_autoadd_host_runtime_dto(arr[2]),
+    );
+  }
+
+  @protected
   HostRuntimeDto dco_decode_host_runtime_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -6221,9 +6980,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<HostRestoreOverrideDto> dco_decode_list_host_restore_override_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_host_restore_override_dto)
+        .toList();
+  }
+
+  @protected
   List<LocalSessionDto> dco_decode_list_local_session_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_local_session_dto).toList();
+  }
+
+  @protected
+  List<ManagedHostDto> dco_decode_list_managed_host_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_managed_host_dto).toList();
+  }
+
+  @protected
+  List<ManagedRuntimeAvailabilityDto>
+  dco_decode_list_managed_runtime_availability_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_managed_runtime_availability_dto)
+        .toList();
   }
 
   @protected
@@ -6339,6 +7123,86 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       target: dco_decode_String(arr[1]),
       message: dco_decode_String(arr[2]),
       timestampMs: dco_decode_i_64(arr[3]),
+    );
+  }
+
+  @protected
+  ManagedDeviceDto dco_decode_managed_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ManagedDeviceDto(
+      device: dco_decode_String(arr[0]),
+      os: dco_decode_String(arr[1]),
+      appVersion: dco_decode_String(arr[2]),
+      hosts: dco_decode_list_managed_host_dto(arr[3]),
+      restoreProblem: dco_decode_opt_String(arr[4]),
+    );
+  }
+
+  @protected
+  ManagedHostDto dco_decode_managed_host_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ManagedHostDto(
+      name: dco_decode_String(arr[0]),
+      config: dco_decode_host_config_dto(arr[1]),
+      status: dco_decode_opt_box_autoadd_app_serve_status_dto(arr[2]),
+      restore: dco_decode_bool(arr[3]),
+      restoreProblem: dco_decode_opt_String(arr[4]),
+      baseUrlMasked: dco_decode_bool(arr[5]),
+    );
+  }
+
+  @protected
+  ManagedHostSaveDto dco_decode_managed_host_save_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ManagedHostSaveDto(
+      input: dco_decode_host_config_input_dto(arr[0]),
+      keyAction: dco_decode_String(arr[1]),
+      key: dco_decode_opt_String(arr[2]),
+      expectedRevision: dco_decode_u_64(arr[3]),
+      runtime: dco_decode_opt_box_autoadd_managed_runtime_dto(arr[4]),
+      keepBaseUrl: dco_decode_bool(arr[5]),
+    );
+  }
+
+  @protected
+  ManagedRuntimeAvailabilityDto dco_decode_managed_runtime_availability_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return ManagedRuntimeAvailabilityDto(
+      kind: dco_decode_String(arr[0]),
+      ready: dco_decode_bool(arr[1]),
+      path: dco_decode_opt_String(arr[2]),
+      version: dco_decode_opt_String(arr[3]),
+      needsHostLogin: dco_decode_bool(arr[4]),
+      canPrepare: dco_decode_bool(arr[5]),
+      problem: dco_decode_opt_String(arr[6]),
+    );
+  }
+
+  @protected
+  ManagedRuntimeDto dco_decode_managed_runtime_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ManagedRuntimeDto(
+      kind: dco_decode_String(arr[0]),
+      port: dco_decode_u_16(arr[1]),
+      proxy: dco_decode_opt_String(arr[2]),
+      keepProxy: dco_decode_bool(arr[3]),
     );
   }
 
@@ -6470,6 +7334,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AppServeStatusDto? dco_decode_opt_box_autoadd_app_serve_status_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_app_serve_status_dto(raw);
+  }
+
+  @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_bool(raw);
@@ -6491,6 +7365,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_i_64(raw);
+  }
+
+  @protected
+  ManagedRuntimeDto? dco_decode_opt_box_autoadd_managed_runtime_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_managed_runtime_dto(raw);
   }
 
   @protected
@@ -6564,6 +7446,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ProjectConfigDto(
       projectRoots: dco_decode_list_String(arr[0]),
       defaultProject: dco_decode_opt_String(arr[1]),
+    );
+  }
+
+  @protected
+  ProjectSettingsDto dco_decode_project_settings_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ProjectSettingsDto(
+      projectRoots: dco_decode_list_String(arr[0]),
+      defaultProject: dco_decode_opt_String(arr[1]),
+      revision: dco_decode_opt_String(arr[2]),
+      effectiveDefault: dco_decode_opt_String(arr[3]),
+      automatic: dco_decode_bool(arr[4]),
+      exists: dco_decode_bool(arr[5]),
     );
   }
 
@@ -7357,6 +8255,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AppServeStatusDto sse_decode_box_autoadd_app_serve_status_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_app_serve_status_dto(deserializer));
+  }
+
+  @protected
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_bool(deserializer));
@@ -7390,6 +8296,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_i_64(deserializer));
+  }
+
+  @protected
+  ManagedHostSaveDto sse_decode_box_autoadd_managed_host_save_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_managed_host_save_dto(deserializer));
+  }
+
+  @protected
+  ManagedRuntimeDto sse_decode_box_autoadd_managed_runtime_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_managed_runtime_dto(deserializer));
   }
 
   @protected
@@ -7588,6 +8510,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  DeviceManagementDto sse_decode_device_management_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_supported = sse_decode_bool(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_registered = sse_decode_bool(deserializer);
+    var var_serviceKey = sse_decode_opt_String(deserializer);
+    var var_problem = sse_decode_opt_String(deserializer);
+    return DeviceManagementDto(
+      supported: var_supported,
+      enabled: var_enabled,
+      registered: var_registered,
+      serviceKey: var_serviceKey,
+      problem: var_problem,
+    );
+  }
+
+  @protected
   DirEntryDto sse_decode_dir_entry_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_name = sse_decode_String(deserializer);
@@ -7777,6 +8718,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HostRestoreOverrideDto sse_decode_host_restore_override_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_revision = sse_decode_u_64(deserializer);
+    var var_runtime = sse_decode_opt_box_autoadd_host_runtime_dto(deserializer);
+    return HostRestoreOverrideDto(
+      name: var_name,
+      revision: var_revision,
+      runtime: var_runtime,
+    );
+  }
+
+  @protected
   HostRuntimeDto sse_decode_host_runtime_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_kind = sse_decode_String(deserializer);
@@ -7951,6 +8907,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<HostRestoreOverrideDto> sse_decode_list_host_restore_override_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <HostRestoreOverrideDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_host_restore_override_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<LocalSessionDto> sse_decode_list_local_session_dto(
     SseDeserializer deserializer,
   ) {
@@ -7960,6 +8930,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <LocalSessionDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_local_session_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ManagedHostDto> sse_decode_list_managed_host_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ManagedHostDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_managed_host_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ManagedRuntimeAvailabilityDto>
+  sse_decode_list_managed_runtime_availability_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ManagedRuntimeAvailabilityDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_managed_runtime_availability_dto(deserializer));
     }
     return ans_;
   }
@@ -8165,6 +9164,107 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ManagedDeviceDto sse_decode_managed_device_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_device = sse_decode_String(deserializer);
+    var var_os = sse_decode_String(deserializer);
+    var var_appVersion = sse_decode_String(deserializer);
+    var var_hosts = sse_decode_list_managed_host_dto(deserializer);
+    var var_restoreProblem = sse_decode_opt_String(deserializer);
+    return ManagedDeviceDto(
+      device: var_device,
+      os: var_os,
+      appVersion: var_appVersion,
+      hosts: var_hosts,
+      restoreProblem: var_restoreProblem,
+    );
+  }
+
+  @protected
+  ManagedHostDto sse_decode_managed_host_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_config = sse_decode_host_config_dto(deserializer);
+    var var_status = sse_decode_opt_box_autoadd_app_serve_status_dto(
+      deserializer,
+    );
+    var var_restore = sse_decode_bool(deserializer);
+    var var_restoreProblem = sse_decode_opt_String(deserializer);
+    var var_baseUrlMasked = sse_decode_bool(deserializer);
+    return ManagedHostDto(
+      name: var_name,
+      config: var_config,
+      status: var_status,
+      restore: var_restore,
+      restoreProblem: var_restoreProblem,
+      baseUrlMasked: var_baseUrlMasked,
+    );
+  }
+
+  @protected
+  ManagedHostSaveDto sse_decode_managed_host_save_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_input = sse_decode_host_config_input_dto(deserializer);
+    var var_keyAction = sse_decode_String(deserializer);
+    var var_key = sse_decode_opt_String(deserializer);
+    var var_expectedRevision = sse_decode_u_64(deserializer);
+    var var_runtime = sse_decode_opt_box_autoadd_managed_runtime_dto(
+      deserializer,
+    );
+    var var_keepBaseUrl = sse_decode_bool(deserializer);
+    return ManagedHostSaveDto(
+      input: var_input,
+      keyAction: var_keyAction,
+      key: var_key,
+      expectedRevision: var_expectedRevision,
+      runtime: var_runtime,
+      keepBaseUrl: var_keepBaseUrl,
+    );
+  }
+
+  @protected
+  ManagedRuntimeAvailabilityDto sse_decode_managed_runtime_availability_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_ready = sse_decode_bool(deserializer);
+    var var_path = sse_decode_opt_String(deserializer);
+    var var_version = sse_decode_opt_String(deserializer);
+    var var_needsHostLogin = sse_decode_bool(deserializer);
+    var var_canPrepare = sse_decode_bool(deserializer);
+    var var_problem = sse_decode_opt_String(deserializer);
+    return ManagedRuntimeAvailabilityDto(
+      kind: var_kind,
+      ready: var_ready,
+      path: var_path,
+      version: var_version,
+      needsHostLogin: var_needsHostLogin,
+      canPrepare: var_canPrepare,
+      problem: var_problem,
+    );
+  }
+
+  @protected
+  ManagedRuntimeDto sse_decode_managed_runtime_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_port = sse_decode_u_16(deserializer);
+    var var_proxy = sse_decode_opt_String(deserializer);
+    var var_keepProxy = sse_decode_bool(deserializer);
+    return ManagedRuntimeDto(
+      kind: var_kind,
+      port: var_port,
+      proxy: var_proxy,
+      keepProxy: var_keepProxy,
+    );
+  }
+
+  @protected
   ModelInfoDto sse_decode_model_info_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_id = sse_decode_String(deserializer);
@@ -8337,6 +9437,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  AppServeStatusDto? sse_decode_opt_box_autoadd_app_serve_status_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_app_serve_status_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -8379,6 +9492,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_i_64(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  ManagedRuntimeDto? sse_decode_opt_box_autoadd_managed_runtime_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_managed_runtime_dto(deserializer));
     } else {
       return null;
     }
@@ -8490,6 +9616,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return ProjectConfigDto(
       projectRoots: var_projectRoots,
       defaultProject: var_defaultProject,
+    );
+  }
+
+  @protected
+  ProjectSettingsDto sse_decode_project_settings_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_projectRoots = sse_decode_list_String(deserializer);
+    var var_defaultProject = sse_decode_opt_String(deserializer);
+    var var_revision = sse_decode_opt_String(deserializer);
+    var var_effectiveDefault = sse_decode_opt_String(deserializer);
+    var var_automatic = sse_decode_bool(deserializer);
+    var var_exists = sse_decode_bool(deserializer);
+    return ProjectSettingsDto(
+      projectRoots: var_projectRoots,
+      defaultProject: var_defaultProject,
+      revision: var_revision,
+      effectiveDefault: var_effectiveDefault,
+      automatic: var_automatic,
+      exists: var_exists,
     );
   }
 
@@ -9263,6 +10410,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_app_serve_status_dto(
+    AppServeStatusDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_app_serve_status_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self, serializer);
@@ -9302,6 +10458,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_64(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_managed_host_save_dto(
+    ManagedHostSaveDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_managed_host_save_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_managed_runtime_dto(
+    ManagedRuntimeDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_managed_runtime_dto(self, serializer);
   }
 
   @protected
@@ -9462,6 +10636,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_device_management_dto(
+    DeviceManagementDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.supported, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_bool(self.registered, serializer);
+    sse_encode_opt_String(self.serviceKey, serializer);
+    sse_encode_opt_String(self.problem, serializer);
+  }
+
+  @protected
   void sse_encode_dir_entry_dto(DirEntryDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.name, serializer);
@@ -9593,6 +10780,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.name, serializer);
     sse_encode_opt_String(self.value, serializer);
+  }
+
+  @protected
+  void sse_encode_host_restore_override_dto(
+    HostRestoreOverrideDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_u_64(self.revision, serializer);
+    sse_encode_opt_box_autoadd_host_runtime_dto(self.runtime, serializer);
   }
 
   @protected
@@ -9744,6 +10942,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_host_restore_override_dto(
+    List<HostRestoreOverrideDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_host_restore_override_dto(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_local_session_dto(
     List<LocalSessionDto> self,
     SseSerializer serializer,
@@ -9752,6 +10962,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_local_session_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_managed_host_dto(
+    List<ManagedHostDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_managed_host_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_managed_runtime_availability_dto(
+    List<ManagedRuntimeAvailabilityDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_managed_runtime_availability_dto(item, serializer);
     }
   }
 
@@ -9927,6 +11161,74 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_managed_device_dto(
+    ManagedDeviceDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.device, serializer);
+    sse_encode_String(self.os, serializer);
+    sse_encode_String(self.appVersion, serializer);
+    sse_encode_list_managed_host_dto(self.hosts, serializer);
+    sse_encode_opt_String(self.restoreProblem, serializer);
+  }
+
+  @protected
+  void sse_encode_managed_host_dto(
+    ManagedHostDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_host_config_dto(self.config, serializer);
+    sse_encode_opt_box_autoadd_app_serve_status_dto(self.status, serializer);
+    sse_encode_bool(self.restore, serializer);
+    sse_encode_opt_String(self.restoreProblem, serializer);
+    sse_encode_bool(self.baseUrlMasked, serializer);
+  }
+
+  @protected
+  void sse_encode_managed_host_save_dto(
+    ManagedHostSaveDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_host_config_input_dto(self.input, serializer);
+    sse_encode_String(self.keyAction, serializer);
+    sse_encode_opt_String(self.key, serializer);
+    sse_encode_u_64(self.expectedRevision, serializer);
+    sse_encode_opt_box_autoadd_managed_runtime_dto(self.runtime, serializer);
+    sse_encode_bool(self.keepBaseUrl, serializer);
+  }
+
+  @protected
+  void sse_encode_managed_runtime_availability_dto(
+    ManagedRuntimeAvailabilityDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_bool(self.ready, serializer);
+    sse_encode_opt_String(self.path, serializer);
+    sse_encode_opt_String(self.version, serializer);
+    sse_encode_bool(self.needsHostLogin, serializer);
+    sse_encode_bool(self.canPrepare, serializer);
+    sse_encode_opt_String(self.problem, serializer);
+  }
+
+  @protected
+  void sse_encode_managed_runtime_dto(
+    ManagedRuntimeDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_u_16(self.port, serializer);
+    sse_encode_opt_String(self.proxy, serializer);
+    sse_encode_bool(self.keepProxy, serializer);
+  }
+
+  @protected
   void sse_encode_model_info_dto(ModelInfoDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.id, serializer);
@@ -10059,6 +11361,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_app_serve_status_dto(
+    AppServeStatusDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_app_serve_status_dto(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -10104,6 +11419,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_i_64(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_managed_runtime_dto(
+    ManagedRuntimeDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_managed_runtime_dto(self, serializer);
     }
   }
 
@@ -10213,6 +11541,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_String(self.projectRoots, serializer);
     sse_encode_opt_String(self.defaultProject, serializer);
+  }
+
+  @protected
+  void sse_encode_project_settings_dto(
+    ProjectSettingsDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_String(self.projectRoots, serializer);
+    sse_encode_opt_String(self.defaultProject, serializer);
+    sse_encode_opt_String(self.revision, serializer);
+    sse_encode_opt_String(self.effectiveDefault, serializer);
+    sse_encode_bool(self.automatic, serializer);
+    sse_encode_bool(self.exists, serializer);
   }
 
   @protected

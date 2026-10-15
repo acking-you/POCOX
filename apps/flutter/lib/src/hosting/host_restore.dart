@@ -2,121 +2,171 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 
 /// Which saved hosting to bring back on a desktop cold start.
+///
+/// The bridge's restore overrides ([BridgeApi.hostRestoreOverrides]) are the
+/// authority: an override names the runtime to restore, or (runtime null)
+/// that the host was stopped, locally or from another device. The UI
+/// preferences only still count for a name with no override at all.
 class HostRestorePlan {
   /// Creates a plan.
   const HostRestorePlan({
     this.codex = const [],
     this.acp = const [],
     this.opencode,
+    this.overrides = const [],
   });
 
-  /// Codex hosts to restore, each under its own instance name.
+  /// Legacy Codex records to restore (names without an override).
   final List<AutoHostPrefs> codex;
 
-  /// ACP agents to restore, each under its own instance name.
+  /// Legacy ACP records to restore (names without an override).
   final List<AutoHostAcpPrefs> acp;
 
-  /// The native OpenCode host to restore, if any.
+  /// The legacy native OpenCode record to restore, if any.
   final AutoHostOpenCodePrefs? opencode;
 
+  /// Authoritative choices to restore, each with a runtime.
+  final List<HostRestoreOverride> overrides;
+
   /// Whether nothing needs restoring.
-  bool get isEmpty => codex.isEmpty && acp.isEmpty && opencode == null;
+  bool get isEmpty =>
+      codex.isEmpty && acp.isEmpty && opencode == null && overrides.isEmpty;
+
+  /// Every instance name the plan touches, by attempt set: Codex names, and
+  /// the names shared by ACP and OpenCode hosts.
+  ({Set<String> codex, Set<String> acp}) get names => (
+    codex: {
+      for (final saved in codex) saved.name,
+      for (final o in overrides)
+        if (o.runtime!.isCodex) o.name,
+    },
+    acp: {
+      for (final saved in acp) saved.name,
+      ?opencode?.name,
+      for (final o in overrides)
+        if (!o.runtime!.isCodex) o.name,
+    },
+  );
 }
 
-/// Plan the restore: each saved record at most once per run (callers track
-/// the attempts by instance name, per provider), and only names this device
-/// does not host already. Names are shared by every provider on a device,
-/// so a name taken by any running host is not restored over it.
+/// Instance names compare as the bridge canonicalizes them.
+String _canonical(String name) => name.trim().toLowerCase();
+
+/// Plan the restore: each name at most once per run (callers track the
+/// attempts by instance name, per provider), and only names this device does
+/// not host already. Names are shared by every provider on a device, so a
+/// name taken by any running host is not restored over it. One OpenCode host
+/// per device: none is restored beside a running one.
+///
+/// An override for a name, even one that only says "stopped", replaces that
+/// name's UI record, so a stopped host is never brought back from stale
+/// preferences.
 HostRestorePlan planHostRestore(
   UiPrefs prefs,
   List<AppServeStatus> local, {
   required Set<String> codexAttempted,
   required Set<String> acpAttempted,
   required bool acpSupported,
+  List<HostRestoreOverride> overrides = const [],
 }) {
-  final hostedNames = {for (final h in local) h.name};
+  final hosted = {for (final h in local) _canonical(h.name)};
+  final overridden = {for (final o in overrides) _canonical(o.name)};
+  bool open(String name, Set<String> attempted) =>
+      !attempted.contains(name) &&
+      !hosted.contains(_canonical(name)) &&
+      !overridden.contains(_canonical(name));
+  var openCodeTaken = local.any((h) => h.isOpenCode);
+
+  final chosen = <HostRestoreOverride>[];
+  for (final o in overrides) {
+    final runtime = o.runtime;
+    if (runtime == null) continue;
+    final attempted = runtime.isCodex ? codexAttempted : acpAttempted;
+    if (attempted.contains(o.name) || hosted.contains(_canonical(o.name))) {
+      continue;
+    }
+    if (!runtime.isCodex && !acpSupported) continue;
+    if (runtime.isOpenCode) {
+      if (openCodeTaken) continue;
+      openCodeTaken = true;
+    }
+    chosen.add(o);
+  }
+
   final codex = [
     for (final saved in prefs.autoHostCodex)
-      if (!codexAttempted.contains(saved.name) &&
-          !hostedNames.contains(saved.name))
-        saved,
+      if (open(saved.name, codexAttempted)) saved,
   ];
   final acp = !acpSupported
       ? const <AutoHostAcpPrefs>[]
       : [
           for (final saved in prefs.autoHostAcp)
-            if (!acpAttempted.contains(saved.name) &&
-                !hostedNames.contains(saved.name))
-              saved,
+            if (open(saved.name, acpAttempted)) saved,
         ];
   final saved = prefs.autoHostOpenCode;
-  // One OpenCode host per device: none is restored beside a running one.
   final opencode =
       saved == null ||
           !acpSupported ||
-          acpAttempted.contains(saved.name) ||
-          hostedNames.contains(saved.name) ||
-          local.any((h) => h.isOpenCode)
+          openCodeTaken ||
+          !open(saved.name, acpAttempted)
       ? null
       : saved;
-  return HostRestorePlan(codex: codex, acp: acp, opencode: opencode);
+  return HostRestorePlan(
+    codex: codex,
+    acp: acp,
+    opencode: opencode,
+    overrides: chosen,
+  );
 }
 
-/// Run [plan]; a failed restore is left to the start-hosting fallback.
-/// Returns whether anything was restored (discovery is then stale).
+/// Run [plan]. Every restore goes through [BridgeApi.hostRestoreService],
+/// which revalidates the choice under the host's lifecycle lease (a stop
+/// from another device after the plan was made wins) and starts with what is
+/// saved for the name. Only a legacy record carries its runtime. A failed
+/// restore is left to the start-hosting fallback. Returns whether anything
+/// was restored (discovery is then stale).
 Future<bool> runHostRestore(BridgeApi api, HostRestorePlan plan) async {
   var restored = false;
-  for (final codex in plan.codex) {
+  Future<void> restore(
+    String name, {
+    int? revision,
+    HostRuntime? legacyRuntime,
+  }) async {
     try {
-      await api.appServeStart(
-        port: codex.port,
-        binaryOverride: codex.binaryOverride,
-        name: codex.name,
-        proxy: codex.proxy,
-        // Legacy built-in hosts are restored through the external binary.
-        embedded: false,
+      await api.hostRestoreService(
+        name,
+        expectedRevision: revision,
+        legacyRuntime: legacyRuntime,
       );
       restored = true;
     } catch (_) {
-      // The hero (with its start-hosting action) is the fallback.
+      // Uninstalled, changed or stopped meanwhile: nothing is forced, and
+      // the hero (with its start-hosting action) is the fallback.
     }
+  }
+
+  for (final o in plan.overrides) {
+    await restore(o.name, revision: o.revision);
+  }
+  for (final saved in plan.codex) {
+    await restore(
+      saved.name,
+      // Legacy built-in hosts are restored through the external binary.
+      legacyRuntime: HostRuntime.codex(
+        binary: saved.binaryOverride,
+        port: saved.port,
+        proxy: saved.proxy,
+      ),
+    );
   }
   for (final saved in plan.acp) {
-    try {
-      await api.appServeStartAcp(name: saved.name, spec: saved.spec);
-      restored = true;
-    } catch (_) {
-      // The agent may have been uninstalled; its record stays for next time.
-    }
+    await restore(saved.name, legacyRuntime: HostRuntime.acp(saved.spec));
   }
   if (plan.opencode case final saved?) {
-    try {
-      // Started again with what is saved for it: its model service (its own
-      // configuration or a custom provider, whose stored key is kept) and
-      // its desired runtime. A start saves what it is given, so nothing
-      // starts from a configuration that is unreadable, reported damaged
-      // (its fields are then only defaults) or saved for another engine:
-      // the record and that configuration stay for the editor to resolve.
-      final config = await api.hostConfigGet(saved.name);
-      final desired = config.runtime;
-      if (config.problem != null || (desired != null && !desired.isOpenCode)) {
-        return restored;
-      }
-      await api.appServeStartConfigured(
-        name: saved.name,
-        runtime: desired ?? HostRuntime.opencode(binary: saved.binary),
-        input: HostConfigInput(
-          source: config.source,
-          protocol: config.protocol,
-          baseUrl: config.baseUrl,
-          model: config.model,
-        ),
-        keyAction: HostKeyAction.keep,
-      );
-      restored = true;
-    } catch (_) {
-      // OpenCode may have been uninstalled; its record stays for next time.
-    }
+    await restore(
+      saved.name,
+      legacyRuntime: HostRuntime.opencode(binary: saved.binary),
+    );
   }
   return restored;
 }

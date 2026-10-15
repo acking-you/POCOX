@@ -343,123 +343,11 @@ extension _SessionComposer on _AppSessionState {
     // them beside the permission and model pills (~180 px each); narrower
     // cards give them their own line above.
     Widget composerBody(bool inlineModes) {
-      // The toolbar's fixed-width members — attach, dictate, voice, send, the
-      // stop button while streaming — plus the gaps between them.
-      double fixedToolbarWidth(bool dictateInline) =>
-          (touch ? 48.0 : 30.0) +
-          (dictateInline ? (touch ? 40.0 : 32.0) + 2 : 0) +
-          (_caps.voice ? (touch ? 40.0 : 32.0) : 0) +
-          (touch ? 48.0 : 32.0) +
-          (_streaming ? (touch ? 48.0 : 32.0) + 6 : 0) +
-          10;
-      final toolbar = LayoutBuilder(
-        // One row at every width. Attachments collapse into a single `+` menu
-        // and the config pills into two chips, so a 360 px phone lays out like
-        // the desktop — no wrapping, no expand/collapse mode to get stuck in.
-        builder: (context, constraints) {
-          // On a card too narrow for it beside the pills (a phone, the review
-          // pane open) the microphone lives in the `+` menu; during a take it
-          // always shows, since it is the done button.
-          final dictateInline =
-              _caps.dictation &&
-              (constraints.maxWidth >= _AppSessionState._dictationInlineWidth ||
-                  _dictationTake != DictationTake.idle);
-          final fixed = fixedToolbarWidth(dictateInline);
-          return Row(
-            children: [
-              _attachMenu(l10n),
-              const SizedBox(width: 2),
-              // Bound long permission labels, and never so wide that the model
-              // pill is left less than its icon-and-chevron minimum: on a narrow
-              // card (the review pane open) both ellipsize instead of
-              // overflowing.
-              if (_caps.permissionPresets)
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: math.max(
-                      touch ? 44.0 : 34.0,
-                      math.min(
-                        constraints.maxWidth * 0.34,
-                        constraints.maxWidth - fixed - 96,
-                      ),
-                    ),
-                  ),
-                  child: _permissionChip(l10n),
-                ),
-              if (inlineModes)
-                for (final chip in modeChips) ...[
-                  const SizedBox(width: 4),
-                  chip,
-                ],
-              const SizedBox(width: 4),
-              // Right-aligned next to send, taking whatever is left.
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  // The model menu exists only where the protocol has a
-                  // catalog and no per-session options; an agent's own
-                  // options (ACP, native OpenCode) replace it.
-                  child: _usesModelMenu
-                      ? _modelChip(l10n)
-                      : AgentSessionOptions(
-                          settings: _agentSettings,
-                          enabled: _agentControlsEnabled,
-                          // Before the first send the agent's options exist
-                          // once the session opened ahead for this draft
-                          // does; until then the capsule says so.
-                          phase: _agentPhase,
-                          agentName: _caps.providerName,
-                          onRetry: _retryAgentSession,
-                          // Bound to this build's target: a menu opened now
-                          // answers to it, never to a later conversation.
-                          onSelectConfig: (id, value) =>
-                              _setAgentConfig(agentTarget, id, value),
-                          onSelectMode: (mode) =>
-                              _setAgentMode(agentTarget, mode),
-                        ),
-                ),
-              ),
-              // Speech to text into the draft. Teal and a microphone, where the
-              // live voice call beside it is the blue waveform: two different
-              // things, and they look it.
-              if (dictateInline) ...[
-                DictationButton(
-                  line: _dictation,
-                  onStart: _startDictation,
-                  onFinish: _finishDictation,
-                  // A live call already holds the microphone.
-                  enabled: !_voice.busy && !_externalWriterMode,
-                  size: touch ? 40 : 32,
-                  iconSize: touch ? 22 : 18,
-                ),
-                const SizedBox(width: 2),
-              ],
-              // Native live voice only; absent rather than disabled elsewhere.
-              if (_caps.voice)
-                IconButton(
-                  key: const Key('voice-start'),
-                  tooltip: _isVoiceThread
-                      ? l10n.voiceStart
-                      : l10n.voiceNewSession,
-                  // A take in progress finishes first; the call needs the mic.
-                  onPressed: _canStartVoice && !_dictation.taking
-                      ? _startVoice
-                      : null,
-                  icon: Icon(Icons.graphic_eq, size: touch ? 22 : 18),
-                  // 40 px on touch: two buttons beside send must still leave
-                  // the model pill room on a 320 px phone.
-                  style: IconButton.styleFrom(
-                    minimumSize: Size.square(touch ? 40 : 32),
-                    fixedSize: Size.square(touch ? 40 : 32),
-                    padding: EdgeInsets.zero,
-                  ),
-                ),
-              const SizedBox(width: 4),
-              if (_streaming) ...[_stopButton(l10n), const SizedBox(width: 6)],
-              _sendButton(),
-            ],
-          );
-        },
+      final toolbar = _composerToolbar(
+        l10n,
+        inlineModes: inlineModes,
+        modeChips: modeChips,
+        agentTarget: agentTarget,
       );
 
       return Column(
@@ -569,13 +457,19 @@ extension _SessionComposer on _AppSessionState {
             ? signalColor(scheme).withValues(alpha: 0.55)
             : _inputFocus.hasFocus
             ? scheme.outline
+            // A phone's idle card is found by its tone and shadow; a full
+            // hairline around it is noise at arm's length.
+            : touch
+            ? scheme.outlineVariant.withValues(alpha: 0.6)
             : scheme.outlineVariant;
         return AnimatedContainer(
           duration: Motion.of(context, Motion.fast),
           curve: Motion.move,
           decoration: BoxDecoration(
             color: surfacePanel(scheme),
-            borderRadius: BorderRadius.circular(kComposerRadius),
+            borderRadius: BorderRadius.circular(
+              touch ? kTouchComposerRadius : kComposerRadius,
+            ),
             border: Border.all(color: edge),
             boxShadow: panelShadow(scheme, blur: 16),
           ),
@@ -593,7 +487,7 @@ extension _SessionComposer on _AppSessionState {
       child: Padding(
         padding: doc
             ? const EdgeInsets.fromLTRB(16, 4, 16, 10)
-            : const EdgeInsets.fromLTRB(10, 4, 10, 10),
+            : const EdgeInsets.fromLTRB(12, 4, 12, 10),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -3,15 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
 import 'package:pocket_codex/src/hosting/opencode_runtime_section.dart';
+import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
 /// A running native OpenCode host: its version, what OpenCode's own
-/// configuration provides (providers, models, default model, agents), what a
-/// write here excludes, its gateway and the project folders.
+/// configuration provides (providers, models, default model, agents) and the
+/// default project folder; what a write here excludes, its gateway and its
+/// executable are folded into diagnostics.
 ///
 /// Only counts and names are shown; provider options and keys never leave
 /// the host. Refresh asks the host to re-read OpenCode's catalog, since
@@ -180,33 +182,23 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
             small,
           ),
         ],
-        const SizedBox(height: 8),
-        Text(l10n.openCodeConfigNote, style: muted),
+        const SizedBox(height: 12),
+        DefaultProjectTile(serviceKey: host.appServiceKey, local: true),
         const SizedBox(height: 4),
-        // What a write through this host excludes, said once here rather
-        // than as chrome in every conversation.
-        Text(
-          l10n.openCodeScopeNote,
-          key: const Key('opencode-scope-note'),
-          style: muted,
+        HostDiagnostics(
+          host: host,
+          binaryLabel: l10n.openCodePath,
+          notes: [
+            Text(l10n.openCodeConfigNote, style: muted),
+            // What a write through this host excludes, said once here rather
+            // than as chrome in every conversation.
+            Text(
+              l10n.openCodeScopeNote,
+              key: const Key('opencode-scope-note'),
+              style: muted,
+            ),
+          ],
         ),
-        const Divider(height: 24),
-        Text(l10n.acpGatewayLabel, style: small),
-        Text(l10n.localHostListening(host.appListenAddr), style: small),
-        SelectableText(host.appServiceKey, style: muted),
-        const SizedBox(height: 8),
-        Text(l10n.hostMetaLabel, style: small),
-        Text(l10n.localHostListening(host.metaListenAddr), style: small),
-        SelectableText(host.metaServiceKey, style: muted),
-        if (host.codexBinary != null) ...[
-          const SizedBox(height: 8),
-          SelectableText(
-            '${l10n.openCodePath}: ${host.codexBinary}',
-            style: muted,
-          ),
-        ],
-        const Divider(height: 24),
-        ProjectFoldersEditor(serviceKey: host.appServiceKey),
       ],
     );
   }

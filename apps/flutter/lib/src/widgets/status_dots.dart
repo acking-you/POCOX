@@ -199,6 +199,7 @@ class StatusChip extends StatelessWidget {
     required this.label,
     this.pulsing = false,
     this.filled = false,
+    this.wrap = false,
   });
 
   /// Colour shared by the dot and (subtly) the label.
@@ -213,6 +214,10 @@ class StatusChip extends StatelessWidget {
   /// Whether to draw a status-tinted rounded background behind the dot+label.
   final bool filled;
 
+  /// Whether a label too long for the available width wraps onto further
+  /// lines (it may name a device or host). Needs a bounded width.
+  final bool wrap;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -222,6 +227,15 @@ class StatusChip extends StatelessWidget {
     final labelColor = filled
         ? Color.lerp(color, scheme.onSurface, 0.35)!
         : scheme.onSurfaceVariant;
+    final text = Text(
+      label,
+      style: TextStyle(
+        fontSize: 11.5,
+        color: labelColor,
+        fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
+        letterSpacing: 0.1,
+      ),
+    );
     final row = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -229,15 +243,7 @@ class StatusChip extends StatelessWidget {
             ? PulsingDot(color: color, size: 8)
             : StatusDot(color: color, size: 8),
         const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11.5,
-            color: labelColor,
-            fontWeight: filled ? FontWeight.w600 : FontWeight.w400,
-            letterSpacing: 0.1,
-          ),
-        ),
+        if (wrap) Flexible(child: text) else text,
       ],
     );
     if (!filled) return row;
@@ -247,7 +253,8 @@ class StatusChip extends StatelessWidget {
         // A wash of the status colour: enough to read as a pill in both
         // themes without shouting over the card content.
         color: color.withValues(alpha: isLight ? 0.12 : 0.18),
-        borderRadius: BorderRadius.circular(999),
+        // A wrapped label would turn a full pill into a blob.
+        borderRadius: BorderRadius.circular(wrap ? 12 : 999),
       ),
       child: row,
     );

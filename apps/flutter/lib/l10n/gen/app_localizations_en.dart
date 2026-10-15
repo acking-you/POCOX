@@ -3570,4 +3570,294 @@ class AppLocalizationsEn extends AppLocalizations {
   String nativeContinueElsewhere(String agent) {
     return 'Continue on the computer that hosts $agent.';
   }
+
+  @override
+  String get defaultProjectTitle => 'Default project folder';
+
+  @override
+  String get defaultProjectAutomatic =>
+      'Automatic, chosen by the host computer';
+
+  @override
+  String get defaultProjectCreatedLater =>
+      'Not created yet. It is created when the first conversation starts here.';
+
+  @override
+  String get defaultProjectMissing =>
+      'This folder no longer exists on the host. Choose another one.';
+
+  @override
+  String get defaultProjectNone =>
+      'No default folder. New conversations ask for one.';
+
+  @override
+  String get defaultProjectChange => 'Change folder';
+
+  @override
+  String get defaultProjectUseAutomatic => 'Use automatic folder';
+
+  @override
+  String get defaultProjectSaved => 'Default project folder saved.';
+
+  @override
+  String get defaultProjectConflict =>
+      'Another device changed the project settings. Reload to see them.';
+
+  @override
+  String defaultProjectUnavailable(String error) {
+    return 'Project settings unavailable. Service management is not affected. $error';
+  }
+
+  @override
+  String defaultProjectLabel(String name) {
+    return '$name (default)';
+  }
+
+  @override
+  String projectRootsAdvanced(int count) {
+    return 'Browsable folders ($count)';
+  }
+
+  @override
+  String get projectRootsHint =>
+      'Other devices can browse only inside these folders. Leave empty to use the host\'s defaults.';
+
+  @override
+  String get projectRootPathHint =>
+      'Absolute path on the host, e.g. /Users/me/code';
+
+  @override
+  String get managedComputerTitle => 'Computer management';
+
+  @override
+  String managedComputerSummary(String os, String version) {
+    return '$os · Pocket $version';
+  }
+
+  @override
+  String get managedNoServices =>
+      'No services on this computer yet. Add one below.';
+
+  @override
+  String get managedAddService => 'Add service';
+
+  @override
+  String get managedAddHint =>
+      'Installed on that computer. Nothing is installed or signed in here.';
+
+  @override
+  String managedAddTitle(String device) {
+    return 'New service on $device';
+  }
+
+  @override
+  String managedEditTitle(String name, String device) {
+    return '$name on $device';
+  }
+
+  @override
+  String get managedNoRuntimes =>
+      'No supported runtime was found on that computer.';
+
+  @override
+  String get managedRuntimeUnavailable => 'Not available on that computer.';
+
+  @override
+  String get managedNeedsHostLogin =>
+      'Needs sign-in on that computer to use its own account; a custom provider works without it.';
+
+  @override
+  String get managedOpenCodeTaken =>
+      'OpenCode already runs on that computer; one OpenCode service per computer.';
+
+  @override
+  String get managedKindUnknown => 'Unknown agent';
+
+  @override
+  String get managedStateRunning => 'Running';
+
+  @override
+  String get managedStateStopped => 'Stopped';
+
+  @override
+  String get managedStateNew => 'New';
+
+  @override
+  String get managedStateNeedsAttention => 'Needs attention';
+
+  @override
+  String get managedStart => 'Start';
+
+  @override
+  String get managedEdit => 'Edit';
+
+  @override
+  String managedStarted(String name) {
+    return '$name is running.';
+  }
+
+  @override
+  String managedStopped(String name) {
+    return '$name stopped. It stays listed and can be started again.';
+  }
+
+  @override
+  String get managedSaved => 'Saved.';
+
+  @override
+  String managedStopConfirmTitle(String name) {
+    return 'Stop $name?';
+  }
+
+  @override
+  String get managedStopConfirmBody =>
+      'Its conversations disconnect and a running turn is interrupted. The computer stays manageable.';
+
+  @override
+  String managedRestoreProblem(String problem) {
+    return 'Automatic restore needs attention: $problem';
+  }
+
+  @override
+  String managedConfigUnreadable(String problem) {
+    return 'The saved configuration cannot be read ($problem). It can still be stopped; fix it on that computer.';
+  }
+
+  @override
+  String get managedConflict =>
+      'Another device saved this service since you opened it. Your edits are kept; reload to see the new version (your edits are then discarded).';
+
+  @override
+  String get managedOutcomeUnknown =>
+      'The result is unknown (the answer was lost). The current state was refreshed; check it before trying again.';
+
+  @override
+  String get managedHostBusy => 'That computer is busy. Try again shortly.';
+
+  @override
+  String get managedAlreadyRunning =>
+      'This service is already running. Refresh, or choose another name.';
+
+  @override
+  String get managedHostStopped =>
+      'This service has stopped. Refresh its status.';
+
+  @override
+  String get managedHostChanged =>
+      'This service was restarted or replaced elsewhere. Its state was refreshed.';
+
+  @override
+  String get managedLoginRequired =>
+      'The service\'s own account is not signed in on that computer. Sign in there, or choose a custom provider.';
+
+  @override
+  String get managedPrepareRequired =>
+      'Prepare the Claude adapter on that computer first (Add service → Prepare ACP environment).';
+
+  @override
+  String get managedInvalidConfiguration =>
+      'Review and save this service\'s configuration before starting.';
+
+  @override
+  String get managedConfigurationChanged =>
+      'Another device saved this service. Reload before saving.';
+
+  @override
+  String get managedOutsideRoots =>
+      'Choose a folder within the host\'s browsable folders.';
+
+  @override
+  String get managedNameRequired => 'Enter a name for the service.';
+
+  @override
+  String get managedNameHelper =>
+      'Unique on that computer; it names the service on your relay.';
+
+  @override
+  String get managedPortLabel => 'Port';
+
+  @override
+  String get managedPortHelper => '0 picks a free port.';
+
+  @override
+  String get managedPortInvalid => 'Enter a port from 0 to 65535.';
+
+  @override
+  String get managedRuntimeNote =>
+      'Runs the program installed on that computer. Paths and arguments are managed there.';
+
+  @override
+  String get managedInheritedNote =>
+      'Uses the configuration already on that computer.';
+
+  @override
+  String get managedOfficialNote =>
+      'Uses the official account signed in on that computer. Sign in there if it is not yet.';
+
+  @override
+  String get managedDiagnostics => 'Diagnostics';
+
+  @override
+  String get managedKey => 'Management key';
+
+  @override
+  String get managedDevice => 'Device';
+
+  @override
+  String get managedSwitchTitle => 'Allow management from my other devices';
+
+  @override
+  String get managedSwitchOn =>
+      'On. Your signed-in devices can add, configure, start and stop services here while this computer is online.';
+
+  @override
+  String get managedSwitchOff =>
+      'Off. Only this computer can change its services.';
+
+  @override
+  String get managedSwitchConnecting => 'On, not reachable yet.';
+
+  @override
+  String get managedSwitchUnavailable => 'Management status could not be read.';
+
+  @override
+  String hostRestoreBlocked(String problem) {
+    return 'Automatic restore was skipped because its saved choices cannot be read: $problem';
+  }
+
+  @override
+  String get managedRuntimeReady => 'Ready';
+
+  @override
+  String get managedRuntimeNeedsSetup => 'Needs setup';
+
+  @override
+  String get managedRuntimeSignInThere => 'Ready · sign in on that computer';
+
+  @override
+  String get managedOpenCodeRunning => 'Already running · one per computer';
+
+  @override
+  String get managedRuntimeDetails => 'Details';
+
+  @override
+  String managedRuntimeDetailsTitle(String name) {
+    return '$name details';
+  }
+
+  @override
+  String get managedRuntimePath => 'Executable';
+
+  @override
+  String get managedRuntimeVersion => 'Version';
+
+  @override
+  String get refreshServices => 'Refresh services';
+
+  @override
+  String get refreshServicesFailed =>
+      'Services could not be refreshed. Tap to try again.';
+
+  @override
+  String get managedRefreshComputer => 'Refresh this computer';
 }

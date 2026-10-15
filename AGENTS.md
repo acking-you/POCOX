@@ -949,6 +949,76 @@ this file's roadmap so the source of truth stays in sync.
     See [Native OpenCode](docs/opencode-native.md) and
     [session access](docs/native-agent-history.md#session-access).
 
+30. **Phone layered navigation (2026-10-15).** Below 720 px the sessions list
+    lies under the conversation (`widgets/layered_navigation.dart`): a
+    touch/stylus horizontal drag anywhere on the page (past touch slop; the
+    page's own horizontal scrollables and text gestures win first) moves it
+    aside with the finger and rests wherever it is held. Release completes
+    the direction the finger last clearly moved in, however short (a 16 px
+    reversal flips it; no distance or velocity threshold); the open sidebar
+    closes the same way. One light haptic when a drag is first recognized
+    as an opening, one medium haptic when a gesture settles open; the menu
+    control and closing drags are silent. The sidebar stays
+    mounted offstage (scroll, folds, search kept; not rebuilt while hidden);
+    the page keeps its state and leaves input, focus and semantics while
+    moved. Back and Escape close it first; a system pointer cancel returns
+    the drag to where it started, with no completion haptic. Mouse drags and
+    an open keyboard leave the page alone. Close it through
+    `LayeredNavigation.maybeOf` (`isOpen`/`close`), not `Scaffold` drawers.
+    Touch-only polish: tonal blue new-conversation pill, 14 px row/search
+    radius, 22 px composer radius with a quieter idle edge. Touch tablets
+    (>= 720 px) keep a 480 px chat and give the inline sidebar the rest (up to
+    520 px), so the default 280 px pane fits at 834 px; saved widths still
+    apply. Desktop layout is unchanged. Widget tests mock haptics and
+    cover system pointer cancel. Historical: an iPhone 15 / iOS 17.5
+    simulator run of an earlier edge/threshold build on the real relay
+    (unsent draft, no send or session write) checked edge drag, threshold
+    release, reverse-drag cancel, close, list scroll kept across
+    close/reopen, multiline draft retention, Chinese pinyin commit, Return
+    as newline, input after a cancelled drag, keyboard-up edge ignored,
+    light/dark. The user accepted the current content drag, hold and release
+    behaviour on the installed iOS app. No instrumented haptic feel,
+    physical-phone haptics or tablet check is claimed.
+    Responsive pass: phone layouts reflow by measured room instead of
+    squeezing. Service capability rows below 440 px (text-scaled) put status
+    and actions under the title and provider; the action keeps its overflow
+    beside it. An agent's options, or a phone's Codex model chip, take a line
+    above the attach/send row when their labels do not fit beside it (the
+    model alone on a second line when sharing would halve a label), but only
+    while at least 420/520 px stay above the keyboard; otherwise they rejoin
+    the toolbar and scroll. Option segments keep their state across moves.
+    A Codex permission label that fits on neither line moves up beside the
+    model. Pending requests share the transcript's slot (each group at most
+    45 % of the screen, scrolling), so approve and send stay reachable; on
+    touch the chat pane and sidebar keep a minimum height and scroll in
+    landscape or with the keyboard. Touch sidebar heading buttons are 44 px;
+    host switcher names take two lines. Settings lists subscriptions by service key, never the internal composite
+    identity. `test/responsive_layout_test.dart` covers 320–430 px, en/zh,
+    1.0/1.6/2.0 text, light/dark, keyboard, landscape and tablet sanity with
+    real fonts.
+
+31. **Remote device management, default project, status (2026-10-16).** A
+    desktop host that allows it publishes one management-only `host` key
+    (`pcx:<device>:host:<name>`): never a chat entry, and its device stays
+    listed after the last service stops. The switch is local-only. Another
+    device adds, edits, applies and stops services there: installed Codex,
+    native OpenCode, the Claude preset or a saved configuration only (no
+    remote path/argv; discovery never installs or signs in). Save names the
+    revision, Apply the revision and incarnation, Stop the incarnation; a
+    conflict keeps edits for an explicit reload, a lost answer refreshes and
+    never resends, and secrets are write-only (keep/remove/replace). Restore
+    overrides are authoritative on cold start. Each host has a default
+    project folder: an automatic one is display-only (sent as no cwd, created
+    by the host on first use), an explicit one seeds new conversations, and
+    the view adopts the folder the host reports. The status page is concise,
+    with diagnostics expandable and copyable. The chat host switcher has
+    Refresh services; Add service rows show name and status, with paths under
+    Details. Covered by widget tests with the fake bridge; the parent agent
+    verified phone add, edit and apply against the real desktop host, and the
+    user accepted the current functionality on the installed desktop and iOS
+    apps. No physical-phone haptics or other platforms are claimed. See
+    `docs/remote-device-management.md`.
+
 ### UI and history maintenance (2026-09-13)
 
 - Keep shared colors, typography, and control shapes in `theme.dart` /

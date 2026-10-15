@@ -6,6 +6,7 @@
 import 'api/bridge.dart';
 import 'api/bridge/codex_setup.dart';
 import 'api/bridge/connection.dart';
+import 'api/bridge/device_management.dart';
 import 'api/bridge/events.dart';
 import 'api/bridge/host_config.dart';
 import 'api/bridge/host_sessions.dart';
@@ -114,6 +115,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AcpAgentSpecDto dco_decode_box_autoadd_acp_agent_spec_dto(dynamic raw);
 
   @protected
+  AppServeStatusDto dco_decode_box_autoadd_app_serve_status_dto(dynamic raw);
+
+  @protected
   bool dco_decode_box_autoadd_bool(dynamic raw);
 
   @protected
@@ -127,6 +131,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
+
+  @protected
+  ManagedHostSaveDto dco_decode_box_autoadd_managed_host_save_dto(dynamic raw);
+
+  @protected
+  ManagedRuntimeDto dco_decode_box_autoadd_managed_runtime_dto(dynamic raw);
 
   @protected
   OpenCodeHostStatusDto dco_decode_box_autoadd_open_code_host_status_dto(
@@ -178,6 +188,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DeviceCodeDto dco_decode_device_code_dto(dynamic raw);
 
   @protected
+  DeviceManagementDto dco_decode_device_management_dto(dynamic raw);
+
+  @protected
   DirEntryDto dco_decode_dir_entry_dto(dynamic raw);
 
   @protected
@@ -212,6 +225,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HostEnvironmentEntryDto dco_decode_host_environment_entry_dto(dynamic raw);
+
+  @protected
+  HostRestoreOverrideDto dco_decode_host_restore_override_dto(dynamic raw);
 
   @protected
   HostRuntimeDto dco_decode_host_runtime_dto(dynamic raw);
@@ -255,7 +271,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<HostRestoreOverrideDto> dco_decode_list_host_restore_override_dto(
+    dynamic raw,
+  );
+
+  @protected
   List<LocalSessionDto> dco_decode_list_local_session_dto(dynamic raw);
+
+  @protected
+  List<ManagedHostDto> dco_decode_list_managed_host_dto(dynamic raw);
+
+  @protected
+  List<ManagedRuntimeAvailabilityDto>
+  dco_decode_list_managed_runtime_availability_dto(dynamic raw);
 
   @protected
   List<ModelInfoDto> dco_decode_list_model_info_dto(dynamic raw);
@@ -304,6 +332,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LogLineDto dco_decode_log_line_dto(dynamic raw);
 
   @protected
+  ManagedDeviceDto dco_decode_managed_device_dto(dynamic raw);
+
+  @protected
+  ManagedHostDto dco_decode_managed_host_dto(dynamic raw);
+
+  @protected
+  ManagedHostSaveDto dco_decode_managed_host_save_dto(dynamic raw);
+
+  @protected
+  ManagedRuntimeAvailabilityDto dco_decode_managed_runtime_availability_dto(
+    dynamic raw,
+  );
+
+  @protected
+  ManagedRuntimeDto dco_decode_managed_runtime_dto(dynamic raw);
+
+  @protected
   ModelInfoDto dco_decode_model_info_dto(dynamic raw);
 
   @protected
@@ -337,6 +382,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AcpAgentSpecDto? dco_decode_opt_box_autoadd_acp_agent_spec_dto(dynamic raw);
 
   @protected
+  AppServeStatusDto? dco_decode_opt_box_autoadd_app_serve_status_dto(
+    dynamic raw,
+  );
+
+  @protected
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
 
   @protected
@@ -347,6 +397,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
+
+  @protected
+  ManagedRuntimeDto? dco_decode_opt_box_autoadd_managed_runtime_dto(
+    dynamic raw,
+  );
 
   @protected
   OpenCodeHostStatusDto? dco_decode_opt_box_autoadd_open_code_host_status_dto(
@@ -382,6 +437,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectConfigDto dco_decode_project_config_dto(dynamic raw);
+
+  @protected
+  ProjectSettingsDto dco_decode_project_settings_dto(dynamic raw);
 
   @protected
   RetryProgressDto dco_decode_retry_progress_dto(dynamic raw);
@@ -555,6 +613,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  AppServeStatusDto sse_decode_box_autoadd_app_serve_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
@@ -574,6 +637,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  ManagedHostSaveDto sse_decode_box_autoadd_managed_host_save_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ManagedRuntimeDto sse_decode_box_autoadd_managed_runtime_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   OpenCodeHostStatusDto sse_decode_box_autoadd_open_code_host_status_dto(
@@ -643,6 +716,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DeviceCodeDto sse_decode_device_code_dto(SseDeserializer deserializer);
 
   @protected
+  DeviceManagementDto sse_decode_device_management_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   DirEntryDto sse_decode_dir_entry_dto(SseDeserializer deserializer);
 
   @protected
@@ -685,6 +763,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   HostEnvironmentEntryDto sse_decode_host_environment_entry_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HostRestoreOverrideDto sse_decode_host_restore_override_dto(
     SseDeserializer deserializer,
   );
 
@@ -742,7 +825,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<HostRestoreOverrideDto> sse_decode_list_host_restore_override_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<LocalSessionDto> sse_decode_list_local_session_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ManagedHostDto> sse_decode_list_managed_host_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ManagedRuntimeAvailabilityDto>
+  sse_decode_list_managed_runtime_availability_dto(
     SseDeserializer deserializer,
   );
 
@@ -809,6 +908,27 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LogLineDto sse_decode_log_line_dto(SseDeserializer deserializer);
 
   @protected
+  ManagedDeviceDto sse_decode_managed_device_dto(SseDeserializer deserializer);
+
+  @protected
+  ManagedHostDto sse_decode_managed_host_dto(SseDeserializer deserializer);
+
+  @protected
+  ManagedHostSaveDto sse_decode_managed_host_save_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ManagedRuntimeAvailabilityDto sse_decode_managed_runtime_availability_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ManagedRuntimeDto sse_decode_managed_runtime_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ModelInfoDto sse_decode_model_info_dto(SseDeserializer deserializer);
 
   @protected
@@ -858,6 +978,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  AppServeStatusDto? sse_decode_opt_box_autoadd_app_serve_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
@@ -872,6 +997,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  ManagedRuntimeDto? sse_decode_opt_box_autoadd_managed_runtime_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   OpenCodeHostStatusDto? sse_decode_opt_box_autoadd_open_code_host_status_dto(
@@ -909,6 +1039,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ProjectConfigDto sse_decode_project_config_dto(SseDeserializer deserializer);
+
+  @protected
+  ProjectSettingsDto sse_decode_project_settings_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RetryProgressDto sse_decode_retry_progress_dto(SseDeserializer deserializer);
@@ -1127,6 +1262,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_app_serve_status_dto(
+    AppServeStatusDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
 
   @protected
@@ -1150,6 +1291,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_i_64(
     PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_managed_host_save_dto(
+    ManagedHostSaveDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_managed_runtime_dto(
+    ManagedRuntimeDto self,
     SseSerializer serializer,
   );
 
@@ -1232,6 +1385,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_device_code_dto(DeviceCodeDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_device_management_dto(
+    DeviceManagementDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_dir_entry_dto(DirEntryDto self, SseSerializer serializer);
 
   @protected
@@ -1282,6 +1441,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_host_environment_entry_dto(
     HostEnvironmentEntryDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_host_restore_override_dto(
+    HostRestoreOverrideDto self,
     SseSerializer serializer,
   );
 
@@ -1358,8 +1523,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_host_restore_override_dto(
+    List<HostRestoreOverrideDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_local_session_dto(
     List<LocalSessionDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_managed_host_dto(
+    List<ManagedHostDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_managed_runtime_availability_dto(
+    List<ManagedRuntimeAvailabilityDto> self,
     SseSerializer serializer,
   );
 
@@ -1442,6 +1625,36 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_log_line_dto(LogLineDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_managed_device_dto(
+    ManagedDeviceDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_managed_host_dto(
+    ManagedHostDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_managed_host_save_dto(
+    ManagedHostSaveDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_managed_runtime_availability_dto(
+    ManagedRuntimeAvailabilityDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_managed_runtime_dto(
+    ManagedRuntimeDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_model_info_dto(ModelInfoDto self, SseSerializer serializer);
 
   @protected
@@ -1499,6 +1712,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_app_serve_status_dto(
+    AppServeStatusDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
 
   @protected
@@ -1516,6 +1735,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_i_64(
     PlatformInt64? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_managed_runtime_dto(
+    ManagedRuntimeDto? self,
     SseSerializer serializer,
   );
 
@@ -1561,6 +1786,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_project_config_dto(
     ProjectConfigDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_project_settings_dto(
+    ProjectSettingsDto self,
     SseSerializer serializer,
   );
 

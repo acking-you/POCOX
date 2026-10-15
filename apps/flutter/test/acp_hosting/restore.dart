@@ -58,7 +58,91 @@ void _registerRestore() {
       ),
     );
     expect(restored, isTrue);
-    expect(api.acpServeCalls.single.$2.args, ['a b', '']);
+    // A legacy record carries its own runtime, and no override revision.
+    final call = api.restoreServiceCalls.single;
+    expect(call.name, 'x');
+    expect(call.revision, isNull);
+    expect(call.legacy!.agent!.args, ['a b', '']);
+  });
+
+  test('an override decides its name: a stop is never undone by old '
+      'preferences, and a remotely added host restores too', () {
+    const prefs = UiPrefs(
+      autoHostCodex: [
+        AutoHostPrefs(port: 0, name: 'stopped'),
+        AutoHostPrefs(port: 0, name: 'legacy'),
+      ],
+      autoHostOpenCode: AutoHostOpenCodePrefs(name: 'oc-old'),
+    );
+    final plan = planHostRestore(
+      prefs,
+      const [],
+      codexAttempted: const {},
+      acpAttempted: const {},
+      acpSupported: true,
+      overrides: const [
+        // Stopped from another device: its legacy record must not count.
+        HostRestoreOverride(name: 'Stopped', revision: 4),
+        HostRestoreOverride(
+          name: 'remote-added',
+          revision: 5,
+          runtime: HostRuntime.codex(port: 18090),
+        ),
+        HostRestoreOverride(
+          name: 'oc-new',
+          revision: 6,
+          runtime: HostRuntime.opencode(),
+        ),
+      ],
+    );
+    expect(plan.codex.map((h) => h.name), ['legacy']);
+    expect(plan.overrides.map((o) => o.name), ['remote-added', 'oc-new']);
+    // One OpenCode per device: the override's wins over the legacy record.
+    expect(plan.opencode, isNull);
+    expect(plan.names.codex, {'legacy', 'remote-added'});
+    expect(plan.names.acp, {'oc-new'});
+    // Attempted, hosted or unsupported names are not planned again.
+    final again = planHostRestore(
+      prefs,
+      [FakeBridgeApi.openCodeHost('busy')],
+      codexAttempted: const {'stopped', 'legacy', 'remote-added'},
+      acpAttempted: const {},
+      acpSupported: true,
+      overrides: const [
+        HostRestoreOverride(
+          name: 'oc-new',
+          revision: 6,
+          runtime: HostRuntime.opencode(),
+        ),
+      ],
+    );
+    expect(again.isEmpty, isTrue);
+  });
+
+  test('every restore revalidates through the bridge with the observed '
+      'revision; only legacy records carry a runtime', () async {
+    final api = FakeBridgeApi()
+      ..restoreOverrides = const [
+        HostRestoreOverride(
+          name: 'remote',
+          revision: 9,
+          runtime: HostRuntime.codex(port: 18091),
+        ),
+      ];
+    final restored = await runHostRestore(
+      api,
+      HostRestorePlan(
+        overrides: api.restoreOverrides,
+        codex: const [AutoHostPrefs(port: 18081, name: 'old')],
+      ),
+    );
+    expect(restored, isTrue);
+    expect(api.restoreServiceCalls.map((c) => (c.name, c.revision)), [
+      ('remote', 9),
+      ('old', null),
+    ]);
+    expect(api.restoreServiceCalls.first.legacy, isNull);
+    expect(api.restoreServiceCalls.last.legacy!.port, 18081);
   });
 
   test('preferences grow compatibly and drop malformed ACP records', () {
@@ -168,18 +252,9 @@ void _registerRestore() {
     expect(api.serveHosts.map((h) => h.name), ['a', 'b']);
   });
 
-  test('OpenCode is restored with its saved model service and runtime, '
-      'its stored key kept', () async {
+  test('a legacy OpenCode record restores through the bridge with its '
+      'runtime, which starts from what is saved for it', () async {
     final api = FakeBridgeApi();
-    api.hostConfigs['studio'] = const HostConfig(
-      source: 'custom',
-      protocol: 'anthropic-messages',
-      baseUrl: 'https://gateway.example',
-      model: 'claude-sonnet',
-      keySet: true,
-      revision: 4,
-      runtime: HostRuntime.opencode(binary: '/opt/opencode'),
-    );
     final restored = await runHostRestore(
       api,
       const HostRestorePlan(
@@ -187,81 +262,37 @@ void _registerRestore() {
       ),
     );
     expect(restored, isTrue);
-    final (name, runtime, input, action, key) = api.startConfiguredCalls.single;
-    expect(name, 'studio');
-    expect(runtime.isOpenCode, isTrue);
-    expect(runtime.binary, '/opt/opencode', reason: 'the desired runtime');
-    expect(input.source, 'custom');
-    expect(input.protocol, 'anthropic-messages');
-    expect(input.baseUrl, 'https://gateway.example');
-    expect(input.model, 'claude-sonnet');
-    expect(action, HostKeyAction.keep);
-    expect(key, isNull, reason: 'no key is read back or resent');
+    final call = api.restoreServiceCalls.single;
+    expect(call.name, 'studio');
+    expect(call.revision, isNull);
+    expect(call.legacy!.isOpenCode, isTrue);
+    expect(call.legacy!.binary, '/old/oc');
+    // No configuration is read or re-sent from here: the bridge keeps the
+    // saved model service and key, and refuses a damaged record.
+    expect(api.startConfiguredCalls, isEmpty);
   });
 
-  test('an unreadable OpenCode configuration restores nothing and replaces '
+  test('a refused restore (stopped elsewhere, changed or damaged) starts '
       'nothing', () async {
     final api = FakeBridgeApi()
-      ..hostConfigGetError = StateError('profile unreadable');
-    api.hostConfigs['studio'] = const HostConfig(
-      source: 'custom',
-      protocol: 'responses',
-      baseUrl: 'https://models.example/v1',
-      model: 'm',
-      keySet: true,
-    );
+      ..restoreServiceErrors['studio'] = StateError(
+        'this service was stopped; automatic restore was skipped',
+      );
     final restored = await runHostRestore(
       api,
       const HostRestorePlan(
-        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
+        overrides: [
+          HostRestoreOverride(
+            name: 'studio',
+            revision: 3,
+            runtime: HostRuntime.opencode(),
+          ),
+        ],
       ),
     );
     expect(restored, isFalse);
-    expect(api.startConfiguredCalls, isEmpty);
-    expect(api.hostConfigs['studio']!.source, 'custom');
-  });
-
-  // A damaged record is reported, not thrown: its fields are only defaults
-  // (source inherited), and starting from them would save over it.
-  test('a damaged OpenCode configuration restores nothing and replaces '
-      'nothing', () async {
-    const damaged = HostConfig(revision: 7, problem: 'unreadable profile');
-    final api = FakeBridgeApi();
-    api.hostConfigs['studio'] = damaged;
-    final restored = await runHostRestore(
-      api,
-      const HostRestorePlan(
-        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
-      ),
-    );
-    expect(restored, isFalse);
-    expect(api.startConfiguredCalls, isEmpty);
     expect(api.serveHosts, isEmpty);
-    expect(identical(api.hostConfigs['studio'], damaged), isTrue);
-  });
-
-  test('an OpenCode record whose saved runtime is another engine restores '
-      'nothing and replaces nothing', () async {
-    const other = HostConfig(
-      source: 'custom',
-      protocol: 'responses',
-      baseUrl: 'https://models.example/v1',
-      keySet: true,
-      revision: 3,
-      runtime: HostRuntime.codex(binary: '/usr/local/bin/codex'),
-    );
-    final api = FakeBridgeApi();
-    api.hostConfigs['studio'] = other;
-    final restored = await runHostRestore(
-      api,
-      const HostRestorePlan(
-        opencode: AutoHostOpenCodePrefs(name: 'studio', binary: '/bin/oc'),
-      ),
-    );
-    expect(restored, isFalse);
     expect(api.startConfiguredCalls, isEmpty);
-    expect(api.serveHosts, isEmpty);
-    expect(identical(api.hostConfigs['studio'], other), isTrue);
   });
 
   test('a skipped OpenCode restore keeps its restore record', () {
@@ -288,7 +319,7 @@ void _registerRestore() {
     ];
 
     testWidgets('a Codex host started while a full file is still loading '
-        'says it will not be restored, and keeps every record', (t) async {
+        'starts without a restore warning, and keeps every record', (t) async {
       final gate = Completer<void>();
       final prefs = _HeldPrefs(UiPrefs(autoHostCodex: full), gate);
       final api = FakeBridgeApi();
@@ -296,14 +327,11 @@ void _registerRestore() {
       await _start(t);
       expect(api.lastServeName, 'default', reason: 'hosting started');
       expect(find.byType(LocalHostDialog), findsNothing);
-      // The interim snapshot looks empty; no verdict yet, so no notice.
-      expect(find.text(en.hostRestoreFull(UiPrefs.maxAutoHosts)), findsNothing);
       gate.complete();
       await t.pumpAndSettle();
-      expect(
-        find.text(en.hostRestoreFull(UiPrefs.maxAutoHosts)),
-        findsOneWidget,
-      );
+      // The bridge records the start for restore, so a full preference file
+      // no longer means it will not come back.
+      expect(find.text(en.hostRestoreFull(UiPrefs.maxAutoHosts)), findsNothing);
       final settled = await c.read(uiPrefsProvider.notifier).ready;
       expect(settled.autoHostCodex.map((h) => h.name), [
         for (final h in full) h.name,
@@ -331,8 +359,8 @@ void _registerRestore() {
       ]);
     });
 
-    testWidgets('an ACP host and a custom agent refused by a full file are '
-        'reported and not shown as saved', (t) async {
+    testWidgets('a custom agent refused by a full file is reported and not '
+        'shown as saved', (t) async {
       final gate = Completer<void>();
       final prefs = _HeldPrefs(
         UiPrefs(
@@ -375,10 +403,10 @@ void _registerRestore() {
       expect(api.acpServeCalls, hasLength(1), reason: 'hosting started');
       gate.complete();
       await t.pumpAndSettle();
-      final notice = find.textContaining(
-        en.hostRestoreFull(UiPrefs.maxAutoHosts),
+      expect(
+        find.textContaining(en.hostRestoreFull(UiPrefs.maxAutoHosts)),
+        findsNothing,
       );
-      expect(notice, findsOneWidget);
       expect(
         find.textContaining(en.acpSavedAgentsFull(UiPrefs.maxSavedAgents)),
         findsOneWidget,
@@ -402,6 +430,20 @@ void _registerRestore() {
               ),
         ),
         findsNothing,
+      );
+    });
+
+    testWidgets('a restore-record warning is shown beside a successful start, '
+        'never as its failure', (t) async {
+      final api = FakeBridgeApi()
+        ..restoreProblems['default'] = 'storage is read-only';
+      await _pumpDialog(t, api);
+      await _start(t);
+      expect(api.lastServeName, 'default', reason: 'hosting started');
+      expect(find.byType(LocalHostDialog), findsNothing);
+      expect(
+        find.text(en.managedRestoreProblem('storage is read-only')),
+        findsOneWidget,
       );
     });
   });

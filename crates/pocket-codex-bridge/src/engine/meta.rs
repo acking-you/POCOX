@@ -128,7 +128,95 @@ fn stream_client() -> &'static Client {
 fn meta_key_of(service_key: &str) -> Result<String> {
     let id = ServiceId::parse_key(service_key)
         .ok_or_else(|| anyhow!("not a pocket-codex service key: {service_key}"))?;
-    Ok(ServiceId::new(id.device, ServiceKind::Meta, id.name).key())
+    Ok(ServiceId::new(
+        id.device,
+        if id.kind == ServiceKind::Host { ServiceKind::Host } else { ServiceKind::Meta },
+        id.name,
+    )
+    .key())
+}
+
+/// A fresh relay inventory can confirm a legacy Codex host has no meta
+/// capability. A network failure is not proof of an older host; never silently
+/// substitute a different working directory after that failure.
+pub fn default_projects_available(service_key: &str) -> Result<bool> {
+    if serve::local_endpoints(service_key).is_some() {
+        return Ok(true);
+    }
+    let id = ServiceId::parse_key(service_key).context("invalid service key")?;
+    if id.kind != ServiceKind::App {
+        return Ok(true);
+    }
+    let owned = transport::resolve_owned_blocking()?;
+    if !transport::Context::of(&owned.transport).admits(service_key) {
+        anyhow::bail!("this service belongs to another account or relay");
+    }
+    let services = runtime::runtime().block_on(async {
+        tokio::time::timeout(Duration::from_secs(10), super::discovery::discover(&owned.transport))
+            .await
+            .context("checking host project capability timed out")?
+    })?;
+    if !transport::is_current(owned.epoch) {
+        anyhow::bail!("connection changed while checking host project capability");
+    }
+    let available = project_capability(&id, &services, |manager| {
+        let device = super::management_client::device(&manager.key())?;
+        Ok(device
+            .hosts
+            .iter()
+            .any(|host| super::host_names::same(&host.name, &id.name)))
+    })?;
+    if !transport::is_current(owned.epoch) {
+        anyhow::bail!("connection changed while checking host project capability");
+    }
+    Ok(available)
+}
+
+fn project_capability(
+    id: &ServiceId,
+    services: &[ServiceId],
+    mut managed: impl FnMut(&ServiceId) -> Result<bool>,
+) -> Result<bool> {
+    if services.iter().any(|service| {
+        service.device == id.device && service.kind == ServiceKind::Meta && service.name == id.name
+    }) {
+        return Ok(true);
+    }
+    // A CLI host can share this device ID without belonging to the app's
+    // manager. Only a confirmed app-owned host must have its meta recovered.
+    for manager in services
+        .iter()
+        .filter(|s| s.device == id.device && s.kind == ServiceKind::Host)
+    {
+        if managed(manager)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+#[test]
+fn only_confirmed_legacy_hosts_skip_default_project_lookup() {
+    let app = ServiceId::new("desktop", ServiceKind::App, "old-cli");
+    let unexpected = |_: &ServiceId| -> Result<bool> { panic!("unnecessary manager lookup") };
+    assert!(!project_capability(&app, std::slice::from_ref(&app), unexpected).expect("legacy"));
+    assert!(project_capability(
+        &app,
+        &[ServiceId::new("desktop", ServiceKind::Meta, "old-cli")],
+        unexpected
+    )
+    .expect("meta"));
+    let managers = [ServiceId::new("desktop", ServiceKind::Host, "pocket")];
+    assert!(!project_capability(&app, &managers, |_| Ok(false)).expect("independent CLI"));
+    assert!(project_capability(&app, &managers, |_| Ok(true)).expect("app-owned host"));
+    assert!(project_capability(&app, &managers, |_| anyhow::bail!("offline")).is_err());
+    assert!(!project_capability(
+        &app,
+        &[ServiceId::new("other", ServiceKind::Meta, "old-cli")],
+        unexpected
+    )
+    .expect("other device"));
 }
 
 /// Registry-key prefix of the meta tunnels; each is scoped to the transport

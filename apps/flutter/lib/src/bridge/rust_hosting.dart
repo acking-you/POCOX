@@ -33,50 +33,7 @@ mixin _RustHosting implements BridgeApi {
   @override
   Future<List<AppServeStatus>> appServeStatus() async {
     final list = await frb.appServeStatus();
-    return list
-        .map(
-          (s) => AppServeStatus(
-            name: s.name,
-            device: s.device,
-            pid: s.pid,
-            alive: s.alive,
-            appListenAddr: s.appListenAddr,
-            appServiceKey: s.appServiceKey,
-            appRegistered: s.appRegistered,
-            apiListenAddr: s.apiListenAddr,
-            apiServiceKey: s.apiServiceKey,
-            apiRegistered: s.apiRegistered,
-            metaListenAddr: s.metaListenAddr,
-            metaServiceKey: s.metaServiceKey,
-            metaRegistered: s.metaRegistered,
-            embedded: s.embedded,
-            codexBinary: s.codexBinary,
-            proxy: s.proxy,
-            provider: s.provider,
-            providerVersion: s.providerVersion,
-            protocol: s.protocol,
-            providerName: s.providerName,
-            profileId: s.profileId,
-            agentPhase: s.agentPhase,
-            agentError: s.agentError,
-            authRequired: s.authRequired,
-            opencode: s.opencode == null
-                ? null
-                : OpenCodeHostStatus(
-                    version: s.opencode!.version,
-                    providersConnected: s.opencode!.providersConnected,
-                    models: s.opencode!.models,
-                    defaultModel: s.opencode!.defaultModel,
-                    agents: s.opencode!.agents,
-                    problem: s.opencode!.problem,
-                  ),
-            configSource: s.configSource,
-            configRevision: s.configRevision?.toInt(),
-            incarnation: s.incarnation,
-            busy: s.busy,
-          ),
-        )
-        .toList();
+    return list.map(_serveStatus).toList();
   }
 
   @override
@@ -409,4 +366,45 @@ HostConfig _hostConfig(frb.HostConfigDto c) => HostConfig(
           source: c.active!.source,
           revision: c.active!.revision.toInt(),
         ),
+);
+
+AppServeStatus _serveStatus(frb.AppServeStatusDto s) => AppServeStatus(
+  name: s.name,
+  device: s.device,
+  pid: s.pid,
+  alive: s.alive,
+  appListenAddr: s.appListenAddr,
+  appServiceKey: s.appServiceKey,
+  appRegistered: s.appRegistered,
+  apiListenAddr: s.apiListenAddr,
+  apiServiceKey: s.apiServiceKey,
+  apiRegistered: s.apiRegistered,
+  metaListenAddr: s.metaListenAddr,
+  metaServiceKey: s.metaServiceKey,
+  metaRegistered: s.metaRegistered,
+  embedded: s.embedded,
+  codexBinary: s.codexBinary,
+  proxy: s.proxy,
+  provider: s.provider,
+  providerVersion: s.providerVersion,
+  protocol: s.protocol,
+  providerName: s.providerName,
+  profileId: s.profileId,
+  agentPhase: s.agentPhase,
+  agentError: s.agentError,
+  authRequired: s.authRequired,
+  opencode: s.opencode == null
+      ? null
+      : OpenCodeHostStatus(
+          version: s.opencode!.version,
+          providersConnected: s.opencode!.providersConnected,
+          models: s.opencode!.models,
+          defaultModel: s.opencode!.defaultModel,
+          agents: s.opencode!.agents,
+          problem: s.opencode!.problem,
+        ),
+  configSource: s.configSource,
+  configRevision: s.configRevision?.toInt(),
+  incarnation: s.incarnation,
+  busy: s.busy,
 );

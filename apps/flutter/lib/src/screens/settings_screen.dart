@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
@@ -235,7 +236,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         ? successColor(Theme.of(context).colorScheme)
                         : Theme.of(context).colorScheme.error,
                   ),
-                  title: Text(s.key),
+                  title: Text(subscriptionServiceKey(s.key)),
                   subtitle: Text(s.localAddr),
                 ),
               ),
@@ -449,7 +450,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         for (final sub in subs)
                           _SettingsRow(
                             icon: Icons.link_outlined,
-                            title: sub.key,
+                            title: subscriptionServiceKey(sub.key),
                             subtitle: sub.localAddr,
                             status: StatusChip(
                               color: sub.alive

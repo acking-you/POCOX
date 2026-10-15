@@ -344,7 +344,7 @@ fn own_services(
             ServiceKind::App | ServiceKind::Api => true,
             ServiceKind::Acp => opt_in.acp,
             ServiceKind::OpenCode => opt_in.opencode,
-            ServiceKind::Meta | ServiceKind::Unknown => false,
+            ServiceKind::Meta | ServiceKind::Host | ServiceKind::Unknown => false,
         })
         .map(|nsid| ServiceEntry {
             device: nsid.service.device,

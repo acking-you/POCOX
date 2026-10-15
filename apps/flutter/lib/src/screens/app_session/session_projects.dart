@@ -17,17 +17,18 @@ extension _SessionProjects on _AppSessionState {
               const SizedBox(height: 14),
               _projectSwitcher(
                 l10n,
-                label: (_cwd?.isNotEmpty ?? false)
-                    ? _projectName()
-                    : l10n.workOutsideProject,
+                label: _newProjectLabel(l10n, l10n.workOutsideProject),
                 style: Theme.of(
                   context,
                 ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
               ),
-              if (_cwd?.trim().isNotEmpty ?? false) ...[
+              if ((_cwd?.trim().isNotEmpty ?? false)
+                      ? _cwd!.trim()
+                      : _automaticProject
+                  case final shown?) ...[
                 const SizedBox(height: 4),
                 Text(
-                  _cwd!.trim(),
+                  shown,
                   key: const Key('new-session-cwd'),
                   textAlign: TextAlign.center,
                   maxLines: 1,
@@ -68,10 +69,10 @@ extension _SessionProjects on _AppSessionState {
         _retry = null;
       });
     }
-    final scaffold = Scaffold.maybeOf(paneContext);
-    if (scaffold?.isDrawerOpen ?? false) {
+    final nav = LayeredNavigation.maybeOf(paneContext);
+    if (nav?.isOpen ?? false) {
       _newDraftFocusAfterDrawer = _threadLoadGeneration;
-      scaffold!.closeDrawer();
+      nav!.close();
     } else {
       _focusNewComposer(_threadLoadGeneration);
     }
@@ -106,7 +107,30 @@ extension _SessionProjects on _AppSessionState {
   /// nothing could be created, so nothing may be sent. Codex works outside
   /// a project.
   bool get _needsProjectToSend =>
-      _caps.hostAccess && _threadId == null && (_cwd?.trim().isEmpty ?? true);
+      _caps.hostAccess &&
+      _threadId == null &&
+      (_cwd?.trim().isEmpty ?? true) &&
+      _automaticProject == null;
+
+  /// The host's automatic default folder, while the shown new conversation
+  /// has no folder of its own: it is where the conversation will be
+  /// created. Display only — never [_cwd], so a send passes no folder and
+  /// the host creates it then; any folder the user picks wins.
+  String? get _automaticProject {
+    final known = _hostDefault;
+    if (known == null || known.key != widget.serviceKey) return null;
+    if (_threadId != null || (_cwd?.trim().isNotEmpty ?? false)) return null;
+    return known.path.isEmpty ? null : known.path;
+  }
+
+  /// The shown new conversation's project label: its chosen folder, the
+  /// host's automatic default, or [fallback].
+  String _newProjectLabel(AppLocalizations l10n, String fallback) {
+    if (_cwd?.trim().isNotEmpty ?? false) return _projectName();
+    final automatic = _automaticProject;
+    if (automatic == null) return fallback;
+    return l10n.defaultProjectLabel(_AppSessionState._leafOf(automatic));
+  }
 
   /// A send without the project it needs: ask for the folder first. The
   /// draft stays as it is until a folder is chosen (cancelling changes
@@ -235,7 +259,7 @@ extension _SessionProjects on _AppSessionState {
   /// predict from its icon is a worse trade than losing one-tap access to a
   /// default that Settings still offers. The icon shows what is in effect now;
   /// tapping shows the other one.
-  /// One sidebar-footer shortcut: closes the drawer (mobile) then pushes.
+  /// One sidebar-footer shortcut: closes the phone sidebar, then pushes.
   Widget _paneShortcut({
     required String key,
     required IconData icon,
@@ -244,17 +268,18 @@ extension _SessionProjects on _AppSessionState {
     required String route,
   }) => IconButton(
     key: Key(key),
-    icon: Icon(icon, size: 18),
+    icon: Icon(icon, size: isDesktop ? 18 : 20),
     tooltip: tooltip,
     style: IconButton.styleFrom(
-      minimumSize: const Size(32, 32),
+      minimumSize: isDesktop ? const Size(32, 32) : const Size(44, 44),
       foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kRowRadius),
       ),
     ),
     onPressed: () {
-      if (Scaffold.maybeOf(ctx)?.isDrawerOpen ?? false) Navigator.pop(ctx);
+      final nav = LayeredNavigation.maybeOf(ctx);
+      if (nav?.isOpen ?? false) nav!.close();
       context.push(route);
     },
   );
@@ -268,31 +293,36 @@ extension _SessionProjects on _AppSessionState {
     required VoidCallback onTap,
   }) {
     final scheme = Theme.of(context).colorScheme;
+    // Touch: the list's primary action is a full-width tonal pill in the
+    // brand blue — the one accent of the sidebar besides live work.
+    final touch = !isDesktop;
+    final ink = touch ? scheme.onTertiaryContainer : scheme.onSurface;
+    final radius = BorderRadius.circular(touch ? 28 : kRowRadius);
     return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(kRowRadius),
+      color: touch ? scheme.tertiaryContainer : Colors.transparent,
+      borderRadius: radius,
       child: InkWell(
         key: key,
         mouseCursor: clickable,
-        borderRadius: BorderRadius.circular(kRowRadius),
+        borderRadius: radius,
         onTap: onTap,
         child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: isDesktop ? 32 : 44),
+          constraints: BoxConstraints(minHeight: touch ? 52 : 32),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: EdgeInsets.symmetric(horizontal: touch ? 18 : 8),
             child: Row(
               children: [
-                Icon(icon, size: 16, color: scheme.onSurface),
-                const SizedBox(width: 10),
+                Icon(icon, size: touch ? 20 : 16, color: ink),
+                SizedBox(width: touch ? 14 : 10),
                 Expanded(
                   child: Text(
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: scheme.onSurface,
+                      fontSize: touch ? 15 : 13,
+                      fontWeight: touch ? FontWeight.w600 : FontWeight.w500,
+                      color: ink,
                     ),
                   ),
                 ),
@@ -314,6 +344,13 @@ extension _SessionProjects on _AppSessionState {
     identities: _hostIdentities(),
     onPick: (key) => widget.onSwitchService?.call(key),
     onManage: () => context.push('/manage'),
+    // Re-discover: a host another device just started appears in this list
+    // (home watches discovery); the conversation and its draft stay.
+    onRefresh: () async {
+      ref.invalidate(appReachableProvider);
+      ref.invalidate(servicesProvider);
+      await ref.read(servicesProvider.future);
+    },
   );
 
   /// Preserve project recency when opening another project's draft.
@@ -468,11 +505,13 @@ extension _SessionProjects on _AppSessionState {
 
   /// A muted section header for the conversations pane (Active / Today / …).
   Widget _sectionLabel(String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 12, 8, 4),
+    padding: isDesktop
+        ? const EdgeInsets.fromLTRB(8, 12, 8, 4)
+        : const EdgeInsets.fromLTRB(12, 18, 12, 6),
     child: Text(
       text,
       style: TextStyle(
-        fontSize: 11.5,
+        fontSize: isDesktop ? 11.5 : 13,
         fontWeight: FontWeight.w600,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),

@@ -303,6 +303,14 @@ pub fn app_thread_start(
     service_tier: Option<String>,
     sandbox: Option<String>,
 ) -> Result<String> {
+    let epoch = crate::engine::transport::epoch();
+    let cwd = match cwd.filter(|path| !path.trim().is_empty()) {
+        Some(explicit) => Some(explicit),
+        None => host_sessions::meta_ensure_default_project(service_key.clone())?,
+    };
+    if !crate::engine::transport::is_current(epoch) {
+        anyhow::bail!("connection changed before the conversation was created; try again");
+    }
     engine(&service_key).thread_start(&service_key, StartOptions {
         model,
         cwd,

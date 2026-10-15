@@ -458,6 +458,115 @@ pub fn meta_set_project_config(
     )?))
 }
 
+/// Project settings with an optional new-host revision and effective default.
+/// Older hosts retain their existing configured-default behaviour.
+pub struct ProjectSettingsDto {
+    /// Explicit browsing roots on the host.
+    pub project_roots: Vec<String>,
+    /// User override; absent selects the host OS automatic folder on new hosts.
+    pub default_project: Option<String>,
+    /// Compare-and-save token. Absent identifies a legacy host.
+    pub revision: Option<String>,
+    /// Actual host default, absent only on legacy hosts without one configured.
+    pub effective_default: Option<String>,
+    /// The host derives this folder from its OS rather than a saved override.
+    pub automatic: bool,
+    /// Effective folder exists now; checking it did not create it.
+    pub exists: bool,
+}
+
+#[derive(serde::Deserialize)]
+struct ProjectViewResponse {
+    #[serde(flatten)]
+    config: pocket_codex_host_svc::store::HostConfig,
+    #[serde(default)]
+    revision: Option<String>,
+    #[serde(default)]
+    effective_default: Option<pocket_codex_host_svc::projects::DefaultProject>,
+}
+
+impl From<ProjectViewResponse> for ProjectSettingsDto {
+    fn from(value: ProjectViewResponse) -> Self {
+        let (effective_default, automatic, exists) = match value.effective_default {
+            Some(folder) => (Some(folder.path), folder.automatic, folder.exists),
+            None => (value.config.default_project.clone(), false, false),
+        };
+        Self {
+            project_roots: value.config.project_roots,
+            default_project: value.config.default_project,
+            revision: value.revision,
+            effective_default,
+            automatic,
+            exists,
+        }
+    }
+}
+
+/// Read current host defaults and conflict metadata without creating a folder.
+pub fn meta_project_settings(service_key: String) -> Result<ProjectSettingsDto> {
+    let view: ProjectViewResponse = crate::engine::management_client::request(
+        &service_key,
+        reqwest::Method::GET,
+        &["projects"],
+        None::<&()>,
+    )?;
+    Ok(view.into())
+}
+
+/// Save reviewed project settings. New hosts require their last read revision.
+pub fn meta_save_project_settings(
+    service_key: String,
+    project_roots: Vec<String>,
+    default_project: Option<String>,
+    expected_revision: Option<String>,
+) -> Result<ProjectSettingsDto> {
+    let body = pocket_codex_host_svc::projects::ProjectsUpdate {
+        config: pocket_codex_host_svc::store::HostConfig {
+            project_roots,
+            default_project,
+        },
+        expected_revision,
+    };
+    let view: ProjectViewResponse = crate::engine::management_client::request(
+        &service_key,
+        reqwest::Method::PUT,
+        &["projects"],
+        Some(&body),
+    )?;
+    Ok(view.into())
+}
+
+/// Resolve the host's default at first send. Never substitute the controller's
+/// filesystem or overwrite an explicitly selected project. On a legacy host,
+/// returns its configured default or None so the existing picker can be used.
+pub fn meta_ensure_default_project(service_key: String) -> Result<Option<String>> {
+    if !meta::default_projects_available(&service_key)? {
+        return Ok(None);
+    }
+    let view = match meta_project_settings(service_key.clone()) {
+        Ok(view) => view,
+        Err(error)
+            if error
+                .downcast_ref::<crate::engine::management_client::RemoteError>()
+                .is_some_and(|error| error.status == 404) =>
+        {
+            return Ok(None)
+        },
+        Err(error) => return Err(error),
+    };
+    if view.revision.is_none() {
+        return Ok(view.default_project);
+    }
+    let ready: pocket_codex_host_svc::projects::EnsuredProject =
+        crate::engine::management_client::request(
+            &service_key,
+            reqwest::Method::POST,
+            &["projects", "default", "ensure"],
+            None::<&()>,
+        )?;
+    Ok(Some(ready.path))
+}
+
 /// List the sub-directories of `path` on the host behind `service_key`, for the
 /// remote project-folder browser. Errors (with a `403`-carrying message) if
 /// `path` is outside the host's configured project roots.

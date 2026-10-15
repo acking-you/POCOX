@@ -7,6 +7,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
@@ -353,9 +354,8 @@ void main() {
     );
   });
 
-  testWidgets('composer is one row on a 360 px phone, with 44 px targets', (
-    t,
-  ) async {
+  testWidgets('composer fits a 360 px phone with 44 px targets and a '
+      'readable model label', (t) async {
     final api = FakeBridgeApi(
       config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
     );
@@ -369,19 +369,35 @@ void main() {
     await t.pumpAndSettle();
 
     // Everything the composer offers is on screen at once — no expand toggle,
-    // no wrapping, nothing pushed off the right edge.
+    // nothing pushed off the right edge.
     for (final k in ['attach-menu-btn', 'permission-chip', 'model-chip']) {
       final rect = t.getRect(find.byKey(Key(k)));
       expect(rect.right, lessThanOrEqualTo(360.0), reason: k);
       expect(rect.height, greaterThanOrEqualTo(44.0), reason: k);
     }
+    final send = t.getRect(find.byKey(const Key('send-btn')));
+    expect(send.right, lessThanOrEqualTo(360.0));
+    // The permission chip shares the attach and send line; the model chip
+    // shares it too, or takes the line above where its label would not fit
+    // beside them, never squeezed to its icon.
+    final permission = t.getRect(find.byKey(const Key('permission-chip')));
+    expect(permission.center.dy, closeTo(send.center.dy, 1));
+    final model = t.getRect(find.byKey(const Key('model-chip')));
     expect(
-      t.getRect(find.byKey(const Key('send-btn'))).right,
-      lessThanOrEqualTo(360.0),
+      (model.center.dy - send.center.dy).abs() < 1 || model.bottom <= send.top,
+      isTrue,
+      reason: 'model chip beside or above the toolbar: $model',
     );
-    // The three rows share one line.
-    final y = t.getRect(find.byKey(const Key('model-chip'))).center.dy;
-    expect(t.getRect(find.byKey(const Key('permission-chip'))).center.dy, y);
+    final label = find.descendant(
+      of: find.byKey(const Key('model-chip')),
+      matching: find.text('默认模型'),
+    );
+    expect(label, findsOneWidget);
+    expect(
+      t.renderObject<RenderParagraph>(label).didExceedMaxLines,
+      isFalse,
+      reason: 'model label whole',
+    );
     expect(t.takeException(), isNull); // no RenderFlex overflow
   });
 

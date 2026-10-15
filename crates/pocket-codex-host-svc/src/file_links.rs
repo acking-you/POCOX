@@ -176,7 +176,7 @@ pub(crate) async fn read(
     State(state): State<std::sync::Arc<AppState>>,
     Query(query): Query<FileQuery>,
 ) -> Result<Response, ApiError> {
-    let roots = state.host.get().await.project_roots;
+    let roots = state.host.effective_roots().await?;
     let preview = query.preview;
     let path = match (&state.session_dirs, query.thread.clone()) {
         (None, _) => tokio::task::spawn_blocking(move || authorized_file(&query, &roots)).await,

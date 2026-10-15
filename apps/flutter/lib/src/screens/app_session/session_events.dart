@@ -179,7 +179,7 @@ extension _SessionEvents on _AppSessionState {
     // effect (possibly one this app just sent). Newer servers emit this with
     // the full snapshot whenever a turn's overrides change the settings.
     if (e.kind == 'thread/settings/updated') {
-      final cfg = _AppSessionState._parseSettingsUpdate(e.raw);
+      final cfg = _parseSettingsUpdate(e.raw);
       if (cfg != null) _applyRuntime(cfg);
       return;
     }
@@ -718,5 +718,55 @@ extension _SessionEvents on _AppSessionState {
   String _fmtClock(DateTime t) {
     String p(int n) => n.toString().padLeft(2, '0');
     return '${p(t.hour)}:${p(t.minute)}:${p(t.second)}';
+  }
+}
+
+/// Parse a `thread/settings/updated` notification's raw params into a
+/// runtime config. The payload's `threadSettings` carries the full effective
+/// snapshot: `model`, `modelProvider`, `effort`, `approvalPolicy`,
+/// `sandboxPolicy` (camelCase-tagged object) and `collaborationMode`
+/// (`{mode, settings}`). Null on any shape surprise — never guess.
+ThreadRuntimeConfig? _parseSettingsUpdate(String raw) {
+  try {
+    final params = jsonDecode(raw) as Map<String, dynamic>;
+    final s = params['threadSettings'];
+    if (s is! Map<String, dynamic>) return null;
+    String? str(Object? v) => (v is String && v.isNotEmpty) ? v : null;
+    // Sandbox: `{"type": "readOnly"}` → the kebab wire string the app speaks.
+    String? sandbox;
+    final sp = s['sandboxPolicy'];
+    final tag = sp is Map<String, dynamic> ? str(sp['type']) : str(sp);
+    if (tag != null) {
+      sandbox = switch (tag) {
+        'readOnly' => 'read-only',
+        'workspaceWrite' => 'workspace-write',
+        'dangerFullAccess' => 'danger-full-access',
+        'externalSandbox' => 'external-sandbox',
+        _ => tag,
+      };
+    }
+    // Approval: a plain string, or the externally-tagged granular object.
+    final ap = s['approvalPolicy'];
+    final approval = ap is Map<String, dynamic>
+        ? (ap.keys.isEmpty ? null : ap.keys.first)
+        : str(ap);
+    // Collaboration mode: `{mode: "plan"|"default", …}` or a bare string.
+    final cm = s['collaborationMode'];
+    final collab = cm is Map<String, dynamic> ? str(cm['mode']) : str(cm);
+    return ThreadRuntimeConfig(
+      model: str(s['model']),
+      modelProvider: str(s['modelProvider']),
+      reasoningEffort: str(s['effort']),
+      approvalPolicy: approval,
+      approvalsReviewer: s['approvalsReviewer'] == 'guardian_subagent'
+          ? 'auto_review'
+          : str(s['approvalsReviewer']),
+      serviceTier: str(s['serviceTier']),
+      sandboxMode: sandbox,
+      collaborationMode: collab,
+      confirmedByUpdate: true,
+    );
+  } catch (_) {
+    return null;
   }
 }

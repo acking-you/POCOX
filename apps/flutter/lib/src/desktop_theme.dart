@@ -24,11 +24,18 @@ const double kPanelRadius = 12.0;
 /// The composer card and other large raised frames.
 const double kComposerRadius = 16.0;
 
+/// The phone composer: rounder, so the card reads as one soft control.
+const double kTouchComposerRadius = 22.0;
+
 /// Small controls: chips, pills, suggestion rows, hover chips.
 const double kControlRadius = 8.0;
 
 /// Sidebar rows and other list selections — the macOS source-list radius.
 const double kRowRadius = 6.0;
+
+/// Rows and fields of the phone sidebar: a finger-sized list wants a softer
+/// corner than the desktop source list.
+const double kTouchRowRadius = 14.0;
 
 /// Dialogs and modal panels.
 const double kDialogRadius = 14.0;

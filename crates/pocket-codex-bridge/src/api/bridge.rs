@@ -23,6 +23,7 @@ use crate::{
 
 pub mod codex_setup;
 pub mod connection;
+pub mod device_management;
 pub mod events;
 pub mod host_config;
 pub mod host_sessions;
@@ -45,6 +46,14 @@ pub use self::{
         app_is_connected, app_probe, app_probe_local, app_probe_reason, app_running_threads,
         AppCapabilitiesDto,
     },
+    device_management::{
+        device_management_set_enabled, device_management_status, host_restore_overrides,
+        host_restore_problem, host_restore_service, managed_claude_prepare, managed_device,
+        managed_host, managed_host_apply, managed_host_save, managed_host_start,
+        managed_host_start_saved, managed_host_stop, managed_runtimes, DeviceManagementDto,
+        HostRestoreOverrideDto, ManagedDeviceDto, ManagedHostDto, ManagedHostSaveDto,
+        ManagedRuntimeAvailabilityDto, ManagedRuntimeDto,
+    },
     events::{
         app_events, log_events, meta_retry_events, AppEventDto, LogLineDto, RetryProgressDto,
     },
@@ -57,14 +66,15 @@ pub use self::{
     },
     host_sessions::{
         app_force_resume, app_local_session_transcript, app_local_sessions, app_session_liveness,
-        meta_file_download, meta_file_preview, meta_force_resume, meta_host_is_local,
-        meta_list_dir, meta_list_files, meta_project_config, meta_read_file,
-        meta_read_thread_image, meta_session_events, meta_session_liveness,
-        meta_session_transcript, meta_sessions, meta_set_project_config, meta_thread_config_get,
-        meta_thread_config_set, meta_upload_context, meta_upload_file, meta_upload_file_scoped,
-        meta_write_file, DirEntryDto, FileEntryDto, FilePreviewDto, ForceResumeReportDto,
-        HolderDto, LocalSessionDto, ProjectConfigDto, SessionFollowUpdateDto, SessionLivenessDto,
-        ThreadConfigDto,
+        meta_ensure_default_project, meta_file_download, meta_file_preview, meta_force_resume,
+        meta_host_is_local, meta_list_dir, meta_list_files, meta_project_config,
+        meta_project_settings, meta_read_file, meta_read_thread_image, meta_save_project_settings,
+        meta_session_events, meta_session_liveness, meta_session_transcript, meta_sessions,
+        meta_set_project_config, meta_thread_config_get, meta_thread_config_set,
+        meta_upload_context, meta_upload_file, meta_upload_file_scoped, meta_write_file,
+        DirEntryDto, FileEntryDto, FilePreviewDto, ForceResumeReportDto, HolderDto,
+        LocalSessionDto, ProjectConfigDto, ProjectSettingsDto, SessionFollowUpdateDto,
+        SessionLivenessDto, ThreadConfigDto,
     },
     hosted_account::{
         account_current_user, account_deregister_service, account_login_poll, account_login_start,
@@ -136,7 +146,9 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // Mirror the captured log to disk (last 6 hours), so a hang can be read
     // after the fact instead of only in a viewer that was open at the time.
     logging::init_file(&support_dir);
-    runtime::init(support_dir)
+    runtime::init(support_dir)?;
+    crate::engine::management::initialize();
+    Ok(())
 }
 
 /// Current config view (relay/key presence, locale, and account state).

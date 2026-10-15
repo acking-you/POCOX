@@ -3372,4 +3372,265 @@ class AppLocalizationsZh extends AppLocalizations {
   String nativeContinueElsewhere(String agent) {
     return '请在托管 $agent 的电脑上继续。';
   }
+
+  @override
+  String get defaultProjectTitle => '默认项目目录';
+
+  @override
+  String get defaultProjectAutomatic => '自动：由主机电脑决定';
+
+  @override
+  String get defaultProjectCreatedLater => '尚未创建。首次在这里开始会话时才会创建。';
+
+  @override
+  String get defaultProjectMissing => '主机上已没有这个目录，请另选一个。';
+
+  @override
+  String get defaultProjectNone => '没有默认目录，新会话会请你选择。';
+
+  @override
+  String get defaultProjectChange => '更改目录';
+
+  @override
+  String get defaultProjectUseAutomatic => '改回自动目录';
+
+  @override
+  String get defaultProjectSaved => '默认项目目录已保存。';
+
+  @override
+  String get defaultProjectConflict => '其他设备改过项目设置，请重新加载后再修改。';
+
+  @override
+  String defaultProjectUnavailable(String error) {
+    return '项目设置暂不可用，不影响服务管理。$error';
+  }
+
+  @override
+  String defaultProjectLabel(String name) {
+    return '$name（默认）';
+  }
+
+  @override
+  String projectRootsAdvanced(int count) {
+    return '可浏览目录（$count）';
+  }
+
+  @override
+  String get projectRootsHint => '其他设备只能在这些目录内浏览。留空则使用主机默认范围。';
+
+  @override
+  String get projectRootPathHint => '主机上的绝对路径，如 /Users/me/code';
+
+  @override
+  String get managedComputerTitle => '电脑管理';
+
+  @override
+  String managedComputerSummary(String os, String version) {
+    return '$os · Pocket $version';
+  }
+
+  @override
+  String get managedNoServices => '这台电脑还没有服务，可在下方添加。';
+
+  @override
+  String get managedAddService => '添加服务';
+
+  @override
+  String get managedAddHint => '那台电脑上已安装的运行时。此处不会安装或登录。';
+
+  @override
+  String managedAddTitle(String device) {
+    return '在 $device 上新建服务';
+  }
+
+  @override
+  String managedEditTitle(String name, String device) {
+    return '$device 上的 $name';
+  }
+
+  @override
+  String get managedNoRuntimes => '那台电脑上没有找到支持的运行时。';
+
+  @override
+  String get managedRuntimeUnavailable => '那台电脑上不可用。';
+
+  @override
+  String get managedNeedsHostLogin => '使用其自有账号需要先在那台电脑上登录；自定义提供方无需登录。';
+
+  @override
+  String get managedOpenCodeTaken => '那台电脑已在运行 OpenCode；每台电脑只能有一个 OpenCode 服务。';
+
+  @override
+  String get managedKindUnknown => '未知智能体';
+
+  @override
+  String get managedStateRunning => '运行中';
+
+  @override
+  String get managedStateStopped => '已停止';
+
+  @override
+  String get managedStateNew => '新建';
+
+  @override
+  String get managedStateNeedsAttention => '需要处理';
+
+  @override
+  String get managedStart => '启动';
+
+  @override
+  String get managedEdit => '编辑';
+
+  @override
+  String managedStarted(String name) {
+    return '$name 已启动。';
+  }
+
+  @override
+  String managedStopped(String name) {
+    return '$name 已停止，仍保留在列表中，可再次启动。';
+  }
+
+  @override
+  String get managedSaved => '已保存。';
+
+  @override
+  String managedStopConfirmTitle(String name) {
+    return '停止 $name？';
+  }
+
+  @override
+  String get managedStopConfirmBody => '它的会话会断开，进行中的回合会被中断。电脑仍可继续管理。';
+
+  @override
+  String managedRestoreProblem(String problem) {
+    return '自动恢复需要处理：$problem';
+  }
+
+  @override
+  String managedConfigUnreadable(String problem) {
+    return '无法读取已保存的配置（$problem）。仍可停止它，请在那台电脑上修复。';
+  }
+
+  @override
+  String get managedConflict => '打开后其他设备保存过这个服务。你的修改仍保留；重新加载可查看新版本（会丢弃你的修改）。';
+
+  @override
+  String get managedOutcomeUnknown => '结果未知（响应丢失）。已刷新当前状态，请确认后再操作。';
+
+  @override
+  String get managedHostBusy => '那台电脑正忙，请稍后再试。';
+
+  @override
+  String get managedAlreadyRunning => '这个服务已在运行。请刷新，或换一个名称。';
+
+  @override
+  String get managedHostStopped => '这个服务已停止，请刷新状态。';
+
+  @override
+  String get managedHostChanged => '这个服务已在别处重启或替换，已刷新状态。';
+
+  @override
+  String get managedLoginRequired => '那台电脑上尚未登录该服务的账号。请在那台电脑上登录，或改用自定义提供方。';
+
+  @override
+  String get managedPrepareRequired =>
+      '请先在那台电脑上准备 Claude 适配器（添加服务 → 准备 ACP 环境）。';
+
+  @override
+  String get managedInvalidConfiguration => '启动前请检查并保存这个服务的配置。';
+
+  @override
+  String get managedConfigurationChanged => '其他设备已保存过这个服务，请重新加载后再保存。';
+
+  @override
+  String get managedOutsideRoots => '请在主机的可浏览目录内选择。';
+
+  @override
+  String get managedNameRequired => '请输入服务名称。';
+
+  @override
+  String get managedNameHelper => '在那台电脑上唯一，用于在中转上标识服务。';
+
+  @override
+  String get managedPortLabel => '端口';
+
+  @override
+  String get managedPortHelper => '0 表示自动选择空闲端口。';
+
+  @override
+  String get managedPortInvalid => '请输入 0 到 65535 之间的端口。';
+
+  @override
+  String get managedRuntimeNote => '运行那台电脑上已安装的程序，路径和参数在那台电脑上管理。';
+
+  @override
+  String get managedInheritedNote => '使用那台电脑上已有的配置。';
+
+  @override
+  String get managedOfficialNote => '使用那台电脑上已登录的官方账号；若未登录，请在那台电脑上登录。';
+
+  @override
+  String get managedDiagnostics => '诊断详情';
+
+  @override
+  String get managedKey => '管理服务键';
+
+  @override
+  String get managedDevice => '设备';
+
+  @override
+  String get managedSwitchTitle => '允许我的其他设备管理这台电脑';
+
+  @override
+  String get managedSwitchOn => '已开启。你的已授权设备可在这台电脑在线时添加、配置、启动和停止服务。';
+
+  @override
+  String get managedSwitchOff => '已关闭。只有这台电脑能修改它的服务。';
+
+  @override
+  String get managedSwitchConnecting => '已开启，暂未连通。';
+
+  @override
+  String get managedSwitchUnavailable => '无法读取管理状态。';
+
+  @override
+  String hostRestoreBlocked(String problem) {
+    return '已跳过自动恢复，因为无法读取已保存的恢复选择：$problem';
+  }
+
+  @override
+  String get managedRuntimeReady => '可用';
+
+  @override
+  String get managedRuntimeNeedsSetup => '需要准备';
+
+  @override
+  String get managedRuntimeSignInThere => '可用 · 需在那台电脑上登录';
+
+  @override
+  String get managedOpenCodeRunning => '已在运行 · 每台电脑仅一个';
+
+  @override
+  String get managedRuntimeDetails => '详情';
+
+  @override
+  String managedRuntimeDetailsTitle(String name) {
+    return '$name 详情';
+  }
+
+  @override
+  String get managedRuntimePath => '可执行文件';
+
+  @override
+  String get managedRuntimeVersion => '版本';
+
+  @override
+  String get refreshServices => '刷新服务';
+
+  @override
+  String get refreshServicesFailed => '服务刷新失败，点按重试。';
+
+  @override
+  String get managedRefreshComputer => '刷新这台电脑';
 }

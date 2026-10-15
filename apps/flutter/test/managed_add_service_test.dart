@@ -1,0 +1,278 @@
+// The Add service sheet on a phone, opened through its real entrance (the
+// management panel's Add service button and the adaptive bottom sheet): each
+// runtime shows its name and a short availability line; long paths and
+// explanations sit behind an explicit Details button. Every state stays
+// reachable: choosing a ready runtime, blocked OpenCode, unavailable, sign-in
+// on the host, Claude preparation, loading errors and retry. Real fonts;
+// PCX_UI_PREVIEW_DIR writes each layout as a PNG.
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/screens/services_screen.dart';
+import 'package:pocket_codex/src/theme.dart';
+
+import 'fake_bridge_api.dart';
+import 'support/ui_preview.dart';
+
+const _mgmt = 'pcx:studio:host:studio';
+final _en = lookupAppLocalizations(const Locale('en'));
+
+const _codexPath = '/opt/homebrew/bin/codex';
+const _openCodePath = '/Users/someone/.nvm/versions/node/v20.20.1/bin/opencode';
+const _claudePath =
+    '/Users/someone/Library/Application Support/io.github.acking-you.'
+    'pocket-codex/acp-runtime/claude-agent-acp/node_modules/.bin/'
+    'claude-agent-acp';
+
+const _runtimes = [
+  ManagedRuntimeAvailability(
+    kind: 'codex',
+    ready: true,
+    path: _codexPath,
+    version: '0.130.0',
+    needsHostLogin: true,
+  ),
+  ManagedRuntimeAvailability(
+    kind: 'opencode',
+    ready: true,
+    path: _openCodePath,
+    version: '1.19.0',
+  ),
+  ManagedRuntimeAvailability(kind: 'claude', ready: true, path: _claudePath),
+];
+
+ManagedHost _openCodeRunning() => ManagedHost(
+  name: 'opencode',
+  status: const AppServeStatus(
+    name: 'opencode',
+    device: 'studio',
+    alive: true,
+    provider: 'opencode',
+    appServiceKey: 'pcx:studio:opencode:opencode',
+    incarnation: 'inc-oc',
+  ),
+  config: HostConfig(
+    revision: 1,
+    runtime: const HostRuntime.opencode(),
+    active: const HostActive(
+      incarnation: 'inc-oc',
+      runtime: HostRuntime.opencode(),
+      revision: 1,
+    ),
+  ),
+);
+
+FakeBridgeApi _fake({
+  List<ManagedRuntimeAvailability> runtimes = _runtimes,
+  List<ManagedHost>? hosts,
+}) {
+  final api = FakeBridgeApi(
+    services: const [
+      ServiceEntry(device: 'studio', kind: 'host', name: 'studio', key: _mgmt),
+    ],
+  );
+  api.managedDevices[_mgmt] = ManagedDevice(
+    device: 'studio',
+    os: 'macOS',
+    appVersion: '0.9.0',
+    hosts: hosts ?? [_openCodeRunning()],
+  );
+  api.managedRuntimeLists[_mgmt] = runtimes;
+  return api;
+}
+
+Widget _app(
+  BridgeApi api, {
+  double textScale = 1,
+  Locale locale = const Locale('en'),
+  bool dark = false,
+}) => ProviderScope(
+  overrides: [bridgeApiProvider.overrideWithValue(api)],
+  child: MaterialApp(
+    locale: locale,
+    theme: lightTheme(),
+    darkTheme: darkTheme(),
+    themeMode: dark ? ThemeMode.dark : ThemeMode.light,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => RepaintBoundary(
+      key: previewKey,
+      child: MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
+    ),
+    home: const ServicesScreen(),
+  ),
+);
+
+/// Open the sheet the way a person does: the computer, then Add service.
+Future<void> _openSheet(
+  WidgetTester t,
+  FakeBridgeApi api, {
+  Size size = const Size(393, 852),
+  double textScale = 1,
+  Locale locale = const Locale('en'),
+  bool dark = false,
+}) async {
+  t.view.physicalSize = size;
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
+  await t.pumpWidget(
+    _app(api, textScale: textScale, locale: locale, dark: dark),
+  );
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('device-studio')));
+  await t.pumpAndSettle();
+  final add = find.byKey(const Key('managed-add-service'));
+  await t.ensureVisible(add);
+  await t.pumpAndSettle();
+  await t.tap(add);
+  await t.pumpAndSettle();
+  expect(find.byKey(const Key('managed-add-panel')), findsOneWidget);
+}
+
+Future<void> _tap(WidgetTester t, Finder finder) async {
+  await t.ensureVisible(finder);
+  await t.pumpAndSettle();
+  await t.tap(finder);
+  await t.pumpAndSettle();
+}
+
+void main() {
+  setUpAll(() => loadPreviewFonts(always: true));
+
+  testWidgets('rows show name and availability; paths only under Details', (
+    t,
+  ) async {
+    await _openSheet(t, _fake());
+    expect(find.text(_codexPath), findsNothing);
+    expect(find.text(_openCodePath), findsNothing);
+    expect(find.text(_claudePath), findsNothing);
+    expect(find.text(_en.managedRuntimeSignInThere), findsOneWidget);
+    expect(find.text(_en.managedOpenCodeRunning), findsOneWidget);
+    expect(find.text(_en.managedRuntimeReady), findsOneWidget);
+    await _tap(t, find.byKey(const Key('managed-runtime-details-codex')));
+    expect(find.text(_codexPath), findsOneWidget);
+    expect(find.text('0.130.0'), findsOneWidget);
+    expect(find.text(_en.managedNeedsHostLogin), findsOneWidget);
+    await _tap(t, find.text(_en.done));
+    // Details never chose the runtime.
+    expect(find.byKey(const Key('managed-add-panel')), findsOneWidget);
+  });
+
+  testWidgets('blocked OpenCode cannot be chosen and explains why under '
+      'Details', (t) async {
+    await _openSheet(t, _fake());
+    await _tap(t, find.byKey(const Key('managed-runtime-opencode')));
+    expect(find.byKey(const Key('managed-add-panel')), findsOneWidget);
+    await _tap(t, find.byKey(const Key('managed-runtime-details-opencode')));
+    expect(find.text(_en.managedOpenCodeTaken), findsOneWidget);
+    expect(find.text(_openCodePath), findsOneWidget);
+  });
+
+  testWidgets('a ready runtime opens its editor', (t) async {
+    await _openSheet(t, _fake());
+    await _tap(t, find.byKey(const Key('managed-runtime-claude')));
+    expect(find.byKey(const Key('managed-add-panel')), findsNothing);
+    expect(find.byKey(const Key('managed-create')), findsOneWidget);
+  });
+
+  testWidgets('an unavailable runtime and Claude needing setup say so '
+      'briefly; Prepare stays a single explicit action', (t) async {
+    final api =
+        _fake(
+            hosts: const [],
+            runtimes: const [
+              ManagedRuntimeAvailability(
+                kind: 'codex',
+                ready: false,
+                problem: 'codex 0.20 is older than the supported 0.120',
+              ),
+              ManagedRuntimeAvailability(
+                kind: 'claude',
+                ready: false,
+                canPrepare: true,
+              ),
+            ],
+          )
+          ..claudePrepareScript.add(
+            const AcpClaudeSetup(
+              state: 'running',
+              stage: 'downloading',
+              started: true,
+            ),
+          );
+    await _openSheet(t, api);
+    expect(find.text(_en.managedRuntimeUnavailable), findsOneWidget);
+    expect(find.text(_en.managedRuntimeNeedsSetup), findsOneWidget);
+    expect(find.textContaining('older than'), findsNothing);
+    await _tap(t, find.byKey(const Key('managed-runtime-details-codex')));
+    expect(find.textContaining('older than'), findsOneWidget);
+    await _tap(t, find.text(_en.done));
+    await t.tap(find.byKey(const Key('managed-claude-prepare')));
+    await t.pump();
+    expect(api.claudePrepareStarts, 1);
+    expect(find.byKey(const Key('managed-claude-progress')), findsOneWidget);
+    Navigator.of(t.element(find.byKey(const Key('managed-add-panel')))).pop();
+    await t.pumpAndSettle();
+  });
+
+  testWidgets('a failed runtime read offers Retry', (t) async {
+    final api = _fake()..managedRuntimesError = Exception('tunnel dropped');
+    await _openSheet(t, api);
+    expect(find.byKey(const Key('managed-runtimes-error')), findsOneWidget);
+    await _tap(t, find.byKey(const Key('managed-runtimes-retry')));
+    expect(find.byKey(const Key('managed-runtime-codex')), findsOneWidget);
+  });
+
+  for (final (width, locale, dark, scale) in const [
+    (320.0, 'zh', false, 1.0),
+    (320.0, 'en', true, 2.0),
+    (393.0, 'en', false, 1.0),
+    (393.0, 'zh', true, 2.0),
+    (320.0, 'zh', true, 2.0),
+    (393.0, 'en', true, 1.0),
+  ]) {
+    final name =
+        'add-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}-'
+        '${scale.toInt()}x';
+    testWidgets('$name: padded, scrollable, nothing clipped', (t) async {
+      final api = _fake();
+      await _openSheet(
+        t,
+        api,
+        size: Size(width, 760),
+        textScale: scale,
+        locale: Locale(locale),
+        dark: dark,
+      );
+      expect(t.takeException(), isNull);
+      final panel = t.getRect(find.byKey(const Key('managed-add-panel')));
+      expect(panel.left, greaterThanOrEqualTo(20));
+      expect(width - panel.right, greaterThanOrEqualTo(20));
+      await capturePreview(t, name);
+      // Every row and its Details button is reachable and full size.
+      for (final kind in ['codex', 'opencode', 'claude']) {
+        final details = find.byKey(Key('managed-runtime-details-$kind'));
+        await t.ensureVisible(details);
+        await t.pumpAndSettle();
+        final box = t.getRect(details);
+        expect(box.width, greaterThanOrEqualTo(40));
+        expect(box.height, greaterThanOrEqualTo(40));
+        expect(box.bottom, lessThanOrEqualTo(760));
+      }
+      await capturePreview(t, '$name-end');
+      await t.tap(find.byKey(const Key('managed-runtime-details-claude')));
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      await capturePreview(t, '$name-details');
+    });
+  }
+}

@@ -48,6 +48,8 @@ pub enum ServiceKind {
     /// Host-side meta service (session inventory + per-thread config), exposed
     /// alongside an `app`/`api` host so its local sessions are remote-viewable.
     Meta,
+    /// Device-level management, independent of any running engine.
+    Host,
     /// A service kind this build does not recognise — e.g. one a newer peer
     /// introduced. Only ever produced by **deserialization**
     /// (`#[serde(other)]`), so an older client tolerates a future kind in a
@@ -67,6 +69,7 @@ impl ServiceKind {
             Self::Acp => "acp",
             Self::OpenCode => "opencode",
             Self::Meta => "meta",
+            Self::Host => "host",
             Self::Unknown => "unknown",
         }
     }
@@ -88,6 +91,7 @@ impl FromStr for ServiceKind {
             "acp" => Ok(Self::Acp),
             "opencode" => Ok(Self::OpenCode),
             "meta" => Ok(Self::Meta),
+            "host" => Ok(Self::Host),
             _ => Err(()),
         }
     }

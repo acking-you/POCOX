@@ -94,8 +94,34 @@ pub(super) fn settle_retained(name: &str) -> Result<()> {
 /// that did not exit is tried again when that name isn't hosting. Fails
 /// while its codex may still run (it is kept, and the next stop or quit
 /// tries again).
+#[cfg(test)]
 pub fn serve_stop(name: &str) -> Result<()> {
     let lease = host_lease::acquire(name, Op::Stop)?;
+    serve_stop_locked(&lease, name)
+}
+
+/// User-requested stop, durably suppressing automatic restore before any
+/// process is touched. A remote controller must provide its observed
+/// incarnation.
+pub fn serve_stop_remembered(name: &str, expected: Option<&str>) -> Result<()> {
+    serve_stop_remembered_checked(name, expected, &|| Ok(()))
+}
+
+/// Remote stop, rechecking authorization after any lifecycle wait.
+pub(in crate::engine) fn serve_stop_remembered_checked(
+    name: &str,
+    expected: Option<&str>,
+    check: &dyn Fn() -> Result<()>,
+) -> Result<()> {
+    let lease = host_lease::acquire_checked(name, Op::Stop, check)?;
+    if let Some(expected) = expected {
+        if super::super::host_apply::active(lease.name())
+            .is_none_or(|active| active.incarnation != expected)
+        {
+            bail!("the host has changed; refresh before stopping it");
+        }
+    }
+    super::super::host_lifecycle::record_stop_in(&host_profiles::root()?, lease.name())?;
     serve_stop_locked(&lease, name)
 }
 
@@ -163,6 +189,7 @@ pub fn serve_stop_all() -> Result<()> {
         QUITTING.store(true, Ordering::SeqCst);
     }
     host_lease::close_admission();
+    super::super::management::stop();
     super::super::serve_opencode::close_admission();
     super::super::serve_acp::stop_all();
     let mut left = Vec::new();

@@ -303,7 +303,11 @@ fn report(host: &AcpServe, reused: bool) -> AcpServeReport {
 pub fn start(name: Option<String>, spec: AgentSpec) -> Result<AcpServeReport> {
     let name = host_names::canonical(&host_names::requested(name.as_deref(), &spec.profile_id))?;
     let lease = host_lease::acquire(&name, Op::Start)?;
-    start_locked(&lease, spec, None, &host_profiles::root()?)
+    let profiles = host_profiles::root()?;
+    let restore = host_profiles::Runtime::Acp(spec.clone());
+    let result = start_locked(&lease, spec, None, &profiles)?;
+    super::host_lifecycle::record_running_in(&profiles, lease.name(), restore);
+    Ok(result)
 }
 
 /// [`start`] under the held lease of its instance, with the model service

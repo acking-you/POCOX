@@ -28,7 +28,7 @@ async fn spawn() -> (String, String, tempfile::TempDir) {
             .expect("config store"),
     );
     let host = Arc::new(
-        HostStore::open(dir.path().join("host.json"))
+        HostStore::open_with_default(dir.path().join("host.json"), dir.path().join("PocketCodex"))
             .await
             .expect("host store"),
     );
@@ -396,4 +396,91 @@ async fn local_probe_requires_a_secret_shared_through_the_filesystem() {
         .await
         .expect("invalid");
     assert!(!invalid.status().is_success());
+}
+
+#[tokio::test]
+async fn default_project_http_preserves_legacy_shape_and_checks_revision() {
+    let (base, root, guard) = spawn().await;
+    let client = reqwest::Client::new();
+    let view: serde_json::Value = client
+        .get(format!("{base}/projects"))
+        .send()
+        .await
+        .expect("get")
+        .error_for_status()
+        .expect("ok")
+        .json()
+        .await
+        .expect("view");
+    assert_eq!(view["default_project"], serde_json::Value::Null);
+    assert_eq!(view["effective_default"]["automatic"], true);
+    assert!(!guard.path().join("PocketCodex").exists());
+    let ensured: serde_json::Value = client
+        .post(format!("{base}/projects/default/ensure"))
+        .send()
+        .await
+        .expect("ensure")
+        .error_for_status()
+        .expect("ok")
+        .json()
+        .await
+        .expect("result");
+    let path = ensured["path"].as_str().expect("host path");
+    assert_eq!(ensured["created"], true);
+    assert!(client
+        .get(format!("{base}/fs/list"))
+        .query(&[("path", path)])
+        .send()
+        .await
+        .expect("browse")
+        .status()
+        .is_success());
+    assert_eq!(
+        client
+            .get(format!("{base}/fs/list"))
+            .query(&[("path", guard.path().to_str().expect("parent"))])
+            .send()
+            .await
+            .expect("outside")
+            .status(),
+        reqwest::StatusCode::FORBIDDEN
+    );
+    let update = serde_json::json!({"project_roots": [], "default_project": root, "expected_revision": view["revision"]});
+    let saved: serde_json::Value = client
+        .put(format!("{base}/projects"))
+        .json(&update)
+        .send()
+        .await
+        .expect("save")
+        .error_for_status()
+        .expect("saved")
+        .json()
+        .await
+        .expect("saved view");
+    let stale = client
+        .put(format!("{base}/projects"))
+        .json(&update)
+        .send()
+        .await
+        .expect("stale");
+    assert_eq!(stale.status(), reqwest::StatusCode::CONFLICT);
+    let error: serde_json::Value = stale.json().await.expect("error");
+    assert_eq!(error["code"], "revision_conflict");
+    assert_eq!(error["current"]["revision"], saved["revision"]);
+    let missing = guard.path().join("missing");
+    client
+        .put(format!("{base}/projects"))
+        .json(&serde_json::json!({"project_roots": [], "default_project": missing}))
+        .send()
+        .await
+        .expect("legacy save")
+        .error_for_status()
+        .expect("legacy accepted");
+    let error = client
+        .post(format!("{base}/projects/default/ensure"))
+        .send()
+        .await
+        .expect("missing");
+    assert_eq!(error.status(), reqwest::StatusCode::NOT_FOUND);
+    assert!(!missing.exists());
 }

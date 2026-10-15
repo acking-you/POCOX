@@ -18,9 +18,10 @@ extension _SessionConversations on _AppSessionState {
       ...?ref.watch(runningThreadsProvider(widget.serviceKey)).valueOrNull,
       if (_externalWriterRunning && _threadId != null) _threadId!,
     };
-    // Close the drawer (mobile) if this pane is inside an open one.
+    // Close the phone's sidebar if this pane is inside an open one.
     void closeDrawerIfOpen(BuildContext ctx) {
-      if (Scaffold.maybeOf(ctx)?.isDrawerOpen ?? false) Navigator.pop(ctx);
+      final nav = LayeredNavigation.maybeOf(ctx);
+      if (nav?.isOpen ?? false) nav!.close();
     }
 
     // Filter by the search query, then bucket by recency: running threads go to
@@ -250,11 +251,13 @@ extension _SessionConversations on _AppSessionState {
         }
         _visibleConversationOrder = order;
 
-        return Column(
+        // 44 px on touch: these are the only controls on the list heading.
+        final headingTarget = isDesktop ? 26.0 : 44.0;
+        final pane = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // In the mobile drawer, "back to projects" lives here (the AppBar's
-            // leading button opens this drawer instead). Desktop shows it as the
+            // In the phone sidebar, "back to projects" lives here (the AppBar's
+            // leading button opens the sidebar instead). Desktop shows it as the
             // AppBar leading, so the inline pane omits it. The home has no back
             // destination at all.
             if (inDrawer && !widget.home) ...[
@@ -270,36 +273,16 @@ extension _SessionConversations on _AppSessionState {
               ),
               const Divider(height: 1),
             ],
-            // Mobile drawer only: the brand header (the desktop sidebar's top
-            // strip already carries it).
-            if (inDrawer && widget.home)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-                child: Row(
-                  children: [
-                    const BrandLogo(size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        l10n.appTitle,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             // Home only: which host this chat runs on, switchable when several
             // app services are available.
             if (widget.home) _serviceSwitcher(l10n),
             // The primary action of a conversation list, as a row rather than
             // a coloured disc: it reads as the first entry of the list it
-            // creates into, and keeps the accent free for live state.
+            // creates into. On touch it is a full-width tonal pill.
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+              padding: isDesktop
+                  ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
+                  : const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: _sidebarAction(
                 key: const Key('new-conversation-btn'),
                 icon: Icons.edit_square,
@@ -310,44 +293,52 @@ extension _SessionConversations on _AppSessionState {
             // Quick filter — shown once there are enough conversations to scan.
             if (_threads.length > 6)
               Padding(
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                padding: isDesktop
+                    ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
+                    : const EdgeInsets.fromLTRB(12, 6, 12, 0),
                 child: SizedBox(
-                  height: 32,
+                  height: isDesktop ? 32 : 44,
                   child: TextField(
                     key: const Key('conv-search'),
                     focusNode: _convSearchFocus,
                     onChanged: (v) => _updateState(() => _convQuery = v),
-                    style: const TextStyle(fontSize: 13),
+                    style: TextStyle(fontSize: isDesktop ? 13 : 15),
                     textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       isDense: true,
                       prefixIcon: Icon(
                         Icons.search,
-                        size: 16,
+                        size: isDesktop ? 16 : 20,
                         color: scheme.onSurfaceVariant,
                       ),
-                      prefixIconConstraints: const BoxConstraints(
-                        minWidth: 32,
+                      prefixIconConstraints: BoxConstraints(
+                        minWidth: isDesktop ? 32 : 44,
                         minHeight: 32,
                       ),
                       hintText: l10n.searchConversations,
                       hintStyle: TextStyle(
-                        fontSize: 13,
+                        fontSize: isDesktop ? 13 : 15,
                         color: scheme.onSurfaceVariant,
                       ),
                       filled: true,
                       fillColor: scheme.onSurface.withValues(alpha: 0.05),
                       contentPadding: EdgeInsets.zero,
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(kRowRadius + 1),
+                        borderRadius: BorderRadius.circular(
+                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                        ),
                         borderSide: BorderSide.none,
                       ),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(kRowRadius + 1),
+                        borderRadius: BorderRadius.circular(
+                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                        ),
                         borderSide: BorderSide.none,
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(kRowRadius + 1),
+                        borderRadius: BorderRadius.circular(
+                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                        ),
                         borderSide: BorderSide(color: scheme.outline),
                       ),
                     ),
@@ -370,7 +361,7 @@ extension _SessionConversations on _AppSessionState {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: isDesktop ? 12 : 13,
                         fontWeight: FontWeight.w600,
                         color: scheme.onSurfaceVariant,
                       ),
@@ -380,13 +371,13 @@ extension _SessionConversations on _AppSessionState {
                   // the user has wandered off to.
                   if (selectedRow != null)
                     SizedBox(
-                      width: 26,
-                      height: 26,
+                      width: headingTarget,
+                      height: headingTarget,
                       child: IconButton(
                         key: const Key('locate-conversation-btn'),
                         padding: EdgeInsets.zero,
                         style: IconButton.styleFrom(
-                          minimumSize: const Size(26, 26),
+                          minimumSize: Size.square(headingTarget),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(kRowRadius),
                           ),
@@ -401,13 +392,13 @@ extension _SessionConversations on _AppSessionState {
                       ),
                     ),
                   SizedBox(
-                    width: 26,
-                    height: 26,
+                    width: headingTarget,
+                    height: headingTarget,
                     child: IconButton(
                       key: const Key('activity-view-btn'),
                       padding: EdgeInsets.zero,
                       style: IconButton.styleFrom(
-                        minimumSize: const Size(26, 26),
+                        minimumSize: Size.square(headingTarget),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(kRowRadius),
                         ),
@@ -549,6 +540,29 @@ extension _SessionConversations on _AppSessionState {
             ],
           ],
         );
+        return _shortPane(pane);
+      },
+    );
+  }
+
+  /// [pane], which on a touch screen too short for its fixed rows and a
+  /// usable list (a phone in landscape, the keyboard up) keeps a usable
+  /// height inside a scroll view, so no row is cut off; taller screens keep
+  /// the pinned footer. The scroll view is always there on touch, so the
+  /// keyboard opening never rebuilds the search field it is typing into.
+  Widget _shortPane(Widget pane) {
+    if (isDesktop) return pane;
+    return LayoutBuilder(
+      builder: (context, box) {
+        if (!box.maxHeight.isFinite) return pane;
+        return SingleChildScrollView(
+          key: const Key('sidebar-short-scroll'),
+          primary: false,
+          child: SizedBox(
+            height: box.maxHeight >= 480 ? box.maxHeight : 600,
+            child: pane,
+          ),
+        );
       },
     );
   }
@@ -604,7 +618,7 @@ extension _SessionConversations on _AppSessionState {
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
       style: TextStyle(
-        fontSize: dense ? 13 : 14,
+        fontSize: dense ? 13 : 15,
         fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
         color: fg,
       ),
@@ -727,16 +741,21 @@ extension _SessionConversations on _AppSessionState {
     required Widget child,
   }) {
     final scheme = Theme.of(context).colorScheme;
+    // Touch: a soft tonal plate without edge or shadow — on a full-screen
+    // list the lift reads as clutter, the tone alone finds the row.
+    final touch = !isDesktop;
     return Material(
       key: key,
-      color: selected ? sidebarSelection(scheme) : Colors.transparent,
-      elevation: selected ? 1 : 0,
+      color: selected
+          ? (touch ? surfaceSelection(scheme) : sidebarSelection(scheme))
+          : Colors.transparent,
+      elevation: selected && !touch ? 1 : 0,
       shadowColor: sidebarSelectionShadow(scheme),
       surfaceTintColor: Colors.transparent,
       animationDuration: Motion.of(context, Motion.fast),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(radius),
-        side: selected
+        borderRadius: BorderRadius.circular(touch ? kTouchRowRadius : radius),
+        side: selected && !touch
             ? BorderSide(color: sidebarSelectionEdge(scheme))
             : BorderSide.none,
       ),

@@ -8,6 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'threads.dart';
 
 // These functions are ignored because they are not marked as `pub`: `holder_dto`, `local_session_dto`, `meta_follow_update_dto`, `meta_holder_dto`, `meta_liveness_dto`, `meta_thread_item_dto`, `project_config_dto`, `thread_config_dto`, `thread_config_from_dto`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ProjectViewResponse`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
 
 /// List every codex session under the shared `CODEX_HOME`, newest first,
 /// each annotated with whether it is safe to resume.
@@ -183,6 +185,33 @@ Future<ProjectConfigDto> metaSetProjectConfig({
   projectRoots: projectRoots,
   defaultProject: defaultProject,
 );
+
+/// Read current host defaults and conflict metadata without creating a folder.
+Future<ProjectSettingsDto> metaProjectSettings({required String serviceKey}) =>
+    RustLib.instance.api.crateApiBridgeHostSessionsMetaProjectSettings(
+      serviceKey: serviceKey,
+    );
+
+/// Save reviewed project settings. New hosts require their last read revision.
+Future<ProjectSettingsDto> metaSaveProjectSettings({
+  required String serviceKey,
+  required List<String> projectRoots,
+  String? defaultProject,
+  String? expectedRevision,
+}) => RustLib.instance.api.crateApiBridgeHostSessionsMetaSaveProjectSettings(
+  serviceKey: serviceKey,
+  projectRoots: projectRoots,
+  defaultProject: defaultProject,
+  expectedRevision: expectedRevision,
+);
+
+/// Resolve the host's default at first send. Never substitute the controller's
+/// filesystem or overwrite an explicitly selected project. On a legacy host,
+/// returns its configured default or None so the existing picker can be used.
+Future<String?> metaEnsureDefaultProject({required String serviceKey}) =>
+    RustLib.instance.api.crateApiBridgeHostSessionsMetaEnsureDefaultProject(
+      serviceKey: serviceKey,
+    );
 
 /// List the sub-directories of `path` on the host behind `service_key`, for the
 /// remote project-folder browser. Errors (with a `403`-carrying message) if
@@ -550,6 +579,58 @@ class ProjectConfigDto {
           runtimeType == other.runtimeType &&
           projectRoots == other.projectRoots &&
           defaultProject == other.defaultProject;
+}
+
+/// Project settings with an optional new-host revision and effective default.
+/// Older hosts retain their existing configured-default behaviour.
+class ProjectSettingsDto {
+  /// Explicit browsing roots on the host.
+  final List<String> projectRoots;
+
+  /// User override; absent selects the host OS automatic folder on new hosts.
+  final String? defaultProject;
+
+  /// Compare-and-save token. Absent identifies a legacy host.
+  final String? revision;
+
+  /// Actual host default, absent only on legacy hosts without one configured.
+  final String? effectiveDefault;
+
+  /// The host derives this folder from its OS rather than a saved override.
+  final bool automatic;
+
+  /// Effective folder exists now; checking it did not create it.
+  final bool exists;
+
+  const ProjectSettingsDto({
+    required this.projectRoots,
+    this.defaultProject,
+    this.revision,
+    this.effectiveDefault,
+    required this.automatic,
+    required this.exists,
+  });
+
+  @override
+  int get hashCode =>
+      projectRoots.hashCode ^
+      defaultProject.hashCode ^
+      revision.hashCode ^
+      effectiveDefault.hashCode ^
+      automatic.hashCode ^
+      exists.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProjectSettingsDto &&
+          runtimeType == other.runtimeType &&
+          projectRoots == other.projectRoots &&
+          defaultProject == other.defaultProject &&
+          revision == other.revision &&
+          effectiveDefault == other.effectiveDefault &&
+          automatic == other.automatic &&
+          exists == other.exists;
 }
 
 /// One read-only history revision + ownership update from the host's live

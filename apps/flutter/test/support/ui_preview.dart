@@ -28,11 +28,15 @@ Future<void> loadPreviewFonts({bool always = false}) async {
   await (FontLoader(
     'MaterialIcons',
   )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  final prose = FontLoader('Figtree');
-  for (final weight in ['Light', 'Regular', 'Medium', 'SemiBold', 'Bold']) {
-    prose.addFont(rootBundle.load('assets/fonts/Figtree-$weight.ttf'));
+  // Figtree also stands in for the Apple system face, which the headless
+  // engine lacks, so iOS-platform previews measure real Latin text.
+  for (final family in ['Figtree', 'CupertinoSystemText']) {
+    final prose = FontLoader(family);
+    for (final weight in ['Light', 'Regular', 'Medium', 'SemiBold', 'Bold']) {
+      prose.addFont(rootBundle.load('assets/fonts/Figtree-$weight.ttf'));
+    }
+    await prose.load();
   }
-  await prose.load();
   final mono = FontLoader('GeistMono');
   for (final weight in ['Regular', 'Medium', 'SemiBold']) {
     mono.addFont(rootBundle.load('assets/fonts/GeistMono-$weight.ttf'));

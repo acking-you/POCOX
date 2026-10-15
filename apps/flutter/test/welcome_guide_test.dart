@@ -93,7 +93,7 @@ void main() {
       // Step 1 flips to "hosting is up"; step 2 unlocks the folder editor.
       expect(find.text('托管已开启'), findsOneWidget);
       expect(find.byKey(const Key('welcome-folders-locked')), findsNothing);
-      expect(find.byKey(const Key('add-project-folder-btn')), findsOneWidget);
+      expect(find.byKey(const Key('default-project-tile')), findsOneWidget);
 
       // Enter the chat.
       await t.tap(find.byKey(const Key('welcome-enter-btn')));

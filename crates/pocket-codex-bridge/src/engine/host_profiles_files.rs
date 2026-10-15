@@ -65,7 +65,7 @@ fn private_options() -> OpenOptions {
 
 /// How far a successful [`write_private`] got.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Committed {
+pub(in crate::engine) enum Committed {
     /// Renamed into place and the directory synced.
     Durable,
     /// Renamed into place (readers see it), but the directory sync failed,
@@ -76,7 +76,7 @@ pub(super) enum Committed {
 /// Replace `file` with `bytes` atomically, `0600` on Unix. An error means
 /// the file was not replaced; once the rename happened the result is
 /// [`Committed`], never an error.
-pub(super) fn write_private(file: &Path, bytes: &[u8]) -> Result<Committed> {
+pub(in crate::engine) fn write_private(file: &Path, bytes: &[u8]) -> Result<Committed> {
     let dir = file
         .parent()
         .ok_or_else(|| anyhow!("no parent directory"))?;
@@ -133,10 +133,10 @@ fn sync_dir(dir: &Path, file: &Path) -> std::io::Result<()> {
 }
 
 /// The store's cross-process lock; released when dropped.
-pub(super) struct FileLock(File);
+pub(in crate::engine) struct FileLock(File);
 
 impl FileLock {
-    pub(super) fn acquire(root: &Path) -> Result<Self> {
+    pub(in crate::engine) fn acquire(root: &Path) -> Result<Self> {
         private_dir(root)?;
         let file = private_options()
             .read(true)
@@ -173,11 +173,13 @@ pub(super) fn sweep_keys(root: &Path, name: &str, keep: &[&str]) {
 /// Which directory sync a test makes fail.
 #[cfg(test)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum SyncFault {
+pub(in crate::engine) enum SyncFault {
     /// The record file's directory, after `profiles.json` was renamed.
     Record,
     /// The key directory, after a key file was renamed into it.
     Key,
+    /// The lifecycle ledger after its atomic rename.
+    Lifecycle,
 }
 
 #[cfg(test)]
@@ -186,6 +188,7 @@ impl SyncFault {
         match self {
             Self::Record => file.ends_with("profiles.json"),
             Self::Key => dir.ends_with("keys") && file.extension().is_some_and(|e| e == "key"),
+            Self::Lifecycle => file.ends_with("lifecycle.json"),
         }
     }
 }
@@ -211,7 +214,7 @@ pub(super) fn fail_commit_once() {
 /// Test hook: make this thread's next directory sync of `fault`'s kind
 /// fail.
 #[cfg(test)]
-pub(super) fn fail_dir_sync_once(fault: SyncFault) {
+pub(in crate::engine) fn fail_dir_sync_once(fault: SyncFault) {
     FAIL_DIR_SYNC.with(|f| f.set(Some(fault)));
 }
 

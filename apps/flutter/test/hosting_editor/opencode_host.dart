@@ -155,6 +155,11 @@ void _openCodeHostTests() {
     await _tapKey(t, 'agent-choice-opencode');
     // The tile opened that host's own page.
     expect(find.byKey(const Key('opencode-host-details')), findsOneWidget);
+    // The longer notes are folded into diagnostics.
+    expect(find.byKey(const Key('opencode-scope-note')), findsNothing);
+    await t.ensureVisible(find.byKey(const Key('host-diagnostics')));
+    await t.tap(find.byKey(const Key('host-diagnostics')));
+    await t.pumpAndSettle();
     expect(find.byKey(const Key('opencode-scope-note')), findsOneWidget);
     expect(api.startConfiguredCalls, isEmpty);
   });

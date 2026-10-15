@@ -9,7 +9,8 @@
 use std::fmt;
 
 /// The wire API a custom provider speaks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum ApiProtocol {
     /// OpenAI Responses (`POST <base>/responses`).
     Responses,

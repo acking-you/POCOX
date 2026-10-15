@@ -250,9 +250,11 @@ impl Config {
             ServiceKind::Api => self.services.api.default.as_ref(),
             // ACP uses its own session configuration; meta/unknown have
             // no standalone default target.
-            ServiceKind::Acp | ServiceKind::OpenCode | ServiceKind::Meta | ServiceKind::Unknown => {
-                None
-            },
+            ServiceKind::Acp
+            | ServiceKind::OpenCode
+            | ServiceKind::Meta
+            | ServiceKind::Host
+            | ServiceKind::Unknown => None,
         }
     }
 
@@ -272,8 +274,11 @@ impl Config {
             ServiceKind::Api => self.services.api.default = Some(target),
             // Keep ACP defaults out of this legacy configuration schema.
             // Meta/unknown have no standalone default.
-            ServiceKind::Acp | ServiceKind::OpenCode | ServiceKind::Meta | ServiceKind::Unknown => {
-            },
+            ServiceKind::Acp
+            | ServiceKind::OpenCode
+            | ServiceKind::Meta
+            | ServiceKind::Host
+            | ServiceKind::Unknown => {},
         }
     }
 

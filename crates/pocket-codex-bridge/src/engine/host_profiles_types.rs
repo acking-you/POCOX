@@ -3,7 +3,8 @@
 use super::*;
 
 /// Where a host gets its model service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Source {
     /// The agent's own existing configuration.
     Inherited,
@@ -30,6 +31,22 @@ impl Source {
             .find(|s| s.as_str() == raw)
     }
 }
+
+/// A save/apply expected an older configuration revision.
+#[derive(Debug)]
+pub struct RevisionConflict {
+    /// Current saved revision; reload before retrying.
+    pub current: u64,
+}
+impl std::fmt::Display for RevisionConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(
+            "this host's saved configuration changed elsewhere; reload it before saving or \
+             applying",
+        )
+    }
+}
+impl std::error::Error for RevisionConflict {}
 
 /// The engine a configuration is for, which decides what it may select.
 #[derive(Debug, Clone, Copy)]
@@ -179,7 +196,8 @@ impl Runtime {
 }
 
 /// A saved configuration, as readers see it: the key only as set or not.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostProfile {
     /// Where the host gets its model service.
     pub source: Source,
@@ -219,7 +237,8 @@ impl HostProfile {
 }
 
 /// What a save asks for (everything but the key and the runtime).
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProfileInput {
     /// None keeps existing overrides; Some replaces the complete set.
     pub claude_env: Option<environment::Input>,

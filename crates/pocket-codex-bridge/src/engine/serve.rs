@@ -68,7 +68,9 @@ mod registration;
 
 #[cfg(test)]
 use self::codex::{over_log_cap, truncate_host_log, MAX_HOST_LOG_BYTES};
-pub(super) use self::lifecycle::serve_stop_locked;
+#[cfg(test)]
+pub use self::lifecycle::serve_stop;
+pub(super) use self::lifecycle::{serve_stop_locked, serve_stop_remembered_checked};
 use self::{
     codex::{health_watchdog, per_host_log_file, startup_failure_error, tail_codex_log, Watched},
     lifecycle::{
@@ -77,7 +79,7 @@ use self::{
     registration::{republish_dropped, republish_refused},
 };
 pub use self::{
-    lifecycle::{serve_stop, serve_stop_all},
+    lifecycle::{serve_stop_all, serve_stop_remembered},
     registration::{serve_deregister, serve_reregister},
 };
 use super::host_services::{
@@ -223,7 +225,8 @@ pub struct ServeReport {
 }
 
 /// Status of one local host, surfaced to the UI.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ServeStatus {
     /// Service instance name.
     pub name: String,
@@ -474,7 +477,17 @@ pub(super) fn serve_start_in(
     start: CodexStart,
 ) -> Result<ServeReport> {
     let lease = host_lease::acquire(&start.name, Op::Start)?;
-    serve_start_locked(&lease, support, profiles, start)
+    let restore = host_profiles::Runtime::Codex {
+        port: start.port,
+        binary: match &start.binary {
+            Binary::Requested(binary) => binary.clone(),
+            Binary::Exact(path) => Some(path.to_string_lossy().into_owned()),
+        },
+        proxy: start.proxy.clone(),
+    };
+    let result = serve_start_locked(&lease, support, profiles, start)?;
+    super::host_lifecycle::record_running_in(profiles, lease.name(), restore);
+    Ok(result)
 }
 
 /// [`serve_start_in`] with the instance's lease already held (an apply).

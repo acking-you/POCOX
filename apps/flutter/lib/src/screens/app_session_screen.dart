@@ -58,6 +58,7 @@ import 'package:pocket_codex/src/screens/app_session/history_merge.dart';
 import 'package:pocket_codex/src/screens/app_session/history_rows.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_view.dart';
 import 'package:pocket_codex/src/motion.dart';
+import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/animated_label.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
@@ -69,6 +70,7 @@ import 'package:pocket_codex/src/widgets/draggable_navigation.dart';
 import 'package:pocket_codex/src/widgets/history_arrival.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/host_switcher.dart';
+import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/widgets/file_browser_panel.dart';
 import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
@@ -91,6 +93,7 @@ part 'app_session/session_agent_prepare.dart';
 part 'app_session/session_attachments.dart';
 part 'app_session/session_capabilities.dart';
 part 'app_session/session_composer.dart';
+part 'app_session/session_composer_toolbar.dart';
 part 'app_session/session_configuration.dart';
 part 'app_session/session_draft_options.dart';
 part 'app_session/session_conversations.dart';
@@ -220,6 +223,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
+  // Keeps the agent's options (an open menu, a change in flight) while the
+  // composer moves them between the toolbar and a line of their own.
+  final _agentOptionsKey = GlobalKey();
   int? _newDraftFocusAfterDrawer;
   int _projectSelectionGeneration = 0;
   final _expandedInputFocus = FocusNode();
@@ -308,6 +314,14 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _voiceStarting = false;
   int _voiceIntentGeneration = 0;
   String? _cwd;
+  // The host's automatic default folder for [key]: shown for a new
+  // conversation with no chosen folder, never stored in [_cwd].
+  ({String key, String path})? _hostDefault;
+  // Numbers the host-default reads; only the latest one is noted.
+  int _hostDefaultRead = 0;
+  // A conversation this view created in the host's automatic default
+  // folder: its real folder is taken from the host's list once listed.
+  ({String key, String thread})? _automaticThread;
   ModelInfo? _model;
   // True while the user holds a model pick that hasn't been sent yet, so a
   // server-confirmed model (thread/settings/updated) doesn't clobber it.
@@ -797,56 +811,6 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       // Same rule for the dictation line: a phone in the background has no
       // microphone, and a held session would only idle against the quota.
       unawaited(_dictation.close());
-    }
-  }
-
-  /// Parse a `thread/settings/updated` notification's raw params into a
-  /// runtime config. The payload's `threadSettings` carries the full effective
-  /// snapshot: `model`, `modelProvider`, `effort`, `approvalPolicy`,
-  /// `sandboxPolicy` (camelCase-tagged object) and `collaborationMode`
-  /// (`{mode, settings}`). Null on any shape surprise — never guess.
-  static ThreadRuntimeConfig? _parseSettingsUpdate(String raw) {
-    try {
-      final params = jsonDecode(raw) as Map<String, dynamic>;
-      final s = params['threadSettings'];
-      if (s is! Map<String, dynamic>) return null;
-      String? str(Object? v) => (v is String && v.isNotEmpty) ? v : null;
-      // Sandbox: `{"type": "readOnly"}` → the kebab wire string the app speaks.
-      String? sandbox;
-      final sp = s['sandboxPolicy'];
-      final tag = sp is Map<String, dynamic> ? str(sp['type']) : str(sp);
-      if (tag != null) {
-        sandbox = switch (tag) {
-          'readOnly' => 'read-only',
-          'workspaceWrite' => 'workspace-write',
-          'dangerFullAccess' => 'danger-full-access',
-          'externalSandbox' => 'external-sandbox',
-          _ => tag,
-        };
-      }
-      // Approval: a plain string, or the externally-tagged granular object.
-      final ap = s['approvalPolicy'];
-      final approval = ap is Map<String, dynamic>
-          ? (ap.keys.isEmpty ? null : ap.keys.first)
-          : str(ap);
-      // Collaboration mode: `{mode: "plan"|"default", …}` or a bare string.
-      final cm = s['collaborationMode'];
-      final collab = cm is Map<String, dynamic> ? str(cm['mode']) : str(cm);
-      return ThreadRuntimeConfig(
-        model: str(s['model']),
-        modelProvider: str(s['modelProvider']),
-        reasoningEffort: str(s['effort']),
-        approvalPolicy: approval,
-        approvalsReviewer: s['approvalsReviewer'] == 'guardian_subagent'
-            ? 'auto_review'
-            : str(s['approvalsReviewer']),
-        serviceTier: str(s['serviceTier']),
-        sandboxMode: sandbox,
-        collaborationMode: collab,
-        confirmedByUpdate: true,
-      );
-    } catch (_) {
-      return null;
     }
   }
 

@@ -240,6 +240,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     final container = ProviderScope.containerOf(context);
     final prefs = container.read(uiPrefsProvider.notifier);
     final life = container.read(scopeLifeProvider);
+    final toast = ToastMessenger.of(context);
     try {
       final result = await api.appServeStartConfigured(
         name: typed.isEmpty ? null : typed,
@@ -255,6 +256,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       container.invalidate(localServeListProvider);
       container.invalidate(servicesProvider);
       if (_owns(op)) navigator.pop();
+      await _noticeRestoreProblem(result.name, toast, life, l10n);
     } catch (e) {
       if (_owns(op)) setState(() => error = hostingError(e));
     } finally {
@@ -295,9 +297,9 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         key: key,
       );
       if (!life.alive) return;
-      // Remembered for a desktop cold start; the verdict is taken on the
-      // loaded file.
-      final remembered = prefs.setAutoHost(
+      // Still written for older versions of the app; the bridge's restore
+      // record of this start is what a cold start now follows.
+      prefs.setAutoHost(
         AutoHostPrefs(
           port: value.port,
           name: result.name,
@@ -311,9 +313,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       // Only this page's own route, while it is mounted and the operation
       // is still its latest.
       if (_owns(op)) navigator.pop();
-      if (!await remembered && life.alive) {
-        toast.notice(l10n.hostRestoreFull(UiPrefs.maxAutoHosts));
-      }
+      await _noticeRestoreProblem(result.name, toast, life, l10n);
     } catch (e) {
       if (_owns(op)) setState(() => error = hostingError(e));
     } finally {
@@ -380,7 +380,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         key: key,
       );
       if (!life.alive) return;
-      final remembered = prefs.setAutoHostAcp(
+      prefs.setAutoHostAcp(
         AutoHostAcpPrefs(name: result.name, spec: value.spec),
       );
       final saved = value.save
@@ -389,11 +389,10 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       container.invalidate(localServeListProvider);
       container.invalidate(servicesProvider);
       if (_owns(op)) navigator.pop();
-      final notices = [
-        if (!await remembered) l10n.hostRestoreFull(UiPrefs.maxAutoHosts),
-        if (!await saved) l10n.acpSavedAgentsFull(UiPrefs.maxSavedAgents),
-      ];
-      if (notices.isNotEmpty && life.alive) toast.notice(notices.join('\n'));
+      if (!await saved && life.alive) {
+        toast.notice(l10n.acpSavedAgentsFull(UiPrefs.maxSavedAgents));
+      }
+      await _noticeRestoreProblem(result.name, toast, life, l10n);
     } catch (e) {
       if (_owns(op)) setState(() => error = hostingError(e));
     } finally {
@@ -580,9 +579,18 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       container.invalidate(localServeListProvider);
       container.invalidate(servicesProvider);
       if (!_owns(op)) return;
+      // A restart that happened is reported as such; a restore-record
+      // warning is shown beside it, never as a failure.
+      final restoreProblem = result.applied
+          ? await _restoreProblem(host.name)
+          : null;
+      if (!_owns(op)) return;
       setState(() {
         if (result.applied) {
-          notice = l10n.hostApplied;
+          notice = restoreProblem == null
+              ? l10n.hostApplied
+              : '${l10n.hostApplied}\n'
+                    '${l10n.managedRestoreProblem(restoreProblem)}';
         } else if (result.restoredPrevious) {
           error = l10n.hostApplyRestored(result.error ?? '');
         } else if (result.restoreError != null) {
@@ -600,6 +608,30 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       if (_owns(op)) setState(() => error = friendlyError(e));
     } finally {
       _end(op);
+    }
+  }
+
+  /// This computer's restart-persistence warning for [name], if any. A read
+  /// failure is not a warning.
+  Future<String?> _restoreProblem(String name) async {
+    try {
+      return await api.hostRestoreProblem(name: name);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// After a successful start: tell the user when it will not be restored
+  /// at the next launch, without turning the start into a failure.
+  Future<void> _noticeRestoreProblem(
+    String name,
+    ToastMessenger toast,
+    ScopeLife life,
+    AppLocalizations l10n,
+  ) async {
+    final problem = await _restoreProblem(name);
+    if (problem != null && life.alive) {
+      toast.notice(l10n.managedRestoreProblem(problem));
     }
   }
 

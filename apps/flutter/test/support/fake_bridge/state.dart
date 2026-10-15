@@ -699,6 +699,9 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Holds the next [appThreadStart] until completed.
   Completer<void>? threadStartGate;
 
+  /// Where the host creates a session started without a folder.
+  String? threadStartDefaultCwd;
+
   /// Every [appThreadStart] call's service key.
   final List<String> threadStartCalls = [];
 

@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
+import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 
@@ -68,6 +69,7 @@ class HostSwitcher extends StatefulWidget {
     this.pending,
     this.identities = const {},
     this.onManage,
+    this.onRefresh,
   });
 
   /// Connectable app services, in display order.
@@ -89,12 +91,36 @@ class HostSwitcher extends StatefulWidget {
   /// Opens host management (add, host, stop); null hides the entry.
   final VoidCallback? onManage;
 
+  /// Re-discovers services (a host another device just started); the list
+  /// updates in place. Null hides the entry.
+  final Future<void> Function()? onRefresh;
+
   @override
   State<HostSwitcher> createState() => _HostSwitcherState();
 }
 
 class _HostSwitcherState extends State<HostSwitcher> {
   final MenuController _menu = MenuController();
+
+  /// The services an open sheet shows: it follows discovery while open, so
+  /// a refresh updates the list in place.
+  late final _services = ValueNotifier(widget.services);
+
+  @override
+  void didUpdateWidget(HostSwitcher old) {
+    super.didUpdateWidget(old);
+    if (identical(old.services, widget.services)) return;
+    // The open sheet is another route; it is told after this build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _services.value = widget.services;
+    });
+  }
+
+  @override
+  void dispose() {
+    _services.dispose();
+    super.dispose();
+  }
 
   bool get _busy {
     final p = widget.pending;
@@ -111,38 +137,51 @@ class _HostSwitcherState extends State<HostSwitcher> {
   void _pick(String key) {
     _menu.close();
     if (key == widget.current || _busy) return;
-    // On a phone this row lives in the drawer, which would cover the
+    // On a phone this row lives in the sidebar, which would cover the
     // progress strip the switch shows above the conversation.
-    final scaffold = Scaffold.maybeOf(context);
-    if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
+    _closeNavigation();
     widget.onPick(key);
   }
 
   void _manage() {
     _menu.close();
+    _closeNavigation();
+    widget.onManage?.call();
+  }
+
+  /// Close the phone sidebar (or a Scaffold drawer) this row sits in.
+  void _closeNavigation() {
+    final nav = LayeredNavigation.maybeOf(context);
+    if (nav?.isOpen ?? false) {
+      nav!.close();
+      return;
+    }
     final scaffold = Scaffold.maybeOf(context);
     if (scaffold?.isDrawerOpen ?? false) scaffold!.closeDrawer();
-    widget.onManage?.call();
   }
 
   Future<void> _openSheet() => showAdaptivePanel<void>(
     context: context,
-    builder: (c) => _HostList(
-      services: widget.services,
-      current: widget.current,
-      pending: widget.pending,
-      identities: widget.identities,
-      touch: true,
-      onPick: (key) {
-        Navigator.of(c).pop();
-        _pick(key);
-      },
-      onManage: widget.onManage == null
-          ? null
-          : () {
-              Navigator.of(c).pop();
-              _manage();
-            },
+    builder: (c) => ValueListenableBuilder(
+      valueListenable: _services,
+      builder: (_, services, _) => _HostList(
+        services: services,
+        current: widget.current,
+        pending: widget.pending,
+        identities: widget.identities,
+        touch: true,
+        onPick: (key) {
+          Navigator.of(c).pop();
+          _pick(key);
+        },
+        onManage: widget.onManage == null
+            ? null
+            : () {
+                Navigator.of(c).pop();
+                _manage();
+              },
+        onRefresh: widget.onRefresh,
+      ),
     ),
   );
 
@@ -267,6 +306,7 @@ class _HostSwitcherState extends State<HostSwitcher> {
               touch: false,
               onPick: _pick,
               onManage: widget.onManage == null ? null : _manage,
+              onRefresh: widget.onRefresh,
             ),
           ),
         ],
@@ -336,6 +376,7 @@ class _HostList extends StatelessWidget {
     required this.touch,
     required this.onPick,
     this.onManage,
+    this.onRefresh,
   });
 
   final List<ServiceEntry> services;
@@ -345,6 +386,7 @@ class _HostList extends StatelessWidget {
   final bool touch;
   final ValueChanged<String> onPick;
   final VoidCallback? onManage;
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -364,8 +406,10 @@ class _HostList extends StatelessWidget {
           ),
         ),
         for (final s in services) _item(context, s),
+        if (onRefresh != null || onManage != null) const Divider(height: 9),
+        if (onRefresh case final refresh?)
+          _RefreshServicesRow(onRefresh: refresh, touch: touch),
         if (onManage != null) ...[
-          const Divider(height: 9),
           InkWell(
             key: const Key('host-switch-manage'),
             mouseCursor: clickable,
@@ -421,9 +465,11 @@ class _HostList extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Two lines on touch: a long device or instance name (or the
+                  // failure) stays recognisable in a phone's sheet.
                   Text(
                     s.device,
-                    maxLines: 1,
+                    maxLines: touch ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: touch ? 14 : 13,
@@ -436,7 +482,7 @@ class _HostList extends StatelessWidget {
                         : isCurrent
                         ? l10n.hostInUse(s.name)
                         : s.name,
-                    maxLines: 1,
+                    maxLines: touch ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 12,
@@ -610,6 +656,94 @@ class HostSwitchBanner extends StatelessWidget {
                   backgroundColor: Colors.transparent,
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Refresh services": re-discovers hosts in place, with progress while it
+/// runs and a retryable note when it fails. The shown list stays until the
+/// new one arrives.
+class _RefreshServicesRow extends StatefulWidget {
+  const _RefreshServicesRow({required this.onRefresh, required this.touch});
+
+  final Future<void> Function() onRefresh;
+  final bool touch;
+
+  @override
+  State<_RefreshServicesRow> createState() => _RefreshServicesRowState();
+}
+
+class _RefreshServicesRowState extends State<_RefreshServicesRow> {
+  bool _busy = false;
+  bool _failed = false;
+
+  Future<void> _refresh() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _failed = false;
+    });
+    var failed = false;
+    try {
+      await widget.onRefresh();
+    } catch (_) {
+      failed = true;
+    }
+    if (mounted) {
+      setState(() {
+        _busy = false;
+        _failed = failed;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final touch = widget.touch;
+    return InkWell(
+      key: const Key('host-switch-refresh'),
+      mouseCursor: clickable,
+      onTap: _busy ? null : _refresh,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: touch ? 20 : 12,
+          vertical: touch ? 12 : 8,
+        ),
+        child: Row(
+          children: [
+            SizedBox.square(
+              dimension: 16,
+              child: _busy
+                  ? CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: scheme.tertiary,
+                    )
+                  : Icon(Icons.refresh, size: 16, color: scheme.tertiary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.refreshServices,
+                    style: TextStyle(fontSize: touch ? 14 : 13),
+                  ),
+                  if (_failed)
+                    Text(
+                      l10n.refreshServicesFailed,
+                      key: const Key('host-switch-refresh-error'),
+                      style: TextStyle(fontSize: 12, color: scheme.error),
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),

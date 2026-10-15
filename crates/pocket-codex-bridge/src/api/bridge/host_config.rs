@@ -29,7 +29,7 @@ pub struct HostRuntimeDto {
 }
 
 impl HostRuntimeDto {
-    fn into_runtime(self) -> Result<Runtime> {
+    pub(super) fn into_runtime(self) -> Result<Runtime> {
         match self.kind.as_str() {
             "codex" => Ok(Runtime::Codex {
                 binary: self.binary,
@@ -53,7 +53,7 @@ impl HostRuntimeDto {
         }
     }
 
-    fn of(runtime: Runtime) -> Self {
+    pub(super) fn of(runtime: Runtime) -> Self {
         match runtime {
             Runtime::Codex {
                 binary,
@@ -211,7 +211,10 @@ pub struct HostStartedDto {
     pub reused: bool,
 }
 
-fn dto(profile: host_profiles::HostProfile, active: Option<HostActiveDto>) -> HostConfigDto {
+pub(super) fn dto(
+    profile: host_profiles::HostProfile,
+    active: Option<HostActiveDto>,
+) -> HostConfigDto {
     HostConfigDto {
         claude_env: profile
             .claude_env
@@ -249,7 +252,11 @@ fn parse_protocol(raw: Option<&str>) -> Result<Option<ApiProtocol>> {
         .transpose()
 }
 
-fn change_of(input: HostConfigInputDto, key_action: &str, key: Option<String>) -> Result<Change> {
+pub(super) fn change_of(
+    input: HostConfigInputDto,
+    key_action: &str,
+    key: Option<String>,
+) -> Result<Change> {
     let source = Source::parse(input.source.trim())
         .ok_or_else(|| anyhow!("unknown configuration source `{}`", input.source))?;
     let key = match key_action {
@@ -471,7 +478,9 @@ pub fn app_serve_start_configured(
             binary,
         },
     };
-    Ok(match host_start::start_configured(name.as_deref(), host, change)? {
+    let started = host_start::start_configured(name.as_deref(), host, change)?;
+    crate::engine::management::enable_after_hosting();
+    Ok(match started {
         Started::Codex(r) => HostStartedDto {
             name: r.name,
             provider: "codex".into(),

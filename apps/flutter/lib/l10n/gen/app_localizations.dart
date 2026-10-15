@@ -6223,6 +6223,474 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Continue on the computer that hosts {agent}.'**
   String nativeContinueElsewhere(String agent);
+
+  /// No description provided for @defaultProjectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Default project folder'**
+  String get defaultProjectTitle;
+
+  /// No description provided for @defaultProjectAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic, chosen by the host computer'**
+  String get defaultProjectAutomatic;
+
+  /// No description provided for @defaultProjectCreatedLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Not created yet. It is created when the first conversation starts here.'**
+  String get defaultProjectCreatedLater;
+
+  /// No description provided for @defaultProjectMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'This folder no longer exists on the host. Choose another one.'**
+  String get defaultProjectMissing;
+
+  /// No description provided for @defaultProjectNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No default folder. New conversations ask for one.'**
+  String get defaultProjectNone;
+
+  /// No description provided for @defaultProjectChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change folder'**
+  String get defaultProjectChange;
+
+  /// No description provided for @defaultProjectUseAutomatic.
+  ///
+  /// In en, this message translates to:
+  /// **'Use automatic folder'**
+  String get defaultProjectUseAutomatic;
+
+  /// No description provided for @defaultProjectSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Default project folder saved.'**
+  String get defaultProjectSaved;
+
+  /// No description provided for @defaultProjectConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device changed the project settings. Reload to see them.'**
+  String get defaultProjectConflict;
+
+  /// No description provided for @defaultProjectUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Project settings unavailable. Service management is not affected. {error}'**
+  String defaultProjectUnavailable(String error);
+
+  /// No description provided for @defaultProjectLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} (default)'**
+  String defaultProjectLabel(String name);
+
+  /// No description provided for @projectRootsAdvanced.
+  ///
+  /// In en, this message translates to:
+  /// **'Browsable folders ({count})'**
+  String projectRootsAdvanced(int count);
+
+  /// No description provided for @projectRootsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Other devices can browse only inside these folders. Leave empty to use the host\'s defaults.'**
+  String get projectRootsHint;
+
+  /// No description provided for @projectRootPathHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Absolute path on the host, e.g. /Users/me/code'**
+  String get projectRootPathHint;
+
+  /// No description provided for @managedComputerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Computer management'**
+  String get managedComputerTitle;
+
+  /// No description provided for @managedComputerSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'{os} · Pocket {version}'**
+  String managedComputerSummary(String os, String version);
+
+  /// No description provided for @managedNoServices.
+  ///
+  /// In en, this message translates to:
+  /// **'No services on this computer yet. Add one below.'**
+  String get managedNoServices;
+
+  /// No description provided for @managedAddService.
+  ///
+  /// In en, this message translates to:
+  /// **'Add service'**
+  String get managedAddService;
+
+  /// No description provided for @managedAddHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed on that computer. Nothing is installed or signed in here.'**
+  String get managedAddHint;
+
+  /// No description provided for @managedAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New service on {device}'**
+  String managedAddTitle(String device);
+
+  /// No description provided for @managedEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} on {device}'**
+  String managedEditTitle(String name, String device);
+
+  /// No description provided for @managedNoRuntimes.
+  ///
+  /// In en, this message translates to:
+  /// **'No supported runtime was found on that computer.'**
+  String get managedNoRuntimes;
+
+  /// No description provided for @managedRuntimeUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not available on that computer.'**
+  String get managedRuntimeUnavailable;
+
+  /// No description provided for @managedNeedsHostLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs sign-in on that computer to use its own account; a custom provider works without it.'**
+  String get managedNeedsHostLogin;
+
+  /// No description provided for @managedOpenCodeTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode already runs on that computer; one OpenCode service per computer.'**
+  String get managedOpenCodeTaken;
+
+  /// No description provided for @managedKindUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown agent'**
+  String get managedKindUnknown;
+
+  /// No description provided for @managedStateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get managedStateRunning;
+
+  /// No description provided for @managedStateStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get managedStateStopped;
+
+  /// No description provided for @managedStateNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New'**
+  String get managedStateNew;
+
+  /// No description provided for @managedStateNeedsAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get managedStateNeedsAttention;
+
+  /// No description provided for @managedStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get managedStart;
+
+  /// No description provided for @managedEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get managedEdit;
+
+  /// No description provided for @managedStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is running.'**
+  String managedStarted(String name);
+
+  /// No description provided for @managedStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} stopped. It stays listed and can be started again.'**
+  String managedStopped(String name);
+
+  /// No description provided for @managedSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get managedSaved;
+
+  /// No description provided for @managedStopConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop {name}?'**
+  String managedStopConfirmTitle(String name);
+
+  /// No description provided for @managedStopConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Its conversations disconnect and a running turn is interrupted. The computer stays manageable.'**
+  String get managedStopConfirmBody;
+
+  /// No description provided for @managedRestoreProblem.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic restore needs attention: {problem}'**
+  String managedRestoreProblem(String problem);
+
+  /// No description provided for @managedConfigUnreadable.
+  ///
+  /// In en, this message translates to:
+  /// **'The saved configuration cannot be read ({problem}). It can still be stopped; fix it on that computer.'**
+  String managedConfigUnreadable(String problem);
+
+  /// No description provided for @managedConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device saved this service since you opened it. Your edits are kept; reload to see the new version (your edits are then discarded).'**
+  String get managedConflict;
+
+  /// No description provided for @managedOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'The result is unknown (the answer was lost). The current state was refreshed; check it before trying again.'**
+  String get managedOutcomeUnknown;
+
+  /// No description provided for @managedHostBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'That computer is busy. Try again shortly.'**
+  String get managedHostBusy;
+
+  /// No description provided for @managedAlreadyRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'This service is already running. Refresh, or choose another name.'**
+  String get managedAlreadyRunning;
+
+  /// No description provided for @managedHostStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'This service has stopped. Refresh its status.'**
+  String get managedHostStopped;
+
+  /// No description provided for @managedHostChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'This service was restarted or replaced elsewhere. Its state was refreshed.'**
+  String get managedHostChanged;
+
+  /// No description provided for @managedLoginRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The service\'s own account is not signed in on that computer. Sign in there, or choose a custom provider.'**
+  String get managedLoginRequired;
+
+  /// No description provided for @managedPrepareRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare the Claude adapter on that computer first (Add service → Prepare ACP environment).'**
+  String get managedPrepareRequired;
+
+  /// No description provided for @managedInvalidConfiguration.
+  ///
+  /// In en, this message translates to:
+  /// **'Review and save this service\'s configuration before starting.'**
+  String get managedInvalidConfiguration;
+
+  /// No description provided for @managedConfigurationChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device saved this service. Reload before saving.'**
+  String get managedConfigurationChanged;
+
+  /// No description provided for @managedOutsideRoots.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a folder within the host\'s browsable folders.'**
+  String get managedOutsideRoots;
+
+  /// No description provided for @managedNameRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a name for the service.'**
+  String get managedNameRequired;
+
+  /// No description provided for @managedNameHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'Unique on that computer; it names the service on your relay.'**
+  String get managedNameHelper;
+
+  /// No description provided for @managedPortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get managedPortLabel;
+
+  /// No description provided for @managedPortHelper.
+  ///
+  /// In en, this message translates to:
+  /// **'0 picks a free port.'**
+  String get managedPortHelper;
+
+  /// No description provided for @managedPortInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a port from 0 to 65535.'**
+  String get managedPortInvalid;
+
+  /// No description provided for @managedRuntimeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Runs the program installed on that computer. Paths and arguments are managed there.'**
+  String get managedRuntimeNote;
+
+  /// No description provided for @managedInheritedNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the configuration already on that computer.'**
+  String get managedInheritedNote;
+
+  /// No description provided for @managedOfficialNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the official account signed in on that computer. Sign in there if it is not yet.'**
+  String get managedOfficialNote;
+
+  /// No description provided for @managedDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get managedDiagnostics;
+
+  /// No description provided for @managedKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Management key'**
+  String get managedKey;
+
+  /// No description provided for @managedDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Device'**
+  String get managedDevice;
+
+  /// No description provided for @managedSwitchTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow management from my other devices'**
+  String get managedSwitchTitle;
+
+  /// No description provided for @managedSwitchOn.
+  ///
+  /// In en, this message translates to:
+  /// **'On. Your signed-in devices can add, configure, start and stop services here while this computer is online.'**
+  String get managedSwitchOn;
+
+  /// No description provided for @managedSwitchOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off. Only this computer can change its services.'**
+  String get managedSwitchOff;
+
+  /// No description provided for @managedSwitchConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'On, not reachable yet.'**
+  String get managedSwitchConnecting;
+
+  /// No description provided for @managedSwitchUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Management status could not be read.'**
+  String get managedSwitchUnavailable;
+
+  /// No description provided for @hostRestoreBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic restore was skipped because its saved choices cannot be read: {problem}'**
+  String hostRestoreBlocked(String problem);
+
+  /// No description provided for @managedRuntimeReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get managedRuntimeReady;
+
+  /// No description provided for @managedRuntimeNeedsSetup.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs setup'**
+  String get managedRuntimeNeedsSetup;
+
+  /// No description provided for @managedRuntimeSignInThere.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready · sign in on that computer'**
+  String get managedRuntimeSignInThere;
+
+  /// No description provided for @managedOpenCodeRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Already running · one per computer'**
+  String get managedOpenCodeRunning;
+
+  /// No description provided for @managedRuntimeDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details'**
+  String get managedRuntimeDetails;
+
+  /// No description provided for @managedRuntimeDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} details'**
+  String managedRuntimeDetailsTitle(String name);
+
+  /// No description provided for @managedRuntimePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Executable'**
+  String get managedRuntimePath;
+
+  /// No description provided for @managedRuntimeVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Version'**
+  String get managedRuntimeVersion;
+
+  /// No description provided for @refreshServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh services'**
+  String get refreshServices;
+
+  /// No description provided for @refreshServicesFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Services could not be refreshed. Tap to try again.'**
+  String get refreshServicesFailed;
+
+  /// No description provided for @managedRefreshComputer.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh this computer'**
+  String get managedRefreshComputer;
 }
 
 class _AppLocalizationsDelegate

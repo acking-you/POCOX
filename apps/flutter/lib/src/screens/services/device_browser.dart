@@ -108,6 +108,7 @@ class _DeviceFirstServices extends ConsumerWidget {
       final recovered = <String>[
         for (final service in services)
           if (dismissed.contains(service.key) &&
+              service.kind != 'host' &&
               (isSessionKind(service.kind)
                           ? ref.watch(appReachableProvider(service.key))
                           : ref.watch(apiReachableProvider(service.key)))
@@ -121,11 +122,27 @@ class _DeviceFirstServices extends ConsumerWidget {
       }
     }
 
+    // A computer's management entry (`host:`) is never a chat or model
+    // service: it only keeps its device listed, even with no services left,
+    // and opens that computer's management panel.
+    final managementKeys = <String, String>{
+      for (final service in visible)
+        if (service.kind == 'host') service.device: service.key,
+    };
+    final ownManagementKey = _hostingSupported
+        ? ref.watch(deviceManagementProvider).valueOrNull?.serviceKey
+        : null;
+    final ownDevice = ownManagementKey == null
+        ? null
+        : serviceKeyDevice(ownManagementKey);
     final devices = <String>{
       for (final service in visible) service.device,
       for (final host in localHosts) host.device,
     }.toList()..sort();
-    final localDevices = {for (final host in localHosts) host.device};
+    final localDevices = {
+      for (final host in localHosts) host.device,
+      if (ownDevice != null && ownDevice.isNotEmpty) ownDevice,
+    };
     final preferredKey = ref.watch(
       uiPrefsProvider.select(
         (prefs) => prefs.valueOrNull?.preferredAppServiceKey,
@@ -163,7 +180,12 @@ class _DeviceFirstServices extends ConsumerWidget {
         ? preferredDevice
         : devices.firstOrNull;
     final deviceEntries =
-        visible.where((service) => service.device == activeDevice).toList()
+        visible
+            .where(
+              (service) =>
+                  service.device == activeDevice && service.kind != 'host',
+            )
+            .toList()
           ..sort((a, b) {
             final byName = a.name.compareTo(b.name);
             return byName == 0 ? a.kind.compareTo(b.kind) : byName;
@@ -498,7 +520,9 @@ class _DeviceFirstServices extends ConsumerWidget {
 
     int countFor(String device) {
       final entries = visible
-          .where((service) => service.device == device)
+          .where(
+            (service) => service.device == device && service.kind != 'host',
+          )
           .toList();
       final appCount = entries.where((service) => service.kind == 'app').length;
       return entries.length + (account ? appCount : 0);
@@ -518,6 +542,9 @@ class _DeviceFirstServices extends ConsumerWidget {
       filled: split,
     );
 
+    final managementKey = activeDevice == null
+        ? null
+        : managementKeys[activeDevice];
     final detail = <Widget>[
       _DeviceDetailHeader(
         device: activeDevice,
@@ -527,6 +554,17 @@ class _DeviceFirstServices extends ConsumerWidget {
             ? null
             : () => _batchRemove(context, ref, unreachableEntries),
       ),
+      // Another computer that can be managed: its services, running or
+      // not, come first. This computer is managed by its own hosting card.
+      if (managementKey != null && !localDevices.contains(activeDevice)) ...[
+        ManagedDevicePanel(
+          key: ValueKey('managed-panel-$managementKey'),
+          serviceKey: managementKey,
+          device: activeDevice!,
+          onOpen: (key) => _openInChat(context, ref, key),
+        ),
+        const SizedBox(height: 12),
+      ],
       GroupCard(
         title: l10n.servicesCapabilities,
         trailing: _CountPill(
@@ -569,6 +607,8 @@ class _DeviceFirstServices extends ConsumerWidget {
                       host: host,
                     ),
                   const _AddLocalHostCard(),
+                  const SizedBox(height: 8),
+                  const DeviceManagementSwitch(),
                 ],
               ),
             ),

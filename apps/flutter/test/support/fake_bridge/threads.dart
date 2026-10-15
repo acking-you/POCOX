@@ -154,7 +154,13 @@ mixin _FakeThreads on _FakeBridgeState {
     if (seeded != null) sessionSettings['$serviceKey|$id'] = seeded;
     appThreads.insert(
       0,
-      ThreadMeta(id: id, preview: '', cwd: cwd ?? '', updatedAt: 0),
+      // A host with a default project creates a folder-less session there.
+      ThreadMeta(
+        id: id,
+        preview: '',
+        cwd: cwd ?? threadStartDefaultCwd ?? '',
+        updatedAt: 0,
+      ),
     );
     return id;
   }

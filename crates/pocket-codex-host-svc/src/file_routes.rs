@@ -25,7 +25,7 @@ pub(super) async fn list_dir(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListDirQuery>,
 ) -> Result<Json<ListDirResponse>, ApiError> {
-    let roots = state.host.get().await.project_roots;
+    let roots = state.host.effective_roots().await?;
     let requested = std::path::PathBuf::from(&q.path);
     if !fs::within_roots(&requested, &roots) {
         return Err(ApiError(anyhow!("path is outside the configured project roots")));
@@ -52,7 +52,7 @@ pub(super) async fn list_files_in(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListDirQuery>,
 ) -> Result<Json<ListFilesResponse>, ApiError> {
-    let roots = state.host.get().await.project_roots;
+    let roots = state.host.effective_roots().await?;
     let requested = std::path::PathBuf::from(&q.path);
     if !fs::within_roots(&requested, &roots) {
         return Err(ApiError(anyhow!("path is outside the configured project roots")));
@@ -74,7 +74,7 @@ pub(super) async fn read_file(
     State(state): State<Arc<AppState>>,
     Query(q): Query<ListDirQuery>,
 ) -> Result<Vec<u8>, ApiError> {
-    let roots = state.host.get().await.project_roots;
+    let roots = state.host.effective_roots().await?;
     let requested = std::path::PathBuf::from(&q.path);
     if !fs::within_roots(&requested, &roots) {
         return Err(ApiError(anyhow!("path is outside the configured project roots")));
@@ -107,7 +107,7 @@ pub(super) async fn write_file(
     Query(q): Query<WriteFileQuery>,
     body: axum::body::Bytes,
 ) -> Result<Json<UploadResponse>, ApiError> {
-    let roots = state.host.get().await.project_roots;
+    let roots = state.host.effective_roots().await?;
     let dir = std::path::PathBuf::from(&q.dir);
     if !fs::within_roots(&dir, &roots) {
         return Err(ApiError(anyhow!("path is outside the configured project roots")));
@@ -259,6 +259,7 @@ fn sanitize_file_name(name: &str) -> Result<String, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::store::HostConfig;
 
     #[test]
     fn file_upload_waits_for_background_write_before_success() {
@@ -306,10 +307,9 @@ mod tests {
                 (release, ready, task)
             };
 
-            // Queue the file open behind a blocked worker so its completion
-            // cannot race the first poll of the handler.
-            let (open_release, open_started, open_task) = block_worker();
-            open_started.await.expect("worker started");
+            // Finish the fresh project-policy read before controlling file IO.
+            let (policy_release, policy_started, policy_task) = block_worker();
+            policy_started.await.expect("policy blocker started");
             let mut upload = std::pin::pin!(write_file(
                 State(state),
                 Query(WriteFileQuery {
@@ -319,6 +319,14 @@ mod tests {
                 axum::body::Bytes::from_static(b"uploaded"),
             ));
             let mut cx = TaskContext::from_waker(Waker::noop());
+            assert!(upload.as_mut().poll(&mut cx).is_pending());
+
+            // Queue file open behind a blocked worker so its completion cannot
+            // race the next poll of the handler.
+            let (open_release, open_started, open_task) = block_worker();
+            drop(policy_release);
+            policy_task.await.expect("policy blocker");
+            open_started.await.expect("open blocker started");
             assert!(upload.as_mut().poll(&mut cx).is_pending());
 
             // The second blocker runs after open, but before the handler can

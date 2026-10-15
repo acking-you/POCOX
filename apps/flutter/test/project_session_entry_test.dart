@@ -13,6 +13,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/theme.dart';
 
 import 'fake_bridge_api.dart';
@@ -149,7 +150,7 @@ void main() {
   );
 
   testWidgets(
-    'mobile long press selects project, closes drawer and focuses input',
+    'mobile long press selects project, closes sidebar and focuses input',
     (t) async {
       final api = FakeBridgeApi();
       await _mount(t, api, size: const Size(390, 844));
@@ -161,7 +162,7 @@ void main() {
       await t.tap(find.text('New conversation in beta'));
       await t.pumpAndSettle();
       expect(
-        t.state<ScaffoldState>(find.byType(Scaffold).first).isDrawerOpen,
+        t.state<LayeredNavigationState>(find.byType(LayeredNavigation)).isOpen,
         isFalse,
       );
       expect(t.widget<TextField>(_input).focusNode!.hasFocus, isTrue);

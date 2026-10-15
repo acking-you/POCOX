@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/src/dismissed_services.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/hosting/host_restore.dart';
+import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/service_key.dart';
@@ -366,8 +367,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   /// Restore the Codex, ACP and OpenCode hosting the user left running, each
   /// at most once per run and only what this machine does not host already
-  /// (see [planHostRestore]). True when at least one restore succeeded
-  /// (discovery is stale).
+  /// (see [planHostRestore]). The bridge's restore overrides decide first; if
+  /// they cannot be read nothing is restored (stale preferences could bring
+  /// back a host stopped from another device) and the reason is kept for the
+  /// services page. True when at least one restore succeeded (discovery is
+  /// stale).
   Future<bool> _restoreHosting(
     BridgeApi api, {
     required int gen,
@@ -375,14 +379,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }) async {
     final prefs = await _prefs();
     if (!mounted || gen != _generation) return false;
-    final pending = planHostRestore(
+    List<HostRestoreOverride> overrides;
+    try {
+      overrides = await api.hostRestoreOverrides();
+    } catch (e) {
+      if (mounted && gen == _generation) {
+        ref.read(hostRestoreBlockedProvider.notifier).state = friendlyError(e);
+      }
+      return false;
+    }
+    if (!mounted || gen != _generation) return false;
+    ref.read(hostRestoreBlockedProvider.notifier).state = null;
+    HostRestorePlan plan(List<AppServeStatus> local) => planHostRestore(
       prefs,
-      const [],
+      local,
       codexAttempted: _autoHostAttempted,
       acpAttempted: _autoHostAcpAttempted,
       acpSupported: api.acpHostingSupported(),
+      overrides: overrides,
     );
-    if (pending.isEmpty) return false;
+    if (plan(const []).isEmpty) return false;
     var local = const <AppServeStatus>[];
     try {
       local = await api.appServeStatus();
@@ -391,23 +407,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // failure) settle it.
     }
     if (!mounted || gen != _generation) return false;
-    final plan = planHostRestore(
-      prefs,
-      local,
-      codexAttempted: _autoHostAttempted,
-      acpAttempted: _autoHostAcpAttempted,
-      acpSupported: api.acpHostingSupported(),
-    );
-    if (plan.isEmpty) return false;
+    final chosen = plan(local);
+    if (chosen.isEmpty) return false;
     // Burn the once-per-run flags only for a real attempt, so a slow prefs
-    // load on the first pass doesn't forfeit the restore.
-    _autoHostAttempted.addAll(plan.codex.map((saved) => saved.name));
-    _autoHostAcpAttempted.addAll(plan.acp.map((saved) => saved.name));
-    // OpenCode hosts share the agent set: instance names are per device.
-    if (plan.opencode case final saved?) _autoHostAcpAttempted.add(saved.name);
+    // load on the first pass doesn't forfeit the restore. OpenCode and ACP
+    // hosts share one set: instance names are per device.
+    final names = chosen.names;
+    _autoHostAttempted.addAll(names.codex);
+    _autoHostAcpAttempted.addAll(names.acp);
     if (!background) setState(() => _rehosting = true);
     try {
-      return await runHostRestore(api, plan);
+      return await runHostRestore(api, chosen);
     } finally {
       if (mounted && gen == _generation && _rehosting) {
         setState(() => _rehosting = false);

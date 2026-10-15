@@ -5,10 +5,14 @@ import 'package:pocket_codex/src/hosting/acp_host_details.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/opencode_host_details.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/widgets/project_folders_editor.dart';
+import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
+import 'package:pocket_codex/src/managed/default_project_tile.dart';
+import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
-/// What a running host is: for native Codex its tunnels (listen address and
-/// relay key each), runtime and project folders; for an ACP host the agent's
+/// What a running host is, most important first: its state, the default
+/// project folder and the key actions, with tunnels, keys and executables
+/// folded into diagnostics. For native Codex shown here; for an ACP host the agent's
 /// details ([AcpHostDetails]); for OpenCode its server ([OpenCodeHostDetails]).
 class HostStatusSection extends StatelessWidget {
   /// Creates the section for [host].
@@ -39,44 +43,49 @@ class HostStatusSection extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final small = Theme.of(context).textTheme.bodySmall;
     final muted = small?.copyWith(color: scheme.onSurfaceVariant);
+    final online = host.appRegistered;
+    final color = online ? successColor(scheme) : scheme.onSurfaceVariant;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      key: const Key('codex-host-details'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(l10n.localHostHint),
-        const SizedBox(height: 12),
-        // Two tunnels under one name: each kind's listen address + relay key.
-        Text(l10n.tunnelAppLabel, style: small),
-        Text(l10n.localHostListening(host.appListenAddr), style: small),
-        SelectableText(host.appServiceKey, style: muted),
-        const SizedBox(height: 8),
-        Text(l10n.tunnelApiLabel, style: small),
-        Text(l10n.localHostListening(host.apiListenAddr), style: small),
-        SelectableText(host.apiServiceKey, style: muted),
-        const Divider(height: 24),
-        Text(
-          l10n.hostRuntimeInfo,
-          style: small?.copyWith(fontWeight: FontWeight.w600),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const ProviderBadge(provider: 'codex'),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, size: 10, color: color),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    online ? l10n.managedStateRunning : l10n.tunnelOffline,
+                    style: small?.copyWith(color: color),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${l10n.hostRuntimeMode}: ${l10n.codexSourceExternal}',
-          style: small,
-        ),
-        SelectableText(
-          '${l10n.hostCodexPath}: ${host.codexBinary ?? '—'}',
-          style: muted,
-        ),
+        const SizedBox(height: 6),
         Text(
           '${l10n.hostProxyLabel}: ${host.proxy ?? l10n.hostProxyInherit}',
-          style: small,
+          style: muted,
         ),
+        const SizedBox(height: 12),
+        DefaultProjectTile(serviceKey: host.appServiceKey, local: true),
         const SizedBox(height: 4),
-        EditorNote(l10n.hostCodexRuntimeFixed),
-        // The roots a phone's folder browser is confined to, and the default
-        // new conversations open in. Configured on the host.
-        const Divider(height: 24),
-        ProjectFoldersEditor(serviceKey: host.appServiceKey),
+        HostDiagnostics(
+          host: host,
+          notes: [
+            Text(l10n.localHostHint, style: muted),
+            EditorNote(l10n.hostCodexRuntimeFixed),
+          ],
+        ),
       ],
     );
   }

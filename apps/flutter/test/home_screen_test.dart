@@ -13,6 +13,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/dismissed_services.dart';
 import 'package:pocket_codex/src/hosting/host_editor_page.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/screens/home_screen.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
@@ -443,6 +444,31 @@ void main() {
     });
   }
 
+  testWidgets('An unreadable restore authority restores nothing (no '
+      'fallback to old preferences) and reports why', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final api = _lifecycleApi()
+        ..restoreOverridesError = Exception('restore records unreadable');
+      final container = await _pumpHome(
+        t,
+        api,
+        prefs: _MemoryPrefs(_savedRestore),
+        memoryDismissed: true,
+      );
+      await t.pumpAndSettle();
+      expect(api.restoreServiceCalls, isEmpty);
+      expect(api.serveHosts, isEmpty);
+      expect(
+        container.read(hostRestoreBlockedProvider),
+        contains('restore records unreadable'),
+      );
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('Home restores the conversation the user last had open', (
     t,
   ) async {
@@ -590,6 +616,32 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  testWidgets('Refresh services in the host switcher lists a host started '
+      'elsewhere, in place, keeping the draft', (t) async {
+    final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);
+    await _pumpHome(t, api);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const Key('composer-input')), 'draft');
+    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+    await t.pumpAndSettle();
+    expect(find.byKey(Key('host-switch-item-${_app2.key}')), findsNothing);
+    // Another device starts a host meanwhile.
+    api.services.add(_app2);
+    final calls = api.discoverCalls;
+    await t.tap(find.byKey(const Key('host-switch-refresh')).last);
+    await t.pumpAndSettle();
+    expect(api.discoverCalls, greaterThan(calls));
+    expect(find.byKey(Key('host-switch-item-${_app2.key}')), findsWidgets);
+    expect(find.byKey(const Key('host-switch-refresh-error')), findsNothing);
+    expect(
+      t
+          .widget<TextField>(find.byKey(const Key('composer-input')))
+          .controller!
+          .text,
+      'draft',
+    );
   });
 
   testWidgets('Switching to an unreachable host keeps the current chat', (
@@ -820,7 +872,7 @@ void main() {
     },
   );
 
-  testWidgets('Home drawer on a phone: no back tile, footer shortcuts shown', (
+  testWidgets('Home sidebar on a phone: no back tile, footer shortcuts shown', (
     t,
   ) async {
     t.view.physicalSize = const Size(400, 800);
@@ -830,13 +882,13 @@ void main() {
     await _pumpHome(t, api);
     await t.pumpAndSettle();
 
-    // Narrow layout: sessions live in the drawer behind the hamburger.
+    // Narrow layout: sessions lie under the chat, behind the hamburger.
     expect(find.byKey(const Key('sidebar-manage-btn')), findsNothing);
     await t.tap(find.byIcon(Icons.menu));
     await t.pumpAndSettle();
-    final drawer = t.widget<Drawer>(find.byType(Drawer));
-    expect(drawer.backgroundColor, isNotNull);
-    expect(drawer.backgroundColor!.a, 1.0);
+    final sidebar = t.widget<Material>(find.byKey(const Key('phone-sidebar')));
+    expect(sidebar.color, isNotNull);
+    expect(sidebar.color!.a, 1.0);
     expect(find.byKey(const Key('drawer-back-to-sessions')), findsNothing);
     expect(find.byKey(const Key('sidebar-manage-btn')), findsOneWidget);
     expect(find.byKey(const Key('sidebar-settings-btn')), findsOneWidget);
