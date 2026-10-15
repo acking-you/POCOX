@@ -886,6 +886,7 @@ extension _SessionComposer on _AppSessionState {
           !_historySyncing &&
           !_restoringSettings &&
           !_showingCachedHistory &&
+          !_savingAgentConfig &&
           !_attachments.any((a) => !a.ready) &&
           hasDraft;
       final scheme = Theme.of(context).colorScheme;

@@ -3,7 +3,7 @@
 use pocket_codex_host_svc::{
     opencode::{
         catalog::Command,
-        host::{Answer, Input},
+        host::{Answer, Input, Options},
     },
     session_access::SessionAccess,
 };
@@ -47,7 +47,11 @@ pub(super) fn access_for_link(link: &Link, session: &str) -> Result<SessionAcces
     Ok(access)
 }
 
-fn validate_access(identity: &Identity, access: &SessionAccess, session: &str) -> Result<()> {
+pub(super) fn validate_access(
+    identity: &Identity,
+    access: &SessionAccess,
+    session: &str,
+) -> Result<()> {
     if access.session_id != session
         || access.host_id != identity.host_id
         || access.generation != identity.generation
@@ -68,7 +72,7 @@ pub fn open(service: &str, session: &str) -> Result<SessionAccess> {
         bail!("OpenCode returned another session");
     }
     let old = link.commit(&identity, |view| view.sessions.get(session).cloned())?;
-    if link.accept(&identity, next.clone(), true)? {
+    if link.accept(&identity, next.clone())? {
         events::announce(&link, &identity, old.as_ref(), &next);
     }
     link.commit(&identity, |view| {
@@ -106,13 +110,17 @@ pub(super) fn start(service: &str, options: StartOptions) -> Result<String> {
         .cwd
         .filter(|s| !s.trim().is_empty())
         .ok_or_else(|| anyhow!("choose a project folder for the new session"))?;
-    let session = block(
-        link.client
-            .create(&cwd, &settings::initial(options.model), &identity),
-    )?;
+    let session = block(link.client.create(
+        &cwd,
+        &Options {
+            model: options.model,
+            ..Options::default()
+        },
+        &identity,
+    ))?;
     link.commit(&identity, |_| ())?;
     let next = block(link.client.snapshot(&session.id, None))?;
-    link.accept(&identity, next, true)?;
+    link.accept(&identity, next)?;
     Ok(session.id)
 }
 
@@ -123,8 +131,7 @@ pub(super) fn read(service: &str, session: &str) -> Result<ThreadHistory> {
     if snapshot.session.id != session {
         bail!("OpenCode returned another session");
     }
-    validate_snapshot(&identity, &snapshot)?;
-    link.accept(&identity, snapshot.clone(), true)?;
+    link.accept(&identity, snapshot.clone())?;
     link.commit(&identity, |view| {
         let snapshot = view.sessions.get(session).unwrap_or(&snapshot);
         let result = projection::history(snapshot);
@@ -206,8 +213,7 @@ pub(super) fn supplement(
     let link = conn(service)?;
     let identity = link.identity();
     let current = block(link.client.snapshot(session, None))?;
-    validate_snapshot(&identity, &current)?;
-    link.accept(&identity, current.clone(), true)?;
+    link.accept(&identity, current.clone())?;
     let Some(actual) = current.turn_id.as_deref() else { return Ok(Supplement::PromptRequired) };
     if turn.is_some_and(|turn| turn != actual) {
         bail!("the OpenCode turn changed; refresh before supplementing");

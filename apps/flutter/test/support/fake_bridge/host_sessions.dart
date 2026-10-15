@@ -56,6 +56,11 @@ mixin _FakeHostSessions on _FakeBridgeState {
       sessionAccessGate = null;
       await gate.future;
     }
+    final error = sessionAccessError;
+    if (error != null) {
+      sessionAccessError = null;
+      throw error;
+    }
     final next = sessionAccessResults.isEmpty
         ? null
         : sessionAccessResults.removeAt(0);
@@ -86,20 +91,15 @@ mixin _FakeHostSessions on _FakeBridgeState {
   }
 
   @override
-  Future<List<AgentCommand>> appCommandList(String serviceKey) async {
-    commandListCalls.add(serviceKey);
-    return agentCommands;
-  }
-
-  @override
   Future<List<AgentCommand>> appCommandListForProject(
     String serviceKey,
     String? directory,
   ) async {
+    commandListCalls.add(serviceKey);
     commandListProjects.add(directory);
     final listed = projectCommands['$serviceKey|${directory ?? ''}'];
     await projectCommandGates[directory]?.future;
-    return listed ?? await appCommandList(serviceKey);
+    return listed ?? agentCommands;
   }
 
   @override

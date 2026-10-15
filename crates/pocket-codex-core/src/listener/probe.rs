@@ -362,18 +362,19 @@ mod tests {
         bystander.assert_running();
     }
 
-    /// A probe past its deadline is stopped with what it forked: the
-    /// background `sleep` holding its pipes dies too, both readers finish,
-    /// and the run returns within the deadline plus the settle bound.
+    /// A probe past its deadline is stopped and both readers finish within
+    /// the settle bound, even if it was not scheduled before the deadline.
+    /// The other cleanup tests cover forked helpers without a startup race.
     #[test]
-    fn a_probe_that_outlives_its_deadline_is_stopped_with_its_group() {
+    fn a_probe_that_outlives_its_deadline_is_stopped() {
         let mut bystander = Bystander::start();
-        let (ran, cleanup, took, helper) =
-            with_helper("sleep 30 & echo $! > \"$1\"; wait", Duration::from_secs(1), 64);
+        let started = Instant::now();
+        let (ran, cleanup) =
+            attempt(&mut sh("exec sleep 30"), started + Duration::from_secs(1), 64);
+        let took = started.elapsed();
         assert!(ran.is_none());
         assert_eq!(cleanup, CLEAN);
         assert!(took < Duration::from_secs(1) + 2 * SETTLE, "{took:?}");
-        assert_gone(helper);
         bystander.assert_running();
     }
 

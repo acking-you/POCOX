@@ -166,11 +166,6 @@ pub struct AgentCommandDto {
     pub hints: Vec<String>,
 }
 
-/// List genuine native commands for the command palette.
-pub fn app_command_list(service_key: String) -> Result<Vec<AgentCommandDto>> {
-    app_command_list_for_project(service_key, None)
-}
-
 /// List commands from the selected project without creating a session.
 pub fn app_command_list_for_project(
     service_key: String,

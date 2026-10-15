@@ -1,7 +1,7 @@
 //! Native messages become shared UI items without guessing missing prefixes or
 //! authorizing host file reads from attachment paths.
 
-use pocket_codex_host_svc::opencode::{host::Snapshot, schema::Message};
+use pocket_codex_host_svc::opencode::{host::Snapshot, public, schema::Message};
 use serde_json::{json, Value};
 
 use super::super::app_session::{AppEvent, ThreadHistory, ThreadItem, TurnSummary};
@@ -57,7 +57,7 @@ fn clip(value: &str, limit: usize) -> String {
     format!("{}\n[… truncated]", &value[..end])
 }
 
-fn attachments(target: &mut ThreadItem, files: impl Iterator<Item = Value>) -> bool {
+fn attachments<'a>(target: &mut ThreadItem, files: impl Iterator<Item = &'a Value>) -> bool {
     let mut omitted = false;
     for file in files {
         let url = file["url"].as_str().unwrap_or_default();
@@ -93,16 +93,14 @@ fn message(message: &Message) -> Vec<ThreadItem> {
             .filter_map(|p| p["text"].as_str())
             .collect::<Vec<_>>()
             .join("\n");
+        let truncated = body.len() > 128 * 1024;
         let mut mapped = item(id.clone(), turn, "userMessage", body);
-        let omitted = attachments(
-            &mut mapped,
-            message
-                .parts
-                .iter()
-                .filter(|p| p["type"] == "file")
-                .cloned(),
-        );
+        let omitted =
+            attachments(&mut mapped, message.parts.iter().filter(|p| p["type"] == "file"));
         out.push(mapped);
+        if truncated {
+            out.push(item(format!("#input:{id}"), turn, "contentOmitted", "input".into()));
+        }
         if omitted {
             out.push(item(
                 format!("#attachments:{id}"),
@@ -113,6 +111,26 @@ fn message(message: &Message) -> Vec<ThreadItem> {
         }
         return out;
     }
+    // Some providers finish with reasoning only, even embedding their answer
+    // in it. Keep the original content/type provenance visible; never guess a
+    // natural-language boundary or relabel it as a normal assistant answer.
+    let reasoning_only = message.info["finish"] == "stop"
+        && message.info["time"]["completed"].is_number()
+        && !message.info["error"].is_object()
+        && message.parts.iter().any(|part| {
+            part["type"] == "reasoning"
+                && part["text"]
+                    .as_str()
+                    .is_some_and(|text| !text.trim().is_empty())
+        })
+        && !message.parts.iter().any(|part| {
+            part["type"] == "file"
+                || (part["type"] == "text"
+                    && part["ignored"] != true
+                    && part["text"]
+                        .as_str()
+                        .is_some_and(|text| !text.trim().is_empty()))
+        });
     for part in &message.parts {
         let part_id = text(part, "id");
         if part_id.is_empty() {
@@ -122,7 +140,12 @@ fn message(message: &Message) -> Vec<ThreadItem> {
             Some("text") if part["ignored"] != true => {
                 item(part_id, turn, "agentMessage", text(part, "text"))
             },
-            Some("reasoning") => item(part_id, turn, "reasoning", text(part, "text")),
+            Some("reasoning") => item(
+                part_id,
+                turn,
+                if reasoning_only { "reasoningOutput" } else { "reasoning" },
+                text(part, "text"),
+            ),
             Some("tool") => {
                 let state = &part["state"];
                 let input = if state["input"].to_string().len() <= 64 * 1024 {
@@ -147,14 +170,7 @@ fn message(message: &Message) -> Vec<ThreadItem> {
                         .unwrap_or_default(),
                     4096,
                 );
-                if attachments(
-                    &mut mapped,
-                    state["attachments"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .cloned(),
-                ) {
+                if attachments(&mut mapped, state["attachments"].as_array().into_iter().flatten()) {
                     out.push(item(
                         format!("#attachments:{}", mapped.id),
                         turn,
@@ -166,7 +182,7 @@ fn message(message: &Message) -> Vec<ThreadItem> {
             },
             Some("file") => {
                 let mut mapped = item(part_id, turn, "agentMessage", String::new());
-                if attachments(&mut mapped, std::iter::once(part.clone())) {
+                if attachments(&mut mapped, std::iter::once(part)) {
                     mapped.item_type = "contentOmitted".into();
                     mapped.text = "attachments".into();
                 }
@@ -181,10 +197,32 @@ fn message(message: &Message) -> Vec<ThreadItem> {
             .map(|ms| ms / 1000);
         out.push(mapped);
     }
-    if let Some(error) = message.info["error"]["name"].as_str() {
-        out.push(item(format!("#error:{id}"), turn, "agentMessage", format!("OpenCode: {error}")));
+    if message.info["error"].is_object() {
+        let error = model_error(&message.info);
+        let cancelled = error["code"] == "cancelled";
+        out.push(item(
+            format!("#error:{id}"),
+            turn,
+            if cancelled { "interrupted" } else { "modelError" },
+            if cancelled { String::new() } else { error.to_string() },
+        ));
     }
     out
+}
+
+fn model_error(info: &Value) -> Value {
+    let mut error = public::error(&info["error"]);
+    if let Some(fields) = error.as_object_mut() {
+        fields.remove("name");
+    }
+    error["model"] = clip(info["modelID"].as_str().unwrap_or_default(), 256).into();
+    error["provider"] = clip(info["providerID"].as_str().unwrap_or_default(), 128).into();
+    // A supplement has its own native prompt ID inside the admitted turn.
+    // Terminal notifications must identify the same failure as history/items.
+    let id = text(info, "id");
+    error["itemId"] = format!("#error:{id}").into();
+    error["turnId"] = info["parentID"].as_str().unwrap_or(&id).into();
+    error
 }
 
 pub(super) fn items(snapshot: &Snapshot) -> Vec<ThreadItem> {
@@ -266,10 +304,18 @@ pub(super) fn ended(snapshot: &Snapshot, turn: &str) -> AppEvent {
                 parent >= turn && snapshot.turn_id.as_deref().is_none_or(|next| parent < next)
             })
     });
-    let error = last.and_then(|m| m.info["error"]["name"].as_str());
+    let error = last
+        .filter(|m| m.info["error"].is_object())
+        .map(|m| model_error(&m.info));
+    // A stopped supplement has its own prompt/item identity. Preserve it
+    // without turning cancellation into an error or changing the admitted turn.
+    let interruption = error
+        .as_ref()
+        .filter(|error| error["code"] == "cancelled")
+        .map(|error| json!({"itemId":error["itemId"],"turnId":error["turnId"]}));
     let (status, detail) = match error {
-        Some("MessageAbortedError") => ("interrupted", None),
-        Some(name) => ("failed", Some(name.to_string())),
+        Some(error) if error["code"] == "cancelled" => ("interrupted", None),
+        Some(error) => ("failed", Some(error)),
         None if last.is_some_and(|m| {
             m.info["time"]["completed"].is_number() && m.info["finish"] == "stop"
         }) =>
@@ -278,15 +324,15 @@ pub(super) fn ended(snapshot: &Snapshot, turn: &str) -> AppEvent {
         },
         _ => (
             "failed",
-            Some(snapshot.operation_error.clone().unwrap_or_else(|| {
+            Some(json!({"message":snapshot.operation_error.clone().unwrap_or_else(|| {
                 "OpenCode turn outcome is unavailable; refresh the conversation.".into()
-            })),
+            })})),
         ),
     };
-    event(
-        "turn/completed",
-        Some(&snapshot.session.id),
-        json!({"threadId":snapshot.session.id,
-        "turn":{"id":turn,"status":status,"error":detail.map(|message|json!({"message":message}))}}),
-    )
+    let mut body = json!({"threadId":snapshot.session.id,
+        "turn":{"id":turn,"status":status,"error":detail}});
+    if let Some(interruption) = interruption {
+        body["turn"]["interruption"] = interruption;
+    }
+    event("turn/completed", Some(&snapshot.session.id), body)
 }

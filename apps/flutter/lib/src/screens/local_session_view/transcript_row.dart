@@ -129,6 +129,10 @@ class _TranscriptRow extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: MarkdownView(data: item.text, muted: true),
         );
+      case 'modelError':
+        return ModelErrorCard(body: item.text);
+      case 'reasoningOutput':
+        return ReasoningOutputView(text: item.text);
       case 'turnContext':
         return _TurnContextCaption(item: item);
       case 'imageGeneration':

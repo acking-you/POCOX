@@ -58,7 +58,7 @@ impl SessionEngine for OpenCodeEngine {
         caps.negotiated = true;
         caps.external_writer_monitor = true;
         caps.local_sessions = true;
-        caps.image_input = view.catalog.models.iter().any(|m| m.images);
+        caps.image_input = view.image_input;
         caps.steer = true;
         caps.rename = true;
         caps.model_catalog = true;
@@ -179,7 +179,7 @@ impl SessionEngine for OpenCodeEngine {
         Ok(running)
     }
     fn session_settings(&self, service: &str, session: &str) -> Option<Value> {
-        settings::settings(service, session)
+        refresh_settings(service, session).ok()
     }
     fn set_session_config(
         &self,

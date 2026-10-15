@@ -1,13 +1,8 @@
 //! Native per-session choices, with draft defaults that never mutate the host.
 
-use pocket_codex_host_svc::opencode::host::Options;
 use serde_json::{json, Value};
 
 use super::*;
-
-pub(super) fn settings(service: &str, session: &str) -> Option<Value> {
-    refresh_settings(service, session).ok()
-}
 
 /// Refresh native session choices, preserving read failures for async callers.
 pub fn refresh_settings(service: &str, session: &str) -> Result<Value> {
@@ -91,11 +86,4 @@ pub(super) fn set_link(link: &Link, session: &str, id: &str, value: &str) -> Res
         }
     })?;
     Ok(())
-}
-
-pub(super) fn initial(model: Option<String>) -> Options {
-    Options {
-        model,
-        ..Options::default()
-    }
 }

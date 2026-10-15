@@ -10,10 +10,10 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
-import 'support/screen_harness.dart';
+import 'support/opencode_chat.dart';
 
 const claude = 'pcx:local:acp:claude';
-const opencode = 'pcx:local:opencode:opencode';
+const opencode = openCodeService;
 const thread = 'original-session';
 
 SessionAccess access({
@@ -50,47 +50,29 @@ final writable = access(
   recheck: false,
 );
 
-Future<void> frames(WidgetTester t, [int n = 12]) async {
-  for (var i = 0; i < n; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
-
 Future<FakeBridgeApi> openChat(
   WidgetTester t, {
   String service = claude,
   List<SessionAccess> opens = const [],
   Size size = const Size(1280, 900),
-}) async {
-  t.view.physicalSize = size;
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
-  final api = FakeBridgeApi();
-  api.acpCapabilities[service] = service == opencode
-      ? negotiatedOpenCodeCapabilities(generation: 7)
-      : negotiatedAcpCapabilities(
-          providerName: 'Claude',
-          profileId: 'claude',
-          generation: 7,
-          nativeHistory: true,
-        );
-  api.metadataOnlyFollow = true;
+}) {
+  final api = FakeBridgeApi()
+    ..acpCapabilities[service] = service == opencode
+        ? negotiatedOpenCodeCapabilities(generation: 7)
+        : negotiatedAcpCapabilities(
+            providerName: 'Claude',
+            profileId: 'claude',
+            generation: 7,
+            nativeHistory: true,
+          )
+    ..metadataOnlyFollow = true
+    ..readResult = const ThreadHistory(
+      running: false,
+      cwd: '/project',
+      items: [],
+    );
   api.sessionOpenResults.addAll(opens);
-  api.readResult = const ThreadHistory(
-    running: false,
-    cwd: '/project',
-    items: [],
-  );
-  await api.appConnect(service, 28080);
-  await t.pumpWidget(
-    host(
-      AppSessionScreen(serviceKey: service, threadId: thread),
-      api,
-      locale: const Locale('en'),
-    ),
-  );
-  await frames(t);
-  return api;
+  return mountChat(t, api, service: service, threadId: thread, size: size);
 }
 
 Future<void> disposeChat(WidgetTester t) async {
@@ -288,13 +270,7 @@ void main() {
     await t.tap(find.byKey(const Key('access-continue')));
     await frames(t);
     expect(api.sessionOpenCalls, hasLength(2));
-    expect(
-      t
-          .widget<TextField>(find.byKey(const Key('composer-input')))
-          .controller!
-          .text,
-      'keep me',
-    );
+    expect(composerText(t), 'keep me');
     expect(api.turnStartCount, 0);
     await disposeChat(t);
   });

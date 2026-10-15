@@ -72,7 +72,8 @@ extension _SessionCapabilities on _AppSessionState {
       !_reconnecting &&
       !_historySyncing &&
       !_showingCachedHistory &&
-      !_connectionLost;
+      !_connectionLost &&
+      !_savingAgentConfig;
 
   /// Whether a change bound to [target] may still be sent.
   bool _agentTargetCurrent(_AgentTarget? target) =>
@@ -154,19 +155,40 @@ extension _SessionCapabilities on _AppSessionState {
     if (offered == null || !offered.values.any((v) => v.value == value)) {
       return;
     }
+    // Until the host answers, a send would still run with the old value:
+    // every send and this conversation's options wait (see
+    // [_savingAgentConfig]). Only this save releases its own hold.
+    final saving = target!;
+    final hold = (target: saving, save: Object());
+    _updateState(() => _configSaving = hold);
     try {
       await ref
           .read(bridgeApiProvider)
-          .appSetSessionConfig(target!.service, target.thread, configId, value);
+          .appSetSessionConfig(saving.service, saving.thread, configId, value);
     } catch (e) {
       // The agent kept its previous value; its option set is unchanged. A
       // failure for a conversation the user already left is not shown here.
-      if (mounted && _agentTarget() == target) {
-        _updateState(() => _error = friendlyError(e));
+      if (mounted && _agentTarget() == saving) {
+        final reason = friendlyError(e);
+        final l10n = AppLocalizations.of(context);
+        _updateState(
+          () => _error = offered.category == 'model'
+              ? l10n.modelChangeFailed(reason)
+              : reason,
+        );
+      }
+    } finally {
+      if (mounted && identical(_configSaving?.save, hold.save)) {
+        _updateState(() => _configSaving = null);
       }
     }
-    if (mounted && _agentTarget() == target) _refreshAgentSettings();
+    if (mounted && _agentTarget() == saving) _refreshAgentSettings();
   }
+
+  /// A model or other option change of the shown conversation is still
+  /// being saved (see [_setAgentConfig]).
+  bool get _savingAgentConfig =>
+      _configSaving != null && _configSaving!.target == _agentTarget();
 
   /// Switch the agent's legacy mode for [target]; refused like
   /// [_setAgentConfig].

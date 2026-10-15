@@ -50,15 +50,6 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let mut config = pocket_codex_core::config::Config::default();
     config.pb_mapper.relay = Some("127.0.0.1:9".into());
     config.pb_mapper.key = Some("f".repeat(32));
-    assert_eq!(
-        config
-            .pb_mapper
-            .key
-            .as_ref()
-            .expect("valid test fixture")
-            .len(),
-        32
-    );
     config::save_config(&root.join("support"), &config).expect("isolated offline relay");
     let _cleanup = Cleanup;
     let Started::OpenCode(report) = host_start::start_configured(

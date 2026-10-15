@@ -37,12 +37,6 @@ Future<SessionAccessDto> appSessionRelease({
   snapshot: snapshot,
 );
 
-/// List genuine native commands for the command palette.
-Future<List<AgentCommandDto>> appCommandList({required String serviceKey}) =>
-    RustLib.instance.api.crateApiBridgeSessionAccessAppCommandList(
-      serviceKey: serviceKey,
-    );
-
 /// List commands from the selected project without creating a session.
 Future<List<AgentCommandDto>> appCommandListForProject({
   required String serviceKey,

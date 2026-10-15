@@ -533,6 +533,89 @@ class AppLocalizationsEn extends AppLocalizations {
   String get turnStopped => 'Stopped';
 
   @override
+  String get modelErrorTitle => 'The model couldn\'t respond';
+
+  @override
+  String modelErrorModel(String model) {
+    return 'Model: $model';
+  }
+
+  @override
+  String modelErrorStatus(String status) {
+    return 'HTTP $status';
+  }
+
+  @override
+  String get modelErrorRegion =>
+      'This model isn\'t available in your region. Choose another model, then retry.';
+
+  @override
+  String get modelErrorAuthentication =>
+      'The provider couldn\'t sign you in. Check its API key or sign-in, then retry.';
+
+  @override
+  String get modelErrorPermission =>
+      'The provider denied access to this model. Choose another model or check your account.';
+
+  @override
+  String get modelErrorUnavailable =>
+      'The model or its endpoint is unavailable. Choose another model or check the provider configuration.';
+
+  @override
+  String get modelErrorRateLimited =>
+      'The provider is receiving too many requests. Wait a moment, then retry.';
+
+  @override
+  String get modelErrorQuota =>
+      'The provider\'s usage allowance is used up. Check your account or choose another model.';
+
+  @override
+  String get modelErrorContext =>
+      'The conversation is longer than this model accepts. Choose a model with a larger context or start a new conversation.';
+
+  @override
+  String get modelErrorOutput =>
+      'The model reached its output limit before finishing. Ask it to continue.';
+
+  @override
+  String get modelErrorProvider =>
+      'The provider is temporarily unavailable. Retry later or choose another model.';
+
+  @override
+  String get modelErrorInvalid =>
+      'The provider rejected this request. Check the model and the message, then retry.';
+
+  @override
+  String get modelErrorUnknown =>
+      'The model couldn\'t complete the response. Retry, or choose another model.';
+
+  @override
+  String get modelErrorRetry => 'Retry';
+
+  @override
+  String get modelErrorChangeModel => 'Change model';
+
+  @override
+  String get modelErrorIncomplete =>
+      'The failed message isn\'t fully available here, so it can\'t be sent again as recorded. Edit it or send a new message.';
+
+  @override
+  String modelChangeFailed(String reason) {
+    return 'Couldn\'t switch the model: $reason. The previous model stays selected and your draft is unchanged.';
+  }
+
+  @override
+  String get modelErrorRetryHint =>
+      'Sends this message again with the model selected now.';
+
+  @override
+  String get reasoningOutputNote =>
+      'The model returned this as reasoning, without a separate answer.';
+
+  @override
+  String get queuedPausedHint => 'Paused. Retry or send a message to continue.';
+
+  @override
   String turnElapsed(String duration) {
     return 'Took $duration';
   }

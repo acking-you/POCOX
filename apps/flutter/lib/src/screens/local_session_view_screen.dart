@@ -24,6 +24,7 @@ import 'package:pocket_codex/src/realtime_delegation.dart';
 import 'package:pocket_codex/src/screens/local_sessions_screen.dart'
     show SessionSource, resumeLocalSession;
 import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
+import 'package:pocket_codex/src/screens/app_session/model_feedback.dart';
 import 'package:pocket_codex/src/screens/app_session/message_actions.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/theme.dart';

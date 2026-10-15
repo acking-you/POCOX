@@ -82,7 +82,9 @@ extension _SessionQueue on _AppSessionState {
         _restoringSettings ||
         _showingCachedHistory ||
         _reconnecting ||
-        _connectionLost) {
+        _connectionLost ||
+        // The draft stays in the composer until the model change is saved.
+        _savingAgentConfig) {
       return;
     }
     if (_supplement && _streaming && _caps.steer) {
@@ -187,7 +189,8 @@ extension _SessionQueue on _AppSessionState {
         _connectionLost ||
         _historySyncing ||
         _restoringSettings ||
-        _showingCachedHistory) {
+        _showingCachedHistory ||
+        _savingAgentConfig) {
       return;
     }
     unawaited(_send(queued: _queue.first));
@@ -307,15 +310,23 @@ extension _SessionQueue on _AppSessionState {
   /// transcript. Local-only (not persisted); call inside a `_updateState`. An Esc
   /// "undo" interrupt suppresses the marker — the send is being taken back into
   /// the composer, not shown as a stopped turn.
-  void _addStoppedMarker() {
+  /// A host that reports the stop itself (an `interrupted` item of [turn])
+  /// gets no second marker.
+  void _addStoppedMarker(String turn) {
     _pendingInterrupt = false;
     if (_suppressStopMarker) {
       _suppressStopMarker = false;
       return;
     }
+    if (turn.isNotEmpty &&
+        _items.any((i) => i.type == 'interrupted' && i.turnId == turn)) {
+      return;
+    }
     final id = 'local-stopped-${_localSeq++}';
     _itemIndex[id] = _items.length;
-    _items.add(TranscriptItem(id: id, type: 'interrupted', text: ''));
+    _items.add(
+      TranscriptItem(id: id, type: 'interrupted', text: '', turnId: turn),
+    );
     _historyLiveItems?[id] = _items.last;
   }
 
@@ -335,7 +346,8 @@ extension _SessionQueue on _AppSessionState {
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                '${l10n.queuedCount(_queue.length)} · ${l10n.queuedHint}',
+                '${l10n.queuedCount(_queue.length)} · '
+                '${_draft.queuePaused ? l10n.queuedPausedHint : l10n.queuedHint}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(

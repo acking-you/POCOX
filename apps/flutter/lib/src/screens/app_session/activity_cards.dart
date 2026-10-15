@@ -19,6 +19,7 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/git_diff.dart';
 import 'package:pocket_codex/src/screens/app_session/diff_view.dart';
+import 'package:pocket_codex/src/screens/app_session/model_feedback.dart';
 import 'package:pocket_codex/src/screens/app_session/step_body.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/motion.dart';
@@ -68,6 +69,11 @@ Widget activityRow(TranscriptItem item) => switch (item.type) {
   'plan' => PlanCard(key: ValueKey(item.id), item: item),
   'contextCompaction' => _CompactionNotice(key: ValueKey(item.id), item: item),
   'interrupted' => _InterruptedNotice(key: ValueKey(item.id)),
+  'modelError' => ModelErrorCard(key: ValueKey(item.id), body: item.text),
+  'reasoningOutput' => ReasoningOutputView(
+    key: ValueKey(item.id),
+    text: item.text,
+  ),
   // An ACP host retains bounded history: its missing beginning is shown as a
   // gap, never as the conversation's start.
   'historyGap' => _HistoryGapNotice(key: ValueKey(item.id)),

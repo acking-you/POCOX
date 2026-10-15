@@ -905,9 +905,30 @@ this file's roadmap so the source of truth stays in sync.
     - Quit (`serve_stop_all`) closes OpenCode admission and stops each host
       under its lease; a failed stop or pending startup cleanup fails the
       quit. macOS native quits go through `NativeQuitGate` to the same path.
-    - Verified on one Mac (OpenCode 1.19.0): Rust 829 passed/24 ignored,
-      Flutter 1533 passed/5 skipped, real-server and bridge lifecycle tests.
-      The final macOS build (`4011bbdb…`): a source held by another process
+    - Model failures are classified by the host from bounded fields into a
+      fixed reason; the provider's message is never published. One inline
+      card per failure, keyed by the host's item and exact prompt turn;
+      Change model sends nothing; Retry resends the exact original prompt
+      only on explicit action and is withheld for a truncated, attachment-
+      missing or non-inline-image copy. Option saves hold every send path
+      and never auto-send when they end.
+    - `reasoningOutput` only for a completed message with reasoning and no
+      separate text: shown in full with its source note, never split or
+      relabelled. Mixed text/reasoning is unchanged.
+    - A session created by a first send re-reads its access read-only after
+      that send and at each turn's end until releasable (busy or failed reads
+      do not stand); latest writable answer for the same view only, no
+      polling, never reacquires a handed-back session.
+    - Verified on one Mac (OpenCode 1.19.0): Rust 831 passed/24 ignored,
+      Flutter 1557 passed/5 skipped, real-server and bridge lifecycle tests.
+      The final macOS build (`127debfc…`): a new conversation's first reply
+      arrived, Hand back appeared without reopening, Release/Continue here
+      kept the session ID and draft with no duplicate history or automatic
+      send. An earlier build of this round: a region-refused model's card,
+      Change model without sending (newer draft kept), explicit Retry of the
+      original prompt answered, and a full reasoning-only reply in existing
+      history inspected without sending (read-only viewer by tests only).
+      Build `4011bbdb…`: a source held by another process
       stayed read-only and, once free, opened only on Check now and
       answered; Release showed the sent message once with only Continue
       here, which kept the draft unsent; an official-CLI deletion in another
@@ -921,7 +942,8 @@ this file's roadmap so the source of truth stays in sync.
       with a non-default model answering, Apply reconnect and back to
       existing configuration (draft kept unsent), clean Cmd+Q, relaunch
       restore, close to tray. Not verified: a successful Responses reply
-      (provider refused the model; further testing waived), draft
+      (provider refused the model; further testing waived), live attachment
+      Retry and cancellation identity (tests only), draft
       attachments across Apply in the app (tests only), relay/multi-controller
       use, other platforms. Former ACP-preset evidence is not native evidence.
     See [Native OpenCode](docs/opencode-native.md) and

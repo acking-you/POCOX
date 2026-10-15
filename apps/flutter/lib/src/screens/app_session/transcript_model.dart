@@ -116,6 +116,9 @@ class TranscriptItem {
   /// * `interrupted` — the turn was cut short, which is why there is no answer
   ///   below. Folding it would leave the transcript silently ending.
   ///
+  /// * `modelError` — the turn failed; the card says why, in place of an answer.
+  /// * `reasoningOutput` — the turn's only output, returned as reasoning.
+  ///
   /// `contextCompaction` is deliberately NOT here: compaction happens *during* a
   /// turn, so leaving it out split one turn's work into several folds that each
   /// reported the same duration. `autoApprovalReview` is not here either: a
@@ -126,7 +129,9 @@ class TranscriptItem {
       type == 'turnDuration' ||
       type == 'plan' ||
       type == 'interrupted' ||
-      type == 'imageGeneration';
+      type == 'imageGeneration' ||
+      type == 'modelError' ||
+      type == 'reasoningOutput';
 }
 
 /// Stopwatch-format an elapsed-second count: `m:ss`, or `h:mm:ss` past an hour

@@ -29,12 +29,6 @@ mixin _RustHostSessions implements BridgeApi {
   );
 
   @override
-  Future<List<AgentCommand>> appCommandList(String serviceKey) async => [
-    for (final c in await frb.appCommandList(serviceKey: serviceKey))
-      _command(c),
-  ];
-
-  @override
   Future<List<AgentCommand>> appCommandListForProject(
     String serviceKey,
     String? directory,

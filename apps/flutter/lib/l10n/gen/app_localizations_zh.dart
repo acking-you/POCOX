@@ -524,6 +524,75 @@ class AppLocalizationsZh extends AppLocalizations {
   String get turnStopped => '已停止';
 
   @override
+  String get modelErrorTitle => '模型未能回复';
+
+  @override
+  String modelErrorModel(String model) {
+    return '模型:$model';
+  }
+
+  @override
+  String modelErrorStatus(String status) {
+    return 'HTTP $status';
+  }
+
+  @override
+  String get modelErrorRegion => '此模型在你所在的地区不可用。请换一个模型后重试。';
+
+  @override
+  String get modelErrorAuthentication => '服务商无法验证身份。请检查 API 密钥或登录状态后重试。';
+
+  @override
+  String get modelErrorPermission => '服务商拒绝访问此模型。请换一个模型或检查账户权限。';
+
+  @override
+  String get modelErrorUnavailable => '模型或其服务端点不可用。请换一个模型或检查服务商配置。';
+
+  @override
+  String get modelErrorRateLimited => '服务商请求过多。请稍等片刻后重试。';
+
+  @override
+  String get modelErrorQuota => '服务商的用量额度已用完。请检查账户或换一个模型。';
+
+  @override
+  String get modelErrorContext => '对话长度超出此模型的上限。请换用上下文更大的模型,或开始新对话。';
+
+  @override
+  String get modelErrorOutput => '模型在完成前达到了输出上限。可以让它继续。';
+
+  @override
+  String get modelErrorProvider => '服务商暂时不可用。请稍后重试或换一个模型。';
+
+  @override
+  String get modelErrorInvalid => '服务商拒绝了此请求。请检查模型和消息后重试。';
+
+  @override
+  String get modelErrorUnknown => '模型未能完成回复。请重试,或换一个模型。';
+
+  @override
+  String get modelErrorRetry => '重试';
+
+  @override
+  String get modelErrorChangeModel => '更换模型';
+
+  @override
+  String get modelErrorIncomplete => '这条失败的消息在此处不完整,无法按原样重新发送。请编辑后发送,或发送新消息。';
+
+  @override
+  String modelChangeFailed(String reason) {
+    return '无法切换模型:$reason。仍保留之前的模型,草稿未改动。';
+  }
+
+  @override
+  String get modelErrorRetryHint => '以当前选择的模型重新发送这条消息。';
+
+  @override
+  String get reasoningOutputNote => '模型将这段内容作为思考返回,没有单独的回答。';
+
+  @override
+  String get queuedPausedHint => '已暂停。重试或发送消息后继续。';
+
+  @override
   String turnElapsed(String duration) {
     return '用时 $duration';
   }

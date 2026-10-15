@@ -1058,6 +1058,132 @@ abstract class AppLocalizations {
   /// **'Stopped'**
   String get turnStopped;
 
+  /// No description provided for @modelErrorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The model couldn\'t respond'**
+  String get modelErrorTitle;
+
+  /// No description provided for @modelErrorModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model: {model}'**
+  String modelErrorModel(String model);
+
+  /// No description provided for @modelErrorStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP {status}'**
+  String modelErrorStatus(String status);
+
+  /// No description provided for @modelErrorRegion.
+  ///
+  /// In en, this message translates to:
+  /// **'This model isn\'t available in your region. Choose another model, then retry.'**
+  String get modelErrorRegion;
+
+  /// No description provided for @modelErrorAuthentication.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider couldn\'t sign you in. Check its API key or sign-in, then retry.'**
+  String get modelErrorAuthentication;
+
+  /// No description provided for @modelErrorPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider denied access to this model. Choose another model or check your account.'**
+  String get modelErrorPermission;
+
+  /// No description provided for @modelErrorUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The model or its endpoint is unavailable. Choose another model or check the provider configuration.'**
+  String get modelErrorUnavailable;
+
+  /// No description provided for @modelErrorRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider is receiving too many requests. Wait a moment, then retry.'**
+  String get modelErrorRateLimited;
+
+  /// No description provided for @modelErrorQuota.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider\'s usage allowance is used up. Check your account or choose another model.'**
+  String get modelErrorQuota;
+
+  /// No description provided for @modelErrorContext.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is longer than this model accepts. Choose a model with a larger context or start a new conversation.'**
+  String get modelErrorContext;
+
+  /// No description provided for @modelErrorOutput.
+  ///
+  /// In en, this message translates to:
+  /// **'The model reached its output limit before finishing. Ask it to continue.'**
+  String get modelErrorOutput;
+
+  /// No description provided for @modelErrorProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider is temporarily unavailable. Retry later or choose another model.'**
+  String get modelErrorProvider;
+
+  /// No description provided for @modelErrorInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'The provider rejected this request. Check the model and the message, then retry.'**
+  String get modelErrorInvalid;
+
+  /// No description provided for @modelErrorUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'The model couldn\'t complete the response. Retry, or choose another model.'**
+  String get modelErrorUnknown;
+
+  /// No description provided for @modelErrorRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get modelErrorRetry;
+
+  /// No description provided for @modelErrorChangeModel.
+  ///
+  /// In en, this message translates to:
+  /// **'Change model'**
+  String get modelErrorChangeModel;
+
+  /// No description provided for @modelErrorIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'The failed message isn\'t fully available here, so it can\'t be sent again as recorded. Edit it or send a new message.'**
+  String get modelErrorIncomplete;
+
+  /// No description provided for @modelChangeFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t switch the model: {reason}. The previous model stays selected and your draft is unchanged.'**
+  String modelChangeFailed(String reason);
+
+  /// No description provided for @modelErrorRetryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sends this message again with the model selected now.'**
+  String get modelErrorRetryHint;
+
+  /// No description provided for @reasoningOutputNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The model returned this as reasoning, without a separate answer.'**
+  String get reasoningOutputNote;
+
+  /// No description provided for @queuedPausedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused. Retry or send a message to continue.'**
+  String get queuedPausedHint;
+
   /// No description provided for @turnElapsed.
   ///
   /// In en, this message translates to:

@@ -686,11 +686,7 @@ abstract interface class BridgeApi {
   );
 
   /// Native slash commands of the engine behind [serviceKey]
-  /// ([AppCapabilities.commands]).
-  Future<List<AgentCommand>> appCommandList(String serviceKey);
-
-  /// Native slash commands offered in project [directory]. Native OpenCode
-  /// reads that project's list; other engines answer as [appCommandList].
+  /// ([AppCapabilities.commands]) offered in project [directory].
   Future<List<AgentCommand>> appCommandListForProject(
     String serviceKey,
     String? directory,

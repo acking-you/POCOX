@@ -60,7 +60,7 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
     };
     let shared = Arc::new(Mutex::new(Shared {
         info,
-        catalog,
+        image_input: catalog.models.iter().any(|model| model.images),
         healthy: true,
         sessions: HashMap::new(),
         bytes: HashMap::new(),

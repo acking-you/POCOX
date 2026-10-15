@@ -735,6 +735,9 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// answer is taken when it is released.
   Completer<void>? sessionAccessGate;
 
+  /// Thrown by the next [appSessionAccess] (after its gate), then cleared.
+  Object? sessionAccessError;
+
   /// Every [appSessionOpen] / [appSessionAccess] thread id.
   final List<String> sessionOpenCalls = [];
   final List<String> sessionAccessCalls = [];
@@ -745,12 +748,13 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Thrown by the next [appSessionRelease] (then cleared).
   Object? sessionReleaseError;
 
-  /// What [appCommandList] reports, and its calls.
+  /// What [appCommandListForProject] reports for a project without
+  /// [projectCommands], and the service of every call.
   List<AgentCommand> agentCommands = const [];
   final List<String> commandListCalls = [];
 
   /// Per-project commands (`service|directory`) of
-  /// [appCommandListForProject]; without one it answers as [appCommandList].
+  /// [appCommandListForProject]; without one it answers [agentCommands].
   final Map<String, List<AgentCommand>> projectCommands = {};
 
   /// Holds [appCommandListForProject] answers for a directory until

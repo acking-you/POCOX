@@ -15,9 +15,9 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
-import 'support/screen_harness.dart';
+import 'support/opencode_chat.dart';
 
-const _svc = 'pcx:local:opencode:opencode';
+const _svc = openCodeService;
 const _cwd = '/work/alpha';
 const _thread = 'oc-session';
 const _beta = '/work/beta';
@@ -74,50 +74,13 @@ SessionSettings _options({
   ],
 );
 
-Future<void> _frames(WidgetTester t, [int count = 8]) async {
-  for (var i = 0; i < count; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
-
 Future<FakeBridgeApi> _mount(
   WidgetTester t,
   FakeBridgeApi api, {
   String? threadId,
-}) async {
-  t.view.physicalSize = const Size(1400, 900);
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
+}) {
   api.acpCapabilities[_svc] = negotiatedOpenCodeCapabilities();
-  await api.appConnect(_svc, 28080);
-  await t.pumpWidget(
-    host(
-      AppSessionScreen(serviceKey: _svc, cwd: _cwd, threadId: threadId),
-      api,
-      locale: const Locale('en'),
-    ),
-  );
-  await _frames(t);
-  return api;
-}
-
-Finder _choice(String value) {
-  final listed = find.byKey(Key('agent-option-value-$value'));
-  return listed.evaluate().isNotEmpty
-      ? listed
-      : find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
-        );
-}
-
-Future<void> _pick(WidgetTester t, String option, String value) async {
-  await t.tap(find.byKey(Key('agent-config-$option')));
-  await t.pumpAndSettle();
-  final target = _choice(value);
-  await t.ensureVisible(target);
-  await t.pumpAndSettle();
-  await t.tap(target);
-  await t.pumpAndSettle();
+  return mountChat(t, api, cwd: _cwd, threadId: threadId);
 }
 
 /// Option [option] shows [label]: the segment announces (and its tooltip
@@ -154,36 +117,11 @@ Finder _shown(String option, String label) => find.descendant(
   }),
 );
 
-Future<void> _pickProject(WidgetTester t, String path) async {
-  await t.tap(find.byKey(const Key('project-switcher-btn')));
-  await _frames(t);
-  await t.tap(find.byKey(Key('project-menu-item-$path')));
-  await _frames(t);
-}
-
-Future<void> _type(WidgetTester t, String text) async {
-  await t.enterText(find.byKey(const Key('composer-input')), text);
-  await t.pump();
-}
-
-String _composer(WidgetTester t) => t
-    .widget<TextField>(find.byKey(const Key('composer-input')))
-    .controller!
-    .text;
-
 /// The composer offers the native options, none of the Codex menu.
 void _nativeControls() {
   expect(find.byKey(const Key('model-chip')), findsNothing);
   expect(find.byKey(const Key('agent-config-model')), findsOneWidget);
   expect(find.byKey(const Key('agent-config-agent')), findsOneWidget);
-}
-
-/// Nothing of the Codex menu went out with the turn.
-void _noMenuSettings(FakeBridgeApi api) {
-  expect(api.lastModel, isNull);
-  expect(api.lastTurnModel, isNull);
-  expect(api.lastReasoningEffort, isNull);
-  expect(api.lastCollaborationMode, isNull);
 }
 
 void main() {
@@ -202,24 +140,24 @@ void main() {
     // the Codex menu either; typing works.
     expect(find.byKey(const Key('model-chip')), findsNothing);
     expect(find.byKey(const Key('agent-config-model')), findsNothing);
-    await _type(t, 'hello');
-    expect(_composer(t), 'hello');
+    await typeMessage(t, 'hello');
+    expect(composerText(t), 'hello');
 
     read.complete();
-    await _frames(t);
+    await frames(t);
     _nativeControls();
     expect(_shown('model', 'Inherited'), findsOneWidget);
 
-    await _pick(t, 'model', 'zen/pickle');
+    await pickOption(t, 'model', 'zen/pickle');
     expect(_shown('model', 'Big Pickle'), findsOneWidget);
     // Only the chosen model's variants.
     await t.tap(find.byKey(const Key('agent-config-variant')));
     await t.pumpAndSettle();
-    expect(_choice('fast'), findsOneWidget);
-    expect(_choice('high'), findsNothing);
-    await t.tap(_choice('fast'));
+    expect(optionChoice('fast'), findsOneWidget);
+    expect(optionChoice('high'), findsNothing);
+    await t.tap(optionChoice('fast'));
     await t.pumpAndSettle();
-    await _pick(t, 'agent', 'plan');
+    await pickOption(t, 'agent', 'plan');
     expect(_shown('variant', 'fast'), findsOneWidget);
     expect(_shown('agent', 'plan'), findsOneWidget);
     expect(api.sessionConfigCalls, isEmpty);
@@ -236,13 +174,13 @@ void main() {
     });
     api.draftSettingsGates[_cwd] = applyRead;
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t);
+    await frames(t);
     expect(api.threadStartCalls, [_svc]);
     expect(api.sessionConfigCalls, isEmpty);
     expect(api.turnStartCount, 0, reason: 'the message waits for its options');
 
     applyRead.complete();
-    await _frames(t);
+    await frames(t);
     final thread = api.threadStartResults.single!;
     expect(api.lastCwd, _cwd);
     expect(api.sessionConfigCalls, [
@@ -253,27 +191,13 @@ void main() {
     expect(turnsAtFirstChoice, 0, reason: 'options before the message');
     expect(api.lastTurnThread, thread);
     expect(api.lastTurnText, 'hello');
-    _noMenuSettings(api);
+    expectNoModelMenuSettings(api);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('an existing session offers its own options after a slow read '
       'and a choice is sent to it', (t) async {
     final api = FakeBridgeApi()
-      ..sessionOpenResults.add(
-        const SessionAccess(
-          sessionId: _thread,
-          hostId: 'host-1',
-          generation: 1,
-          provider: 'opencode',
-          mode: 'write',
-          writer: 'this_host',
-          turn: 'idle',
-          exclusion: 'pocket',
-          reason: 'owned',
-          canRelease: true,
-          recheck: false,
-        ),
-      )
+      ..sessionOpenResults.add(openCodeWritable(_thread))
       ..readResult = const ThreadHistory(running: false, cwd: _cwd, items: [])
       ..sessionSettings['$_svc|$_thread'] = _options(
         model: 'zen/mimo',
@@ -295,28 +219,28 @@ void main() {
     await _mount(t, api, threadId: _thread);
     expect(find.byKey(const Key('model-chip')), findsNothing);
     expect(find.byKey(const Key('agent-config-model')), findsNothing);
-    await _type(t, 'next');
-    expect(_composer(t), 'next');
+    await typeMessage(t, 'next');
+    expect(composerText(t), 'next');
 
     api.sessionSettingsRefreshGate = null;
     read.complete();
-    await _frames(t);
+    await frames(t);
     _nativeControls();
     expect(_shown('model', 'PR109 Alpha MiMo'), findsOneWidget);
     expect(_shown('agent', 'build'), findsOneWidget);
     expect(_shown('variant', 'high'), findsOneWidget);
 
-    await _pick(t, 'agent', 'plan');
-    await _frames(t);
+    await pickOption(t, 'agent', 'plan');
+    await frames(t);
     expect(api.sessionConfigCalls, [(_thread, 'agent', 'plan')]);
     expect(_shown('agent', 'plan'), findsOneWidget);
 
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t);
+    await frames(t);
     expect(api.threadStartCalls, isEmpty);
     expect(api.lastTurnThread, _thread);
     expect(api.lastTurnText, 'next');
-    _noMenuSettings(api);
+    expectNoModelMenuSettings(api);
   }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
   testWidgets('the same model id in another project shows that project\'s '
@@ -340,10 +264,10 @@ void main() {
       if (!read.isCompleted) read.complete();
     });
     api.draftSettingsGates[_beta] = read;
-    await _pickProject(t, _beta);
+    await pickProject(t, _beta);
     expect(_shown('model', 'PR109 Alpha MiMo'), findsNothing);
     read.complete();
-    await _frames(t);
+    await frames(t);
     expect(_shown('model', 'PR109 Beta MiMo'), findsOneWidget);
     expect(_shown('model', 'PR109 Alpha MiMo'), findsNothing);
     await t.tap(find.byKey(const Key('agent-config-model')));
@@ -353,7 +277,7 @@ void main() {
     await t.pumpAndSettle();
 
     // And back in Alpha, Alpha's own label.
-    await _pickProject(t, _cwd);
+    await pickProject(t, _cwd);
     expect(_shown('model', 'PR109 Alpha MiMo'), findsOneWidget);
     expect(_shown('model', 'PR109 Beta MiMo'), findsNothing);
     expect(api.threadStartCalls, isEmpty);

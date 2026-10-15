@@ -154,15 +154,8 @@ pub(super) async fn refresh(link: &Link, identity: &Identity) -> Result<()> {
                 return Err(error.into());
             },
         };
-        validate_snapshot(identity, &next)?;
         let old = link.commit(identity, |view| view.sessions.get(&session).cloned())?;
-        if old
-            .as_ref()
-            .is_some_and(|old| old.window.sequence > next.window.sequence)
-        {
-            continue;
-        }
-        if !link.accept(identity, next.clone(), true)? {
+        if !link.accept(identity, next.clone())? {
             continue;
         }
         announce(link, identity, old.as_ref(), &next);

@@ -297,7 +297,7 @@ class AppCapabilities {
   /// The agent reported that authentication is required.
   final bool authRequired;
 
-  /// Native slash commands the engine lists ([BridgeApi.appCommandList]).
+  /// Native slash commands the engine lists ([BridgeApi.appCommandListForProject]).
   final bool commands;
 
   /// Session options exist before a session does: a draft keeps its own

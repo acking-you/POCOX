@@ -265,6 +265,11 @@ extension _SessionEvents on _AppSessionState {
         _turnEnded(e.raw);
         // Terminal notifications can carry errors on failed or interrupted turns.
         final failure = _turnFailureText(e.raw);
+        // A classified model failure is said by its card in the transcript,
+        // never also by the error banner.
+        final modelFailure = failure == null ? null : _modelFailure(e.raw);
+        final ended = _parseTurnId(e.raw) ?? '';
+        final interruption = _interruption(e.raw);
         _updateState(() {
           _streaming = false;
           _supplement = false;
@@ -272,11 +277,22 @@ extension _SessionEvents on _AppSessionState {
           for (final it in _items) {
             it.streaming = false;
           }
+          final stopped =
+              _pendingInterrupt || modelFailure?.code == 'cancelled';
+          if (!stopped && modelFailure != null) {
+            _showModelFailure(ended, modelFailure);
+          }
           _finishTurn();
           // A turn the user stopped also ends as failed/aborted; show the
           // "stopped" marker rather than an error banner.
-          if (_pendingInterrupt) {
-            _addStoppedMarker();
+          if (interruption != null) {
+            _showStop(interruption);
+          } else if (stopped) {
+            _addStoppedMarker(ended);
+          } else if (modelFailure != null) {
+            // Queued messages would only meet the same failure: they wait
+            // for the user's Retry or next send.
+            if (_queue.isNotEmpty) _draft.queuePaused = true;
           } else if (failure != null) {
             _error = _humanizeTurnError(failure);
             _retry = () => _send(retry: true);
@@ -304,7 +320,7 @@ extension _SessionEvents on _AppSessionState {
           // A turn the user stopped also ends as failed/aborted; show the
           // "stopped" marker rather than an error banner.
           if (_pendingInterrupt) {
-            _addStoppedMarker();
+            _addStoppedMarker(_parseTurnId(e.raw) ?? '');
           } else {
             _error = _humanizeTurnError(e.text);
             _retry = () => _send(retry: true);
@@ -352,6 +368,109 @@ extension _SessionEvents on _AppSessionState {
     }
   }
 
+  /// A terminal `turn.error` the host classified (a string `code`, a bool
+  /// `retryable` and the failure's own `itemId`), or null for an
+  /// unclassified one, which keeps the banner.
+  ModelFailure? _modelFailure(String raw) {
+    try {
+      final m = jsonDecode(raw);
+      final err = m is Map && m['turn'] is Map ? m['turn']['error'] : null;
+      if (err is! Map ||
+          err['code'] is! String ||
+          err['retryable'] is! bool ||
+          err['itemId'] is! String ||
+          (err['itemId'] as String).isEmpty) {
+        return null;
+      }
+      return ModelFailure.parse(err);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Show [failure] until the host's own item arrives. The card takes that
+  /// item's ID and exact prompt, so the item — live, in a history read or
+  /// a follow page, merged by ID — replaces it instead of adding a second
+  /// one; the ended turn is only a fallback when no prompt was named. Call
+  /// inside a `_updateState`.
+  void _showModelFailure(String ended, ModelFailure failure) {
+    final id = failure.itemId;
+    if (_itemIndex.containsKey(id)) return;
+    _itemIndex[id] = _items.length;
+    _items.add(
+      TranscriptItem(
+        id: id,
+        type: 'modelError',
+        text: failure.encode(),
+        turnId: failure.turnId.isNotEmpty ? failure.turnId : ended,
+      ),
+    );
+    _historyLiveItems?[id] = _items.last;
+  }
+
+  /// The host's identity of an interrupted turn's stop row
+  /// (`turn.interruption`: its `interrupted` item and exact prompt), or null
+  /// from a host that does not name it.
+  ({String itemId, String turnId})? _interruption(String raw) {
+    try {
+      final m = jsonDecode(raw);
+      final turn = m is Map ? m['turn'] : null;
+      if (turn is! Map || turn['status'] != 'interrupted') return null;
+      final stop = turn['interruption'];
+      if (stop is! Map) return null;
+      final item = stop['itemId'], prompt = stop['turnId'];
+      if (item is! String || item.isEmpty) return null;
+      return (itemId: item, turnId: prompt is String ? prompt : '');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Show the stop the host named, whoever stopped the turn, under the
+  /// host's own item ID: its `interrupted` row — live, in a history read
+  /// or a follow page, early or late — is then the same row, never a second.
+  /// An Esc undo still shows none. Call inside a `_updateState`.
+  void _showStop(({String itemId, String turnId}) stop) {
+    _pendingInterrupt = false;
+    if (_suppressStopMarker) {
+      _suppressStopMarker = false;
+      return;
+    }
+    if (_itemIndex.containsKey(stop.itemId)) return;
+    _itemIndex[stop.itemId] = _items.length;
+    _items.add(
+      TranscriptItem(id: stop.itemId, type: 'interrupted', turnId: stop.turnId),
+    );
+    _historyLiveItems?[stop.itemId] = _items.last;
+  }
+
+  /// A host that does not name its stop row (see [_interruption]):
+  /// drop each local stopped marker whose turn the host now reports stopped
+  /// itself (an `interrupted` item of the same turn), however that item
+  /// arrived: live, in a history read or a follow page. Returns whether
+  /// anything was dropped; the caller rebuilds what depends on the list.
+  bool _dropHostedStops() {
+    final hosted = {
+      for (final i in _items)
+        if (i.type == 'interrupted' &&
+            !i.id.startsWith('local-stopped-') &&
+            i.turnId.isNotEmpty)
+          i.turnId,
+    };
+    if (hosted.isEmpty) return false;
+    final before = _items.length;
+    _items.removeWhere((i) {
+      final drop =
+          i.id.startsWith('local-stopped-') && hosted.contains(i.turnId);
+      if (drop) _historyLiveItems?.remove(i.id);
+      return drop;
+    });
+    if (_items.length == before) return false;
+    _rebuildItemIndex();
+    _cachedRows = null;
+    return true;
+  }
+
   /// While the next turn is awaited, a repeated terminal event of a turn
   /// this view already saw end (a recovery re-announcing it) is not the new
   /// turn's end: it must neither release the queue nor reset anything.
@@ -372,6 +491,9 @@ extension _SessionEvents on _AppSessionState {
     }
     _turnStartSeen();
     if (_caps.sessionConfig) _refreshAgentSettings();
+    // Access read while it ran (or not read at all) may be releasable now.
+    final thread = _threadId;
+    if (thread != null) unawaited(_refreshWriteAccess(thread));
   }
 
   /// The admitted turn has not announced itself yet (see
@@ -537,6 +659,7 @@ extension _SessionEvents on _AppSessionState {
         if (!it.isAgent) it.streaming = running;
       }
       _historyLiveItems?[id] = _items[_itemIndex[id]!];
+      if (type == 'interrupted') _dropHostedStops();
     });
     _scrollToEnd();
   }

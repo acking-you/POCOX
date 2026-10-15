@@ -22,7 +22,8 @@ extension _SessionHistory on _AppSessionState {
     }
     for (final it in _items.reversed) {
       if (it.type == 'reasoning') continue; // trailing reasoning isn't a steer
-      return it.type != 'userMessage';
+      // A failed turn proposed nothing.
+      return it.type != 'userMessage' && it.type != 'modelError';
     }
     return false;
   }
@@ -187,6 +188,7 @@ extension _SessionHistory on _AppSessionState {
     for (var i = 0; i < _items.length; i++) {
       _itemIndex[_items[i].id] = i;
     }
+    _dropHostedStops();
     _cachedRows = null;
   }
 
@@ -283,6 +285,7 @@ extension _SessionHistory on _AppSessionState {
     for (var i = 0; i < _items.length; i++) {
       _itemIndex[_items[i].id] = i;
     }
+    _dropHostedStops();
   }
 
   /// Fetch the page of history before what's shown, keeping the reading

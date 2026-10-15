@@ -127,9 +127,11 @@ extension _SessionTranscript on _AppSessionState {
         hostImageLoader: _loadHostImage,
       );
     }
+    final item = row as TranscriptItem;
     return MessageView(
       key: _rowKey(row),
-      item: row as TranscriptItem,
+      item: item,
+      errorActions: item.type == 'modelError' ? _modelErrorActions(item) : null,
       hostImageLoader: _loadHostImage,
       imageCacheScope: '${widget.serviceKey}:$_threadId',
       onEdit: _externalWriterMode || _historySyncing || _showingCachedHistory

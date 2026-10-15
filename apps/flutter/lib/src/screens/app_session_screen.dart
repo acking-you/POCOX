@@ -48,6 +48,8 @@ import 'package:pocket_codex/src/screens/app_session/command_palette.dart';
 import 'package:pocket_codex/src/screens/app_session/composer_cards.dart';
 import 'package:pocket_codex/src/screens/app_session/expanded_composer.dart';
 import 'package:pocket_codex/src/screens/app_session/message_editor.dart';
+import 'package:pocket_codex/src/screens/app_session/model_feedback.dart';
+import 'package:pocket_codex/src/screens/app_session/option_picker.dart';
 import 'package:pocket_codex/src/screens/app_session/session_access_panel.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/screens/app_session/user_input_card.dart';
@@ -539,12 +541,16 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _accessChecking = false;
   // Check now was pressed while an earlier check was still out.
   bool _accessCheckAsked = false;
+  // The latest write-access read; older answers apply nothing.
+  int _accessReadSeq = 0;
 
   /// The local operation (a send, a supplement, an answer) holding the
   /// composer's send lock. Each releases only its own hold, so a superseded
   /// operation finishing late never unlocks a newer one; leaving the
   /// conversation drops whatever holds it.
   Object? _localSendOwner;
+  // The conversation whose option change is being saved, and that save.
+  ({_AgentTarget target, Object save})? _configSaving;
 
   /// Moves with every composer operation that takes the send lock, and
   /// never moves back: an operation is the latest only while nothing began

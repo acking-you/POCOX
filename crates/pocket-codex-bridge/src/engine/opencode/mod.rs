@@ -58,7 +58,7 @@ static CONNS: Lazy<Mutex<HashMap<Key, Conn>>> = Lazy::new(Mutex::default);
 
 struct Shared {
     info: Info,
-    catalog: Catalog,
+    image_input: bool,
     healthy: bool,
     /// Only bounded newest windows are retained; older pages go straight to UI.
     sessions: HashMap<String, Snapshot>,
@@ -133,45 +133,40 @@ impl Link {
         Ok(apply(&mut shared))
     }
 
-    fn accept(&self, expected: &Identity, snapshot: Snapshot, tail: bool) -> Result<bool> {
+    fn accept(&self, expected: &Identity, snapshot: Snapshot) -> Result<bool> {
         validate_snapshot(expected, &snapshot)?;
         self.commit(expected, |view| {
-            if tail {
-                // An in-flight HTTP answer cannot overwrite a more recent live window.
-                if view
-                    .sessions
-                    .get(&snapshot.session.id)
-                    .is_some_and(|old| old.window.sequence > snapshot.window.sequence)
-                {
-                    return false;
-                }
-                let size = snapshot_bytes(&snapshot);
-                let id = &snapshot.session.id;
-                view.bytes.remove(id);
-                while view.bytes.values().sum::<usize>().saturating_add(size) > 16 * 1024 * 1024
-                    || !view.sessions.contains_key(id) && view.sessions.len() >= 8
-                {
-                    let Some(victim) = view
-                        .sessions
-                        .keys()
-                        .filter(|key| *key != id)
-                        .min_by_key(|key| {
-                            (
-                                view.sessions[*key].turn_id.is_some(),
-                                view.sessions[*key].window.sequence,
-                            )
-                        })
-                        .cloned()
-                    else {
-                        break;
-                    };
-                    view.sessions.remove(&victim);
-                    view.cursors.remove(&victim);
-                    view.bytes.remove(&victim);
-                }
-                view.bytes.insert(id.clone(), size);
-                view.sessions.insert(id.clone(), snapshot);
+            // An in-flight HTTP answer cannot overwrite a more recent live window.
+            if view
+                .sessions
+                .get(&snapshot.session.id)
+                .is_some_and(|old| old.window.sequence > snapshot.window.sequence)
+            {
+                return false;
             }
+            let size = snapshot_bytes(&snapshot);
+            let id = &snapshot.session.id;
+            view.bytes.remove(id);
+            while view.bytes.values().sum::<usize>().saturating_add(size) > 16 * 1024 * 1024
+                || !view.sessions.contains_key(id) && view.sessions.len() >= 8
+            {
+                let Some(victim) = view
+                    .sessions
+                    .keys()
+                    .filter(|key| *key != id)
+                    .min_by_key(|key| {
+                        (view.sessions[*key].turn_id.is_some(), view.sessions[*key].window.sequence)
+                    })
+                    .cloned()
+                else {
+                    break;
+                };
+                view.sessions.remove(&victim);
+                view.cursors.remove(&victim);
+                view.bytes.remove(&victim);
+            }
+            view.bytes.insert(id.clone(), size);
+            view.sessions.insert(id.clone(), snapshot);
             true
         })
     }
@@ -194,15 +189,7 @@ fn snapshot_bytes(snapshot: &Snapshot) -> usize {
 }
 
 fn validate_snapshot(expected: &Identity, snapshot: &Snapshot) -> Result<()> {
-    let access = &snapshot.access;
-    if access.session_id != snapshot.session.id
-        || access.host_id != expected.host_id
-        || access.generation != expected.generation
-        || access.source_generation.as_deref() != Some(&expected.source_generation)
-    {
-        bail!("the OpenCode host or history source changed; reconnect");
-    }
-    Ok(())
+    ops::validate_access(expected, &snapshot.access, &snapshot.session.id)
 }
 
 fn conn(service: &str) -> Result<Link> {

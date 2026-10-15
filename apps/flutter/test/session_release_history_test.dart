@@ -11,25 +11,12 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
-import 'support/screen_harness.dart';
+import 'support/opencode_chat.dart';
 
-const _svc = 'pcx:local:opencode:opencode';
+const _svc = openCodeService;
 const _thread = 'ses_shown';
 const _ask = 'Reply with exactly PR109_OK.';
 const _more = 'Also say DONE.';
-
-const _writable = SessionAccess(
-  sessionId: _thread,
-  hostId: 'host-1',
-  generation: 7,
-  provider: 'opencode',
-  mode: 'write',
-  writer: 'this_host',
-  turn: 'idle',
-  exclusion: 'pocket',
-  reason: 'owned',
-  canRelease: true,
-);
 
 ThreadItem _item(String id, String turn, String type, String text) =>
     ThreadItem(id: id, turnId: turn, itemType: type, title: '', text: text);
@@ -45,19 +32,7 @@ ThreadHistory _history(List<ThreadItem> turns) => ThreadHistory(
   ],
 );
 
-Future<void> _frames(WidgetTester t, [int n = 12]) async {
-  for (var i = 0; i < n; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
-
-Future<FakeBridgeApi> _openWritable(
-  WidgetTester t,
-  ThreadHistory history,
-) async {
-  t.view.physicalSize = const Size(1280, 900);
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
+Future<FakeBridgeApi> _openWritable(WidgetTester t, ThreadHistory history) {
   final api = FakeBridgeApi()
     ..acpCapabilities[_svc] = negotiatedOpenCodeCapabilities(generation: 7)
     ..metadataOnlyFollow = true
@@ -71,7 +46,7 @@ Future<FakeBridgeApi> _openWritable(
       ),
     )
     ..readResult = history;
-  api.sessionOpenResults.add(_writable);
+  api.sessionOpenResults.add(openCodeWritable(_thread, generation: 7));
   api.sessionSettings['$_svc|$_thread'] = const SessionSettings(
     configOptions: [
       SessionConfigOption(
@@ -85,28 +60,21 @@ Future<FakeBridgeApi> _openWritable(
       ),
     ],
   );
-  await api.appConnect(_svc, 28080);
-  await t.pumpWidget(
-    host(
-      const AppSessionScreen(
-        serviceKey: _svc,
-        threadId: _thread,
-        cwd: '/project',
-      ),
-      api,
-      locale: const Locale('en'),
-    ),
+  return mountChat(
+    t,
+    api,
+    threadId: _thread,
+    cwd: '/project',
+    size: const Size(1280, 900),
   );
-  await _frames(t);
-  return api;
 }
 
 /// Hand the session back from the conversation menu.
 Future<void> _release(WidgetTester t) async {
   await t.tap(find.byTooltip('More').first);
-  await _frames(t);
+  await frames(t);
   await t.tap(find.byKey(const Key('session-release')));
-  await _frames(t, 40);
+  await frames(t, 40);
   expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
 }
 
@@ -122,18 +90,18 @@ Future<void> _reread(WidgetTester t, FakeBridgeApi api, String revision) async {
       historyRevision: revision,
     ),
   );
-  await _frames(t, 40);
+  await frames(t, 40);
   expect(api.threadReads.length, greaterThan(reads));
 }
 
 /// Send [text] as a supplement to the running turn.
 Future<void> _supplement(WidgetTester t, String text) async {
   await t.tap(find.byKey(const Key('supplement-toggle')));
-  await _frames(t, 2);
+  await frames(t, 2);
   await t.enterText(find.byKey(const Key('composer-input')), text);
-  await _frames(t, 2);
+  await frames(t, 2);
   await t.tap(find.byKey(const Key('send-btn')));
-  await _frames(t);
+  await frames(t);
 }
 
 Finder _shown(String text) => find.text(text, findRichText: true);
@@ -144,13 +112,13 @@ void main() {
   testWidgets('a message sent here shows once after the session is handed '
       'back, and a repeated ask stays', (t) async {
     final api = await _openWritable(t, _history(const []));
-    expect(find.text(_ask, findRichText: true), findsOneWidget);
+    expect(_shown(_ask), findsOneWidget);
 
     // Ask the same again here; OpenCode names the turn after the message.
     await t.enterText(find.byKey(const Key('composer-input')), _ask);
-    await _frames(t, 2);
+    await frames(t, 2);
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t, 4);
+    await frames(t, 4);
     expect(api.turnStartCount, 1);
     for (final event in const [
       AppEvent(
@@ -174,28 +142,24 @@ void main() {
     ]) {
       api.pushEvent(_svc, event);
     }
-    await _frames(t);
-    expect(find.text(_ask, findRichText: true), findsNWidgets(2));
-    expect(find.text('PR109_OK', findRichText: true), findsOneWidget);
+    await frames(t);
+    expect(_shown(_ask), findsNWidgets(2));
+    expect(_shown('PR109_OK'), findsOneWidget);
 
     // The host's history now holds the message sent here.
     api.readResult = _history([
       _item('msg_2', 'msg_2', 'userMessage', _ask),
       _item('msg_2a', 'msg_2', 'agentMessage', 'PR109_OK'),
     ]);
-    await t.tap(find.byTooltip('More').first);
-    await _frames(t);
-    await t.tap(find.byKey(const Key('session-release')));
-    await _frames(t, 40);
-    expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
+    await _release(t);
     expect(api.threadReads, isNotEmpty);
-    expect(find.text(_ask, findRichText: true), findsNWidgets(2));
-    expect(find.text('PR109_OK', findRichText: true), findsOneWidget);
-    expect(find.text('first answer', findRichText: true), findsOneWidget);
+    expect(_shown(_ask), findsNWidgets(2));
+    expect(_shown('PR109_OK'), findsOneWidget);
+    expect(_shown('first answer'), findsOneWidget);
     expect(api.turnStartCount, 1);
 
     await t.pumpWidget(const SizedBox.shrink());
-    await _frames(t);
+    await frames(t);
     expect(t.takeException(), isNull);
   });
 
@@ -203,9 +167,9 @@ void main() {
       'the history is read again', (t) async {
     final api = await _openWritable(t, _history(const []));
     await t.enterText(find.byKey(const Key('composer-input')), _ask);
-    await _frames(t, 2);
+    await frames(t, 2);
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t, 4);
+    await frames(t, 4);
     api.pushEvent(
       _svc,
       const AppEvent(
@@ -214,7 +178,7 @@ void main() {
         raw: '{"turn":{"id":"msg_2"}}',
       ),
     );
-    await _frames(t);
+    await frames(t);
     await _supplement(t, _more);
     expect(api.supplementCalls, hasLength(1));
     expect(_shown(_more), findsOneWidget);
@@ -235,7 +199,7 @@ void main() {
     ]) {
       api.pushEvent(_svc, event);
     }
-    await _frames(t);
+    await frames(t);
 
     // The host's history holds the message but not yet the supplement.
     api.readResult = _history([
@@ -263,7 +227,7 @@ void main() {
     expect(api.turnStartCount, 1);
 
     await t.pumpWidget(const SizedBox.shrink());
-    await _frames(t);
+    await frames(t);
     expect(t.takeException(), isNull);
   });
 
@@ -299,7 +263,7 @@ void main() {
         raw: '{"turn":{"id":"msg_2"}}',
       ),
     );
-    await _frames(t);
+    await frames(t);
 
     // The history still shows only the message that was already there.
     api.readResult = _history([
@@ -314,7 +278,7 @@ void main() {
     expect(api.turnStartCount, 0);
 
     await t.pumpWidget(const SizedBox.shrink());
-    await _frames(t);
+    await frames(t);
     expect(t.takeException(), isNull);
   });
 }

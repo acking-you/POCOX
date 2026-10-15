@@ -40,6 +40,50 @@ extension _SessionAccess on _AppSessionState {
     return false;
   }
 
+  /// Re-read the access of [thread], which this view writes, when it is not
+  /// known to be releasable: a session its first send created was never
+  /// opened here, and an answer read while a turn ran (or a failed read)
+  /// must not stand for good. Called after that send and at each turn's end;
+  /// it asks the host without side effects and decides nothing for a send.
+  /// Only the latest read applies, only a writable answer, and only while
+  /// the view is unchanged: same connection, service, thread, load and
+  /// follow epoch, still writing, and nothing else recorded since.
+  Future<void> _refreshWriteAccess(String thread) async {
+    bool writing() =>
+        mounted &&
+        _caps.hostAccess &&
+        _threadId == thread &&
+        !_externalWriterMode &&
+        !_guardianReadOnly &&
+        !_takingOver &&
+        !_isDeleted(thread) &&
+        !_releasedHereThreads.contains(_threadKey(thread));
+    if (!writing() || (_access?.canRelease ?? false)) return;
+    final service = widget.serviceKey;
+    final link = _linkEpoch;
+    final generation = _threadLoadGeneration;
+    final epoch = _externalWriterEpoch;
+    final before = _access;
+    final seq = ++_accessReadSeq;
+    bool current() =>
+        writing() &&
+        seq == _accessReadSeq &&
+        identical(_access, before) &&
+        widget.serviceKey == service &&
+        _linkEpoch == link &&
+        _threadLoadGeneration == generation &&
+        _externalWriterEpoch == epoch;
+    try {
+      final access = await ref
+          .read(bridgeApiProvider)
+          .appSessionAccess(service, thread);
+      if (!current() || access.sessionId != thread || !access.writable) return;
+      _updateState(() => _access = access);
+    } catch (_) {
+      // Unknown stays unknown; the next turn's end asks again.
+    }
+  }
+
   /// Follow [thread] read-only as [access] says, re-checking while the host
   /// expects it to change.
   void _enterAccessFollow(String thread, SessionAccess access) {

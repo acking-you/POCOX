@@ -186,6 +186,42 @@ OpenCode answers `false`, the turn counts as ended only when a fresh status
 read right after it reports the session idle; a failed read, a busy status
 or a transport error leaves the turn uncertain, and exact-turn checks stay.
 
+A model failure is classified by the host from bounded fields only (error
+name, HTTP status, the provider's error code) into a fixed reason such as
+region unavailable, authentication, quota, rate limit or context length;
+the provider's own message, which can echo requests or secrets, is never
+shown. The failure (`modelError`) is one inline card with the
+localized reason, the failed model and the next step, never a reply and
+never also the error banner. A terminal-only failure gets a card under the
+host's own `itemId` and exact prompt `turnId` (a supplement's own prompt,
+not the running turn's), so the item arriving later, live or in a history or
+follow read, replaces it by ID. A failure pauses the queue. Only the
+conversation's last row in a writable, idle view offers actions: **Change
+model** opens the session's own model option and sends nothing; **Retry**
+sends the failed prompt's message again as a new turn with the model
+selected now and leaves the draft and attachments alone. While a model or
+other option change of the shown conversation is being saved, every send
+(button, Enter, queue, supplement, Retry) and that conversation's options
+wait; the draft stays, and nothing is sent when the save ends. A refused
+change says so and keeps the previous model; a save of a conversation left
+meanwhile neither holds nor releases the one shown now. Retry is withheld
+when that message is not here exactly as sent: not loaded (a supplement
+sent from this view), truncated (`#input:<id>`), missing attachments
+(`#attachments:<id>`), or carrying a non-inline image, so a partial copy is
+never sent as if whole; editing the message or a new send remains. A
+stopped turn's terminal names its stop row
+(`turn.interruption = {itemId, turnId}`, the supplement's own prompt when a
+supplement was stopped): that row is shown under the host's ID whoever
+stopped the turn, so the item and later reads are the same row. A host that
+does not name it keeps the local marker for a Stop pressed here, which gives
+way to the host's `interrupted` item of the same turn.
+
+A completed message whose output is reasoning with no separate text part
+(`reasoningOutput`) is shown in full, live and read-only, with a note that
+the model returned it as reasoning without a separate answer. No answer is
+extracted from it and no boundary is guessed; a message that also has text
+shows its reasoning as before.
+
 ## Session access
 
 Opening an existing OpenCode session resolves its access through the host,
@@ -214,6 +250,15 @@ keeping it open; **Check now** opens it afresh when that check finds no
 writer and no running turn, and **Continue here** opens it explicitly. A
 forgotten released session stays handed back until **Continue here**. Drafts
 and queues stay. Navigating to a session still opens it as before.
+
+A conversation created by its first send was never opened here, so its
+access is read after that send and again at each turn's end until the host
+says it can be handed back: an answer read while the turn ran, or a failed
+read, does not stand, and **Hand back** appears without reopening. The read
+has no side effects, never opens the session or decides a send, and adds no
+polling; only the latest writable answer for the same view, connection and
+session applies, and after Hand back, a follow or a switch it reacquires
+nothing.
 
 When the bridge reconciles its open sessions and the host answers that one
 was deleted, only that session leaves the controller. Deletion needs a 404
@@ -248,10 +293,10 @@ continued by opening it on the running OpenCode host (**Continue in
 
 ## Verification
 
-On one Mac with installed OpenCode 1.19.0, the full Rust (829 passed, 24
-ignored) and Flutter (1533 passed, 5 skipped, plus 127 focused) suites
+On one Mac with installed OpenCode 1.19.0, the full Rust (831 passed, 24
+ignored) and Flutter (1557 passed, 5 skipped, plus 160 focused) suites
 passed with format, clippy and analysis, and a coherent macOS build (source
-hash `4011bbdb…`) was run against the user's real configuration, database
+hash `127debfc…`) was run against the user's real configuration, database
 and sign-ins. With this round's Rust:
 
 - Three opt-in integration tests against a real `opencode serve` passed:
@@ -265,8 +310,30 @@ and sign-ins. With this round's Rust:
   one-host-per-source rule, apply with original history kept, stop and quit.
 - Session retention and a `false` abort are covered by tests only.
 
-In the final app build, against the user's inherited host configuration and
-a disposable session:
+In the final app build (`127debfc…`), a new conversation's first send
+created a session with `opencode/mimo-v2.6-flash-free`, which replied in
+9.4 s. **Hand back** was offered without reopening; **Release** and
+**Continue here** kept the same session ID and an unsent draft, sent
+nothing, and the history showed each message once. Busy-first and
+failed-first access reads are covered by tests only.
+
+In an earlier build of this round (`1a8cb671…`):
+
+- A model refused by its provider (`opencode/muse-spark-1.3-contributor-free`,
+  HTTP 403, region) showed one inline region card. **Change model** opened
+  the model option directly; choosing `opencode/mimo-v2.6-flash-free` sent
+  nothing and kept a newer unsent draft. **Retry** then sent the original
+  prompt unchanged and received the reply in 4.4 s.
+- A reasoning-only reply was shown in full (803 characters), with its
+  reasoning note, when existing history was inspected without sending; the
+  dedicated read-only viewer is covered by tests only.
+- Release and Continue here after reopening kept the history without
+  duplicates and the draft unsent.
+- Retry of truncated or attachment-missing messages and stop-row identity
+  are covered by tests only.
+
+In an earlier build (`4011bbdb…`), against the user's inherited host
+configuration and a disposable session:
 
 - With another OpenCode process holding the source, the session stayed
   read-only (`external_source_open`). Once that process closed, the view did
@@ -331,7 +398,8 @@ Not verified:
 - OpenAI Responses: a request reached the provider's `/responses` endpoint,
   but the only model tried was refused by the provider (HTTP 403, region),
   so no successful Responses reply is recorded. The UI recovered to ready;
-  further live Responses testing was waived.
+  further live Responses testing was waived and none was run with the
+  model-failure card.
 - Controllers through a relay, several controllers on one host, a second
   physical device, hosted-account mode and platforms other than macOS.
 - Evidence from the removed `opencode acp` preset is not evidence for this

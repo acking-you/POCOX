@@ -19,8 +19,9 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
+import 'support/opencode_chat.dart';
 
-const _svc = 'pcx:local:opencode:opencode';
+const _svc = openCodeService;
 const _alpha = '/work/alpha';
 const _beta = '/work/beta';
 
@@ -44,12 +45,6 @@ const _mAlpha = ModelInfo(
   displayName: 'Alpha Only',
   description: '',
 );
-
-Future<void> _frames(WidgetTester t, [int count = 8]) async {
-  for (var i = 0; i < count; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
 
 /// A desktop-sized new conversation in [_alpha]; the host knows both
 /// projects from earlier sessions.
@@ -88,43 +83,9 @@ Future<(FakeBridgeApi, ProviderContainer)> _open(
       ),
     ),
   );
-  await _frames(t);
+  await frames(t);
   return (api, container);
 }
-
-Future<void> _pickProject(WidgetTester t, String path) async {
-  await t.tap(find.byKey(const Key('project-switcher-btn')));
-  await _frames(t);
-  final item = find.byKey(Key('project-menu-item-$path'));
-  expect(item, findsOneWidget);
-  await t.tap(item);
-  await _frames(t);
-}
-
-Future<void> _type(WidgetTester t, String text) async {
-  await t.enterText(find.byKey(const Key('composer-input')), text);
-  await t.pump();
-}
-
-Future<void> _send(WidgetTester t) async {
-  await t.tap(find.byKey(const Key('send-btn')));
-  await _frames(t);
-}
-
-Finder _choice(String value) {
-  final listed = find.byKey(Key('agent-option-value-$value'));
-  return listed.evaluate().isNotEmpty
-      ? listed
-      : find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
-        );
-}
-
-/// The draft's model option shows [label].
-Finder _draftModel(String label) => find.descendant(
-  of: find.byKey(const Key('agent-config-model')),
-  matching: find.text(label),
-);
 
 Future<void> _openOption(WidgetTester t) async {
   await t.tap(find.byKey(const Key('agent-config-model')));
@@ -152,30 +113,30 @@ void main() {
         ..['$_svc|$_beta'] = _models([('beta/one', 'Beta One')]),
     );
     expect(api.draftSettingsProjects, contains(_alpha));
-    expect(_draftModel('Alpha One'), findsOneWidget);
+    expect(optionShows('model', 'Alpha One'), findsOneWidget);
     await _openOption(t);
-    await t.tap(_choice('alpha/two'));
+    await t.tap(optionChoice('alpha/two'));
     await t.pumpAndSettle();
-    expect(_draftModel('Alpha Two'), findsOneWidget);
+    expect(optionShows('model', 'Alpha Two'), findsOneWidget);
 
     // Project B offers its own catalog, without A's choice or models.
-    await _pickProject(t, _beta);
+    await pickProject(t, _beta);
     expect(api.draftSettingsProjects, contains(_beta));
-    expect(_draftModel('Beta One'), findsOneWidget);
+    expect(optionShows('model', 'Beta One'), findsOneWidget);
     await _openOption(t);
-    expect(_choice('alpha/two'), findsNothing);
-    expect(_choice('alpha/one'), findsNothing);
+    expect(optionChoice('alpha/two'), findsNothing);
+    expect(optionChoice('alpha/one'), findsNothing);
     await _closeOption(t);
 
     // Back in A its draft still holds its choice; nothing went out.
-    await _pickProject(t, _alpha);
-    expect(_draftModel('Alpha Two'), findsOneWidget);
+    await pickProject(t, _alpha);
+    expect(optionShows('model', 'Alpha Two'), findsOneWidget);
     expect(api.threadStartCalls, isEmpty);
     expect(api.sessionConfigCalls, isEmpty);
     expect(api.turnStartCount, 0);
 
-    await _type(t, 'hello');
-    await _send(t);
+    await typeMessage(t, 'hello');
+    await tapSend(t);
     final thread = api.threadStartResults.single!;
     expect(api.lastCwd, _alpha);
     expect(api.sessionConfigCalls, [(thread, 'model', 'alpha/two')]);
@@ -198,13 +159,13 @@ void main() {
         ]),
     );
     await _openOption(t);
-    await t.tap(_choice('shared/two'));
+    await t.tap(optionChoice('shared/two'));
     await t.pumpAndSettle();
-    await _pickProject(t, _beta);
+    await pickProject(t, _beta);
     // The same model id in B is not chosen there.
-    expect(_draftModel('Shared One'), findsOneWidget);
-    await _type(t, 'in beta');
-    await _send(t);
+    expect(optionShows('model', 'Shared One'), findsOneWidget);
+    await typeMessage(t, 'in beta');
+    await tapSend(t);
     expect(api.lastCwd, _beta);
     expect(api.sessionConfigCalls, isEmpty);
     expect(api.lastTurnText, 'in beta');
@@ -229,20 +190,20 @@ void main() {
         api.projectCommandGates[_alpha] = held;
       },
     );
-    await _type(t, '/');
-    await _frames(t);
+    await typeMessage(t, '/');
+    await frames(t);
     expect(api.commandListProjects, contains(_alpha));
     expect(find.byKey(const Key('command-palette')), findsNothing);
 
-    await _pickProject(t, _beta);
-    await _type(t, '/');
-    await _frames(t);
+    await pickProject(t, _beta);
+    await typeMessage(t, '/');
+    await frames(t);
     expect(api.commandListProjects, contains(_beta));
     expect(find.byKey(const Key('command-beta-cmd')), findsOneWidget);
 
     // A's answer arrives after the view moved to B.
     held.complete();
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('command-beta-cmd')), findsOneWidget);
     expect(find.byKey(const Key('command-alpha-cmd')), findsNothing);
     expect(api.turnStartCount, 0);
@@ -265,18 +226,15 @@ void main() {
         },
       );
       expect(find.byKey(const Key('model-chip')), findsNothing);
-      expect(_draftModel('Alpha One'), findsOneWidget);
-      await _pickProject(t, _beta);
+      expect(optionShows('model', 'Alpha One'), findsOneWidget);
+      await pickProject(t, _beta);
       expect(find.byKey(const Key('model-chip')), findsNothing);
-      expect(_draftModel('Beta One'), findsOneWidget);
+      expect(optionShows('model', 'Beta One'), findsOneWidget);
       expect(api.turnStartCount, 0, reason: 'switching sends nothing');
-      await _type(t, 'beta turn');
-      await _send(t);
+      await typeMessage(t, 'beta turn');
+      await tapSend(t);
       expect(api.lastCwd, _beta);
-      expect(api.lastModel, isNull);
-      expect(api.lastTurnModel, isNull);
-      expect(api.lastReasoningEffort, isNull);
-      expect(api.lastCollaborationMode, isNull);
+      expectNoModelMenuSettings(api);
       expect(api.lastTurnText, 'beta turn');
       // No catalog is read for a menu that is not shown.
       expect(api.modelListProjects, isEmpty);
@@ -296,8 +254,8 @@ void main() {
     );
     expect(api.codexStatus.needsSetup, isTrue, reason: 'Codex itself');
     expect(find.byKey(const Key('codex-chat-needs-setup')), findsNothing);
-    await _type(t, 'no codex needed');
-    await _send(t);
+    await typeMessage(t, 'no codex needed');
+    await tapSend(t);
     expect(api.threadStartCalls, [_svc]);
     expect(api.lastTurnText, 'no codex needed');
   });

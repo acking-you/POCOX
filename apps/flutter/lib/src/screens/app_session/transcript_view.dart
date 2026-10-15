@@ -11,6 +11,7 @@ import 'approval_review.dart';
 import 'async_questions.dart';
 import 'generated_image_card.dart';
 import 'message_actions.dart';
+import 'model_feedback.dart';
 import 'approval_review_card.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
@@ -57,8 +58,12 @@ class MessageView extends StatefulWidget {
     this.hostImageLoader,
     this.imageCacheScope,
     this.onEdit,
+    this.errorActions,
   });
   final TranscriptItem item;
+
+  /// What a `modelError` row offers; null for a failure that is history.
+  final ModelErrorActions? errorActions;
 
   /// Reads a host-side image so a mentioned file renders as a picture.
   final HostImageLoader? hostImageLoader;
@@ -118,6 +123,12 @@ class _MessageViewState extends State<MessageView> {
   @override
   Widget build(BuildContext context) {
     final item = widget.item;
+    if (item.type == 'modelError') {
+      return ModelErrorCard(body: item.text, actions: widget.errorActions);
+    }
+    if (item.type == 'reasoningOutput') {
+      return ReasoningOutputView(text: item.text);
+    }
     if (item.type == 'imageGeneration') {
       return GeneratedImageCard(
         item: item,

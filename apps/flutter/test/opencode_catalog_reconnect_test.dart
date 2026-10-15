@@ -17,9 +17,9 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
-import 'support/screen_harness.dart';
+import 'support/opencode_chat.dart';
 
-const _svc = 'pcx:local:opencode:opencode';
+const _svc = openCodeService;
 const _cwd = '/work';
 
 SessionSettings _catalog(List<(String, String)> models) => SessionSettings(
@@ -42,64 +42,20 @@ const _mimo = ('opencode/mimo-free', 'MiMo Free');
 const _other = ('opencode/other-free', 'Other Free');
 const _claude = ('anthropic/claude-opus', 'Claude Opus');
 
-Future<void> _frames(WidgetTester t, [int count = 12]) async {
-  for (var i = 0; i < count; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
-
 /// A desktop draft on a connected OpenCode host whose catalog offers MiMo
 /// and Other.
-Future<FakeBridgeApi> _open(WidgetTester t) async {
-  t.view.physicalSize = const Size(1400, 900);
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
-  final api = FakeBridgeApi();
-  api.acpCapabilities[_svc] = negotiatedOpenCodeCapabilities();
-  api.draftSettings['$_svc|$_cwd'] = _catalog(const [_mimo, _other]);
-  await api.appConnect(_svc, 28080);
-  await t.pumpWidget(
-    host(
-      const AppSessionScreen(serviceKey: _svc, cwd: _cwd),
-      api,
-      locale: const Locale('en'),
-    ),
-  );
-  await _frames(t);
-  return api;
+Future<FakeBridgeApi> _open(WidgetTester t) {
+  final api = FakeBridgeApi()
+    ..acpCapabilities[_svc] = negotiatedOpenCodeCapabilities()
+    ..draftSettings['$_svc|$_cwd'] = _catalog(const [_mimo, _other]);
+  return mountChat(t, api, cwd: _cwd);
 }
 
-Finder _choice(String value) {
-  final listed = find.byKey(Key('agent-option-value-$value'));
-  return listed.evaluate().isNotEmpty
-      ? listed
-      : find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
-        );
-}
-
-Future<void> _pick(WidgetTester t, (String, String) model) async {
-  await t.tap(find.byKey(const Key('agent-config-model')));
-  await t.pumpAndSettle();
-  await t.tap(_choice(model.$1));
-  await t.pumpAndSettle();
-}
+Future<void> _pick(WidgetTester t, (String, String) model) =>
+    pickOption(t, 'model', model.$1);
 
 /// The model option shows [label].
-Finder _shown(String label) => find.descendant(
-  of: find.byKey(const Key('agent-config-model')),
-  matching: find.text(label),
-);
-
-Future<void> _type(WidgetTester t, String text) async {
-  await t.enterText(find.byKey(const Key('composer-input')), text);
-  await t.pump();
-}
-
-String _composer(WidgetTester t) => t
-    .widget<TextField>(find.byKey(const Key('composer-input')))
-    .controller!
-    .text;
+Finder _shown(String label) => optionShows('model', label);
 
 /// The host is replaced (Apply): its event stream ends, the new host offers
 /// only [models], and the screen's bounded reconnect reaches it.
@@ -113,7 +69,7 @@ Future<void> _replaceHost(
     _svc,
     const AppEvent(kind: 'acp/host/state', raw: '{"connected":false}'),
   );
-  await _frames(t);
+  await frames(t);
 }
 
 void _nextGeneration(FakeBridgeApi api) => api.pushEvent(
@@ -124,14 +80,6 @@ void _nextGeneration(FakeBridgeApi api) => api.pushEvent(
   ),
 );
 
-/// Nothing of the composer's own model menu went out with the turn.
-void _noMenuSettings(FakeBridgeApi api) {
-  expect(api.lastModel, isNull);
-  expect(api.lastTurnModel, isNull);
-  expect(api.lastReasoningEffort, isNull);
-  expect(api.lastCollaborationMode, isNull);
-}
-
 void main() {
   setUp(AppSessionScreen.debugResetThreadMemory);
 
@@ -141,7 +89,7 @@ void main() {
     expect(find.byKey(const Key('model-chip')), findsNothing);
     await _pick(t, _other);
     expect(_shown('Other Free'), findsOneWidget);
-    await _type(t, 'keep this');
+    await typeMessage(t, 'keep this');
     final connects = api.appConnectCount;
 
     await _replaceHost(t, api, const [_claude]);
@@ -149,22 +97,22 @@ void main() {
     expect(_shown('Other Free'), findsNothing);
     await t.tap(find.byKey(const Key('agent-config-model')));
     await t.pumpAndSettle();
-    expect(_choice(_claude.$1), findsOneWidget);
-    expect(_choice(_mimo.$1), findsNothing);
-    expect(_choice(_other.$1), findsNothing);
+    expect(optionChoice(_claude.$1), findsOneWidget);
+    expect(optionChoice(_mimo.$1), findsNothing);
+    expect(optionChoice(_other.$1), findsNothing);
     await t.tapAt(Offset.zero);
     await t.pumpAndSettle();
-    expect(_composer(t), 'keep this');
+    expect(composerText(t), 'keep this');
     expect(api.threadStartCalls, isEmpty);
     expect(api.turnStartCount, 0);
 
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t);
+    await frames(t);
     expect(api.threadStartCalls, [_svc]);
     expect(api.sessionConfigCalls, isEmpty);
     expect(api.turnStartCount, 1);
     expect(api.lastTurnText, 'keep this');
-    _noMenuSettings(api);
+    expectNoModelMenuSettings(api);
   });
 
   testWidgets('a choice the replacement still offers stays and is applied', (
@@ -174,13 +122,13 @@ void main() {
     await _pick(t, _other);
     await _replaceHost(t, api, const [_mimo, _other, _claude]);
     expect(_shown('Other Free'), findsOneWidget);
-    await _type(t, 'hi');
+    await typeMessage(t, 'hi');
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t);
+    await frames(t);
     final thread = api.threadStartResults.single!;
     expect(api.sessionConfigCalls, [(thread, 'model', _other.$1)]);
     expect(api.lastTurnText, 'hi');
-    _noMenuSettings(api);
+    expectNoModelMenuSettings(api);
   });
 
   testWidgets('a draft read answered by the previous connection after the '
@@ -194,18 +142,18 @@ void main() {
     });
     api.draftSettingsGates[_cwd] = stale;
     _nextGeneration(api);
-    await _frames(t, 2);
+    await frames(t, 2);
     // The host is then replaced; the reconnect's own read answers first.
     api.draftSettingsGates.remove(_cwd);
     await _replaceHost(t, api, const [_claude]);
     expect(_shown('Inherited'), findsOneWidget);
     // The previous connection's answer arrives last.
     stale.complete();
-    await _frames(t);
+    await frames(t);
     await t.tap(find.byKey(const Key('agent-config-model')));
     await t.pumpAndSettle();
-    expect(_choice(_claude.$1), findsOneWidget);
-    expect(_choice(_mimo.$1), findsNothing);
+    expect(optionChoice(_claude.$1), findsOneWidget);
+    expect(optionChoice(_mimo.$1), findsNothing);
     await t.tapAt(Offset.zero);
     await t.pumpAndSettle();
     expect(api.turnStartCount, 0);
@@ -224,18 +172,18 @@ void main() {
     api.draftSettings['$_svc|$_cwd'] = _catalog(const [_claude]);
     api.draftSettingsGates[_cwd] = gate;
     _nextGeneration(api);
-    await _frames(t, 2);
-    await _type(t, 'hold on');
+    await frames(t, 2);
+    await typeMessage(t, 'hold on');
     await t.tap(find.byKey(const Key('send-btn')));
-    await _frames(t, 2);
+    await frames(t, 2);
     // The session exists; the choices wait for that project's defaults.
     expect(api.threadStartCalls, [_svc]);
     expect(api.turnStartCount, 0);
     gate.complete();
-    await _frames(t);
+    await frames(t);
     expect(api.sessionConfigCalls, isEmpty);
     expect(api.turnStartCount, 1);
     expect(api.lastTurnText, 'hold on');
-    _noMenuSettings(api);
+    expectNoModelMenuSettings(api);
   });
 }

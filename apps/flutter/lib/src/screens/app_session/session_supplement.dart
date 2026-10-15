@@ -7,6 +7,7 @@ extension _SessionSupplement on _AppSessionState {
         _externalWriterMode ||
         !_streaming ||
         _restoringSettings ||
+        _savingAgentConfig ||
         _sending ||
         _attachments.any((a) => !a.ready)) {
       return;

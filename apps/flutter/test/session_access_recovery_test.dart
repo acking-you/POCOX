@@ -15,51 +15,35 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
-import 'support/screen_harness.dart';
+import 'support/opencode_chat.dart';
 
-const _svc = 'pcx:local:opencode:opencode';
+const _svc = openCodeService;
 const _thread = 'ses_shown';
 const _other = 'ses_other';
 
 SessionAccess _access({
-  String mode = 'follow',
   String writer = 'none',
+  String turn = 'idle',
   String reason = 'not_opened',
-  bool recheck = true,
 }) => SessionAccess(
   sessionId: _thread,
   hostId: 'host-1',
   generation: 7,
   provider: 'opencode',
-  mode: mode,
+  mode: 'follow',
   writer: writer,
-  turn: 'idle',
+  turn: turn,
   exclusion: 'pocket',
   reason: reason,
-  canRelease: mode == 'write',
-  recheck: recheck,
+  recheck: true,
 );
 
-final _writable = _access(
-  mode: 'write',
-  writer: 'this_host',
-  reason: 'owned',
-  recheck: false,
-);
-
-Future<void> _frames(WidgetTester t, [int n = 12]) async {
-  for (var i = 0; i < n; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
+final _writable = openCodeWritable(_thread, generation: 7);
 
 Future<FakeBridgeApi> _open(
   WidgetTester t, {
   List<SessionAccess> opens = const [],
-}) async {
-  t.view.physicalSize = const Size(1280, 900);
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
+}) {
   final api = FakeBridgeApi()
     ..acpCapabilities[_svc] = negotiatedOpenCodeCapabilities(generation: 7)
     ..metadataOnlyFollow = true
@@ -73,32 +57,20 @@ Future<FakeBridgeApi> _open(
       items: [],
     );
   api.sessionOpenResults.addAll(opens);
-  await api.appConnect(_svc, 28080);
-  await t.pumpWidget(
-    host(
-      const AppSessionScreen(
-        serviceKey: _svc,
-        threadId: _thread,
-        cwd: '/project',
-      ),
-      api,
-      locale: const Locale('en'),
-    ),
+  return mountChat(
+    t,
+    api,
+    threadId: _thread,
+    cwd: '/project',
+    size: const Size(1280, 900),
   );
-  await _frames(t);
-  return api;
 }
 
 Future<void> _dispose(WidgetTester t) async {
   await t.pumpWidget(const SizedBox.shrink());
-  await _frames(t);
+  await frames(t);
   expect(t.takeException(), isNull);
 }
-
-String _composer(WidgetTester t) => t
-    .widget<TextField>(find.byKey(const Key('composer-input')))
-    .controller!
-    .text;
 
 /// The host withdrew this view's admission (an eviction or a release).
 void _withdrawn(FakeBridgeApi api) => api.pushEvent(
@@ -112,7 +84,7 @@ void _withdrawn(FakeBridgeApi api) => api.pushEvent(
 
 Future<void> _wait(WidgetTester t, Duration time) async {
   await t.pump(time);
-  await _frames(t);
+  await frames(t);
 }
 
 void main() {
@@ -126,7 +98,7 @@ void main() {
       api.sessionAccessResults.add(_access());
     }
     _withdrawn(api);
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('access-panel-not_opened')), findsOneWidget);
     expect(find.byKey(const Key('access-continue')), findsOneWidget);
     // Nobody writes it, yet the view never opens it by itself.
@@ -138,9 +110,9 @@ void main() {
 
     api.sessionOpenResults.add(_writable);
     await t.tap(find.byKey(const Key('access-continue')));
-    await _frames(t);
+    await frames(t);
     expect(api.sessionOpenCalls, [_thread, _thread]);
-    expect(_composer(t), 'keep me');
+    expect(composerText(t), 'keep me');
     expect(api.turnStartCount, 0);
     await _dispose(t);
   });
@@ -166,9 +138,9 @@ void main() {
       'stays handed back', (t) async {
     final api = await _open(t, opens: [_writable]);
     await t.tap(find.byTooltip('More').first);
-    await _frames(t);
+    await frames(t);
     await t.tap(find.byKey(const Key('session-release')));
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
     // The host evicts it: no writer, nothing kept open.
     for (var i = 0; i < 30; i++) {
@@ -188,7 +160,7 @@ void main() {
 
     api.sessionOpenResults.add(_writable);
     await t.tap(find.byKey(const Key('access-continue')));
-    await _frames(t);
+    await frames(t);
     expect(api.sessionOpenCalls, hasLength(2));
     expect(find.byKey(const Key('composer-input')), findsOneWidget);
     await _dispose(t);
@@ -210,7 +182,7 @@ void main() {
       ..sessionAccessGate = check
       ..sessionAccessResults.add(_access(reason: 'released'));
     _withdrawn(api);
-    await _frames(t, 2);
+    await frames(t, 2);
     expect(api.sessionAccessCalls, [_thread]);
     api.pushEvent(
       _svc,
@@ -220,7 +192,7 @@ void main() {
         raw: '{"threadId":"ses_shown"}',
       ),
     );
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('conv-tile-$_thread')), findsNothing);
     expect(find.byKey(const Key('conv-tile-$_other')), findsOneWidget);
     expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
@@ -249,10 +221,18 @@ void main() {
     await _dispose(t);
   });
 
-  testWidgets('nothing said about a deleted session afterwards acts on it', (
+  testWidgets('a session handed back here and then deleted is gone, not '
+      'handed back, and nothing said about it afterwards acts on it', (
     t,
   ) async {
     final api = await _open(t, opens: [_writable]);
+    await t.tap(find.byTooltip('More').first);
+    await frames(t);
+    await t.tap(find.byKey(const Key('session-release')));
+    await frames(t);
+    expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
+    expect(find.byKey(const Key('access-continue')), findsOneWidget);
+
     api.pushEvent(
       _svc,
       const AppEvent(
@@ -261,15 +241,29 @@ void main() {
         raw: '{"threadId":"ses_shown"}',
       ),
     );
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
+    expect(find.byKey(const Key('access-panel-released_here')), findsNothing);
+    expect(find.byKey(const Key('access-check')), findsNothing);
+    expect(find.byKey(const Key('access-continue')), findsNothing);
+    expect(find.byKey(const Key('composer-input')), findsNothing);
+    expect(find.byKey(const Key('conv-tile-$_thread')), findsNothing);
     final accessCalls = api.sessionAccessCalls.length;
     final openCalls = api.sessionOpenCalls.length;
     final settingsReads = api.sessionSettingsRefreshCalls.length;
     final reads = api.threadReads.length;
 
+    // Answers a check would get, should one be made.
+    for (var i = 0; i < 10; i++) {
+      api.sessionAccessResults.add(_access());
+    }
     for (final event in const [
       AppEvent(kind: 'session/access/changed', threadId: _thread, raw: '{}'),
+      AppEvent(
+        kind: 'acp/session/updated',
+        threadId: _thread,
+        raw: '{"sessionId":"ses_shown","admitted":false}',
+      ),
       AppEvent(
         kind: 'acp/session/updated',
         threadId: _thread,
@@ -305,119 +299,17 @@ void main() {
     expect(api.sessionOpenCalls, hasLength(openCalls));
     expect(api.sessionSettingsRefreshCalls, hasLength(settingsReads));
     expect(api.threadReads, hasLength(reads));
+    expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
+    expect(find.byKey(const Key('access-continue')), findsNothing);
     expect(find.byKey(const Key('approval-card')), findsNothing);
     expect(find.byKey(const Key('stop-btn')), findsNothing);
-    expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
+    expect(find.byKey(const Key('composer-input')), findsNothing);
     expect(find.byKey(const Key('agent-config-model')), findsNothing);
 
     // Other sessions still work: one is opened from the list as usual.
-    api.sessionOpenResults.add(
-      SessionAccess(
-        sessionId: _other,
-        hostId: 'host-1',
-        generation: 7,
-        provider: 'opencode',
-        mode: 'write',
-        writer: 'this_host',
-        turn: 'idle',
-        exclusion: 'pocket',
-        reason: 'owned',
-        canRelease: true,
-      ),
-    );
+    api.sessionOpenResults.add(openCodeWritable(_other, generation: 7));
     await t.tap(find.byKey(const Key('conv-tile-$_other')));
-    await _frames(t);
-    expect(api.sessionOpenCalls.last, _other);
-    expect(find.byKey(const Key('composer-input')), findsOneWidget);
-    await _dispose(t);
-  });
-
-  testWidgets('a session handed back here and then deleted is gone, not '
-      'handed back', (t) async {
-    final api = await _open(t, opens: [_writable]);
-    await t.tap(find.byTooltip('More').first);
-    await _frames(t);
-    await t.tap(find.byKey(const Key('session-release')));
-    await _frames(t);
-    expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
-    expect(find.byKey(const Key('access-continue')), findsOneWidget);
-
-    api.pushEvent(
-      _svc,
-      const AppEvent(
-        kind: 'thread/deleted',
-        threadId: _thread,
-        raw: '{"threadId":"ses_shown"}',
-      ),
-    );
-    await _frames(t);
-    expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
-    expect(find.byKey(const Key('access-panel-released_here')), findsNothing);
-    expect(find.byKey(const Key('access-check')), findsNothing);
-    expect(find.byKey(const Key('access-continue')), findsNothing);
-    expect(find.byKey(const Key('composer-input')), findsNothing);
-    expect(find.byKey(const Key('conv-tile-$_thread')), findsNothing);
-    final accessCalls = api.sessionAccessCalls.length;
-    final openCalls = api.sessionOpenCalls.length;
-    final settingsReads = api.sessionSettingsRefreshCalls.length;
-    final reads = api.threadReads.length;
-
-    // Answers a check would get, should one be made.
-    for (var i = 0; i < 10; i++) {
-      api.sessionAccessResults.add(_access());
-    }
-    for (final event in const [
-      AppEvent(kind: 'session/access/changed', threadId: _thread, raw: '{}'),
-      AppEvent(
-        kind: 'acp/session/updated',
-        threadId: _thread,
-        raw: '{"sessionId":"ses_shown","admitted":false}',
-      ),
-      AppEvent(
-        kind: 'turn/started',
-        threadId: _thread,
-        raw: '{"turn":{"id":"late-turn"}}',
-      ),
-      AppEvent(
-        kind: 'execCommandApproval',
-        threadId: _thread,
-        requestId: 'late-approval',
-        raw: '{"command":["ls"]}',
-      ),
-      AppEvent(
-        kind: 'acp/host/state',
-        raw: '{"generation":7,"connected":true}',
-      ),
-    ]) {
-      api.pushEvent(_svc, event);
-    }
-    await _wait(t, const Duration(seconds: 20));
-    expect(api.sessionAccessCalls, hasLength(accessCalls));
-    expect(api.sessionOpenCalls, hasLength(openCalls));
-    expect(api.sessionSettingsRefreshCalls, hasLength(settingsReads));
-    expect(api.threadReads, hasLength(reads));
-    expect(find.byKey(const Key('access-panel-not_found')), findsOneWidget);
-    expect(find.byKey(const Key('access-continue')), findsNothing);
-    expect(find.byKey(const Key('approval-card')), findsNothing);
-    expect(find.byKey(const Key('composer-input')), findsNothing);
-
-    // Other sessions still work.
-    api.sessionOpenResults.add(
-      SessionAccess(
-        sessionId: _other,
-        hostId: 'host-1',
-        generation: 7,
-        provider: 'opencode',
-        mode: 'write',
-        writer: 'this_host',
-        turn: 'idle',
-        exclusion: 'pocket',
-        reason: 'owned',
-        canRelease: true,
-      ),
-    );
-    await t.tap(find.byKey(const Key('conv-tile-$_other')));
-    await _frames(t);
+    await frames(t);
     expect(api.sessionOpenCalls.last, _other);
     expect(find.byKey(const Key('composer-input')), findsOneWidget);
     expect(api.turnStartCount, 0);
@@ -438,7 +330,7 @@ void main() {
         api.sessionAccessResults.add(_access());
       }
       _withdrawn(api);
-      await _frames(t);
+      await frames(t);
       expect(find.byKey(Key('access-panel-$reason')), findsOneWidget);
 
       // Background checks find it free, but the host holds no admission:
@@ -455,10 +347,10 @@ void main() {
       final asked = api.sessionAccessCalls.length;
       api.sessionOpenResults.add(_writable);
       await t.tap(find.byKey(const Key('access-check')));
-      await _frames(t);
+      await frames(t);
       expect(api.sessionAccessCalls, hasLength(asked + 1));
       expect(api.sessionOpenCalls, [_thread, _thread]);
-      expect(_composer(t), 'keep me');
+      expect(composerText(t), 'keep me');
       expect(api.turnStartCount, 0);
       await _dispose(t);
     });
@@ -472,30 +364,17 @@ void main() {
       _access(writer: 'unknown', reason: 'external_source_open'),
     ]);
     _withdrawn(api);
-    await _frames(t);
+    await frames(t);
     await t.tap(find.byKey(const Key('access-check')));
-    await _frames(t);
+    await frames(t);
     expect(
       find.byKey(const Key('access-panel-external_source_open')),
       findsOneWidget,
     );
     // Free of writers, but a turn runs: still not opened.
-    api.sessionAccessResults.add(
-      SessionAccess(
-        sessionId: _thread,
-        hostId: 'host-1',
-        generation: 7,
-        provider: 'opencode',
-        mode: 'follow',
-        writer: 'none',
-        turn: 'running',
-        exclusion: 'pocket',
-        reason: 'not_opened',
-        recheck: true,
-      ),
-    );
+    api.sessionAccessResults.add(_access(turn: 'running'));
     await t.tap(find.byKey(const Key('access-check')));
-    await _frames(t);
+    await frames(t);
     expect(api.sessionOpenCalls, [_thread]);
     expect(find.byKey(const Key('composer-input')), findsNothing);
     await _dispose(t);
@@ -505,9 +384,9 @@ void main() {
       'that finds it free is out', (t) async {
     final api = await _open(t, opens: [_writable]);
     await t.tap(find.byTooltip('More').first);
-    await _frames(t);
+    await frames(t);
     await t.tap(find.byKey(const Key('session-release')));
-    await _frames(t);
+    await frames(t);
     expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
     // Nothing here asks again on the user's behalf.
     expect(find.byKey(const Key('access-check')), findsNothing);
@@ -530,17 +409,17 @@ void main() {
         raw: '{}',
       ),
     );
-    await _frames(t, 2);
+    await frames(t, 2);
     expect(api.sessionAccessCalls, hasLength(asked + 1));
     check.complete();
-    await _frames(t);
+    await frames(t);
     await _wait(t, const Duration(seconds: 30));
     expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
     expect(api.sessionOpenCalls, [_thread]);
 
     api.sessionOpenResults.add(_writable);
     await t.tap(find.byKey(const Key('access-continue')));
-    await _frames(t);
+    await frames(t);
     expect(api.sessionOpenCalls, [_thread, _thread]);
     expect(find.byKey(const Key('composer-input')), findsOneWidget);
     await _dispose(t);

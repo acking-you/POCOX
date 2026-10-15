@@ -72,9 +72,9 @@ fn deleted_session_is_removed_without_blocking_other_session_updates() {
     let mut deleted = tests::snapshot();
     deleted.session.id = "ses_deleted".into();
     deleted.access.session_id = deleted.session.id.clone();
-    link.accept(&link.identity(), deleted, true)
+    link.accept(&link.identity(), deleted)
         .expect("valid test fixture");
-    link.accept(&link.identity(), tests::snapshot(), true)
+    link.accept(&link.identity(), tests::snapshot())
         .expect("valid test fixture");
     lock(&link.shared)
         .cursors
@@ -102,55 +102,13 @@ fn deleted_session_is_removed_without_blocking_other_session_updates() {
 }
 
 #[test]
-fn unavailable_or_replaced_host_never_looks_like_a_deleted_session() {
-    for status in [404, 503] {
-        let (client, _server) = server(move |path| {
-            if path.ends_with("/info") {
-                let mut info = info();
-                info["hostId"] = json!("replacement");
-                return (200, info);
-            }
-            (status, json!({"code":"session_not_found"}))
-        });
-        let fixture = tests::Fixture::with_client(client);
-        let link = &fixture.link;
-        link.accept(&link.identity(), tests::snapshot(), true)
-            .expect("valid test fixture");
-        assert!(runtime::runtime()
-            .block_on(events::refresh(link, &link.identity()))
-            .is_err());
-        assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
-    }
-}
-
-#[test]
-fn a_missing_native_subroute_never_deletes_a_session() {
-    let (client, _server) = server(|path| {
-        if path.ends_with("/info") {
-            return (200, info());
-        }
-        (404, json!({"code":"native_request_failed"}))
-    });
-    let fixture = tests::Fixture::with_client(client);
-    let link = &fixture.link;
-    let mut events = link.tx.subscribe();
-    link.accept(&link.identity(), tests::snapshot(), true)
-        .expect("valid test fixture");
-    assert!(runtime::runtime()
-        .block_on(events::refresh(link, &link.identity()))
-        .is_err());
-    assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
-    assert!(events.try_recv().is_err());
-}
-
-#[test]
 fn failed_settings_refresh_preserves_errors_and_cached_session() {
     for cached in [false, true] {
         let (client, _server) = server(|_| (503, json!({"code":"not_ready"})));
         let fixture = tests::Fixture::with_client(client);
         let link = &fixture.link;
         if cached {
-            link.accept(&link.identity(), tests::snapshot(), true)
+            link.accept(&link.identity(), tests::snapshot())
                 .expect("valid test fixture");
         }
         let error = settings::settings_for_link(link, "ses_fixture")
@@ -192,7 +150,6 @@ fn project_catalog_reads_never_reuse_the_connection_global_catalog() {
         assert_eq!(catalog.commands[0].name, project);
         assert_eq!(catalog.agents[0].name, project);
     }
-    assert!(lock(&fixture.link.shared).catalog.models.is_empty());
 }
 
 #[test]
@@ -210,8 +167,7 @@ fn access_detects_deletion_without_sse_including_uncached_sessions() {
         if cached {
             let mut released = tests::snapshot();
             released.access.reason = "released_here".into();
-            link.accept(&link.identity(), released, true)
-                .expect("fixture");
+            link.accept(&link.identity(), released).expect("fixture");
         }
         let access = ops::access_for_link(link, "ses_fixture").expect("confirmed missing");
         assert_eq!(access.reason, "not_found");
@@ -229,11 +185,12 @@ fn access_detects_deletion_without_sse_including_uncached_sessions() {
 }
 
 #[test]
-fn access_failure_or_replaced_host_preserves_session_and_error() {
+fn failed_reads_preserve_sessions_and_emit_no_deletion() {
     for (status, code, replaced) in [
         (404, "native_request_failed", false),
         (503, "session_not_found", false),
         (404, "session_not_found", true),
+        (503, "session_not_found", true),
     ] {
         let (client, _server) = server(move |path| {
             if path.ends_with("/info") {
@@ -248,11 +205,18 @@ fn access_failure_or_replaced_host_preserves_session_and_error() {
         let fixture = tests::Fixture::with_client(client);
         let link = &fixture.link;
         let mut events = link.tx.subscribe();
-        link.accept(&link.identity(), tests::snapshot(), true)
+        link.accept(&link.identity(), tests::snapshot())
             .expect("fixture");
-        assert!(ops::access_for_link(link, "ses_fixture").is_err());
-        assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
-        assert!(events.try_recv().is_err());
+        for access in [false, true] {
+            let result = if access {
+                ops::access_for_link(link, "ses_fixture").map(|_| ())
+            } else {
+                runtime::runtime().block_on(events::refresh(link, &link.identity()))
+            };
+            assert!(result.is_err(), "HTTP {status}, {code}, replaced={replaced}, access={access}");
+            assert!(lock(&link.shared).sessions.contains_key("ses_fixture"));
+            assert!(events.try_recv().is_err());
+        }
     }
 }
 
@@ -267,7 +231,7 @@ fn follow_detects_external_deletion_without_an_sse_invalidation() {
     let fixture = tests::Fixture::with_client(client);
     let link = &fixture.link;
     let mut events = link.tx.subscribe();
-    link.accept(&link.identity(), tests::snapshot(), true)
+    link.accept(&link.identity(), tests::snapshot())
         .expect("fixture");
     runtime::runtime()
         .block_on(async {
