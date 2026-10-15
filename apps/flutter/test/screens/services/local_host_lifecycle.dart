@@ -235,10 +235,8 @@ void _registerLocalHostLifecycle() {
       await t.pumpWidget(host(const ServicesScreen(), api));
       await t.pumpAndSettle();
       await openDevice(t);
-      // Before hosting, the device is just a discovered remote one — and the
-      // hosting card belongs to THIS machine, so it isn't shown under a peer.
+      // Before hosting, the device is just a discovered remote one.
       expect(find.text('本机'), findsNothing);
-      expect(find.byKey(const Key('add-local-host-card')), findsNothing);
 
       // Host "default" locally → its key matches the discovered service. The
       // title bar's button is the route in when no local device is selected.

@@ -49,8 +49,17 @@ class HostRestorePlan {
   );
 }
 
-/// Instance names compare as the bridge canonicalizes them.
-String _canonical(String name) => name.trim().toLowerCase();
+/// Instance names compare as the bridge canonicalizes them
+/// (`pocket_codex_core::service::sanitize_component`): lowercase, keep
+/// `a-z0-9_.`, turn every other run into one `-`, trim dashes, else `default`.
+String _canonical(String name) {
+  final id = name
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9_.]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  return id.isEmpty ? 'default' : id;
+}
 
 /// Plan the restore: each name at most once per run (callers track the
 /// attempts by instance name, per provider), and only names this device does
@@ -69,20 +78,33 @@ HostRestorePlan planHostRestore(
   required bool acpSupported,
   List<HostRestoreOverride> overrides = const [],
 }) {
-  final hosted = {for (final h in local) _canonical(h.name)};
-  final overridden = {for (final o in overrides) _canonical(o.name)};
-  bool open(String name, Set<String> attempted) =>
-      !attempted.contains(name) &&
-      !hosted.contains(_canonical(name)) &&
-      !overridden.contains(_canonical(name));
+  // Identities only; the bridge still receives each record's original name.
+  Set<String> ids(Iterable<String> names) => {
+    for (final n in names) _canonical(n),
+  };
+  final hosted = ids(local.map((h) => h.name));
+  final overridden = ids(overrides.map((o) => o.name));
+  final codexTried = ids(codexAttempted);
+  final acpTried = ids(acpAttempted);
+  // Names this plan already restores: an alias is planned once.
+  final planned = <String>{};
+  bool open(String name, Set<String> tried) {
+    final id = _canonical(name);
+    return !tried.contains(id) &&
+        !hosted.contains(id) &&
+        !overridden.contains(id) &&
+        planned.add(id);
+  }
+
   var openCodeTaken = local.any((h) => h.isOpenCode);
 
   final chosen = <HostRestoreOverride>[];
   for (final o in overrides) {
     final runtime = o.runtime;
     if (runtime == null) continue;
-    final attempted = runtime.isCodex ? codexAttempted : acpAttempted;
-    if (attempted.contains(o.name) || hosted.contains(_canonical(o.name))) {
+    final id = _canonical(o.name);
+    final tried = runtime.isCodex ? codexTried : acpTried;
+    if (tried.contains(id) || hosted.contains(id) || planned.contains(id)) {
       continue;
     }
     if (!runtime.isCodex && !acpSupported) continue;
@@ -90,25 +112,26 @@ HostRestorePlan planHostRestore(
       if (openCodeTaken) continue;
       openCodeTaken = true;
     }
+    planned.add(id);
     chosen.add(o);
   }
 
   final codex = [
     for (final saved in prefs.autoHostCodex)
-      if (open(saved.name, codexAttempted)) saved,
+      if (open(saved.name, codexTried)) saved,
   ];
   final acp = !acpSupported
       ? const <AutoHostAcpPrefs>[]
       : [
           for (final saved in prefs.autoHostAcp)
-            if (open(saved.name, acpAttempted)) saved,
+            if (open(saved.name, acpTried)) saved,
         ];
   final saved = prefs.autoHostOpenCode;
   final opencode =
       saved == null ||
           !acpSupported ||
           openCodeTaken ||
-          !open(saved.name, acpAttempted)
+          !open(saved.name, acpTried)
       ? null
       : saved;
   return HostRestorePlan(

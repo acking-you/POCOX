@@ -69,8 +69,11 @@ void _registerRestore() {
       'preferences, and a remotely added host restores too', () {
     const prefs = UiPrefs(
       autoHostCodex: [
-        AutoHostPrefs(port: 0, name: 'stopped'),
+        // Aliases of the override and of each other, as the bridge
+        // canonicalizes names.
+        AutoHostPrefs(port: 0, name: 'My Stopped!'),
         AutoHostPrefs(port: 0, name: 'legacy'),
+        AutoHostPrefs(port: 0, name: ' Legacy '),
       ],
       autoHostOpenCode: AutoHostOpenCodePrefs(name: 'oc-old'),
     );
@@ -82,7 +85,7 @@ void _registerRestore() {
       acpSupported: true,
       overrides: const [
         // Stopped from another device: its legacy record must not count.
-        HostRestoreOverride(name: 'Stopped', revision: 4),
+        HostRestoreOverride(name: 'my-stopped', revision: 4),
         HostRestoreOverride(
           name: 'remote-added',
           revision: 5,
@@ -105,7 +108,7 @@ void _registerRestore() {
     final again = planHostRestore(
       prefs,
       [FakeBridgeApi.openCodeHost('busy')],
-      codexAttempted: const {'stopped', 'legacy', 'remote-added'},
+      codexAttempted: const {'my stopped', 'LEGACY', 'Remote Added'},
       acpAttempted: const {},
       acpSupported: true,
       overrides: const [
