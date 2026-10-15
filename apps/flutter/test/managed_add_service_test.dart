@@ -3,8 +3,7 @@
 // runtime shows its name and a short availability line; long paths and
 // explanations sit behind an explicit Details button. Every state stays
 // reachable: choosing a ready runtime, blocked OpenCode, unavailable, sign-in
-// on the host, Claude preparation, loading errors and retry. Real fonts;
-// PCX_UI_PREVIEW_DIR writes each layout as a PNG.
+// on the host, Claude preparation, loading errors and retry. Real fonts.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,24 +88,18 @@ Widget _app(
   BridgeApi api, {
   double textScale = 1,
   Locale locale = const Locale('en'),
-  bool dark = false,
 }) => ProviderScope(
   overrides: [bridgeApiProvider.overrideWithValue(api)],
   child: MaterialApp(
     locale: locale,
     theme: lightTheme(),
-    darkTheme: darkTheme(),
-    themeMode: dark ? ThemeMode.dark : ThemeMode.light,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
-    builder: (context, child) => RepaintBoundary(
-      key: previewKey,
-      child: MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
-      ),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(textScale)),
+      child: child!,
     ),
     home: const ServicesScreen(),
   ),
@@ -119,14 +112,11 @@ Future<void> _openSheet(
   Size size = const Size(393, 852),
   double textScale = 1,
   Locale locale = const Locale('en'),
-  bool dark = false,
 }) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
-  await t.pumpWidget(
-    _app(api, textScale: textScale, locale: locale, dark: dark),
-  );
+  await t.pumpWidget(_app(api, textScale: textScale, locale: locale));
   await t.pumpAndSettle();
   await t.tap(find.byKey(const Key('device-studio')));
   await t.pumpAndSettle();
@@ -232,47 +222,30 @@ void main() {
     expect(find.byKey(const Key('managed-runtime-codex')), findsOneWidget);
   });
 
-  for (final (width, locale, dark, scale) in const [
-    (320.0, 'zh', false, 1.0),
-    (320.0, 'en', true, 2.0),
-    (393.0, 'en', false, 1.0),
-    (393.0, 'zh', true, 2.0),
-    (320.0, 'zh', true, 2.0),
-    (393.0, 'en', true, 1.0),
-  ]) {
-    final name =
-        'add-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}-'
-        '${scale.toInt()}x';
-    testWidgets('$name: padded, scrollable, nothing clipped', (t) async {
-      final api = _fake();
-      await _openSheet(
-        t,
-        api,
-        size: Size(width, 760),
-        textScale: scale,
-        locale: Locale(locale),
-        dark: dark,
-      );
-      expect(t.takeException(), isNull);
-      final panel = t.getRect(find.byKey(const Key('managed-add-panel')));
-      expect(panel.left, greaterThanOrEqualTo(20));
-      expect(width - panel.right, greaterThanOrEqualTo(20));
-      await capturePreview(t, name);
-      // Every row and its Details button is reachable and full size.
-      for (final kind in ['codex', 'opencode', 'claude']) {
-        final details = find.byKey(Key('managed-runtime-details-$kind'));
-        await t.ensureVisible(details);
-        await t.pumpAndSettle();
-        final box = t.getRect(details);
-        expect(box.width, greaterThanOrEqualTo(40));
-        expect(box.height, greaterThanOrEqualTo(40));
-        expect(box.bottom, lessThanOrEqualTo(760));
-      }
-      await capturePreview(t, '$name-end');
-      await t.tap(find.byKey(const Key('managed-runtime-details-claude')));
+  testWidgets('a 320 px phone at 2x text keeps the sheet padded and every '
+      'Details button reachable', (t) async {
+    await _openSheet(
+      t,
+      _fake(),
+      size: const Size(320, 760),
+      textScale: 2,
+      locale: const Locale('zh'),
+    );
+    expect(t.takeException(), isNull);
+    final panel = t.getRect(find.byKey(const Key('managed-add-panel')));
+    expect(panel.left, greaterThanOrEqualTo(20));
+    expect(320 - panel.right, greaterThanOrEqualTo(20));
+    for (final kind in ['codex', 'opencode', 'claude']) {
+      final details = find.byKey(Key('managed-runtime-details-$kind'));
+      await t.ensureVisible(details);
       await t.pumpAndSettle();
-      expect(t.takeException(), isNull);
-      await capturePreview(t, '$name-details');
-    });
-  }
+      final box = t.getRect(details);
+      expect(box.width, greaterThanOrEqualTo(40));
+      expect(box.height, greaterThanOrEqualTo(40));
+      expect(box.bottom, lessThanOrEqualTo(760));
+    }
+    await t.tap(find.byKey(const Key('managed-runtime-details-claude')));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+  });
 }

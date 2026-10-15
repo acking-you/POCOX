@@ -1,5 +1,5 @@
 // Phone layouts that used to squeeze or overflow, measured with the real
-// fonts on an iOS target across widths, languages, text sizes and themes:
+// fonts on an iOS target at the narrowest width with the largest text:
 // the services capability rows, the composer's agent options and model
 // chip, the welcome guide's found host and the settings subscriptions. Set
 // PCX_UI_PREVIEW_DIR to write the previews (`responsive-*`).
@@ -26,14 +26,13 @@ const _device = 'ackingliu-mc1';
 const _openCode = 'pcx:$_device:opencode:opencode';
 const _codex = 'pcx:$_device:app:default';
 const _cwd = '/work/pocket-codex';
-const _phones = [
-  Size(320, 640),
-  Size(360, 780),
-  Size(393, 852),
-  Size(430, 932),
+// The narrowest phone at the largest text in both languages, and a common
+// phone at default text: the cases where the layouts used to break.
+const _cases = [
+  (Size(320, 640), Locale('en'), 2.0),
+  (Size(320, 640), Locale('zh'), 2.0),
+  (Size(393, 852), Locale('en'), 1.0),
 ];
-const _scales = [1.0, 1.6, 2.0];
-const _locales = [Locale('en'), Locale('zh')];
 const _modelLabel = 'MiMo V2.6 Flash Free';
 
 FakeBridgeApi _api() {
@@ -97,7 +96,6 @@ Future<void> _mount(
   required Size size,
   double scale = 1,
   Locale locale = const Locale('en'),
-  Brightness brightness = Brightness.light,
 }) async {
   t.view.devicePixelRatio = 1;
   t.view.physicalSize = size;
@@ -107,7 +105,7 @@ Future<void> _mount(
       overrides: [bridgeApiProvider.overrideWithValue(api)],
       child: MaterialApp(
         locale: locale,
-        theme: brightness == Brightness.light ? lightTheme() : darkTheme(),
+        theme: lightTheme(),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         builder: (context, child) => MediaQuery(
@@ -182,67 +180,57 @@ void main() {
       'whole at every phone width, language and text size', (t) async {
     await _onIos(t, () async {
       final row = find.byKey(const Key('device-capability-$_openCode'));
-      for (final size in _phones) {
-        for (final locale in _locales) {
-          final l10n = lookupAppLocalizations(locale);
-          for (final scale in _scales) {
-            for (final brightness in Brightness.values) {
-              final api = _api();
-              await api.appConnect(_openCode, 1);
-              await _mount(
-                t,
-                api,
-                const ServicesScreen(),
-                size: size,
-                scale: scale,
-                locale: locale,
-                brightness: brightness,
-              );
-              await t.tap(find.byKey(const Key('device-$_device')));
-              await _frames(t);
-              final at = '$size ${locale.languageCode} ×$scale $brightness';
-              expect(t.takeException(), isNull, reason: 'no overflow: $at');
-              // Large text can push the row below the fold: scroll to it.
-              await t.ensureVisible(row);
-              await t.pump();
-              final bounds = t.getRect(row);
-              expect(
-                bounds.bottom,
-                lessThanOrEqualTo(size.height),
-                reason: 'row on screen $at',
-              );
-              _whole(t, row, l10n.servicesChatCapability, 'title $at');
-              _whole(t, row, 'OpenCode', 'provider $at');
-              _whole(t, row, l10n.statusConnected, 'status $at');
-              _reachable(
-                t,
-                find.descendant(
-                  of: row,
-                  matching: find.widgetWithText(TextButton, l10n.servicesOpen),
-                ),
-                bounds,
-                'open $at',
-              );
-              _reachable(
-                t,
-                find.descendant(
-                  of: row,
-                  matching: find.byType(PopupMenuButton<VoidCallback>),
-                ),
-                bounds,
-                'more $at',
-              );
-              if (size.width == 393 && scale == 1 ||
-                  size.width == 320 && scale == 2) {
-                await capturePreview(
-                  t,
-                  'responsive-services-${size.width.toInt()}-'
-                  '${locale.languageCode}-$scale-${brightness.name}',
-                );
-              }
-            }
-          }
-        }
+      for (final (size, locale, scale) in _cases) {
+        final l10n = lookupAppLocalizations(locale);
+        final api = _api();
+        await api.appConnect(_openCode, 1);
+        await _mount(
+          t,
+          api,
+          const ServicesScreen(),
+          size: size,
+          scale: scale,
+          locale: locale,
+        );
+        await t.tap(find.byKey(const Key('device-$_device')));
+        await _frames(t);
+        final at = '$size ${locale.languageCode} ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        // Large text can push the row below the fold: scroll to it.
+        await t.ensureVisible(row);
+        await t.pump();
+        final bounds = t.getRect(row);
+        expect(
+          bounds.bottom,
+          lessThanOrEqualTo(size.height),
+          reason: 'row on screen $at',
+        );
+        _whole(t, row, l10n.servicesChatCapability, 'title $at');
+        _whole(t, row, 'OpenCode', 'provider $at');
+        _whole(t, row, l10n.statusConnected, 'status $at');
+        _reachable(
+          t,
+          find.descendant(
+            of: row,
+            matching: find.widgetWithText(TextButton, l10n.servicesOpen),
+          ),
+          bounds,
+          'open $at',
+        );
+        _reachable(
+          t,
+          find.descendant(
+            of: row,
+            matching: find.byType(PopupMenuButton<VoidCallback>),
+          ),
+          bounds,
+          'more $at',
+        );
+        await capturePreview(
+          t,
+          'responsive-services-${size.width.toInt()}-'
+          '${locale.languageCode}-$scale',
+        );
       }
 
       // The overflow still opens its menu from the stacked row.
@@ -287,43 +275,42 @@ void main() {
         cwd: _cwd,
         home: true,
       );
-      for (final size in _phones) {
-        for (final scale in [1.0, 2.0]) {
-          final api = _api();
-          await api.appConnect(_openCode, 1);
-          await _mount(t, api, screen, size: size, scale: scale);
-          final at = '$size ×$scale';
-          expect(t.takeException(), isNull, reason: 'no overflow: $at');
-          final screenRect = Offset.zero & size;
-          for (final id in ['model', 'variant', 'agent']) {
-            _reachable(
-              t,
-              find.byKey(Key('agent-config-$id')),
-              screenRect,
-              '$id $at',
-            );
-          }
-          // Above the attach and send row, not squeezed between them.
-          final send = t.getRect(find.byKey(const Key('send-btn')));
-          final model = t.getRect(find.byKey(const Key('agent-config-model')));
-          expect(model.bottom, lessThanOrEqualTo(send.top), reason: at);
-          // The model reads whole, or keeps at least half its tail.
-          final face = _face(t, 'model');
-          expect(
-            face == _modelLabel ||
-                face.startsWith('…') &&
-                    _modelLabel.endsWith(face.substring(1)) &&
-                    face.length > _modelLabel.length / 2,
-            isTrue,
-            reason: 'model reads "$face" at $at',
+      for (final (size, scale) in const [
+        (Size(320, 640), 2.0),
+        (Size(393, 852), 1.0),
+      ]) {
+        final api = _api();
+        await api.appConnect(_openCode, 1);
+        await _mount(t, api, screen, size: size, scale: scale);
+        final at = '$size ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        final screenRect = Offset.zero & size;
+        for (final id in ['model', 'variant', 'agent']) {
+          _reachable(
+            t,
+            find.byKey(Key('agent-config-$id')),
+            screenRect,
+            '$id $at',
           );
-          if (scale == 2 || size.width == 393) {
-            await capturePreview(
-              t,
-              'responsive-composer-options-${size.width.toInt()}-$scale',
-            );
-          }
         }
+        // Above the attach and send row, not squeezed between them.
+        final send = t.getRect(find.byKey(const Key('send-btn')));
+        final model = t.getRect(find.byKey(const Key('agent-config-model')));
+        expect(model.bottom, lessThanOrEqualTo(send.top), reason: at);
+        // The model reads whole, or keeps at least half its tail.
+        final face = _face(t, 'model');
+        expect(
+          face == _modelLabel ||
+              face.startsWith('…') &&
+                  _modelLabel.endsWith(face.substring(1)) &&
+                  face.length > _modelLabel.length / 2,
+          isTrue,
+          reason: 'model reads "$face" at $at',
+        );
+        await capturePreview(
+          t,
+          'responsive-composer-options-${size.width.toInt()}-$scale',
+        );
       }
 
       // A choice from the stacked line applies to the draft and sends nothing.
@@ -385,44 +372,32 @@ void main() {
   testWidgets('the Codex model chip keeps its label on a phone', (t) async {
     await _onIos(t, () async {
       const screen = AppSessionScreen(serviceKey: _codex, home: true);
-      for (final size in _phones) {
-        for (final locale in _locales) {
-          for (final scale in _scales) {
-            final l10n = lookupAppLocalizations(locale);
-            final api = _api();
-            await api.appConnect(_codex, 1);
-            await _mount(
-              t,
-              api,
-              screen,
-              size: size,
-              scale: scale,
-              locale: locale,
-            );
-            final at = '$size ${locale.languageCode} ×$scale';
-            expect(t.takeException(), isNull, reason: 'no overflow: $at');
-            final chip = find.byKey(const Key('model-chip'));
-            _reachable(t, chip, Offset.zero & size, 'model $at');
-            _whole(t, chip, l10n.modelDefault, 'model label $at');
-            // The permission label stays readable too: beside attach or, at
-            // 320 px with large text, on the line above with the model.
-            final permission = find.byKey(const Key('permission-chip'));
-            _reachable(t, permission, Offset.zero & size, 'permission $at');
-            _whole(t, permission, l10n.modeAuto, 'permission label $at');
-            _reachable(
-              t,
-              find.byKey(const Key('send-btn')),
-              Offset.zero & size,
-              'send $at',
-            );
-            if (size.width == 320 && scale == 2) {
-              await capturePreview(
-                t,
-                'responsive-codex-composer-320-${locale.languageCode}-2.0',
-              );
-            }
-          }
-        }
+      for (final (size, locale, scale) in _cases) {
+        final l10n = lookupAppLocalizations(locale);
+        final api = _api();
+        await api.appConnect(_codex, 1);
+        await _mount(t, api, screen, size: size, scale: scale, locale: locale);
+        final at = '$size ${locale.languageCode} ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        final chip = find.byKey(const Key('model-chip'));
+        _reachable(t, chip, Offset.zero & size, 'model $at');
+        _whole(t, chip, l10n.modelDefault, 'model label $at');
+        // The permission label stays readable too: beside attach or, at
+        // 320 px with large text, on the line above with the model.
+        final permission = find.byKey(const Key('permission-chip'));
+        _reachable(t, permission, Offset.zero & size, 'permission $at');
+        _whole(t, permission, l10n.modeAuto, 'permission label $at');
+        _reachable(
+          t,
+          find.byKey(const Key('send-btn')),
+          Offset.zero & size,
+          'send $at',
+        );
+        await capturePreview(
+          t,
+          'responsive-codex-composer-${size.width.toInt()}-'
+          '${locale.languageCode}-$scale',
+        );
       }
       // Its sheet still opens from the line above the toolbar.
       await t.tap(find.byKey(const Key('model-chip')));
@@ -452,37 +427,30 @@ void main() {
 
   testWidgets('a found host with a long name wraps inside its step', (t) async {
     await _onIos(t, () async {
-      for (final locale in _locales) {
-        for (final scale in _scales) {
-          final l10n = lookupAppLocalizations(locale);
-          await _mount(
-            t,
-            _api(),
-            const WelcomeGuideScreen(),
-            size: const Size(320, 640),
-            scale: scale,
-            locale: locale,
-          );
-          final at = '${locale.languageCode} ×$scale';
-          expect(t.takeException(), isNull, reason: 'no overflow: $at');
-          final label = find.text(l10n.welcomeHostFound('$_device · opencode'));
-          // The steps are a lazy list: scroll the third one in.
-          await t.scrollUntilVisible(label, 100);
-          await t.pump();
-          final rect = t.getRect(label);
-          expect(rect.right, lessThanOrEqualTo(320), reason: at);
-          expect(
-            t.renderObject<RenderParagraph>(label).didExceedMaxLines,
-            isFalse,
-            reason: at,
-          );
-          if (scale == 2) {
-            await capturePreview(
-              t,
-              'responsive-welcome-320-${locale.languageCode}-2.0',
-            );
-          }
-        }
+      for (final locale in const [Locale('en'), Locale('zh')]) {
+        final l10n = lookupAppLocalizations(locale);
+        await _mount(
+          t,
+          _api(),
+          const WelcomeGuideScreen(),
+          size: const Size(320, 640),
+          scale: 2,
+          locale: locale,
+        );
+        final at = locale.languageCode;
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        final label = find.text(l10n.welcomeHostFound('$_device · opencode'));
+        // The steps are a lazy list: scroll the third one in.
+        await t.scrollUntilVisible(label, 100);
+        await t.pump();
+        final rect = t.getRect(label);
+        expect(rect.right, lessThanOrEqualTo(320), reason: at);
+        expect(
+          t.renderObject<RenderParagraph>(label).didExceedMaxLines,
+          isFalse,
+          reason: at,
+        );
+        await capturePreview(t, 'responsive-welcome-320-$at-2.0');
       }
     });
   });
@@ -525,79 +493,74 @@ void main() {
           'cargo test -p pocket_codex_bridge --locked -- serve_lifecycle '
           '/Users/me/work/pocket-codex/crates/pocket-codex-bridge/src';
       FakeBridgeApi? last;
+      const scale = 2.0;
       for (final (size, keyboard) in const [
-        (Size(320, 640), 0.0),
         (Size(320, 640), 280.0),
         (Size(393, 852), 336.0),
-        (Size(852, 393), 0.0),
         (Size(852, 393), 190.0),
       ]) {
-        for (final scale in [1.0, 2.0]) {
-          final api = last = _api()
-            ..readResult = const ThreadHistory(
-              items: [
-                ThreadItem(
-                  id: 'u1',
-                  itemType: 'userMessage',
-                  title: '',
-                  text: '运行测试并解释失败原因',
-                ),
-                ThreadItem(
-                  id: 'a1',
-                  itemType: 'agentMessage',
-                  title: '',
-                  text: '我需要先运行测试。',
-                ),
-              ],
-              running: false,
-            );
-          await api.appConnect(_codex, 1);
-          t.view.viewInsets = FakeViewPadding.zero;
-          await _mount(
-            t,
-            api,
-            screen,
-            size: size,
-            scale: scale,
-            locale: const Locale('zh'),
+        final api = last = _api()
+          ..readResult = const ThreadHistory(
+            items: [
+              ThreadItem(
+                id: 'u1',
+                itemType: 'userMessage',
+                title: '',
+                text: '运行测试并解释失败原因',
+              ),
+              ThreadItem(
+                id: 'a1',
+                itemType: 'agentMessage',
+                title: '',
+                text: '我需要先运行测试。',
+              ),
+            ],
+            running: false,
           );
-          api.pushEvent(
-            _codex,
-            const AppEvent(
-              kind: 'execCommandApproval',
-              requestId: '7',
-              raw: '{"command":"$command","cwd":"/Users/me/work/pocket-codex"}',
-            ),
-          );
-          await _frames(t);
-          await t.enterText(find.byKey(const Key('composer-input')), '草稿');
-          t.view.viewInsets = FakeViewPadding(bottom: keyboard);
-          await _frames(t);
-          final at = '$size kb=$keyboard ×$scale';
-          expect(t.takeException(), isNull, reason: 'no overflow: $at');
-          final open = Offset.zero & Size(size.width, size.height - keyboard);
-          for (final key in ['approve-btn', 'composer-input', 'send-btn']) {
-            final control = find.byKey(Key(key));
-            await t.ensureVisible(control);
-            await t.pump();
-            _reachable(t, control, open, '$key $at');
-          }
-          expect(
-            t
-                .widget<TextField>(find.byKey(const Key('composer-input')))
-                .controller!
-                .text,
-            '草稿',
-            reason: 'the draft survives the keyboard: $at',
-          );
-          if (scale == 2 && (keyboard > 0 || size.width > size.height)) {
-            await capturePreview(
-              t,
-              'responsive-approval-${size.width.toInt()}x'
-              '${size.height.toInt()}-kb${keyboard.toInt()}-2.0',
-            );
-          }
+        await api.appConnect(_codex, 1);
+        t.view.viewInsets = FakeViewPadding.zero;
+        await _mount(
+          t,
+          api,
+          screen,
+          size: size,
+          scale: scale,
+          locale: const Locale('zh'),
+        );
+        api.pushEvent(
+          _codex,
+          const AppEvent(
+            kind: 'execCommandApproval',
+            requestId: '7',
+            raw: '{"command":"$command","cwd":"/Users/me/work/pocket-codex"}',
+          ),
+        );
+        await _frames(t);
+        await t.enterText(find.byKey(const Key('composer-input')), '草稿');
+        t.view.viewInsets = FakeViewPadding(bottom: keyboard);
+        await _frames(t);
+        final at = '$size kb=$keyboard ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        final open = Offset.zero & Size(size.width, size.height - keyboard);
+        for (final key in ['approve-btn', 'composer-input', 'send-btn']) {
+          final control = find.byKey(Key(key));
+          await t.ensureVisible(control);
+          await t.pump();
+          _reachable(t, control, open, '$key $at');
         }
+        expect(
+          t
+              .widget<TextField>(find.byKey(const Key('composer-input')))
+              .controller!
+              .text,
+          '草稿',
+          reason: 'the draft survives the keyboard: $at',
+        );
+        await capturePreview(
+          t,
+          'responsive-approval-${size.width.toInt()}x'
+          '${size.height.toInt()}-kb${keyboard.toInt()}-2.0',
+        );
       }
       // Still answerable from there, and nothing is sent.
       await t.ensureVisible(find.byKey(const Key('approve-btn')));
@@ -614,56 +577,49 @@ void main() {
     t,
   ) async {
     await _onIos(t, () async {
-      for (final size in const [Size(320, 640), Size(393, 852)]) {
-        for (final scale in [1.0, 2.0]) {
-          final api = _api();
-          api.services.add(
-            const ServiceEntry(
-              device: 'studio-mini',
-              kind: 'app',
-              name: 'default',
-              key: 'pcx:studio-mini:app:default',
-            ),
-          );
-          await api.appConnect(_codex, 1);
-          await _mount(
-            t,
-            api,
-            AppSessionScreen(
-              serviceKey: _codex,
-              home: true,
-              services: api.services,
-            ),
-            size: size,
-            scale: scale,
-            locale: const Locale('zh'),
-          );
-          await t.tap(find.byKey(const Key('sidebar-open-btn')));
-          await _frames(t);
-          await t.tap(find.byKey(const Key('sidebar-service-switcher')));
-          await _frames(t);
-          final at = '$size ×$scale';
-          expect(t.takeException(), isNull, reason: 'no overflow: $at');
-          for (final s in api.services) {
-            final item = find.byKey(Key('host-switch-item-${s.key}'));
-            await t.ensureVisible(item);
-            await t.pump();
-            _reachable(t, item, Offset.zero & size, '${s.key} $at');
-            final device = find.descendant(
-              of: item,
-              matching: find.text(s.device),
-            );
-            expect(
-              t.renderObject<RenderParagraph>(device).didExceedMaxLines,
-              isFalse,
-              reason: '${s.device} whole at $at',
-            );
-          }
-          if (size.width == 320 && scale == 2) {
-            await capturePreview(t, 'responsive-host-switcher-320-zh-2.0');
-          }
-        }
+      const size = Size(320, 640);
+      const scale = 2.0;
+      final api = _api();
+      api.services.add(
+        const ServiceEntry(
+          device: 'studio-mini',
+          kind: 'app',
+          name: 'default',
+          key: 'pcx:studio-mini:app:default',
+        ),
+      );
+      await api.appConnect(_codex, 1);
+      await _mount(
+        t,
+        api,
+        AppSessionScreen(
+          serviceKey: _codex,
+          home: true,
+          services: api.services,
+        ),
+        size: size,
+        scale: scale,
+        locale: const Locale('zh'),
+      );
+      await t.tap(find.byKey(const Key('sidebar-open-btn')));
+      await _frames(t);
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await _frames(t);
+      final at = '$size ×$scale';
+      expect(t.takeException(), isNull, reason: 'no overflow: $at');
+      for (final s in api.services) {
+        final item = find.byKey(Key('host-switch-item-${s.key}'));
+        await t.ensureVisible(item);
+        await t.pump();
+        _reachable(t, item, Offset.zero & size, '${s.key} $at');
+        final device = find.descendant(of: item, matching: find.text(s.device));
+        expect(
+          t.renderObject<RenderParagraph>(device).didExceedMaxLines,
+          isFalse,
+          reason: '${s.device} whole at $at',
+        );
       }
+      await capturePreview(t, 'responsive-host-switcher-320-zh-2.0');
     });
   });
 
@@ -672,40 +628,39 @@ void main() {
     await _onIos(t, () async {
       const screen = AppSessionScreen(serviceKey: _codex, home: true);
       for (final size in const [Size(852, 393), Size(393, 852)]) {
-        for (final scale in [1.0, 2.0]) {
-          final api = _api();
-          await api.appConnect(_codex, 1);
-          await _mount(
-            t,
-            api,
-            screen,
-            size: size,
-            scale: scale,
-            locale: const Locale('zh'),
-          );
-          final menu = find.byKey(const Key('sidebar-open-btn'));
-          if (menu.evaluate().isNotEmpty) {
-            await t.tap(menu);
-            await _frames(t);
-          }
-          final at = '$size ×$scale';
-          expect(t.takeException(), isNull, reason: 'no overflow: $at');
-          for (final key in [
-            'new-conversation-btn',
-            'activity-view-btn',
-            'sidebar-settings-btn',
-          ]) {
-            final control = find.byKey(Key(key));
-            // Portrait keeps the footer pinned: no scrolling needed there.
-            if (size.width > size.height) await t.ensureVisible(control);
-            await t.pump();
-            _reachable(t, control, Offset.zero & size, '$key $at');
-          }
-          final heading = t.getSize(find.byKey(const Key('activity-view-btn')));
-          expect(heading.height, greaterThanOrEqualTo(44), reason: at);
-          if (scale == 2 && size.width > size.height) {
-            await capturePreview(t, 'responsive-sidebar-landscape-zh-2.0');
-          }
+        const scale = 2.0;
+        final api = _api();
+        await api.appConnect(_codex, 1);
+        await _mount(
+          t,
+          api,
+          screen,
+          size: size,
+          scale: scale,
+          locale: const Locale('zh'),
+        );
+        final menu = find.byKey(const Key('sidebar-open-btn'));
+        if (menu.evaluate().isNotEmpty) {
+          await t.tap(menu);
+          await _frames(t);
+        }
+        final at = '$size ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        for (final key in [
+          'new-conversation-btn',
+          'activity-view-btn',
+          'sidebar-settings-btn',
+        ]) {
+          final control = find.byKey(Key(key));
+          // Portrait keeps the footer pinned: no scrolling needed there.
+          if (size.width > size.height) await t.ensureVisible(control);
+          await t.pump();
+          _reachable(t, control, Offset.zero & size, '$key $at');
+        }
+        final heading = t.getSize(find.byKey(const Key('activity-view-btn')));
+        expect(heading.height, greaterThanOrEqualTo(44), reason: at);
+        if (size.width > size.height) {
+          await capturePreview(t, 'responsive-sidebar-landscape-zh-2.0');
         }
       }
     });

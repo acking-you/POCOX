@@ -7,9 +7,9 @@ typedef ManagedCall = ({String op, String key, String name, Object? arg});
 ///
 /// Remote computers live in [managedDevices] keyed by their `host:` service
 /// key; mutations update them like the real host would (revisions,
-/// incarnations, stop leaving the entry). [managedFailNext] refuses the next
-/// call of an operation with a host error; [managedLoseNext] performs it and
-/// then loses the response, as a dropped tunnel would.
+/// incarnations, stop leaving the entry). [managedLoseNext] performs the next
+/// call of an operation and then loses the response, as a dropped tunnel
+/// would.
 mixin _FakeManagement on _FakeBridgeState {
   /// Seeded project settings; absent keys derive from [metaProjectConfig] so
   /// tests overriding the legacy call keep working.
@@ -21,9 +21,6 @@ mixin _FakeManagement on _FakeBridgeState {
 
   /// Thrown by the next [metaProjectSettings] (then cleared).
   Object? projectSettingsError;
-
-  /// Calls to [metaProjectSettings].
-  int projectSettingsCalls = 0;
 
   /// Holds [metaProjectSettings] answers until completed (late answers).
   Completer<void>? projectSettingsGate;
@@ -67,9 +64,6 @@ mixin _FakeManagement on _FakeBridgeState {
   /// Remote computers by management key.
   final Map<String, ManagedDevice> managedDevices = {};
 
-  /// Per-key read failures of [managedDevice].
-  final Map<String, Object> managedDeviceErrors = {};
-
   /// Thrown by the next [managedRuntimes] (then cleared).
   Object? managedRuntimesError;
 
@@ -83,10 +77,6 @@ mixin _FakeManagement on _FakeBridgeState {
   /// Every mutation, in order.
   final List<ManagedCall> managedCalls = [];
 
-  /// Refuse the next call of an op (`start`, `save`, `apply`, `stop`,
-  /// `startSaved`) with this host error text.
-  final Map<String, String> managedFailNext = {};
-
   /// Perform the next call of an op, then lose its response.
   final Set<String> managedLoseNext = {};
 
@@ -97,7 +87,6 @@ mixin _FakeManagement on _FakeBridgeState {
 
   @override
   Future<ProjectSettings> metaProjectSettings(String serviceKey) async {
-    projectSettingsCalls++;
     if (projectSettingsGate case final gate?) await gate.future;
     final error = projectSettingsError;
     if (error != null) {
@@ -240,8 +229,6 @@ mixin _FakeManagement on _FakeBridgeState {
 
   @override
   Future<ManagedDevice> managedDevice(String serviceKey) async {
-    final error = managedDeviceErrors[serviceKey];
-    if (error != null) throw error;
     final device = managedDevices[serviceKey];
     if (device == null) {
       throw Exception('host request failed; refresh its state before retrying');
@@ -456,8 +443,6 @@ mixin _FakeManagement on _FakeBridgeState {
     managedCalls.add((op: op, key: key, name: name, arg: arg));
     final gate = managedGate;
     if (gate != null) await gate.future;
-    final refusal = managedFailNext.remove(op);
-    if (refusal != null) throw Exception(refusal);
     final result = apply(await managedDevice(key));
     if (managedLoseNext.remove(op)) {
       throw Exception('host response interrupted; refresh its state');

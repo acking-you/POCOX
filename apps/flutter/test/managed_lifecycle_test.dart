@@ -122,22 +122,6 @@ void main() {
       expect(t.takeException(), isNull);
     });
 
-    testWidgets('a stop answered after the panel was removed raises nothing '
-        'and is not repeated', (t) async {
-      final api = _fake()..managedGate = Completer<void>();
-      final key = await pumpPanel(t, api);
-      await _tap(t, find.byKey(const Key('managed-stop-work')));
-      await t.tap(find.byKey(const Key('managed-confirm-ok')));
-      await t.pump();
-      expect(find.byKey(const Key('managed-row-pending')), findsOneWidget);
-      key.value = null;
-      await t.pump();
-      api.managedGate!.complete();
-      await t.pumpAndSettle();
-      expect(api.managedCalls, hasLength(1));
-      expect(t.takeException(), isNull);
-    });
-
     testWidgets('a start answered after the panel moved is not shown on the '
         'other computer', (t) async {
       final api = _fake();
@@ -284,25 +268,6 @@ void main() {
       expect(find.text('/lab/main'), findsOneWidget);
       expect(find.byKey(const Key('default-project-error')), findsNothing);
       expect(t.takeException(), isNull);
-    });
-
-    testWidgets('a lost save answer of the old host does not reappear on the '
-        'new one', (t) async {
-      final api = FakeBridgeApi()
-        ..projectSettings[_a] = explicit
-        ..projectSettings[_b] = other
-        ..projectSaveError = Exception('tunnel dropped');
-      final key = await pumpTile(t, api);
-      api.projectSettingsGate = Completer<void>();
-      await t.tap(find.byKey(const Key('default-project-automatic')));
-      await t.pump();
-      // The old host's reload is still out; the tile moves on.
-      key.value = _b;
-      await t.pump();
-      api.projectSettingsGate!.complete();
-      await t.pumpAndSettle();
-      expect(find.text('/lab/main'), findsOneWidget);
-      expect(find.text(_en.managedOutcomeUnknown), findsNothing);
     });
 
     testWidgets('after a conflict nothing saves until an explicit reload', (

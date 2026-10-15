@@ -477,16 +477,11 @@ pub(super) fn serve_start_in(
     start: CodexStart,
 ) -> Result<ServeReport> {
     let lease = host_lease::acquire(&start.name, Op::Start)?;
-    let restore = host_profiles::Runtime::Codex {
-        port: start.port,
-        binary: match &start.binary {
-            Binary::Requested(binary) => binary.clone(),
-            Binary::Exact(path) => Some(path.to_string_lossy().into_owned()),
-        },
-        proxy: start.proxy.clone(),
-    };
     let result = serve_start_locked(&lease, support, profiles, start)?;
-    super::host_lifecycle::record_running_in(profiles, lease.name(), restore);
+    // A repeated start can reuse a launch with different options.
+    if let Some(active) = super::host_apply::active(lease.name()) {
+        super::host_lifecycle::record_running_in(profiles, lease.name(), active.runtime);
+    }
     Ok(result)
 }
 

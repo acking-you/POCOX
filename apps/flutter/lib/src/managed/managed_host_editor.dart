@@ -399,28 +399,8 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
   bool _sameTarget(String key, ManagedHost host) =>
       mounted && key == widget.serviceKey && identical(_host, host) && !_busy;
 
-  Future<bool> _confirm(String title, String body, String action) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        key: const Key('managed-confirm'),
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(AppLocalizations.of(context).cancel),
-          ),
-          FilledButton(
-            key: const Key('managed-confirm-ok'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(action),
-          ),
-        ],
-      ),
-    );
-    return ok == true && mounted;
-  }
+  Future<bool> _confirm(String title, String body, String action) async =>
+      await confirmManaged(context, title, body, action) && mounted;
 
   Future<bool> _confirmLeave() async {
     if (_busy) return false;
@@ -748,6 +728,35 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
       ),
     );
   }
+}
+
+/// Ask before a remote mutation; true only for an explicit [action].
+Future<bool> confirmManaged(
+  BuildContext context,
+  String title,
+  String body,
+  String action,
+) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      key: const Key('managed-confirm'),
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(AppLocalizations.of(context).cancel),
+        ),
+        FilledButton(
+          key: const Key('managed-confirm-ok'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: Text(action),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
 }
 
 /// The display name of a runtime kind.

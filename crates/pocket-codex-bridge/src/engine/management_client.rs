@@ -64,9 +64,11 @@ async fn request_at<T: DeserializeOwned, B: Serialize + ?Sized>(
     body: Option<&B>,
     epoch: u64,
 ) -> Result<T> {
-    let mut request = client()?.request(method, url);
+    let mut request = client()?.request(method.clone(), url);
     if let Some(body) = body {
         request = request.json(body);
+    } else if method == Method::POST {
+        request = request.json(&serde_json::json!({}));
     }
     let mut response = request
         .send()

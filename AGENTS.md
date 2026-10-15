@@ -993,9 +993,9 @@ this file's roadmap so the source of truth stays in sync.
     touch the chat pane and sidebar keep a minimum height and scroll in
     landscape or with the keyboard. Touch sidebar heading buttons are 44 px;
     host switcher names take two lines. Settings lists subscriptions by service key, never the internal composite
-    identity. `test/responsive_layout_test.dart` covers 320–430 px, en/zh,
-    1.0/1.6/2.0 text, light/dark, keyboard, landscape and tablet sanity with
-    real fonts.
+    identity. `test/responsive_layout_test.dart` covers 320 px at 2.0 text
+    (en/zh), 393 px at default text, keyboard, landscape and tablet sanity
+    with real fonts.
 
 31. **Remote device management, default project, status (2026-10-16).** A
     desktop host that allows it publishes one management-only `host` key

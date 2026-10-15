@@ -214,7 +214,7 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
             get(|State(s): State<Admission>| {
                 run(s, |_| Ok(crate::engine::management_runtimes::progress()))
             })
-            .post(|State(s): State<Admission>| {
+            .post(|State(s): State<Admission>, Json(_): Json<serde_json::Value>| {
                 run(s, |_| Ok(crate::engine::management_runtimes::prepare()))
             }),
         )
@@ -283,7 +283,7 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
         )
         .route(
             "/projects/default/ensure",
-            post(|State(s): State<Admission>| {
+            post(|State(s): State<Admission>, Json(_): Json<serde_json::Value>| {
                 run(s, |token| {
                     runtime::runtime().block_on(
                         host_services::host_store()?.ensure_default_checked(move || token.check()),
@@ -332,10 +332,24 @@ mod tests {
             .no_proxy()
             .build()
             .expect("client");
+        for path in ["/projects/default/ensure", "/manage/v1/claude/prepare"] {
+            let response = client
+                .post(format!("{url}{path}"))
+                .header("origin", "https://untrusted.example")
+                .body("{}")
+                .send()
+                .await
+                .expect("simple request");
+            assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+        }
         for request in [
             client.get(format!("{url}/manage/v1/device")),
-            client.post(format!("{url}/projects/default/ensure")),
-            client.post(format!("{url}/manage/v1/claude/prepare")),
+            client
+                .post(format!("{url}/projects/default/ensure"))
+                .json(&serde_json::json!({})),
+            client
+                .post(format!("{url}/manage/v1/claude/prepare"))
+                .json(&serde_json::json!({})),
             client
                 .post(format!("{url}/manage/v1/hosts/stale/stop"))
                 .json(&serde_json::json!({"expectedIncarnation":"old"})),

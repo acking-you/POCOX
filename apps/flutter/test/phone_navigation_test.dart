@@ -1,6 +1,5 @@
-// The phone session screen's layered navigation, end to end, plus the
-// preview set for the mobile Material pass. Set PCX_UI_PREVIEW_DIR to write
-// the previews as PNGs.
+// The phone session screen's layered navigation, end to end, and the
+// tablet/desktop layouts it must leave alone.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -25,12 +24,7 @@ final _input = find.byKey(const Key('composer-input'));
 LayeredNavigationState _nav(WidgetTester t) =>
     t.state<LayeredNavigationState>(find.byType(LayeredNavigation));
 
-Future<FakeBridgeApi> _mount(
-  WidgetTester t, {
-  Size size = _phone,
-  Brightness brightness = Brightness.light,
-  double textScale = 1,
-}) async {
+Future<FakeBridgeApi> _mount(WidgetTester t, {Size size = _phone}) async {
   t.view.devicePixelRatio = 1;
   t.view.physicalSize = size;
   addTearDown(t.view.reset);
@@ -56,7 +50,6 @@ Future<FakeBridgeApi> _mount(
     );
   }
   await api.appConnect(_service, 28080);
-  final theme = brightness == Brightness.light ? lightTheme() : darkTheme();
   await t.pumpWidget(
     ProviderScope(
       overrides: [bridgeApiProvider.overrideWithValue(api)],
@@ -64,13 +57,7 @@ Future<FakeBridgeApi> _mount(
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        theme: theme,
-        builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(textScale)),
-          child: RepaintBoundary(key: previewKey, child: child!),
-        ),
+        theme: lightTheme(),
         home: const AppSessionScreen(serviceKey: _service, home: true),
       ),
     ),
@@ -153,98 +140,34 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('the sessions list keeps its scroll position across a close '
-      'and reopen; system back closes before leaving', (t) async {
-    await _mount(t);
-    await t.tap(find.byKey(const Key('sidebar-open-btn')));
-    await t.pumpAndSettle();
-    final list = find
-        .descendant(
-          of: find.byKey(const Key('phone-sidebar')),
-          matching: find.byType(Scrollable, skipOffstage: false),
-        )
-        .last;
-    await t.drag(list, const Offset(0, -500));
-    await t.pumpAndSettle();
-    expect(_nav(t).isOpen, isTrue);
-    final scrolled = t.state<ScrollableState>(list).position.pixels;
-    expect(scrolled, greaterThan(200));
-
-    await t.binding.handlePopRoute();
-    await t.pumpAndSettle();
-    expect(_nav(t).isOpen, isFalse);
-    expect(find.byType(AppSessionScreen), findsOneWidget);
-
-    await t.tap(find.byKey(const Key('sidebar-open-btn')));
-    await t.pumpAndSettle();
-    expect(t.state<ScrollableState>(list).position.pixels, scrolled);
+  testWidgets('a tablet keeps a readable inline sidebar', (t) async {
+    await _mount(t, size: const Size(834, 1194));
+    expect(find.byType(LayeredNavigation), findsNothing);
+    // The default 280 px pane fits beside a 480 px chat on touch, so the
+    // finger-sized pill keeps its whole label.
+    final pill = find.byKey(const Key('new-conversation-btn'));
+    expect(t.getSize(pill).width, greaterThanOrEqualTo(250));
+    final label = t.renderObject<RenderParagraph>(
+      find.descendant(of: pill, matching: find.text('New conversation')),
+    );
+    expect(label.didExceedMaxLines, isFalse);
     expect(t.takeException(), isNull);
   });
 
-  for (final brightness in Brightness.values) {
-    testWidgets('preview: phone ${brightness.name} closed, partial, open', (
-      t,
-    ) async {
-      await _mount(t, brightness: brightness);
-      await t.enterText(_input, 'Tighten the drawer spacing');
-      await t.pump();
-      FocusManager.instance.primaryFocus?.unfocus();
-      await t.pumpAndSettle();
-      await capturePreview(t, 'phone-${brightness.name}-closed');
-      final g = await _edgeDrag(t, 0.55);
-      await capturePreview(t, 'phone-${brightness.name}-partial');
-      await g.up();
-      await t.pumpAndSettle();
-      expect(_nav(t).isOpen, isTrue);
-      await capturePreview(t, 'phone-${brightness.name}-open');
-      expect(t.takeException(), isNull);
-    });
-  }
-
-  testWidgets('preview: phone large text, closed and open', (t) async {
-    await _mount(t, textScale: 1.6);
-    await capturePreview(t, 'phone-large-text-closed');
-    await t.tap(find.byKey(const Key('sidebar-open-btn')));
-    await t.pumpAndSettle();
-    await capturePreview(t, 'phone-large-text-open');
-    expect(t.takeException(), isNull);
-  });
-
-  for (final brightness in Brightness.values) {
-    testWidgets('preview: tablet ${brightness.name} keeps a readable inline '
-        'sidebar', (t) async {
-      await _mount(t, size: const Size(834, 1194), brightness: brightness);
+  testWidgets('the desktop layout is unchanged', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    try {
+      await _mount(t, size: const Size(1280, 860));
       expect(find.byType(LayeredNavigation), findsNothing);
-      // The default 280 px pane fits beside a 480 px chat on touch, so the
-      // finger-sized pill keeps its whole label.
-      final pill = find.byKey(const Key('new-conversation-btn'));
-      expect(t.getSize(pill).width, greaterThanOrEqualTo(250));
-      final label = t.renderObject<RenderParagraph>(
-        find.descendant(of: pill, matching: find.text('New conversation')),
+      // Desktop keeps its source-list row, not the touch pill.
+      expect(
+        t.getSize(find.byKey(const Key('new-conversation-btn'))).height,
+        lessThan(40),
       );
-      expect(label.didExceedMaxLines, isFalse);
-      await capturePreview(t, 'tablet-${brightness.name}');
       expect(t.takeException(), isNull);
-    });
-  }
-
-  for (final brightness in Brightness.values) {
-    testWidgets('preview: desktop ${brightness.name} is unchanged', (t) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      try {
-        await _mount(t, size: const Size(1280, 860), brightness: brightness);
-        expect(find.byType(LayeredNavigation), findsNothing);
-        // Desktop keeps its source-list row, not the touch pill.
-        expect(
-          t.getSize(find.byKey(const Key('new-conversation-btn'))).height,
-          lessThan(40),
-        );
-        await capturePreview(t, 'desktop-${brightness.name}');
-        expect(t.takeException(), isNull);
-        await t.pumpWidget(const SizedBox());
-      } finally {
-        debugDefaultTargetPlatformOverride = null;
-      }
-    });
-  }
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
 }

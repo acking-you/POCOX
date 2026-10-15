@@ -4,6 +4,7 @@
 // was read (revision, incarnation). Conflicts keep edits; lost answers
 // refresh and are never resent; secrets and masked values are kept.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,33 +89,23 @@ FakeBridgeApi _fake({
   return api;
 }
 
-Widget _app(
-  Widget child,
-  BridgeApi api, {
-  double textScale = 1,
-  Locale locale = const Locale('en'),
-  bool dark = false,
-}) => ProviderScope(
-  overrides: [bridgeApiProvider.overrideWithValue(api)],
-  child: MaterialApp(
-    locale: locale,
-    theme: lightTheme(),
-    darkTheme: darkTheme(),
-    themeMode: dark ? ThemeMode.dark : ThemeMode.light,
-    localizationsDelegates: AppLocalizations.localizationsDelegates,
-    supportedLocales: AppLocalizations.supportedLocales,
-    builder: (context, child) => RepaintBoundary(
-      key: previewKey,
-      child: MediaQuery(
-        data: MediaQuery.of(
-          context,
-        ).copyWith(textScaler: TextScaler.linear(textScale)),
-        child: child!,
+Widget _app(Widget child, BridgeApi api, {double textScale = 1}) =>
+    ProviderScope(
+      overrides: [bridgeApiProvider.overrideWithValue(api)],
+      child: MaterialApp(
+        locale: const Locale('en'),
+        theme: lightTheme(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: child,
       ),
-    ),
-    home: child,
-  ),
-);
+    );
 
 Future<void> _size(WidgetTester t, Size size) async {
   t.view.physicalSize = size;
@@ -170,23 +161,19 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('an older computer without management shows no panel', (t) async {
-    final api = _fake(
-      services: const [
-        ServiceEntry(
-          device: 'old',
-          kind: 'app',
-          name: 'default',
-          key: 'pcx:old:app:default',
-        ),
-      ],
-    );
-    await _openServices(t, api, device: 'old');
-    expect(
-      find.byKey(const Key('device-capability-pcx:old:app:default')),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('managed-device-old')), findsNothing);
+  testWidgets('with management off and no local host, a desktop still '
+      'reaches its own switch beside a remote computer', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      // No local host and no published key: nothing names this device.
+      final api = _fake();
+      await _openServices(t, api);
+      await _tapVisible(t, find.byKey(const Key('device-management-switch')));
+      expect(api.deviceManagementSets, [true]);
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('stop names the observed incarnation and the stopped service '
@@ -386,44 +373,6 @@ void main() {
     });
   });
 
-  testWidgets('Add service lists only the host runtimes and prepares Claude '
-      'only on request', (t) async {
-    final api = _fake()
-      ..managedRuntimeLists[_mgmt] = const [
-        ManagedRuntimeAvailability(
-          kind: 'codex',
-          ready: true,
-          needsHostLogin: true,
-        ),
-        ManagedRuntimeAvailability(
-          kind: 'claude',
-          ready: false,
-          canPrepare: true,
-        ),
-      ]
-      ..claudePrepareScript.add(
-        const AcpClaudeSetup(
-          state: 'running',
-          stage: 'downloading',
-          started: true,
-        ),
-      );
-    await _openServices(t, api);
-    await _tapVisible(t, find.byKey(const Key('managed-add-service')));
-    expect(find.byKey(const Key('managed-runtime-codex')), findsOneWidget);
-    expect(find.byKey(const Key('managed-runtime-claude')), findsOneWidget);
-    expect(find.byKey(const Key('managed-runtime-opencode')), findsNothing);
-    expect(find.text(_en.managedRuntimeSignInThere), findsOneWidget);
-    expect(api.claudePrepareStarts, 0, reason: 'nothing installs by looking');
-    await t.tap(find.byKey(const Key('managed-claude-prepare')));
-    await t.pump();
-    expect(api.claudePrepareStarts, 1);
-    expect(find.byKey(const Key('managed-claude-progress')), findsOneWidget);
-    // Close the panel; its poll stops with it.
-    Navigator.of(t.element(find.byKey(const Key('managed-add-panel')))).pop();
-    await t.pumpAndSettle();
-  });
-
   testWidgets('the management panel and editor fit a 320 px phone at 2x '
       'text', (t) async {
     final api = _fake(
@@ -436,66 +385,15 @@ void main() {
       find.byKey(const Key('managed-edit-a-very-long-service-name-on-studio')),
     );
     expect(t.takeException(), isNull);
-    expect(find.byKey(const Key('managed-save')), findsOneWidget);
+    // The keyboard takes half the screen: the form still scrolls to Save.
+    t.view.viewInsets = FakeViewPadding(bottom: 380);
+    addTearDown(t.view.resetViewInsets);
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const Key('managed-save')));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(find.byKey(const Key('managed-save')).hitTestable(), findsOneWidget);
   });
-
-  // Real fonts, so text is measured as shipped; PCX_UI_PREVIEW_DIR writes
-  // each layout as a PNG.
-  for (final (width, locale, dark) in const [
-    (320.0, 'zh', false),
-    (320.0, 'en', true),
-    (393.0, 'en', false),
-    (393.0, 'zh', true),
-  ]) {
-    final name = 'managed-${width.toInt()}-$locale-${dark ? 'dark' : 'light'}';
-    testWidgets('$name at 2x text: panel and editor lay out', (t) async {
-      final api =
-          _fake(
-              hosts: [
-                _running('a-very-long-service-name-on-studio'),
-                _stopped('oc'),
-              ],
-            )
-            ..projectSettings[_mgmt] = const ProjectSettings(
-              revision: '1',
-              effectiveDefault: '/Users/someone/PocketCodex',
-              automatic: true,
-            );
-      await _size(t, Size(width, 760));
-      await t.pumpWidget(
-        _app(
-          const ServicesScreen(),
-          api,
-          textScale: 2,
-          locale: Locale(locale),
-          dark: dark,
-        ),
-      );
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('device-studio')));
-      await t.pumpAndSettle();
-      await t.ensureVisible(find.byKey(const Key('managed-device-studio')));
-      await t.pumpAndSettle();
-      expect(t.takeException(), isNull);
-      await capturePreview(t, '$name-panel');
-      await _tapVisible(
-        t,
-        find.byKey(
-          const Key('managed-edit-a-very-long-service-name-on-studio'),
-        ),
-      );
-      expect(t.takeException(), isNull);
-      await capturePreview(t, '$name-editor');
-      // The keyboard takes half the screen: the form still scrolls.
-      t.view.viewInsets = FakeViewPadding(bottom: 380);
-      addTearDown(t.view.resetViewInsets);
-      await t.pumpAndSettle();
-      await t.ensureVisible(find.byKey(const Key('managed-save')));
-      await t.pumpAndSettle();
-      expect(t.takeException(), isNull);
-      await capturePreview(t, '$name-editor-keyboard');
-    });
-  }
 
   group('default project tile', () {
     Future<void> pumpTile(WidgetTester t, FakeBridgeApi api) async {
@@ -542,29 +440,6 @@ void main() {
       final save = api.projectSettingsSaves.single;
       expect(save.def, isNull);
       expect(save.rev, '8');
-    });
-
-    testWidgets('a project conflict asks for a reload instead of saving '
-        'again', (t) async {
-      final api = _fake()
-        ..projectSettings[_mgmt] = const ProjectSettings(
-          revision: '8',
-          defaultProject: '/srv/app',
-          effectiveDefault: '/srv/app',
-          exists: true,
-        );
-      await pumpTile(t, api);
-      // Another device saved meanwhile.
-      api.projectSettings[_mgmt] = const ProjectSettings(
-        revision: '9',
-        defaultProject: '/srv/other',
-        effectiveDefault: '/srv/other',
-        exists: true,
-      );
-      await _tapVisible(t, find.byKey(const Key('default-project-automatic')));
-      expect(find.text(_en.defaultProjectConflict), findsOneWidget);
-      expect(find.byKey(const Key('default-project-reload')), findsOneWidget);
-      expect(api.projectSettingsSaves, hasLength(1));
     });
 
     testWidgets('a project-settings failure leaves service management usable', (

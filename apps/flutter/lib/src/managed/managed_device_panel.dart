@@ -122,26 +122,14 @@ class _ManagedDevicePanelState extends ConsumerState<ManagedDevicePanel> {
     if (incarnation == null) return;
     final key = widget.serviceKey;
     final l10n = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        key: const Key('managed-confirm'),
-        title: Text(l10n.managedStopConfirmTitle(host.name)),
-        content: Text(l10n.managedStopConfirmBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            key: const Key('managed-confirm-ok'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(l10n.stopHosting),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
+    if (!await confirmManaged(
+      context,
+      l10n.managedStopConfirmTitle(host.name),
+      l10n.managedStopConfirmBody,
+      l10n.stopHosting,
+    )) {
+      return;
+    }
     await _run(
       key,
       host,

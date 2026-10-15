@@ -276,7 +276,11 @@ class _DefaultProjectTileState extends ConsumerState<DefaultProjectTile> {
           const SizedBox(height: 4),
           Text(l10n.defaultProjectCreatedLater, style: muted),
         ],
-        if (path != null && !settings.automatic && !settings.exists) ...[
+        // An older host reports no existence (`exists` false means unknown).
+        if (path != null &&
+            !settings.automatic &&
+            !settings.legacy &&
+            !settings.exists) ...[
           const SizedBox(height: 4),
           Text(
             l10n.defaultProjectMissing,

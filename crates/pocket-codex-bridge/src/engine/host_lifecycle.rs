@@ -218,35 +218,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn boot_snapshot_cannot_override_a_later_stop_or_local_restart() {
+    fn a_stop_is_durable_and_only_a_later_start_of_its_name_replaces_it() {
         let root = tempfile::tempdir().expect("temp");
+        let runtime = Runtime::OpenCode {
+            binary: None,
+        };
+        // A legacy record without an override restores; a remote stop blocks it.
         assert!(restore_choice(root.path(), "old-pref", None)
             .expect("legacy")
             .is_none());
         record_in(root.path(), "old-pref", None).expect("remote stop");
         assert!(restore_choice(root.path(), "old-pref", None).is_err());
-        let runtime = Runtime::OpenCode {
-            binary: None,
-        };
-        let start = record_in(root.path(), "new-pref", Some(runtime.clone())).expect("start");
-        assert_eq!(
-            restore_choice(root.path(), "new-pref", Some(start.revision)).expect("current"),
-            Some(runtime)
-        );
-        let stop = record_in(root.path(), "new-pref", None).expect("stop");
-        assert!(restore_choice(root.path(), "new-pref", Some(start.revision)).is_err());
-        assert!(restore_choice(root.path(), "new-pref", Some(stop.revision)).is_err());
-    }
-
-    #[test]
-    fn a_stop_survives_reopen_and_a_later_start_replaces_only_its_name() {
-        let root = tempfile::tempdir().expect("tempdir");
-        let runtime = Runtime::OpenCode {
-            binary: None,
-        };
         record_in(root.path(), "Other", Some(runtime.clone())).expect("other start");
-        record_in(root.path(), "My Host", Some(runtime.clone())).expect("start");
+        let start = record_in(root.path(), "My Host", Some(runtime.clone())).expect("start");
+        assert_eq!(
+            restore_choice(root.path(), "my-host", Some(start.revision)).expect("current"),
+            Some(runtime.clone())
+        );
         let stopped = record_in(root.path(), "my-host", None).expect("stop before effect");
+        // A boot snapshot from before the stop, or of the stop, restores nothing.
+        assert!(restore_choice(root.path(), "my-host", Some(start.revision)).is_err());
+        assert!(restore_choice(root.path(), "my-host", Some(stopped.revision)).is_err());
         // Simulate a crash before the caller stopped its child or wrote UI prefs.
         let reopened = entries_in(root.path()).expect("reopen");
         assert_eq!(reopened["my-host"], stopped);

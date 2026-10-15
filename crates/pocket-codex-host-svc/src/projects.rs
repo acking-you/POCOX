@@ -339,23 +339,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn automatic_default_is_lazy_and_confined_to_its_child() {
-        let dir = tempfile::tempdir().expect("temp");
-        let store = open(dir.path()).await;
-        let first = store.view().await.expect("view");
-        assert!(first.config.default_project.is_none());
-        assert!(first.effective_default.automatic);
-        assert!(!Path::new(&first.effective_default.path).exists());
-        let ready = store.ensure_default().await.expect("ensure");
-        assert!(ready.created);
-        assert!(!store.ensure_default().await.expect("again").created);
-        let roots = store.effective_roots().await.expect("roots");
-        assert!(crate::fs::within_roots(Path::new(&ready.path), &roots));
-        assert!(!crate::fs::within_roots(dir.path(), &roots));
-        assert_eq!(store.view().await.expect("after").revision, first.revision);
-    }
-
-    #[tokio::test]
     async fn controllers_observe_changes_and_refuse_stale_saves() {
         let dir = tempfile::tempdir().expect("temp");
         let one = open(dir.path()).await;

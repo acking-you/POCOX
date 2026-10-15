@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// A navigation control that stays inside its transcript viewport when moved,
@@ -33,19 +34,42 @@ class _DraggableNavigationState extends State<DraggableNavigation> {
 
   @override
   Widget build(BuildContext context) {
+    // An ancestor page drag (the phone's layered sidebar) accepts a
+    // horizontal move at touch slop, while a pan normally waits for twice
+    // that. Accept this control's pan at the same distance instead: being
+    // deeper, it sees each move first and so keeps any drag that starts on
+    // it, whatever the direction.
+    final touchSlop =
+        MediaQuery.maybeGestureSettingsOf(context)?.touchSlop ?? kTouchSlop;
+    final settings = DeviceGestureSettings(touchSlop: touchSlop / 2);
     return CustomSingleChildLayout(
       delegate: _position,
       child: Semantics(
         label: widget.label,
-        child: GestureDetector(
+        child: RawGestureDetector(
           key: const Key('draggable-turn-navigation'),
           behavior: HitTestBehavior.opaque,
-          // Start from where the control actually is (it may sit at its
-          // default corner with no offset yet), then follow the pointer 1:1.
-          onPanStart: (_) => _offset.value = _position.actual,
-          onPanUpdate: (details) => _offset.value = _position.clamp(
-            (_offset.value ?? _position.actual) + details.delta,
-          ),
+          gestures: {
+            PanGestureRecognizer:
+                GestureRecognizerFactoryWithHandlers<PanGestureRecognizer>(
+                  () => PanGestureRecognizer(debugOwner: this),
+                  (pan) {
+                    pan
+                      ..gestureSettings = settings
+                      // Start from where the control actually is (it may
+                      // sit at its default corner with no offset yet),
+                      // then follow the pointer 1:1.
+                      ..onStart = (_) {
+                        _offset.value = _position.actual;
+                      }
+                      ..onUpdate = (details) {
+                        _offset.value = _position.clamp(
+                          (_offset.value ?? _position.actual) + details.delta,
+                        );
+                      };
+                  },
+                ),
+          },
           // Its own layer: moving it then composites one small picture
           // instead of repainting the transcript underneath every frame.
           child: RepaintBoundary(child: widget.child),

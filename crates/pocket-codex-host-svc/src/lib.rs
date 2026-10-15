@@ -280,6 +280,7 @@ async fn put_projects(
 
 async fn ensure_default_project(
     State(state): State<Arc<AppState>>,
+    Json(_): Json<serde_json::Value>,
 ) -> Result<Json<EnsuredProject>, ApiError> {
     Ok(Json(state.host.ensure_default().await?))
 }

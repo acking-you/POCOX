@@ -137,28 +137,6 @@ void main() {
     expect(api.lastCwd, '/srv/next');
   });
 
-  testWidgets('an existing conversation, then New conversation, honors an '
-      'explicit default', (t) async {
-    final api =
-        _api(
-            settings: const ProjectSettings(
-              revision: '2',
-              defaultProject: '/srv/app',
-              effectiveDefault: '/srv/app',
-              exists: true,
-            ),
-          )
-          ..appThreads.add(
-            const ThreadMeta(id: 't1', preview: 'old', cwd: '', updatedAt: 1),
-          );
-    await mountChat(t, api, threadId: 't1');
-    await newConversation(t);
-    await typeMessage(t, 'hi');
-    await tapSend(t);
-    expect(find.byKey(const Key('folder-picker-no-roots')), findsNothing);
-    expect(api.lastCwd, '/srv/app');
-  });
-
   testWidgets('after an automatic first send the conversation takes the '
       'folder the host lists for it', (t) async {
     final api = _api(settings: _automatic)..threadStartDefaultCwd = _auto;

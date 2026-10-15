@@ -135,14 +135,19 @@ class _DeviceFirstServices extends ConsumerWidget {
     final ownDevice = ownManagementKey == null
         ? null
         : serviceKeyDevice(ownManagementKey);
-    final devices = <String>{
-      for (final service in visible) service.device,
-      for (final host in localHosts) host.device,
-    }.toList()..sort();
     final localDevices = {
       for (final host in localHosts) host.device,
       if (ownDevice != null && ownDevice.isNotEmpty) ownDevice,
     };
+    final devices = <String>{
+      for (final service in visible) service.device,
+      ...localDevices,
+    }.toList()..sort();
+    // With no host running here and management off (so no published key),
+    // nothing names this computer's device. Its hosting and management
+    // controls must stay reachable anyway, or management could never be
+    // switched back on: they then sit under whichever device is selected.
+    final localUnknown = !devices.any(localDevices.contains);
     final preferredKey = ref.watch(
       uiPrefsProvider.select(
         (prefs) => prefs.valueOrNull?.preferredAppServiceKey,
@@ -588,9 +593,10 @@ class _DeviceFirstServices extends ConsumerWidget {
       // Hosting is about THIS machine, so it belongs under this machine's
       // device — showing it while a remote peer is selected implied the hosts
       // listed were that peer's. The no-devices case still needs it, since that
-      // is the only route to starting a first host.
+      // is the only route to starting a first host, and so does a computer
+      // whose own device is not known (see `localUnknown`).
       if (_hostingSupported &&
-          (devices.isEmpty || localDevices.contains(activeDevice))) ...[
+          (localUnknown || localDevices.contains(activeDevice))) ...[
         const SizedBox(height: 12),
         // No status on the header: each host card carries its own, and the same
         // pill in both places said one thing twice.

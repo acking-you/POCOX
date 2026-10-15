@@ -228,6 +228,7 @@ pub fn host(name: &str) -> Result<HostView> {
         mask_runtime(&mut active.runtime);
     }
     if let Some(status) = &mut status {
+        status.codex_binary = None;
         mask_url(&mut status.proxy);
         if status.agent_error.is_some() {
             status.agent_error =
@@ -303,16 +304,21 @@ fn mask_url(value: &mut Option<String>) -> bool {
 fn mask_runtime(runtime: &mut Runtime) {
     match runtime {
         Runtime::Codex {
-            proxy, ..
+            binary,
+            proxy,
+            ..
         } => {
+            *binary = None;
             mask_url(proxy);
         },
-        // A saved local command may embed arbitrary secrets. Remote clients
-        // may select that saved runtime, but never inspect or edit its argv.
-        Runtime::Acp(spec) => spec.args.clear(),
+        // Remote clients select a saved launch without receiving its command.
+        Runtime::Acp(spec) => {
+            spec.program.clear();
+            spec.args.clear();
+        },
         Runtime::OpenCode {
-            ..
-        } => {},
+            binary,
+        } => *binary = None,
     }
 }
 
@@ -523,16 +529,27 @@ mod tests {
         let mut invalid = Some("https://secret@[invalid".into());
         assert!(mask_url(&mut invalid));
         assert!(invalid.is_none());
-        let mut runtime = Runtime::Acp(AgentSpec {
-            profile_id: "custom".into(),
-            display_name: "Custom".into(),
-            program: "agent".into(),
-            args: vec!["--token=secret".into()],
-        });
-        mask_runtime(&mut runtime);
-        assert!(!serde_json::to_string(&runtime)
-            .expect("JSON")
-            .contains("secret"));
+        for mut runtime in [
+            Runtime::Acp(AgentSpec {
+                profile_id: "custom".into(),
+                display_name: "Custom".into(),
+                program: "/private/secret/agent".into(),
+                args: vec!["--token=secret".into()],
+            }),
+            Runtime::Codex {
+                binary: Some("/private/secret/codex".into()),
+                port: 1234,
+                proxy: Some("https://secret@example.org".into()),
+            },
+            Runtime::OpenCode {
+                binary: Some("/private/secret/opencode".into()),
+            },
+        ] {
+            mask_runtime(&mut runtime);
+            assert!(!serde_json::to_string(&runtime)
+                .expect("JSON")
+                .contains("secret"));
+        }
     }
 
     #[test]

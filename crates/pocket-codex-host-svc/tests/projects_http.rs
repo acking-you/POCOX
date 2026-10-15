@@ -415,8 +415,18 @@ async fn default_project_http_preserves_legacy_shape_and_checks_revision() {
     assert_eq!(view["default_project"], serde_json::Value::Null);
     assert_eq!(view["effective_default"]["automatic"], true);
     assert!(!guard.path().join("PocketCodex").exists());
+    let simple = client
+        .post(format!("{base}/projects/default/ensure"))
+        .header("origin", "https://untrusted.example")
+        .body("{}")
+        .send()
+        .await
+        .expect("simple request");
+    assert_eq!(simple.status(), reqwest::StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert!(!guard.path().join("PocketCodex").exists());
     let ensured: serde_json::Value = client
         .post(format!("{base}/projects/default/ensure"))
+        .json(&serde_json::json!({}))
         .send()
         .await
         .expect("ensure")
@@ -478,6 +488,7 @@ async fn default_project_http_preserves_legacy_shape_and_checks_revision() {
         .expect("legacy accepted");
     let error = client
         .post(format!("{base}/projects/default/ensure"))
+        .json(&serde_json::json!({}))
         .send()
         .await
         .expect("missing");
