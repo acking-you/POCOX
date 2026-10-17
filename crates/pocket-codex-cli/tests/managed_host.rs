@@ -23,22 +23,29 @@ impl Fixture {
             .join(format!("pcx-managed-host-{}-{sequence}", std::process::id()));
         let reservation = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let relay = reservation.local_addr().unwrap().to_string();
-        let state = root.join("state/pocket-codex/managed-host/hosting");
-        std::fs::create_dir_all(&state).unwrap();
-        std::fs::write(
-            state.join("lifecycle.json"),
-            serde_json::to_vec(&serde_json::json!({
-                "version": 1, "revision": 1,
-                "entries": {"default": {"revision": 1, "runtime": null}},
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        Self {
+        std::fs::create_dir_all(root.join("state/pocket-codex/managed-host/hosting")).unwrap();
+        let fixture = Self {
             root,
             relay,
             children: vec![],
-        }
+        };
+        fixture.save_ledger(serde_json::json!({"default": {"revision": 1, "runtime": null}}));
+        fixture
+    }
+
+    /// The managed host's authoritative restore choices.
+    fn ledger(&self) -> PathBuf {
+        self.root
+            .join("state/pocket-codex/managed-host/hosting/lifecycle.json")
+    }
+
+    fn save_ledger(&self, entries: serde_json::Value) {
+        let ledger = serde_json::json!({"version": 1, "revision": 1, "entries": entries});
+        std::fs::write(self.ledger(), serde_json::to_vec(&ledger).unwrap()).unwrap();
+    }
+
+    fn read_ledger(&self) -> serde_json::Value {
+        serde_json::from_slice(&std::fs::read(self.ledger()).unwrap()).unwrap()
     }
 
     fn command(&self) -> Command {
@@ -143,17 +150,25 @@ fn stopped_services_survive_restart_and_duplicate_owners_are_refused() {
     fixture.stop(pid);
     let restarted = fixture.start();
     fixture.stop(restarted);
-    let ledger: serde_json::Value = serde_json::from_slice(
-        &std::fs::read(
-            fixture
-                .root
-                .join("state/pocket-codex/managed-host/hosting/lifecycle.json"),
-        )
-        .unwrap(),
-    )
-    .unwrap();
+    let ledger = fixture.read_ledger();
     assert_eq!(ledger["entries"]["default"]["revision"], 1);
     assert!(ledger["entries"]["default"]["runtime"].is_null());
+}
+
+#[test]
+fn a_service_that_cannot_start_never_keeps_management_offline() {
+    let mut fixture = Fixture::new();
+    // Saved as running, but its executable has since been removed.
+    let broken = serde_json::json!({"kind": "codex", "binary": "/missing-codex", "port": 0});
+    fixture.save_ledger(serde_json::json!({
+        "default": {"revision": 1, "runtime": null},
+        "broken": {"revision": 1, "runtime": broken},
+    }));
+    // Starting asserts management is enabled and nothing is running.
+    let pid = fixture.start();
+    fixture.stop(pid);
+    // The choice is kept, so the service is tried again on the next start.
+    assert_eq!(fixture.read_ledger()["entries"]["broken"]["runtime"], broken);
 }
 
 #[test]
@@ -207,13 +222,7 @@ fn invalid_options_and_corrupt_restore_never_publish_management() {
             .join("state/pocket-codex/managed-host/owner.lock")
             .exists());
     }
-    std::fs::write(
-        fixture
-            .root
-            .join("state/pocket-codex/managed-host/hosting/lifecycle.json"),
-        b"invalid lifecycle contents",
-    )
-    .unwrap();
+    std::fs::write(fixture.ledger(), b"invalid lifecycle contents").unwrap();
     let result = fixture
         .command()
         .args(["serve", "--allow-remote-management", "--relay", &fixture.relay])
