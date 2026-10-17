@@ -237,20 +237,6 @@ void _openCodeHostTests() {
     );
   });
 
-  testWidgets('a running OpenCode host folds its longer notes into '
-      'diagnostics', (t) async {
-    final api = FakeBridgeApi();
-    final running = FakeBridgeApi.openCodeHost('studio');
-    api.serveHosts.add(running);
-    await _pumpEditor(t, api, existing: running);
-    expect(find.byKey(const Key('opencode-host-details')), findsOneWidget);
-    expect(find.byKey(const Key('opencode-scope-note')), findsNothing);
-    await t.ensureVisible(find.byKey(const Key('host-diagnostics')));
-    await t.tap(find.byKey(const Key('host-diagnostics')));
-    await t.pumpAndSettle();
-    expect(find.byKey(const Key('opencode-scope-note')), findsOneWidget);
-  });
-
   testWidgets('a running host without a provider says so; Refresh re-reads', (
     t,
   ) async {

@@ -258,37 +258,7 @@ class _AgentTile extends StatelessWidget {
                 child: SizedBox(
                   // Grows with the text size; the section's width caps it.
                   width: MediaQuery.textScalerOf(context).scale(124),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            icon,
-                            const Spacer(),
-                            if (selected)
-                              Icon(
-                                AppIcons.check_circle,
-                                size: 16,
-                                color: scheme.onSurface,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  child: _body(scheme),
                 ),
               ),
             ),
@@ -297,4 +267,30 @@ class _AgentTile extends StatelessWidget {
       ),
     );
   }
+
+  /// The agent's mark (with a check when chosen) over its name.
+  Widget _body(ColorScheme scheme) => Padding(
+    padding: const EdgeInsets.fromLTRB(14, 14, 12, 14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            icon,
+            const Spacer(),
+            if (selected)
+              Icon(AppIcons.check_circle, size: 16, color: scheme.onSurface),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+        ),
+      ],
+    ),
+  );
 }

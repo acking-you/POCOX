@@ -28,6 +28,22 @@ Future<void> pumpMarkdown(WidgetTester tester, String data) async {
   await tester.pump();
 }
 
+/// The painted span whose text contains [needle].
+InlineSpan spanContaining(WidgetTester tester, String needle) => tester
+    .widgetList<RichText>(find.byType(RichText))
+    .map((w) => w.text)
+    .firstWhere((s) => s.toPlainText().contains(needle));
+
+/// Every colour [span] and its children paint text in.
+Set<Color> spanColours(InlineSpan span) {
+  final colours = <Color>{};
+  span.visitChildren((child) {
+    if (child.style?.color case final colour?) colours.add(colour);
+    return true;
+  });
+  return colours;
+}
+
 void main() {
   testWidgets('bolds CJK text that CommonMark leaves literal', (tester) async {
     await pumpMarkdown(tester, '**重点是印度：**苹果页面同时列出 ₹700。');
@@ -62,26 +78,28 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('links render with a favicon slot and no raw markup', (
+  testWidgets('a web link gets a favicon slot, a non-web one none', (
     tester,
   ) async {
-    await pumpMarkdown(tester, '价格见 [苹果官网](https://www.apple.com/cn/) 页面。');
+    await pumpMarkdown(
+      tester,
+      '价格见 [苹果官网](https://www.apple.com/cn/) 与 [第二节](#section-2) 页面。',
+    );
 
     // The network favicon can't load in a test binding, so the generic globe
     // stands in — that is the same fallback a blocked or 404ing host gets.
+    // The in-page anchor has no site to represent.
     expect(find.byIcon(AppIcons.public), findsOneWidget);
     final text = renderedText(tester);
     expect(text, contains('苹果官网'));
+    expect(text, contains('第二节'));
     expect(text, isNot(contains('https://')));
   });
 
   testWidgets('keeps formatting inside a link label', (tester) async {
     await pumpMarkdown(tester, '见 [**苹果**官网](https://www.apple.com/cn/)。');
 
-    final span = tester
-        .widgetList<RichText>(find.byType(RichText))
-        .map((w) => w.text)
-        .firstWhere((s) => s.toPlainText().contains('苹果'));
+    final span = spanContaining(tester, '苹果');
     final weights = <FontWeight?>[];
     span.visitChildren((child) {
       if (child is TextSpan && child.text == '苹果') {
@@ -90,13 +108,6 @@ void main() {
       return true;
     });
     expect(weights, [FontWeight.w600]);
-  });
-
-  testWidgets('a non-web link gets no favicon', (tester) async {
-    await pumpMarkdown(tester, '见 [第二节](#section-2) 说明。');
-
-    expect(find.byIcon(AppIcons.public), findsNothing);
-    expect(renderedText(tester), contains('第二节'));
   });
 
   testWidgets('a fenced block is syntax-highlighted, with its text intact', (
@@ -108,23 +119,10 @@ void main() {
     );
 
     // Find the block's own RichText (the header carries the language name).
-    final span = tester
-        .widgetList<RichText>(find.byType(RichText))
-        .map((w) => w.text)
-        .firstWhere((s) => s.toPlainText().contains('fn main()'));
-    final colours = <Color>{};
-    void walk(InlineSpan s) {
-      if (s is TextSpan) {
-        final c = s.style?.color;
-        if (c != null) colours.add(c);
-        s.children?.forEach(walk);
-      }
-    }
-
-    walk(span);
+    final span = spanContaining(tester, 'fn main()');
     // More than one colour is the whole point; one would mean the highlighter
     // never ran and the fallback plain span was rendered.
-    expect(colours.length, greaterThan(1));
+    expect(spanColours(span).length, greaterThan(1));
     // And highlighting must not rewrite what the agent wrote.
     expect(span.toPlainText(), contains('fn main() {\n    let x = 1; // note'));
   });
@@ -134,22 +132,9 @@ void main() {
   ) async {
     await pumpMarkdown(tester, '```\nsome free-form output\n```');
 
-    final span = tester
-        .widgetList<RichText>(find.byType(RichText))
-        .map((w) => w.text)
-        .firstWhere((s) => s.toPlainText().contains('free-form'));
+    final span = spanContaining(tester, 'free-form');
     expect(span.toPlainText(), contains('some free-form output'));
     // No info string → no grammar → one uniform colour, not a mis-guess.
-    final colours = <Color>{};
-    void walk(InlineSpan s) {
-      if (s is TextSpan) {
-        final c = s.style?.color;
-        if (c != null) colours.add(c);
-        s.children?.forEach(walk);
-      }
-    }
-
-    walk(span);
-    expect(colours.length, lessThanOrEqualTo(1));
+    expect(spanColours(span).length, lessThanOrEqualTo(1));
   });
 }

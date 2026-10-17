@@ -4,11 +4,10 @@
 /// sidebar row and a status card all speak the same visual language. Every
 /// glyph uses Lucide's 300 weight (a 1.55 stroke on its 24 grid instead of
 /// 2): at the 14-20 px the UI draws them, the default reads heavier than the
-/// text beside it. Names
-/// keep the Material identifiers they replaced, which keeps call sites
-/// readable; the value is what the design picked. Solid shapes that only
-/// read as filled (a status dot, the stop square) stay Material glyphs.
-// Constants keep the Material identifiers they replaced.
+/// text beside it. Names keep the Material identifiers they replaced, which
+/// keeps call sites readable; the value is what the design picked. Solid
+/// shapes that only read as filled (a status dot, the stop square) stay
+/// Material glyphs.
 // ignore_for_file: constant_identifier_names
 library;
 
@@ -516,9 +515,6 @@ abstract final class AppIcons {
 
   /// `radio_button_unchecked`.
   static const IconData radio_button_unchecked = LucideIcons.circle300;
-
-  /// `rate_review_outlined`.
-  static const IconData rate_review_outlined = LucideIcons.messageSquareText300;
 
   /// `refresh`.
   static const IconData refresh = LucideIcons.refreshCw300;

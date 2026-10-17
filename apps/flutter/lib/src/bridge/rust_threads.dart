@@ -246,20 +246,6 @@ mixin _RustThreads implements BridgeApi {
   }
 
   @override
-  Future<List<ThreadItem>> appThreadTurnItems(
-    String serviceKey,
-    String threadId,
-    String turnId,
-  ) async {
-    final items = await frb.appThreadTurnItems(
-      serviceKey: serviceKey,
-      threadId: threadId,
-      turnId: turnId,
-    );
-    return items.map(_item).toList();
-  }
-
-  @override
   ThreadRuntimeConfig? appThreadRuntimeConfig(
     String serviceKey,
     String threadId,

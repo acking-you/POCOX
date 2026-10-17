@@ -50,10 +50,4 @@ class LruCache<K, V extends Object> {
     final w = weigh(key, value);
     return w < 1 ? 1 : w;
   }
-
-  /// Forget everything.
-  void clear() {
-    _entries.clear();
-    _weight = 0;
-  }
 }

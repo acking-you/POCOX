@@ -60,7 +60,6 @@ class _MarkdownViewState extends State<MarkdownView>
   late final _LinkBuilder _links = _LinkBuilder();
   final _recognizers = <GestureRecognizer>[];
   List<Widget> _children = const [];
-  MarkdownStyleSheet? _style;
   // This row's parse and the text it was made from.
   List<md.Node>? _nodes;
   String? _nodesFor;
@@ -99,17 +98,15 @@ class _MarkdownViewState extends State<MarkdownView>
   /// or the theme changed — never on an unrelated rebuild, and a row that
   /// scrolls back into view reuses the parse instead of redoing it.
   void _build() {
-    final style = markdownStyle(
-      context,
-      muted: widget.muted,
-      dense: widget.dense,
-    );
-    _style = style;
     _disposeRecognizers();
     final builder = MarkdownBuilder(
       delegate: this,
       selectable: false,
-      styleSheet: style,
+      styleSheet: markdownStyle(
+        context,
+        muted: widget.muted,
+        dense: widget.dense,
+      ),
       imageDirectory: null,
       imageBuilder: null,
       checkboxBuilder: (checked) => _checkbox(context, checked),
@@ -159,7 +156,6 @@ class _MarkdownViewState extends State<MarkdownView>
   Widget build(BuildContext context) {
     // A theme change rebuilds through didChangeDependencies; this only
     // places what is already laid out.
-    assert(_style != null);
     return _children.length == 1
         ? _children.single
         : Column(
@@ -178,10 +174,12 @@ final _parses = LruCache<String, List<md.Node>>(
   weigh: (data, _) => data.length,
 );
 
-List<md.Node> _parse(String data) => md.Document(
-  extensionSet: markdownExtensionSet,
-  encodeHtml: false,
-).parseLines(const LineSplitter().convert(autolinkifyMarkdown(data)));
+md.Document _document() =>
+    md.Document(extensionSet: markdownExtensionSet, encodeHtml: false);
+
+List<md.Node> _parse(String data) => _document().parseLines(
+  const LineSplitter().convert(autolinkifyMarkdown(data)),
+);
 
 // Stylesheets handed out so far, keyed by the theme they came from. Building
 // one costs ~40 TextStyles, and every message in the transcript asks for it on
@@ -388,13 +386,8 @@ class _CodeBlockBuilder extends MarkdownElementBuilder {
 /// one line of plain text — an activity card's collapsed peek. Uses the real
 /// parser rather than a strip-the-asterisks regex, so `**Planning restart**`
 /// reads as `Planning restart` and a stray `*` in prose survives intact.
-String markdownPlainPreview(String source) {
-  final doc = md.Document(
-    extensionSet: markdownExtensionSet,
-    encodeHtml: false,
-  );
-  return doc.parseInline(source).map((n) => n.textContent).join();
-}
+String markdownPlainPreview(String source) =>
+    _document().parseInline(source).map((n) => n.textContent).join();
 
 /// Renders `<a>` as `favicon + underlined text`, tappable.
 ///

@@ -417,10 +417,7 @@ class _HostList extends StatelessWidget {
             mouseCursor: clickable,
             onTap: onManage,
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: touch ? 20 : 12,
-                vertical: touch ? 12 : 8,
-              ),
+              padding: _rowPadding(touch),
               child: Row(
                 children: [
                   Icon(AppIcons.add, size: 16, color: scheme.onSurfaceVariant),
@@ -454,10 +451,7 @@ class _HostList extends StatelessWidget {
       mouseCursor: clickable,
       onTap: () => onPick(s.key),
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: touch ? 20 : 12,
-          vertical: touch ? 12 : 8,
-        ),
+        padding: _rowPadding(touch),
         child: Row(
           children: [
             _identityIcon(identities, s.key, scheme.onSurfaceVariant),
@@ -667,6 +661,10 @@ class HostSwitchBanner extends StatelessWidget {
   }
 }
 
+/// The inset of every row in the host switcher.
+EdgeInsets _rowPadding(bool touch) =>
+    EdgeInsets.symmetric(horizontal: touch ? 20 : 12, vertical: touch ? 12 : 8);
+
 /// "Refresh services": re-discovers hosts in place, with progress while it
 /// runs and a retryable note when it fails. The shown list stays until the
 /// new one arrives.
@@ -714,10 +712,7 @@ class _RefreshServicesRowState extends State<_RefreshServicesRow> {
       mouseCursor: clickable,
       onTap: _busy ? null : _refresh,
       child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: touch ? 20 : 12,
-          vertical: touch ? 12 : 8,
-        ),
+        padding: _rowPadding(touch),
         child: Row(
           children: [
             SizedBox.square(

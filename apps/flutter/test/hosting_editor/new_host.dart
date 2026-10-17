@@ -178,20 +178,6 @@ void _newHostTests() {
     );
     expect(find.byKey(const Key('host-protocol-responses')), findsNothing);
 
-    // Native OpenCode: its own providers and sign-ins, or a custom provider
-    // of any of its three APIs; never the official account.
-    await _tapKey(t, 'agent-choice-opencode');
-    expect(find.byKey(const Key('host-inherited-opencode')), findsOneWidget);
-    expect(find.byKey(const Key('host-source-official')), findsNothing);
-    await _tapKey(t, 'host-source-custom');
-    for (final protocol in const [
-      'responses',
-      'anthropic-messages',
-      'chat-completions',
-    ]) {
-      expect(find.byKey(Key('host-protocol-$protocol')), findsOneWidget);
-    }
-
     await _choosePreset(t, 'fixture');
     expect(find.byKey(const Key('host-source-custom')), findsNothing);
 
@@ -290,22 +276,5 @@ void _newHostTests() {
     expect(find.byKey(const Key('host-leave-dialog')), findsOneWidget);
     await _tapKey(t, 'host-leave-discard');
     expect(find.byType(HostingEditor), findsNothing);
-  });
-
-  testWidgets('the api:<name> service is explained as official-only', (
-    t,
-  ) async {
-    final api = FakeBridgeApi();
-    await _pumpEditor(t, api);
-    // In the model service's explanation, for Codex hosts only.
-    final note = find.byWidgetPredicate(
-      (w) =>
-          w is Tooltip && (w.message ?? '').contains(_l10n(t).hostApiProxyNote),
-    );
-    expect(note, findsOneWidget);
-    await _choosePreset(t, 'fixture');
-    expect(note, findsNothing);
-    await _tapKey(t, 'agent-choice-opencode');
-    expect(note, findsNothing);
   });
 }

@@ -23,6 +23,7 @@ class ReviewFileView extends StatefulWidget {
     required this.path,
     required this.load,
     this.changed = const {},
+    this.revision,
   });
 
   /// The file, as the review names it.
@@ -33,6 +34,10 @@ class ReviewFileView extends StatefulWidget {
 
   /// Line numbers to mark.
   final Set<int> changed;
+
+  /// Moves whenever the file may hold something else; the view then reads it
+  /// again, showing what it has until the new lines arrive.
+  final Object? revision;
 
   @override
   State<ReviewFileView> createState() => _ReviewFileViewState();
@@ -54,7 +59,11 @@ class _ReviewFileViewState extends State<ReviewFileView> {
   @override
   void didUpdateWidget(ReviewFileView old) {
     super.didUpdateWidget(old);
-    if (old.path != widget.path) _load();
+    if (old.path != widget.path) {
+      _load();
+    } else if (old.revision != widget.revision) {
+      _load(keep: true);
+    }
   }
 
   @override
@@ -64,9 +73,11 @@ class _ReviewFileViewState extends State<ReviewFileView> {
     super.dispose();
   }
 
-  Future<void> _load() async {
+  /// Read the file; with [keep], the lines shown stay (and keep their scroll
+  /// position) until the new ones arrive.
+  Future<void> _load({bool keep = false}) async {
     final read = ++_read;
-    if (_lines != null || _failed) {
+    if (!keep && (_lines != null || _failed)) {
       setState(() {
         _lines = null;
         _failed = false;
@@ -74,10 +85,12 @@ class _ReviewFileViewState extends State<ReviewFileView> {
     }
     final lines = await widget.load(widget.path);
     if (!mounted || read != _read) return;
+    final shown = keep && _lines != null;
     setState(() {
       _lines = lines;
       _failed = lines == null;
     });
+    if (shown) return;
     final first = widget.changed.isEmpty
         ? null
         : widget.changed.reduce((a, b) => a < b ? a : b);

@@ -190,7 +190,26 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
         WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _setImageLoader();
     _load(initial: true);
-    _poll = Timer.periodic(_pollInterval, (_) => _load());
+    _startPoll();
+  }
+
+  void _startPoll() => _poll = Timer.periodic(_pollInterval, (_) => _load());
+
+  /// Whether this viewer is the visible route.
+  bool get _onTop => ModalRoute.of(context)?.isCurrent ?? true;
+
+  /// Whether the reader is at (or near) the transcript's end.
+  bool get _atBottom =>
+      !_scroll.hasClients ||
+      _scroll.position.pixels >= _scroll.position.maxScrollExtent - 40;
+
+  /// Keep the end in view once the next frame laid it out, while [current].
+  void _followTail(bool Function() current) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (current() && _scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
   }
 
   @override
@@ -209,10 +228,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
 
   Future<void> _load({bool initial = false}) async {
     if (_source.isNative) {
-      if (!initial &&
-          (!_foreground || !(ModalRoute.of(context)?.isCurrent ?? true))) {
-        return;
-      }
+      if (!initial && (!_foreground || !_onTop)) return;
       return _loadNative(initial: initial);
     }
     if (_reading && !initial) return;
@@ -247,22 +263,14 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       if (!current()) return;
       // Auto-follow the tail if the reader is already near the bottom, so a
       // session being driven elsewhere streams in like a live conversation.
-      final atBottom =
-          !_scroll.hasClients ||
-          _scroll.position.pixels >= _scroll.position.maxScrollExtent - 40;
+      final atBottom = _atBottom;
       setState(() {
         _items = items;
         _live = live;
         _loading = false;
         _error = null;
       });
-      if (fetchTranscript && atBottom) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (current() && _scroll.hasClients) {
-            _scroll.jumpTo(_scroll.position.maxScrollExtent);
-          }
-        });
-      }
+      if (fetchTranscript && atBottom) _followTail(current);
     } catch (e) {
       if (!current()) return;
       // A transient poll failure shouldn't blow away a transcript already shown.
@@ -306,9 +314,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     // Only re-arm the poll when this viewer is still the visible route. On a
     // successful resume it pushed the live conversation on top of us, and
     // polling a backgrounded screen every 3s is wasted work.
-    if (mounted && (ModalRoute.of(context)?.isCurrent ?? true)) {
-      _poll = Timer.periodic(_pollInterval, (_) => _load());
-    }
+    if (mounted && _onTop) _startPoll();
   }
 
   @override

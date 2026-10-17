@@ -57,56 +57,11 @@ extension _SessionLayout on _AppSessionState {
             SafeArea(
               child: Row(
                 children: [
-                  // The sidebar slides rather than snapping: the sheet
-                  // visibly takes over the space, so the user sees where the
-                  // list went. The content keeps its open width and is
-                  // clipped while it slides, so rows never reflow
-                  // mid-animation. A drag resizes without easing.
-                  ClipRect(
-                    child: AnimatedContainer(
-                      duration: slide,
-                      curve: Motion.move,
-                      width: _leftOpen ? sidebarWidth + kSheetInset : 0,
-                      onEnd: () {
-                        if (_sidebarClosing && mounted) {
-                          _updateState(() => _sidebarClosing = false);
-                        }
-                      },
-                      child: OverflowBox(
-                        alignment: Alignment.centerRight,
-                        minWidth: sidebarWidth + kSheetInset,
-                        maxWidth: sidebarWidth + kSheetInset,
-                        child: _leftOpen || _sidebarClosing
-                            ? Row(
-                                children: [
-                                  SizedBox(
-                                    width: sidebarWidth,
-                                    child: _sidebar(l10n),
-                                  ),
-                                  // The gap before the sheet is the handle.
-                                  _splitter(
-                                    key: const Key('left-splitter'),
-                                    width: kSheetInset,
-                                    line: false,
-                                    onDragStart: () => _updateState(
-                                      () => _paneDragging = true,
-                                    ),
-                                    onDrag: (dx) => _updateState(
-                                      () => _leftWidth = (_leftWidth + dx)
-                                          .clamp(200, maxLeft),
-                                    ),
-                                    onDragEnd: () {
-                                      _updateState(() => _paneDragging = false);
-                                      ref
-                                          .read(uiPrefsProvider.notifier)
-                                          .setSidebarWidth(_leftWidth);
-                                    },
-                                  ),
-                                ],
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                    ),
+                  _sidebarSlot(
+                    l10n,
+                    width: sidebarWidth,
+                    maxWidth: maxLeft,
+                    slide: slide,
                   ),
                   Expanded(
                     child: AnimatedPadding(
@@ -152,6 +107,58 @@ extension _SessionLayout on _AppSessionState {
       ),
     );
   }
+
+  /// The desktop sidebar and the gap beside it, which is its resize handle.
+  ///
+  /// The sidebar slides rather than snapping: the sheet visibly takes over
+  /// the space, so the user sees where the list went. The content keeps its
+  /// open [width] and is clipped while it slides, so rows never reflow
+  /// mid-animation. A drag resizes (up to [maxWidth]) without easing.
+  Widget _sidebarSlot(
+    AppLocalizations l10n, {
+    required double width,
+    required double maxWidth,
+    required Duration slide,
+  }) => ClipRect(
+    child: AnimatedContainer(
+      duration: slide,
+      curve: Motion.move,
+      width: _leftOpen ? width + kSheetInset : 0,
+      onEnd: () {
+        if (_sidebarClosing && mounted) {
+          _updateState(() => _sidebarClosing = false);
+        }
+      },
+      child: OverflowBox(
+        alignment: Alignment.centerRight,
+        minWidth: width + kSheetInset,
+        maxWidth: width + kSheetInset,
+        child: _leftOpen || _sidebarClosing
+            ? Row(
+                children: [
+                  SizedBox(width: width, child: _sidebar(l10n)),
+                  // The gap before the sheet is the handle.
+                  _splitter(
+                    key: const Key('left-splitter'),
+                    width: kSheetInset,
+                    line: false,
+                    onDragStart: () => _updateState(() => _paneDragging = true),
+                    onDrag: (dx) => _updateState(
+                      () => _leftWidth = (_leftWidth + dx).clamp(200, maxWidth),
+                    ),
+                    onDragEnd: () {
+                      _updateState(() => _paneDragging = false);
+                      ref
+                          .read(uiPrefsProvider.notifier)
+                          .setSidebarWidth(_leftWidth);
+                    },
+                  ),
+                ],
+              )
+            : const SizedBox.shrink(),
+      ),
+    ),
+  );
 
   /// The phone's conversation page: a plain app bar naming the conversation
   /// over the chat. It slides aside to uncover [_phoneSidebar].
@@ -540,14 +547,14 @@ extension _SessionLayout on _AppSessionState {
   /// unhittable) plus a resize cursor, so the affordance appears on hover the
   /// way a desktop splitter should.
   ///
-  /// The hairline sits on the trailing edge of a 5 px target painted in the
-  /// left neighbour's ground, so the seam reads as one line, not a gutter.
+  /// The hairline sits on the trailing edge of a 5 px target, so the seam
+  /// reads as one line, not a gutter; without [line] the gap itself is the
+  /// handle.
   Widget _splitter({
     required Key key,
     required ValueChanged<double> onDrag,
     VoidCallback? onDragStart,
     VoidCallback? onDragEnd,
-    Color? ground,
     double width = 5,
     bool line = true,
   }) => MouseRegion(
@@ -561,15 +568,13 @@ extension _SessionLayout on _AppSessionState {
       onHorizontalDragCancel: () => onDragEnd?.call(),
       child: Container(
         width: width,
-        color: ground ?? Colors.transparent,
+        color: Colors.transparent,
         alignment: Alignment.centerRight,
-        // Beside a toned pane the change of ground is the seam; a drawn rule
-        // only where two equal grounds meet.
         child: VerticalDivider(
           width: 1,
-          color: ground != null || !line
-              ? Colors.transparent
-              : Theme.of(context).colorScheme.outlineVariant,
+          color: line
+              ? Theme.of(context).colorScheme.outlineVariant
+              : Colors.transparent,
         ),
       ),
     ),

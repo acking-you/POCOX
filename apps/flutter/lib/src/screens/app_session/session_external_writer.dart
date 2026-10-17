@@ -215,11 +215,7 @@ extension _SessionExternalWriter on _AppSessionState {
             existing.images = resolveImageUrls(item.images);
           }
           if (item.itemType == 'imageGeneration') {
-            existing.streaming =
-                item.turnId.isNotEmpty &&
-                item.turnId == history.activeTurnId &&
-                item.turnCompletedAt == null &&
-                imageGenerationInProgress(item.text);
+            existing.streaming = _generatingImage(item, history.activeTurnId);
           }
           existing
             ..text = item.text

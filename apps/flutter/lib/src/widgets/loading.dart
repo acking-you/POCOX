@@ -35,12 +35,7 @@ class _ShimmerState extends State<Shimmer> with SingleTickerProviderStateMixin {
     super.didChangeDependencies();
     // Reduced-motion users keep the skeleton and lose the movement: the shape
     // is what says "loading", the sweep is only polish.
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _c.stop();
-      _c.value = 0.5;
-    } else if (!_c.isAnimating) {
-      _c.repeat();
-    }
+    _c.loopUnlessReduced(context, rest: 0.5);
   }
 
   @override
@@ -129,16 +124,69 @@ class _SlideGradient extends GradientTransform {
 /// A quiet initial-history state: after a short delay, a label with a small
 /// spinner fades in. Fast cache hits never flash a loading shape, and no mock
 /// conversation stands in for the real one.
-class ChatLoadingSkeleton extends StatefulWidget {
+class ChatLoadingSkeleton extends StatelessWidget {
+  /// Creates the loading state.
   const ChatLoadingSkeleton({super.key});
 
   @override
-  State<ChatLoadingSkeleton> createState() => _ChatLoadingSkeletonState();
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Center(
+      child: _DelayedFadeIn(
+        delay: const Duration(milliseconds: 250),
+        hidden: const SizedBox.shrink(),
+        child: Semantics(
+          liveRegion: true,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Reduced motion keeps the label alone, perfectly still.
+              if (Motion.ambientAllowed(context)) ...[
+                SizedBox.square(
+                  dimension: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.6,
+                    color: muted,
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              Text(
+                AppLocalizations.of(context).historyLoading,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _ChatLoadingSkeletonState extends State<ChatLoadingSkeleton> {
+/// Shows [child] only once [delay] has passed, fading it in, so a wait that
+/// ends at once never flashes a placeholder and one that only just outlasts
+/// the delay does not pop. [hidden] holds the place meanwhile; [child] is not
+/// built before it shows, so a hidden sweep never ticks.
+class _DelayedFadeIn extends StatefulWidget {
+  const _DelayedFadeIn({
+    required this.delay,
+    required this.hidden,
+    required this.child,
+  });
+
+  final Duration delay;
+  final Widget hidden;
+  final Widget child;
+
+  @override
+  State<_DelayedFadeIn> createState() => _DelayedFadeInState();
+}
+
+class _DelayedFadeInState extends State<_DelayedFadeIn> {
   bool _visible = false;
-  late final Timer _delay = Timer(const Duration(milliseconds: 250), () {
+  late final Timer _delay = Timer(widget.delay, () {
     if (mounted) setState(() => _visible = true);
   });
 
@@ -155,45 +203,12 @@ class _ChatLoadingSkeletonState extends State<ChatLoadingSkeleton> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
-    // Fades in rather than appearing, so a read that only just outlasts the
-    // delay doesn't flash.
-    return Center(
-      child: AnimatedOpacity(
-        opacity: _visible ? 1 : 0,
-        duration: Motion.of(context, Motion.slow),
-        curve: Motion.enter,
-        child: _visible
-            ? Semantics(
-                liveRegion: true,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Reduced motion keeps the label alone, perfectly still.
-                    if (Motion.ambientAllowed(context)) ...[
-                      SizedBox.square(
-                        dimension: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.6,
-                          color: muted,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    Text(
-                      AppLocalizations.of(context).historyLoading,
-                      style: Theme.of(
-                        context,
-                      ).textTheme.bodySmall?.copyWith(color: muted),
-                    ),
-                  ],
-                ),
-              )
-            : const SizedBox.shrink(),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => AnimatedOpacity(
+    opacity: _visible ? 1 : 0,
+    duration: Motion.of(context, Motion.slow),
+    curve: Motion.enter,
+    child: _visible ? widget.child : widget.hidden,
+  );
 }
 
 /// A shimmer skeleton mimicking a list (services / sessions) while it loads.
@@ -235,19 +250,13 @@ class ListLoadingSkeleton extends StatelessWidget {
 /// The sessions sidebar while its first listing is on its way: after a short
 /// delay, quiet rows under project headings fade in, so a listing that
 /// answers at once never flashes a placeholder.
-class ConversationListSkeleton extends StatefulWidget {
+class ConversationListSkeleton extends StatelessWidget {
   /// Creates the skeleton; [touch] lays it out with touch-sized rows.
   const ConversationListSkeleton({super.key, this.touch = false});
 
   /// Touch-sized rows rather than pointer-sized ones.
   final bool touch;
 
-  @override
-  State<ConversationListSkeleton> createState() =>
-      _ConversationListSkeletonState();
-}
-
-class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
   // Each group: its heading's width, then its rows' title widths (fractions
   // of the row), uneven the way real titles are.
   static const _groups = [
@@ -256,25 +265,8 @@ class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
     (96.0, [0.5, 0.72, 0.6]),
   ];
 
-  bool _visible = false;
-  late final Timer _delay = Timer(const Duration(milliseconds: 180), () {
-    if (mounted) setState(() => _visible = true);
-  });
-
-  @override
-  void initState() {
-    super.initState();
-    _delay;
-  }
-
-  @override
-  void dispose() {
-    _delay.cancel();
-    super.dispose();
-  }
-
   // A pointer row: the title, its time at the end of the line.
-  Widget _pointerRow(double title) => SizedBox(
+  static Widget _pointerRow(double title) => SizedBox(
     height: 34,
     child: Row(
       children: [
@@ -292,7 +284,7 @@ class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
   );
 
   // A touch row: the title, its time on the line below.
-  Widget _touchRow(double title) => SizedBox(
+  static Widget _touchRow(double title) => SizedBox(
     height: 58,
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -322,7 +314,7 @@ class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
         for (final title in titles)
           Padding(
             padding: const EdgeInsetsDirectional.fromSTEB(28, 0, 10, 0),
-            child: widget.touch ? _touchRow(title) : _pointerRow(title),
+            child: touch ? _touchRow(title) : _pointerRow(title),
           ),
       ],
     ];
@@ -330,20 +322,16 @@ class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
       label: AppLocalizations.of(context).conversationsLoading,
       liveRegion: true,
       child: ExcludeSemantics(
-        child: AnimatedOpacity(
-          opacity: _visible ? 1 : 0,
-          duration: Motion.of(context, Motion.slow),
-          curve: Motion.enter,
-          // Only once it shows: a hidden sweep would tick for nothing.
-          child: _visible
-              ? Shimmer(
-                  child: ListView(
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-                    children: rows,
-                  ),
-                )
-              : const SizedBox.expand(),
+        child: _DelayedFadeIn(
+          delay: const Duration(milliseconds: 180),
+          hidden: const SizedBox.expand(),
+          child: Shimmer(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              children: rows,
+            ),
+          ),
         ),
       ),
     );

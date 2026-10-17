@@ -200,14 +200,12 @@ look''';
       );
     });
 
-    test('a voice handoff is unwrapped, never hidden', () {
+    test('a voice handoff is the person talking, never hidden', () {
       const wrapped =
           '<realtime_delegation>\n  <input>run ls</input>\n'
           '  <transcript_delta>user: run ls</transcript_delta>\n'
           '</realtime_delegation>';
       expect(isContextFragment(wrapped), isFalse);
-      expect(realtimeDelegationInput(wrapped), 'run ls');
-      expect(realtimeDelegationInput('plain text'), isNull);
     });
   });
 

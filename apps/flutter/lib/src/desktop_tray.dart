@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:pocket_codex/src/bridge_api_rust.dart';
+import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/native_quit.dart';
 import 'package:pocket_codex/src/quit_status.dart';
 import 'package:pocket_codex/src/window_geometry.dart';
@@ -63,16 +64,10 @@ class DesktopTray with TrayListener, WindowListener {
   /// Where a quit stands, shown by the app ([QuitStatusBanner]).
   final ValueNotifier<QuitStatus?> quitStatus = ValueNotifier(null);
 
-  /// Whether the current platform has a desktop system tray.
-  ///
-  /// Gated on [defaultTargetPlatform] (NOT `dart:io` Platform) like
-  /// `fonts.dart`: `flutter test` forces the android target, so the tray is
-  /// never initialised there and the native channels stay untouched in tests.
-  static bool get supported =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.macOS ||
-          defaultTargetPlatform == TargetPlatform.linux);
+  /// Whether the current platform has a desktop system tray: [isDesktop],
+  /// so `flutter test` (forced to android) never initialises it and the
+  /// native channels stay untouched in tests.
+  static bool get supported => isDesktop;
 
   // Platform checks via defaultTargetPlatform (NOT `dart:io` Platform), so this
   // file imports no dart:io and main.dart can import it unconditionally without

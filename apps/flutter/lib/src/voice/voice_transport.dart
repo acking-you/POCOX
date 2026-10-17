@@ -31,6 +31,80 @@ Future<void> _applyAudioPolicy() async {
   }
 }
 
+/// How both media links capture the microphone. The platform's echo
+/// canceller is what keeps the assistant's own voice, coming out of the
+/// speakers, from reading as the user talking over it. Gain control keeps a
+/// quiet or distant voice above the recogniser's threshold without boosting
+/// room noise into it.
+const microphoneConstraints = <String, Object>{
+  'audio': {
+    'echoCancellation': true,
+    'noiseSuppression': true,
+    'autoGainControl': true,
+  },
+  'video': false,
+};
+
+/// Open the `oai-events` data channel the upstream offer expects (app-server
+/// sideband notifications own transcript and agent handling), then set
+/// [makeOffer]'s description on [peer] and wait for ICE gathering: signaling
+/// has no trickle-ICE RPC, so the host gets one complete offer.
+///
+/// [adopt] receives the channel and the gathering completer so the owner's
+/// close can release the one and cut the other short; [checkOpen] throws
+/// once the owner has been closed (a channel opened meanwhile is closed).
+Future<String> completeOffer(
+  RTCPeerConnection peer, {
+  required Future<RTCSessionDescription> Function() makeOffer,
+  required void Function(RTCDataChannel, Completer<void>) adopt,
+  required void Function() checkOpen,
+}) async {
+  final channel = await peer.createDataChannel(
+    'oai-events',
+    RTCDataChannelInit(),
+  );
+  try {
+    checkOpen();
+  } catch (_) {
+    await channel.close();
+    rethrow;
+  }
+  final gathered = Completer<void>();
+  adopt(channel, gathered);
+  peer.onIceGatheringState = (state) {
+    if (state == RTCIceGatheringState.RTCIceGatheringStateComplete &&
+        !gathered.isCompleted) {
+      gathered.complete();
+    }
+  };
+  final offer = await makeOffer();
+  checkOpen();
+  await peer.setLocalDescription(offer);
+  await gathered.future.timeout(const Duration(seconds: 10));
+  checkOpen();
+  final sdp = (await peer.getLocalDescription())?.sdp;
+  if (sdp == null || sdp.isEmpty) throw StateError('Missing audio offer');
+  return sdp;
+}
+
+/// Run every cleanup [steps] in order even when one fails, so a failed track
+/// release never skips the peer or channel; then throw the first failure,
+/// labelled [what].
+Future<void> releaseAll(
+  String what,
+  Iterable<Future<void> Function()> steps,
+) async {
+  Object? failure;
+  for (final step in steps) {
+    try {
+      await step();
+    } catch (e) {
+      failure ??= e;
+    }
+  }
+  if (failure != null) throw StateError('$what cleanup failed: $failure');
+}
+
 /// Client-owned media connection; credentials and Codex remain on the host.
 abstract interface class VoiceTransport {
   /// Capture the microphone and return a complete WebRTC offer.
@@ -143,18 +217,9 @@ class WebRtcVoiceTransport implements VoiceTransport {
     };
     // Keep a handle on the assistant's audio so a barge-in can silence it.
     peer.onTrack = (event) => _adoptRemote(event.track);
-    final media = await navigator.mediaDevices.getUserMedia({
-      'audio': {
-        // The platform's echo canceller is what keeps the assistant's own
-        // voice, coming out of the speakers, from reading as the user
-        // talking over it. Gain control keeps a quiet or distant voice above
-        // the recogniser's threshold without boosting room noise into it.
-        'echoCancellation': true,
-        'noiseSuppression': true,
-        'autoGainControl': true,
-      },
-      'video': false,
-    });
+    final media = await navigator.mediaDevices.getUserMedia(
+      microphoneConstraints,
+    );
     if (_closed) {
       for (final track in media.getTracks()) {
         await track.stop();
@@ -167,37 +232,21 @@ class WebRtcVoiceTransport implements VoiceTransport {
       await peer.addTrack(track, media);
       _checkOpen();
     }
-    // The upstream offer expects both audio and a realtime event channel.
-    // App-server sideband notifications own transcript/agent handling.
-    final channel = await peer.createDataChannel(
-      'oai-events',
-      RTCDataChannelInit(),
+    return completeOffer(
+      peer,
+      makeOffer: () => peer.createOffer({
+        'mandatory': {
+          'OfferToReceiveAudio': true,
+          'OfferToReceiveVideo': false,
+        },
+        'optional': <Object>[],
+      }),
+      adopt: (channel, gathered) {
+        _channel = channel;
+        _gathered = gathered;
+      },
+      checkOpen: _checkOpen,
     );
-    if (_closed) {
-      await channel.close();
-      _checkOpen();
-    }
-    _channel = channel;
-    final gathered = Completer<void>();
-    _gathered = gathered;
-    peer.onIceGatheringState = (state) {
-      if (state == RTCIceGatheringState.RTCIceGatheringStateComplete &&
-          !gathered.isCompleted) {
-        gathered.complete();
-      }
-    };
-    final offer = await peer.createOffer({
-      'mandatory': {'OfferToReceiveAudio': true, 'OfferToReceiveVideo': false},
-      'optional': <Object>[],
-    });
-    _checkOpen();
-    await peer.setLocalDescription(offer);
-    // Signaling has no trickle-ICE RPC: send one complete offer.
-    await gathered.future.timeout(const Duration(seconds: 10));
-    _checkOpen();
-    final sdp = (await peer.getLocalDescription())?.sdp;
-    if (sdp == null || sdp.isEmpty) throw StateError('Missing audio offer');
-    return sdp;
   }
 
   @override
@@ -256,25 +305,15 @@ class WebRtcVoiceTransport implements VoiceTransport {
     _peer = null;
     _channel = null;
     _remoteAudio.clear();
-    Object? failure;
-    Future<void> release(Future<void> Function() action) async {
-      try {
-        await action();
-      } catch (e) {
-        failure ??= e;
-      }
-    }
-
-    // A failed track release must not skip the peer/channel cleanup.
-    for (final track in media?.getTracks() ?? <MediaStreamTrack>[]) {
-      await release(() async {
-        track.enabled = false;
-        await track.stop();
-      });
-    }
-    if (media != null) await release(media.dispose);
-    if (channel != null) await release(channel.close);
-    if (peer != null) await release(peer.dispose);
-    if (failure != null) throw StateError('Audio cleanup failed: $failure');
+    await releaseAll('Audio', [
+      for (final track in media?.getTracks() ?? <MediaStreamTrack>[])
+        () async {
+          track.enabled = false;
+          await track.stop();
+        },
+      if (media != null) media.dispose,
+      if (channel != null) channel.close,
+      if (peer != null) peer.dispose,
+    ]);
   }
 }

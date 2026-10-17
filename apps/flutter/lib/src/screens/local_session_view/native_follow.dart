@@ -37,27 +37,17 @@ extension _NativeFollow on _LocalSessionViewState {
             )
           : null;
       if (!current()) return;
-      final atBottom =
-          !_scroll.hasClients ||
-          _scroll.position.pixels >= _scroll.position.maxScrollExtent - 40;
+      final atBottom = _atBottom;
       _update(() {
         if (page != null) {
           _native.tail(page);
-          _items = _native.items;
-          final retained = _items.map((i) => i.id).toSet();
-          _imageCache.removeWhere((id, _) => !retained.contains(id));
+          _showNative();
         }
         _live = revision.liveness;
         _loading = false;
         _error = null;
       });
-      if (page != null && atBottom) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (current() && _scroll.hasClients) {
-            _scroll.jumpTo(_scroll.position.maxScrollExtent);
-          }
-        });
-      }
+      if (page != null && atBottom) _followTail(current);
     } catch (e) {
       if (current()) {
         _update(() {
@@ -97,11 +87,7 @@ extension _NativeFollow on _LocalSessionViewState {
           'Local history changed; refresh before loading older messages',
         );
       }
-      _update(() {
-        _items = _native.items;
-        final retained = _items.map((i) => i.id).toSet();
-        _imageCache.removeWhere((id, _) => !retained.contains(id));
-      });
+      _update(_showNative);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (current() && _scroll.hasClients) {
           _scroll.jumpTo(
@@ -122,6 +108,13 @@ extension _NativeFollow on _LocalSessionViewState {
         });
       }
     }
+  }
+
+  /// Show the native window's items, keeping only their resolved images.
+  void _showNative() {
+    _items = _native.items;
+    final retained = _items.map((i) => i.id).toSet();
+    _imageCache.removeWhere((id, _) => !retained.contains(id));
   }
 
   Widget _nativeControls(AppLocalizations l10n) => Padding(

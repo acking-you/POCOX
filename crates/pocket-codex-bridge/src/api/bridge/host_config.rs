@@ -11,7 +11,7 @@ use crate::engine::{
     host_profiles::{
         self, Change, Engine, KeyChange, ProfileInput, Runtime, RuntimeChange, Source,
     },
-    host_start::{self, NewHost, Started},
+    host_start::{self, Started},
 };
 
 /// A host's runtime: what runs, not its model service.
@@ -421,16 +421,7 @@ fn save_profile(
         RuntimeChange::Keep if spec.is_none() => saved.runtime.as_ref(),
         _ => None,
     };
-    let engine = match runtime {
-        Some(Runtime::OpenCode {
-            ..
-        }) => Engine::OpenCode,
-        Some(Runtime::Acp(agent)) => Engine::Acp(agent),
-        Some(Runtime::Codex {
-            ..
-        }) => Engine::Codex,
-        None => spec.map_or(Engine::Codex, Engine::Acp),
-    };
+    let engine = runtime.map_or_else(|| spec.map_or(Engine::Codex, Engine::Acp), Runtime::engine);
     // The runtime used for validation must still be the one we read.
     host_profiles::save_in(root, name, change, expected.or(Some(saved.revision)), engine)
 }
@@ -472,8 +463,7 @@ pub fn app_serve_start_configured(
     key: Option<String>,
 ) -> Result<HostStartedDto> {
     let change = change_of(input, &key_action, key)?;
-    let host = NewHost::from(runtime.into_runtime()?);
-    let started = host_start::start_configured(name.as_deref(), host, change)?;
+    let started = host_start::start_configured(name.as_deref(), runtime.into_runtime()?, change)?;
     crate::engine::management::enable_after_hosting();
     Ok(match started {
         Started::Codex(r) => HostStartedDto {
@@ -656,7 +646,6 @@ mod tests {
         };
         assert!(bad_runtime.into_runtime().is_err());
         let codex_history = HostRuntimeDto {
-            kind: "codex".into(),
             separate_history: true,
             ..HostRuntimeDto::of(Runtime::Codex {
                 binary: None,
@@ -671,27 +660,22 @@ mod tests {
 
     #[test]
     fn runtimes_cross_the_bridge_unchanged() {
-        let codex = Runtime::Codex {
-            binary: Some("/opt/codex".into()),
-            port: 4500,
-            proxy: None,
-        };
-        let back = HostRuntimeDto::of(codex.clone())
-            .into_runtime()
-            .expect("codex");
-        assert_eq!(back, codex);
-        let agent = Runtime::Acp(spec("custom-x-1").into_spec());
-        let back = HostRuntimeDto::of(agent.clone())
-            .into_runtime()
-            .expect("acp");
-        assert_eq!(back, agent);
-        let own = Runtime::OpenCode {
-            binary: None,
-            separate_history: true,
-        };
-        let back = HostRuntimeDto::of(own.clone())
-            .into_runtime()
-            .expect("opencode");
-        assert_eq!(back, own);
+        for runtime in [
+            Runtime::Codex {
+                binary: Some("/opt/codex".into()),
+                port: 4500,
+                proxy: None,
+            },
+            Runtime::Acp(spec("custom-x-1").into_spec()),
+            Runtime::OpenCode {
+                binary: None,
+                separate_history: true,
+            },
+        ] {
+            let back = HostRuntimeDto::of(runtime.clone())
+                .into_runtime()
+                .expect("round trip");
+            assert_eq!(back, runtime);
+        }
     }
 }

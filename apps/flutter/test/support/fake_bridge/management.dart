@@ -237,10 +237,6 @@ mixin _FakeManagement on _FakeBridgeState {
   }
 
   @override
-  Future<ManagedHost> managedHost(String serviceKey, String name) async =>
-      _hostOf(await managedDevice(serviceKey), name);
-
-  @override
   Future<ManagedHost> managedHostStart(
     String serviceKey, {
     required String name,

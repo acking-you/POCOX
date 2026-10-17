@@ -5,12 +5,7 @@ import 'package:flutter/material.dart';
 /// width, instead of either being squeezed.
 class ActionRow extends StatelessWidget {
   /// Creates the row.
-  const ActionRow({
-    super.key,
-    required this.lead,
-    required this.action,
-    this.minWidth = 420,
-  });
+  const ActionRow({super.key, required this.lead, required this.action});
 
   /// What the row is about (a title and its description, a state line).
   final Widget lead;
@@ -19,12 +14,12 @@ class ActionRow extends StatelessWidget {
   final Widget action;
 
   /// The narrowest width that still holds both side by side.
-  final double minWidth;
+  static const double _minWidth = 420;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
-      if (constraints.maxWidth >= minWidth) {
+      if (constraints.maxWidth >= _minWidth) {
         return Row(
           children: [
             Expanded(child: lead),

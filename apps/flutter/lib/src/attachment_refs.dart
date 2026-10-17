@@ -22,6 +22,7 @@ library;
 
 import 'package:pocket_codex/src/automation_prompt.dart';
 import 'package:pocket_codex/src/ide_context.dart';
+import 'package:pocket_codex/src/realtime_delegation.dart';
 
 /// Header line introducing the attached-files block (English on purpose — it
 /// is model-facing wire text, like codex's own `<image>` markers).
@@ -91,6 +92,13 @@ String hostPathBasename(String path) {
   return cut < 0 ? path : path.substring(cut + 1);
 }
 
+/// The folder name a project path is known by: its last non-empty segment
+/// (a trailing separator ignored), or [path] itself when it has none.
+String folderName(String path) {
+  final segs = path.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
+  return segs.isEmpty ? path : segs.last;
+}
+
 /// Display form of a session/thread PREVIEW that may carry wire text. Server
 /// previews are the first user message verbatim (possibly truncated), so
 /// without this a list title reads as the raw attached-files header or the
@@ -110,8 +118,8 @@ String previewWithoutFileRefs(String preview, String placeholder) {
   if (isContextFragment(preview)) return '';
   if (isTruncatedIdeContext(preview)) return placeholder;
   // A voice handoff is the user's own turn, wrapped — show what they said.
-  final spoken = realtimeDelegationInput(preview);
-  if (spoken != null) return spoken;
+  final spoken = parseRealtimeDelegation(preview)?.input;
+  if (spoken != null && spoken.isNotEmpty) return spoken;
   // An automation's run reads as the task it set.
   final automation = AutomationPrompt.parse(preview);
   if (automation != null) return automation.instructions;

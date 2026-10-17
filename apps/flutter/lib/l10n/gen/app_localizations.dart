@@ -584,29 +584,11 @@ abstract class AppLocalizations {
   /// **'File exceeds the {mb} MB limit'**
   String fileTooLarge(int mb);
 
-  /// No description provided for @fileUploadFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Couldn\'t upload the file to the host'**
-  String get fileUploadFailed;
-
   /// No description provided for @fileOnlyMessage.
   ///
   /// In en, this message translates to:
   /// **'[File]'**
   String get fileOnlyMessage;
-
-  /// No description provided for @interrupt.
-  ///
-  /// In en, this message translates to:
-  /// **'Interrupt'**
-  String get interrupt;
-
-  /// No description provided for @thinking.
-  ///
-  /// In en, this message translates to:
-  /// **'Thinking…'**
-  String get thinking;
 
   /// No description provided for @emptyConversation.
   ///
@@ -649,12 +631,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This built-in (自带) session can\'t start its command sandbox, so the agent can\'t run commands or read files here. Switch to \"Full access\" mode to run without a sandbox, or connect to an external/remote codex host.'**
   String get sandboxHelperUnavailable;
-
-  /// No description provided for @disconnect.
-  ///
-  /// In en, this message translates to:
-  /// **'Disconnect'**
-  String get disconnect;
 
   /// No description provided for @connectionLost.
   ///
@@ -709,18 +685,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Work outside a project'**
   String get workOutsideProject;
-
-  /// No description provided for @switchProjectTip.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch project'**
-  String get switchProjectTip;
-
-  /// No description provided for @newSessionTitleIn.
-  ///
-  /// In en, this message translates to:
-  /// **'What should we build in {project}?'**
-  String newSessionTitleIn(String project);
 
   /// No description provided for @remotePathLabel.
   ///
@@ -1406,12 +1370,6 @@ abstract class AppLocalizations {
   /// **'Local'**
   String get envLocal;
 
-  /// No description provided for @envProject.
-  ///
-  /// In en, this message translates to:
-  /// **'Project'**
-  String get envProject;
-
   /// No description provided for @envSource.
   ///
   /// In en, this message translates to:
@@ -1868,66 +1826,6 @@ abstract class AppLocalizations {
   /// **'Dark'**
   String get appearanceDark;
 
-  /// No description provided for @newSessionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'What should we build?'**
-  String get newSessionTitle;
-
-  /// No description provided for @newSessionSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Pick a starting point, or just type your task below.'**
-  String get newSessionSubtitle;
-
-  /// No description provided for @suggestExploreTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Explore the project'**
-  String get suggestExploreTitle;
-
-  /// No description provided for @suggestExplorePrompt.
-  ///
-  /// In en, this message translates to:
-  /// **'Give me an overview of this project — its structure, main modules, and tech stack.'**
-  String get suggestExplorePrompt;
-
-  /// No description provided for @suggestTestsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Run & fix tests'**
-  String get suggestTestsTitle;
-
-  /// No description provided for @suggestTestsPrompt.
-  ///
-  /// In en, this message translates to:
-  /// **'Run the test suite and fix any failing tests.'**
-  String get suggestTestsPrompt;
-
-  /// No description provided for @suggestDiffTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Review changes'**
-  String get suggestDiffTitle;
-
-  /// No description provided for @suggestDiffPrompt.
-  ///
-  /// In en, this message translates to:
-  /// **'Summarize the current working-tree changes against the main branch.'**
-  String get suggestDiffPrompt;
-
-  /// No description provided for @suggestPlanTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Plan a feature'**
-  String get suggestPlanTitle;
-
-  /// No description provided for @suggestPlanPrompt.
-  ///
-  /// In en, this message translates to:
-  /// **'Help me plan out a new feature before writing any code.'**
-  String get suggestPlanPrompt;
-
   /// No description provided for @searchConversations.
   ///
   /// In en, this message translates to:
@@ -2330,18 +2228,6 @@ abstract class AppLocalizations {
   /// **'Runtime'**
   String get hostRuntimeInfo;
 
-  /// No description provided for @hostRuntimeMode.
-  ///
-  /// In en, this message translates to:
-  /// **'codex'**
-  String get hostRuntimeMode;
-
-  /// No description provided for @hostCodexVersion.
-  ///
-  /// In en, this message translates to:
-  /// **'Version'**
-  String get hostCodexVersion;
-
   /// No description provided for @hostCodexPath.
   ///
   /// In en, this message translates to:
@@ -2371,12 +2257,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Runs codex on this machine and publishes it on your relay, so your other devices can drive it.'**
   String get localHostHint;
-
-  /// No description provided for @localHostListening.
-  ///
-  /// In en, this message translates to:
-  /// **'Listening on {addr}'**
-  String localHostListening(String addr);
 
   /// No description provided for @codexFoundAt.
   ///
@@ -2726,12 +2606,6 @@ abstract class AppLocalizations {
   /// **'Open PocketCodex on your computer and start hosting (app-server); this screen will enter the chat automatically.'**
   String get homeNoServiceMobileHint;
 
-  /// No description provided for @homeNoServiceSelfHostHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Run `pocket-codex serve` on a machine with codex to publish an app-server on your relay, or sign in with an account to host from this app.'**
-  String get homeNoServiceSelfHostHint;
-
   /// No description provided for @homeAutoRetryNote.
   ///
   /// In en, this message translates to:
@@ -2749,12 +2623,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Switch host'**
   String get hostSwitchTitle;
-
-  /// No description provided for @hostRestoreFull.
-  ///
-  /// In en, this message translates to:
-  /// **'Hosting started, but it will not be restored at launch: {count} hosts are already remembered. To have it restored, stop one of those hosts, then start this one again.'**
-  String hostRestoreFull(int count);
 
   /// No description provided for @acpSavedAgentsFull.
   ///
@@ -2942,12 +2810,6 @@ abstract class AppLocalizations {
   /// **'Up one level'**
   String get folderUp;
 
-  /// No description provided for @folderPickerEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No sub-folders here'**
-  String get folderPickerEmpty;
-
   /// No description provided for @folderPickerNoRoots.
   ///
   /// In en, this message translates to:
@@ -3026,35 +2888,11 @@ abstract class AppLocalizations {
   /// **'Project folders'**
   String get projectFolders;
 
-  /// No description provided for @projectFoldersHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Folders your phone can browse to start a session in. Star one to make it the default for new conversations.'**
-  String get projectFoldersHint;
-
-  /// No description provided for @noProjectFolders.
-  ///
-  /// In en, this message translates to:
-  /// **'No project folders yet.'**
-  String get noProjectFolders;
-
   /// No description provided for @addProjectFolder.
   ///
   /// In en, this message translates to:
   /// **'Add folder'**
   String get addProjectFolder;
-
-  /// No description provided for @defaultProjectFolder.
-  ///
-  /// In en, this message translates to:
-  /// **'Default folder'**
-  String get defaultProjectFolder;
-
-  /// No description provided for @setAsDefault.
-  ///
-  /// In en, this message translates to:
-  /// **'Set as default'**
-  String get setAsDefault;
 
   /// No description provided for @removeProjectFolder.
   ///
@@ -4148,12 +3986,6 @@ abstract class AppLocalizations {
   /// **'You\'re speaking'**
   String get voiceUserSpeaking;
 
-  /// No description provided for @voiceInterrupted.
-  ///
-  /// In en, this message translates to:
-  /// **'Interrupted'**
-  String get voiceInterrupted;
-
   /// No description provided for @voiceEndedByUser.
   ///
   /// In en, this message translates to:
@@ -4171,12 +4003,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Voice call dropped'**
   String get voiceFailedShort;
-
-  /// No description provided for @voiceOpenCall.
-  ///
-  /// In en, this message translates to:
-  /// **'Go to the voice conversation'**
-  String get voiceOpenCall;
 
   /// No description provided for @voiceHangUp.
   ///
@@ -4304,12 +4130,6 @@ abstract class AppLocalizations {
   /// **'The live voice call is using the microphone'**
   String get dictationVoiceBusy;
 
-  /// No description provided for @dictationShortcut.
-  ///
-  /// In en, this message translates to:
-  /// **'Dictate (Ctrl+Shift+Space)'**
-  String get dictationShortcut;
-
   /// No description provided for @providerAcpAgent.
   ///
   /// In en, this message translates to:
@@ -4327,12 +4147,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Runs an ACP-compatible agent on this device from a program and its arguments, and makes it available to your devices. Stopping hosting stops the agent.'**
   String get acpHostHint;
-
-  /// No description provided for @acpAgentLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Agent'**
-  String get acpAgentLabel;
 
   /// No description provided for @acpAgentCustom.
   ///
@@ -4508,18 +4322,6 @@ abstract class AppLocalizations {
   /// **'Check again'**
   String get claudeEnvRecheck;
 
-  /// No description provided for @claudePreparing.
-  ///
-  /// In en, this message translates to:
-  /// **'Preparing the Claude ACP adapter… {seconds} s'**
-  String claudePreparing(int seconds);
-
-  /// No description provided for @claudePrepareVerifying.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking the downloaded adapter… {seconds} s'**
-  String claudePrepareVerifying(int seconds);
-
   /// No description provided for @claudePrepareCancel.
   ///
   /// In en, this message translates to:
@@ -4645,12 +4447,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Stopping hosting stops this agent and the processes it started.'**
   String get acpStopNote;
-
-  /// No description provided for @acpFeatures.
-  ///
-  /// In en, this message translates to:
-  /// **'Agent features'**
-  String get acpFeatures;
 
   /// No description provided for @acpFeatureReopen.
   ///
@@ -6685,12 +6481,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Details'**
   String get managedRuntimeDetails;
-
-  /// No description provided for @managedRuntimeDetailsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'{name} details'**
-  String managedRuntimeDetailsTitle(String name);
 
   /// No description provided for @managedRuntimePath.
   ///

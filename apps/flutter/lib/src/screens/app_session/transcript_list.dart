@@ -96,11 +96,12 @@ extension _TranscriptList on _AppSessionState {
   ({Key key, List<String> items, int hint}) _centerOf(
     List<Object> rows,
     int index,
-  ) => (
-    key: _rowKey(rows[index]),
-    items: [for (final item in _rowItems(rows[index])) item.id],
-    hint: index,
-  );
+  ) => (key: _rowKey(rows[index]), items: _itemIds(rows[index]), hint: index);
+
+  /// The ids of the items [row] shows.
+  List<String> _itemIds(Object row) => [
+    for (final item in _rowItems(row)) item.id,
+  ];
 
   /// The row with [key], or else the one now showing any of [items].
   int? _locateRow(Key key, List<String> items) {
@@ -298,7 +299,7 @@ extension _TranscriptList on _AppSessionState {
     if (top == null) return null;
     return (
       key: _rowKey(row),
-      items: [for (final item in _rowItems(row)) item.id],
+      items: _itemIds(row),
       top: top,
       path: _pathToCenter(rows, index),
     );

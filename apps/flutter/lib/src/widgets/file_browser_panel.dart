@@ -13,6 +13,7 @@ import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/error_retry.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/attachment_refs.dart';
 
 /// Show the host file-transfer panel over [serviceKey]'s meta tunnel: browse
 /// the host's configured project roots, download a host file to local disk, or
@@ -137,11 +138,6 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
     }
   }
 
-  String _leaf(String path) {
-    final segs = path.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-    return segs.isEmpty ? path : segs.last;
-  }
-
   Future<void> _download(HostFileEntry file) async {
     final l10n = AppLocalizations.of(context);
     final messenger = ToastMessenger.of(context);
@@ -199,7 +195,7 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
     final dirRows = atRoots
         ? [
             for (final r in _roots)
-              HostDirEntry(name: _leaf(r), path: r, isGitRepo: false),
+              HostDirEntry(name: folderName(r), path: r, isGitRepo: false),
           ]
         : _dirs;
 
@@ -221,7 +217,7 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
                 ),
               Expanded(
                 child: Text(
-                  _current == null ? l10n.hostFiles : _leaf(_current!),
+                  _current == null ? l10n.hostFiles : folderName(_current!),
                   style: Theme.of(context).textTheme.titleMedium,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

@@ -120,9 +120,6 @@ class SessionSettings {
 
   /// Cancellation was requested and the agent has not finished yet.
   final bool cancelRequested;
-
-  /// Whether the agent reported anything the user can change.
-  bool get hasControls => configOptions.isNotEmpty || modes.isNotEmpty;
 }
 
 /// What a session connection supports, so the shared session UI can hide

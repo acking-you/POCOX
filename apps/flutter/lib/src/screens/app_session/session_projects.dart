@@ -130,13 +130,11 @@ extension _SessionProjects on _AppSessionState {
     if (!merging) _submit();
   }
 
-  /// The project name rendered as a dropdown trigger, wired to [ProjectMenu].
-  Widget _projectSwitcher(
-    AppLocalizations l10n, {
-    required String label,
-    TextStyle? style,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
+  /// The project name rendered as a dropdown trigger, wired to [ProjectMenu]:
+  /// the headline of a new conversation's opening view.
+  Widget _projectSwitcher(AppLocalizations l10n, {required String label}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return ProjectMenu(
       projects: _knownProjects(),
       current: _cwd?.trim().isEmpty ?? true ? null : _cwd!.trim(),
@@ -161,15 +159,15 @@ extension _SessionProjects on _AppSessionState {
                     label,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style:
-                        style ??
-                        TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 2),
                 Icon(
                   AppIcons.expand_more,
-                  size: style == null ? 16 : 20,
+                  size: 20,
                   color: scheme.onSurfaceVariant,
                 ),
               ],
@@ -502,9 +500,4 @@ extension _SessionProjects on _AppSessionState {
 }
 
 /// Leaf folder name of [cwd], or empty when unknown.
-String _leafOf(String cwd) {
-  final c = cwd.trim();
-  if (c.isEmpty) return '';
-  final segs = c.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-  return segs.isEmpty ? c : segs.last;
-}
+String _leafOf(String cwd) => folderName(cwd.trim());

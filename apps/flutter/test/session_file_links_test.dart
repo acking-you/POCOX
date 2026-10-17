@@ -130,25 +130,29 @@ void main() {
     skip: Platform.isWindows,
   );
 
-  for (final brightness in Brightness.values) {
-    for (final width in [360.0, 800.0, 1280.0]) {
-      testWidgets('file preview fits $width $brightness', (tester) async {
-        await tester.binding.setSurfaceSize(Size(width, 700));
-        addTearDown(() => tester.binding.setSurfaceSize(null));
-        final api = FakeBridgeApi()
-          ..fileBytes['/host/report.md'] = Uint8List.fromList(
-            utf8.encode('Report content\n' * 100),
-          );
-        await host(tester, api, '/host/report.md', brightness: brightness);
-        await tester.tap(find.text('Preview'));
-        await tester.pumpAndSettle();
-        expect(find.text('Download'), findsOneWidget);
-        expect(tester.takeException(), isNull);
-        final rect = tester.getRect(find.byType(AlertDialog));
-        expect(rect.left, greaterThanOrEqualTo(0));
-        expect(rect.right, lessThanOrEqualTo(width));
-      });
-    }
+  // Each width once, and each theme at least once: the theme changes no
+  // geometry, so the full cross product added nothing.
+  for (final (width, brightness) in [
+    (360.0, Brightness.dark),
+    (800.0, Brightness.light),
+    (1280.0, Brightness.dark),
+  ]) {
+    testWidgets('file preview fits $width $brightness', (tester) async {
+      await tester.binding.setSurfaceSize(Size(width, 700));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final api = FakeBridgeApi()
+        ..fileBytes['/host/report.md'] = Uint8List.fromList(
+          utf8.encode('Report content\n' * 100),
+        );
+      await host(tester, api, '/host/report.md', brightness: brightness);
+      await tester.tap(find.text('Preview'));
+      await tester.pumpAndSettle();
+      expect(find.text('Download'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final rect = tester.getRect(find.byType(AlertDialog));
+      expect(rect.left, greaterThanOrEqualTo(0));
+      expect(rect.right, lessThanOrEqualTo(width));
+    });
   }
 
   for (final outcome in ['save', 'cancel', 'failure']) {

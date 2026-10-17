@@ -37,9 +37,6 @@ mixin _RustHosting implements BridgeApi {
   }
 
   @override
-  Future<String> embeddedCodexVersion() => frb.embeddedCodexVersion();
-
-  @override
   Future<void> appServeDeregister({
     required String name,
     required String kind,
@@ -117,10 +114,6 @@ mixin _RustHosting implements BridgeApi {
   @override
   AcpClaudeSetup acpClaudePrepareState() =>
       _claudeSetup(frb.acpClaudePrepareState());
-
-  @override
-  AcpClaudeSetup acpClaudePrepareCancel() =>
-      _claudeSetup(frb.acpClaudePrepareCancel());
 
   @override
   AcpClaudeSetup acpClaudePrepareCancelRun(int run) =>

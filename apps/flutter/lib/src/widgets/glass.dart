@@ -32,8 +32,6 @@ class Glass extends StatelessWidget {
     this.lift = 1,
     this.tint,
     this.edge,
-    this.blur,
-    this.shadow = true,
   });
 
   /// The content.
@@ -57,17 +55,11 @@ class Glass extends StatelessWidget {
   /// Replaces the outer hairline, e.g. with a status colour.
   final Color? edge;
 
-  /// Replaces the recipe's backdrop blur; zero turns it off.
-  final double? blur;
-
-  /// Whether the surface casts its shadow.
-  final bool shadow;
-
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final recipe = glassRecipe(scheme, depth, lift: lift);
-    final sigma = blur ?? recipe.blur;
+    final sigma = recipe.blur;
     Widget body = CustomPaint(
       painter: _GlassBodyPainter(
         borderRadius: borderRadius,
@@ -92,7 +84,7 @@ class Glass extends StatelessWidget {
       );
     }
     body = ClipRRect(borderRadius: borderRadius, child: body);
-    if (!shadow || recipe.shadows.isEmpty) return body;
+    if (recipe.shadows.isEmpty) return body;
     return CustomPaint(
       painter: OuterShadowPainter(
         borderRadius: borderRadius,
@@ -627,29 +619,20 @@ class FieldBorder extends InputBorder {
     TextDirection? textDirection,
   }) => canvas.drawRRect(_shape(rect), paint);
 
-  @override
-  ShapeBorder? lerpFrom(ShapeBorder? a, double t) {
-    if (a is FieldBorder) {
-      return FieldBorder(
-        borderSide: BorderSide.lerp(a.borderSide, borderSide, t),
-        borderRadius: BorderRadius.lerp(a.borderRadius, borderRadius, t)!,
-        glow: Color.lerp(a.glow, glow, t),
+  static FieldBorder _lerp(FieldBorder a, FieldBorder b, double t) =>
+      FieldBorder(
+        borderSide: BorderSide.lerp(a.borderSide, b.borderSide, t),
+        borderRadius: BorderRadius.lerp(a.borderRadius, b.borderRadius, t)!,
+        glow: Color.lerp(a.glow, b.glow, t),
       );
-    }
-    return super.lerpFrom(a, t);
-  }
 
   @override
-  ShapeBorder? lerpTo(ShapeBorder? b, double t) {
-    if (b is FieldBorder) {
-      return FieldBorder(
-        borderSide: BorderSide.lerp(borderSide, b.borderSide, t),
-        borderRadius: BorderRadius.lerp(borderRadius, b.borderRadius, t)!,
-        glow: Color.lerp(glow, b.glow, t),
-      );
-    }
-    return super.lerpTo(b, t);
-  }
+  ShapeBorder? lerpFrom(ShapeBorder? a, double t) =>
+      a is FieldBorder ? _lerp(a, this, t) : super.lerpFrom(a, t);
+
+  @override
+  ShapeBorder? lerpTo(ShapeBorder? b, double t) =>
+      b is FieldBorder ? _lerp(this, b, t) : super.lerpTo(b, t);
 
   @override
   void paint(

@@ -23,7 +23,6 @@ import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
-import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
 import 'fake_bridge_api.dart';
 import 'package:pocket_codex/src/app_icons.dart';

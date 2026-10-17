@@ -22,15 +22,15 @@ enum _Tone { neutral, ok, error }
 
 /// A neutral notice — something happened, and it is neither good news nor bad.
 void showToast(BuildContext context, String message) =>
-    _show(context, message, _Tone.neutral);
+    ToastMessenger.of(context).notice(message);
 
 /// A confirmation: copied, saved, uploaded, signed in.
 void showToastOk(BuildContext context, String message) =>
-    _show(context, message, _Tone.ok);
+    ToastMessenger.of(context).ok(message);
 
 /// A failure. Shown longer, since the message carries a reason worth reading.
 void showToastError(BuildContext context, String message) =>
-    _show(context, message, _Tone.error);
+    ToastMessenger.of(context).error(message);
 
 /// A toast raised on a messenger captured before an `await`, for reporting the
 /// outcome of work whose own `BuildContext` may be gone by the time it finishes.
@@ -65,6 +65,8 @@ class ToastMessenger {
     final messenger = _messenger;
     // A late completion may outlive the captured messenger.
     if (messenger == null || !messenger.mounted) return;
+    // Tapping a copy button twice should replace the confirmation, not queue
+    // a second one behind it.
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       _bar(
@@ -92,24 +94,6 @@ const double _insetBreakpoint = 520;
 
 const Duration _briefly = Duration(seconds: 2);
 const Duration _longEnoughToRead = Duration(seconds: 4);
-
-void _show(BuildContext context, String message, _Tone tone) {
-  final messenger = ScaffoldMessenger.maybeOf(context);
-  if (messenger == null) return;
-  final theme = Theme.of(context);
-  // Tapping a copy button twice should replace the confirmation, not queue a
-  // second one behind it.
-  messenger.hideCurrentSnackBar();
-  messenger.showSnackBar(
-    _bar(
-      message: message,
-      tone: tone,
-      scheme: theme.colorScheme,
-      textTheme: theme.textTheme,
-      wide: MediaQuery.sizeOf(context).width >= _insetBreakpoint,
-    ),
-  );
-}
 
 SnackBar _bar({
   required String message,

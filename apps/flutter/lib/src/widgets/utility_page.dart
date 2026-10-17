@@ -71,13 +71,7 @@ class UtilityPage extends StatelessWidget {
       return AppPageShortcuts(currentRoute: route, child: _sheetShell(context));
     }
     final scaffold = Scaffold(
-      appBar: UtilityPageTitleBar(
-        route: route,
-        title: title,
-        parent: parent,
-        actions: actions,
-        primaryAction: primaryAction,
-      ),
+      appBar: _titleBar(),
       body: body,
       bottomNavigationBar:
           bottomNavigationBar ?? _navigation(context, compact: true),
@@ -85,6 +79,15 @@ class UtilityPage extends StatelessWidget {
     );
     return AppPageShortcuts(currentRoute: route, child: scaffold);
   }
+
+  UtilityPageTitleBar _titleBar({bool inSheet = false}) => UtilityPageTitleBar(
+    route: route,
+    title: title,
+    parent: parent,
+    actions: actions,
+    primaryAction: primaryAction,
+    inSheet: inSheet,
+  );
 
   /// The workspace destinations, with a detail page's section current.
   Widget _navigation(BuildContext context, {bool compact = false}) {
@@ -126,14 +129,7 @@ class UtilityPage extends StatelessWidget {
                         grouped: true,
                         child: Scaffold(
                           backgroundColor: Colors.transparent,
-                          appBar: UtilityPageTitleBar(
-                            route: route,
-                            title: title,
-                            parent: parent,
-                            actions: actions,
-                            primaryAction: primaryAction,
-                            inSheet: true,
-                          ),
+                          appBar: _titleBar(inSheet: true),
                           body: EntranceMotion(child: body),
                           bottomNavigationBar: bottomNavigationBar,
                           floatingActionButton: floatingActionButton,
@@ -441,6 +437,16 @@ class UtilityPageTitleBar extends ConsumerWidget
     final scheme = Theme.of(context).colorScheme;
     final compact = MediaQuery.sizeOf(context).width < 620;
     final primary = primaryAction;
+    final pageTitle = Flexible(
+      child: Text(
+        title,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
     Widget compactTitle() => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -470,16 +476,7 @@ class UtilityPageTitleBar extends ConsumerWidget
           ),
           _breadcrumbSeparator(scheme),
         ],
-        Flexible(
-          child: Text(
-            title,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+        pageTitle,
       ],
     );
     Widget fullTitle() => Row(
@@ -514,16 +511,7 @@ class UtilityPageTitleBar extends ConsumerWidget
           ),
           _breadcrumbSeparator(scheme),
         ],
-        Flexible(
-          child: Text(
-            title,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
+        pageTitle,
       ],
     );
     return WindowTitleBar(
@@ -663,43 +651,22 @@ class _BreadcrumbLink extends StatelessWidget {
   }
 }
 
+/// The keys that open each destination, with the platform's command
+/// modifier; the page menu shows them beside the pages.
+const _pageKeys = <String, LogicalKeyboardKey>{
+  '/': LogicalKeyboardKey.digit0,
+  '/manage': LogicalKeyboardKey.digit1,
+  '/sessions': LogicalKeyboardKey.digit2,
+  '/logs': LogicalKeyboardKey.digit3,
+  '/settings': LogicalKeyboardKey.comma,
+};
+
+bool get _commandIsMeta => defaultTargetPlatform == TargetPlatform.macOS;
+
 List<PopupMenuEntry<String>> _menuItems(BuildContext context, String route) {
   final l10n = AppLocalizations.of(context);
   final dark = Theme.of(context).brightness == Brightness.dark;
-  final modifier = defaultTargetPlatform == TargetPlatform.macOS ? '⌘' : 'Ctrl';
-  final pages =
-      <({String route, IconData icon, String label, String shortcut})>[
-        (
-          route: '/',
-          icon: AppIcons.chat_bubble_outline,
-          label: l10n.utilityChat,
-          shortcut: '$modifier 0',
-        ),
-        (
-          route: '/manage',
-          icon: AppIcons.dns_outlined,
-          label: l10n.manageServices,
-          shortcut: '$modifier 1',
-        ),
-        (
-          route: '/sessions',
-          icon: AppIcons.history,
-          label: l10n.localSessionsTitle,
-          shortcut: '$modifier 2',
-        ),
-        (
-          route: '/logs',
-          icon: AppIcons.article_outlined,
-          label: l10n.logsTitle,
-          shortcut: '$modifier 3',
-        ),
-        (
-          route: '/settings',
-          icon: AppIcons.settings_outlined,
-          label: l10n.settingsTitle,
-          shortcut: '$modifier ,',
-        ),
-      ];
+  final modifier = _commandIsMeta ? '⌘' : 'Ctrl';
   return [
     PopupMenuItem<String>(
       enabled: false,
@@ -711,14 +678,14 @@ List<PopupMenuEntry<String>> _menuItems(BuildContext context, String route) {
         ),
       ),
     ),
-    for (final page in pages)
+    for (final page in workspaceDestinations(l10n))
       PopupMenuItem<String>(
         value: page.route,
         enabled: page.route != route,
         child: _PageMenuRow(
           icon: page.icon,
           label: page.label,
-          shortcut: page.shortcut,
+          shortcut: '$modifier ${_pageKeys[page.route]!.keyLabel}',
           selected: page.route == route,
         ),
       ),
@@ -859,14 +826,9 @@ Map<ShortcutActivator, VoidCallback> _pageShortcuts(
     _openUtilityRoute(context, currentRoute, targetRoute);
   }
 
-  final meta = defaultTargetPlatform == TargetPlatform.macOS;
-  ShortcutActivator shortcut(LogicalKeyboardKey key) =>
-      SingleActivator(key, meta: meta, control: !meta);
+  final meta = _commandIsMeta;
   return {
-    shortcut(LogicalKeyboardKey.digit0): () => open('/'),
-    shortcut(LogicalKeyboardKey.digit1): () => open('/manage'),
-    shortcut(LogicalKeyboardKey.digit2): () => open('/sessions'),
-    shortcut(LogicalKeyboardKey.digit3): () => open('/logs'),
-    shortcut(LogicalKeyboardKey.comma): () => open('/settings'),
+    for (final MapEntry(key: target, value: key) in _pageKeys.entries)
+      SingleActivator(key, meta: meta, control: !meta): () => open(target),
   };
 }

@@ -129,8 +129,9 @@ class _TurnNavigationHandleState extends State<TurnNavigationHandle> {
           depth: GlassDepth.floating,
           borderRadius: BorderRadius.circular(_open ? 24 : 16),
           lift: _open ? 0.6 : 0.3,
-          child: AnimatedSize(
-            duration: duration,
+          child: Motion.resize(
+            context,
+            duration: Motion.medium,
             curve: Motion.spring,
             alignment: Alignment.bottomCenter,
             child: Padding(

@@ -81,9 +81,6 @@ mixin _FakeHosting on _FakeBridgeState {
   }
 
   @override
-  Future<String> embeddedCodexVersion() async => embeddedCodexCommit;
-
-  @override
   Future<void> appServeDeregister({
     required String name,
     required String kind,
@@ -292,10 +289,6 @@ mixin _FakeHosting on _FakeBridgeState {
 
   @override
   AcpClaudeSetup acpClaudePrepareState() => claudeSetup;
-
-  @override
-  AcpClaudeSetup acpClaudePrepareCancel() =>
-      acpClaudePrepareCancelRun(claudeSetup.run);
 
   @override
   AcpClaudeSetup acpClaudePrepareCancelRun(int run) {
@@ -649,7 +642,11 @@ mixin _FakeHosting on _FakeBridgeState {
   @override
   Future<CodexLoginStart> codexLocalLoginStart(String sessionId) async {
     _requireLocal(sessionId);
-    return codexLoginChatgptStart(sessionId);
+    return const CodexLoginStart(
+      mode: 'browser',
+      loginId: 'fake-login',
+      authUrl: 'https://auth.openai.com/fake',
+    );
   }
 
   @override
@@ -684,7 +681,6 @@ mixin _FakeHosting on _FakeBridgeState {
     }
     localLogouts++;
     localLogoutSessions.add(sessionId);
-    codexAuth = const CodexAuthStatus(authenticated: false);
   }
 }
 

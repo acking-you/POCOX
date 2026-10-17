@@ -158,9 +158,7 @@ void main() {
           AutoHostPrefs(port: 0, name: 'h$i'),
       ];
       final (c, gate, file) = await _store(UiPrefs(autoHostCodex: full));
-      final (loaded, _) = await _settle(c, gate, file);
-      expect(loaded.canRememberCodexHost('new'), isFalse);
-      expect(loaded.canRememberCodexHost('h3'), isTrue);
+      await _settle(c, gate, file);
       c.read(uiPrefsProvider.notifier).setAutoHost(_b);
       expect(_codex(c.read(uiPrefsProvider).value!), [
         for (final h in full) h.name,

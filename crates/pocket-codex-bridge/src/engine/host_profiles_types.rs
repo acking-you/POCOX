@@ -174,6 +174,20 @@ impl std::fmt::Debug for Runtime {
 }
 
 impl Runtime {
+    /// The engine this runtime launches, which decides what its
+    /// configuration may select.
+    pub(crate) fn engine(&self) -> Engine<'_> {
+        match self {
+            Self::Codex {
+                ..
+            } => Engine::Codex,
+            Self::Acp(spec) => Engine::Acp(spec),
+            Self::OpenCode {
+                ..
+            } => Engine::OpenCode,
+        }
+    }
+
     /// Validated and trimmed, or why not.
     pub(super) fn normalized(&self) -> Result<Self> {
         match self {

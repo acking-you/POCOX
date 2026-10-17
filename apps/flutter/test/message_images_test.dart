@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/ide_context.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
@@ -171,6 +172,21 @@ void main() {
     expect(find.byIcon(AppIcons.broken_image_outlined), findsOneWidget);
     expect(images.single.hostPath, isNull);
     expect(reads, isEmpty);
+  });
+
+  test('a pathless inline copy stands for a flagged mention only', () {
+    final inline = resolveImageUrls([_dataUrl()]);
+    const shot = IdeMentionedFile(name: 'shot.png', path: '/w/shot.png');
+    const sent = IdeMentionedFile(
+      name: 'sent.png',
+      path: '/w/sent.png',
+      attachedImage: true,
+    );
+    // The unflagged mention is a file on the host, not the inline copy.
+    expect(unattachedImageMentions([shot, sent], inline), ['/w/shot.png']);
+    // Text from before the flag existed pairs image mentions in order.
+    const old = IdeMentionedFile(name: 'old.png', path: '/w/old.png');
+    expect(unattachedImageMentions([old, shot], inline), ['/w/shot.png']);
   });
 
   test(

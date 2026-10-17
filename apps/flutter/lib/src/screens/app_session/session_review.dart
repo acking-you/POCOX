@@ -6,11 +6,18 @@ extension _SessionReview on _AppSessionState {
   Future<void> _loadGit() async {
     final cwd = _cwd?.trim();
     if (cwd == null || cwd.isEmpty || !_caps.gitDiff) return;
+    // Reads overlap (turn events, the badge, a refresh): only the latest one,
+    // for the folder still shown, may replace the diff.
+    final read = ++_gitRead;
+    final service = widget.serviceKey;
     try {
-      final raw = await ref
-          .read(bridgeApiProvider)
-          .appGitDiff(widget.serviceKey, cwd);
-      if (!mounted) return;
+      final raw = await ref.read(bridgeApiProvider).appGitDiff(service, cwd);
+      if (!mounted ||
+          read != _gitRead ||
+          widget.serviceKey != service ||
+          _cwd?.trim() != cwd) {
+        return;
+      }
       _updateState(() => _diff = DiffModel.parse(raw));
     } catch (_) {
       // Not a git repo / no remote: leave the badge as branch-only.
@@ -131,7 +138,9 @@ extension _SessionReview on _AppSessionState {
   void _openReview({ReviewTarget? target}) {
     _updateState(() {
       _reviewOpen = true;
-      _reviewTarget = target ?? _reviewTarget ?? const ReviewTarget();
+      _reviewTarget = target == null
+          ? _reviewTarget ?? const ReviewTarget()
+          : ReviewTarget.of(target);
     });
   }
 
@@ -160,12 +169,16 @@ extension _SessionReview on _AppSessionState {
   Widget _envButton(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final d = _diff;
-    // A diff can name one path twice (staged and unstaged hunks); the menu
-    // lists each file once, and its keys must stay unique.
-    final seen = <String>{};
+    // Each file once, counting all of its records (staged and unstaged).
     final files = [
-      for (final f in d?.files ?? const <DiffFile>[])
-        if (seen.add(f.path)) f,
+      for (final MapEntry(key: path, value: records) in workspaceFiles(
+        d,
+      ).entries)
+        (
+          path: path,
+          added: records.fold(0, (n, f) => n + f.added),
+          removed: records.fold(0, (n, f) => n + f.removed),
+        ),
     ];
     Widget line(IconData icon, String label, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
@@ -205,27 +218,12 @@ extension _SessionReview on _AppSessionState {
                 AppIcons.difference_outlined,
                 l10n.changesTitle,
                 trailing: (d != null && !d.isEmpty)
-                    ? Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '+${d.added}',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: additionColor(scheme),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '−${d.removed}',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: scheme.error,
-                            ),
-                          ),
-                        ],
+                    ? ChangeCounts(
+                        added: d.added,
+                        removed: d.removed,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        gap: 6,
                       )
                     : Text(
                         l10n.noChanges,
@@ -322,20 +320,11 @@ extension _SessionReview on _AppSessionState {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  Text(
-                                    '+${f.added}',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: additionColor(scheme),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    '−${f.removed}',
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      color: scheme.error,
-                                    ),
+                                  ChangeCounts(
+                                    added: f.added,
+                                    removed: f.removed,
+                                    fontSize: 10.5,
+                                    gap: 3,
                                   ),
                                 ],
                               ),

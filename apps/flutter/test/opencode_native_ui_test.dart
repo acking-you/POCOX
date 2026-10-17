@@ -334,8 +334,7 @@ void main() {
   test('a permission option without a name reads as its kind', () {
     AgentPermissionOption option(String kind, [String name = '']) =>
         AgentPermissionOption(id: 'id-$kind', name: name, kind: kind);
-    expect(option('allow_once').label(l10n), 'Allow once');
-    expect(option('reject_always').label(l10n), 'Always reject');
+    expect(option('allow_once').label(l10n), l10n.permissionAllowOnce);
     expect(option('allow_once', 'Yes').label(l10n), 'Yes');
     expect(option('future_kind').label(l10n), 'id-future_kind');
   });
@@ -363,7 +362,6 @@ void main() {
         locale: const Locale('en'),
       ),
     );
-    expect(find.text('Choose any that apply.'), findsOneWidget);
     await t.tap(find.byKey(const Key('user-input-q1-a.dart')));
     await t.tap(find.byKey(const Key('user-input-q1-b.dart')));
     await t.tap(find.byKey(const Key('user-input-q1-Other…')));

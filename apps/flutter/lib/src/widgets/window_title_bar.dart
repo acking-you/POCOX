@@ -61,7 +61,7 @@ abstract final class WindowChrome {
 /// keeps its native traffic lights (top-left, floating over content), so we
 /// only inset the leading edge to clear them; Windows loses ALL native caption
 /// buttons with `TitleBarStyle.hidden`, so this bar draws its own
-/// minimize/maximize/close ([_WindowCaptionButtons]) at the trailing edge. The
+/// minimize/maximize/close ([WindowCaptionButtons]) at the trailing edge. The
 /// theme's `appBarTheme` flattens tint/elevation so it blends into the content.
 ///
 /// On mobile (and Linux, which keeps native decorations) it is a plain
@@ -79,7 +79,6 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
     this.backgroundColor,
     this.foregroundColor,
     this.centerTitle,
-    this.leadingGround,
     this.clearTrafficLights = true,
     this.height,
   });
@@ -90,10 +89,6 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
 
   /// Overrides the bar's height (the window chrome's by default).
   final double? height;
-
-  /// A band of the bar's leading edge painted in another ground, so a
-  /// full-height side pane reads as running up under the title bar.
-  final ({double width, Color color})? leadingGround;
 
   /// Whether to centre the title; null follows the platform (centred on
   /// macOS, leading elsewhere).
@@ -200,24 +195,7 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
       // The bar's empty space drags the window (and double-click zooms, as
       // a native title bar does); the leading/title/actions sit above this
       // layer and keep their own taps.
-      flexibleSpace: leadingGround == null
-          ? const WindowDragArea()
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: ColoredBox(
-                    color: leadingGround!.color,
-                    child: SizedBox(
-                      width: leadingGround!.width,
-                      height: double.infinity,
-                    ),
-                  ),
-                ),
-                const WindowDragArea(),
-              ],
-            ),
+      flexibleSpace: const WindowDragArea(),
       bottom: bottom,
     );
   }
@@ -233,27 +211,28 @@ class WindowDragArea extends StatelessWidget {
   /// Optional content painted inside the drag area.
   final Widget? child;
 
-  Future<void> _zoom() async {
-    try {
-      if (await windowManager.isMaximized()) {
-        await windowManager.unmaximize();
-      } else {
-        await windowManager.maximize();
-      }
-    } catch (_) {
-      // Best-effort; there is no real window under `flutter test`.
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (!isFramelessDesktop) return child ?? const SizedBox.expand();
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onPanStart: (_) => windowManager.startDragging(),
-      onDoubleTap: _zoom,
+      onDoubleTap: _toggleMaximized,
       child: child ?? const SizedBox.expand(),
     );
+  }
+}
+
+/// Maximize the window, or restore it when it already is.
+Future<void> _toggleMaximized() async {
+  try {
+    if (await windowManager.isMaximized()) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
+  } catch (_) {
+    // Best-effort; there is no real window under `flutter test`.
   }
 }
 
@@ -307,16 +286,6 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons>
     if (mounted) setState(() => _maximized = false);
   }
 
-  Future<void> _toggleMaximize() async {
-    try {
-      if (await windowManager.isMaximized()) {
-        await windowManager.unmaximize();
-      } else {
-        await windowManager.maximize();
-      }
-    } catch (_) {}
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -333,7 +302,7 @@ class _WindowCaptionButtonsState extends State<WindowCaptionButtons>
           tooltip: _maximized ? l10n.windowRestore : l10n.windowMaximize,
           // filter_none (two stacked squares) reads better a touch smaller.
           iconSize: _maximized ? 13 : 15,
-          onTap: _toggleMaximize,
+          onTap: _toggleMaximized,
         ),
         _CaptionButton(
           icon: AppIcons.close,

@@ -118,13 +118,7 @@ class _TypingIndicatorState extends State<TypingIndicator>
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Reduced motion: three steady dots still say "working".
-    if (Motion.ambientAllowed(context)) {
-      if (!_c.isAnimating) _c.repeat();
-    } else {
-      _c
-        ..stop()
-        ..value = 0.5;
-    }
+    _c.loopUnlessReduced(context, rest: 0.5);
   }
 
   @override

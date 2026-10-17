@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
 import 'package:pocket_codex/src/hosting/opencode_runtime_section.dart';
 import 'package:pocket_codex/src/managed/default_project_tile.dart';
@@ -91,39 +92,22 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
     };
     final ready = host.alive && problem == null;
     final refreshing = _refreshing == host.name;
-    final stateColor = ready
-        ? successColor(scheme)
-        : problem != null
-        ? cautionColor(scheme)
-        : scheme.onSurfaceVariant;
     return Column(
       key: const Key('opencode-host-details'),
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            const ProviderBadge(provider: 'opencode'),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(AppIcons.circle, size: 10, color: stateColor),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    host.alive
-                        ? l10n.openCodeRunning(status?.version ?? '')
-                        : l10n.acpPhaseStarting,
-                    key: const Key('opencode-phase'),
-                    style: small?.copyWith(color: stateColor),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        HostStateLine(
+          badge: const ProviderBadge(provider: 'opencode'),
+          label: host.alive
+              ? l10n.openCodeRunning(status?.version ?? '')
+              : l10n.acpPhaseStarting,
+          labelKey: const Key('opencode-phase'),
+          color: ready
+              ? successColor(scheme)
+              : problem != null
+              ? cautionColor(scheme)
+              : scheme.onSurfaceVariant,
         ),
         if (host.agentError case final error? when !host.alive) ...[
           const SizedBox(height: 6),
@@ -168,19 +152,17 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
         ],
         if (status != null) ...[
           const SizedBox(height: 8),
-          _row(l10n.openCodeProviders, '${status.providersConnected}', small),
-          _row(l10n.openCodeModels, '${status.models}', small),
-          _row(
+          DetailRow(l10n.openCodeProviders, '${status.providersConnected}'),
+          DetailRow(l10n.openCodeModels, '${status.models}'),
+          DetailRow(
             l10n.openCodeDefaultModel,
             status.defaultModel ?? l10n.openCodeNone,
-            small,
           ),
-          _row(
+          DetailRow(
             l10n.openCodeAgents,
             status.agents.isEmpty
                 ? l10n.openCodeNone
                 : status.agents.join(', '),
-            small,
           ),
         ],
         const SizedBox(height: 12),
@@ -203,18 +185,4 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
       ],
     );
   }
-
-  Widget _row(String label, String value, TextStyle? style) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(label, style: style)),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(value, style: style, textAlign: TextAlign.end),
-        ),
-      ],
-    ),
-  );
 }

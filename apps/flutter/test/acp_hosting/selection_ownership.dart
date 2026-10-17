@@ -223,40 +223,7 @@ void _registerSelectionOwnership() {
     });
   });
 
-  group('start follows the chosen tile', () {
-    testWidgets('Codex starts the native app-server', (t) async {
-      final api = FakeBridgeApi();
-      await _pumpDialog(t, api);
-      await _start(t);
-      expect(api.lastServeName, 'default');
-      expect(api.acpServeCalls, isEmpty);
-    });
-
-    testWidgets('a preset, a saved agent and a custom agent start ACP', (
-      t,
-    ) async {
-      final api = FakeBridgeApi();
-      final c = await _pumpDialog(t, api);
-      c
-          .read(uiPrefsProvider.notifier)
-          .saveAcpAgent(
-            const AcpAgentSpec(
-              profileId: 'custom-saved-1',
-              displayName: 'Saved',
-              program: '/opt/agents/saved',
-            ),
-          );
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('agent-choice-saved:custom-saved-1')));
-      await t.pump(const Duration(milliseconds: 400));
-      await t.pumpAndSettle();
-      await _start(t);
-      expect(api.lastServeName, isNull, reason: 'no Codex start');
-      expect(api.acpServeCalls.single.$2.profileId, 'custom-saved-1');
-    });
-
-    _sameNameTests();
-  });
+  group('start follows the chosen tile', _sameNameTests);
 }
 
 /// A saved configuration with the fixture preset's own profile id and name,
@@ -399,6 +366,7 @@ void _sameNameTests() {
     await t.pump(const Duration(milliseconds: 400));
     await t.pumpAndSettle();
     await _start(t);
+    expect(api.lastServeName, isNull, reason: 'no Codex start');
     final (_, spec) = api.acpServeCalls.single;
     expect(spec.profileId, _savedFixture.profileId);
     expect(spec.program, _savedFixture.program);

@@ -2,10 +2,10 @@ import 'package:flutter/foundation.dart';
 
 /// Font configuration.
 ///
-/// The design system is set in Google Sans Flex (prose) and Geist Mono (code), both
-/// bundled on every platform — see the `fonts:` block in pubspec.yaml. Neither
-/// face carries a single CJK glyph, so Chinese never renders *from* them: it
-/// resolves down the fallback chains below.
+/// The design system is set in Google Sans Flex (prose) and Geist Mono
+/// (code), both bundled on every platform — see the `fonts:` block in
+/// pubspec.yaml. Neither face carries a single CJK glyph, so Chinese never
+/// renders *from* them: it resolves down the fallback chains below.
 ///
 /// Chinese rendered with Flutter's default (no declared CJK font) looks thin
 /// and unevenly weighted on Windows, because the OS picks a fallback face per
@@ -61,8 +61,9 @@ bool get isDesktop =>
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux);
 
-/// CJK fallback behind [appFontFamily]. Google Sans Flex is Latin-only, so every Han
-/// glyph in the app resolves from this chain rather than the primary family.
+/// CJK fallback behind [appFontFamily]. Google Sans Flex is Latin-only, so
+/// every Han glyph in the app resolves from this chain rather than the
+/// primary family.
 ///
 /// The bundled Noto Sans SC leads: on desktop it wins, which is the whole point
 /// (a single declared face instead of the per-glyph-run OS guessing that made

@@ -64,6 +64,16 @@ void main() {
     // Text + block → just the text.
     final mixed = appendFileRefs('check this', ['/host/up/1/a.pdf']);
     expect(previewWithoutFileRefs(mixed, '[File]'), 'check this');
+    // A voice handoff reads as what was said.
+    expect(
+      previewWithoutFileRefs(
+        '<realtime_delegation>\n  <input>run ls</input>\n'
+            '  <transcript_delta>user: run ls</transcript_delta>\n'
+            '</realtime_delegation>',
+        '[File]',
+      ),
+      'run ls',
+    );
     // Plain text passes through.
     expect(previewWithoutFileRefs('hello', '[File]'), 'hello');
   });

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/git_diff.dart';
 import 'package:pocket_codex/src/review/diff_rows.dart';
-import 'package:pocket_codex/src/theme.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 /// One block of a file's changes in the review: an edit of the conversation,
 /// or the workspace's whole diff of the file.
@@ -215,14 +215,9 @@ class _ReviewFileDiffState extends State<ReviewFileDiff> {
             ),
           ],
           const Spacer(),
-          Text(
-            '+${section.file.added}',
-            style: TextStyle(fontSize: 11.5, color: additionColor(scheme)),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '−${section.file.removed}',
-            style: TextStyle(fontSize: 11.5, color: scheme.error),
+          ChangeCounts(
+            added: section.file.added,
+            removed: section.file.removed,
           ),
         ],
       ),

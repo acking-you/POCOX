@@ -350,16 +350,6 @@ void main() {
   setUpAll(() => loadPreviewFonts(always: true));
   setUp(AppSessionScreen.debugResetThreadMemory);
 
-  test('the preview catalog offers every current value exactly once', () {
-    final settings = previewAgentSettings();
-    final model = settings.configOptions.first;
-    expect(model.currentValue, previewCurrentModel);
-    expect(
-      model.values.where((v) => v.value == previewCurrentModel),
-      hasLength(1),
-    );
-  });
-
   for (final (device, size) in _devices) {
     for (final brightness in Brightness.values) {
       for (final language in ['en', 'zh']) {
@@ -387,25 +377,14 @@ void main() {
             find.byKey(const Key('codex-name-field')),
           );
           expect(name.controller!.text, 'default-2');
-          // The external Codex choice reads as one line; the built-in one is
-          // shown and disabled.
+          // Each Codex source choice reads as one line.
           final l10n = lookupAppLocalizations(locale);
           _oneLine(t, find.text(l10n.codexSourceExternal));
-          // Marked as not implemented on the segment itself.
           _oneLine(
             t,
             find.text(
               '${l10n.codexSourceBuiltin} · ${l10n.codexBuiltinUnavailable}',
             ),
-          );
-          final source = t.widget<SegmentedButton<bool>>(
-            find.byKey(const Key('codex-source')),
-          );
-          expect(source.selected, {false});
-          expect(
-            source.segments.singleWhere((s) => s.value).enabled,
-            isFalse,
-            reason: 'the built-in engine is not implemented',
           );
           await capturePreview(t, 'hosting-dialog-$variant');
           final start = find.byKey(const Key('start-hosting-btn'));

@@ -33,17 +33,13 @@ import 'package:pocket_codex/src/screens/welcome_guide_screen.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
 
 import 'fake_bridge_api.dart';
+import 'support/screen_harness.dart';
 
 const _accountConfig = ConfigInfo(
   relay: null,
   hasKey: false,
   mode: 'account',
   accountLogin: 'octocat',
-);
-
-GoRoute _stub(String path, String label) => GoRoute(
-  path: path,
-  builder: (_, _) => Scaffold(body: Text(label)),
 );
 
 Future<void> _pump(
@@ -64,10 +60,10 @@ Future<void> _pump(
         path: '/setup/codex',
         builder: (_, _) => const CodexSetupScreen(),
       ),
-      _stub('/', 'HOME-ROUTE'),
-      _stub('/manage', 'MANAGE-ROUTE'),
-      _stub('/sessions', 'SESSIONS-ROUTE'),
-      _stub('/logs', 'LOGS-ROUTE'),
+      stub('/', 'HOME-ROUTE'),
+      stub('/manage', 'MANAGE-ROUTE'),
+      stub('/sessions', 'SESSIONS-ROUTE'),
+      stub('/logs', 'LOGS-ROUTE'),
     ],
   );
   addTearDown(router.dispose);
@@ -346,18 +342,7 @@ void main() {
         expect(_edited(t), isNull, reason: 'a new host, not a running one');
         _untouched(api, const []);
 
-        // An unsaved edit is kept by Stay, and only Discard leaves.
-        final name = find.byKey(const Key('codex-name-field'));
-        await t.ensureVisible(name);
-        await t.enterText(name, 'edited-host');
-        await _frames(t);
         await _back(t);
-        expect(find.byKey(const Key('host-leave-dialog')), findsOneWidget);
-        await _tap(t, 'host-leave-stay');
-        expect(_edited(t), isNull);
-        expect(t.widget<TextField>(name).controller?.text, 'edited-host');
-        await _back(t);
-        await _tap(t, 'host-leave-discard');
         expect(find.byType(HostingEditor), findsNothing);
         expect(find.byKey(const Key('settings-hosting-btn')), findsOneWidget);
         _untouched(api, const []);

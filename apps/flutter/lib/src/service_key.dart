@@ -64,9 +64,6 @@ bool isSessionKind(String kind) =>
 /// Whether [key] names an ACP agent service.
 bool isAcpKey(String key) => parseServiceKey(key).kind == 'acp';
 
-/// Whether [key] names a native OpenCode service.
-bool isOpenCodeKey(String key) => parseServiceKey(key).kind == 'opencode';
-
 /// The wire protocol a session service key selects (its kind, never a
 /// provider name).
 enum SessionProtocol {

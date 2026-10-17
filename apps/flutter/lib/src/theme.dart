@@ -77,19 +77,15 @@ ColorScheme _flowScheme(Brightness brightness) {
   );
 }
 
-/// The brand's blues, from the logo's tile — for the few moments that are
-/// about the app itself rather than about status (the greeting on a first-run
-/// or sign-in page). Never a fill for a control.
-List<Color> brandSpectrum(ColorScheme scheme) =>
-    scheme.brightness == Brightness.light
-    ? const [Color(0xFF4F7DF2), Color(0xFF2443B0)]
-    : const [Color(0xFFA9BFF7), Color(0xFF6F8FEA)];
-
-/// [brandSpectrum] as a left-to-right gradient.
+/// The brand's blues, from the logo's tile, as a left-to-right gradient — for
+/// the few moments that are about the app itself rather than about status
+/// (the greeting on a first-run or sign-in page). Never a fill for a control.
 LinearGradient brandGradient(ColorScheme scheme) => LinearGradient(
   begin: Alignment.centerLeft,
   end: Alignment.centerRight,
-  colors: brandSpectrum(scheme),
+  colors: scheme.brightness == Brightness.light
+      ? const [Color(0xFF4F7DF2), Color(0xFF2443B0)]
+      : const [Color(0xFFA9BFF7), Color(0xFF6F8FEA)],
 );
 
 /// Ink for secondary chrome glyphs: placeholders, carets, quiet icons. Text
@@ -161,12 +157,6 @@ Color surfaceBackground(ColorScheme scheme) => scheme.surface;
 
 /// An opaque raised panel shared by cards, sheets, menus and the composer.
 Color surfacePanel(ColorScheme scheme) => scheme.surfaceBright;
-
-/// The composer's ground: a raised card that floats over the transcript on
-/// a soft shadow (see [floatingShadows]).
-Color composerFill(ColorScheme scheme) => scheme.brightness == Brightness.light
-    ? Colors.white
-    : scheme.surfaceContainerHigh;
 
 /// The plate behind a code block: a half step off the page.
 Color codeSurface(ColorScheme scheme) => scheme.brightness == Brightness.light
@@ -253,10 +243,6 @@ Color userBubbleColor(ColorScheme scheme) =>
     ? const Color(0xFFEDEDEB)
     : const Color(0xFF262628);
 
-/// Selected rows carry no outline; kept as a function so call sites that draw
-/// a border can resolve it from one place.
-Color selectionBorder(ColorScheme scheme) => Colors.transparent;
-
 /// The well of a text field: a step darker than both the page and cards, so
 /// a field reads without an outline on either.
 Color fieldFill(ColorScheme scheme) => scheme.brightness == Brightness.light
@@ -294,12 +280,6 @@ List<BoxShadow> floatingShadows(ColorScheme scheme, {double lift = 1}) {
 Color floatingEdge(ColorScheme scheme) => scheme.brightness == Brightness.light
     ? Colors.black.withValues(alpha: 0.05)
     : Colors.white.withValues(alpha: 0.07);
-
-/// Floating previews need a stronger elevation step over the transcript.
-Color surfacePreview(ColorScheme scheme) =>
-    scheme.brightness == Brightness.light
-    ? scheme.surfaceBright
-    : scheme.surfaceContainer;
 
 /// The window's own ground, behind the sidebar and the content sheet: a
 /// neutral a step below the page, lit from above by [backdropGlows] so the
@@ -466,7 +446,12 @@ ThemeData _base(ColorScheme scheme) {
   );
   const pill = StadiumBorder();
   final floatShadow = Colors.black.withValues(alpha: light ? 0.14 : 0.5);
-  final menuColor = light ? Colors.white : scheme.surfaceContainerHigh;
+  final menuColor = floatingSurface(scheme);
+  final menuShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(kMenuRadius),
+    side: BorderSide(color: floatingEdge(scheme)),
+  );
+  final fieldRadius = BorderRadius.circular(kFieldRadius);
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
@@ -611,10 +596,6 @@ ThemeData _base(ColorScheme scheme) {
       labelStyle: ui(12.5, weight: FontWeight.w500, color: scheme.onSurface),
       padding: const EdgeInsets.symmetric(horizontal: 6),
     ),
-    // Fields sit in a soft container with a hairline that firms up on focus,
-    // the way the composer does. Only `border` is set so a field that opts
-    // out with `InputBorder.none` (the composer, inline renames) does not get
-    // an enabled/focused outline back from the theme.
     // Fields are soft filled wells with no outline at rest; focus draws a
     // firm ink ring. One look for every form, search and prompt field.
     inputDecorationTheme: InputDecorationTheme(
@@ -622,15 +603,11 @@ ThemeData _base(ColorScheme scheme) {
       fillColor: fieldFill(scheme),
       hoverColor: scheme.onSurface.withValues(alpha: 0.03),
       // Filled, not outlined: a floating label stays inside the fill.
-      border: FieldBorder(borderRadius: BorderRadius.circular(kFieldRadius)),
-      enabledBorder: FieldBorder(
-        borderRadius: BorderRadius.circular(kFieldRadius),
-      ),
-      disabledBorder: FieldBorder(
-        borderRadius: BorderRadius.circular(kFieldRadius),
-      ),
+      border: FieldBorder(borderRadius: fieldRadius),
+      enabledBorder: FieldBorder(borderRadius: fieldRadius),
+      disabledBorder: FieldBorder(borderRadius: fieldRadius),
       focusedBorder: FieldBorder(
-        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderRadius: fieldRadius,
         borderSide: BorderSide(
           color: scheme.onSurface.withValues(alpha: light ? 0.5 : 0.55),
           width: 1.5,
@@ -638,11 +615,11 @@ ThemeData _base(ColorScheme scheme) {
         glow: scheme.tertiary.withValues(alpha: light ? 0.16 : 0.28),
       ),
       errorBorder: FieldBorder(
-        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderRadius: fieldRadius,
         borderSide: BorderSide(color: scheme.error.withValues(alpha: 0.7)),
       ),
       focusedErrorBorder: FieldBorder(
-        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderRadius: fieldRadius,
         borderSide: BorderSide(color: scheme.error, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -752,10 +729,7 @@ ThemeData _base(ColorScheme scheme) {
       shadowColor: floatShadow,
       color: menuColor,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kMenuRadius),
-        side: BorderSide(color: floatingEdge(scheme)),
-      ),
+      shape: menuShape,
       menuPadding: const EdgeInsets.all(6),
       textStyle: ui(14, weight: FontWeight.w400, color: scheme.onSurface),
     ),
@@ -765,12 +739,7 @@ ThemeData _base(ColorScheme scheme) {
         shadowColor: WidgetStatePropertyAll(floatShadow),
         surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
         backgroundColor: WidgetStatePropertyAll(menuColor),
-        shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kMenuRadius),
-            side: BorderSide(color: floatingEdge(scheme)),
-          ),
-        ),
+        shape: WidgetStatePropertyAll(menuShape),
         padding: const WidgetStatePropertyAll(EdgeInsets.all(6)),
       ),
     ),

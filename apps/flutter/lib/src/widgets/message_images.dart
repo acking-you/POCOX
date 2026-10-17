@@ -51,7 +51,9 @@ class ResolvedImage {
 /// app's "Files mentioned by the user") also sends each picture as an
 /// image: a mention is the same attachment when its path matches one, or —
 /// for copies that lost their path on the way (a rollout's inline images) —
-/// while such copies remain, one each in order.
+/// while such copies remain, one each in order. Where the text flags its
+/// attachments (`Image attachment: true`), only flagged mentions take such a
+/// copy; older text without any flag pairs every image mention in order.
 List<String> unattachedImageMentions(
   List<IdeMentionedFile> mentions,
   List<ResolvedImage> attached,
@@ -61,11 +63,12 @@ List<String> unattachedImageMentions(
       if (i.hostPath case final p?) p.replaceAll('\\', '/'),
   };
   var pathless = attached.where((i) => i.hostPath == null).length;
+  final flagged = mentions.any((m) => m.attachedImage);
   final out = <String>[];
   for (final m in mentions) {
     if (!looksLikeImagePath(m.path)) continue;
     if (paths.contains(m.path.replaceAll('\\', '/'))) continue;
-    if (pathless > 0) {
+    if (pathless > 0 && (m.attachedImage || !flagged)) {
       pathless--;
       continue;
     }

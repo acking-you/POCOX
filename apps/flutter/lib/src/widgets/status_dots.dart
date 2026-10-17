@@ -78,13 +78,11 @@ class _PulsingDotState extends State<PulsingDot>
   void _syncMotion() {
     // Reduced motion keeps the dot (it still says "running") at full
     // strength, without the pulse.
-    if (Motion.ambientAllowed(context)) {
-      if (!_c.isAnimating) _c.repeat(reverse: !widget.orbit);
-    } else {
-      _c
-        ..stop()
-        ..value = widget.orbit ? 0 : 1;
-    }
+    _c.loopUnlessReduced(
+      context,
+      rest: widget.orbit ? 0 : 1,
+      reverse: !widget.orbit,
+    );
   }
 
   @override

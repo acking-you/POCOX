@@ -97,11 +97,12 @@ FakeBridgeApi _withClaude() => FakeBridgeApi()
   ..acpPrograms['claude-agent-acp'] =
       '/Users/me/.npm-global/bin/claude-agent-acp';
 
-Future<ProviderContainer> _pumpEditor(
+/// Mount [home] on a desktop-sized view over [api], without settling.
+Future<ProviderContainer> _mount(
   WidgetTester t,
-  FakeBridgeApi api, {
-  AppServeStatus? existing,
-}) async {
+  FakeBridgeApi api,
+  Widget home,
+) async {
   t.view.physicalSize = const Size(1280, 1000);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -116,13 +117,27 @@ Future<ProviderContainer> _pumpEditor(
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: TextButton(
-              onPressed: () => showHostingEditor(context, existing: existing),
-              child: const Text('open'),
-            ),
-          ),
+        home: home,
+      ),
+    ),
+  );
+  return container;
+}
+
+/// Open the editor as the app pushes it, and settle.
+Future<ProviderContainer> _pumpEditor(
+  WidgetTester t,
+  FakeBridgeApi api, {
+  AppServeStatus? existing,
+}) async {
+  final container = await _mount(
+    t,
+    api,
+    Builder(
+      builder: (context) => Scaffold(
+        body: TextButton(
+          onPressed: () => showHostingEditor(context, existing: existing),
+          child: const Text('open'),
         ),
       ),
     ),

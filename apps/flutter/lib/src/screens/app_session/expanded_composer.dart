@@ -42,13 +42,11 @@ class _ExpandedComposerState extends State<ExpandedComposer> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final wide =
         MediaQuery.sizeOf(context).width >= ExpandedComposer.splitWidth;
     var view = _picked ?? (wide ? _EditorView.split : _EditorView.write);
     if (!wide && view == _EditorView.split) view = _EditorView.write;
-    final controlHeight = isDesktop ? 34.0 : 40.0;
     final editor = _editor(context, l10n);
     final preview = _MarkdownPreview(
       controller: widget.controller,
@@ -61,80 +59,7 @@ class _ExpandedComposerState extends State<ExpandedComposer> {
       child: SafeArea(
         child: Column(
           children: [
-            // The editor fills the window, so its header is the window's
-            // strip: clear of the traffic lights, centred on their line, and
-            // draggable where it is empty.
-            SizedBox(
-              height: isFramelessDesktop ? WindowChrome.barHeight : 64,
-              child: Stack(
-                alignment: AlignmentDirectional.centerStart,
-                children: [
-                  const Positioned.fill(child: WindowDragArea()),
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      20 + WindowChrome.leadingInset,
-                      0,
-                      16,
-                      0,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            l10n.editMessage,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium,
-                          ),
-                        ),
-                        GlassSegmented<_EditorView>(
-                          key: const Key('composer-editor-view'),
-                          expand: false,
-                          height: controlHeight,
-                          selected: view,
-                          onChanged: (v) => setState(() => _picked = v),
-                          segments: [
-                            GlassSegment(
-                              key: const Key('composer-editor-write'),
-                              value: _EditorView.write,
-                              label: l10n.composerWrite,
-                            ),
-                            if (wide)
-                              GlassSegment(
-                                key: const Key('composer-editor-split'),
-                                value: _EditorView.split,
-                                label: l10n.composerSplit,
-                              ),
-                            GlassSegment(
-                              key: const Key('composer-editor-preview'),
-                              value: _EditorView.preview,
-                              label: l10n.composerPreview,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 12),
-                        FilledButton(
-                          key: const Key('composer-editor-done'),
-                          // On touch, drawn at the switcher's height inside
-                          // a full touch target.
-                          style: isDesktop
-                              ? null
-                              : FilledButton.styleFrom(
-                                  minimumSize: Size(64, controlHeight),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                  ),
-                                  tapTargetSize: MaterialTapTargetSize.padded,
-                                ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: Text(l10n.done),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _header(context, l10n, view, wide: wide),
             Divider(height: 1, color: scheme.outlineVariant),
             Expanded(
               child: switch (view) {
@@ -154,6 +79,87 @@ class _ExpandedComposerState extends State<ExpandedComposer> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// The editor fills the window, so its header is the window's strip:
+  /// clear of the traffic lights, centred on their line, and draggable
+  /// where it is empty. It holds the view switcher and Done.
+  Widget _header(
+    BuildContext context,
+    AppLocalizations l10n,
+    _EditorView view, {
+    required bool wide,
+  }) {
+    final controlHeight = isDesktop ? 34.0 : 40.0;
+    return SizedBox(
+      height: isFramelessDesktop ? WindowChrome.barHeight : 64,
+      child: Stack(
+        alignment: AlignmentDirectional.centerStart,
+        children: [
+          const Positioned.fill(child: WindowDragArea()),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              20 + WindowChrome.leadingInset,
+              0,
+              16,
+              0,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    l10n.editMessage,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                GlassSegmented<_EditorView>(
+                  key: const Key('composer-editor-view'),
+                  expand: false,
+                  height: controlHeight,
+                  selected: view,
+                  onChanged: (v) => setState(() => _picked = v),
+                  segments: [
+                    GlassSegment(
+                      key: const Key('composer-editor-write'),
+                      value: _EditorView.write,
+                      label: l10n.composerWrite,
+                    ),
+                    if (wide)
+                      GlassSegment(
+                        key: const Key('composer-editor-split'),
+                        value: _EditorView.split,
+                        label: l10n.composerSplit,
+                      ),
+                    GlassSegment(
+                      key: const Key('composer-editor-preview'),
+                      value: _EditorView.preview,
+                      label: l10n.composerPreview,
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 12),
+                FilledButton(
+                  key: const Key('composer-editor-done'),
+                  // On touch, drawn at the switcher's height inside a full
+                  // touch target.
+                  style: isDesktop
+                      ? null
+                      : FilledButton.styleFrom(
+                          minimumSize: Size(64, controlHeight),
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                        ),
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(l10n.done),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

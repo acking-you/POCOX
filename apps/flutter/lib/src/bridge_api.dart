@@ -79,20 +79,6 @@ abstract interface class BridgeApi {
   /// `default` restores codex's built-in prompt.
   Future<void> codexSetPromptVariant(String variant);
 
-  /// Begin codex's official ChatGPT login on the app-server behind [serviceKey]
-  /// (a connected host). Open the returned URL in a browser; codex writes its
-  /// own `auth.json`. Poll [codexAuthStatus] until authenticated.
-  Future<CodexLoginStart> codexLoginChatgptStart(String serviceKey);
-
-  /// Poll the codex auth status for the app-server behind [serviceKey].
-  Future<CodexAuthStatus> codexAuthStatus(String serviceKey);
-
-  /// Cancel an in-flight ChatGPT login (from [codexLoginChatgptStart]).
-  Future<void> codexLoginCancel(String serviceKey, String loginId);
-
-  /// Sign the external Codex out (revoke + delete its `auth.json`) on [serviceKey].
-  Future<void> codexLogout(String serviceKey);
-
   // --- Hosted account (GitHub device-flow login) ---
 
   /// Begin a GitHub device-flow login. [backend] overrides the configured /
@@ -124,15 +110,8 @@ abstract interface class BridgeApi {
     required String backend,
   });
 
-  /// The signed-in user (verified against the backend), or `null` if not signed
-  /// in.
-  Future<AccountUser?> accountCurrentUser();
-
   /// Sign out: revoke the refresh token (best effort) and clear the session.
   Future<void> accountLogout();
-
-  /// List the account's services from the backend.
-  Future<List<AccountService>> accountServices();
 
   /// Deregister one of the account's services from the relay (best-effort; a
   /// still-running host re-registers shortly after). [kind] is 'app' or 'api'.
@@ -160,9 +139,6 @@ abstract interface class BridgeApi {
 
   /// Snapshot of every local host (for the status cards + periodic re-probe).
   Future<List<AppServeStatus>> appServeStatus();
-
-  /// Legacy endpoint returning `unavailable`; no built-in engine is bundled.
-  Future<String> embeddedCodexVersion();
 
   /// Take one tunnel ([kind] = 'app' or 'api') of a local host off the relay
   /// without stopping the host — a reversible unpublish. The codex / API proxy
@@ -220,9 +196,6 @@ abstract interface class BridgeApi {
 
   /// Where the adapter preparation is.
   AcpClaudeSetup acpClaudePrepareState();
-
-  /// Cancel the running adapter preparation.
-  AcpClaudeSetup acpClaudePrepareCancel();
 
   /// Cancel preparation run [run] only (the one its caller started); a later
   /// run started by another caller keeps going.
@@ -497,14 +470,6 @@ abstract interface class BridgeApi {
     bool loadMore = false,
   });
 
-  /// Every item of one turn, oldest first — for jumping to a turn the
-  /// transcript hasn't scrolled back to yet.
-  Future<List<ThreadItem>> appThreadTurnItems(
-    String serviceKey,
-    String threadId,
-    String turnId,
-  );
-
   /// The latest server-reported runtime config for a thread (from its
   /// start/resume response, kept fresh by `thread/settings/updated`
   /// notifications), or null when the server hasn't reported any. Reads the
@@ -693,18 +658,6 @@ abstract interface class BridgeApi {
     String? directory,
   );
 
-  /// Upload a document/file attachment to the host behind [serviceKey] (over
-  /// its meta tunnel — loopback when this app is the host). Returns the
-  /// absolute HOST filesystem path where it was stored; the turn text then
-  /// references that path so the agent reads the file with its own tools —
-  /// codex's native host-file workflow (its input protocol carries only text
-  /// and images inline; there is no document slot).
-  Future<String> metaUploadFile(
-    String serviceKey,
-    String fileName,
-    Uint8List bytes,
-  );
-
   /// Capture the current destination context before reading attachment bytes.
   String metaUploadContext();
 
@@ -731,14 +684,6 @@ abstract interface class BridgeApi {
   /// Read the project-folder config (roots + default) of the host behind
   /// [serviceKey] — what a new session's folder browser starts from.
   Future<ProjectConfig> metaProjectConfig(String serviceKey);
-
-  /// Replace the project-folder config of the host behind [serviceKey]; returns
-  /// the stored value. The desktop host edits this over its own loopback tunnel.
-  Future<ProjectConfig> metaSetProjectConfig(
-    String serviceKey,
-    List<String> projectRoots,
-    String? defaultProject,
-  );
 
   /// Read the project settings, including the effective (possibly automatic)
   /// default folder. Never creates the folder. Works on `meta:` and `host:`
@@ -779,9 +724,6 @@ abstract interface class BridgeApi {
 
   /// Read a remote computer's management view.
   Future<ManagedDevice> managedDevice(String serviceKey);
-
-  /// Read one remote host.
-  Future<ManagedHost> managedHost(String serviceKey, String name);
 
   /// Create and start a remote service. A lost response needs a refresh,
   /// never an automatic retry.

@@ -45,23 +45,23 @@ class _TranscriptRow extends StatelessWidget {
         result: result,
       );
     }
+    if (item.itemType == 'userMessage') {
+      // An automation's run, or a Live voice handoff (spoken turns): not
+      // something the user typed.
+      if (AutomationPrompt.parse(item.text) case final prompt?) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: AutomationPromptCard(prompt: prompt),
+        );
+      }
+      if (parseRealtimeDelegation(item.text) case final handoff?) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: RealtimeHandoffCard(handoff: handoff),
+        );
+      }
+    }
     switch (item.itemType) {
-      case 'userMessage' when AutomationPrompt.parse(item.text) != null:
-        // An automation's run, not something the user typed.
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: AutomationPromptCard(
-            prompt: AutomationPrompt.parse(item.text)!,
-          ),
-        );
-      case 'userMessage' when parseRealtimeDelegation(item.text) != null:
-        // A Live voice handoff: spoken turns, not a typed message.
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: RealtimeHandoffCard(
-            handoff: parseRealtimeDelegation(item.text)!,
-          ),
-        );
       case 'userMessage':
         // Document attachments ride the text as a trailing path-reference
         // block, and a client with editor context serializes that context

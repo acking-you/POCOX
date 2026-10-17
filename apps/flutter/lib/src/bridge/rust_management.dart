@@ -68,10 +68,6 @@ mixin _RustManagement implements BridgeApi {
   }
 
   @override
-  Future<ManagedHost> managedHost(String serviceKey, String name) async =>
-      _managedHost(await frb.managedHost(serviceKey: serviceKey, name: name));
-
-  @override
   Future<ManagedHost> managedHostStart(
     String serviceKey, {
     required String name,

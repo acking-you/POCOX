@@ -16,10 +16,11 @@ class _UploadingApi extends FakeBridgeApi {
   final upload = Completer<String>();
 
   @override
-  Future<String> metaUploadFile(
+  Future<String> metaUploadFileScoped(
     String serviceKey,
     String fileName,
     Uint8List bytes,
+    String context,
   ) => upload.future;
 }
 

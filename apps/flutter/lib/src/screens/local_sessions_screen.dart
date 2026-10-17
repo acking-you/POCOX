@@ -354,17 +354,12 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
         )
         .toList();
 
-    final allTree = SessionTree(
+    SessionTree<LocalSession> treeOf(Iterable<LocalSession> sessions) =>
+        SessionTree(sessions, (s) => s.threadId, (s) => s.parentThreadId);
+    final included = treeOf(
       _sessions,
-      (LocalSession s) => s.threadId,
-      (s) => s.parentThreadId,
-    );
-    final included = allTree.withAncestors(matched.map((s) => s.threadId));
-    final tree = SessionTree(
-      _sessions.where((s) => included.contains(s.threadId)),
-      (LocalSession s) => s.threadId,
-      (s) => s.parentThreadId,
-    );
+    ).withAncestors(matched.map((s) => s.threadId));
+    final tree = treeOf(_sessions.where((s) => included.contains(s.threadId)));
     final filtered = tree.roots;
     final activeParents = tree.withAncestors(
       _sessions.where((s) => s.safety == 'ownedRunning').map((s) => s.threadId),
@@ -403,15 +398,8 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
             expanded: expanded.contains(s.threadId),
             childSession: s.parentThreadId != null,
             guardian: s.isGuardian,
-            onToggle: () => setState(() {
-              if (expanded.contains(s.threadId)) {
-                _expandedParents.remove(s.threadId);
-                _collapsedParents.add(s.threadId);
-              } else {
-                _collapsedParents.remove(s.threadId);
-                _expandedParents.add(s.threadId);
-              }
-            }),
+            onToggle: () =>
+                _toggle(s.threadId, open: !expanded.contains(s.threadId)),
             child: _SessionRow(
               session: s,
               now: now,
@@ -427,6 +415,14 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     section(l10n.groupActive, active);
     section(l10n.groupToday, today);
     section(l10n.groupEarlier, earlier);
+    final list = RefreshIndicator(
+      key: const ValueKey('local-list'),
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 8),
+        children: rows,
+      ),
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -449,30 +445,25 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
               : desktop
               ? Padding(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                  child: Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: RefreshIndicator(
-                      key: const ValueKey('local-list'),
-                      onRefresh: _load,
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        children: rows,
-                      ),
-                    ),
-                  ),
+                  child: Card(clipBehavior: Clip.antiAlias, child: list),
                 )
-              : RefreshIndicator(
-                  key: const ValueKey('local-list'),
-                  onRefresh: _load,
-                  child: ListView(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    children: rows,
-                  ),
-                ),
+              : list,
         ),
       ],
     );
   }
+
+  /// Fold or unfold [id]'s children by hand; a manual fold outranks the
+  /// automatic reveal of a search or filter.
+  void _toggle(String id, {required bool open}) => setState(() {
+    if (open) {
+      _collapsedParents.remove(id);
+      _expandedParents.add(id);
+    } else {
+      _expandedParents.remove(id);
+      _collapsedParents.add(id);
+    }
+  });
 
   Widget _desktopToolbar(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
@@ -844,11 +835,5 @@ Future<void> resumeLocalSession(
 
   // Open the resumed conversation (only reached on success).
   if (!context.mounted || !current()) return;
-  final key = Uri.encodeComponent(target);
-  final q = <String>[
-    'tid=${Uri.encodeComponent(threadId)}',
-    if (cwd != null && cwd.trim().isNotEmpty)
-      'cwd=${Uri.encodeComponent(cwd.trim())}',
-  ];
-  context.push('/app/$key/session?${q.join('&')}');
+  context.push(conversationRoute(target, threadId, cwd: cwd));
 }

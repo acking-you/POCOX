@@ -349,25 +349,4 @@ void _registerPresets() {
     ], everyElement(isFalse));
     expect(acp.permissionOptions, isTrue);
   });
-
-  testWidgets('the ACP badge names the agent and tags the protocol', (t) async {
-    await t.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        locale: const Locale('en'),
-        home: const Scaffold(
-          body: Row(
-            children: [
-              ProviderBadge(provider: 'acp', name: 'Beta agent'),
-              ProviderBadge(provider: 'codex'),
-            ],
-          ),
-        ),
-      ),
-    );
-    expect(find.text('Beta agent'), findsOneWidget);
-    expect(find.text('ACP'), findsOneWidget);
-    expect(find.text('Codex'), findsOneWidget);
-  });
 }

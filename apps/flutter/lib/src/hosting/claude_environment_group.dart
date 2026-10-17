@@ -108,6 +108,7 @@ class ClaudeEnvironmentGroup extends StatelessWidget {
       expanded: expanded,
       child: InkWell(
         key: Key('claude-env-group-$id'),
+        mouseCursor: clickable,
         onTap: onToggle,
         borderRadius: BorderRadius.circular(kControlRadius),
         child: Padding(

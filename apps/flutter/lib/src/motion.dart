@@ -39,7 +39,7 @@ abstract final class Motion {
   /// [d], or zero when the platform asks for reduced motion — the state still
   /// changes, it just doesn't travel.
   static Duration of(BuildContext context, Duration d) =>
-      MediaQuery.maybeDisableAnimationsOf(context) ?? false ? Duration.zero : d;
+      _reduced(context) ? Duration.zero : d;
 
   /// Animate a child's size, or lay it out directly with reduced motion.
   /// A zero-duration AnimatedSize can notify layout from its own layout pass.
@@ -61,8 +61,29 @@ abstract final class Motion {
   }
 
   /// Whether looping, purely decorative motion (pulses, typing dots) may run.
-  static bool ambientAllowed(BuildContext context) =>
-      !(MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+  static bool ambientAllowed(BuildContext context) => !_reduced(context);
+
+  static bool _reduced(BuildContext context) =>
+      MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+}
+
+/// Ambient loops (sheens, pulses, typing dots, shimmer).
+extension AmbientLoop on AnimationController {
+  /// Loop while [context] allows ambient motion ([Motion.ambientAllowed]);
+  /// otherwise rest at [rest], a frame that still says what the motion says.
+  /// Call from `didChangeDependencies`, so a changed preference applies.
+  void loopUnlessReduced(
+    BuildContext context, {
+    double rest = 0,
+    bool reverse = false,
+  }) {
+    if (Motion.ambientAllowed(context)) {
+      if (!isAnimating) repeat(reverse: reverse);
+    } else {
+      stop();
+      value = rest;
+    }
+  }
 }
 
 /// The step response of an under-damped spring (damping ratio 0.72), scaled
@@ -116,7 +137,7 @@ class _DesktopPageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return child;
+    if (Motion._reduced(context)) return child;
     return FadeTransition(
       opacity: CurvedAnimation(
         parent: animation,

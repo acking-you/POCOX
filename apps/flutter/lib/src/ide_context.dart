@@ -31,18 +31,24 @@ import 'dart:convert';
 const String kUserMessageBegin = '## My request for Codex:';
 
 /// The request heading the ChatGPT desktop app writes after its context
-/// blocks. Only honoured after one of them ([_desktopContextHeads]), so a
-/// message that merely contains the heading keeps it.
+/// blocks. Only honoured after one of them ([_contextHeads]), so a message
+/// that merely contains the heading keeps it.
 const String kDesktopRequestBegin = '## My request:';
 
-const _desktopContextHeads = [
+// Section headers the known context renderers open with. They gate
+// [kDesktopRequestBegin] and recognise a preview the SERVER truncated before
+// the marker; an unknown header degrades to the raw text rather than guessing.
+const _contextHeads = [
   '# Files mentioned by the user:',
   '# Context from my IDE setup:',
   '# Response annotations:',
   '<in-app-browser-context',
 ];
 
-final _desktopMarker = RegExp(r'^## My request:[ \t]*$', multiLine: true);
+final _desktopMarker = RegExp(
+  '^${RegExp.escape(kDesktopRequestBegin)}[ \\t]*\$',
+  multiLine: true,
+);
 
 /// A file the sending client named in its IDE context.
 class IdeMentionedFile {
@@ -135,7 +141,7 @@ IdeSplit splitIdeContext(String raw) {
 
 int? _desktopRequestAt(String raw) {
   final head = raw.trimLeft();
-  if (!_desktopContextHeads.any(head.startsWith)) return null;
+  if (!_contextHeads.any(head.startsWith)) return null;
   final matches = _desktopMarker.allMatches(raw);
   return matches.isEmpty ? null : matches.last.start;
 }
@@ -192,16 +198,6 @@ String ideDisplayText(String request, List<IdeAnnotation> annotations) {
   return out.toString().trim();
 }
 
-// Section headers the two known context renderers open with. Only used to
-// recognise a preview the SERVER truncated before the marker — an unknown
-// header degrades to showing the raw preview rather than guessing.
-const _contextHeaders = [
-  '# Files mentioned by the user:',
-  '# Context from my IDE setup:',
-  '# Response annotations:',
-  '<in-app-browser-context',
-];
-
 /// Whether [preview] is the start of an IDE-context block with no request in
 /// it yet — i.e. a server-truncated preview whose visible part is all wire.
 bool isTruncatedIdeContext(String preview) {
@@ -209,7 +205,7 @@ bool isTruncatedIdeContext(String preview) {
   if (t.contains(kUserMessageBegin) || _desktopRequestAt(t) != null) {
     return false;
   }
-  return _contextHeaders.any(t.startsWith);
+  return _contextHeads.any(t.startsWith);
 }
 
 // Marker pairs codex wraps an injected contextual user fragment in — a message
@@ -265,25 +261,6 @@ bool isContextFragment(String text) {
       _fragmentPairs.any(
         (p) => bounded(p.$1.toLowerCase(), p.$2.toLowerCase()),
       );
-}
-
-/// What the user actually said inside a `<realtime_delegation>` wrapper.
-///
-/// Voice handoff wraps the spoken turn in `<input>…</input>`. Unlike the
-/// fragments above these ARE the person's words, so they are unwrapped for
-/// display rather than hidden. Null when [text] isn't such a wrapper.
-String? realtimeDelegationInput(String text) {
-  final trimmed = text.trim();
-  if (!trimmed.startsWith('<realtime_delegation>') ||
-      !trimmed.endsWith('</realtime_delegation>')) {
-    return null;
-  }
-  final open = trimmed.indexOf('<input>');
-  if (open < 0) return null;
-  final close = trimmed.indexOf('</input>', open);
-  if (close < 0) return null;
-  final input = trimmed.substring(open + '<input>'.length, close).trim();
-  return input.isEmpty ? null : input;
 }
 
 /// Extensions the image pipeline can decode, for deciding whether a mention

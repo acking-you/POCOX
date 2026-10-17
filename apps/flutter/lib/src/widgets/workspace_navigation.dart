@@ -16,7 +16,32 @@ const double workspaceNavigationWidth = 208;
 const double _rowHeight = 38;
 const double _rowGap = 2;
 
-/// Persistent destinations, in the same order on touch and wide layouts.
+/// A persistent destination: where it leads, its glyph and its name.
+typedef WorkspaceDestination = ({String route, IconData icon, String label});
+
+/// The persistent destinations, in the order every navigation lists them
+/// (the rail, the bottom bar and the page menu).
+List<WorkspaceDestination> workspaceDestinations(AppLocalizations l10n) => [
+  (
+    route: '/',
+    icon: AppIcons.chat_bubble_outline_rounded,
+    label: l10n.utilityChat,
+  ),
+  (route: '/manage', icon: AppIcons.dns_outlined, label: l10n.manageServices),
+  (
+    route: '/sessions',
+    icon: AppIcons.history_rounded,
+    label: l10n.localSessionsTitle,
+  ),
+  (route: '/logs', icon: AppIcons.article_outlined, label: l10n.logsTitle),
+  (
+    route: '/settings',
+    icon: AppIcons.settings_outlined,
+    label: l10n.settingsTitle,
+  ),
+];
+
+/// The destinations' routes, in [workspaceDestinations] order.
 const _routes = ['/', '/manage', '/sessions', '/logs', '/settings'];
 
 /// The workspace's persistent destinations: a rail on the backdrop of a wide
@@ -87,21 +112,15 @@ class _WorkspaceNavigationState extends State<WorkspaceNavigation> {
     final scheme = Theme.of(context).colorScheme;
     final compact = widget.compact;
     final route = widget.route;
-    final entries = [
-      ('/', AppIcons.chat_bubble_outline_rounded, l10n.utilityChat),
-      ('/manage', AppIcons.dns_outlined, l10n.manageServices),
-      ('/sessions', AppIcons.history_rounded, l10n.localSessionsTitle),
-      ('/logs', AppIcons.article_outlined, l10n.logsTitle),
-      ('/settings', AppIcons.settings_outlined, l10n.settingsTitle),
-    ];
-    Widget destination((String, IconData, String) entry) {
-      final selected = entry.$1 == route;
+    final entries = workspaceDestinations(l10n);
+    Widget destination(WorkspaceDestination entry) {
+      final selected = entry.route == route;
       final ink = selected ? scheme.onSurface : scheme.onSurfaceVariant;
       return Semantics(
         selected: selected,
         button: true,
         child: Tooltip(
-          message: entry.$3,
+          message: entry.label,
           child: Material(
             // Wide rows sit over the sliding glass; compact ones carry
             // their own plate.
@@ -110,11 +129,11 @@ class _WorkspaceNavigationState extends State<WorkspaceNavigation> {
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(999),
             child: InkWell(
-              key: Key('workspace-nav-${entry.$1}'),
+              key: Key('workspace-nav-${entry.route}'),
               mouseCursor: clickable,
               hoverColor: compact ? null : backdropHover(scheme),
               borderRadius: BorderRadius.circular(999),
-              onTap: selected ? null : () => _open(entry.$1),
+              onTap: selected ? null : () => _open(entry.route),
               child: Padding(
                 padding: EdgeInsets.symmetric(
                   horizontal: compact ? 8 : 14,
@@ -125,12 +144,12 @@ class _WorkspaceNavigationState extends State<WorkspaceNavigation> {
                       ? MainAxisAlignment.center
                       : MainAxisAlignment.start,
                   children: [
-                    Icon(entry.$2, size: compact ? 21 : 18, color: ink),
+                    Icon(entry.icon, size: compact ? 21 : 18, color: ink),
                     if (!compact) ...[
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          entry.$3,
+                          entry.label,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(

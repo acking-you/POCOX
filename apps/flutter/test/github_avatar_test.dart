@@ -47,32 +47,15 @@ void main() {
   testWidgets('no account id renders the fallback without a request', (
     t,
   ) async {
-    await t.pumpWidget(
-      _host(
-        const GitHubAvatar(
-          accountId: null,
-          fallbackIcon: AppIcons.dns_outlined,
-        ),
-      ),
-    );
-
-    // A self-hosted user has no GitHub identity, so nothing should be fetched.
-    expect(find.byType(Image), findsNothing);
-    expect(find.byIcon(AppIcons.dns_outlined), findsOneWidget);
-  });
-
-  testWidgets('a blank account id is treated as absent', (t) async {
-    await t.pumpWidget(
-      _host(
-        const GitHubAvatar(
-          accountId: '   ',
-          fallbackIcon: AppIcons.dns_outlined,
-        ),
-      ),
-    );
-
-    expect(find.byType(Image), findsNothing);
-    expect(find.byIcon(AppIcons.dns_outlined), findsOneWidget);
+    // A self-hosted user has no GitHub identity, so nothing should be
+    // fetched; a blank id counts as none.
+    for (final id in [null, '   ']) {
+      await t.pumpWidget(
+        _host(GitHubAvatar(accountId: id, fallbackIcon: AppIcons.dns_outlined)),
+      );
+      expect(find.byType(Image), findsNothing);
+      expect(find.byIcon(AppIcons.dns_outlined), findsOneWidget);
+    }
   });
 
   testWidgets('a failed id is not re-requested on the next build', (t) async {

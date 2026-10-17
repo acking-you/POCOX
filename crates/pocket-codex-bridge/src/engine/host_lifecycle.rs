@@ -159,7 +159,7 @@ pub fn restore(name: &str, expected: Option<u64>, legacy: Option<Runtime>) -> Re
         .context("no runtime to restore")?;
     super::host_start::start_configured_checked(
         Some(name),
-        runtime.into(),
+        runtime,
         Change {
             input: ProfileInput {
                 source: saved.source,

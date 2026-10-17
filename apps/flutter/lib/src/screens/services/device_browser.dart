@@ -114,11 +114,7 @@ class _DeviceFirstServices extends ConsumerWidget {
         for (final service in services)
           if (dismissed.contains(service.key) &&
               service.kind != 'host' &&
-              (isSessionKind(service.kind)
-                          ? ref.watch(appReachableProvider(service.key))
-                          : ref.watch(apiReachableProvider(service.key)))
-                      .valueOrNull ==
-                  true)
+              ref.watch(_reachability(service)).valueOrNull == true)
             service.key,
       ];
       if (recovered.isNotEmpty) {
@@ -249,6 +245,31 @@ class _DeviceFirstServices extends ConsumerWidget {
       reason: unreachable ? reasonText : null,
     );
 
+    // What a probe answered, unreachable with [reasonText].
+    ({Widget chip, String? reason}) probed(
+      AsyncValue<bool> reach,
+      String reasonText,
+    ) => reach.when(
+      data: (ok) => status(
+        unreachable: !ok,
+        label: ok ? l10n.statusOnline : l10n.statusUnreachable,
+        color: ok ? online : scheme.error,
+        reasonText: reasonText,
+      ),
+      loading: () => status(
+        unreachable: false,
+        label: l10n.statusChecking,
+        color: scheme.outline,
+        reasonText: reasonText,
+      ),
+      error: (_, _) => status(
+        unreachable: true,
+        label: l10n.statusUnreachable,
+        color: scheme.error,
+        reasonText: reasonText,
+      ),
+    );
+
     ({Widget chip, String? reason}) appStatus(ServiceEntry service) {
       if (!observedDown.contains(service.key) &&
           bridge.appIsConnected(service.key)) {
@@ -268,28 +289,11 @@ class _DeviceFirstServices extends ConsumerWidget {
         );
       }
       final localAddr = localAppAddr[service.key];
-      final reach = localAddr == null
-          ? ref.watch(appReachableProvider(service.key))
-          : ref.watch(appReachableLocalProvider(localAddr));
-      return reach.when(
-        data: (ok) => status(
-          unreachable: !ok,
-          label: ok ? l10n.statusOnline : l10n.statusUnreachable,
-          color: ok ? online : scheme.error,
-          reasonText: l10n.unreachableReason,
-        ),
-        loading: () => status(
-          unreachable: false,
-          label: l10n.statusChecking,
-          color: scheme.outline,
-          reasonText: l10n.unreachableReason,
-        ),
-        error: (_, _) => status(
-          unreachable: true,
-          label: l10n.statusUnreachable,
-          color: scheme.error,
-          reasonText: l10n.unreachableReason,
-        ),
+      return probed(
+        localAddr == null
+            ? ref.watch(appReachableProvider(service.key))
+            : ref.watch(appReachableLocalProvider(localAddr)),
+        l10n.unreachableReason,
       );
     }
 
@@ -304,28 +308,11 @@ class _DeviceFirstServices extends ConsumerWidget {
         );
       }
       final localAddr = localApiAddr[service.key];
-      final reach = localAddr == null
-          ? ref.watch(apiReachableProvider(service.key))
-          : ref.watch(apiReachableLocalProvider(localAddr));
-      return reach.when(
-        data: (ok) => status(
-          unreachable: !ok,
-          label: ok ? l10n.statusOnline : l10n.statusUnreachable,
-          color: ok ? online : scheme.error,
-          reasonText: l10n.apiUnreachableReason,
-        ),
-        loading: () => status(
-          unreachable: false,
-          label: l10n.statusChecking,
-          color: scheme.outline,
-          reasonText: l10n.apiUnreachableReason,
-        ),
-        error: (_, _) => status(
-          unreachable: true,
-          label: l10n.statusUnreachable,
-          color: scheme.error,
-          reasonText: l10n.apiUnreachableReason,
-        ),
+      return probed(
+        localAddr == null
+            ? ref.watch(apiReachableProvider(service.key))
+            : ref.watch(apiReachableLocalProvider(localAddr)),
+        l10n.apiUnreachableReason,
       );
     }
 
@@ -335,9 +322,7 @@ class _DeviceFirstServices extends ConsumerWidget {
       if (isSessionKind(service.kind) && observedDown.contains(service.key)) {
         return true;
       }
-      final probe = isSessionKind(service.kind)
-          ? ref.watch(appReachableProvider(service.key))
-          : ref.watch(apiReachableProvider(service.key));
+      final probe = ref.watch(_reachability(service));
       return probe.hasError || probe.valueOrNull == false;
     }
 
@@ -396,7 +381,8 @@ class _DeviceFirstServices extends ConsumerWidget {
     // A tunnel we took off the relay reads as offline, not unreachable: nothing
     // is broken, it simply is not published. With the relay down it is not
     // published because nothing can be, which is not the same thing.
-    Widget? offlineChip(String key) => offlineTunnels.contains(key)
+    Widget? offlineChip(String key, [Set<String>? offline]) =>
+        (offline ?? offlineTunnels).contains(key)
         ? StatusChip(
             color: scheme.outline,
             label: relayDown ? l10n.tunnelNotConnected : l10n.tunnelOffline,
@@ -417,54 +403,52 @@ class _DeviceFirstServices extends ConsumerWidget {
       'opencode' => 'OpenCode HTTP',
       _ => 'App-server',
     };
-    Widget chatRow(ServiceEntry service, {AppServeStatus? host}) =>
-        _CapabilityRow(
-          host: host,
-          key: Key('device-capability-${service.key}'),
-          icon: AppIcons.chat_bubble_outline,
-          title: l10n.servicesChatCapability,
-          provider: switch (service.kind) {
-            'acp' => 'acp',
-            'opencode' => 'opencode',
-            _ => 'codex',
-          },
-          providerName: localHosts
-              .where((h) => h.appServiceKey == service.key)
-              .firstOrNull
-              ?.providerName,
-          profileId: localHosts
-              .where((h) => h.appServiceKey == service.key)
-              .firstOrNull
-              ?.profileId,
-          // A host card is headed by the host's name already.
-          protocol: host != null
-              ? wireOf(service)
-              : protocolOf(wireOf(service), service),
-          localAddr: localAppAddr[service.key],
-          menuKey: Key('capability-menu-${service.key}'),
-          status: offlineChip(service.key) ?? appStates[service.key]!.chip,
-          reason: appStates[service.key]!.reason,
-          onReregister: reregisterFor(service.key),
-          isDefault: service.key == preferredKey,
-          onSetDefault: () => ref
-              .read(uiPrefsProvider.notifier)
-              .setPreferredAppService(service.key),
-          actionLabel: l10n.servicesOpen,
-          // Straight back to the chat, pointed at this service. The project /
-          // conversation picker this used to push lives in the chat's own
-          // sidebar, so drilling into a third page only put the same tree
-          // behind an extra tap.
-          onAction: () => _openInChat(context, ref, service.key),
-          onDeregister: () => _confirmDeregister(
-            context,
-            ref,
-            service,
-            localTunnel: localTunnels[service.key],
-            unreachable: unreachableEntries.any(
-              (entry) => entry.key == service.key,
-            ),
-          ),
-        );
+    final unreachableKeys = {for (final entry in unreachableEntries) entry.key};
+    Widget chatRow(ServiceEntry service, {AppServeStatus? host}) {
+      final hosted = localHosts
+          .where((h) => h.appServiceKey == service.key)
+          .firstOrNull;
+      return _CapabilityRow(
+        host: host,
+        key: Key('device-capability-${service.key}'),
+        icon: AppIcons.chat_bubble_outline,
+        title: l10n.servicesChatCapability,
+        provider: switch (service.kind) {
+          'acp' => 'acp',
+          'opencode' => 'opencode',
+          _ => 'codex',
+        },
+        providerName: hosted?.providerName,
+        profileId: hosted?.profileId,
+        // A host card is headed by the host's name already.
+        protocol: host != null
+            ? wireOf(service)
+            : protocolOf(wireOf(service), service),
+        localAddr: localAppAddr[service.key],
+        menuKey: Key('capability-menu-${service.key}'),
+        status: offlineChip(service.key) ?? appStates[service.key]!.chip,
+        reason: appStates[service.key]!.reason,
+        onReregister: reregisterFor(service.key),
+        isDefault: service.key == preferredKey,
+        onSetDefault: () => ref
+            .read(uiPrefsProvider.notifier)
+            .setPreferredAppService(service.key),
+        actionLabel: l10n.servicesOpen,
+        // Straight back to the chat, pointed at this service. The project /
+        // conversation picker this used to push lives in the chat's own
+        // sidebar, so drilling into a third page only put the same tree
+        // behind an extra tap.
+        onAction: () => _openInChat(context, ref, service.key),
+        onDeregister: () => _confirmDeregister(
+          context,
+          ref,
+          service,
+          localTunnel: localTunnels[service.key],
+          unreachable: unreachableKeys.contains(service.key),
+        ),
+      );
+    }
+
     final capabilityRows = <Widget>[
       for (final service in apps)
         if (!hostOfService.containsKey(service.key)) chatRow(service),
@@ -488,9 +472,7 @@ class _DeviceFirstServices extends ConsumerWidget {
             ref,
             service,
             localTunnel: localTunnels[service.key],
-            unreachable: unreachableEntries.any(
-              (entry) => entry.key == service.key,
-            ),
+            unreachable: unreachableKeys.contains(service.key),
           ),
         ),
       if (account)
@@ -504,13 +486,7 @@ class _DeviceFirstServices extends ConsumerWidget {
             menuKey: Key('capability-menu-meta-${service.key}'),
             // The meta tunnel is unpublishable like the other two, so this row
             // carries the same controls the tunnel list used to.
-            status: offlineMeta.contains(service.key)
-                ? StatusChip(
-                    color: scheme.outline,
-                    label: l10n.tunnelOffline,
-                    filled: true,
-                  )
-                : null,
+            status: offlineChip(service.key, offlineMeta),
             onReregister: reregisterOf(metaHostOf, offlineMeta, service.key),
             onDeregister: metaHostOf.containsKey(service.key)
                 ? () => _confirmDeregister(

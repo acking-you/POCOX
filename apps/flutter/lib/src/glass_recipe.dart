@@ -61,15 +61,13 @@ GlassRecipe glassRecipe(
   double lift = 1,
 }) {
   final light = scheme.brightness == Brightness.light;
-  BoxShadow shadow(double alpha, double blur, double y, {Color? color}) =>
-      BoxShadow(
-        color: (color ?? Colors.black).withValues(alpha: alpha),
-        blurRadius: blur,
-        offset: Offset(0, y),
-      );
   // Shadows stay neutral: a tinted shadow colours everything around a
   // floating control.
-  const tint = Colors.black;
+  BoxShadow shadow(double alpha, double blur, double y) => BoxShadow(
+    color: Colors.black.withValues(alpha: alpha),
+    blurRadius: blur,
+    offset: Offset(0, y),
+  );
   if (light) {
     return switch (depth) {
       GlassDepth.chrome => GlassRecipe(
@@ -81,7 +79,7 @@ GlassRecipe glassRecipe(
         blur: 0,
         shadows: [
           shadow(0.05, 2, 1),
-          shadow(0.045 * lift, 12 * lift, 3 * lift, color: tint),
+          shadow(0.045 * lift, 12 * lift, 3 * lift),
         ],
       ),
       GlassDepth.floating => GlassRecipe(
@@ -93,7 +91,7 @@ GlassRecipe glassRecipe(
         blur: 24,
         shadows: [
           shadow(0.05, 3, 1),
-          shadow(0.09 * lift, 36 * lift, 14 * lift, color: tint),
+          shadow(0.09 * lift, 36 * lift, 14 * lift),
         ],
       ),
       GlassDepth.overlay => GlassRecipe(
@@ -105,7 +103,7 @@ GlassRecipe glassRecipe(
         blur: 28,
         shadows: [
           shadow(0.06, 4, 1),
-          shadow(0.11 * lift, 48 * lift, 20 * lift, color: tint),
+          shadow(0.11 * lift, 48 * lift, 20 * lift),
         ],
       ),
     };

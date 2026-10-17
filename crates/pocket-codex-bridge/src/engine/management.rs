@@ -11,9 +11,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     host_apply, host_lifecycle,
-    host_profiles::{self, Change, Engine, KeyChange, ProfileInput, Runtime, RuntimeChange},
-    host_start::{self, NewHost},
-    runtime, serve,
+    host_profiles::{self, Change, KeyChange, ProfileInput, Runtime, RuntimeChange},
+    host_start, runtime, serve,
 };
 
 #[path = "management_http.rs"]
@@ -371,21 +370,12 @@ fn save(name: &str, mut request: SaveRequest, token: AdmissionToken) -> Result<H
             .ok_or_else(|| anyhow!("choose a runtime"))?,
     };
     change.runtime = RuntimeChange::Set(desired.clone());
-    let engine = match &desired {
-        Runtime::Codex {
-            ..
-        } => Engine::Codex,
-        Runtime::OpenCode {
-            ..
-        } => Engine::OpenCode,
-        Runtime::Acp(spec) => Engine::Acp(spec),
-    };
     let (_, staged) = host_profiles::stage_checked_in(
         &host_profiles::root()?,
         name,
         &change,
         Some(request.expected_revision),
-        engine,
+        desired.engine(),
         &|| token.check(),
     )?;
     staged.finish();
@@ -447,11 +437,10 @@ fn start_revision(
             .block_on(pocket_codex_api_proxy::check_auth())
             .map_err(|_| Fault::AuthenticationRequired)?;
     }
-    let choice = resolve_runtime(&request.name, request.runtime)?;
-    let new_host = NewHost::from(choice);
+    let runtime = resolve_runtime(&request.name, request.runtime)?;
     host_start::start_configured_checked(
         Some(&request.name),
-        new_host,
+        runtime,
         change(request.input, request.key),
         Some(expected),
         &|| {

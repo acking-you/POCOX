@@ -18,6 +18,7 @@ import 'package:pocket_codex/src/screens/app_session/agent_session_options.dart'
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/attachment_refs.dart';
 
 /// The welcome card of a conversation that has not sent anything yet.
 class AgentWelcome extends StatelessWidget {
@@ -83,16 +84,11 @@ class AgentWelcome extends StatelessWidget {
   /// with the first message.
   final bool opensOnFirstMessage;
 
-  static String _leaf(String path) {
-    final segs = path.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-    return segs.isEmpty ? path : segs.last;
-  }
-
   /// [path]'s folder name, with its parent where another of [all] shares
   /// the name, so two checkouts of one repository stay distinguishable.
   static String _shortName(String path, List<String> all) {
-    final leaf = _leaf(path);
-    if (all.where((p) => _leaf(p) == leaf).length < 2) return leaf;
+    final leaf = folderName(path);
+    if (all.where((p) => folderName(p) == leaf).length < 2) return leaf;
     final segs = path.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
     return segs.length < 2 ? leaf : '${segs[segs.length - 2]}/$leaf';
   }
@@ -227,30 +223,8 @@ class AgentWelcome extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
-            children: [
-              for (final p in projects) ...[
-                Tooltip(
-                  message: p,
-                  child: _pill(
-                    context,
-                    scheme,
-                    key: Key('agent-welcome-recent-$p'),
-                    label: _shortName(p, projects),
-                    onTap: onPickRecent == null ? null : () => onPickRecent!(p),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              if (chooser)
-                _pill(
-                  context,
-                  scheme,
-                  key: const Key('agent-welcome-choose-folder'),
-                  icon: AppIcons.add,
-                  label: l10n.chooseFolder,
-                  onTap: onChooseFolder,
-                ),
-            ],
+            spacing: 8,
+            children: _pills(context, l10n, scheme, projects, chooser: chooser),
           ),
         ),
       ],
@@ -480,33 +454,50 @@ class AgentWelcome extends StatelessWidget {
           alignment: WrapAlignment.center,
           spacing: 8,
           runSpacing: 8,
-          children: [
-            for (final p in projects)
-              Tooltip(
-                message: p,
-                child: _pill(
-                  context,
-                  scheme,
-                  key: Key('agent-welcome-recent-$p'),
-                  label: _shortName(p, projects),
-                  onTap: onPickRecent == null ? null : () => onPickRecent!(p),
-                ),
-              ),
-            if (onChooseFolder != null &&
-                phase != AgentSessionPhase.needsProject)
-              _pill(
-                context,
-                scheme,
-                key: const Key('agent-welcome-choose-folder'),
-                icon: AppIcons.add,
-                label: l10n.chooseFolder,
-                onTap: onChooseFolder,
-              ),
-          ],
+          children: _pills(
+            context,
+            l10n,
+            scheme,
+            projects,
+            chooser:
+                onChooseFolder != null &&
+                phase != AgentSessionPhase.needsProject,
+          ),
         ),
       ],
     );
   }
+
+  /// One pill per project (the folder name; the full path in the tooltip),
+  /// then the folder [chooser].
+  List<Widget> _pills(
+    BuildContext context,
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    List<String> projects, {
+    required bool chooser,
+  }) => [
+    for (final p in projects)
+      Tooltip(
+        message: p,
+        child: _pill(
+          context,
+          scheme,
+          key: Key('agent-welcome-recent-$p'),
+          label: _shortName(p, projects),
+          onTap: onPickRecent == null ? null : () => onPickRecent!(p),
+        ),
+      ),
+    if (chooser)
+      _pill(
+        context,
+        scheme,
+        key: const Key('agent-welcome-choose-folder'),
+        icon: AppIcons.add,
+        label: l10n.chooseFolder,
+        onTap: onChooseFolder,
+      ),
+  ];
 
   Widget _pill(
     BuildContext context,

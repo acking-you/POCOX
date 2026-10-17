@@ -48,8 +48,9 @@ class _FocusHelpState extends State<FocusHelp> {
         mainAxisSize: MainAxisSize.min,
         children: [
           widget.child,
-          AnimatedSize(
-            duration: Motion.of(context, Motion.fast),
+          Motion.resize(
+            context,
+            duration: Motion.fast,
             curve: Motion.emphasized,
             alignment: AlignmentDirectional.topStart,
             child: _focused
@@ -82,13 +83,10 @@ TextStyle helpTextStyle(ThemeData theme) => TextStyle(
 /// explanation takes no room in the layout.
 class InfoTip extends StatefulWidget {
   /// Creates the mark for [message].
-  const InfoTip(this.message, {super.key, this.size = 15});
+  const InfoTip(this.message, {super.key});
 
   /// The explanation.
   final String message;
-
-  /// The glyph's size.
-  final double size;
 
   @override
   State<InfoTip> createState() => _InfoTipState();
@@ -131,7 +129,7 @@ class _InfoTipState extends State<InfoTip> {
             padding: const EdgeInsets.all(4),
             child: Icon(
               AppIcons.info_outline,
-              size: widget.size,
+              size: 15,
               color: lit ? scheme.onSurfaceVariant : onSurfaceMuted(scheme),
             ),
           ),

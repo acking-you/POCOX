@@ -281,16 +281,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get fileUploadFailed => '上传文件到主机失败';
-
-  @override
   String get fileOnlyMessage => '[文件]';
-
-  @override
-  String get interrupt => '打断';
-
-  @override
-  String get thinking => '思考中…';
 
   @override
   String get emptyConversation => '发送消息开始对话';
@@ -314,9 +305,6 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get sandboxHelperUnavailable =>
       '此自带会话无法启动命令沙箱，因此智能体在这里无法执行命令或读取文件。请切换到「完全放行」模式（不使用沙箱运行），或连接到外部/远程 codex 主机。';
-
-  @override
-  String get disconnect => '断开连接';
 
   @override
   String get connectionLost => '连接已断开';
@@ -344,14 +332,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get workOutsideProject => '不在项目中工作';
-
-  @override
-  String get switchProjectTip => '切换项目';
-
-  @override
-  String newSessionTitleIn(String project) {
-    return '要在 $project 内开发什么？';
-  }
 
   @override
   String get remotePathLabel => '远端项目文件夹路径（主机上）';
@@ -722,9 +702,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get envLocal => '本地';
 
   @override
-  String get envProject => '项目';
-
-  @override
   String get envSource => '来源';
 
   @override
@@ -965,36 +942,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearanceDark => '暗黑';
 
   @override
-  String get newSessionTitle => '我们该构建什么？';
-
-  @override
-  String get newSessionSubtitle => '选一个起点，或直接在下方输入你的任务。';
-
-  @override
-  String get suggestExploreTitle => '了解项目';
-
-  @override
-  String get suggestExplorePrompt => '介绍一下这个项目的结构、主要模块和技术栈。';
-
-  @override
-  String get suggestTestsTitle => '运行并修复测试';
-
-  @override
-  String get suggestTestsPrompt => '运行测试套件，并修复所有失败的用例。';
-
-  @override
-  String get suggestDiffTitle => '审查改动';
-
-  @override
-  String get suggestDiffPrompt => '总结当前工作区相对主分支的改动。';
-
-  @override
-  String get suggestPlanTitle => '规划功能';
-
-  @override
-  String get suggestPlanPrompt => '在写代码之前，帮我规划一个新功能。';
-
-  @override
   String get searchConversations => '搜索会话';
 
   @override
@@ -1214,12 +1161,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostRuntimeInfo => '运行信息';
 
   @override
-  String get hostRuntimeMode => 'codex';
-
-  @override
-  String get hostCodexVersion => '版本';
-
-  @override
   String get hostCodexPath => '路径';
 
   @override
@@ -1233,11 +1174,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get localHostHint => '在本机运行 codex 并发布到你的中转，让你的其它设备可以驱动它。';
-
-  @override
-  String localHostListening(String addr) {
-    return '正在监听 $addr';
-  }
 
   @override
   String codexFoundAt(String path) {
@@ -1434,10 +1370,6 @@ class AppLocalizationsZh extends AppLocalizations {
       '在电脑上打开 PocketCodex 并开启托管（app-server），这里就会自动进入对话。';
 
   @override
-  String get homeNoServiceSelfHostHint =>
-      '在装有 codex 的机器上运行 `pocket-codex serve` 把 app-server 发布到中转，或登录账号后直接在本应用内托管。';
-
-  @override
   String get homeAutoRetryNote => '会自动持续检测新主机。';
 
   @override
@@ -1445,11 +1377,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hostSwitchTitle => '切换主机';
-
-  @override
-  String hostRestoreFull(int count) {
-    return '已开始托管，但启动时不会恢复此主机：已记住 $count 个主机。如需恢复，请先停止其中一个主机，再重新启动此主机。';
-  }
 
   @override
   String acpSavedAgentsFull(int count) {
@@ -1561,9 +1488,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get folderUp => '上一级';
 
   @override
-  String get folderPickerEmpty => '这里没有子文件夹';
-
-  @override
   String get folderPickerNoRoots => '该主机还没有配置项目文件夹。请在电脑端的托管设置里添加。';
 
   @override
@@ -1611,19 +1535,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get projectFolders => '项目文件夹';
 
   @override
-  String get projectFoldersHint => '手机可浏览这些文件夹来开启会话。点亮星标即设为新会话的默认目录。';
-
-  @override
-  String get noProjectFolders => '还没有项目文件夹。';
-
-  @override
   String get addProjectFolder => '添加文件夹';
-
-  @override
-  String get defaultProjectFolder => '默认目录';
-
-  @override
-  String get setAsDefault => '设为默认';
 
   @override
   String get removeProjectFolder => '移除';
@@ -2199,9 +2111,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceUserSpeaking => '你正在说话';
 
   @override
-  String get voiceInterrupted => '已打断';
-
-  @override
   String get voiceEndedByUser => '语音通话已结束';
 
   @override
@@ -2211,9 +2120,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get voiceFailedShort => '语音连接已断开';
-
-  @override
-  String get voiceOpenCall => '回到语音会话';
 
   @override
   String get voiceHangUp => '挂断';
@@ -2279,9 +2185,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dictationVoiceBusy => '实时语音通话正在使用麦克风';
 
   @override
-  String get dictationShortcut => '语音输入（Ctrl+Shift+Space）';
-
-  @override
   String get providerAcpAgent => 'ACP 智能体';
 
   @override
@@ -2289,9 +2192,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get acpHostHint => '按程序和参数在本机运行兼容 ACP 的智能体，并提供给你的设备使用。停止托管会停止该智能体。';
-
-  @override
-  String get acpAgentLabel => '智能体';
 
   @override
   String get acpAgentCustom => '自定义智能体';
@@ -2397,16 +2297,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get claudeEnvRecheck => '重新检测';
 
   @override
-  String claudePreparing(int seconds) {
-    return '正在准备 Claude ACP 适配器… $seconds 秒';
-  }
-
-  @override
-  String claudePrepareVerifying(int seconds) {
-    return '正在校验下载的适配器… $seconds 秒';
-  }
-
-  @override
   String get claudePrepareCancel => '停止准备';
 
   @override
@@ -2476,9 +2366,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get acpStopNote => '停止托管会停止该智能体及其启动的进程。';
-
-  @override
-  String get acpFeatures => '智能体功能';
 
   @override
   String get acpFeatureReopen => '重新打开以前的会话';
@@ -3632,11 +3519,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get managedRuntimeDetails => '详情';
-
-  @override
-  String managedRuntimeDetailsTitle(String name) {
-    return '$name 详情';
-  }
 
   @override
   String get managedRuntimePath => '可执行文件';

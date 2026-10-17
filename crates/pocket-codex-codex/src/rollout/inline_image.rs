@@ -25,9 +25,14 @@ pub fn inline_user_image(rollout: &Path, path: &str) -> Result<Option<String>> {
     let needle = escaped.trim_matches('"');
     let reader = std::io::BufReader::new(std::fs::File::open(rollout)?);
     for line in reader.lines() {
-        // A partially written last line, or a line that is not UTF-8, ends
-        // nothing: the image may still be on an earlier line.
-        let Ok(line) = line else { continue };
+        // A line that is not UTF-8 (its bytes are consumed) ends nothing: the
+        // image may still be on another line. Any other read error would
+        // repeat on every attempt, so it ends the search.
+        let line = match line {
+            Ok(line) => line,
+            Err(error) if error.kind() == std::io::ErrorKind::InvalidData => continue,
+            Err(error) => return Err(error.into()),
+        };
         if !line.contains(needle) || !line.contains("input_image") {
             continue;
         }
@@ -74,14 +79,14 @@ fn names_path(tag: &str, path: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Write;
+    use serde_json::json;
 
     use super::*;
 
-    fn message(parts: Value) -> String {
-        serde_json::json!({
+    fn message(role: &str, parts: Value) -> String {
+        json!({
             "type": "response_item",
-            "payload": {"type": "message", "role": "user", "content": parts},
+            "payload": {"type": "message", "role": role, "content": parts},
         })
         .to_string()
     }
@@ -91,43 +96,36 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let rollout = dir.path().join("rollout.jsonl");
         let wanted = "/var/folders/T/codex-clipboard-a.png";
-        let mut file = std::fs::File::create(&rollout).expect("create");
+        let tag = |path: &str, n: u8| format!("<image name=[Image #{n}] path=\"{path}\">");
         // A reply that merely names the path, and another attachment, come
         // first; neither is the image the user attached from `wanted`.
-        writeln!(
-            file,
-            "{}",
-            serde_json::json!({
-                "type": "response_item",
-                "payload": {"type": "message", "role": "assistant", "content": [
-                    {"type": "output_text", "text": format!("<image name=[Image #1] path=\"{wanted}\">")},
+        let lines = [
+            message(
+                "assistant",
+                json!([
+                    {"type": "output_text", "text": tag(wanted, 1)},
                     {"type": "input_image", "image_url": "data:image/png;base64,QUFB"},
-                ]},
-            })
-        )
-        .expect("write");
-        writeln!(
-            file,
-            "{}",
-            message(serde_json::json!([
-                {"type": "input_text", "text": "<image name=[Image #1] path=\"/tmp/other.png\">"},
-                {"type": "input_image", "image_url": "data:image/png;base64,T1RIRVI="},
-                {"type": "input_text", "text": "</image>"},
-                {"type": "input_text", "text": format!("mentions {wanted} in prose")},
-            ]))
-        )
-        .expect("write");
-        writeln!(
-            file,
-            "{}",
-            message(serde_json::json!([
-                {"type": "input_text", "text": format!("<image name=[Image #2] path=\"{wanted}\">")},
-                {"type": "input_image", "image_url": "data:image/png;base64,V0FOVEVE"},
-                {"type": "input_text", "text": "</image>"},
-            ]))
-        )
-        .expect("write");
-        drop(file);
+                ]),
+            ),
+            message(
+                "user",
+                json!([
+                    {"type": "input_text", "text": tag("/tmp/other.png", 1)},
+                    {"type": "input_image", "image_url": "data:image/png;base64,T1RIRVI="},
+                    {"type": "input_text", "text": "</image>"},
+                    {"type": "input_text", "text": format!("mentions {wanted} in prose")},
+                ]),
+            ),
+            message(
+                "user",
+                json!([
+                    {"type": "input_text", "text": tag(wanted, 2)},
+                    {"type": "input_image", "image_url": "data:image/png;base64,V0FOVEVE"},
+                    {"type": "input_text", "text": "</image>"},
+                ]),
+            ),
+        ];
+        std::fs::write(&rollout, lines.join("\n")).expect("write");
 
         assert_eq!(
             inline_user_image(&rollout, wanted)

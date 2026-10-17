@@ -122,7 +122,6 @@ extension _SessionStatus on _AppSessionState {
   Widget _statusBar(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final st = _sessionState(l10n);
-    final d = _diff;
     final activeModel = _activeModelStatus();
     final running = _streaming || _externalWriterRunning;
     return AnimatedContainer(
@@ -168,59 +167,10 @@ extension _SessionStatus on _AppSessionState {
           ),
           const Spacer(),
           // The model actively handling this thread's requests — server truth
-          // when confirmed (✓), else the best-known effective value. Tap for
-          // the full runtime configuration, so a model switch is verifiable.
+          // when confirmed, else the best-known effective value. Tap for the
+          // full runtime configuration, so a model switch is verifiable.
           if (activeModel != null) ...[
-            Tooltip(
-              message: l10n.activeModelTooltip,
-              child: InkWell(
-                mouseCursor: clickable,
-                key: const Key('active-model-chip'),
-                onTap: _showRuntimeSheet,
-                borderRadius: BorderRadius.circular(kControlRadius),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 180),
-                        child: Text(
-                          _modelDisplayLabel(activeModel.id)!,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Confirmed by the server: a solid dot; still
-                      // pending: a hollow one.
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: activeModel.confirmed
-                              ? additionColor(scheme)
-                              : null,
-                          border: activeModel.confirmed
-                              ? null
-                              : Border.all(
-                                  color: scheme.onSurfaceVariant,
-                                  width: 1.2,
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            _activeModelChip(l10n, scheme, activeModel),
             const SizedBox(width: 10),
           ],
           // Live elapsed clock for the running turn. A local turn freezes this
@@ -245,82 +195,116 @@ extension _SessionStatus on _AppSessionState {
           // Branch + working-tree change counts, tappable to open the diff.
           // This is the single, unified place the git state lives (no separate
           // app-bar chip), so the status bar is the one source of truth.
-          if (_branch != null)
-            Tooltip(
-              message: _diffLoading
-                  ? l10n.cancelDiffLoad
-                  : (d != null && !d.isEmpty)
-                  ? l10n.viewDiff
-                  : _branch!,
-              child: InkWell(
-                mouseCursor: clickable,
-                key: const Key('status-branch-chip'),
-                onTap: _showDiff,
-                borderRadius: BorderRadius.circular(kControlRadius),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
+          if (_branch case final branch?) _branchChip(l10n, scheme, branch),
+        ],
+      ),
+    );
+  }
+
+  /// The model handling this thread's requests, marked solid once the
+  /// server confirmed it; tap for the full runtime configuration.
+  Widget _activeModelChip(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    ({String id, bool confirmed}) model,
+  ) => Tooltip(
+    message: l10n.activeModelTooltip,
+    child: InkWell(
+      mouseCursor: clickable,
+      key: const Key('active-model-chip'),
+      onTap: _showRuntimeSheet,
+      borderRadius: BorderRadius.circular(kControlRadius),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 180),
+              child: Text(
+                _modelDisplayLabel(model.id)!,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Confirmed by the server: a solid dot; still pending: a hollow
+            // one.
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: model.confirmed ? additionColor(scheme) : null,
+                border: model.confirmed
+                    ? null
+                    : Border.all(color: scheme.onSurfaceVariant, width: 1.2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  /// The [branch] with its working-tree change counts, tappable to open the
+  /// diff.
+  Widget _branchChip(AppLocalizations l10n, ColorScheme scheme, String branch) {
+    final d = _diff;
+    final changed = d != null && !d.isEmpty;
+    return Tooltip(
+      message: _diffLoading
+          ? l10n.cancelDiffLoad
+          : changed
+          ? l10n.viewDiff
+          : branch,
+      child: InkWell(
+        mouseCursor: clickable,
+        key: const Key('status-branch-chip'),
+        onTap: _showDiff,
+        borderRadius: BorderRadius.circular(kControlRadius),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // While the diff is loading the badge IS the cancel control: a
+              // spinner in place of the branch glyph, so the press that
+              // started it can also stop it.
+              if (_diffLoading)
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.6,
+                    color: signalColor(scheme),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // While the diff is loading the badge IS the cancel
-                      // control: a spinner in place of the branch glyph, so the
-                      // press that started it can also stop it.
-                      if (_diffLoading)
-                        SizedBox(
-                          width: 12,
-                          height: 12,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.6,
-                            color: signalColor(scheme),
-                          ),
-                        )
-                      else
-                        Icon(
-                          AppIcons.account_tree_outlined,
-                          size: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      const SizedBox(width: 4),
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 160),
-                        child: Text(
-                          _branch!,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      if (d != null && !d.isEmpty) ...[
-                        const SizedBox(width: 6),
-                        Text(
-                          '+${d.added}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: additionColor(scheme),
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '−${d.removed}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: scheme.error,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ],
+                )
+              else
+                Icon(
+                  AppIcons.account_tree_outlined,
+                  size: 12,
+                  color: scheme.onSurfaceVariant,
+                ),
+              const SizedBox(width: 4),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  branch,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
               ),
-            ),
-        ],
+              if (changed) ...[
+                const SizedBox(width: 6),
+                ChangeCounts(added: d.added, removed: d.removed, gap: 3),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

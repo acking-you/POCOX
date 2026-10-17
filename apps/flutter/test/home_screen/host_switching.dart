@@ -65,28 +65,23 @@ void _registerHostSwitching() {
     expect(api.appIsConnected(_app2.key), isFalse);
     expect(api.appIsConnected(_app1.key), isTrue);
 
-    // Retry once the host is back: the same switch, now succeeding.
+    // Dismissing the notice keeps the chat where it is.
+    await t.tap(find.byKey(const Key('host-switch-dismiss')));
+    await t.pumpAndSettle();
+    expect(banner, findsNothing);
+    expect(api.appIsConnected(_app1.key), isTrue);
+
+    // Retry once the host is back: the same switch fails again, then succeeds.
+    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(Key('host-switch-item-${_app2.key}')).last);
+    await t.pumpAndSettle();
+    expect(banner, findsOneWidget);
     api.reachable[_app2.key] = true;
     await t.tap(find.byKey(const Key('host-switch-retry')));
     await t.pumpAndSettle();
     expect(banner, findsNothing);
     expect(api.appIsConnected(_app2.key), isTrue);
-  });
-
-  testWidgets('A failed switch notice can be dismissed', (t) async {
-    final api = FakeBridgeApi(config: _accountConfig, services: [_app1, _app2]);
-    api.reachable[_app2.key] = false;
-    await _pumpHome(t, api);
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(Key('host-switch-item-${_app2.key}')).last);
-    await t.pumpAndSettle();
-    expect(find.byKey(const Key('host-switch-banner')), findsOneWidget);
-    await t.tap(find.byKey(const Key('host-switch-dismiss')));
-    await t.pumpAndSettle();
-    expect(find.byKey(const Key('host-switch-banner')), findsNothing);
-    expect(api.appIsConnected(_app1.key), isTrue);
   });
 
   testWidgets('A switch in flight shows its target and step, then confirms', (
@@ -109,7 +104,10 @@ void _registerHostSwitching() {
     final banner = find.byKey(const Key('host-switch-banner'));
     expect(banner, findsOneWidget);
     expect(
-      find.descendant(of: banner, matching: find.text('正在建立连接…')),
+      find.descendant(
+        of: banner,
+        matching: find.text(_zh.hostSwitchConnecting),
+      ),
       findsOneWidget,
     );
     expect(find.byKey(const Key('host-switch-progress')), findsOneWidget);
@@ -124,7 +122,7 @@ void _registerHostSwitching() {
     expect(banner, findsNothing);
     expect(find.byKey(const Key('host-switch-progress')), findsNothing);
     expect(api.appIsConnected(_app2.key), isTrue);
-    expect(find.text('已切换到 laptop · beta'), findsOneWidget);
+    expect(find.text(_zh.hostSwitched('laptop · beta')), findsOneWidget);
   });
 
   testWidgets('An explicit default host outranks the last-used host', (
@@ -188,7 +186,7 @@ void _registerHostSwitching() {
   });
 
   testWidgets(
-    'Sidebar footer reaches manage / host history / logs / settings',
+    "Sidebar footer reaches host management and this host's history",
     (t) async {
       final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);
       await _pumpHome(
@@ -197,8 +195,6 @@ void _registerHostSwitching() {
         extraRoutes: [
           _stub('/manage', 'manage'),
           _stub('/sessions', 'sessions'),
-          _stub('/logs', 'logs'),
-          _stub('/settings', 'settings'),
         ],
       );
       await t.pumpAndSettle();

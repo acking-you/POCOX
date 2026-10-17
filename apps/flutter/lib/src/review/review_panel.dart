@@ -12,6 +12,7 @@ import 'package:pocket_codex/src/review/session_changes.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 /// Where the review reads its changes from.
 enum ReviewSource {
@@ -22,12 +23,27 @@ enum ReviewSource {
   workspace,
 }
 
+/// The working tree's records by path, in diff order. A diff can name one
+/// path twice (staged and unstaged hunks); both records belong to that file.
+Map<String, List<DiffFile>> workspaceFiles(DiffModel? diff) {
+  final byPath = <String, List<DiffFile>>{};
+  for (final file in diff?.files ?? const <DiffFile>[]) {
+    (byPath[file.path] ??= []).add(file);
+  }
+  return byPath;
+}
+
 /// Where the review opens: a source, narrowed to one edit and opened on one
 /// file when given. A new target (by identity) is applied however the review
-/// was left.
+/// was left, so every request must pass a fresh instance ([ReviewTarget.of]).
 class ReviewTarget {
   /// Creates a target.
   const ReviewTarget({this.source, this.edit, this.path});
+
+  /// A fresh copy of [target]: a repeated const target is one instance, which
+  /// the review would otherwise take for the request it already applied.
+  factory ReviewTarget.of(ReviewTarget target) =>
+      ReviewTarget(source: target.source, edit: target.edit, path: target.path);
 
   /// The source to show; null keeps the current one.
   final ReviewSource? source;
@@ -159,15 +175,15 @@ class _ReviewPanelState extends State<ReviewPanel> {
   }
 
   List<ReviewFileEntry> _entries() {
-    ReviewFileEntry entry(DiffFile file, {int edits = 0}) {
-      final first = file.lines
+    ReviewFileEntry entry(List<DiffFile> records, {int edits = 0}) {
+      final first = records.first.lines
           .where((l) => l.kind == DiffLineKind.hunk)
           .firstOrNull
           ?.text;
       return ReviewFileEntry(
-        path: file.path,
-        added: file.added,
-        removed: file.removed,
+        path: records.first.path,
+        added: records.fold(0, (n, f) => n + f.added),
+        removed: records.fold(0, (n, f) => n + f.removed),
         edits: edits,
         created: first != null && hunkOldStart(first) == 0,
         deleted: first != null && hunkNewStart(first) == 0,
@@ -175,14 +191,17 @@ class _ReviewPanelState extends State<ReviewPanel> {
     }
 
     if (_source == ReviewSource.workspace) {
-      final seen = <String>{};
       return [
-        for (final file in widget.workspace?.files ?? const <DiffFile>[])
-          if (seen.add(file.path)) entry(file),
+        for (final records in workspaceFiles(widget.workspace).values)
+          entry(records),
       ];
     }
     final edit = _edit == null ? null : widget.session.edit(_edit!);
-    if (edit != null) return [for (final file in edit.diff.files) entry(file)];
+    if (edit != null) {
+      return [
+        for (final file in edit.diff.files) entry([file]),
+      ];
+    }
     return [
       for (final file in widget.session.files)
         ReviewFileEntry(
@@ -190,8 +209,8 @@ class _ReviewPanelState extends State<ReviewPanel> {
           added: file.added,
           removed: file.removed,
           edits: file.edits.length,
-          created: entry(file.edits.first.$2).created,
-          deleted: entry(file.edits.last.$2).deleted,
+          created: entry([file.edits.first.$2]).created,
+          deleted: entry([file.edits.last.$2]).deleted,
         ),
     ];
   }
@@ -212,13 +231,14 @@ class _ReviewPanelState extends State<ReviewPanel> {
     final path = _path;
     if (path == null) return null;
     if (_source == ReviewSource.workspace) {
-      final file = widget.workspace?.files
-          .where((f) => f.path == path)
-          .firstOrNull;
-      if (file == null) return null;
+      final records = workspaceFiles(widget.workspace)[path];
+      if (records == null) return null;
       return (
-        sections: [ReviewDiffSection(file: file, expandable: true)],
-        changed: addedLines(file),
+        sections: [
+          for (final file in records)
+            ReviewDiffSection(file: file, expandable: true),
+        ],
+        changed: {for (final file in records) ...addedLines(file)},
       );
     }
     final file = widget.session.files.where((f) => f.path == path).firstOrNull;
@@ -484,21 +504,12 @@ class _ReviewPanelState extends State<ReviewPanel> {
                     style: theme.textTheme.labelMedium?.copyWith(color: muted),
                   ),
                 if (entries.isNotEmpty)
-                  Text.rich(
-                    TextSpan(
-                      children: [
-                        TextSpan(
-                          text: '+$added',
-                          style: TextStyle(color: additionColor(scheme)),
-                        ),
-                        const TextSpan(text: '  '),
-                        TextSpan(
-                          text: '−$removed',
-                          style: TextStyle(color: scheme.error),
-                        ),
-                      ],
-                    ),
-                    style: theme.textTheme.labelMedium,
+                  ChangeCounts(
+                    added: added,
+                    removed: removed,
+                    fontSize: theme.textTheme.labelMedium?.fontSize ?? 12,
+                    fontWeight: theme.textTheme.labelMedium?.fontWeight,
+                    gap: 6,
                   ),
                 if (workspace && widget.branch != null)
                   Text(
@@ -586,15 +597,7 @@ class _ReviewPanelState extends State<ReviewPanel> {
                 ),
               ),
               if (!_whole) ...[
-                Text(
-                  '+$added',
-                  style: TextStyle(fontSize: 12, color: additionColor(scheme)),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '−$removed',
-                  style: TextStyle(fontSize: 12, color: scheme.error),
-                ),
+                ChangeCounts(added: added, removed: removed, fontSize: 12),
                 const SizedBox(width: 4),
               ],
               IconButton(
@@ -628,6 +631,11 @@ class _ReviewPanelState extends State<ReviewPanel> {
                   path: path,
                   load: load,
                   changed: open.changed,
+                  // A refreshed diff of this file means its content moved on.
+                  revision: Object.hashAll([
+                    for (final section in open.sections)
+                      for (final line in section.file.lines) line.text,
+                  ]),
                 )
               : ReviewFileDiff(
                   key: ValueKey(('review-diff', _source, path)),

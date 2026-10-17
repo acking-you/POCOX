@@ -195,9 +195,6 @@ extension _SessionAgentPrepare on _AppSessionState {
           l10n,
           codex ? l10n.workOutsideProject : l10n.chooseFolder,
         ),
-        style: Theme.of(
-          context,
-        ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
       ),
       cwd: hasProject ? _cwd : _automaticProject,
       phase: phase,

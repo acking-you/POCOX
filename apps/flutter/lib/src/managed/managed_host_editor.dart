@@ -12,7 +12,6 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
 import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// Open the editor for [host] on the remote computer behind [serviceKey], or
@@ -404,9 +403,13 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
   Future<bool> _confirm(String title, String body, String action) async =>
       await confirmManaged(context, title, body, action) && mounted;
 
+  /// Leaving loses nothing (or was confirmed): a new service whose model
+  /// service is untouched has only suggested fields.
+  bool get _clean => _leaveConfirmed || !_dirty || (_fresh && !_draft.dirty);
+
   Future<bool> _confirmLeave() async {
     if (_busy) return false;
-    if (_leaveConfirmed || !_dirty || (_fresh && !_draft.dirty)) return true;
+    if (_clean) return true;
     final l10n = AppLocalizations.of(context);
     final leave = await _confirm(
       l10n.hostLeaveTitle,
@@ -417,17 +420,12 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
     return leave;
   }
 
-  bool get _canLeave =>
-      !_busy && (_leaveConfirmed || !_dirty || (_fresh && !_draft.dirty));
+  bool get _canLeave => !_busy && _clean;
 
   Widget _runtimeSection(AppLocalizations l10n) {
     final host = _host;
     final status = host?.status;
     final scheme = Theme.of(context).colorScheme;
-    final provider = switch (_kind) {
-      'claude' => 'acp',
-      final k => k,
-    };
     return GroupCard(
       key: const Key('managed-runtime-section'),
       title: l10n.hostRuntimeInfo,
@@ -441,11 +439,9 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
             children: [
               Row(
                 children: [
-                  AgentIcon.of(
-                    provider: provider,
-                    profileId: host == null
-                        ? (_kind == 'claude' ? 'claude' : null)
-                        : managedProfile(host),
+                  managedKindIcon(
+                    _kind,
+                    profileId: host == null ? null : managedProfile(host),
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -590,33 +586,20 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
           ),
       ],
     ];
-    return Material(
-      color: scheme.surfaceContainerLow,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowAlignment: OverflowBarAlignment.end,
-            overflowSpacing: 8,
-            children: [
-              if (_busy)
-                const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: SizedBox(
-                    key: Key('managed-pending'),
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
-                ),
-              ...buttons,
-            ],
+    return EditorActionBar(
+      children: [
+        if (_busy)
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: SizedBox(
+              key: Key('managed-pending'),
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
-        ),
-      ),
+        ...buttons,
+      ],
     );
   }
 
@@ -628,21 +611,15 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
         color: scheme.error,
       ),
     if (_conflict)
-      Row(
-        children: [
-          Expanded(
-            child: EditorNote(
-              l10n.managedConflict,
-              key: const Key('managed-conflict'),
-              color: cautionColor(scheme),
-            ),
-          ),
-          TextButton(
-            key: const Key('managed-reload'),
-            onPressed: _busy ? null : () => _refresh(),
-            child: Text(l10n.hostConfigReload),
-          ),
-        ],
+      EditorNote(
+        l10n.managedConflict,
+        key: const Key('managed-conflict'),
+        color: cautionColor(scheme),
+        action: TextButton(
+          key: const Key('managed-reload'),
+          onPressed: _busy ? null : () => _refresh(),
+          child: Text(l10n.hostConfigReload),
+        ),
       ),
     if (_notice case final notice?)
       Text(
@@ -658,12 +635,38 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
       ),
   ];
 
+  /// The sections and outcome lines; [inline] puts the actions under them.
+  Widget _form(
+    AppLocalizations l10n,
+    ColorScheme scheme, {
+    required bool inline,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      _runtimeSection(l10n),
+      const SizedBox(height: 12),
+      // An unreadable record is never shown as fields: its placeholders
+      // must not be saved as configuration.
+      if (_host?.config.problem == null) ...[
+        ModelServiceSection(
+          draft: _draft,
+          enabled: !_busy,
+          inherited: EditorNote(l10n.managedInheritedNote),
+          official: EditorNote(l10n.managedOfficialNote),
+        ),
+        const SizedBox(height: 12),
+      ],
+      for (final message in _messages(l10n, scheme))
+        Padding(padding: const EdgeInsets.only(top: 4), child: message),
+      if (inline) _actions(l10n),
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final host = _host;
-    final unreadable = host?.config.problem != null;
     return PopScope(
       canPop: _canLeave,
       onPopInvokedWithResult: (didPop, _) async {
@@ -694,34 +697,7 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 680),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _runtimeSection(l10n),
-                              const SizedBox(height: 12),
-                              // An unreadable record is never shown as fields: its
-                              // placeholders must not be saved as configuration.
-                              if (!unreadable) ...[
-                                ModelServiceSection(
-                                  draft: _draft,
-                                  enabled: !_busy,
-                                  inherited: EditorNote(
-                                    l10n.managedInheritedNote,
-                                  ),
-                                  official: EditorNote(
-                                    l10n.managedOfficialNote,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              for (final message in _messages(l10n, scheme))
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: message,
-                                ),
-                              if (inline) _actions(l10n),
-                            ],
-                          ),
+                          child: _form(l10n, scheme, inline: inline),
                         ),
                       ),
                     ),
@@ -746,28 +722,14 @@ Future<bool> confirmManaged(
   String title,
   String body,
   String action,
-) async {
-  final ok = await showAppDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      key: const Key('managed-confirm'),
-      title: Text(title),
-      content: Text(body),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: Text(AppLocalizations.of(context).cancel),
-        ),
-        FilledButton(
-          key: const Key('managed-confirm-ok'),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: Text(action),
-        ),
-      ],
-    ),
-  );
-  return ok == true;
-}
+) => confirmEditorAction(
+  context,
+  title: title,
+  body: body,
+  action: action,
+  dialogKey: const Key('managed-confirm'),
+  confirmKey: const Key('managed-confirm-ok'),
+);
 
 /// The display name of a runtime kind.
 String managedKindLabel(
@@ -781,6 +743,18 @@ String managedKindLabel(
   'acp' when agentName != null && agentName.isNotEmpty => agentName,
   _ => l10n.managedKindUnknown,
 };
+
+/// The agent mark of runtime [kind] (the Claude preset is an ACP agent);
+/// [profileId] names a saved agent's own.
+Widget managedKindIcon(
+  String kind, {
+  String? profileId,
+  required double size,
+}) => AgentIcon.of(
+  provider: kind == 'claude' ? 'acp' : kind,
+  profileId: profileId ?? (kind == 'claude' ? 'claude' : null),
+  size: size,
+);
 
 /// The saved (else running) ACP agent of [host]; its argv is never sent
 /// remotely, only its profile and display name matter here.

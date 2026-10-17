@@ -3,12 +3,14 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
+import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/hosting/argv_editor.dart';
 import 'package:pocket_codex/src/widgets/field_help.dart';
@@ -207,7 +209,7 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
     super.didUpdateWidget(old);
     if (old.choice != widget.choice) {
       _select(widget.choice);
-    } else if (!_nameEdited && !_sameNames(old.takenNames, widget.takenNames)) {
+    } else if (!_nameEdited && !setEquals(old.takenNames, widget.takenNames)) {
       // Running hosts arrived (or changed): an untouched suggestion moves
       // off any name they now use; a typed name stays.
       _name.text = uniqueHostName(_nameBase, widget.takenNames);
@@ -229,9 +231,6 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
       _nameEdited = true;
     }
   }
-
-  static bool _sameNames(Set<String> a, Set<String> b) =>
-      a.length == b.length && a.containsAll(b);
 
   String get _nameBase => _choice == _custom ? 'agent' : _profileId;
 
@@ -396,66 +395,40 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
     _locate();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final small = helpTextStyle(Theme.of(context));
-    final api = ref.watch(bridgeApiProvider);
+  /// The program and its arguments, under Advanced.
+  List<Widget> _programFields(AppLocalizations l10n) => [
+    const SizedBox(height: 4),
+    // What a program may be is shown while it is being entered.
+    FocusHelp(
+      help: l10n.acpProgramHint,
+      child: LayoutBuilder(
+        builder: (context, constraints) =>
+            _programRow(context, l10n, constraints.maxWidth),
+      ),
+    ),
+    const SizedBox(height: 18),
+    ArgvEditor(
+      key: const Key('acp-argv-editor'),
+      initial: _argsSeed,
+      enabled: widget.enabled,
+      onChanged: (args) {
+        _args = args;
+        _emit();
+      },
+    ),
+  ];
+
+  /// The program field with its Browse button: side by side only while the
+  /// field keeps room for a short program name and its label beside the
+  /// button in [width]; otherwise the button goes under the field, which then
+  /// has the whole width.
+  Widget _programRow(
+    BuildContext context,
+    AppLocalizations l10n,
+    double width,
+  ) {
     final enabled = widget.enabled;
-    if (!api.acpHostingSupported()) {
-      return Text(
-        l10n.acpHostingUnsupported,
-        key: const Key('acp-hosting-unsupported'),
-        style: TextStyle(color: cautionColor(scheme)),
-      );
-    }
-    final clash = widget.fixedName == null
-        ? hostNameClash(_name.text, widget.takenNames)
-        : null;
-    final program = _program.text.trim();
-    final status = program.isEmpty || _locating
-        ? null
-        : _locateError != null
-        ? Row(
-            key: const Key('acp-program-locate-failed'),
-            children: [
-              Expanded(
-                child: Text(
-                  _locateError!,
-                  style: small.copyWith(color: scheme.error),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              TextButton(
-                key: const Key('acp-program-locate-retry'),
-                onPressed: enabled ? _locate : null,
-                child: Text(l10n.retry),
-              ),
-            ],
-          )
-        : _claude != null
-        ? ClaudeEnvironment(
-            status: _claude!,
-            onRecheck: enabled ? _locate : null,
-            onPrepare: widget.onPrepare == null ? null : _prepareEnvironment,
-            enabled: enabled,
-          )
-        : _located == null
-        ? Text(
-            l10n.acpProgramNotFound,
-            key: const Key('acp-program-missing'),
-            style: small.copyWith(color: scheme.error),
-          )
-        : Text(
-            l10n.acpProgramFound(_located!),
-            key: const Key('acp-program-found'),
-            style: small.copyWith(color: successColor(scheme)),
-            overflow: TextOverflow.ellipsis,
-            maxLines: 2,
-          );
-    final programField = TextField(
+    final field = TextField(
       key: const Key('acp-program-field'),
       controller: _program,
       enabled: enabled,
@@ -473,62 +446,107 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
       style: OutlinedButton.styleFrom(padding: _browsePadding),
       child: Text(l10n.acpProgramBrowse, maxLines: 1, softWrap: false),
     );
-    final programFields = <Widget>[
-      const SizedBox(height: 4),
-      // What a program may be is shown while it is being entered.
-      FocusHelp(
-        help: l10n.acpProgramHint,
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Side by side only while the field keeps room for a short program
-            // name and its label beside the button; otherwise the button goes
-            // under the field, which then has the whole width.
-            final scaler = MediaQuery.textScalerOf(context);
-            final browseWidth =
-                _browsePadding.horizontal +
-                _textWidth(
-                  context,
-                  l10n.acpProgramBrowse,
-                  OutlinedButtonTheme.of(
-                        context,
-                      ).style?.textStyle?.resolve(const {}) ??
-                      Theme.of(context).textTheme.labelLarge,
-                );
-            final fieldMinimum = scaler.scale(16) * _programFieldGlyphs;
-            if (constraints.maxWidth - 8 - browseWidth >= fieldMinimum) {
-              return Row(
-                // The button is centred on the field it fills.
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: programField),
-                  const SizedBox(width: 8),
-                  browse,
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                programField,
-                const SizedBox(height: 8),
-                Align(alignment: AlignmentDirectional.centerEnd, child: browse),
-              ],
-            );
-          },
-        ),
-      ),
-      const SizedBox(height: 18),
-      ArgvEditor(
-        key: const Key('acp-argv-editor'),
-        initial: _argsSeed,
+    final browseWidth =
+        _browsePadding.horizontal +
+        measureTextLine(
+          context,
+          l10n.acpProgramBrowse,
+          OutlinedButtonTheme.of(context).style?.textStyle?.resolve(const {}) ??
+              Theme.of(context).textTheme.labelLarge,
+        ).width;
+    final fieldMinimum =
+        MediaQuery.textScalerOf(context).scale(16) * _programFieldGlyphs;
+    if (width - 8 - browseWidth >= fieldMinimum) {
+      return Row(
+        // The button is centred on the field it fills.
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(child: field),
+          const SizedBox(width: 8),
+          browse,
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        field,
+        const SizedBox(height: 8),
+        Align(alignment: AlignmentDirectional.centerEnd, child: browse),
+      ],
+    );
+  }
+
+  /// What the lookup of the program found, once it answered: why it
+  /// failed (with a retry), the Claude preset's environment, or whether the
+  /// program is there.
+  Widget? _lookupStatus(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    TextStyle small,
+  ) {
+    final enabled = widget.enabled;
+    if (_program.text.trim().isEmpty || _locating) return null;
+    if (_locateError case final error?) {
+      return Row(
+        key: const Key('acp-program-locate-failed'),
+        children: [
+          Expanded(
+            child: Text(
+              error,
+              style: small.copyWith(color: scheme.error),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            key: const Key('acp-program-locate-retry'),
+            onPressed: enabled ? _locate : null,
+            child: Text(l10n.retry),
+          ),
+        ],
+      );
+    }
+    if (_claude case final claude?) {
+      return ClaudeEnvironment(
+        status: claude,
+        onRecheck: enabled ? _locate : null,
+        onPrepare: widget.onPrepare == null ? null : _prepareEnvironment,
         enabled: enabled,
-        onChanged: (args) {
-          _args = args;
-          _emit();
-        },
-      ),
-    ];
+      );
+    }
+    if (_located case final located?) {
+      return Text(
+        l10n.acpProgramFound(located),
+        key: const Key('acp-program-found'),
+        style: small.copyWith(color: successColor(scheme)),
+        overflow: TextOverflow.ellipsis,
+        maxLines: 2,
+      );
+    }
+    return EditorNote(
+      l10n.acpProgramNotFound,
+      key: const Key('acp-program-missing'),
+      color: scheme.error,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    final small = helpTextStyle(Theme.of(context));
+    final api = ref.watch(bridgeApiProvider);
+    final enabled = widget.enabled;
+    if (!api.acpHostingSupported()) {
+      return Text(
+        l10n.acpHostingUnsupported,
+        key: const Key('acp-hosting-unsupported'),
+        style: TextStyle(color: cautionColor(scheme)),
+      );
+    }
+    final status = _lookupStatus(l10n, scheme, small);
     return Column(
       key: const Key('acp-host-form'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -544,27 +562,17 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
           ),
           const SizedBox(height: 14),
         ],
-        FocusHelp(
-          help: widget.fixedName == null && clash == null
-              ? l10n.hostNameHelper
-              : null,
-          child: TextField(
-            key: const Key('acp-instance-name-field'),
-            controller: _name,
-            enabled: enabled && widget.fixedName == null,
-            decoration: InputDecoration(
-              labelText: l10n.localHostName,
-              errorText: switch (clash) {
-                final other? => l10n.hostNameInUse(other),
-                null => null,
-              },
-            ),
-            onChanged: (_) {
-              // The clash check below reads the typed name.
-              setState(() => _nameEdited = true);
-              _emit();
-            },
-          ),
+        HostNameField(
+          fieldKey: const Key('acp-instance-name-field'),
+          controller: _name,
+          enabled: enabled,
+          fixed: widget.fixedName != null,
+          taken: widget.takenNames,
+          onChanged: (_) {
+            // The field's clash check reads the typed name.
+            setState(() => _nameEdited = true);
+            _emit();
+          },
         ),
         if (status != null) ...[const SizedBox(height: 10), status],
         const SizedBox(height: 6),
@@ -578,7 +586,7 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
             _argsSeed = List.of(_args);
           }),
         ),
-        if (_advanced) ...programFields,
+        if (_advanced) ..._programFields(l10n),
         if (_isCustom) ...[
           const SizedBox(height: 6),
           // What saving means for secrets is the switch's own subtitle.
@@ -587,7 +595,7 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
             contentPadding: EdgeInsets.zero,
             value: _save,
             title: Text(l10n.acpSaveAgent),
-            subtitle: Text(l10n.acpSecretsNote, style: small),
+            subtitle: EditorNote(l10n.acpSecretsNote),
             onChanged: !enabled
                 ? null
                 : (value) {
@@ -818,7 +826,3 @@ const _browsePadding = EdgeInsets.symmetric(horizontal: 16);
 
 /// How many 16 px glyphs the program field keeps beside the Browse button.
 const _programFieldGlyphs = 12;
-
-/// The width of [text] in [style] at the current text scale.
-double _textWidth(BuildContext context, String text, TextStyle? style) =>
-    measureTextLine(context, text, style).width;

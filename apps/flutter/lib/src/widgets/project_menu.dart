@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/attachment_refs.dart';
 
 /// An anchored project switcher — the desktop idiom for "which checkout is
 /// this conversation about". Opens directly under whatever [builder] renders
@@ -57,13 +58,6 @@ class _ProjectMenuState extends State<ProjectMenu> {
     _query.dispose();
     _queryFocus.dispose();
     super.dispose();
-  }
-
-  /// Leaf folder name of an absolute path — what the user actually calls the
-  /// project.
-  static String leafOf(String path) {
-    final segs = path.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-    return segs.isEmpty ? path : segs.last;
   }
 
   @override
@@ -193,7 +187,7 @@ class _ProjectMenuState extends State<ProjectMenu> {
                                     child: Tooltip(
                                       message: p,
                                       child: Text(
-                                        leafOf(p),
+                                        folderName(p),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(fontSize: 13),

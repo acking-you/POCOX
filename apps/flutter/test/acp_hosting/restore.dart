@@ -341,22 +341,6 @@ void _registerRestore() {
     );
   });
 
-  test('a skipped OpenCode restore keeps its restore record', () {
-    // The plan is made from the record; nothing in a refused restore
-    // touches preferences, so the next launch plans it again.
-    const prefs = UiPrefs(
-      autoHostOpenCode: AutoHostOpenCodePrefs(name: 'studio', binary: '/oc'),
-    );
-    final plan = planHostRestore(
-      prefs,
-      const [],
-      codexAttempted: const {},
-      acpAttempted: const {},
-      acpSupported: true,
-    );
-    expect(plan.opencode?.name, 'studio');
-  });
-
   group('restore records decided on the loaded file', () {
     final en = lookupAppLocalizations(const Locale('en'));
     final full = [
@@ -375,9 +359,6 @@ void _registerRestore() {
       expect(find.byType(LocalHostDialog), findsNothing);
       gate.complete();
       await t.pumpAndSettle();
-      // The bridge records the start for restore, so a full preference file
-      // no longer means it will not come back.
-      expect(find.text(en.hostRestoreFull(UiPrefs.maxAutoHosts)), findsNothing);
       final settled = await c.read(uiPrefsProvider.notifier).ready;
       expect(settled.autoHostCodex.map((h) => h.name), [
         for (final h in full) h.name,
@@ -397,7 +378,6 @@ void _registerRestore() {
       await _start(t);
       gate.complete();
       await t.pumpAndSettle();
-      expect(find.text(en.hostRestoreFull(UiPrefs.maxAutoHosts)), findsNothing);
       final settled = await c.read(uiPrefsProvider.notifier).ready;
       expect(settled.autoHostCodex.map((h) => h.name), [
         for (final h in full.sublist(1)) h.name,
@@ -449,10 +429,6 @@ void _registerRestore() {
       expect(api.acpServeCalls, hasLength(1), reason: 'hosting started');
       gate.complete();
       await t.pumpAndSettle();
-      expect(
-        find.textContaining(en.hostRestoreFull(UiPrefs.maxAutoHosts)),
-        findsNothing,
-      );
       expect(
         find.textContaining(en.acpSavedAgentsFull(UiPrefs.maxSavedAgents)),
         findsOneWidget,

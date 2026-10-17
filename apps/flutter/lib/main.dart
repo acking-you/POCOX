@@ -13,8 +13,8 @@ import 'package:pocket_codex/src/quit_status.dart';
 import 'package:pocket_codex/src/router.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
-import 'package:pocket_codex/src/widgets/popover.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/widgets/popover.dart';
 import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
 import 'package:pocket_codex/src/rust/frb_generated.dart';
 
@@ -201,8 +201,7 @@ class _PocketCodexAppState extends ConsumerState<PocketCodexApp>
             ),
           );
         }
-        // The light/dark cross-fade captures this subtree; see
-        // ThemeTransition.
+        // The light/dark switch captures this subtree; see ThemeTransition.
         final page = ThemeTransitionHost(
           child: child ?? const SizedBox.shrink(),
         );

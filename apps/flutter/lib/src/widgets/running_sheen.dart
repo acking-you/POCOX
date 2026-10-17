@@ -34,13 +34,7 @@ class _RunningSheenState extends State<RunningSheen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (Motion.ambientAllowed(context)) {
-      if (!_c.isAnimating) _c.repeat();
-    } else {
-      _c
-        ..stop()
-        ..value = 0;
-    }
+    _c.loopUnlessReduced(context);
   }
 
   @override

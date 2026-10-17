@@ -17,10 +17,9 @@ Future<T?> showAppDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
   bool barrierDismissible = true,
-  bool useRootNavigator = true,
   bool fullscreen = false,
 }) {
-  final navigator = Navigator.of(context, rootNavigator: useRootNavigator);
+  final navigator = Navigator.of(context, rootNavigator: true);
   return navigator.push<T>(
     _AppDialogRoute<T>(
       context: context,

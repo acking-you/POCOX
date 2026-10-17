@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/hosting/claude_environment_section.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
@@ -229,6 +230,36 @@ class ClaudeEnvironmentRow extends StatelessWidget {
   /// It is enabled with no value yet.
   final bool missing;
 
+  /// The variable's label and name, marked when it is set here.
+  Widget _heading(
+    AppLocalizations l,
+    ThemeData theme, {
+    required bool custom,
+  }) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        claudeVariableLabel(l, variable.name),
+        style: theme.textTheme.bodyMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+          height: 1.3,
+        ),
+      ),
+      const SizedBox(height: 2),
+      ClaudeVariableName(variable.name),
+      if (custom) ...[
+        const SizedBox(height: 2),
+        Text(
+          l.claudeEnvCustom,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    ],
+  );
+
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
@@ -244,38 +275,14 @@ class ClaudeEnvironmentRow extends StatelessWidget {
         children: [
           MergeSemantics(
             child: InkWell(
+              mouseCursor: clickable,
               onTap: toggle == null ? null : () => toggle(!custom),
               borderRadius: BorderRadius.circular(6),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            claudeVariableLabel(l, name),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                              height: 1.3,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          ClaudeVariableName(name),
-                          if (custom) ...[
-                            const SizedBox(height: 2),
-                            Text(
-                              l.claudeEnvCustom,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurface,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
+                    Expanded(child: _heading(l, theme, custom: custom)),
                     const SizedBox(width: 12),
                     Switch.adaptive(
                       key: Key('claude-env-override-$name'),

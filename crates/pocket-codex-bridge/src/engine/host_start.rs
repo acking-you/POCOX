@@ -6,65 +6,16 @@
 //! stale configuration, and a failed start never leaves its own behind.
 
 use anyhow::{bail, Result};
-use pocket_codex_host_svc::acp::AgentSpec;
 
 use super::{
     host_lease::{self, Op},
     host_names,
-    host_profiles::{self, Change, Engine, Runtime, RuntimeChange},
+    host_profiles::{self, Change, Runtime, RuntimeChange},
     runtime,
     serve::{self, Binary, CodexStart, ServeReport},
     serve_acp::{self, AcpServeReport},
     serve_opencode,
 };
-
-/// What a new host runs.
-#[derive(Debug, Clone)]
-pub enum NewHost {
-    /// A native Codex host.
-    Codex {
-        /// The app-server port (`0`: automatic).
-        port: u16,
-        /// The codex executable (`None`: saved, then `PATH`); an explicit
-        /// one is saved as the app's codex path, as an ordinary start does.
-        binary: Option<String>,
-        /// The upstream proxy.
-        proxy: Option<String>,
-    },
-    /// An ACP agent.
-    Acp(AgentSpec),
-    /// An owned native OpenCode server.
-    OpenCode {
-        /// Explicit executable or child PATH.
-        binary: Option<String>,
-        /// Its own database instead of OpenCode's default one.
-        separate_history: bool,
-    },
-}
-
-impl From<Runtime> for NewHost {
-    fn from(runtime: Runtime) -> Self {
-        match runtime {
-            Runtime::Codex {
-                port,
-                binary,
-                proxy,
-            } => Self::Codex {
-                port,
-                binary,
-                proxy,
-            },
-            Runtime::OpenCode {
-                binary,
-                separate_history,
-            } => Self::OpenCode {
-                binary,
-                separate_history,
-            },
-            Runtime::Acp(spec) => Self::Acp(spec),
-        }
-    }
-}
 
 /// A started host.
 #[derive(Debug, Clone)]
@@ -77,15 +28,15 @@ pub enum Started {
     OpenCode(serve_opencode::Report),
 }
 
-/// Save `change` (with `host`'s runtime) for `name` and start it.
-pub fn start_configured(name: Option<&str>, host: NewHost, change: Change) -> Result<Started> {
-    start_configured_checked(name, host, change, None, &|| Ok(()))
+/// Save `change` (with `runtime`) for `name` and start it.
+pub fn start_configured(name: Option<&str>, runtime: Runtime, change: Change) -> Result<Started> {
+    start_configured_checked(name, runtime, change, None, &|| Ok(()))
 }
 
 /// Remote start, rechecking authorization after waiting for the name/store.
 pub(super) fn start_configured_checked(
     name: Option<&str>,
-    host: NewHost,
+    runtime: Runtime,
     change: Change,
     expected_revision: Option<u64>,
     check: &dyn Fn() -> Result<()>,
@@ -94,7 +45,7 @@ pub(super) fn start_configured_checked(
         &runtime::support_dir()?,
         &host_profiles::root()?,
         name,
-        host,
+        runtime,
         change,
         expected_revision,
         check,
@@ -106,27 +57,27 @@ fn start_in(
     support: &std::path::Path,
     profiles: &std::path::Path,
     name: Option<&str>,
-    host: NewHost,
+    runtime: Runtime,
     change: Change,
 ) -> Result<Started> {
-    start_checked_in(support, profiles, name, host, change, None, &|| Ok(()))
+    start_checked_in(support, profiles, name, runtime, change, None, &|| Ok(()))
 }
 
 fn start_checked_in(
     support: &std::path::Path,
     profiles: &std::path::Path,
     name: Option<&str>,
-    host: NewHost,
+    runtime: Runtime,
     change: Change,
     expected_revision: Option<u64>,
     check: &dyn Fn() -> Result<()>,
 ) -> Result<Started> {
-    let fallback = match &host {
-        NewHost::Codex {
+    let fallback = match &runtime {
+        Runtime::Codex {
             ..
         } => "default",
-        NewHost::Acp(spec) => spec.profile_id.as_str(),
-        NewHost::OpenCode {
+        Runtime::Acp(spec) => spec.profile_id.as_str(),
+        Runtime::OpenCode {
             ..
         } => "opencode",
     };
@@ -138,37 +89,9 @@ fn start_checked_in(
     {
         bail!("`{requested}` is already hosting; edit it instead, or choose another name");
     }
-    let runtime = match &host {
-        NewHost::Codex {
-            port,
-            binary,
-            proxy,
-        } => Runtime::Codex {
-            binary: binary.clone(),
-            port: *port,
-            proxy: proxy.clone(),
-        },
-        NewHost::Acp(spec) => Runtime::Acp(spec.clone()),
-        NewHost::OpenCode {
-            binary,
-            separate_history,
-        } => Runtime::OpenCode {
-            binary: binary.clone(),
-            separate_history: *separate_history,
-        },
-    };
     let change = Change {
         runtime: RuntimeChange::Set(runtime.clone()),
         ..change
-    };
-    let engine = match &host {
-        NewHost::Codex {
-            ..
-        } => Engine::Codex,
-        NewHost::Acp(spec) => Engine::Acp(spec),
-        NewHost::OpenCode {
-            ..
-        } => Engine::OpenCode,
     };
     // No host runs under the name, so whatever was saved for it before is
     // replaced; it comes back if the start fails.
@@ -177,7 +100,7 @@ fn start_checked_in(
         &requested,
         &change,
         expected_revision,
-        engine,
+        runtime.engine(),
         check,
     )?;
     #[cfg(test)]
@@ -188,7 +111,7 @@ fn start_checked_in(
         #[cfg(test)]
         tests::launching(&provider);
         check()?;
-        launch(&lease, support, profiles, &requested, host, provider)
+        launch(&lease, support, profiles, &requested, runtime.clone(), provider)
     });
     match started {
         Ok(started) => {
@@ -213,16 +136,16 @@ fn launch(
     support: &std::path::Path,
     profiles: &std::path::Path,
     requested: &str,
-    host: NewHost,
+    runtime: Runtime,
     provider: host_profiles::Resolved,
 ) -> Result<Started> {
-    match host {
-        NewHost::OpenCode {
+    match runtime {
+        Runtime::OpenCode {
             binary,
             separate_history,
         } => serve_opencode::start_locked(lease, binary.as_deref(), separate_history, provider)
             .map(Started::OpenCode),
-        NewHost::Codex {
+        Runtime::Codex {
             port,
             binary,
             proxy,
@@ -236,7 +159,7 @@ fn launch(
             };
             serve::serve_start_locked(lease, support, profiles, start).map(Started::Codex)
         },
-        NewHost::Acp(spec) => {
+        Runtime::Acp(spec) => {
             serve_acp::start_locked(lease, spec, Some(provider), profiles).map(Started::Acp)
         },
     }
@@ -252,7 +175,7 @@ mod tests {
             root.path(),
             &root.path().join("profiles"),
             Some("revoked-new-host"),
-            super::NewHost::OpenCode {
+            super::Runtime::OpenCode {
                 binary: None,
                 separate_history: false,
             },
@@ -279,7 +202,7 @@ mod tests {
     use pocket_codex_core::provider::{ApiProtocol, Secret};
 
     use super::*;
-    use crate::engine::host_profiles::{KeyChange, ProfileInput, Resolved, Source, Staged};
+    use crate::engine::host_profiles::{Engine, KeyChange, ProfileInput, Resolved, Source, Staged};
 
     type Hook = Box<dyn FnOnce()>;
 
@@ -326,7 +249,7 @@ mod tests {
             support.path(),
             &profiles,
             Some("start-test"),
-            NewHost::Codex {
+            Runtime::Codex {
                 port: 0,
                 binary: Some(missing),
                 proxy: None,
@@ -371,7 +294,7 @@ mod tests {
             support.path(),
             &profiles,
             Some("start-race"),
-            NewHost::Codex {
+            Runtime::Codex {
                 port: 0,
                 binary: Some(missing),
                 proxy: None,
@@ -400,7 +323,7 @@ mod tests {
             support.path(),
             &profiles,
             Some("start-invalid"),
-            NewHost::Codex {
+            Runtime::Codex {
                 port: 0,
                 binary: None,
                 proxy: None,

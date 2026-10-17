@@ -34,34 +34,29 @@ class BusyLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = DefaultTextStyle.of(context).style.color;
-    final Widget content = busy
-        ? Row(
-            key: const ValueKey('busy'),
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox.square(
-                dimension: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 1.8,
-                  color: color,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Free to wrap on a narrow button, as the icon buttons' are.
-              Flexible(child: Text(busyLabel)),
-            ],
-          )
-        : icon == null
-        ? Text(label, key: const ValueKey('idle'))
+    // A lead before the text, which is free to wrap on a narrow button, as
+    // the icon buttons' labels are.
+    Widget line(String key, Widget? lead, String text) => lead == null
+        ? Text(text, key: ValueKey(key))
         : Row(
-            key: const ValueKey('idle'),
+            key: ValueKey(key),
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18),
+              lead,
               const SizedBox(width: 8),
-              Flexible(child: Text(label)),
+              Flexible(child: Text(text)),
             ],
           );
+    final content = busy
+        ? line(
+            'busy',
+            SizedBox.square(
+              dimension: 14,
+              child: CircularProgressIndicator(strokeWidth: 1.8, color: color),
+            ),
+            busyLabel,
+          )
+        : line('idle', icon == null ? null : Icon(icon, size: 18), label);
     return Semantics(
       liveRegion: busy,
       child: Motion.resize(

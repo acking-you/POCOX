@@ -69,17 +69,10 @@ class _FileChangeCardState extends State<FileChangeCard> {
                     ),
                   ),
                   if (hasDiff) ...[
-                    Text(
-                      '+${diff.added}',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: additionColor(scheme),
-                      ),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '−${diff.removed}',
-                      style: TextStyle(fontSize: 11.5, color: scheme.error),
+                    ChangeCounts(
+                      added: diff.added,
+                      removed: diff.removed,
+                      gap: 3,
                     ),
                     const SizedBox(width: 4),
                   ],

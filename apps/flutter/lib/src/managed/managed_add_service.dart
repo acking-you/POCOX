@@ -12,7 +12,6 @@ import 'package:pocket_codex/src/managed/management_failure.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 
@@ -223,12 +222,6 @@ class _RuntimeRowState extends State<_RuntimeRow> {
   bool _expanded = false;
 
   ManagedRuntimeAvailability get runtime => widget.runtime;
-  AcpClaudeSetup? get claude => widget.claude;
-  String? get claudeError => widget.claudeError;
-  VoidCallback? get onPrepare => widget.onPrepare;
-  VoidCallback get onChoose => widget.onChoose;
-
-  bool get _ready => runtime.ready;
 
   /// The short availability line and whether it is a caution.
   (String, bool) _status(AppLocalizations l10n) {
@@ -252,7 +245,7 @@ class _RuntimeRowState extends State<_RuntimeRow> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Container(
-      key: Key('managed-runtime-details-dialog-${runtime.kind}'),
+      key: Key('managed-runtime-details-panel-${runtime.kind}'),
       width: double.infinity,
       margin: const EdgeInsetsDirectional.fromSTEB(0, 12, 12, 0),
       padding: const EdgeInsets.all(14),
@@ -292,7 +285,8 @@ class _RuntimeRowState extends State<_RuntimeRow> {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: _ready ? onChoose : null,
+        mouseCursor: clickable,
+        onTap: runtime.ready ? widget.onChoose : null,
         child: Padding(
           padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 4, 12),
           child: Column(
@@ -300,11 +294,7 @@ class _RuntimeRowState extends State<_RuntimeRow> {
             children: [
               Row(
                 children: [
-                  AgentIcon.of(
-                    provider: runtime.kind == 'claude' ? 'acp' : runtime.kind,
-                    profileId: runtime.kind == 'claude' ? 'claude' : null,
-                    size: 24,
-                  ),
+                  managedKindIcon(runtime.kind, size: 24),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -340,7 +330,7 @@ class _RuntimeRowState extends State<_RuntimeRow> {
                       ),
                       onPressed: () => setState(() => _expanded = !_expanded),
                     ),
-                  if (_ready)
+                  if (runtime.ready)
                     Padding(
                       padding: const EdgeInsetsDirectional.only(end: 8),
                       child: Icon(
@@ -362,22 +352,24 @@ class _RuntimeRowState extends State<_RuntimeRow> {
                 const SizedBox(height: 10),
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 38, end: 12),
-                  child: claude?.running ?? false
-                      ? ClaudePreparationProgress(
-                          key: const Key('managed-claude-progress'),
-                          setup: claude!,
-                        )
-                      : Align(
-                          alignment: AlignmentDirectional.centerStart,
-                          child: FilledButton.tonal(
-                            key: const Key('managed-claude-prepare'),
-                            onPressed: onPrepare,
-                            child: Text(l10n.claudePrepareEnvironment),
-                          ),
-                        ),
+                  child: switch (widget.claude) {
+                    final claude? when claude.running =>
+                      ClaudePreparationProgress(
+                        key: const Key('managed-claude-progress'),
+                        setup: claude,
+                      ),
+                    _ => Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: FilledButton.tonal(
+                        key: const Key('managed-claude-prepare'),
+                        onPressed: widget.onPrepare,
+                        child: Text(l10n.claudePrepareEnvironment),
+                      ),
+                    ),
+                  },
                 ),
               ],
-              if (claudeError case final error?)
+              if (widget.claudeError case final error?)
                 Padding(
                   padding: const EdgeInsetsDirectional.fromSTEB(38, 8, 12, 0),
                   child: Text(

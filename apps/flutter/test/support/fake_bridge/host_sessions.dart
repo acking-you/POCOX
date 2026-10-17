@@ -198,22 +198,6 @@ mixin _FakeHostSessions on _FakeBridgeState {
   }
 
   @override
-  Future<String> metaUploadFile(
-    String serviceKey,
-    String fileName,
-    Uint8List bytes,
-  ) async {
-    if (uploadError != null) throw uploadError!;
-    lastUploadKey = serviceKey;
-    lastUploadName = fileName;
-    lastUploadBytes = bytes;
-    return '/host/uploads/123/$fileName';
-  }
-
-  @override
-  String metaUploadContext() => uploadContext;
-
-  @override
   Future<String> metaUploadFileScoped(
     String serviceKey,
     String fileName,
@@ -223,8 +207,15 @@ mixin _FakeHostSessions on _FakeBridgeState {
     if (context != uploadContext) {
       throw StateError('attachment context changed');
     }
-    return metaUploadFile(serviceKey, fileName, bytes);
+    if (uploadError != null) throw uploadError!;
+    lastUploadKey = serviceKey;
+    lastUploadName = fileName;
+    lastUploadBytes = bytes;
+    return '/host/uploads/123/$fileName';
   }
+
+  @override
+  String metaUploadContext() => uploadContext;
 
   @override
   Future<ThreadConfig> metaThreadConfigGet(
@@ -255,20 +246,6 @@ mixin _FakeHostSessions on _FakeBridgeState {
       throw StateError('meta tunnel not ready');
     }
     return projectConfigs[serviceKey] ?? const ProjectConfig();
-  }
-
-  @override
-  Future<ProjectConfig> metaSetProjectConfig(
-    String serviceKey,
-    List<String> projectRoots,
-    String? defaultProject,
-  ) async {
-    final cfg = ProjectConfig(
-      projectRoots: projectRoots,
-      defaultProject: defaultProject,
-    );
-    projectConfigs[serviceKey] = cfg;
-    return cfg;
   }
 
   @override

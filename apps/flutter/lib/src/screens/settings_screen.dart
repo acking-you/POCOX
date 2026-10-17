@@ -138,11 +138,10 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     final subs =
         ref.watch(subscriptionsProvider).valueOrNull ?? const <SubInfo>[];
     final themeMode = ref.watch(uiPrefsProvider).valueOrNull?.themeMode;
-    final desktop = isDesktop && MediaQuery.sizeOf(context).width >= 840;
     return UtilityPage(
       route: '/settings',
       title: l10n.settingsTitle,
-      body: desktop
+      body: _wide
           ? _desktopBody(l10n, api, config, locale, subs, themeMode)
           : _compactBody(l10n, api, config, locale, subs, themeMode),
     );
@@ -315,54 +314,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   GroupCard(
                     title: l10n.settingsGeneral,
                     children: [
-                      Padding(
-                        key: const Key('appearance-btn'),
-                        padding: const EdgeInsets.fromLTRB(13, 12, 13, 10),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l10n.appearance,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            // The track's glass pane glides to the choice.
-                            GlassSegmented<String>(
-                              selected: themeMode ?? 'system',
-                              onChanged: (value) => ThemeTransition.run(
-                                context,
-                                () => ref
-                                    .read(uiPrefsProvider.notifier)
-                                    .setThemeMode(
-                                      value == 'system' ? null : value,
-                                    ),
-                              ),
-                              segments: [
-                                GlassSegment(
-                                  key: const Key('theme-system'),
-                                  value: 'system',
-                                  icon: AppIcons.brightness_auto_outlined,
-                                  label: l10n.appearanceSystem,
-                                ),
-                                GlassSegment(
-                                  key: const Key('theme-light'),
-                                  value: 'light',
-                                  icon: AppIcons.light_mode_outlined,
-                                  label: l10n.appearanceLight,
-                                ),
-                                GlassSegment(
-                                  key: const Key('theme-dark'),
-                                  value: 'dark',
-                                  icon: AppIcons.dark_mode_outlined,
-                                  label: l10n.appearanceDark,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
+                      _appearanceRow(l10n, themeMode),
                       _SettingsRow(
                         key: const Key('language-btn'),
                         icon: AppIcons.language,
@@ -503,6 +455,52 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     );
   }
 
+  /// The theme choice: a glass segmented control whose pane glides to the
+  /// selected mode.
+  Widget _appearanceRow(AppLocalizations l10n, String? themeMode) => Padding(
+    key: const Key('appearance-btn'),
+    padding: const EdgeInsets.fromLTRB(13, 12, 13, 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          l10n.appearance,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 10),
+        GlassSegmented<String>(
+          selected: themeMode ?? 'system',
+          onChanged: (value) => ThemeTransition.run(
+            context,
+            () => ref
+                .read(uiPrefsProvider.notifier)
+                .setThemeMode(value == 'system' ? null : value),
+          ),
+          segments: [
+            GlassSegment(
+              key: const Key('theme-system'),
+              value: 'system',
+              icon: AppIcons.brightness_auto_outlined,
+              label: l10n.appearanceSystem,
+            ),
+            GlassSegment(
+              key: const Key('theme-light'),
+              value: 'light',
+              icon: AppIcons.light_mode_outlined,
+              label: l10n.appearanceLight,
+            ),
+            GlassSegment(
+              key: const Key('theme-dark'),
+              value: 'dark',
+              icon: AppIcons.dark_mode_outlined,
+              label: l10n.appearanceDark,
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
   String _relayLabel(AppLocalizations l10n, ConfigInfo? config) {
     final value = config?.relay?.trim() ?? '';
     if (value.isNotEmpty) return value;
@@ -524,21 +522,29 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         _showMessage(AppLocalizations.of(context).copiedShareString);
       }
     } catch (error) {
-      if (mounted) {
-        final l10n = AppLocalizations.of(context);
-        _showMessage(l10n.settingsOperationFailed(friendlyError(error)));
-      }
+      _fail(error);
     }
   }
+
+  /// The desktop layout: grouped cards in a centred column.
+  bool get _wide => isDesktop && MediaQuery.sizeOf(context).width >= 840;
 
   void _showMessage(String message) {
     if (!mounted) return;
     setState(() => _msg = message);
     // The inline `_msg` line carries it on compact layouts; wide also toasts,
     // since a message under a long settings list is easy to miss.
-    if (isDesktop && MediaQuery.sizeOf(context).width >= 840) {
-      showToast(context, message);
-    }
+    if (_wide) showToast(context, message);
+  }
+
+  /// Report an operation that failed, while the page is shown.
+  void _fail(Object error) {
+    if (!mounted) return;
+    _showMessage(
+      AppLocalizations.of(
+        context,
+      ).settingsOperationFailed(friendlyError(error)),
+    );
   }
 
   String _languageLabel(AppLocalizations l10n, Locale? locale) {
@@ -612,22 +618,17 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
           : Locale(choice);
       setState(() => _msg = null);
     } catch (error) {
-      if (mounted) {
-        _showMessage(l10n.settingsOperationFailed(friendlyError(error)));
-      }
+      _fail(error);
     }
   }
 
   Future<void> _signOut(BridgeApi api) async {
-    final l10n = AppLocalizations.of(context);
     try {
       await api.accountLogout();
       ref.invalidate(configProvider);
       if (mounted) context.go('/onboarding');
     } catch (error) {
-      if (mounted) {
-        _showMessage(l10n.settingsOperationFailed(friendlyError(error)));
-      }
+      _fail(error);
     }
   }
 
@@ -649,9 +650,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         ref.invalidate(configProvider);
         ref.invalidate(servicesProvider);
       } catch (error) {
-        if (mounted) {
-          _showMessage(l10n.settingsOperationFailed(friendlyError(error)));
-        }
+        _fail(error);
       }
     }
   }
@@ -671,9 +670,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         if (mounted) setState(() => _msg = null);
         ref.invalidate(configProvider);
       } catch (error) {
-        if (mounted) {
-          _showMessage(l10n.settingsOperationFailed(friendlyError(error)));
-        }
+        _fail(error);
       }
     }
   }

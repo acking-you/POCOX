@@ -106,25 +106,7 @@ class RustBridgeApi
   }
 
   @override
-  Future<AccountUser?> accountCurrentUser() async {
-    final u = await frb.accountCurrentUser();
-    return u == null
-        ? null
-        : AccountUser(login: u.login, accountId: u.accountId);
-  }
-
-  @override
   Future<void> accountLogout() => frb.accountLogout();
-
-  @override
-  Future<List<AccountService>> accountServices() async {
-    final list = await frb.accountServices();
-    return list
-        .map(
-          (s) => AccountService(device: s.device, kind: s.kind, name: s.name),
-        )
-        .toList();
-  }
 
   @override
   Future<void> accountDeregisterService({
@@ -216,32 +198,6 @@ class RustBridgeApi
   @override
   Future<void> codexSetPromptVariant(String variant) =>
       frb.codexSetPromptVariant(variant: variant);
-
-  @override
-  Future<CodexLoginStart> codexLoginChatgptStart(String serviceKey) async {
-    final s = await frb.codexLoginChatgptStart(serviceKey: serviceKey);
-    return CodexLoginStart(
-      mode: s.mode,
-      loginId: s.loginId,
-      authUrl: s.authUrl,
-      verificationUrl: s.verificationUrl,
-      userCode: s.userCode,
-    );
-  }
-
-  @override
-  Future<CodexAuthStatus> codexAuthStatus(String serviceKey) async {
-    final s = await frb.codexAuthStatus(serviceKey: serviceKey);
-    return CodexAuthStatus(authenticated: s.authenticated, method: s.method);
-  }
-
-  @override
-  Future<void> codexLoginCancel(String serviceKey, String loginId) =>
-      frb.codexLoginCancel(serviceKey: serviceKey, loginId: loginId);
-
-  @override
-  Future<void> codexLogout(String serviceKey) =>
-      frb.codexLogout(serviceKey: serviceKey);
 
   // --- App-server remote control ---
 

@@ -163,7 +163,7 @@ extension _SessionNavigation on _AppSessionState {
           rowIndex: row ?? -1,
           turnId: turn.turnId,
           userText: user,
-          assistantText: user.isEmpty && reply == null ? null : reply,
+          assistantText: reply,
         ),
       );
     }
@@ -195,42 +195,59 @@ extension _SessionNavigation on _AppSessionState {
             )
           : SizedBox(
               key: const Key('chat-older-history'),
-              child: TextButton.icon(
-                style: TextButton.styleFrom(
-                  foregroundColor: Theme.of(
-                    context,
-                  ).colorScheme.onSurfaceVariant,
-                  textStyle: Theme.of(context).textTheme.labelSmall,
-                ),
+              child: _historyAction(
                 key: _loadingOlder
                     ? null
                     : const Key('chat-older-history-load'),
+                loading: _loadingOlder && _historyFromTop,
+                failed: _historyError && _historyFromTop,
+                icon: AppIcons.history_rounded,
+                iconSize: 16,
+                label: l10n.olderHistoryHint,
                 onPressed: _loadingOlder
                     ? null
                     : () => _loadAtTop(reveal: true),
-                icon: _loadingOlder && _historyFromTop
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Icon(
-                        _historyError && _historyFromTop
-                            ? AppIcons.refresh_rounded
-                            : AppIcons.history_rounded,
-                        size: 16,
-                      ),
-                label: Text(
-                  _loadingOlder && _historyFromTop
-                      ? l10n.historyLoading
-                      : _historyError && _historyFromTop
-                      ? l10n.historyRetry
-                      : l10n.olderHistoryHint,
-                ),
               ),
             ),
     ),
   );
+
+  /// A quiet history action: loading, a retry after a failure, or [label]
+  /// with its [icon].
+  Widget _historyAction({
+    Key? key,
+    required bool loading,
+    required bool failed,
+    required IconData icon,
+    required double iconSize,
+    required String label,
+    required VoidCallback? onPressed,
+  }) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    return TextButton.icon(
+      key: key,
+      style: TextButton.styleFrom(
+        foregroundColor: theme.colorScheme.onSurfaceVariant,
+        textStyle: theme.textTheme.labelSmall,
+      ),
+      onPressed: onPressed,
+      icon: loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(failed ? AppIcons.refresh_rounded : icon, size: iconSize),
+      label: Text(
+        loading
+            ? l10n.historyLoading
+            : failed
+            ? l10n.historyRetry
+            : label,
+      ),
+    );
+  }
 
   Key _rowKey(Object row) => ValueKey(switch (row) {
     TurnWork() => 'w:${row.items.first.id}',
@@ -316,28 +333,16 @@ extension _SessionNavigation on _AppSessionState {
       // a card whose headline was the word "file" above the reply, which named
       // the attachment instead of the turn. With nothing to head the card, the
       // reply speaks for the turn by itself.
-      final user = _collapseWhitespace(_requestPreview(row.text));
-      final reply = _finalReplyAfter(rows, i);
-      // Neither half has anything to show — an empty card that only occludes the
-      // conversation. The tick stays; it just has no preview.
-      if (user.isEmpty && reply == null) {
-        out.add(
-          TurnMinimapItem(
-            rowIndex: i,
-            turnId: row.turnId,
-            messageId: row.id,
-            userText: '',
-          ),
-        );
-        continue;
-      }
+      //
+      // When neither half has anything to show the tick stays; it just has no
+      // preview.
       out.add(
         TurnMinimapItem(
           rowIndex: i,
           turnId: row.turnId,
           messageId: row.id,
-          userText: user,
-          assistantText: reply,
+          userText: _collapseWhitespace(_requestPreview(row.text)),
+          assistantText: _finalReplyAfter(rows, i),
         ),
       );
     }
@@ -351,11 +356,11 @@ extension _SessionNavigation on _AppSessionState {
     for (var i = userRow + 1; i < rows.length; i++) {
       final row = rows[i];
       if (row is TranscriptItem && row.isUser) break;
-      if (row is AgentTurn) {
-        last = row.text;
-      } else if (row is TranscriptItem && row.isAgent) {
-        last = row.text;
-      }
+      last = switch (row) {
+        AgentTurn() => row.text,
+        TranscriptItem(isAgent: true) => row.text,
+        _ => last,
+      };
     }
     final text = _replyPreview(last ?? '');
     return text.isEmpty ? null : text;

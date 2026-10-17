@@ -38,7 +38,7 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
       await op();
       if (mounted) context.go('/');
     } catch (e) {
-      setState(() => _error = friendlyError(e));
+      if (mounted) setState(() => _error = friendlyError(e));
     } finally {
       if (mounted) setState(() => _busy = false);
     }

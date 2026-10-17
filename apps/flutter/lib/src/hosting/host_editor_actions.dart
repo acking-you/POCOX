@@ -7,6 +7,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/hosting/acp_host_form.dart';
 import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
+import 'package:pocket_codex/src/hosting/cancellable_delay.dart';
 import 'package:pocket_codex/src/hosting/host_editor_drafts.dart';
 import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/providers.dart';
@@ -63,9 +64,8 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   bool _left = false;
 
   // A preparation's pending wait between two state reads: cut short when
-  // the page leaves or stops waiting, so no timer outlives either.
-  Timer? _prepareTimer;
-  Completer<bool>? _prepareWait;
+  // the page leaves or stops waiting.
+  final _prepareWait = CancellableDelay();
 
   /// The last failure, safe to show.
   String? error;
@@ -109,7 +109,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     if (_left) return;
     _left = true;
     _op++;
-    _stopPrepareWait();
+    _prepareWait.stop();
     if (_preparing case final run?) {
       _preparing = null;
       api.acpClaudePrepareCancelRun(run);
@@ -167,7 +167,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
   void stopWaitingForClaude() {
     if (_preparing != null || !(claudeSetup?.running ?? false)) return;
     _op++;
-    _stopPrepareWait();
+    _prepareWait.stop();
     setState(() {
       busy = false;
       running = null;
@@ -275,56 +275,15 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       _refuse(invalid);
       return;
     }
-    // OpenCode's own providers and sign-ins, or the custom provider the
-    // bridge supports for it ([HostConfigSupport]).
-    if (draft.problem(l10n, fresh: true) case final problem?) {
-      _refuse(problem);
-      return;
-    }
-    final typed = openCode.name.text.trim();
-    if (hostNameClash(typed, takenNames) case final other?) {
-      _refuse(l10n.hostNameInUse(other));
-      return;
-    }
-    if (sharedHistoryHost case final holder? when !value.separateHistory) {
-      _refuse(l10n.openCodeHistoryTaken(holder));
-      return;
-    }
-    final input = draft.input;
-    final keyAction = draft.keyAction(fresh: true);
-    final key = draft.typedKey;
-    final op = _begin(HostAction.start);
-    if (op == null) return;
-    final navigator = Navigator.of(context);
-    final container = ProviderScope.containerOf(context);
-    final prefs = container.read(uiPrefsProvider.notifier);
-    final life = container.read(scopeLifeProvider);
-    final toast = ToastMessenger.of(context);
-    try {
-      final result = await api.appServeStartConfigured(
-        name: typed.isEmpty ? null : typed,
-        runtime: value,
-        input: input,
-        keyAction: keyAction,
-        key: key,
-      );
-      if (!life.alive) return;
-      // The older record means OpenCode's default database; a host with its
-      // own history is restored from the bridge's record alone.
-      if (!value.separateHistory) {
-        prefs.setAutoHostOpenCode(
-          AutoHostOpenCodePrefs(name: result.name, binary: value.binary),
-        );
-      }
-      container.invalidate(localServeListProvider);
-      container.invalidate(servicesProvider);
-      if (_owns(op)) navigator.pop();
-      await _announceStarted(result.name, toast, life, l10n);
-    } catch (e) {
-      if (_owns(op)) setState(() => error = hostingError(e, name: typed));
-    } finally {
-      _end(op);
-    }
+    await _startConfigured(
+      openCode.name.text.trim(),
+      value,
+      refusal: () {
+        final holder = sharedHistoryHost;
+        if (holder == null || value.separateHistory) return null;
+        return l10n.openCodeHistoryTaken(holder);
+      },
+    );
   }
 
   Future<void> _startCodex() async {
@@ -336,13 +295,49 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       _refuse(invalid);
       return;
     }
-    if (draft.problem(l10n, fresh: true) case final problem?) {
-      _refuse(problem);
+    await _startConfigured(runtime.name.text.trim(), value);
+  }
+
+  Future<void> _startAcp() async {
+    final value = acp;
+    if (value == null || !value.valid) {
+      _refuse(AppLocalizations.of(context).acpProgramNotFound);
       return;
     }
-    final typed = runtime.name.text.trim();
-    if (hostNameClash(typed, takenNames) case final other?) {
-      _refuse(l10n.hostNameInUse(other));
+    await _startConfigured(
+      value.name,
+      HostRuntime.acp(value.spec),
+      saveAgent: value.save ? value.spec : null,
+      // The Claude preset needs its ACP adapter; a missing one is prepared
+      // here, on this explicit Start (announced beforehand).
+      prepare: isClaudeAdapterSpec(value.spec)
+          ? (op, life) => _prepareForStart(value, op, life)
+          : null,
+    );
+  }
+
+  /// Start a new host named [typed] (blank: the bridge's default) running
+  /// [value], with the model service draft: saved and started as one
+  /// operation, then remembered for the next launch. [refusal] adds a
+  /// runtime's own check after the model service and name; [prepare] runs
+  /// first and answers whether the start may go on; [saveAgent] is kept in
+  /// "my agents".
+  Future<void> _startConfigured(
+    String typed,
+    HostRuntime value, {
+    String? Function()? refusal,
+    Future<bool> Function(int op, ScopeLife life)? prepare,
+    AcpAgentSpec? saveAgent,
+  }) async {
+    final l10n = AppLocalizations.of(context);
+    final problem =
+        draft.problem(l10n, fresh: true) ??
+        switch (hostNameClash(typed, takenNames)) {
+          final other? => l10n.hostNameInUse(other),
+          null => refusal?.call(),
+        };
+    if (problem != null) {
+      _refuse(problem);
       return;
     }
     final input = draft.input;
@@ -356,6 +351,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     final prefs = container.read(uiPrefsProvider.notifier);
     final life = container.read(scopeLifeProvider);
     try {
+      if (prepare != null && !await prepare(op, life)) return;
       final result = await api.appServeStartConfigured(
         name: typed.isEmpty ? null : typed,
         runtime: value,
@@ -364,101 +360,14 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         key: key,
       );
       if (!life.alive) return;
-      // Still written for older versions of the app; the bridge's restore
-      // record of this start is what a cold start now follows.
-      prefs.setAutoHost(
-        AutoHostPrefs(
-          port: value.port,
-          name: result.name,
-          proxy: value.proxy,
-          embedded: false,
-          binaryOverride: value.binary,
-        ),
-      );
+      _remember(prefs, result.name, value, fresh: true);
+      final saved = saveAgent == null
+          ? Future.value(true)
+          : prefs.saveAcpAgent(saveAgent);
       container.invalidate(localServeListProvider);
       container.invalidate(servicesProvider);
       // Only this page's own route, while it is mounted and the operation
       // is still its latest.
-      if (_owns(op)) navigator.pop();
-      await _announceStarted(result.name, toast, life, l10n);
-    } catch (e) {
-      if (_owns(op)) setState(() => error = hostingError(e, name: typed));
-    } finally {
-      _end(op);
-    }
-  }
-
-  Future<void> _startAcp() async {
-    final l10n = AppLocalizations.of(context);
-    final value = acp;
-    if (value == null || !value.valid) {
-      _refuse(l10n.acpProgramNotFound);
-      return;
-    }
-    if (draft.problem(l10n, fresh: true) case final problem?) {
-      _refuse(problem);
-      return;
-    }
-    if (hostNameClash(value.name, takenNames) case final other?) {
-      _refuse(l10n.hostNameInUse(other));
-      return;
-    }
-    final input = draft.input;
-    final keyAction = draft.keyAction(fresh: true);
-    final key = draft.typedKey;
-    final op = _begin(HostAction.start);
-    if (op == null) return;
-    final toast = ToastMessenger.of(context);
-    final navigator = Navigator.of(context);
-    final container = ProviderScope.containerOf(context);
-    final prefs = container.read(uiPrefsProvider.notifier);
-    final life = container.read(scopeLifeProvider);
-    try {
-      // The Claude preset needs its ACP adapter; a missing one is prepared
-      // here, on this explicit Start (announced beforehand).
-      if (isClaudeAdapterSpec(value.spec)) {
-        final status = await api.acpClaudeStatus();
-        if (!_owns(op)) return;
-        if (!status.ready) {
-          if (!status.canPrepare) {
-            setState(
-              () => error =
-                  status.problem ?? l10n.claudeAdapterMissing(status.package),
-            );
-            return;
-          }
-          final announcement = claudeAnnouncementKey(value.spec, status);
-          final shown = value.claudeShown;
-          final formAnnounced =
-              value.claudePrepareShown &&
-              shown != null &&
-              claudeAnnouncementKey(value.spec, shown) == announcement;
-          if (!formAnnounced && _claudeAnnounced != announcement) {
-            setState(() {
-              _claudeAnnounced = announcement;
-              error = l10n.claudeAdapterWillPrepare(status.package);
-            });
-            return;
-          }
-          if (!await _prepareClaude(op) || !_owns(op) || !life.alive) return;
-        }
-      }
-      final result = await api.appServeStartConfigured(
-        name: value.name.isEmpty ? null : value.name,
-        runtime: HostRuntime.acp(value.spec),
-        input: input,
-        keyAction: keyAction,
-        key: key,
-      );
-      if (!life.alive) return;
-      prefs.setAutoHostAcp(
-        AutoHostAcpPrefs(name: result.name, spec: value.spec),
-      );
-      final saved = value.save
-          ? prefs.saveAcpAgent(value.spec)
-          : Future.value(true);
-      container.invalidate(localServeListProvider);
-      container.invalidate(servicesProvider);
       if (_owns(op)) navigator.pop();
       final full = !await saved;
       await _announceStarted(
@@ -469,10 +378,45 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         notes: [if (full) l10n.acpSavedAgentsFull(UiPrefs.maxSavedAgents)],
       );
     } catch (e) {
-      if (_owns(op)) setState(() => error = hostingError(e, name: value.name));
+      if (_owns(op)) setState(() => error = hostingError(e, name: typed));
     } finally {
       _end(op);
     }
+  }
+
+  /// Make sure the Claude preset's adapter is there before [value] starts:
+  /// a missing one is prepared only once the form (or a previous Start)
+  /// announced that download for this agent and environment.
+  Future<bool> _prepareForStart(
+    AcpFormValue value,
+    int op,
+    ScopeLife life,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final status = await api.acpClaudeStatus();
+    if (!_owns(op)) return false;
+    if (status.ready) return true;
+    if (!status.canPrepare) {
+      setState(
+        () =>
+            error = status.problem ?? l10n.claudeAdapterMissing(status.package),
+      );
+      return false;
+    }
+    final announcement = claudeAnnouncementKey(value.spec, status);
+    final shown = value.claudeShown;
+    final formAnnounced =
+        value.claudePrepareShown &&
+        shown != null &&
+        claudeAnnouncementKey(value.spec, shown) == announcement;
+    if (!formAnnounced && _claudeAnnounced != announcement) {
+      setState(() {
+        _claudeAnnounced = announcement;
+        error = l10n.claudeAdapterWillPrepare(status.package);
+      });
+      return false;
+    }
+    return await _prepareClaude(op) && _owns(op) && life.alive;
   }
 
   /// Prepare Claude's pinned adapter for operation [op], showing its
@@ -495,7 +439,10 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     _preparing = mine;
     setState(() => claudeSetup = state);
     while (state.running) {
-      if (!await _prepareDelay(op)) return false;
+      if (!await _prepareWait.wait(const Duration(milliseconds: 500)) ||
+          !_owns(op)) {
+        return false;
+      }
       final next = api.acpClaudePrepareState();
       if (next.run != run) {
         // That run ended and another began (or the state is unknown): its
@@ -520,31 +467,6 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       };
     });
     return state.state == 'done';
-  }
-
-  /// Wait one poll interval of the preparation [op] observes: `false` once
-  /// [op] no longer owns the page (it left, or stopped waiting meanwhile).
-  Future<bool> _prepareDelay(int op) async {
-    _stopPrepareWait();
-    final wait = Completer<bool>();
-    _prepareWait = wait;
-    _prepareTimer = Timer(const Duration(milliseconds: 500), () {
-      if (identical(_prepareWait, wait)) {
-        _prepareWait = null;
-        _prepareTimer = null;
-      }
-      wait.complete(true);
-    });
-    return await wait.future && _owns(op);
-  }
-
-  /// End the pending preparation wait, if any, as stopped.
-  void _stopPrepareWait() {
-    _prepareTimer?.cancel();
-    _prepareTimer = null;
-    final wait = _prepareWait;
-    _prepareWait = null;
-    if (wait != null && !wait.isCompleted) wait.complete(false);
   }
 
   /// The runtime a running host's save carries: its edited fields, or null
@@ -656,7 +578,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         expectedRevision: reviewed.revision,
       );
       if (!life.alive) return;
-      if (result.applied) _remember(prefs, host, reviewed.runtime);
+      if (result.applied) _remember(prefs, host.name, reviewed.runtime);
       container.invalidate(localServeListProvider);
       container.invalidate(servicesProvider);
       if (!_owns(op)) return;
@@ -734,22 +656,32 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
     }
   }
 
-  /// The restore record follows the runtime the host now runs.
-  void _remember(UiPrefsStore prefs, AppServeStatus host, HostRuntime? ran) {
+  /// The restore record of [name] follows the runtime it now runs. A new
+  /// host ([fresh]) has no older OpenCode record of its own to clear: the
+  /// older record means OpenCode's default database, and a host with its own
+  /// history is restored from the bridge's record alone. The Codex record is
+  /// still written for older versions of the app; the bridge's restore
+  /// record is what a cold start now follows.
+  void _remember(
+    UiPrefsStore prefs,
+    String name,
+    HostRuntime? ran, {
+    bool fresh = false,
+  }) {
     if (ran == null) return;
     if (ran.isOpenCode) {
-      if (ran.separateHistory) {
-        prefs.clearAutoHostOpenCode(host.name);
-      } else {
+      if (!ran.separateHistory) {
         prefs.setAutoHostOpenCode(
-          AutoHostOpenCodePrefs(name: host.name, binary: ran.binary),
+          AutoHostOpenCodePrefs(name: name, binary: ran.binary),
         );
+      } else if (!fresh) {
+        prefs.clearAutoHostOpenCode(name);
       }
       return;
     }
     if (ran.agent case final agent?) {
       unawaited(
-        prefs.setAutoHostAcp(AutoHostAcpPrefs(name: host.name, spec: agent)),
+        prefs.setAutoHostAcp(AutoHostAcpPrefs(name: name, spec: agent)),
       );
       return;
     }
@@ -757,7 +689,7 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       prefs.setAutoHost(
         AutoHostPrefs(
           port: ran.port,
-          name: host.name,
+          name: name,
           proxy: ran.proxy,
           embedded: false,
           binaryOverride: ran.binary,

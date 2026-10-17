@@ -16,6 +16,7 @@ import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/git_diff.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 /// Most diff lines rendered for one expanded file. Everything inside a
 /// [SingleChildScrollView] is laid out whether or not it is on screen, so this
@@ -91,15 +92,7 @@ class DiffFileTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '+${file.added}',
-            style: TextStyle(fontSize: 11, color: additionColor(scheme)),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            '−${file.removed}',
-            style: TextStyle(fontSize: 11, color: scheme.error),
-          ),
+          ChangeCounts(added: file.added, removed: file.removed, fontSize: 11),
           IconButton(
             tooltip: l10n.copy,
             visualDensity: VisualDensity.compact,

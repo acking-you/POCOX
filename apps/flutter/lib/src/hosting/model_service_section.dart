@@ -195,6 +195,15 @@ class ModelServiceDraft extends ChangeNotifier {
   }
 }
 
+/// The name of a model service [source] (`official`, `custom`, else the
+/// agent's existing configuration).
+String modelSourceLabel(AppLocalizations l10n, String source) =>
+    switch (source) {
+      'official' => l10n.hostSourceOfficial,
+      'custom' => l10n.hostSourceCustom,
+      _ => l10n.hostSourceInherited,
+    };
+
 /// The "Model service" section of the hosting editor for [draft].
 ///
 /// [inherited] describes what the existing configuration provides (it is
@@ -230,13 +239,6 @@ class ModelServiceSection extends StatelessWidget {
 
   /// Save / apply controls, at the end of the section.
   final Widget? footer;
-
-  static String _sourceLabel(AppLocalizations l10n, String source) =>
-      switch (source) {
-        'official' => l10n.hostSourceOfficial,
-        'custom' => l10n.hostSourceCustom,
-        _ => l10n.hostSourceInherited,
-      };
 
   static String _protocolLabel(AppLocalizations l10n, String protocol) =>
       switch (protocol) {
@@ -284,7 +286,7 @@ class ModelServiceSection extends StatelessWidget {
             for (final source in sources)
               ServiceChoice(
                 key: Key('host-source-$source'),
-                label: _sourceLabel(l10n, source),
+                label: modelSourceLabel(l10n, source),
                 selected: draft.source == source,
                 onSelected: enabled ? () => draft.source = source : null,
               ),
@@ -469,6 +471,7 @@ class ServiceChoice extends StatelessWidget {
         shape: shape,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
+          mouseCursor: clickable,
           onTap: onSelected,
           customBorder: shape,
           child: ConstrainedBox(

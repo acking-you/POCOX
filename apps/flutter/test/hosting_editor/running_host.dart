@@ -8,20 +8,7 @@ void _runningHostTests() {
     final api = FakeBridgeApi()..hostConfigGetGate = gate;
     api.serveHosts.add(_codexHost);
     // The read is held, so the page cannot settle on it: pump instead.
-    t.view.physicalSize = const Size(1280, 1000);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    await t.pumpWidget(
-      ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(api)],
-        child: const MaterialApp(
-          locale: Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: HostingEditor(existing: _codexHost),
-        ),
-      ),
-    );
+    await _mount(t, api, const HostingEditor(existing: _codexHost));
     await t.pump();
     expect(find.byKey(const Key('host-config-loading')), findsOneWidget);
     expect(find.byKey(const Key('host-config-save')), findsNothing);
@@ -119,23 +106,10 @@ void _runningHostTests() {
     final detecting = Completer<void>();
     api.codexLocateGate = detecting;
     api.serveHosts.add(unknown);
-    t.view.physicalSize = const Size(1280, 1000);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    final container = ProviderContainer(
-      overrides: [bridgeApiProvider.overrideWithValue(api)],
-    );
-    addTearDown(container.dispose);
-    await t.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          locale: const Locale('en'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const HostingEditor(existing: unknown),
-        ),
-      ),
+    final container = await _mount(
+      t,
+      api,
+      const HostingEditor(existing: unknown),
     );
     // Detection keeps a progress bar animating: pump bounded frames.
     Future<void> frames() async {

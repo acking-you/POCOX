@@ -41,6 +41,7 @@ const _accountConfig = ConfigInfo(
   mode: 'account',
   accountLogin: 'octocat',
 );
+final _zh = lookupAppLocalizations(const Locale('zh'));
 
 /// In-memory prefs: the store's real load/save seam, so a test never reads
 /// or writes the app-support file. [saved] is the "file"; [gate] holds the
@@ -472,55 +473,31 @@ void main() {
     }
   });
 
-  testWidgets('Home restores the conversation the user last had open', (
-    t,
-  ) async {
-    final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);
-    api.appThreads.addAll(const [
-      ThreadMeta(id: 't-old', preview: 'old', cwd: '', updatedAt: 1000),
-      ThreadMeta(id: 't-new', preview: 'new', cwd: '', updatedAt: 2000),
-    ]);
-    await _pumpHome(
-      t,
-      api,
-      seed: (c) =>
-          c.read(uiPrefsProvider.notifier).setLastThread(_app1.key, 't-old'),
-    );
-    await t.pumpAndSettle();
-    expect(api.lastResumed, 't-old');
-  });
-
-  testWidgets('Idle desktop hero offers one-tap hosting (account mode)', (
-    t,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    try {
-      final api = FakeBridgeApi(config: _accountConfig);
+  // The idle hero offers one-tap hosting wherever the platform can host, in
+  // either mode; a phone has no hosting to offer.
+  for (final (platform, mode, config) in const [
+    (TargetPlatform.windows, 'account', _accountConfig),
+    (
+      TargetPlatform.macOS,
+      'self-host',
+      ConfigInfo(relay: 'relay.example:7666', hasKey: true),
+    ),
+    (TargetPlatform.android, 'account', _accountConfig),
+  ]) {
+    final hosts = platform != TargetPlatform.android;
+    testWidgets('Idle hero in $mode mode ${hosts ? 'offers' : 'has no'} '
+        'one-tap hosting', (t) async {
+      final api = FakeBridgeApi(config: config);
       await _pumpHome(t, api);
       await t.pumpAndSettle();
       expect(find.byKey(const Key('home-hero-title')), findsOneWidget);
-      expect(find.byKey(const Key('home-start-hosting-btn')), findsOneWidget);
-      expect(find.byKey(const Key('home-retry-btn')), findsOneWidget);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
-  testWidgets('Idle desktop hero offers hosting in self-host mode too', (
-    t,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      final api = FakeBridgeApi(
-        config: const ConfigInfo(relay: 'relay.example:7666', hasKey: true),
+      expect(
+        find.byKey(const Key('home-start-hosting-btn')),
+        hosts ? findsOneWidget : findsNothing,
       );
-      await _pumpHome(t, api);
-      await t.pumpAndSettle();
-      expect(find.byKey(const Key('home-start-hosting-btn')), findsOneWidget);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+      expect(find.byKey(const Key('home-retry-btn')), findsOneWidget);
+    }, variant: TargetPlatformVariant.only(platform));
+  }
 
   testWidgets('the hero opens the hosting editor, which returns home', (
     t,
@@ -564,20 +541,6 @@ void main() {
     }
   });
 
-  testWidgets('Idle phone hero points at the desktop, no hosting button', (
-    t,
-  ) async {
-    final api = FakeBridgeApi(config: _accountConfig);
-    await _pumpHome(t, api);
-    await t.pumpAndSettle();
-    expect(find.byKey(const Key('home-hero-title')), findsOneWidget);
-    expect(find.byKey(const Key('home-start-hosting-btn')), findsNothing);
-    expect(
-      find.text('在电脑上打开 PocketCodex 并开启托管（app-server），这里就会自动进入对话。'),
-      findsOneWidget,
-    );
-  });
-
   testWidgets('Home enters the chat by itself once a host appears', (t) async {
     final api = FakeBridgeApi(config: _accountConfig);
     await _pumpHome(t, api);
@@ -595,25 +558,35 @@ void main() {
     expect(api.appIsConnected(_app1.key), isTrue);
   });
 
-  testWidgets('Cold start restores hosting even when a remote host exists', (
-    t,
-  ) async {
+  testWidgets('Cold start restores hosting, a built-in record through '
+      'external Codex, even when a remote host exists', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     try {
       // A reachable REMOTE host is discoverable, but this machine held a
       // hosting record — both must come up: hosting restored AND the chat
-      // opens (preferring the local host in the ranking).
+      // opens (preferring the local host in the ranking). The record is a
+      // legacy built-in one: it restores with its persisted params, through
+      // the external Codex.
       final api = FakeBridgeApi(config: _accountConfig, services: [_app2]);
       await _pumpHome(
         t,
         api,
         seed: (c) => c
             .read(uiPrefsProvider.notifier)
-            .setAutoHost(const AutoHostPrefs(port: 18080, name: 'default')),
+            .setAutoHost(
+              const AutoHostPrefs(
+                port: 18080,
+                name: 'default',
+                proxy: 'http://127.0.0.1:11111',
+                embedded: true,
+              ),
+            ),
       );
       await t.pumpAndSettle();
 
       expect(api.lastServePort, 18080);
+      expect(api.lastServeEmbedded, isFalse);
+      expect(api.lastServeProxy, 'http://127.0.0.1:11111');
       expect(find.byKey(const Key('send-btn')), findsOneWidget);
       expect(api.appIsConnected('pcx:local:app:default'), isTrue);
     } finally {
@@ -622,41 +595,6 @@ void main() {
   });
 
   _registerHostSwitching();
-
-  testWidgets(
-    'Desktop cold start migrates built-in hosting to external Codex',
-    (t) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-      try {
-        final api = FakeBridgeApi(config: _accountConfig);
-        await _pumpHome(
-          t,
-          api,
-          seed: (c) => c
-              .read(uiPrefsProvider.notifier)
-              .setAutoHost(
-                const AutoHostPrefs(
-                  port: 18080,
-                  name: 'default',
-                  proxy: 'http://127.0.0.1:11111',
-                  embedded: true,
-                ),
-              ),
-        );
-        await t.pumpAndSettle();
-
-        // Hosting was re-run with the persisted params and the chat opened on
-        // the freshly published local service.
-        expect(api.lastServePort, 18080);
-        expect(api.lastServeEmbedded, isFalse);
-        expect(api.lastServeProxy, 'http://127.0.0.1:11111');
-        expect(find.byKey(const Key('send-btn')), findsOneWidget);
-        expect(api.appIsConnected('pcx:local:app:default'), isTrue);
-      } finally {
-        debugDefaultTargetPlatformOverride = null;
-      }
-    },
-  );
 
   testWidgets('Discovery failure shows the retry hero, then recovers', (
     t,
@@ -701,31 +639,23 @@ void main() {
     }
   });
 
-  testWidgets('Expired account session returns directly to sign-in', (t) async {
-    final api = FakeBridgeApi(config: _accountConfig)
-      ..discoverError = StateError('session expired; sign in again');
-    await _pumpHome(t, api, extraRoutes: [_stub('/onboarding', 'login')]);
-    await t.pumpAndSettle();
+  for (final error in [
+    'session expired; sign in again',
+    '/v1/services failed: 401 Unauthorized',
+  ]) {
+    testWidgets('A rejected account session ($error) returns directly to '
+        'sign-in', (t) async {
+      final api = FakeBridgeApi(config: _accountConfig)
+        ..discoverError = StateError(error);
+      await _pumpHome(t, api, extraRoutes: [_stub('/onboarding', 'login')]);
+      await t.pumpAndSettle();
 
-    expect(
-      find.textContaining('stub:login reason=session-expired'),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('home-hero-title')), findsNothing);
-  });
-
-  testWidgets('Rejected services token also returns directly to sign-in', (
-    t,
-  ) async {
-    final api = FakeBridgeApi(config: _accountConfig)
-      ..discoverError = StateError('/v1/services failed: 401 Unauthorized');
-    await _pumpHome(t, api, extraRoutes: [_stub('/onboarding', 'login')]);
-    await t.pumpAndSettle();
-
-    expect(
-      find.textContaining('stub:login reason=session-expired'),
-      findsOneWidget,
-    );
-    expect(find.byKey(const Key('home-retry-btn')), findsNothing);
-  });
+      expect(
+        find.textContaining('stub:login reason=session-expired'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('home-hero-title')), findsNothing);
+      expect(find.byKey(const Key('home-retry-btn')), findsNothing);
+    });
+  }
 }

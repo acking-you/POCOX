@@ -112,10 +112,7 @@
   "@fileTooLarge": {
     "placeholders": { "mb": { "type": "int" } }
   },
-  "fileUploadFailed": "Couldn't upload the file to the host",
   "fileOnlyMessage": "[File]",
-  "interrupt": "Interrupt",
-  "thinking": "Thinking…",
   "emptyConversation": "Send a message to start the conversation",
   "olderHistoryHint": "Load earlier messages",
   "historyStart": "Start of conversation",
@@ -129,7 +126,6 @@
   "@sandboxHelperUnavailable": {
     "description": "Shown when an embedded (in-process) codex turn fails because the OS sandbox helpers aren't available; guides the user to the no-sandbox Full mode or an external host."
   },
-  "disconnect": "Disconnect",
   "connectionLost": "Connection lost",
   "reconnect": "Reconnect",
   "projectsSection": "Projects",
@@ -139,11 +135,6 @@
   "searchProjects": "Search projects",
   "noMatchingProjects": "No matching projects",
   "workOutsideProject": "Work outside a project",
-  "switchProjectTip": "Switch project",
-  "newSessionTitleIn": "What should we build in {project}?",
-  "@newSessionTitleIn": {
-    "placeholders": { "project": { "type": "String" } }
-  },
   "remotePathLabel": "Remote folder path (on the host)",
   "remotePathHint": "e.g. /home/ubuntu/myproject — blank uses the host default",
   "model": "Model",
@@ -290,7 +281,6 @@
   "noChanges": "No changes vs the main branch.",
   "envTitle": "Environment",
   "envLocal": "Local",
-  "envProject": "Project",
   "envSource": "Source",
   "envRefresh": "Refresh",
   "diffTruncated": "{count} more lines not shown — copy the path to view the full diff",
@@ -388,16 +378,6 @@
   "appearanceSystem": "Follow system",
   "appearanceLight": "Light",
   "appearanceDark": "Dark",
-  "newSessionTitle": "What should we build?",
-  "newSessionSubtitle": "Pick a starting point, or just type your task below.",
-  "suggestExploreTitle": "Explore the project",
-  "suggestExplorePrompt": "Give me an overview of this project — its structure, main modules, and tech stack.",
-  "suggestTestsTitle": "Run & fix tests",
-  "suggestTestsPrompt": "Run the test suite and fix any failing tests.",
-  "suggestDiffTitle": "Review changes",
-  "suggestDiffPrompt": "Summarize the current working-tree changes against the main branch.",
-  "suggestPlanTitle": "Plan a feature",
-  "suggestPlanPrompt": "Help me plan out a new feature before writing any code.",
   "searchConversations": "Search conversations",
   "searchLocalSessions": "Search content / path / source",
   "noMatchingThreads": "No matching conversations",
@@ -490,17 +470,11 @@
   "codexBuiltinNote": "Not implemented yet. Use external Codex.",
   "codexBuiltinUnavailable": "Not implemented yet",
   "hostRuntimeInfo": "Runtime",
-  "hostRuntimeMode": "codex",
-  "hostCodexVersion": "Version",
   "hostCodexPath": "Path",
   "hostProxyLabel": "Proxy",
   "hostProxyInherit": "inherits the app's environment",
   "localHostDialogTitle": "Host on this device",
   "localHostHint": "Runs codex on this machine and publishes it on your relay, so your other devices can drive it.",
-  "localHostListening": "Listening on {addr}",
-  "@localHostListening": {
-    "placeholders": { "addr": { "type": "String" } }
-  },
   "codexFoundAt": "codex found: {path}",
   "@codexFoundAt": {
     "placeholders": { "path": { "type": "String" } }
@@ -586,18 +560,9 @@
   "homeNoServiceTitle": "No Codex host available",
   "homeNoServiceDesktopHint": "Start hosting on this computer and the chat opens right here — your phone can connect to it too.",
   "homeNoServiceMobileHint": "Open PocketCodex on your computer and start hosting (app-server); this screen will enter the chat automatically.",
-  "homeNoServiceSelfHostHint": "Run `pocket-codex serve` on a machine with codex to publish an app-server on your relay, or sign in with an account to host from this app.",
   "homeAutoRetryNote": "Keeps checking for hosts automatically.",
   "switchServiceFailed": "Couldn't reach that host — staying on the current one.",
   "hostSwitchTitle": "Switch host",
-  "hostRestoreFull": "Hosting started, but it will not be restored at launch: {count} hosts are already remembered. To have it restored, stop one of those hosts, then start this one again.",
-  "@hostRestoreFull": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "acpSavedAgentsFull": "This configuration was not saved: {count} configurations are already saved.",
   "@acpSavedAgentsFull": {
     "placeholders": {
@@ -643,7 +608,6 @@
   "pickFolderTitle": "Choose a project folder",
   "useThisFolder": "Use this folder",
   "folderUp": "Up one level",
-  "folderPickerEmpty": "No sub-folders here",
   "folderPickerNoRoots": "No project folders are configured on this host yet. Add them on the computer under hosting settings.",
   "gitRepoLabel": "Git repository",
   "hostFiles": "Host files",
@@ -669,11 +633,7 @@
   "browseProjectFolder": "Browse project folders",
   "orEnterPathManually": "Or enter a path manually:",
   "projectFolders": "Project folders",
-  "projectFoldersHint": "Folders your phone can browse to start a session in. Star one to make it the default for new conversations.",
-  "noProjectFolders": "No project folders yet.",
   "addProjectFolder": "Add folder",
-  "defaultProjectFolder": "Default folder",
-  "setAsDefault": "Set as default",
   "removeProjectFolder": "Remove",
   "welcomeTitle": "Welcome to PocketCodex",
   "welcomeSubtitleDesktop": "One step left: start hosting on this computer, and your phone can drive its Codex from anywhere.",
@@ -921,14 +881,12 @@
   "voiceReconnecting": "Voice reconnecting…",
   "voiceSpeaking": "Assistant speaking",
   "voiceUserSpeaking": "You're speaking",
-  "voiceInterrupted": "Interrupted",
   "voiceEndedByUser": "Voice call ended",
   "voiceEndedReason": "Voice call ended: {reason}",
   "@voiceEndedReason": {
     "placeholders": { "reason": { "type": "String" } }
   },
   "voiceFailedShort": "Voice call dropped",
-  "voiceOpenCall": "Go to the voice conversation",
   "voiceHangUp": "Hang up",
   "voiceModelDefault": "Host default",
   "voiceModelFrameless": "gpt-live-1-codex (low latency)",
@@ -950,11 +908,9 @@
   "dictationUnavailable": "Dictation is unavailable on this host",
   "dictationInterrupted": "Dictation dropped; what was heard is kept",
   "dictationVoiceBusy": "The live voice call is using the microphone",
-  "dictationShortcut": "Dictate (Ctrl+Shift+Space)",
   "providerAcpAgent": "ACP agent",
   "protocolAcpTag": "ACP",
   "acpHostHint": "Runs an ACP-compatible agent on this device from a program and its arguments, and makes it available to your devices. Stopping hosting stops the agent.",
-  "acpAgentLabel": "Agent",
   "acpAgentCustom": "Custom agent",
   "acpAgentName": "Agent name",
   "acpProgram": "Program",
@@ -1008,14 +964,6 @@
   "claudePrepareEnvironment": "Prepare ACP environment",
   "claudeEnvironmentReady": "ACP environment is ready. No host was started or restarted.",
   "claudeEnvRecheck": "Check again",
-  "claudePreparing": "Preparing the Claude ACP adapter… {seconds} s",
-  "@claudePreparing": {
-    "placeholders": { "seconds": { "type": "int" } }
-  },
-  "claudePrepareVerifying": "Checking the downloaded adapter… {seconds} s",
-  "@claudePrepareVerifying": {
-    "placeholders": { "seconds": { "type": "int" } }
-  },
   "claudePrepareCancel": "Stop preparing",
   "claudePrepareStopWaiting": "Stop waiting",
   "claudePrepareJoined": "Another window started this preparation; this page only follows it.",
@@ -1044,7 +992,6 @@
   "acpRestart": "Restart agent",
   "acpGatewayLabel": "Agent gateway",
   "acpStopNote": "Stopping hosting stops this agent and the processes it started.",
-  "acpFeatures": "Agent features",
   "acpFeatureReopen": "Reopen earlier sessions",
   "acpFeatureReopenLoad": "With history",
   "acpFeatureReopenResume": "Without earlier history",
@@ -1477,8 +1424,6 @@
   "managedRuntimeNeedsSetup": "Needs setup",
   "managedRuntimeSignInThere": "Ready · sign in on that computer",
   "managedRuntimeDetails": "Details",
-  "managedRuntimeDetailsTitle": "{name} details",
-  "@managedRuntimeDetailsTitle": {"placeholders": {"name": {"type": "String"}}},
   "managedRuntimePath": "Executable",
   "managedRuntimeVersion": "Version",
   "refreshServices": "Refresh services",

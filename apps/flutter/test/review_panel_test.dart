@@ -129,10 +129,11 @@ void main() {
       ReviewTarget? target,
       double width = 520,
       Future<List<String>?> Function(String)? load,
+      DiffModel? tree,
     }) => _host(
       ReviewPanel(
         session: session,
-        workspace: workspace,
+        workspace: tree ?? workspace,
         workspaceAvailable: true,
         root: '/proj',
         target: target,
@@ -218,6 +219,47 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const Key('review-file-lines')), findsOneWidget);
       expect(find.textContaining('kept', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('a whole file is read again only when its diff changes', (
+      t,
+    ) async {
+      var version = 1;
+      var reads = 0;
+      Future<List<String>?> load(String _) async {
+        reads++;
+        return ['version $version'];
+      }
+
+      await t.pumpWidget(panel(width: 900, load: load));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('review-open-file')));
+      await t.pumpAndSettle();
+      expect(find.textContaining('version 1', findRichText: true), findsOne);
+      // The same diff, rebuilt: nothing to read again.
+      await t.pumpWidget(panel(width: 900, load: load));
+      await t.pumpAndSettle();
+      expect(reads, 1);
+      version = 2;
+      final moved = DiffModel.parse(_diffOf('lib/w.dart', 'was', 'now'));
+      await t.pumpWidget(panel(width: 900, load: load, tree: moved));
+      await t.pumpAndSettle();
+      expect(reads, 2);
+      expect(find.textContaining('version 2', findRichText: true), findsOne);
+    });
+
+    testWidgets('a path named twice in the working tree keeps both records', (
+      t,
+    ) async {
+      final tree = DiffModel.parse(
+        _diffOf('lib/w.dart', 'index old', 'index new') +
+            _diffOf('lib/w.dart', 'tree old', 'tree new'),
+      );
+      await t.pumpWidget(panel(tree: tree));
+      await t.pumpAndSettle();
+      expect(find.textContaining('index new', findRichText: true), findsOne);
+      expect(find.textContaining('tree new', findRichText: true), findsOne);
+      expect(find.textContaining('+2', findRichText: true), findsWidgets);
     });
   });
 }

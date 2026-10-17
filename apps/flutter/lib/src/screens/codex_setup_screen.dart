@@ -63,7 +63,6 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
   CodexSetupStatus? _status;
   bool _busy = false;
   String? _error;
-  String? _info;
 
   @override
   void initState() {
@@ -108,16 +107,14 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
     }
   }
 
-  Future<void> _run(Future<void> Function() op, {String? okMessage}) async {
+  Future<void> _run(Future<void> Function() op) async {
     setState(() {
       _busy = true;
       _error = null;
-      _info = null;
     });
     try {
       await op();
       await _loadStatus();
-      if (mounted && okMessage != null) setState(() => _info = okMessage);
     } catch (e) {
       if (mounted) setState(() => _error = friendlyError(e));
     } finally {
@@ -136,7 +133,6 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final status = _status;
     final nonDegraded = status?.promptVariant == 'non_degraded';
     final live = _liveMethod;
@@ -184,25 +180,10 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
                   title: l10n.codexSetupAdvanced,
                   children: [_nonDegradedRow(l10n, theme, nonDegraded)],
                 ),
-                if (_info != null)
+                if (_error case final error?)
                   Padding(
                     padding: const EdgeInsets.only(top: 14),
-                    child: _Notice(
-                      noticeKey: const Key('codex-setup-info'),
-                      icon: AppIcons.check_circle_outline,
-                      message: _info!,
-                      color: successColor(scheme),
-                    ),
-                  ),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 14),
-                    child: _Notice(
-                      noticeKey: const Key('codex-setup-error'),
-                      icon: AppIcons.error_outline,
-                      message: _error!,
-                      color: scheme.error,
-                    ),
+                    child: _ErrorNotice(error),
                   ),
               ],
             ),
@@ -283,18 +264,12 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
     bool nonDegraded,
   ) {
     final status = _status;
-    return Padding(
-      padding: _MethodRow.padding,
-      child: Row(
+    return _MethodRow(
+      icon: AppIcons.psychology_outlined,
+      live: false,
+      body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            // Nudged down so the badge aligns with the title's cap height rather
-            // than the block of wrapped text beneath it.
-            padding: EdgeInsets.only(top: 2),
-            child: IconBadge(icon: AppIcons.psychology_outlined),
-          ),
-          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,20 +355,13 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
             padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
             child: Row(
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(kControlRadius),
-                  ),
-                  child: Icon(
-                    ready
-                        ? AppIcons.check_circle_outline
-                        : AppIcons.error_outline,
-                    size: 20,
-                    color: color,
-                  ),
+                IconBadge(
+                  icon: ready
+                      ? AppIcons.check_circle_outline
+                      : AppIcons.error_outline,
+                  size: 38,
+                  background: color.withValues(alpha: 0.14),
+                  foreground: color,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -436,16 +404,13 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
 /// reports under them).
 class _MethodRow extends StatelessWidget {
   const _MethodRow({
-    required this.rowKey,
+    this.rowKey,
     required this.icon,
     required this.live,
     required this.body,
   });
 
-  /// The padding of every row in this page's cards.
-  static const padding = EdgeInsets.fromLTRB(13, 12, 12, 12);
-
-  final Key rowKey;
+  final Key? rowKey;
   final IconData icon;
 
   /// Whether codex runs on this method; its badge is accented.
@@ -456,7 +421,7 @@ class _MethodRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(
     key: rowKey,
-    padding: padding,
+    padding: const EdgeInsets.fromLTRB(13, 12, 12, 12),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -527,45 +492,40 @@ class _InlineHint extends StatelessWidget {
       Text(text, style: helpTextStyle(Theme.of(context)));
 }
 
-/// The page's outcome line — a tinted panel rather than bare coloured text, so a
-/// result under a card stack reads as a result.
-class _Notice extends StatelessWidget {
-  const _Notice({
-    required this.noticeKey,
-    required this.icon,
-    required this.message,
-    required this.color,
-  });
+/// The page's failure line — a tinted panel rather than bare coloured text,
+/// so a result under a card stack reads as a result.
+class _ErrorNotice extends StatelessWidget {
+  const _ErrorNotice(this.message);
 
-  final Key noticeKey;
-  final IconData icon;
   final String message;
-  final Color color;
 
   @override
-  Widget build(BuildContext context) => Container(
-    key: noticeKey,
-    padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.10),
-      borderRadius: BorderRadius.circular(kPanelRadius),
-      border: Border.all(color: color.withValues(alpha: 0.35)),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 17, color: color),
-        const SizedBox(width: 9),
-        // Linkified: a provider URL or an upstream error often carries one, and
-        // it was previously plain text the user had to retype.
-        Expanded(
-          child: linkifyText(
-            context,
-            message,
-            style: TextStyle(color: color, height: 1.4),
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.error;
+    return Container(
+      key: const Key('codex-setup-error'),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(kPanelRadius),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(AppIcons.error_outline, size: 17, color: color),
+          const SizedBox(width: 9),
+          // Linkified: a provider URL or an upstream error often carries
+          // one, which would otherwise have to be retyped.
+          Expanded(
+            child: linkifyText(
+              context,
+              message,
+              style: TextStyle(color: color, height: 1.4),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

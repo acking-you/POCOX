@@ -134,28 +134,45 @@ extension _SessionHistory on _AppSessionState {
       }
       _itemIndex[item.id] = _items.length;
       _items.add(
-        TranscriptItem(
-          id: item.id,
-          type: item.itemType,
-          title: item.title,
-          text: item.text,
-          images: resolveImageUrls(item.images),
-          imageUrls: item.images,
-          streaming:
-              (item.itemType == 'contextCompaction' &&
-                  item.title == 'inProgress') ||
-              (item.turnId.isNotEmpty &&
-                  item.turnId == activeTurnId &&
-                  item.itemType == 'imageGeneration' &&
-                  item.turnCompletedAt == null &&
-                  imageGenerationInProgress(item.text)),
-          turnId: item.turnId,
-          turnCompletedAt: item.turnCompletedAt,
-          turnDurationMs: item.turnDurationMs,
+        _transcriptItemOf(
+          item,
+          activeTurnId,
+          compacting:
+              item.itemType == 'contextCompaction' &&
+              item.title == 'inProgress',
         ),
       );
     }
   }
+
+  /// [item] as the transcript shows it. It streams while it is a compaction
+  /// in progress ([compacting]) or an image the running turn
+  /// ([activeTurnId]) is still generating.
+  TranscriptItem _transcriptItemOf(
+    ThreadItem item,
+    String? activeTurnId, {
+    bool compacting = false,
+  }) => TranscriptItem(
+    id: item.id,
+    type: item.itemType,
+    title: item.title,
+    text: item.text,
+    images: resolveImageUrls(item.images),
+    imageUrls: item.images,
+    streaming: compacting || _generatingImage(item, activeTurnId),
+    turnId: item.turnId,
+    turnCompletedAt: item.turnCompletedAt,
+    turnDurationMs: item.turnDurationMs,
+  );
+
+  /// Whether [item] is an image the running turn [activeTurnId] is still
+  /// generating.
+  bool _generatingImage(ThreadItem item, String? activeTurnId) =>
+      item.itemType == 'imageGeneration' &&
+      item.turnId.isNotEmpty &&
+      item.turnId == activeTurnId &&
+      item.turnCompletedAt == null &&
+      imageGenerationInProgress(item.text);
 
   void _mergeHistoryLiveItems(
     Map<String, TranscriptItem> liveItems,
@@ -185,10 +202,7 @@ extension _SessionHistory on _AppSessionState {
           (item) => item.type != 'contentOmitted' || item.text.isNotEmpty,
         ),
       );
-    _itemIndex.clear();
-    for (var i = 0; i < _items.length; i++) {
-      _itemIndex[_items[i].id] = i;
-    }
+    _rebuildItemIndex();
     _dropHostedStops();
     _cachedRows = null;
   }
@@ -225,10 +239,7 @@ extension _SessionHistory on _AppSessionState {
       return true;
     });
     if (_items.length == before) return;
-    _itemIndex.clear();
-    for (var i = 0; i < _items.length; i++) {
-      _itemIndex[_items[i].id] = i;
-    }
+    _rebuildItemIndex();
     _cachedRows = null;
   }
 
@@ -252,25 +263,7 @@ extension _SessionHistory on _AppSessionState {
         fresh.add(_items[_itemIndex[item.id]!]);
         continue;
       }
-      fresh.add(
-        TranscriptItem(
-          id: item.id,
-          type: item.itemType,
-          title: item.title,
-          text: item.text,
-          images: resolveImageUrls(item.images),
-          imageUrls: item.images,
-          streaming:
-              item.turnId.isNotEmpty &&
-              item.turnId == activeTurnId &&
-              item.itemType == 'imageGeneration' &&
-              item.turnCompletedAt == null &&
-              imageGenerationInProgress(item.text),
-          turnId: item.turnId,
-          turnCompletedAt: item.turnCompletedAt,
-          turnDurationMs: item.turnDurationMs,
-        ),
-      );
+      fresh.add(_transcriptItemOf(item, activeTurnId));
     }
     if (fresh.isEmpty) return;
     final merged = mergeHistoryItems(
@@ -282,10 +275,7 @@ extension _SessionHistory on _AppSessionState {
     _items
       ..clear()
       ..addAll(merged);
-    _itemIndex.clear();
-    for (var i = 0; i < _items.length; i++) {
-      _itemIndex[_items[i].id] = i;
-    }
+    _rebuildItemIndex();
     _dropHostedStops();
   }
 
@@ -355,7 +345,6 @@ extension _SessionHistory on _AppSessionState {
   /// Fetch one turn's items, for jumping to a turn not yet scrolled back to.
   Future<void> _loadTurn(
     String turnId, {
-    bool preserveAnchor = true,
     bool fromTop = false,
     int? navigation,
     bool reveal = false,
@@ -374,18 +363,12 @@ extension _SessionHistory on _AppSessionState {
     }
     // A tail-only page may have marked the turn loaded without its user row.
     if (_items.any((item) => item.turnId == turnId && item.isUser)) return;
-    await _startHistoryLoad(
-      turnId: turnId,
-      preserveAnchor: preserveAnchor,
-      fromTop: fromTop,
-      reveal: reveal,
-    );
+    await _startHistoryLoad(turnId: turnId, fromTop: fromTop, reveal: reveal);
   }
 
   Future<void> _startHistoryLoad({
     String? turnId,
     bool loadMore = false,
-    bool preserveAnchor = true,
     bool fromTop = false,
     bool reveal = false,
   }) {
@@ -403,7 +386,6 @@ extension _SessionHistory on _AppSessionState {
           _historyGeneration,
           turnId,
           loadMore,
-          preserveAnchor,
           reveal,
           _scrollIntent,
           _turnNavigation,
@@ -425,7 +407,6 @@ extension _SessionHistory on _AppSessionState {
     int generation,
     String? turnId,
     bool loadMore,
-    bool preserveAnchor,
     bool reveal,
     int intent,
     int navigation,
@@ -459,7 +440,7 @@ extension _SessionHistory on _AppSessionState {
           hasMore: turn.hasMore,
         );
       }
-      final anchor = preserveAnchor ? _captureHistoryAnchor() : null;
+      final anchor = _captureHistoryAnchor();
       _updateState(() {
         // A continuation is the later part of a turn already showing its
         // start; everything else reads backwards.

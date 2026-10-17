@@ -108,12 +108,7 @@ void _registerClaudePreparation() {
       expect(find.byKey(const Key('claude-adapter')), findsOneWidget);
       expect(t.widget<TextField>(name).controller!.text, 'my-claude');
       expectNoHostMutation(api, prefs);
-      expect(
-        find.text(
-          'ACP environment is ready. No host was started or restarted.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('host-editor-notice')), findsOneWidget);
       semantics.dispose();
       await _start(t);
       expect(api.claudePrepareStarts, 1);
@@ -186,7 +181,10 @@ void _registerClaudePreparation() {
       await t.pump(const Duration(milliseconds: 600));
       expect(find.text('4.1 MB downloaded'), findsOneWidget);
       expect(find.byKey(const Key('claude-prepare-speed')), findsNothing);
-      expect(find.text('Checking the downloaded adapter…'), findsOneWidget);
+      expect(
+        t.widget<Text>(find.byKey(const Key('claude-prepare-title'))).data,
+        lookupAppLocalizations(const Locale('en')).claudePrepareStageVerifying,
+      );
       api.settleClaudePrepare('done');
       await finishPreparation(t);
       expect(progress, findsNothing);
@@ -212,9 +210,10 @@ void _registerClaudePreparation() {
       api.settleClaudePrepare('done');
       await finishPreparation(t);
       expect(api.claudePrepareCancels, 0);
+      // The late result is not this page's: no "ready" notice.
       expect(
         find.text(
-          'ACP environment is ready. No host was started or restarted.',
+          lookupAppLocalizations(const Locale('en')).claudeEnvironmentReady,
         ),
         findsNothing,
       );
@@ -369,12 +368,7 @@ void _registerClaudePreparation() {
       await t.pumpAndSettle();
       expect(api.claudePrepareCancels, 1);
       expect(api.acpServeCalls, isEmpty);
-      expect(
-        find.text(
-          'Preparing the Claude ACP adapter was stopped. Choose Prepare ACP environment or Start hosting to retry.',
-        ),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('host-editor-error')), findsOneWidget);
     });
 
     testWidgets('a failed preparation is reported and Start retries it', (
@@ -496,10 +490,10 @@ void _registerClaudePreparation() {
       );
 
     testWidgets('a preparation joined from another caller is never '
-        'cancelled by this page, and Stop waiting leaves through the page', (
-      t,
-    ) async {
+        'cancelled by this page, and Stop waiting (its accessibility action '
+        'too) leaves through the page', (t) async {
       final api = joinedApi();
+      final semantics = t.ensureSemantics();
       await startPreparing(t, api);
       expect(api.claudePrepareStarts, 0, reason: 'joined, not started');
       expect(find.byKey(const Key('claude-prepare-progress')), findsOneWidget);
@@ -510,10 +504,22 @@ void _registerClaudePreparation() {
         find.byKey(const Key('host-editor-close')),
       );
       expect(close.onPressed, isNull);
-      await t.tap(find.byKey(const Key('claude-prepare-stop-waiting')));
+      final node = t.getSemantics(
+        find.byKey(const Key('claude-prepare-stop-waiting')),
+      );
+      node.owner!.performAction(node.id, SemanticsAction.tap);
       await t.pump();
+      expect(find.byKey(const Key('claude-prepare-progress')), findsNothing);
       expect(api.claudePrepareCancels, 0, reason: 'its run is not ours');
       expect(api.claudeSetup.running, isTrue);
+      expect(
+        t
+            .widget<TextButton>(find.byKey(const Key('host-editor-close')))
+            .onPressed,
+        isNotNull,
+        reason: 'the page may be left',
+      );
+      semantics.dispose();
       await t.tap(find.byKey(const Key('host-editor-close')));
       await t.pumpAndSettle();
       expect(find.byType(LocalHostDialog), findsNothing);
@@ -523,24 +529,6 @@ void _registerClaudePreparation() {
       await t.pump(const Duration(milliseconds: 600));
       await t.pumpAndSettle();
       expect(api.acpServeCalls, isEmpty);
-    });
-
-    testWidgets('Stop waiting answers its accessibility action too', (t) async {
-      final api = joinedApi();
-      final semantics = t.ensureSemantics();
-      await startPreparing(t, api);
-      final node = t.getSemantics(
-        find.byKey(const Key('claude-prepare-stop-waiting')),
-      );
-      node.owner!.performAction(node.id, SemanticsAction.tap);
-      await t.pump();
-      expect(find.byKey(const Key('claude-prepare-progress')), findsNothing);
-      expect(api.claudePrepareCancels, 0);
-      final close = t.widget<TextButton>(
-        find.byKey(const Key('host-editor-close')),
-      );
-      expect(close.onPressed, isNotNull, reason: 'the page may be left');
-      semantics.dispose();
     });
 
     testWidgets('a start answered after the page closed stops exactly the '

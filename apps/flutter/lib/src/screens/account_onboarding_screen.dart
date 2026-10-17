@@ -14,8 +14,8 @@ import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/web_authenticator.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/brand_logo.dart';
+import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
 /// Default first-run experience: sign in to a hosted account. The convenient
@@ -62,13 +62,10 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     final l10n = AppLocalizations.of(context);
     String? failure;
     try {
-      // Blank backend → the built-in default (lb7666.top); a self-deployed
-      // backend can be entered under "Advanced".
-      final override = _backend.text.trim();
       final cb = webAuthCallback();
       final start = await api.accountWebLoginStart(
         redirectUri: cb.redirectUri,
-        backend: override.isEmpty ? null : override,
+        backend: _backendOverride,
       );
       final result = await authenticator.authenticate(
         url: start.authorizeUrl,
@@ -131,12 +128,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     });
     final api = ref.read(bridgeApiProvider);
     try {
-      // Blank backend → the built-in default (lb7666.top); a self-deployed
-      // backend can be entered under "Advanced".
-      final override = _backend.text.trim();
-      final device = await api.accountLoginStart(
-        backend: override.isEmpty ? null : override,
-      );
+      final device = await api.accountLoginStart(backend: _backendOverride);
       if (!mounted) return;
       setState(() {
         _device = device;
@@ -151,6 +143,23 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
         });
       }
     }
+  }
+
+  /// The backend typed under "Advanced" (a self-deployed one); null keeps
+  /// the built-in default (lb7666.top).
+  String? get _backendOverride {
+    final typed = _backend.text.trim();
+    return typed.isEmpty ? null : typed;
+  }
+
+  /// End the device flow on [error], dropping its code.
+  void _stopPolling(String error) {
+    _polling = false;
+    if (!mounted) return;
+    setState(() {
+      _device = null;
+      _error = error;
+    });
   }
 
   Future<void> _poll(DeviceCode device) async {
@@ -169,13 +178,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       await Future<void>.delayed(delay);
       if (!_polling || !mounted) return;
       if (DateTime.now().isAfter(deadline)) {
-        _polling = false;
-        if (mounted) {
-          setState(() {
-            _device = null;
-            _error = AppLocalizations.of(context).accountCodeExpired;
-          });
-        }
+        _stopPolling(AppLocalizations.of(context).accountCodeExpired);
         return;
       }
       // Resolve l10n fresh each iteration so a locale change mid-poll shows the
@@ -195,22 +198,10 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
           case 'slow_down':
             delay = interval + const Duration(seconds: 5);
           case 'expired':
-            _polling = false;
-            if (mounted) {
-              setState(() {
-                _device = null;
-                _error = l10n.accountCodeExpired;
-              });
-            }
+            _stopPolling(l10n.accountCodeExpired);
             return;
           case 'denied':
-            _polling = false;
-            if (mounted) {
-              setState(() {
-                _device = null;
-                _error = l10n.accountDenied;
-              });
-            }
+            _stopPolling(l10n.accountDenied);
             return;
           default: // pending / unknown: keep polling at the base interval
             delay = interval;
@@ -272,13 +263,6 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
           ? l10n.accountSignedInAs(login)
           : l10n.accountSignedIn,
     );
-  }
-
-  Future<void> _openVerification(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri != null) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   @override
@@ -424,7 +408,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                     child: FilledButton.icon(
                       key: const Key('account-open-github'),
                       onPressed: () =>
-                          _openVerification(device.verificationUri),
+                          openWebUrl(context, device.verificationUri),
                       icon: const Icon(AppIcons.open_in_new, size: 18),
                       label: Text(l10n.accountOpenGitHub),
                     ),

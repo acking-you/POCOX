@@ -8,10 +8,11 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/cancellable_delay.dart';
+import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/action_row.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
@@ -91,9 +92,8 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
   // The session the current attempt owns, with that attempt's number.
   (int, String)? _owned;
   // The polling attempt's pending wait between two status reads: cut short
-  // whenever that attempt ends, so no timer outlives it or this panel.
-  Timer? _pollTimer;
-  Completer<bool>? _pollWait;
+  // whenever that attempt ends.
+  final _pollWait = CancellableDelay();
 
   // Read once: closing the session on dispose must not touch `ref`.
   late final BridgeApi _api;
@@ -107,7 +107,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
   @override
   void dispose() {
     _attempt++;
-    _stopPollDelay();
+    _pollWait.stop();
     _release();
     super.dispose();
   }
@@ -121,28 +121,8 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
 
   /// Wait one poll interval for [attempt]: `false` when it ended meanwhile
   /// (a new attempt, cancel or dispose stopped the wait).
-  Future<bool> _pollDelay(int attempt) async {
-    _stopPollDelay();
-    final wait = Completer<bool>();
-    _pollWait = wait;
-    _pollTimer = Timer(const Duration(seconds: 2), () {
-      if (identical(_pollWait, wait)) {
-        _pollWait = null;
-        _pollTimer = null;
-      }
-      wait.complete(true);
-    });
-    return await wait.future && _current(attempt);
-  }
-
-  /// End the pending poll wait, if any, as stopped.
-  void _stopPollDelay() {
-    _pollTimer?.cancel();
-    _pollTimer = null;
-    final wait = _pollWait;
-    _pollWait = null;
-    if (wait != null && !wait.isCompleted) wait.complete(false);
-  }
+  Future<bool> _pollDelay(int attempt) async =>
+      await _pollWait.wait(const Duration(seconds: 2)) && _current(attempt);
 
   /// Close [session]; a failure is not the user's to see (the bridge stops
   /// the private codex on quit anyway).
@@ -170,7 +150,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
 
   Future<void> _signIn(AppLocalizations l10n) async {
     final attempt = ++_attempt;
-    _stopPollDelay();
+    _pollWait.stop();
     _release();
     setState(() {
       _busy = true;
@@ -275,7 +255,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
   /// Stop waiting for the browser and close this attempt's sign-in.
   void _cancel() {
     _attempt++;
-    _stopPollDelay();
+    _pollWait.stop();
     _release();
     setState(() {
       _polling = false;
@@ -289,7 +269,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
 
   Future<void> _signOut() async {
     final attempt = ++_attempt;
-    _stopPollDelay();
+    _pollWait.stop();
     _release();
     setState(() {
       _busy = true;
@@ -405,13 +385,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
     ]) {
       children
         ..add(const SizedBox(height: 8))
-        ..add(
-          Text(
-            message,
-            key: key,
-            style: helpTextStyle(theme).copyWith(color: color),
-          ),
-        );
+        ..add(EditorNote(message, key: key, color: color));
     }
     return Column(
       key: const Key('official-login-panel'),

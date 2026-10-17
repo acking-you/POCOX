@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -8,13 +7,13 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/acp_host_form.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
-/// Horizontal padding of each Codex source segment.
+/// Horizontal padding of each Codex source segment, the one
+/// [segmentsFitAcross] counts for the disabled built-in segment.
 const _sourceSegmentPadding = EdgeInsets.symmetric(horizontal: 12);
 
 /// The port the first Codex host listens on by default.
@@ -95,6 +94,14 @@ class CodexRuntimeForm extends ChangeNotifier {
   void edited() {
     touched = true;
     changed();
+  }
+
+  /// The user takes the codex path into their own hands (typing it, or
+  /// "change path"): a late detection no longer replaces it.
+  void customizePath() {
+    overridePath = true;
+    pathIntent++;
+    edited();
   }
 
   /// Fill the fields from a running host's [runtime] (its saved desired
@@ -282,7 +289,13 @@ class CodexRuntimeSection extends StatelessWidget {
         builder: (context, constraints) => SegmentedButton<bool>(
           key: const Key('codex-source'),
           // Side by side only while each label fits on one line.
-          direction: _sourceFitsAcross(context, constraints.maxWidth)
+          direction:
+              segmentsFitAcross(
+                context,
+                constraints.maxWidth,
+                [l10n.codexSourceExternal],
+                disabled: [_builtinLabel(l10n)],
+              )
               ? Axis.horizontal
               : Axis.vertical,
           style: const ButtonStyle(
@@ -343,11 +356,7 @@ class CodexRuntimeSection extends StatelessWidget {
                 controller: form.path,
                 enabled: enabled,
                 decoration: InputDecoration(labelText: l10n.codexBinaryPath),
-                onChanged: (_) {
-                  form.overridePath = true;
-                  form.pathIntent++;
-                  form.edited();
-                },
+                onChanged: (_) => form.customizePath(),
               ),
             ),
             const SizedBox(width: 8),
@@ -360,25 +369,16 @@ class CodexRuntimeSection extends StatelessWidget {
         ),
       );
     }
-    final clash = fixedName ? null : hostNameClash(form.name.text, takenNames);
     children
       ..add(const SizedBox(height: 12))
       ..add(
-        FocusHelp(
-          help: fixedName || clash != null ? null : l10n.hostNameHelper,
-          child: TextField(
-            key: const Key('codex-name-field'),
-            controller: form.name,
-            enabled: enabled && !fixedName,
-            decoration: InputDecoration(
-              labelText: l10n.localHostName,
-              errorText: switch (clash) {
-                final other? => l10n.hostNameInUse(other),
-                null => null,
-              },
-            ),
-            onChanged: (_) => form.nameEdited(),
-          ),
+        HostNameField(
+          fieldKey: const Key('codex-name-field'),
+          controller: form.name,
+          enabled: enabled,
+          fixed: fixedName,
+          taken: takenNames,
+          onChanged: (_) => form.nameEdited(),
         ),
       )
       ..add(const SizedBox(height: 6))
@@ -390,12 +390,7 @@ class CodexRuntimeSection extends StatelessWidget {
           // Without one, what that risks: the switch's own consequence.
           subtitle: form.useProxy
               ? null
-              : Text(
-                  l10n.noProxyWarning,
-                  style: helpTextStyle(
-                    Theme.of(context),
-                  ).copyWith(color: cautionColor(scheme)),
-                ),
+              : EditorNote(l10n.noProxyWarning, color: cautionColor(scheme)),
           value: form.useProxy,
           onChanged: enabled
               ? (v) {
@@ -472,13 +467,7 @@ class CodexRuntimeSection extends StatelessWidget {
     );
     final customize = TextButton(
       key: const Key('customize-codex-btn'),
-      onPressed: enabled
-          ? () {
-              form.overridePath = true;
-              form.pathIntent++;
-              form.edited();
-            }
-          : null,
+      onPressed: enabled ? form.customizePath : null,
       child: Text(l10n.customizeCodexPath),
     );
     return LayoutBuilder(
@@ -499,20 +488,4 @@ class CodexRuntimeSection extends StatelessWidget {
   /// The disabled built-in segment's label, marked as not implemented.
   static String _builtinLabel(AppLocalizations l10n) =>
       '${l10n.codexSourceBuiltin} · ${l10n.codexBuiltinUnavailable}';
-
-  /// Whether the Codex source segments fit side by side in [width], each
-  /// label on one line beside the selected segment's check mark.
-  static bool _sourceFitsAcross(BuildContext context, double width) {
-    final l10n = AppLocalizations.of(context);
-    final style = Theme.of(context).textTheme.labelLarge;
-    double text(String label) => measureTextLine(context, label, style).width;
-    // The selected segment carries the 18 px check mark; Material then uses
-    // its own icon padding (12 + 16) and gap (8), both at most at 1× text.
-    final segment = math.max(
-      12 + 16 + 18 + 8 + text(l10n.codexSourceExternal),
-      _sourceSegmentPadding.horizontal + text(_builtinLabel(l10n)),
-    );
-    // Two segments plus the outer and dividing borders.
-    return 2 * segment + 3 <= width;
-  }
 }

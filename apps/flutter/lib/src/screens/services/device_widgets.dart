@@ -246,7 +246,7 @@ class _DeviceTile extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: selected ? scheme.onSurface : scheme.onSurface,
+                          color: scheme.onSurface,
                         ),
                       ),
                       const SizedBox(height: 2),

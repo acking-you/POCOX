@@ -31,6 +31,7 @@ import 'package:pocket_codex/src/widgets/status_dots.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/widgets/app_dialog.dart';
 import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 part 'activity/file_changes.dart';
 part 'activity/notices.dart';

@@ -39,9 +39,11 @@ mixin _FakeThreads on _FakeBridgeState {
 
   @override
   Future<String> appGitDiff(String serviceKey, String threadId) async {
+    // Answers with the tree as it was when asked, however late it arrives.
+    final text = gitDiffText;
     final gate = gitDiffGate;
     if (gate != null) await gate.future;
-    return gitDiffText;
+    return text;
   }
 
   @override
@@ -221,17 +223,12 @@ mixin _FakeThreads on _FakeBridgeState {
     }
     return TurnItemsPage(
       turnId: turnId,
-      items: await appThreadTurnItems(serviceKey, threadId, turnId),
+      items: await _turnItems(turnId),
       hasMore: false,
     );
   }
 
-  @override
-  Future<List<ThreadItem>> appThreadTurnItems(
-    String serviceKey,
-    String threadId,
-    String turnId,
-  ) async {
+  Future<List<ThreadItem>> _turnItems(String turnId) async {
     turnItemCalls.add(turnId);
     if (pendingTurnItems[turnId] case final response?) return response;
     return turnItems[turnId] ?? const [];

@@ -94,6 +94,7 @@ import 'package:pocket_codex/src/screens/app_session/approval_review.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 part 'app_session/composer_drafts.dart';
 part 'app_session/session_access.dart';
@@ -416,6 +417,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // diff, refreshed after edits (turn/diff/updated, turn/completed, compacted).
   String? _branch;
   DiffModel? _diff;
+  int _gitRead = 0; // the latest diff read; only its answer is kept
 
   // A user-initiated diff fetch that the review is waiting on. Fetching a diff
   // on a large repo over the relay takes long enough to need both a spinner and
@@ -427,9 +429,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   int _diffFetch = 0;
   bool _diffLoading = false;
 
-  // Desktop layout: left = this project's sessions, right = the diff-review
-  // split (a file tree + one file's diff). Both collapsible AND drag-resizable;
-  // the chat stays centered regardless. _threads backs the left pane.
+  // Desktop layout: left = this project's sessions, right = the review
+  // sidebar. Both collapsible AND drag-resizable; the chat stays centered
+  // regardless. _threads backs the left pane.
   // The sidebar's open state and width start from the saved preference and
   // are written back when the user changes them (see [_setLeftOpen] and the
   // splitter's drag end), so a restart reopens the window as it was left.
@@ -653,12 +655,12 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   VoidCallback? _retry; // action for the error banner's retry button
   int _threadLoadGeneration = 0;
   bool _connectionLost = false;
-  // True while an automatic reconnect is in progress (drives the status bar's
-  // "reconnecting" state). Auto-reconnect is attempted on stream close, on a
-  // periodic health check, and after a send fails on a dropped connection.
   String? _historyEpoch;
   bool _historySyncing = false;
   bool _showingCachedHistory = false;
+  // True while an automatic reconnect is in progress (drives the status bar's
+  // "reconnecting" state). Auto-reconnect is attempted on stream close, on a
+  // periodic health check, and after a send fails on a dropped connection.
   bool _reconnecting = false;
   // Running for 3 s after an automatic reconnect began (its debounce); a
   // timer, so the window follows the app's clock rather than a stopwatch.
@@ -934,10 +936,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   }
 
   /// The keyboard inset animates in over several frames, and each frame shrinks
-  /// the transcript viewport a little more. `_scrollToEnd`'s settle loop gives
-  /// up at the first frame that doesn't grow the extent — which an easing curve
-  /// produces early on — so re-pin on every metrics change too, for as long as
-  /// the composer holds focus.
+  /// the transcript viewport a little more, so re-pin on every metrics change,
+  /// for as long as the composer holds focus.
   @override
   void didChangeMetrics() => _repinForKeyboard();
 

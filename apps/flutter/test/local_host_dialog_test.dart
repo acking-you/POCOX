@@ -37,12 +37,17 @@ void main() {
     (tester) async {
       final api = FakeBridgeApi();
       await pumpDialog(tester, api);
-      final selector = tester.widget<SegmentedButton<bool>>(
-        find.byType(SegmentedButton<bool>),
-      );
+      final source = find.byKey(const Key('codex-source'));
+      final selector = tester.widget<SegmentedButton<bool>>(source);
       expect(selector.segments.singleWhere((s) => s.value).enabled, isFalse);
       // Marked as not implemented on the segment itself.
-      final builtIn = find.text('内置引擎 · 暂未实现');
+      final l10n = lookupAppLocalizations(const Locale('zh'));
+      final builtIn = find.descendant(
+        of: source,
+        matching: find.text(
+          '${l10n.codexSourceBuiltin} · ${l10n.codexBuiltinUnavailable}',
+        ),
+      );
       expect(builtIn, findsOneWidget);
       // Scrolled into view first: below the fold the tap would land on the
       // page's workspace navigation instead of the disabled segment.
@@ -50,16 +55,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(builtIn);
       await tester.pumpAndSettle();
-      expect(
-        tester
-            .widget<SegmentedButton<bool>>(find.byType(SegmentedButton<bool>))
-            .selected,
-        {false},
-      );
+      expect(tester.widget<SegmentedButton<bool>>(source).selected, {false});
       await tester.tap(find.byKey(const Key('start-hosting-btn')));
       await tester.pumpAndSettle();
       expect(api.lastServeEmbedded, isFalse);
       expect(api.serveHosts, hasLength(1));
+      expect(api.acpServeCalls, isEmpty, reason: 'the native app-server');
     },
   );
 

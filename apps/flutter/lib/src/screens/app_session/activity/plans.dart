@@ -81,7 +81,6 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final muted = scheme.onSurfaceVariant;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -127,74 +126,7 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
                   onTap: () => setState(() => _expanded = !_expanded),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 13,
-                          height: 13,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.8,
-                            color: signalColor(scheme),
-                          ),
-                        ),
-                        const SizedBox(width: 7),
-                        Flexible(
-                          child: Text(
-                            l10n.turnProgressStep(
-                              _currentStep,
-                              widget.steps.length,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: muted),
-                          ),
-                        ),
-                        if (widget.changedFiles > 0) ...[
-                          Text('  ·  ', style: TextStyle(color: muted)),
-                          if (!widget.compact) ...[
-                            Flexible(
-                              child: Text(
-                                l10n.envFilesChanged(widget.changedFiles),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: muted),
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                          ],
-                          Text(
-                            '+${widget.added}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: additionColor(scheme),
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '−${widget.removed}',
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              color: scheme.error,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(width: 3),
-                        Icon(
-                          _expanded
-                              ? AppIcons.expand_less
-                              : AppIcons.expand_more,
-                          size: 16,
-                          color: muted,
-                        ),
-                      ],
-                    ),
+                    child: _summary(l10n, scheme),
                   ),
                 ),
               ),
@@ -221,6 +153,55 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
               ],
             ],
           ),
+        ),
+      ],
+    );
+  }
+
+  /// The pill's face: which step is running, what the turn has changed so
+  /// far and whether the checklist is open.
+  Widget _summary(AppLocalizations l10n, ColorScheme scheme) {
+    final muted = scheme.onSurfaceVariant;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 13,
+          height: 13,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.8,
+            color: signalColor(scheme),
+          ),
+        ),
+        const SizedBox(width: 7),
+        Flexible(
+          child: Text(
+            l10n.turnProgressStep(_currentStep, widget.steps.length),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, color: muted),
+          ),
+        ),
+        if (widget.changedFiles > 0) ...[
+          Text('  ·  ', style: TextStyle(color: muted)),
+          if (!widget.compact) ...[
+            Flexible(
+              child: Text(
+                l10n.envFilesChanged(widget.changedFiles),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 12, color: muted),
+              ),
+            ),
+            const SizedBox(width: 5),
+          ],
+          ChangeCounts(added: widget.added, removed: widget.removed, gap: 3),
+        ],
+        const SizedBox(width: 3),
+        Icon(
+          _expanded ? AppIcons.expand_less : AppIcons.expand_more,
+          size: 16,
+          color: muted,
         ),
       ],
     );

@@ -6,6 +6,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/managed/managed_add_service.dart';
+import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/managed/managed_host_editor.dart';
 import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/managed/management_failure.dart';
@@ -502,13 +503,10 @@ String managedModelSummary(AppLocalizations l10n, ManagedHost host) {
     managedHostKind(host),
     agentName: managedAgent(host)?.displayName,
   );
-  final source = switch (c.source) {
-    'official' => l10n.hostSourceOfficial,
-    'custom' => [
-      l10n.hostSourceCustom,
+  return [
+    kind,
+    modelSourceLabel(l10n, c.source),
+    if (c.source == 'custom')
       if (c.model case final model? when model.isNotEmpty) model,
-    ].join(' · '),
-    _ => l10n.hostSourceInherited,
-  };
-  return '$kind · $source';
+  ].join(' · ');
 }

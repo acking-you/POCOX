@@ -45,6 +45,7 @@ class RelayProblem extends StatefulWidget {
 
 class _RelayProblemState extends State<RelayProblem> {
   RelayDiagnosis? _diagnosis;
+  int _lookup = 0; // only the latest name lookup may change the diagnosis
 
   @override
   void initState() {
@@ -61,12 +62,13 @@ class _RelayProblemState extends State<RelayProblem> {
   }
 
   Future<void> _diagnose() async {
+    final lookup = ++_lookup;
     final detail = widget.detail;
     final relay = relayAddressOf(widget.relay, detail);
     // What the error says at once; the relay's name, resolved, may say why.
     _diagnosis = relayFailureOf(relay, detail);
     final virtual = await relayVirtualAddressOf(relay);
-    if (virtual == null || !mounted || detail != widget.detail) return;
+    if (virtual == null || !mounted || lookup != _lookup) return;
     setState(() => _diagnosis = virtual);
   }
 

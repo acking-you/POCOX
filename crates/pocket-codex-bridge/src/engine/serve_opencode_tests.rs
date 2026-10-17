@@ -7,7 +7,7 @@ use super::*;
 use crate::engine::{
     config, host_apply,
     host_profiles::{Change, Engine, KeyChange, ProfileInput, Runtime, RuntimeChange, Source},
-    host_start::{self, NewHost, Started},
+    host_start::{self, Started},
     meta, opencode as controller, serve,
     session_engine::{self, StartOptions, TurnOptions},
 };
@@ -54,7 +54,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let _cleanup = Cleanup;
     let Started::OpenCode(report) = host_start::start_configured(
         Some("native-fixture"),
-        NewHost::OpenCode {
+        Runtime::OpenCode {
             binary: Some(binary.clone()),
             separate_history: false,
         },
@@ -78,7 +78,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     assert!(local_gateway(key, &transport::Context::of(&owned.transport)).is_some());
     let duplicate = host_start::start_configured(
         Some("native-second"),
-        NewHost::OpenCode {
+        Runtime::OpenCode {
             binary: Some(binary.clone()),
             separate_history: false,
         },
@@ -97,7 +97,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     // With a history of its own, a second host runs beside the first.
     let Started::OpenCode(second) = host_start::start_configured(
         Some("native-second"),
-        NewHost::OpenCode {
+        Runtime::OpenCode {
             binary: Some(binary.clone()),
             separate_history: true,
         },

@@ -53,9 +53,6 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
   /// The last detection, or null before it finished.
   OpenCodeEnvironment? found;
 
-  /// Whether detection finished.
-  bool get checked => found != null;
-
   /// The user changed a field.
   bool touched = false;
 
@@ -81,6 +78,14 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
   void edited() {
     touched = true;
     _notify();
+  }
+
+  /// The user takes the executable path into their own hands (typing it,
+  /// or "change"): a late detection or pick no longer replaces it.
+  void customizePath() {
+    overridePath = true;
+    pathIntent++;
+    edited();
   }
 
   void _notify() {
@@ -227,48 +232,33 @@ class OpenCodeRuntimeSection extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     return ListenableBuilder(
       listenable: form,
-      builder: (context, _) {
-        final clash = fixedName
-            ? null
-            : hostNameClash(form.name.text, takenNames);
-        return GroupCard(
-          key: const Key('opencode-runtime-section'),
-          title: l10n.hostRuntimeInfo,
-          info: info ?? l10n.openCodeRuntimeHint,
-          children: [
-            EditorBlock(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FocusHelp(
-                    help: fixedName || clash != null
-                        ? null
-                        : l10n.hostNameHelper,
-                    child: TextField(
-                      key: const Key('opencode-name-field'),
-                      controller: form.name,
-                      enabled: enabled && !fixedName,
-                      decoration: InputDecoration(
-                        labelText: l10n.localHostName,
-                        errorText: switch (clash) {
-                          final other? => l10n.hostNameInUse(other),
-                          null => null,
-                        },
-                      ),
-                      onChanged: (_) => form.nameEdited(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _history(context, l10n),
-                  const SizedBox(height: 16),
-                  _executable(context, l10n),
-                ],
-              ),
+      builder: (context, _) => GroupCard(
+        key: const Key('opencode-runtime-section'),
+        title: l10n.hostRuntimeInfo,
+        info: info ?? l10n.openCodeRuntimeHint,
+        children: [
+          EditorBlock(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                HostNameField(
+                  fieldKey: const Key('opencode-name-field'),
+                  controller: form.name,
+                  enabled: enabled,
+                  fixed: fixedName,
+                  taken: takenNames,
+                  onChanged: (_) => form.nameEdited(),
+                ),
+                const SizedBox(height: 16),
+                _history(context, l10n),
+                const SizedBox(height: 16),
+                _executable(context, l10n),
+              ],
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 
@@ -377,11 +367,7 @@ class OpenCodeRuntimeSection extends StatelessWidget {
                 controller: form.path,
                 enabled: enabled,
                 decoration: InputDecoration(labelText: l10n.openCodePath),
-                onChanged: (_) {
-                  form.overridePath = true;
-                  form.pathIntent++;
-                  form.edited();
-                },
+                onChanged: (_) => form.customizePath(),
                 onSubmitted: (_) => form.detect(),
               ),
             ),
@@ -402,13 +388,7 @@ class OpenCodeRuntimeSection extends StatelessWidget {
           if (!form.overridePath && ok)
             TextButton(
               key: const Key('customize-opencode-btn'),
-              onPressed: enabled
-                  ? () {
-                      form.overridePath = true;
-                      form.pathIntent++;
-                      form.edited();
-                    }
-                  : null,
+              onPressed: enabled ? form.customizePath : null,
               child: Text(l10n.customizeCodexPath),
             ),
           TextButton.icon(

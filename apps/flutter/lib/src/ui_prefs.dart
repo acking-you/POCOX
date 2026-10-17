@@ -71,17 +71,6 @@ class UiPrefs {
   /// Most saved custom ACP agents.
   static const maxSavedAgents = 50;
 
-  /// Whether a Codex host named [name] can get a restore record: it already
-  /// has one, or there is room for another.
-  bool canRememberCodexHost(String name) =>
-      autoHostCodex.any((h) => h.name == name) ||
-      autoHostCodex.length < maxAutoHosts;
-
-  /// Whether an ACP host named [name] can get a restore record.
-  bool canRememberAcpHost(String name) =>
-      autoHostAcp.any((h) => h.name == name) ||
-      autoHostAcp.length < maxAutoHosts;
-
   /// Whether the first-run welcome guide has been shown on this device. Set
   /// the first time it renders, so signing in ever again skips it.
   final bool guideSeen;
@@ -167,12 +156,8 @@ class UiPrefs {
       autoHostOpenCode: AutoHostOpenCodePrefs.fromJson(
         json['autoHostOpenCode'],
       ),
-      preferredAppServiceKey: json['preferredAppServiceKey'] is String
-          ? json['preferredAppServiceKey'] as String
-          : null,
-      lastServiceKey: json['lastServiceKey'] is String
-          ? json['lastServiceKey'] as String
-          : null,
+      preferredAppServiceKey: _as<String>(json['preferredAppServiceKey']),
+      lastServiceKey: _as<String>(json['lastServiceKey']),
       lastThreadByService: threads,
       // `autoHostCodex` supersedes the single legacy `autoHost` record; a
       // file written by an older build only has the latter.
@@ -193,9 +178,7 @@ class UiPrefs {
         num value when value.isFinite => value.toDouble().clamp(28, 280),
         _ => null,
       },
-      sidebarOpen: json['sidebarOpen'] is bool
-          ? json['sidebarOpen'] as bool
-          : null,
+      sidebarOpen: _as<bool>(json['sidebarOpen']),
       sidebarWidth: switch (json['sidebarWidth']) {
         num value when value.isFinite => value.toDouble().clamp(200, 520),
         _ => null,
@@ -227,6 +210,26 @@ class UiPrefs {
     if (sidebarOpen != null) 'sidebarOpen': sidebarOpen,
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
   };
+}
+
+/// [value] when it is a [T], else null: a field of the wrong shape reads as
+/// absent.
+T? _as<T>(Object? value) => value is T ? value : null;
+
+/// [items] with [item] replacing any entry of the same [key]; null when
+/// [bound] other entries already fill it.
+List<T>? _upsert<T>(List<T> items, T item, Object? Function(T) key, int bound) {
+  final others = _without(items, key(item), key) ?? items;
+  return others.length >= bound ? null : [...others, item];
+}
+
+/// [items] without the entries whose [key] is [match]; null when none is.
+List<T>? _without<T>(List<T> items, Object? match, Object? Function(T) key) {
+  final kept = [
+    for (final item in items)
+      if (key(item) != match) item,
+  ];
+  return kept.length == items.length ? null : kept;
 }
 
 /// The removed OpenCode ACP preset (`opencode acp`): its records are
@@ -272,13 +275,10 @@ class AutoHostPrefs {
 
   /// Parse from JSON; defaults on shape surprises.
   factory AutoHostPrefs.fromJson(Map<String, dynamic> json) => AutoHostPrefs(
-    port: json['port'] is int ? json['port'] as int : 0,
-    name: json['name'] is String ? json['name'] as String : 'default',
-    proxy: json['proxy'] is String ? json['proxy'] as String : null,
-    embedded: false,
-    binaryOverride: json['binaryOverride'] is String
-        ? json['binaryOverride'] as String
-        : null,
+    port: _as<int>(json['port']) ?? 0,
+    name: _as<String>(json['name']) ?? 'default',
+    proxy: _as<String>(json['proxy']),
+    binaryOverride: _as<String>(json['binaryOverride']),
   );
 
   /// JSON for persistence.
@@ -495,16 +495,17 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
     _enqueueWrite(next);
   }
 
-  /// [_mutate] with [op]'s verdict on the settled snapshot: an operation
-  /// issued before the file is read also runs on the interim state, but
-  /// only its replay on the loaded file decides. Ordered with every other
-  /// operation, so a later stop still wins over an earlier start.
-  Future<bool> _decide((UiPrefs?, bool) Function(UiPrefs prefs) op) {
+  /// [_mutate] with [op]'s verdict on the settled snapshot: accepted when it
+  /// returns a snapshot, refused when it returns null. An operation issued
+  /// before the file is read also runs on the interim state, but only its
+  /// replay on the loaded file decides. Ordered with every other operation,
+  /// so a later stop still wins over an earlier start.
+  Future<bool> _decide(UiPrefsOp op) {
     final verdict = Completer<bool>();
     if (!_loaded) _pendingVerdicts.add(verdict);
     _mutate((p) {
-      final (next, accepted) = op(p);
-      if (_loaded && !verdict.isCompleted) verdict.complete(accepted);
+      final next = op(p);
+      if (_loaded && !verdict.isCompleted) verdict.complete(next != null);
       return next;
     });
     return verdict.future;
@@ -543,12 +544,13 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
   /// [UiPrefs.maxAutoHosts] others already kept, nothing changes. Resolves
   /// with whether the settled snapshot holds the record.
   Future<bool> setAutoHost(AutoHostPrefs host) => _decide((p) {
-    final others = [
-      for (final saved in p.autoHostCodex)
-        if (saved.name != host.name) saved,
-    ];
-    if (others.length >= UiPrefs.maxAutoHosts) return (null, false);
-    return (p.copyWith(autoHostCodex: [...others, host]), true);
+    final hosts = _upsert(
+      p.autoHostCodex,
+      host,
+      (h) => h.name,
+      UiPrefs.maxAutoHosts,
+    );
+    return hosts == null ? null : p.copyWith(autoHostCodex: hosts);
   });
 
   /// Set the theme: `'light'` / `'dark'`, or null to follow the system.
@@ -579,45 +581,39 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
   /// Forget the Codex auto-host record of [name] (the user stopped that host
   /// on purpose). Other hosts keep restoring.
   void clearAutoHost(String name) => _mutate((p) {
-    final hosts = [
-      for (final saved in p.autoHostCodex)
-        if (saved.name != name) saved,
-    ];
-    if (hosts.length == p.autoHostCodex.length) return null;
-    return p.copyWith(autoHostCodex: hosts);
+    final hosts = _without(p.autoHostCodex, name, (h) => h.name);
+    return hosts == null ? null : p.copyWith(autoHostCodex: hosts);
   });
 
   /// Save (or replace, by profile id) a custom ACP agent. A full list
   /// ([UiPrefs.maxSavedAgents] others) is left as is; resolves with whether
   /// the settled snapshot holds the agent.
   Future<bool> saveAcpAgent(AcpAgentSpec agent) => _decide((p) {
-    final others = [
-      for (final saved in p.acpAgents)
-        if (saved.profileId != agent.profileId) saved,
-    ];
-    if (others.length >= UiPrefs.maxSavedAgents) return (null, false);
-    return (p.copyWith(acpAgents: [...others, agent]), true);
+    final agents = _upsert(
+      p.acpAgents,
+      agent,
+      (a) => a.profileId,
+      UiPrefs.maxSavedAgents,
+    );
+    return agents == null ? null : p.copyWith(acpAgents: agents);
   });
 
   /// Forget a saved custom ACP agent.
   void removeAcpAgent(String profileId) => _mutate((p) {
-    final agents = [
-      for (final saved in p.acpAgents)
-        if (saved.profileId != profileId) saved,
-    ];
-    if (agents.length == p.acpAgents.length) return null;
-    return p.copyWith(acpAgents: agents);
+    final agents = _without(p.acpAgents, profileId, (a) => a.profileId);
+    return agents == null ? null : p.copyWith(acpAgents: agents);
   });
 
   /// Remember an ACP agent the user just hosted under `host.name`; same
   /// bound and verdict as [setAutoHost].
   Future<bool> setAutoHostAcp(AutoHostAcpPrefs host) => _decide((p) {
-    final others = [
-      for (final saved in p.autoHostAcp)
-        if (saved.name != host.name) saved,
-    ];
-    if (others.length >= UiPrefs.maxAutoHosts) return (null, false);
-    return (p.copyWith(autoHostAcp: [...others, host]), true);
+    final hosts = _upsert(
+      p.autoHostAcp,
+      host,
+      (h) => h.name,
+      UiPrefs.maxAutoHosts,
+    );
+    return hosts == null ? null : p.copyWith(autoHostAcp: hosts);
   });
 
   /// Remember the native OpenCode host the user just started on OpenCode's
@@ -638,12 +634,8 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
 
   /// Forget the ACP auto-host record of [name] (stopped on purpose).
   void clearAutoHostAcp(String name) => _mutate((p) {
-    final hosts = [
-      for (final saved in p.autoHostAcp)
-        if (saved.name != name) saved,
-    ];
-    if (hosts.length == p.autoHostAcp.length) return null;
-    return p.copyWith(autoHostAcp: hosts);
+    final hosts = _without(p.autoHostAcp, name, (h) => h.name);
+    return hosts == null ? null : p.copyWith(autoHostAcp: hosts);
   });
 }
 

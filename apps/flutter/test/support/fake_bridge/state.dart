@@ -55,16 +55,10 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Records the last provider config written via [codexSetupProvider].
   ({String baseUrl, String apiKey, String? model})? lastProvider;
 
-  /// Seedable auth status returned by [codexAuthStatus].
-  CodexAuthStatus codexAuth = const CodexAuthStatus(authenticated: false);
-
   // --- Hosted account ---
 
-  /// Seedable signed-in user returned by [accountCurrentUser] (null = signed out).
+  /// Seedable signed-in user signed in by the account login calls (null = signed out).
   AccountUser? accountUser;
-
-  /// Seedable services returned by [accountServices].
-  List<AccountService> accountServiceList = const [];
 
   /// Status [accountLoginPoll] returns (default `authorized`).
   String accountPollStatus = 'authorized';
@@ -149,9 +143,6 @@ abstract class _FakeBridgeState implements BridgeApi {
 
   /// How many times [appServeStatus] was read.
   int serveStatusCalls = 0;
-
-  /// Seedable value returned by [embeddedCodexVersion] (default: a fake commit).
-  String embeddedCodexCommit = 'deadbeef1234';
 
   /// When set, [appServeStop] waits for it (then clears it).
   Completer<void>? serveStopGate;
@@ -793,7 +784,7 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Explicit continuation fixtures for independently paged turns.
   final Map<String, List<TurnItemsPage>> turnPages = {};
 
-  /// Turn ids passed to [appThreadTurnItems], in call order.
+  /// Turn ids passed to [appThreadTurnPage], in call order.
   final List<String> turnItemCalls = [];
 
   /// Controlled responses for hover/select races.
@@ -941,22 +932,21 @@ abstract class _FakeBridgeState implements BridgeApi {
         .add(update);
   }
 
-  /// Service key of the last [metaUploadFile] call.
+  /// Service key of the last [metaUploadFileScoped] call.
   String? lastUploadKey;
 
-  /// Records the last [metaUploadFile] call for assertions.
+  /// Records the last [metaUploadFileScoped] call for assertions.
   String? lastUploadName;
 
-  /// Bytes passed to the last [metaUploadFile].
+  /// Bytes passed to the last [metaUploadFileScoped].
   Uint8List? lastUploadBytes;
 
-  /// When set, [metaUploadFile] throws it instead of returning a path.
+  /// When set, [metaUploadFileScoped] throws it instead of returning a path.
   Object? uploadError;
 
   String uploadContext = 'fixture-context';
 
-  /// Seedable per-service project config returned by [metaProjectConfig];
-  /// [metaSetProjectConfig] writes here.
+  /// Seedable per-service project config returned by [metaProjectConfig].
   final Map<String, ProjectConfig> projectConfigs = {};
 
   /// Seedable directory tree for [metaListDir], keyed by absolute host path →

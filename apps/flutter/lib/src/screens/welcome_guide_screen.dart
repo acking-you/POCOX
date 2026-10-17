@@ -1,13 +1,12 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/service_key.dart';
@@ -43,12 +42,6 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
 
   Timer? _detectTimer;
 
-  bool get _isDesktop =>
-      !kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.windows ||
-          defaultTargetPlatform == TargetPlatform.macOS ||
-          defaultTargetPlatform == TargetPlatform.linux);
-
   @override
   void initState() {
     super.initState();
@@ -57,7 +50,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
     Future.microtask(() {
       if (mounted) ref.read(uiPrefsProvider.notifier).markGuideSeen();
     });
-    if (!_isDesktop) {
+    if (!isDesktop) {
       _detectTimer = Timer.periodic(_detectInterval, (_) {
         if (mounted) ref.invalidate(servicesProvider);
       });
@@ -100,7 +93,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                _isDesktop
+                isDesktop
                     ? l10n.welcomeSubtitleDesktop
                     : l10n.welcomeSubtitleMobile,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -109,8 +102,8 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
-              if (_isDesktop) ..._desktopSteps(l10n, scheme),
-              if (!_isDesktop) ..._mobileSteps(l10n, scheme),
+              if (isDesktop) ..._desktopSteps(l10n, scheme),
+              if (!isDesktop) ..._mobileSteps(l10n, scheme),
               const SizedBox(height: 24),
               FilledButton(
                 key: const Key('welcome-enter-btn'),
@@ -226,7 +219,6 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
         number: 1,
         done: false,
         title: l10n.welcomeMobileStep1,
-        description: null,
         child: Align(
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
@@ -246,7 +238,6 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
         number: 2,
         done: false,
         title: l10n.welcomeMobileStep2,
-        description: null,
       ),
       const SizedBox(height: 12),
       _stepCard(
@@ -254,7 +245,6 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
         number: 3,
         done: found.isNotEmpty,
         title: l10n.welcomeMobileStep3,
-        description: null,
         child: found.isEmpty
             ? Row(
                 children: [
@@ -295,7 +285,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
     required int number,
     required bool done,
     required String title,
-    required String? description,
+    String? description,
     Widget? child,
   }) {
     return Container(

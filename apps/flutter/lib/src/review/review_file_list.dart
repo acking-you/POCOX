@@ -4,6 +4,7 @@ import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/search_field.dart';
+import 'package:pocket_codex/src/widgets/change_counts.dart';
 
 /// One file in the review's list.
 class ReviewFileEntry {
@@ -211,18 +212,7 @@ class _ReviewFileListState extends State<ReviewFileList> {
                   ),
                   const SizedBox(width: 8),
                 ],
-                Text(
-                  '+${file.added}',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    color: additionColor(scheme),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '−${file.removed}',
-                  style: TextStyle(fontSize: 11.5, color: scheme.error),
-                ),
+                ChangeCounts(added: file.added, removed: file.removed),
               ],
             ),
           ),

@@ -1160,6 +1160,13 @@ this file's roadmap so the source of truth stays in sync.
     `responsive_layout_test.dart` (320 px at 2.0 text, 393 px); checked on the
     iOS 27 simulator with a Codex host (Flutter suite 1642 passed, 6 skipped).
 
+35. **Session takeover for Claude and OpenCode (planned, not started).** An
+    explicit, confirmed action to continue a Claude ACP or native OpenCode
+    session on this host while another client holds it idle, once the host
+    can show that no turn runs there and nothing already written can be
+    lost. Until it ships, item 29's rules stand: write only from a fresh
+    no-owner admission, no override.
+
 ### UI and history maintenance (2026-09-13)
 
 - Keep shared colors, typography, and control shapes in `theme.dart` /

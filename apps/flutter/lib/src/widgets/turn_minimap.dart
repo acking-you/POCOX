@@ -120,7 +120,6 @@ class TurnMinimap extends StatefulWidget {
     required this.visibleRange,
     required this.gutterWidth,
     required this.onSelect,
-    this.onPreview,
     this.onOpenOutline,
   });
 
@@ -138,10 +137,6 @@ class TurnMinimap extends StatefulWidget {
 
   /// Jump to this turn.
   final ValueChanged<TurnMinimapItem> onSelect;
-
-  /// Preview notification only. Use the supplied summary; never fetch history
-  /// on hover. Only explicit selection should start a page request.
-  final ValueChanged<TurnMinimapItem>? onPreview;
 
   /// Opens the exact, searchable index without loading transcript pages.
   final VoidCallback? onOpenOutline;
@@ -448,7 +443,6 @@ class _TurnMinimapState extends State<TurnMinimap> {
     final next = _indexAt(localY, railHeight);
     if (next == _active) return;
     setState(() => _active = next);
-    if (next != null) widget.onPreview?.call(widget.items[next]);
   }
 
   int _indexOf(TurnMinimapItem item) => widget.items.indexWhere((entry) {

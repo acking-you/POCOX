@@ -287,16 +287,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get fileUploadFailed => 'Couldn\'t upload the file to the host';
-
-  @override
   String get fileOnlyMessage => '[File]';
-
-  @override
-  String get interrupt => 'Interrupt';
-
-  @override
-  String get thinking => 'Thinking…';
 
   @override
   String get emptyConversation => 'Send a message to start the conversation';
@@ -320,9 +311,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get sandboxHelperUnavailable =>
       'This built-in (自带) session can\'t start its command sandbox, so the agent can\'t run commands or read files here. Switch to \"Full access\" mode to run without a sandbox, or connect to an external/remote codex host.';
-
-  @override
-  String get disconnect => 'Disconnect';
 
   @override
   String get connectionLost => 'Connection lost';
@@ -350,14 +338,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get workOutsideProject => 'Work outside a project';
-
-  @override
-  String get switchProjectTip => 'Switch project';
-
-  @override
-  String newSessionTitleIn(String project) {
-    return 'What should we build in $project?';
-  }
 
   @override
   String get remotePathLabel => 'Remote folder path (on the host)';
@@ -751,9 +731,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get envLocal => 'Local';
 
   @override
-  String get envProject => 'Project';
-
-  @override
   String get envSource => 'Source';
 
   @override
@@ -996,41 +973,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appearanceDark => 'Dark';
 
   @override
-  String get newSessionTitle => 'What should we build?';
-
-  @override
-  String get newSessionSubtitle =>
-      'Pick a starting point, or just type your task below.';
-
-  @override
-  String get suggestExploreTitle => 'Explore the project';
-
-  @override
-  String get suggestExplorePrompt =>
-      'Give me an overview of this project — its structure, main modules, and tech stack.';
-
-  @override
-  String get suggestTestsTitle => 'Run & fix tests';
-
-  @override
-  String get suggestTestsPrompt =>
-      'Run the test suite and fix any failing tests.';
-
-  @override
-  String get suggestDiffTitle => 'Review changes';
-
-  @override
-  String get suggestDiffPrompt =>
-      'Summarize the current working-tree changes against the main branch.';
-
-  @override
-  String get suggestPlanTitle => 'Plan a feature';
-
-  @override
-  String get suggestPlanPrompt =>
-      'Help me plan out a new feature before writing any code.';
-
-  @override
   String get searchConversations => 'Search conversations';
 
   @override
@@ -1257,12 +1199,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hostRuntimeInfo => 'Runtime';
 
   @override
-  String get hostRuntimeMode => 'codex';
-
-  @override
-  String get hostCodexVersion => 'Version';
-
-  @override
   String get hostCodexPath => 'Path';
 
   @override
@@ -1277,11 +1213,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get localHostHint =>
       'Runs codex on this machine and publishes it on your relay, so your other devices can drive it.';
-
-  @override
-  String localHostListening(String addr) {
-    return 'Listening on $addr';
-  }
 
   @override
   String codexFoundAt(String path) {
@@ -1481,10 +1412,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open PocketCodex on your computer and start hosting (app-server); this screen will enter the chat automatically.';
 
   @override
-  String get homeNoServiceSelfHostHint =>
-      'Run `pocket-codex serve` on a machine with codex to publish an app-server on your relay, or sign in with an account to host from this app.';
-
-  @override
   String get homeAutoRetryNote => 'Keeps checking for hosts automatically.';
 
   @override
@@ -1493,11 +1420,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hostSwitchTitle => 'Switch host';
-
-  @override
-  String hostRestoreFull(int count) {
-    return 'Hosting started, but it will not be restored at launch: $count hosts are already remembered. To have it restored, stop one of those hosts, then start this one again.';
-  }
 
   @override
   String acpSavedAgentsFull(int count) {
@@ -1615,9 +1537,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get folderUp => 'Up one level';
 
   @override
-  String get folderPickerEmpty => 'No sub-folders here';
-
-  @override
   String get folderPickerNoRoots =>
       'No project folders are configured on this host yet. Add them on the computer under hosting settings.';
 
@@ -1666,20 +1585,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get projectFolders => 'Project folders';
 
   @override
-  String get projectFoldersHint =>
-      'Folders your phone can browse to start a session in. Star one to make it the default for new conversations.';
-
-  @override
-  String get noProjectFolders => 'No project folders yet.';
-
-  @override
   String get addProjectFolder => 'Add folder';
-
-  @override
-  String get defaultProjectFolder => 'Default folder';
-
-  @override
-  String get setAsDefault => 'Set as default';
 
   @override
   String get removeProjectFolder => 'Remove';
@@ -2294,9 +2200,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceUserSpeaking => 'You\'re speaking';
 
   @override
-  String get voiceInterrupted => 'Interrupted';
-
-  @override
   String get voiceEndedByUser => 'Voice call ended';
 
   @override
@@ -2306,9 +2209,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get voiceFailedShort => 'Voice call dropped';
-
-  @override
-  String get voiceOpenCall => 'Go to the voice conversation';
 
   @override
   String get voiceHangUp => 'Hang up';
@@ -2377,9 +2277,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'The live voice call is using the microphone';
 
   @override
-  String get dictationShortcut => 'Dictate (Ctrl+Shift+Space)';
-
-  @override
   String get providerAcpAgent => 'ACP agent';
 
   @override
@@ -2388,9 +2285,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get acpHostHint =>
       'Runs an ACP-compatible agent on this device from a program and its arguments, and makes it available to your devices. Stopping hosting stops the agent.';
-
-  @override
-  String get acpAgentLabel => 'Agent';
 
   @override
   String get acpAgentCustom => 'Custom agent';
@@ -2502,16 +2396,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get claudeEnvRecheck => 'Check again';
 
   @override
-  String claudePreparing(int seconds) {
-    return 'Preparing the Claude ACP adapter… $seconds s';
-  }
-
-  @override
-  String claudePrepareVerifying(int seconds) {
-    return 'Checking the downloaded adapter… $seconds s';
-  }
-
-  @override
   String get claudePrepareCancel => 'Stop preparing';
 
   @override
@@ -2586,9 +2470,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get acpStopNote =>
       'Stopping hosting stops this agent and the processes it started.';
-
-  @override
-  String get acpFeatures => 'Agent features';
 
   @override
   String get acpFeatureReopen => 'Reopen earlier sessions';
@@ -3851,11 +3732,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get managedRuntimeDetails => 'Details';
-
-  @override
-  String managedRuntimeDetailsTitle(String name) {
-    return '$name details';
-  }
 
   @override
   String get managedRuntimePath => 'Executable';

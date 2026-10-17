@@ -211,17 +211,6 @@ mixin _RustHostSessions implements BridgeApi {
   }
 
   @override
-  Future<String> metaUploadFile(
-    String serviceKey,
-    String fileName,
-    Uint8List bytes,
-  ) => frb.metaUploadFile(
-    serviceKey: serviceKey,
-    fileName: fileName,
-    bytes: bytes,
-  );
-
-  @override
   String metaUploadContext() => frb.metaUploadContext();
 
   @override
@@ -272,19 +261,6 @@ mixin _RustHostSessions implements BridgeApi {
   @override
   Future<ProjectConfig> metaProjectConfig(String serviceKey) async =>
       _projectConfig(await frb.metaProjectConfig(serviceKey: serviceKey));
-
-  @override
-  Future<ProjectConfig> metaSetProjectConfig(
-    String serviceKey,
-    List<String> projectRoots,
-    String? defaultProject,
-  ) async => _projectConfig(
-    await frb.metaSetProjectConfig(
-      serviceKey: serviceKey,
-      projectRoots: projectRoots,
-      defaultProject: defaultProject,
-    ),
-  );
 
   @override
   Future<List<HostDirEntry>> metaListDir(String serviceKey, String path) async {

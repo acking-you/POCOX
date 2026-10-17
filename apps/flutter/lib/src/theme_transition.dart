@@ -32,47 +32,36 @@ abstract final class ThemeTransition {
   /// The change still happens, without the reveal, when there is nothing to
   /// capture or motion is reduced.
   static void run(BuildContext context, VoidCallback apply) {
-    try {
-      final boundary = _capturable(context);
-      if (boundary == null) return;
-      final ratio = MediaQuery.devicePixelRatioOf(context);
-      _show(
-        boundary.toImageSync(pixelRatio: ratio),
-        boundary.globalToLocal(_origin(context, boundary)),
-      );
-    } catch (_) {
-      // Image capture is optional; it must never prevent the preference change.
-    } finally {
-      apply();
-    }
+    _freeze(context, reveal: true);
+    apply();
   }
 
   /// Freeze the frame before the system's own brightness change repaints it,
   /// so that change cross-fades instead of snapping.
-  static void systemChange(BuildContext context) {
+  static void systemChange(BuildContext context) =>
+      _freeze(context, reveal: false);
+
+  /// Show the current frame as the leaving snapshot: revealed from the
+  /// pressed control, or cross-faded without [reveal].
+  static void _freeze(BuildContext context, {required bool reveal}) {
     try {
-      final boundary = _capturable(context);
-      if (boundary == null) return;
-      final ratio = MediaQuery.devicePixelRatioOf(context);
-      _show(boundary.toImageSync(pixelRatio: ratio), null);
+      final boundary = _boundary.currentContext?.findRenderObject();
+      final animate = Motion.of(context, Motion.slow) > Duration.zero;
+      if (!animate || boundary is! RenderRepaintBoundary) return;
+      if (!boundary.attached || boundary.size.isEmpty) return;
+      // Flutter's debugNeedsPaint getter throws when assertions are disabled.
+      if (kDebugMode && boundary.debugNeedsPaint) return;
+      final image = boundary.toImageSync(
+        pixelRatio: MediaQuery.devicePixelRatioOf(context),
+      );
+      final origin = reveal
+          ? boundary.globalToLocal(_origin(context, boundary))
+          : null;
+      _snapshot.value?.image.dispose();
+      _snapshot.value = _Snapshot(image, origin);
     } catch (_) {
-      // Optional, as in [run].
+      // Image capture is optional; it must never prevent the theme change.
     }
-  }
-
-  static RenderRepaintBoundary? _capturable(BuildContext context) {
-    final boundary = _boundary.currentContext?.findRenderObject();
-    final animate = Motion.of(context, Motion.slow) > Duration.zero;
-    if (!animate || boundary is! RenderRepaintBoundary) return null;
-    if (!boundary.attached || boundary.size.isEmpty) return null;
-    // Flutter's debugNeedsPaint getter throws when assertions are disabled.
-    if (kDebugMode && boundary.debugNeedsPaint) return null;
-    return boundary;
-  }
-
-  static void _show(ui.Image image, Offset? origin) {
-    _snapshot.value?.image.dispose();
-    _snapshot.value = _Snapshot(image, origin);
   }
 
   /// The pressed control: the last release if it was just now, else the
@@ -202,17 +191,15 @@ class _SnapshotPainter extends CustomPainter {
     final rect = Offset.zero & size;
     final t = progress.value;
     final origin = snapshot.origin;
-    if (origin == null) {
-      paintImage(
-        canvas: canvas,
-        rect: rect,
-        image: snapshot.image,
-        fit: BoxFit.fill,
-        filterQuality: FilterQuality.none,
-        opacity: 1 - t,
-      );
-      return;
-    }
+    void frame({double opacity = 1}) => paintImage(
+      canvas: canvas,
+      rect: rect,
+      image: snapshot.image,
+      fit: BoxFit.fill,
+      filterQuality: FilterQuality.none,
+      opacity: opacity,
+    );
+    if (origin == null) return frame(opacity: 1 - t);
     // Far enough to clear the farthest corner, edge included.
     final reach = [
       rect.topLeft,
@@ -222,13 +209,7 @@ class _SnapshotPainter extends CustomPainter {
     ].map((c) => (c - origin).distance).reduce(math.max);
     final radius = (reach + _feather) * t;
     canvas.saveLayer(rect, Paint());
-    paintImage(
-      canvas: canvas,
-      rect: rect,
-      image: snapshot.image,
-      fit: BoxFit.fill,
-      filterQuality: FilterQuality.none,
-    );
+    frame();
     final outer = radius + _feather;
     canvas.drawRect(
       rect,

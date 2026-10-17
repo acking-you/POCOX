@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
@@ -37,13 +36,8 @@ class ClaudeEnvironmentDraft extends ChangeNotifier {
 
   void setOverride(String name, bool value) {
     if (value) {
-      const credentials = {
-        'ANTHROPIC_AUTH_TOKEN',
-        'ANTHROPIC_API_KEY',
-        'CLAUDE_CODE_OAUTH_TOKEN',
-      };
-      if (credentials.contains(name)) {
-        _overrides.removeAll(credentials.difference({name}));
+      if (claudeCredentials.contains(name)) {
+        _overrides.removeAll(claudeCredentials.where((c) => c != name));
       }
       _overrides.add(name);
     } else {
@@ -64,7 +58,6 @@ class ClaudeEnvironmentDraft extends ChangeNotifier {
           : field(name).text.trim(),
   };
 
-  bool get dirty => !mapEquals(input, _saved);
   bool get valid => input.values.every((v) => v == null || v.isNotEmpty);
 
   @override

@@ -2,12 +2,8 @@ part of '../app_session_screen.dart';
 
 extension _SessionTitle on _AppSessionState {
   String _projectName() {
-    final c = _cwd?.trim();
-    if (c == null || c.isEmpty) {
-      return AppLocalizations.of(context).defaultFolder;
-    }
-    final parts = c.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-    return parts.isEmpty ? c : parts.last;
+    final leaf = _leafOf(_cwd ?? '');
+    return leaf.isEmpty ? AppLocalizations.of(context).defaultFolder : leaf;
   }
 
   /// Title-bar text: the current conversation, ChatGPT-desktop style. Falls

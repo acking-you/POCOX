@@ -535,13 +535,12 @@ extension _SessionComposer on _AppSessionState {
     final scheme = Theme.of(context).colorScheme;
     final muted = TextStyle(fontSize: 12, color: scheme.onSurfaceVariant);
     Widget chip(
-      IconData icon,
       String label, {
+      IconData? icon,
       VoidCallback? onTap,
       Key? key,
       String? tip,
       bool busy = false,
-      bool showIcon = false,
     }) {
       final row = Row(
         mainAxisSize: MainAxisSize.min,
@@ -555,9 +554,9 @@ extension _SessionComposer on _AppSessionState {
                 color: scheme.onSurfaceVariant,
               ),
             )
-          else if (showIcon)
+          else if (icon != null)
             Icon(icon, size: 13, color: scheme.onSurfaceVariant),
-          if (busy || showIcon) const SizedBox(width: 5),
+          if (busy || icon != null) const SizedBox(width: 5),
           // Flexible, not a bare ConstrainedBox: when the review split narrows
           // the chat, the label must be able to shrink below its natural width
           // and ellipsize rather than overflow the row.
@@ -574,30 +573,24 @@ extension _SessionComposer on _AppSessionState {
           ),
         ],
       );
-      if (onTap == null) {
-        // Static chips still explain themselves on hover — a phone user reads
-        // the same fact in the status bar, so this is the desktop affordance.
-        return Tooltip(
-          key: key,
-          message: tip ?? label,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: row,
-          ),
-        );
-      }
+      final padded = Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+        child: row,
+      );
+      // Static chips still explain themselves on hover — a phone user reads
+      // the same fact in the status bar, so this is the desktop affordance.
       return Tooltip(
+        key: onTap == null ? key : null,
         message: tip ?? label,
-        child: InkWell(
-          mouseCursor: clickable,
-          key: key,
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(6),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-            child: row,
-          ),
-        ),
+        child: onTap == null
+            ? padded
+            : InkWell(
+                mouseCursor: clickable,
+                key: key,
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(6),
+                child: padded,
+              ),
       );
     }
 
@@ -647,25 +640,18 @@ extension _SessionComposer on _AppSessionState {
           dot,
         ],
         Flexible(
-          child: chip(
-            AppIcons.computer,
-            _hostLabel(l10n),
-            key: const Key('composer-host-chip'),
-          ),
+          child: chip(_hostLabel(l10n), key: const Key('composer-host-chip')),
         ),
         if (caps.hostAccess && project.isNotEmpty) ...[
           dot,
-          Flexible(
-            child: chip(AppIcons.folder_outlined, _projectName(), tip: project),
-          ),
+          Flexible(child: chip(_projectName(), tip: project)),
         ],
         if (_branch != null) ...[
           dot,
           Flexible(
             child: chip(
-              AppIcons.account_tree_outlined,
-              showIcon: true,
               _branch!,
+              icon: AppIcons.account_tree_outlined,
               key: const Key('composer-branch-chip'),
               tip: _diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff,
               busy: _diffLoading,

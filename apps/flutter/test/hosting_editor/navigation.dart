@@ -35,53 +35,6 @@ void _navigationTests() {
 }
 
 void _entryTests() {
-  testWidgets('the Manage page opens the editor, and its back asks first', (
-    t,
-  ) async {
-    t.view.physicalSize = const Size(1440, 1000);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    // Hosting is desktop-only.
-    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    try {
-      final api = FakeBridgeApi();
-      await t.pumpWidget(
-        ProviderScope(
-          overrides: [bridgeApiProvider.overrideWithValue(api)],
-          child: const MaterialApp(
-            locale: Locale('en'),
-            localizationsDelegates: AppLocalizations.localizationsDelegates,
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: ServicesScreen(),
-          ),
-        ),
-      );
-      await t.pumpAndSettle();
-      await _tapKey(t, 'host-this-device-btn');
-      expect(find.byType(HostingEditor), findsOneWidget);
-
-      await _tapKey(t, 'host-source-custom');
-      await _enter(t, 'host-base-url', 'https://models.example/v1');
-      await t.binding.handlePopRoute();
-      await t.pumpAndSettle();
-      // Keyboard: Escape dismisses the question, which means staying.
-      expect(find.byKey(const Key('host-leave-dialog')), findsOneWidget);
-      await t.sendKeyEvent(LogicalKeyboardKey.escape);
-      await t.pumpAndSettle();
-      expect(find.byType(HostingEditor), findsOneWidget);
-      expect(find.text('https://models.example/v1'), findsOneWidget);
-
-      await t.binding.handlePopRoute();
-      await t.pumpAndSettle();
-      await _tapKey(t, 'host-leave-discard');
-      expect(find.byType(HostingEditor), findsNothing);
-      expect(find.byType(ServicesScreen), findsOneWidget);
-      await t.pumpWidget(const SizedBox());
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
   testWidgets('the page menu, origin and parent of the real router ask '
       'before leaving edits, then navigate', (t) async {
     t.view.physicalSize = const Size(1440, 1000);

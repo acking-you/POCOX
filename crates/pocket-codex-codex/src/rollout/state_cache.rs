@@ -9,7 +9,9 @@ use std::{
     time::{Instant, SystemTime},
 };
 
-use super::{classify_lines, read_tail, turn_state_of_line, Result, TurnState, MAX_TAIL_BYTES};
+use pocket_codex_core::Result;
+
+use super::turn_state::{classify_lines, read_tail, turn_state_of_line, TurnState, MAX_TAIL_BYTES};
 
 #[derive(Clone, PartialEq, Eq)]
 struct Stamp {

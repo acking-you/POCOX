@@ -313,7 +313,8 @@ class HostStartResult {
 /// A started ChatGPT login on the external Codex. [mode] is `browser` (open
 /// [authUrl] and poll) or `device` (open [verificationUrl], show [userCode], and
 /// poll) — codex falls back to device code when it can't bind its local OAuth
-/// callback port. Poll [BridgeApi.codexAuthStatus] until authenticated either way.
+/// callback port. Poll [BridgeApi.codexLocalAuthStatus] until authenticated
+/// either way.
 class CodexLoginStart {
   /// Creates a started codex login.
   const CodexLoginStart({
@@ -327,7 +328,7 @@ class CodexLoginStart {
   /// `browser` or `device`.
   final String mode;
 
-  /// Opaque id to pass back to [BridgeApi.codexLoginCancel].
+  /// Opaque id to pass back to [BridgeApi.codexLocalLoginCancel].
   final String loginId;
 
   /// Browser flow: URL to open in a browser. Null for the device flow.

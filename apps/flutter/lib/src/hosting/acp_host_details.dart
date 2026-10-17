@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
 import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
@@ -58,20 +59,6 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
     _ => l10n.acpPhaseStarting,
   };
 
-  Widget _feature(String label, String value, TextStyle? style) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: Text(label, style: style)),
-        const SizedBox(width: 8),
-        Flexible(
-          child: Text(value, style: style, textAlign: TextAlign.end),
-        ),
-      ],
-    ),
-  );
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -85,11 +72,6 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
         .read(bridgeApiProvider)
         .appCapabilities(host.appServiceKey);
     final negotiated = ready && caps.negotiated;
-    final phaseColor = switch (phase) {
-      'ready' => successColor(scheme),
-      'failed' => scheme.error,
-      _ => scheme.onSurfaceVariant,
-    };
     String supported(bool value) =>
         value ? l10n.acpFeatureSupported : l10n.acpFeatureNotSupported;
     final reopen = switch (caps.sessionReopen) {
@@ -102,31 +84,19 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            ProviderBadge(
-              provider: 'acp',
-              name: host.providerName,
-              profileId: host.profileId,
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(AppIcons.circle, size: 10, color: phaseColor),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: Text(
-                    _phaseLabel(l10n, phase),
-                    key: const Key('acp-phase'),
-                    style: small?.copyWith(color: phaseColor),
-                  ),
-                ),
-              ],
-            ),
-          ],
+        HostStateLine(
+          badge: ProviderBadge(
+            provider: 'acp',
+            name: host.providerName,
+            profileId: host.profileId,
+          ),
+          label: _phaseLabel(l10n, phase),
+          labelKey: const Key('acp-phase'),
+          color: switch (phase) {
+            'ready' => successColor(scheme),
+            'failed' => scheme.error,
+            _ => scheme.onSurfaceVariant,
+          },
         ),
         if (host.agentError != null && !ready) ...[
           const SizedBox(height: 6),
@@ -164,13 +134,12 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
             style: muted,
           )
         else ...[
-          _feature(l10n.acpFeatureReopen, reopen, small),
-          _feature(
+          DetailRow(l10n.acpFeatureReopen, reopen),
+          DetailRow(
             l10n.acpFeatureList,
             supported(caps.sessionList == 'agent'),
-            small,
           ),
-          _feature(l10n.acpFeatureImages, supported(caps.imageInput), small),
+          DetailRow(l10n.acpFeatureImages, supported(caps.imageInput)),
         ],
         const SizedBox(height: 12),
         DefaultProjectTile(serviceKey: host.appServiceKey, local: true),

@@ -23,7 +23,7 @@ void main() {
     expect(find.text('Title'), findsOneWidget);
   });
 
-  testWidgets('desktop: draggable title bar that keeps its content', (
+  testWidgets('macOS: draggable title bar that keeps its content', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
@@ -42,6 +42,9 @@ void main() {
       expect(find.text('Title'), findsOneWidget);
       expect(find.byIcon(AppIcons.menu), findsOneWidget);
       expect(find.byIcon(AppIcons.settings), findsOneWidget);
+      // macOS relies on native traffic lights; the bar draws no buttons.
+      expect(find.byIcon(AppIcons.close), findsNothing);
+      expect(find.byIcon(AppIcons.remove), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
@@ -69,22 +72,6 @@ void main() {
       expect(find.byIcon(AppIcons.close), findsOneWidget); // close
       expect(find.byIcon(AppIcons.settings), findsOneWidget);
       expect(find.byType(WindowDragArea), findsOneWidget);
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
-
-  testWidgets('macOS: no custom caption buttons (native traffic lights)', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-    try {
-      await tester.pumpWidget(
-        _wrap(const WindowTitleBar(title: Text('Title'))),
-      );
-      // macOS relies on native window buttons — the bar draws none of its own.
-      expect(find.byIcon(AppIcons.close), findsNothing);
-      expect(find.byIcon(AppIcons.remove), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

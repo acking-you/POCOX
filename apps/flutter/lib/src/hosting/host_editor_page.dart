@@ -246,37 +246,27 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
           color: scheme.error,
         )
       else if (hostReplaced(live))
-        _noteWithAction(
+        EditorNote(
           l10n.hostReplaced,
-          const Key('host-replaced'),
-          l10n.hostConfigReload,
-          busy ? null : loadConfig,
-          scheme.error,
+          key: const Key('host-replaced'),
+          color: scheme.error,
+          action: TextButton(
+            onPressed: busy ? null : loadConfig,
+            child: Text(l10n.hostConfigReload),
+          ),
         ),
       if (newerConfig case final newer?)
-        _noteWithAction(
+        EditorNote(
           l10n.hostConfigNewer,
-          const Key('host-config-newer'),
-          l10n.hostConfigReload,
-          busy ? null : () => adopt(newer),
-          cautionColor(scheme),
+          key: const Key('host-config-newer'),
+          color: cautionColor(scheme),
+          action: TextButton(
+            onPressed: busy ? null : () => adopt(newer),
+            child: Text(l10n.hostConfigReload),
+          ),
         ),
     ];
   }
-
-  Widget _noteWithAction(
-    String text,
-    Key key,
-    String action,
-    VoidCallback? onPressed,
-    Color color,
-  ) => Row(
-    key: key,
-    children: [
-      Expanded(child: EditorNote(text, color: color)),
-      TextButton(onPressed: onPressed, child: Text(action)),
-    ],
-  );
 
   Widget _loadGate(AppLocalizations l10n) {
     if (load == EditorLoad.loading) {
@@ -521,89 +511,69 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
   Widget _actions(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final host = existing;
-    return Material(
-      color: scheme.surfaceContainerLow,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          // Side by side while both fit; otherwise (a narrow phone, large
-          // text, a long translation) stacked at the end, each label free to
-          // wrap, rather than overflowing the bar.
-          child: OverflowBar(
-            alignment: MainAxisAlignment.end,
-            spacing: 8,
-            overflowAlignment: OverflowBarAlignment.end,
-            overflowSpacing: 8,
-            children: [
-              // While Claude's adapter is being prepared by this page, Cancel
-              // stops that preparation (only the npm process it started); one
-              // joined from another caller is not this page's to stop, so it
-              // offers Stop waiting, which ends only this page's operation.
-              // Close stays beside either, unavailable until it is over.
-              if ((claudeSetup?.running ?? false) && ownsClaudePrepare)
-                TextButton(
-                  key: const Key('claude-prepare-cancel'),
-                  onPressed: cancelClaudePrepare,
-                  child: Text(l10n.claudePrepareCancel),
-                )
-              else if (claudeSetup?.running ?? false)
-                TextButton(
-                  key: const Key('claude-prepare-stop-waiting'),
-                  onPressed: stopWaitingForClaude,
-                  child: Text(l10n.claudePrepareStopWaiting),
-                ),
-              TextButton(
-                key: const Key('host-editor-close'),
-                // Through the page's PopScope, so unsaved edits are asked
-                // about first.
-                onPressed: busy ? null : () => Navigator.of(context).maybePop(),
-                child: Text(
-                  host == null
-                      ? l10n.cancel
-                      : MaterialLocalizations.of(context).closeButtonLabel,
-                ),
-              ),
-              if (host != null)
-                FilledButton(
-                  key: const Key('stop-hosting-btn'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: scheme.error,
-                    foregroundColor: scheme.onError,
-                    // Its working colours while it stops (see [_working]).
-                    disabledBackgroundColor: running == HostAction.stop
-                        ? scheme.error
-                        : null,
-                    disabledForegroundColor: running == HostAction.stop
-                        ? scheme.onError
-                        : null,
-                  ),
-                  onPressed: busy || hostGone(liveHost) ? null : stop,
-                  child: BusyLabel(
-                    busy: running == HostAction.stop,
-                    label: l10n.stopHosting,
-                    busyLabel: l10n.hostStopping,
-                  ),
-                )
-              else
-                FilledButton(
-                  key: const Key('start-hosting-btn'),
-                  style: _working(
-                    HostAction.start,
-                    scheme.primary,
-                    scheme.onPrimary,
-                  ),
-                  onPressed: busy ? null : start,
-                  child: BusyLabel(
-                    busy: running == HostAction.start,
-                    label: l10n.startHosting,
-                    busyLabel: l10n.localHostStarting,
-                  ),
-                ),
-            ],
+    return EditorActionBar(
+      children: [
+        // While Claude's adapter is being prepared by this page, Cancel
+        // stops that preparation (only the npm process it started); one
+        // joined from another caller is not this page's to stop, so it
+        // offers Stop waiting, which ends only this page's operation.
+        // Close stays beside either, unavailable until it is over.
+        if ((claudeSetup?.running ?? false) && ownsClaudePrepare)
+          TextButton(
+            key: const Key('claude-prepare-cancel'),
+            onPressed: cancelClaudePrepare,
+            child: Text(l10n.claudePrepareCancel),
+          )
+        else if (claudeSetup?.running ?? false)
+          TextButton(
+            key: const Key('claude-prepare-stop-waiting'),
+            onPressed: stopWaitingForClaude,
+            child: Text(l10n.claudePrepareStopWaiting),
+          ),
+        TextButton(
+          key: const Key('host-editor-close'),
+          // Through the page's PopScope, so unsaved edits are asked
+          // about first.
+          onPressed: busy ? null : () => Navigator.of(context).maybePop(),
+          child: Text(
+            host == null
+                ? l10n.cancel
+                : MaterialLocalizations.of(context).closeButtonLabel,
           ),
         ),
-      ),
+        if (host != null)
+          FilledButton(
+            key: const Key('stop-hosting-btn'),
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+              // Its working colours while it stops (see [_working]).
+              disabledBackgroundColor: running == HostAction.stop
+                  ? scheme.error
+                  : null,
+              disabledForegroundColor: running == HostAction.stop
+                  ? scheme.onError
+                  : null,
+            ),
+            onPressed: busy || hostGone(liveHost) ? null : stop,
+            child: BusyLabel(
+              busy: running == HostAction.stop,
+              label: l10n.stopHosting,
+              busyLabel: l10n.hostStopping,
+            ),
+          )
+        else
+          FilledButton(
+            key: const Key('start-hosting-btn'),
+            style: _working(HostAction.start, scheme.primary, scheme.onPrimary),
+            onPressed: busy ? null : start,
+            child: BusyLabel(
+              busy: running == HostAction.start,
+              label: l10n.startHosting,
+              busyLabel: l10n.localHostStarting,
+            ),
+          ),
+      ],
     );
   }
 

@@ -122,23 +122,6 @@ mixin _FakeConnection on _FakeBridgeState {
   }
 
   @override
-  Future<CodexLoginStart> codexLoginChatgptStart(String serviceKey) async =>
-      const CodexLoginStart(
-        mode: 'browser',
-        loginId: 'fake-login',
-        authUrl: 'https://auth.openai.com/fake',
-      );
-
-  @override
-  Future<CodexAuthStatus> codexAuthStatus(String serviceKey) async => codexAuth;
-
-  @override
-  Future<void> codexLoginCancel(String serviceKey, String loginId) async {}
-
-  @override
-  Future<void> codexLogout(String serviceKey) async {}
-
-  @override
   Future<DeviceCode> accountLoginStart({String? backend}) async => DeviceCode(
     userCode: 'ABCD-1234',
     verificationUri: 'https://github.com/login/device',
@@ -190,9 +173,6 @@ mixin _FakeConnection on _FakeBridgeState {
   }
 
   @override
-  Future<AccountUser?> accountCurrentUser() async => accountUser;
-
-  @override
   Future<void> accountLogout() async {
     accountUser = null;
     // The token goes with it, so the mode derives back off `account`.
@@ -203,9 +183,6 @@ mixin _FakeConnection on _FakeBridgeState {
       mode: _config.relay == null ? 'unconfigured' : 'self_host',
     );
   }
-
-  @override
-  Future<List<AccountService>> accountServices() async => accountServiceList;
 
   @override
   Future<void> accountDeregisterService({

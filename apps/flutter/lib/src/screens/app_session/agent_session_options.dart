@@ -249,6 +249,10 @@ class AgentSessionOptions extends StatefulWidget {
   /// line on touch.
   static double get _optionCap => isDesktop ? 200 : 160;
 
+  /// The widest a segment of [category] grows: the model gets the most.
+  static double _capOf(String? category) =>
+      category == 'model' ? 220 : _optionCap;
+
   /// The capsule's own edge and inner padding.
   static const double _capsuleChrome = 2;
 
@@ -259,10 +263,7 @@ class AgentSessionOptions extends StatefulWidget {
   ) => [
     if (settings != null)
       for (final option in orderedOptions(settings.configOptions))
-        (
-          label: option.currentLabel,
-          cap: option.category == 'model' ? 220 : _optionCap,
-        ),
+        (label: option.currentLabel, cap: _capOf(option.category)),
     if (settings != null && showsLegacyModes(settings))
       (
         label:
@@ -282,7 +283,7 @@ class AgentSessionOptions extends StatefulWidget {
             measureTextLine(
               context,
               label,
-              optionLabelStyle,
+              _optionLabelStyle,
             ).width.ceilToDouble(),
       );
 
@@ -385,7 +386,7 @@ class AgentSessionOptions extends StatefulWidget {
                 'mode' => AppIcons.swap_horiz,
                 _ => AppIcons.tune,
               },
-              maxWidth: fit(option.category == 'model' ? 220 : _optionCap),
+              maxWidth: fit(_capOf(option.category)),
               enabled: enabled,
               entries: [
                 for (final value in option.values)
@@ -684,16 +685,11 @@ class _OptionChipState extends State<_OptionChip> {
     List<({String id, String label, bool selected})> entries,
   ) {
     final box = context.findRenderObject()! as RenderBox;
-    final anchor = box.localToGlobal(Offset.zero) & box.size;
-    String? current;
-    for (final entry in entries) {
-      if (entry.selected) current = entry.id;
-    }
     return showChoicePanel<String>(
       context: context,
       title: widget.title,
-      anchor: anchor,
-      current: current,
+      anchor: box.localToGlobal(Offset.zero) & box.size,
+      current: entries.where((entry) => entry.selected).lastOrNull?.id,
       maxWidth: 340,
       choices: [for (final entry in entries) (entry.id, entry.label)],
     );
@@ -736,7 +732,7 @@ class _OptionChipState extends State<_OptionChip> {
             Flexible(
               child: TailEllipsisText(
                 widget.label,
-                style: optionLabelStyle.copyWith(
+                style: _optionLabelStyle.copyWith(
                   color: usable || _pending
                       ? scheme.onSurface
                       : scheme.onSurfaceVariant,
@@ -775,7 +771,7 @@ class _OptionChipState extends State<_OptionChip> {
 }
 
 /// The type of an option chip's label; measured and drawn alike.
-const TextStyle optionLabelStyle = TextStyle(
+const TextStyle _optionLabelStyle = TextStyle(
   fontSize: 13,
   fontWeight: FontWeight.w500,
 );

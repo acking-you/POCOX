@@ -146,31 +146,15 @@ class WebRtcDictationTransport implements DictationTransport {
     );
     _checkOpen();
     _sender = transceiver.sender;
-    final channel = await peer.createDataChannel(
-      'oai-events',
-      RTCDataChannelInit(),
+    return completeOffer(
+      peer,
+      makeOffer: peer.createOffer,
+      adopt: (channel, gathered) {
+        _channel = channel;
+        _gathered = gathered;
+      },
+      checkOpen: _checkOpen,
     );
-    if (_closed) {
-      await channel.close();
-      _checkOpen();
-    }
-    _channel = channel;
-    final gathered = Completer<void>();
-    _gathered = gathered;
-    peer.onIceGatheringState = (state) {
-      if (state == RTCIceGatheringState.RTCIceGatheringStateComplete &&
-          !gathered.isCompleted) {
-        gathered.complete();
-      }
-    };
-    await peer.setLocalDescription(await peer.createOffer());
-    _checkOpen();
-    // No trickle-ICE RPC: send one complete offer.
-    await gathered.future.timeout(const Duration(seconds: 10));
-    _checkOpen();
-    final sdp = (await peer.getLocalDescription())?.sdp;
-    if (sdp == null || sdp.isEmpty) throw StateError('Missing audio offer');
-    return sdp;
   }
 
   @override
@@ -194,14 +178,7 @@ class WebRtcDictationTransport implements DictationTransport {
     if (sender == null) throw StateError('Dictation is not ready');
     var media = _microphone;
     if (media == null) {
-      media = await navigator.mediaDevices.getUserMedia({
-        'audio': {
-          'echoCancellation': true,
-          'noiseSuppression': true,
-          'autoGainControl': true,
-        },
-        'video': false,
-      });
+      media = await navigator.mediaDevices.getUserMedia(microphoneConstraints);
       if (_closed) {
         await _stopMedia(media);
         _checkOpen();
@@ -262,19 +239,11 @@ class WebRtcDictationTransport implements DictationTransport {
     _channel = null;
     _peer = null;
     _sender = null;
-    Object? failure;
-    Future<void> release(Future<void> Function() action) async {
-      try {
-        await action();
-      } catch (e) {
-        failure ??= e;
-      }
-    }
-
-    if (media != null) await release(() => _stopMedia(media));
-    if (channel != null) await release(channel.close);
-    if (peer != null) await release(peer.dispose);
-    if (failure != null) throw StateError('Dictation cleanup failed: $failure');
+    await releaseAll('Dictation', [
+      if (media != null) () => _stopMedia(media),
+      if (channel != null) channel.close,
+      if (peer != null) peer.dispose,
+    ]);
   }
 }
 
