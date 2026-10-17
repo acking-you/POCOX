@@ -487,7 +487,13 @@ this file's roadmap so the source of truth stays in sync.
     cursor. It uses only the host's default realtime model and never speaks.
     It yields to a live call, ends its take on navigation, and never sends.
     chatgpt.com's transcription endpoints are not used (Cloudflare refuses
-    non-official clients). See `docs/live-voice.md` › Composer dictation.
+    non-official clients). On iOS and Android (2026-10-16) the line exists
+    only during a take, because an open media link takes the device's audio
+    from other apps; the realtime endpoint refuses a send-only offer's audio.
+    Ended calls and takes give the audio back: an iOS observer of WebRTC's
+    audio engine deactivates the session with `notifyOthersOnDeactivation`,
+    and Android requests transient focus. See `docs/live-voice.md` ›
+    Composer dictation.
 
 19. **Recovery and cache boundaries (2026-10-05).** Scope CLI watchdog stops to
     their own listener; retain pending meta registrations across startup outages.
@@ -515,9 +521,12 @@ this file's roadmap so the source of truth stays in sync.
     for DMG and ZIP downloads. Never fall back to unsigned publication. Keep
     signing credentials out of source and build steps. Theme snapshot capture
     is optional; applying the preference must survive capture failures and
-    release builds without debug-only render getters. Keep the blue Dock and
-    menu-bar icons fixed across themes: use the bundle AppIcon and a non-template
-    tray PNG; never substitute the transparent splash glyph. See `docs/macos-release.md`.
+    release builds without debug-only render getters. Keep the blue Dock icon
+    fixed across themes (the bundle AppIcon). The menu bar shows the mark as a
+    one-colour template glyph (`assets/tray/tray_template.png`, 2026-10-17),
+    which AppKit paints in the bar's own colour like every other status item;
+    never the colour tile or the transparent splash glyph there. See
+    `docs/macos-release.md`.
 
 23. **Generic ACP agents (2026-10-10, PR #99).** Hosting can launch any ACP v1
     stdio agent configured as program + argv, passed verbatim (no shell);
@@ -830,12 +839,13 @@ this file's roadmap so the source of truth stays in sync.
 29. **Native OpenCode and automatic session access (2026-10-15).** OpenCode
     is a third engine: the host owns the installed `opencode serve` and speaks
     its v1 HTTP + SSE API; the service kind is `opencode:<name>`, protocol
-    `opencode-http`, provider `opencode`. One OpenCode host per real database
-    source across Pocket processes; its model service is OpenCode's own
-    configuration and sign-ins, or a per-host custom provider (Responses,
-    Anthropic Messages, Chat Completions; no official account, plugin or ACP
-    route), and its desired runtime is the executable only
-    (`HostRuntime.opencode`); restore starts with both as saved. The
+    `opencode-http`, provider `opencode`. Several OpenCode hosts may run, one
+    per real database source across Pocket processes (item 33); its model
+    service is OpenCode's own configuration and sign-ins, or a per-host
+    custom provider (Responses, Anthropic Messages, Chat Completions; no
+    official account, plugin or ACP route), and its desired runtime is the
+    executable and its history (`HostRuntime.opencode`); restore starts with
+    both as saved. The
     `opencode acp` preset, catalog plugin and custom routes are removed; their
     saved records are dropped on load, never relaunched as generic agents.
     Rules to preserve:
@@ -965,7 +975,7 @@ this file's roadmap so the source of truth stays in sync.
     the drag to where it started, with no completion haptic. Mouse drags and
     an open keyboard leave the page alone. Close it through
     `LayeredNavigation.maybeOf` (`isOpen`/`close`), not `Scaffold` drawers.
-    Touch-only polish: tonal blue new-conversation pill, 14 px row/search
+    Touch-only polish: tonal new-conversation pill, 14 px row/search
     radius, 22 px composer radius with a quieter idle edge. Touch tablets
     (>= 720 px) keep a 480 px chat and give the inline sidebar the rest (up to
     520 px), so the default 280 px pane fits at 834 px; saved widths still
@@ -1018,6 +1028,137 @@ this file's roadmap so the source of truth stays in sync.
     user accepted the current functionality on the installed desktop and iOS
     apps. No physical-phone haptics or other platforms are claimed. See
     `docs/remote-device-management.md`.
+
+32. **Visual refresh (2026-10-16).** Calm graphite neutrals with ink-black
+    primary actions and the logo's blue as the one, sparse signal colour: no
+    purple, no hue cast in greys or shadows, a backdrop lit only by white (a
+    multi-hue backdrop and iris accents proved tiring, 2026-10-17), and the
+    blue-and-white app icon unchanged; Lucide icons through `AppIcons`;
+    Google Sans Flex + Geist Mono (Windows keeps Segoe UI; desktop CJK keeps
+    Noto Sans SC). Desktop pages are layered: navigation lies on a lit neutral
+    backdrop (`AppBackdrop`), content on an inset rounded sheet
+    (`ContentSheet`), and floating controls (composer, navigation cluster,
+    toasts, minimap, turn progress) are translucent `Glass` (`GlassDepth`
+    chrome / floating / overlay: lit rim, blur, outer-only shadows); the
+    transcript scrolls beneath the composer. The macOS title strip is 60 pt
+    (native `titleStripHeight`, `WindowChrome.barHeight`), traffic lights
+    centred on the sheet bars. Modals use `showAppDialog` (blurred, dimmed
+    backdrop; `fullscreen: true` for full-window editors, which keep their
+    own safe areas); pickers and information opened from a control are
+    desktop popovers anchored to it (`widgets/popover.dart`,
+    `showAdaptivePanel(anchored:)`, `showChoicePanel`, `showInfoPanel`) and
+    bottom sheets on touch. Fields are filled and borderless until focused;
+    segmented choices use `GlassSegmented`; motion uses `Motion.spring` /
+    `Motion.emphasized`, and desktop routes fade. One mark per row: a hosted
+    chat service is its host's row, project headings carry no folder glyph,
+    composer context is text separated by dots. User and agent messages
+    render as Markdown, user messages keeping their typed line breaks; the
+    expanded editor previews the draft live (beside the source from 900 px,
+    a tab away below) and never sends.
+
+33. **Quiet forms and several OpenCode hosts (2026-10-16).** Forms show
+    names and values at rest: labels sit inside filled fields
+    (`FieldBorder`), what a field is for appears under it only while it has
+    focus (`FocusHelp`), and a section's or control's explanation sits behind
+    an info mark (`InfoTip`, `InfoTitle`, `GroupCard.info`) or a tooltip.
+    Visible lines under a control are state only (detected, taken, pending,
+    failed) in `helpTextStyle`; field errors wrap. OpenCode hosts are no
+    longer one per device: each picks OpenCode's shared default database
+    (one host at a time; every older record) or a history of its own
+    (`separateHistory`, `OPENCODE_DB=pocket-codex-<canonical name>.db` in
+    OpenCode's data directory), and a new host beside a shared one defaults
+    to its own. Only a shared-history host continues Local sessions or writes
+    the older `autoHostOpenCode` record; restore brings back every own-history
+    host and at most one shared one; a remote add chooses on the host and a
+    remote edit keeps the choice. Instance names are unique per device by
+    canonical identity: every new-host editor (local and remote) says so under
+    the field and refuses Start without a bridge call, and a bridge refusal
+    maps to the same words; a relay-level conflict keeps its own message.
+    The real-server bridge test runs a second own-history host beside the
+    first and still refuses a second shared one; in the macOS app a second
+    own-history host ran beside the shared one, connected with an empty
+    session list and stopped alone (no message sent). Remote add and edit are
+    covered by tests only. See [Native OpenCode](docs/opencode-native.md#hosting).
+    The Codex setup page lists ChatGPT sign-in and custom provider as two
+    rows, each with its control at the end of the row (`ActionRow`) and an
+    "in use" mark on the method Codex runs on; there is no disclosure, and a
+    phone says where sign-in and hosting happen instead of offering them. The
+    state names the credential in words and reports an unreadable
+    `config.toml`. Chinese strings use full-width punctuation.
+
+34. **Anchored transcript and the review sidebar (2026-10-17).** The
+    transcript is one `CustomScrollView` around a centre row
+    (`widgets/centered_scroll.dart`, `screens/app_session/transcript_list.dart`):
+    rows above it lay out upward, so a page or a gap filled above never moves
+    what is on screen, and the end or a jumped-to turn is exact in the frame it
+    becomes the centre, measured or not. Layout holds the end
+    (`stickToEnd`) until the reader scrolls, touches or selects. Never return
+    to one index-keyed list (every page shifted its measured extents) or to
+    post-frame anchor jumps. A jump reads the turn or page just above its
+    landing ahead of the reader; a fully read turn is never fetched again.
+    The in-flight history future is the only loading mark (`_historyLoad`,
+    `_loadingOlder` derives from it and only its own completion clears it), so
+    a rebuild that throws or an immediate failure cannot strand "loading".
+    Sync and navigation status float over the transcript top
+    (`FloatingStatus`); loading fades in; the turn clock and sidebar motion
+    no longer rebuild the transcript. Narrow and touch layouts fold turn
+    navigation into a faint `TurnNavigationHandle` (opens on touch, folds after
+    5 s or a scroll); wide desktops keep the rail. The review
+    (`lib/src/review/`) replaces the diff sheet: a resizable right sidebar
+    from 1100 px, an overlay panel below that, its own page on phones (back or
+    swipe right). It shows this conversation's edits (every edit of a file in
+    order, or one step from its change card) or the working tree against its
+    upstream, with lazy diffs, gap expansion and a whole-file view with the
+    changes marked, read through `/fs/thread-file` (root-confined `/fs/read`
+    only for older hosts). A working tree never read says so with a retry,
+    never "no changes". Codex Desktop `<heartbeat>` automation prompts render
+    as a capsule opening into their instructions; blank replies leave no row.
+    A user attachment whose temp file is gone is served from the rollout's
+    inline copy (`rollout::inline_user_image`); host images are cached per host
+    and thread (64 MiB). Dark-mode favicons sit on a light plate. The
+    read-only foot (takeover, read-only, Guardian, host access) is the
+    composer's glass card, over the same fade. The Codex new-conversation view
+    shows the Codex mark like the other engines; theme switches spread from
+    the pressed control. Verified: Flutter suite (1636 passed, 6 skipped), the
+    touched Rust crates; on the macOS app and an iOS 27 simulator connected
+    through a local pb-mapper relay to the Mac's Codex host (the public relay
+    was unreachable): history paging and jumps, the review sidebar and phone
+    page (workspace and session sources, whole file, retry, swipe back), the
+    navigation handle and a turn jump, theme switching. Not verified: other
+    platforms, a physical phone, frame-timing measurements.
+    When the relay cannot list services, a desktop still restores its hosts
+    and opens its own host over loopback (a toast says other devices cannot
+    reach it), and the services page keeps this computer's hosts under a
+    relay problem card (`RelayProblem`: cause in words, retry, the raw error
+    folded and copyable) with the relay marked unreachable and its tunnels
+    not connected. A relay name resolving only to 198.18.0.0/15 is named as
+    a proxy's or VPN's unrouted virtual address (`relay_diagnosis.dart`); the
+    app never resolves around the system DNS. Lit buttons clip their sheen to
+    the capsule (`LitFace`).
+    Hosting operations report on their own control: Start, Save, Restart and
+    Stop become a spinner with what runs ("Starting…") in their working
+    colours (`widgets/busy_label.dart`), a running line crosses the action
+    bar, and the outcome is pinned above the actions, never at the end of the
+    scrolled form; a finished start or stop closes the editor with one toast
+    naming the host (a restore warning rides in it). The start had no jank to
+    fix: measured on the macOS app, no frame took over 40 ms and the UI thread
+    never paused over 100 ms during a 1–2 s start; it only looked frozen.
+    Until the host first lists its conversations the sessions sidebar shows a
+    delayed skeleton (`ConversationListSkeleton`) that cross-fades into the
+    list (the open conversation's own metadata is no listing; exhausted
+    retries end it), and the home cross-fades between splash, hero and chat
+    by phase. A test holding an operation pending pumps bounded
+    frames: its progress never settles. Verified: Flutter suite (1641 passed,
+    6 skipped); on the macOS app a real Codex start and stop (busy button,
+    running line, toasts) and the skeleton on a host switch; on the iOS 27
+    simulator a cold start and host switches with the rebuilt app.
+    On phones every engine's new-conversation view (`agent_welcome.dart`)
+    uses the room above the composer: the project identity centred (its mark
+    dropped when short), other recent projects and Choose folder in one
+    horizontal row just above the composer, and mode chips such as Fast on
+    the model's toolbar line instead of a line of their own. Covered by
+    `responsive_layout_test.dart` (320 px at 2.0 text, 393 px); checked on the
+    iOS 27 simulator with a Codex host (Flutter suite 1642 passed, 6 skipped).
 
 ### UI and history maintenance (2026-09-13)
 
@@ -1073,16 +1214,17 @@ this file's roadmap so the source of truth stays in sync.
   returns focus and selection to the compact input.
 - Branding uses the same blue/neutral palette as the UI. The mark has one
   source: the vector drawing and `MarkStyle` palettes in
-  `apps/flutter/test/gen_icon_test.dart` (blue tile for launchers, tray and
-  README art; theme surfaces for splash and the in-app glyph). When changing
+  `apps/flutter/test/gen_icon_test.dart` (blue tile for launchers, the
+  Windows/Linux tray and README art; a one-colour template glyph for the macOS
+  menu bar; theme surfaces for splash and the in-app glyph). When changing
   it, run `REGEN_ICONS=1 fvm flutter test test/gen_icon_test.dart`, then
   `fvm dart run flutter_launcher_icons` and
   `fvm dart run flutter_native_splash:create`, for every platform; keep both
   README posters and logo copies in sync and the splash colours equal to the
   `MarkStyle` tiles.
 - Transcript rows must remain lazy and keyed. Preserve the visible message
-  when prepending history, and do not rescan the rest of a turn per item when
-  grouping rows. Pagination failures require an explicit retry instead of a
+  when prepending history (the centre anchor does this by construction, item
+  34), and do not rescan the rest of a turn per item when grouping rows. Pagination failures require an explicit retry instead of a
   scroll-triggered request loop.
   Steering messages can split one physical turn into several work groups:
   show its total duration once, and animate only its current active group.

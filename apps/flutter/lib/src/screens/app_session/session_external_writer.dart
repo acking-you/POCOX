@@ -50,7 +50,7 @@ extension _SessionExternalWriter on _AppSessionState {
       _loading = _items.isEmpty;
       _historySyncing = true;
       _streaming = false;
-      _elapsedSecs = 0;
+      _elapsed.value = 0;
       _error = null;
       _retry = null;
       _approvals.clear();
@@ -122,7 +122,7 @@ extension _SessionExternalWriter on _AppSessionState {
         _showingCachedHistory = false;
         _historyEpoch = null;
       }
-      if (willRun && !wasRunning) _elapsedSecs = 0;
+      if (willRun && !wasRunning) _elapsed.value = 0;
       if (!paginated || _items.isNotEmpty) _loading = false;
       _error = null;
       _retry = null;
@@ -329,7 +329,7 @@ extension _SessionExternalWriter on _AppSessionState {
       return;
     }
     if (liveness.requiresTakeover) {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showAppDialog<bool>(
         context: context,
         builder: (_) =>
             TakeoverDialog(holders: liveness.holders, hasTarget: true),
@@ -387,48 +387,65 @@ extension _SessionExternalWriter on _AppSessionState {
 
   Widget _externalWriterAction(AppLocalizations l10n) {
     if (_guardianReadOnly) {
-      return SafeArea(
-        top: false,
-        child: Padding(
-          key: const Key('guardian-read-only'),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.guardianReadOnly),
-              if (_parentThreadId case final parent?)
-                TextButton.icon(
-                  key: const Key('open-parent-session'),
-                  onPressed: () => _openThread(
-                    parent,
-                    _discoveredThreads[parent]?.cwd ??
-                        _threads
-                            .where((t) => t.id == parent)
-                            .firstOrNull
-                            ?.cwd ??
-                        _cwd,
-                  ),
-                  icon: const Icon(Icons.subdirectory_arrow_left),
-                  label: Text(l10n.parentSession),
-                ),
-            ],
+      return _readOnlyFoot(
+        key: const Key('guardian-read-only'),
+        child: _footRow(
+          lead: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              l10n.guardianReadOnly,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
+            ),
           ),
+          trail: switch (_parentThreadId) {
+            final parent? => TextButton.icon(
+              key: const Key('open-parent-session'),
+              onPressed: () => _openThread(
+                parent,
+                _discoveredThreads[parent]?.cwd ??
+                    _threads.where((t) => t.id == parent).firstOrNull?.cwd ??
+                    _cwd,
+              ),
+              icon: const Icon(AppIcons.subdirectory_arrow_left),
+              label: Text(l10n.parentSession),
+            ),
+            null => null,
+          },
         ),
       );
     }
 
+    final hasCwd = _cwd?.trim().isNotEmpty ?? false;
     // The host decides a host-access session; its panel says how.
-    if (_caps.hostAccess) return _accessPanelBar(l10n);
+    if (_caps.hostAccess) {
+      return _readOnlyFoot(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _accessPanel(l10n),
+            if (hasCwd) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _externalDiffButton(l10n),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
 
     final scheme = Theme.of(context).colorScheme;
     final liveness = _externalWriterLiveness;
     final canResume = liveness?.allowsResume ?? false;
-    final hasCwd = _cwd?.trim().isNotEmpty ?? false;
-    final stateControl = SizedBox(
-      width: double.infinity,
-      height: 46,
-      child: canResume
-          ? FilledButton.icon(
+    final state = canResume
+        ? SizedBox(
+            height: 42,
+            child: FilledButton.icon(
               key: const Key('chat-takeover-action'),
               onPressed: _takingOver ? null : _takeOverExternalWriter,
               icon: _takingOver
@@ -437,97 +454,98 @@ extension _SessionExternalWriter on _AppSessionState {
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.bolt, size: 18),
+                  : const Icon(AppIcons.bolt, size: 18),
               label: Text(
                 liveness!.requiresTakeover
                     ? l10n.forceTakeover
                     : l10n.resumeSession,
               ),
-            )
-          : DecoratedBox(
-              key: const Key('chat-read-only-action'),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(kPanelRadius),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.lock_outline,
-                    size: 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      l10n.readOnlyViewing,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 13,
-                      ),
+            ),
+          )
+        : SizedBox(
+            key: const Key('chat-read-only-action'),
+            height: 42,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  AppIcons.lock_outline,
+                  size: 16,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    l10n.readOnlyViewing,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 13,
                     ),
                   ),
-                ],
-              ),
-            ),
-    );
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                stateControl,
-                if (hasCwd) ...[
-                  const SizedBox(height: 8),
-                  _externalDiffButton(l10n),
-                ],
+                ),
               ],
             ),
-          ),
-        ),
+          );
+    return _readOnlyFoot(
+      child: _footRow(
+        lead: state,
+        trail: hasCwd ? _externalDiffButton(l10n) : null,
       ),
     );
   }
 
-  /// The access panel in place of the composer, with the diff action.
-  Widget _accessPanelBar(AppLocalizations l10n) {
-    final hasCwd = _cwd?.trim().isNotEmpty ?? false;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 820),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _accessPanel(l10n),
-                if (hasCwd) ...[
-                  const SizedBox(height: 8),
-                  _externalDiffButton(l10n),
-                ],
-              ],
+  /// What stands in for the composer while this view only reads: the same
+  /// pane of glass, so the conversation passes beneath it blurred rather than
+  /// showing through between its controls.
+  Widget _readOnlyFoot({Key? key, required Widget child}) => SafeArea(
+    top: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: _AppSessionState._kColumnWidth,
+          ),
+          child: Glass(
+            key: key,
+            depth: GlassDepth.floating,
+            borderRadius: BorderRadius.circular(
+              isDesktop ? kComposerRadius : kTouchComposerRadius,
             ),
+            lift: 0.7,
+            child: Padding(padding: const EdgeInsets.all(8), child: child),
           ),
         ),
       ),
+    ),
+  );
+
+  /// [lead] filling the row with [trail] at its end; stacked when the row is
+  /// too narrow for both to read.
+  Widget _footRow({required Widget lead, Widget? trail}) {
+    if (trail == null) return lead;
+    return LayoutBuilder(
+      builder: (context, box) => box.maxWidth < 360
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [lead, const SizedBox(height: 6), trail],
+            )
+          : Row(
+              children: [
+                Expanded(child: lead),
+                const SizedBox(width: 8),
+                trail,
+              ],
+            ),
     );
   }
 
   Widget _externalDiffButton(AppLocalizations l10n) => SizedBox(
-    width: double.infinity,
     height: 42,
-    child: OutlinedButton.icon(
+    child: TextButton.icon(
       key: const Key('chat-external-diff-action'),
       onPressed: _diffLoading ? _cancelDiff : _showDiff,
       icon: _diffLoading
@@ -536,7 +554,7 @@ extension _SessionExternalWriter on _AppSessionState {
               height: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.difference_outlined, size: 18),
+          : const Icon(AppIcons.difference_outlined, size: 18),
       label: Text(_diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff),
     ),
   );

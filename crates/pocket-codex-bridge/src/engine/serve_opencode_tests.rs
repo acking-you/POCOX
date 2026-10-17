@@ -56,6 +56,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
         Some("native-fixture"),
         NewHost::OpenCode {
             binary: Some(binary.clone()),
+            separate_history: false,
         },
         change(),
     )
@@ -79,6 +80,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
         Some("native-second"),
         NewHost::OpenCode {
             binary: Some(binary.clone()),
+            separate_history: false,
         },
         change(),
     )
@@ -92,6 +94,34 @@ fn native_bridge_hosting_controller_and_original_resume() {
         0,
         "failed start restores saved record"
     );
+    // With a history of its own, a second host runs beside the first.
+    let Started::OpenCode(second) = host_start::start_configured(
+        Some("native-second"),
+        NewHost::OpenCode {
+            binary: Some(binary.clone()),
+            separate_history: true,
+        },
+        change(),
+    )
+    .expect("a second host with its own history") else {
+        panic!("independent engine")
+    };
+    let rows = serve::serve_status();
+    let second_row = rows
+        .iter()
+        .find(|row| row.name == second.name)
+        .expect("second status");
+    assert!(second_row
+        .opencode
+        .as_ref()
+        .is_some_and(|s| s.separate_history));
+    assert!(rows
+        .iter()
+        .find(|row| &row.name == name)
+        .and_then(|row| row.opencode.as_ref())
+        .is_some_and(|s| !s.separate_history));
+    serve::serve_stop(&second.name).expect("second host stops alone");
+    assert!(is_hosting(name) && !is_hosting(&second.name));
     let engine = session_engine::engine(key);
     assert_eq!(
         engine
@@ -202,6 +232,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let bad = Change {
         runtime: RuntimeChange::Set(Runtime::OpenCode {
             binary: Some(root.join("missing-binary").display().to_string()),
+            separate_history: false,
         }),
         ..change()
     };
@@ -223,6 +254,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let desired = Change {
         runtime: RuntimeChange::Set(Runtime::OpenCode {
             binary: Some(binary),
+            separate_history: false,
         }),
         ..change()
     };
@@ -269,6 +301,15 @@ fn native_bridge_hosting_controller_and_original_resume() {
     serve::serve_stop_all().expect("quit drained all owned work");
     assert_eq!(opencode::runtime::pending_cleanup(), 0);
     std::fs::write(root.join("result.json"), serde_json::to_vec_pretty(&json!({"originalSession":original,"nativeProtocol":caps.protocol,"localWithoutRelay":true,"sourceSingleton":true,"originalHistoryAfterApply":true,"ownedProcessesStopped":true})).expect("valid test fixture")).expect("valid test fixture");
+}
+
+#[test]
+fn a_separate_history_is_a_file_named_after_its_instance() {
+    assert_eq!(history_database("My Host").expect("name"), "pocket-codex-my-host.db");
+    let long = history_database(&"x".repeat(300)).expect("a long name");
+    assert!(long.len() < 64 && !long.contains('/'), "{long}");
+    assert_eq!(long, history_database(&"X".repeat(300)).expect("the same instance"));
+    assert!(history_database(" ").is_err());
 }
 
 #[test]

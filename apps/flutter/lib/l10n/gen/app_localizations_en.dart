@@ -43,6 +43,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keyLengthError => 'MSG_HEADER_KEY must be exactly 32 bytes';
 
   @override
+  String get accountWelcomeHeadline => 'Welcome to PocketCodex';
+
+  @override
+  String get accountWelcomeSubtitle =>
+      'Sign in to pick up your conversations on any device.';
+
+  @override
   String get accountSignInTitle => 'Sign in';
 
   @override
@@ -1244,6 +1251,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexBuiltinNote => 'Not implemented yet. Use external Codex.';
 
   @override
+  String get codexBuiltinUnavailable => 'Not implemented yet';
+
+  @override
   String get hostRuntimeInfo => 'Runtime';
 
   @override
@@ -1364,6 +1374,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get tunnelOffline => 'Offline';
+
+  @override
+  String get tunnelNotConnected => 'Not connected';
 
   @override
   String get logsTitle => 'Runtime logs';
@@ -1748,21 +1761,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexSetupProviderSection => 'Custom provider';
 
   @override
-  String get codexSetupProviderDesc =>
-      'Point codex at a third-party or self-hosted model service with its Base URL and API key.';
-
-  @override
-  String get codexSetupModelLabel => 'Model (optional, default gpt-5.5)';
-
-  @override
-  String get codexSetupSaveProvider => 'Save and use';
-
-  @override
-  String get codexSetupLoginSection => 'ChatGPT login';
+  String get codexSetupLoginSection => 'ChatGPT sign-in';
 
   @override
   String get codexSetupLoginDesc =>
-      'Run the model on your ChatGPT subscription; codex generates the credential itself.';
+      'Run the model on your ChatGPT subscription; Codex creates the credential itself.';
 
   @override
   String get codexSetupLoginButton => 'Sign in with ChatGPT';
@@ -1775,17 +1778,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get codexSetupMethodsHint =>
-      'Pick either one — codex uses whichever you configured last.';
+      'If Codex\'s own configuration selects a custom provider, that provider is used instead of the ChatGPT sign-in.';
 
   @override
   String get codexSetupInUse => 'In use';
 
   @override
-  String get codexSetupSwitchTo => 'Switch to this';
-
-  @override
   String get codexSetupProxyNote =>
-      'On a restricted network this needs a proxy: set one when you start local hosting.';
+      'On a restricted network, sign-in needs a proxy: set one in a host\'s editor and sign in there.';
 
   @override
   String get codexSetupAdvanced => 'Advanced';
@@ -1804,18 +1804,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexSetupNonDegradedIssue => 'openai/codex#30364';
 
   @override
-  String get codexSetupNeedFields =>
-      'Please fill in both Base URL and API Key.';
-
-  @override
-  String get codexSetupProviderSaved =>
-      'Provider saved. Restart local hosting to use it.';
-
-  @override
-  String get codexSetupNeedHost =>
-      'Start local hosting under Services first, then sign in with ChatGPT.';
-
-  @override
   String get codexSetupLoginOpened =>
       'Opened the login page in your browser; completion is detected automatically…';
 
@@ -1830,9 +1818,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexSetupDeviceReopen => 'Reopen verification page';
 
   @override
-  String codexSetupLoginSuccess(String method) {
-    return 'Signed in ($method).';
-  }
+  String get codexSetupLoginSuccess => 'Signed in.';
 
   @override
   String get codexSetupLoginTimeout => 'Login timed out, please retry.';
@@ -1841,37 +1827,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codexSetupStatusProvider => 'Custom provider configured';
 
   @override
-  String codexSetupStatusAuth(String method) {
-    return 'Signed in ($method)';
-  }
-
-  @override
   String get codexSetupStatusNeedSetup => 'Not configured yet';
 
   @override
   String get codexSetupStatusNeedSetupHint =>
-      'codex cannot make a model call yet. Configure either method below.';
+      'Codex cannot make a model call yet. Set up either method below.';
 
   @override
-  String get codexSetupStatusReadyHint => 'codex can make model calls.';
+  String get codexSetupStatusReadyHint => 'Codex can make model calls.';
 
   @override
   String get codexSetupCodexHomeLabel => 'Config directory';
 
   @override
-  String get codexSetupCredentialExists => 'credential present';
+  String get codexSignedInChatgpt => 'Signed in with ChatGPT';
+
+  @override
+  String get codexSignedInApiKey => 'Using an API key';
+
+  @override
+  String get codexSignedIn => 'Signed in';
+
+  @override
+  String get codexSetupStatusInvalid =>
+      'Codex\'s config.toml could not be read';
+
+  @override
+  String get codexSetupStatusInvalidHint =>
+      'Fix the file before hosts on \"Existing configuration\" can use it.';
 
   @override
   String get codexSetupProviderPerHost =>
-      'Set per host: each host\'s own model service can use a custom provider.';
+      'Each host can use its own custom provider, chosen in that host\'s editor.';
 
   @override
   String get codexSetupProviderScope =>
-      'This page sets up Codex itself (its config directory below): the ChatGPT sign-in and the prompt option. Hosts set to \"Existing configuration\" use it. A host\'s own custom provider or official account is chosen in that host\'s editor.';
+      'This page sets up Codex itself (the config directory above): the ChatGPT sign-in and the prompt option. Hosts set to \"Existing configuration\" use them; a host\'s own custom provider or official account is chosen in that host\'s editor.';
 
   @override
   String get codexSetupGlobalProvider =>
-      'Codex\'s own configuration already selects a custom provider. Hosts set to \"Existing configuration\" keep using it.';
+      'Codex\'s own configuration already selects a custom provider; hosts set to \"Existing configuration\" keep using it.';
 
   @override
   String get codexSetupConfigureHost => 'Configure a host';
@@ -1879,6 +1874,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get codexSetupHostingDesktopOnly =>
       'Hosting runs on a desktop; set a host\'s provider there.';
+
+  @override
+  String get codexSetupLoginDesktopOnly =>
+      'Sign in on the computer where Codex is installed.';
 
   @override
   String get settingsHosting => 'Hosting and model service';
@@ -2166,10 +2165,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resetComposerHeight => 'Reset height';
 
   @override
-  String get composerKeyboardHint =>
-      'Enter to send · Shift+Enter for a new line';
-
-  @override
   String get selectText => 'Select text';
 
   @override
@@ -2439,13 +2434,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get acpSecretsNote =>
-      'Saved agents are stored on this device in plain text. Avoid secrets in arguments; prefer the agent\'s own sign-in.';
+      'Saved in plain text on this computer. Keep secrets out of the arguments.';
 
   @override
   String get acpProgramNotFound => 'This program was not found on this device.';
 
   @override
   String get claudeEnvTitle => 'Claude environment';
+
+  @override
+  String get claudeRuntimeTitle => 'Runtime components';
 
   @override
   String claudeAdapterInstalled(String path) {
@@ -2706,10 +2704,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hostSourceCustom => 'Custom provider';
-
-  @override
-  String get hostInheritedOnly =>
-      'This agent is launched with its own configuration. Pocket-Codex does not know a provider setting it supports.';
 
   @override
   String get hostInheritedAcp =>
@@ -3248,11 +3242,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get agentChoiceNativeServer => 'Native server';
 
   @override
-  String agentChoiceRunningAs(String name) {
-    return 'Running as $name';
-  }
-
-  @override
   String get hostInheritedOpenCode =>
       'Uses OpenCode\'s own providers and sign-ins on this computer.';
 
@@ -3282,7 +3271,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openCodeAlreadyHosted =>
-      'OpenCode is already hosted on this computer. Open that host instead.';
+      'Another host already uses this OpenCode history. Choose “This host only” for this host, or stop that host first.';
+
+  @override
+  String hostNameInUse(String name) {
+    return 'A host on this computer already uses the name “$name”. Choose another name.';
+  }
+
+  @override
+  String managedNameInUse(String name) {
+    return 'A service on that computer already uses the name “$name”. Choose another name.';
+  }
+
+  @override
+  String get openCodeHistoryTitle => 'History';
+
+  @override
+  String get openCodeHistoryShared => 'Shared with OpenCode';
+
+  @override
+  String get openCodeHistoryOwn => 'This host only';
+
+  @override
+  String get openCodeHistoryInfo =>
+      'Shared: this computer\'s own OpenCode sessions, the same ones the OpenCode terminal app shows. One host can use them at a time.\n\nThis host only: sessions are kept in this host\'s own database, apart from other hosts and the OpenCode terminal app.';
+
+  @override
+  String openCodeHistoryTaken(String name) {
+    return '“$name” is using the shared history, and only one host can at a time. Choose “This host only”.';
+  }
 
   @override
   String get openCodePath => 'OpenCode executable';
@@ -3667,10 +3684,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Needs sign-in on that computer to use its own account; a custom provider works without it.';
 
   @override
-  String get managedOpenCodeTaken =>
-      'OpenCode already runs on that computer; one OpenCode service per computer.';
-
-  @override
   String get managedKindUnknown => 'Unknown agent';
 
   @override
@@ -3807,12 +3820,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get managedSwitchTitle => 'Allow management from my other devices';
 
   @override
-  String get managedSwitchOn =>
-      'On. Your signed-in devices can add, configure, start and stop services here while this computer is online.';
+  String get managedSwitchOn => 'On';
 
   @override
-  String get managedSwitchOff =>
-      'Off. Only this computer can change its services.';
+  String get managedSwitchOff => 'Off';
+
+  @override
+  String get managedSwitchInfo =>
+      'When on, your other signed-in devices can add, configure, start and stop services here while this computer is online. When off, only this computer can change them.';
 
   @override
   String get managedSwitchConnecting => 'On, not reachable yet.';
@@ -3833,9 +3848,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get managedRuntimeSignInThere => 'Ready · sign in on that computer';
-
-  @override
-  String get managedOpenCodeRunning => 'Already running · one per computer';
 
   @override
   String get managedRuntimeDetails => 'Details';
@@ -3860,4 +3872,108 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get managedRefreshComputer => 'Refresh this computer';
+
+  @override
+  String get composerWrite => 'Write';
+
+  @override
+  String get composerSplit => 'Split';
+
+  @override
+  String get composerPreview => 'Preview';
+
+  @override
+  String get composerPreviewEmpty =>
+      'Nothing to preview yet. Write Markdown on the left and it renders here.';
+
+  @override
+  String get composerPreviewEmptyTab => 'Nothing to preview yet.';
+
+  @override
+  String get reviewSessionSource => 'This conversation';
+
+  @override
+  String get reviewWorkspaceSource => 'Workspace';
+
+  @override
+  String get reviewNoSessionChanges =>
+      'This conversation hasn\'t changed any files yet.';
+
+  @override
+  String reviewEdit(int index) {
+    return 'Edit $index';
+  }
+
+  @override
+  String get reviewAllEdits => 'Show every edit';
+
+  @override
+  String reviewEditCount(int count) {
+    return '$count edits';
+  }
+
+  @override
+  String get reviewFilterFiles => 'Filter files';
+
+  @override
+  String get reviewOpenFile => 'Open the whole file';
+
+  @override
+  String get reviewShowChanges => 'Show the changes';
+
+  @override
+  String get reviewFileLoading => 'Reading the file…';
+
+  @override
+  String get reviewFileUnavailable => 'This file can\'t be read from the host.';
+
+  @override
+  String get copyPath => 'Copy path';
+
+  @override
+  String get openInReview => 'Open in review';
+
+  @override
+  String get showTurnNavigation => 'Show conversation controls';
+
+  @override
+  String get automationRun => 'Automation';
+
+  @override
+  String get reviewWorkspaceLoading => 'Reading the working tree\'s changes…';
+
+  @override
+  String get reviewWorkspaceUnavailable =>
+      'The working tree\'s changes couldn\'t be read.';
+
+  @override
+  String relayVirtualAddress(String host, String address) {
+    return 'The system DNS resolved $host to $address, a proxy\'s or VPN\'s virtual address that nothing routes right now. Reconnect that proxy or VPN, then retry.';
+  }
+
+  @override
+  String relayNoAnswer(String relay) {
+    return '$relay didn\'t answer.';
+  }
+
+  @override
+  String get homeRelayLocalOnly =>
+      'The relay can\'t be reached, so this computer\'s own service opened directly.';
+
+  @override
+  String get hostStopping => 'Stopping…';
+
+  @override
+  String get hostSaving => 'Saving…';
+
+  @override
+  String get hostRestarting => 'Restarting…';
+
+  @override
+  String hostStoppedToast(String name) {
+    return '$name stopped.';
+  }
+
+  @override
+  String get conversationsLoading => 'Loading conversations…';
 }

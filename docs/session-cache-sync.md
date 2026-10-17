@@ -154,6 +154,17 @@ and highlight the target through menu dismissal, with reduced-motion support.
 Local-session lists distinguish an unsupported mobile filesystem, a desktop with
 no sessions, and a failed scan; remote host lists remain available on mobile.
 
+### Anchored transcript (2026-10-17)
+
+The transcript is laid out around a centre row: rows above it grow upward and
+rows from it downward. A page or a gap filled above the reader therefore never
+moves the visible message, and the end or a jumped-to turn is exact in the
+frame it becomes the centre, whether or not the rows between were ever
+measured. A jump also reads the turn or page just above its landing, which is
+where the reader goes next; a turn whose pages are exhausted is not requested
+again, and a monitoring refresh cannot reopen it. Only the in-flight request
+marks history as loading, and only its own completion clears the mark.
+
 ### Deliberate limits
 
 - Opening restores retained sequential pages and selected-turn windows locally,

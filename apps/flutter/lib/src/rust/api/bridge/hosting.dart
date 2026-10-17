@@ -740,6 +740,10 @@ class OpenCodeHostStatusDto {
   /// Safe runtime or catalog diagnostic.
   final String? problem;
 
+  /// The host keeps its sessions in a database of its own, not in
+  /// OpenCode's default one.
+  final bool separateHistory;
+
   const OpenCodeHostStatusDto({
     required this.version,
     required this.providersConnected,
@@ -747,6 +751,7 @@ class OpenCodeHostStatusDto {
     this.defaultModel,
     required this.agents,
     this.problem,
+    required this.separateHistory,
   });
 
   @override
@@ -756,7 +761,8 @@ class OpenCodeHostStatusDto {
       models.hashCode ^
       defaultModel.hashCode ^
       agents.hashCode ^
-      problem.hashCode;
+      problem.hashCode ^
+      separateHistory.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -768,5 +774,6 @@ class OpenCodeHostStatusDto {
           models == other.models &&
           defaultModel == other.defaultModel &&
           agents == other.agents &&
-          problem == other.problem;
+          problem == other.problem &&
+          separateHistory == other.separateHistory;
 }

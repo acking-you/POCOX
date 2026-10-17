@@ -16,6 +16,7 @@ import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/brand_logo.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Default first-run experience: sign in to a hosted account. The convenient
 /// browser-redirect login is the default ("Sign in with GitHub" opens a browser
@@ -296,8 +297,21 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: BrandLogo(size: 72)),
-                const SizedBox(height: 24),
+                const Center(child: BrandLogo(size: 64)),
+                const SizedBox(height: 20),
+                BrandHeadline(
+                  l10n.accountWelcomeHeadline,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  l10n.accountWelcomeSubtitle,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 32),
                 if (widget.sessionExpired) ...[
                   DecoratedBox(
                     key: const Key('account-session-expired'),
@@ -311,7 +325,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(
-                            Icons.lock_clock_outlined,
+                            AppIcons.lock_clock_outlined,
                             size: 20,
                             color: theme.colorScheme.onErrorContainer,
                           ),
@@ -362,23 +376,27 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                   if (prefersDeviceCodeLogin) ...[
                     FilledButton.icon(
                       onPressed: _busy ? null : _startDevice,
-                      icon: const Icon(Icons.pin_outlined),
+                      style: _ctaStyle,
+                      icon: const Icon(AppIcons.pin_outlined),
                       label: Text(l10n.accountUseDeviceCode),
                     ),
-                    const SizedBox(height: 4),
-                    TextButton(
+                    const SizedBox(height: 10),
+                    OutlinedButton(
                       onPressed: _busy ? null : _startWeb,
+                      style: _ctaStyle,
                       child: Text(l10n.accountSignInButton),
                     ),
                   ] else ...[
                     FilledButton.icon(
                       onPressed: _busy ? null : _startWeb,
-                      icon: const Icon(Icons.login),
+                      style: _ctaStyle,
+                      icon: const Icon(AppIcons.login),
                       label: Text(l10n.accountSignInButton),
                     ),
-                    const SizedBox(height: 4),
-                    TextButton(
+                    const SizedBox(height: 10),
+                    OutlinedButton(
                       onPressed: _busy ? null : _startDevice,
+                      style: _ctaStyle,
                       child: Text(l10n.accountUseDeviceCode),
                     ),
                   ],
@@ -407,7 +425,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                       key: const Key('account-open-github'),
                       onPressed: () =>
                           _openVerification(device.verificationUri),
-                      icon: const Icon(Icons.open_in_new, size: 18),
+                      icon: const Icon(AppIcons.open_in_new, size: 18),
                       label: Text(l10n.accountOpenGitHub),
                     ),
                   ),
@@ -467,6 +485,12 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     );
   }
 }
+
+/// The sign-in actions are the page's whole purpose: full-size pills on
+/// every platform, not the denser desktop button.
+const _ctaStyle = ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size.fromHeight(46)),
+);
 
 /// One numbered step of the device-code flow.
 ///
@@ -589,7 +613,7 @@ class _DeviceCodeCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  Icons.copy_outlined,
+                  AppIcons.copy_outlined,
                   size: 18,
                   color: scheme.onSurfaceVariant,
                 ),

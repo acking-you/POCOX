@@ -24,7 +24,7 @@ class _CompactionNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return SystemNotice(
-      icon: Icons.compress,
+      icon: AppIcons.compress,
       text: item.streaming ? l10n.compactingContext : l10n.compacted,
       active: item.streaming,
     );
@@ -37,7 +37,7 @@ class _InterruptedNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SystemNotice(
-    icon: Icons.stop_circle_outlined,
+    icon: AppIcons.stop_circle_outlined,
     text: AppLocalizations.of(context).turnStopped,
   );
 }
@@ -47,7 +47,7 @@ class _HistoryGapNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SystemNotice(
-    icon: Icons.history_toggle_off,
+    icon: AppIcons.history_toggle_off,
     text: AppLocalizations.of(context).historyGapNotice,
   );
 }
@@ -70,7 +70,7 @@ class ContentOmittedNotice extends StatelessWidget {
         .toList();
     if (parts.contains('unavailable')) {
       return SystemNotice(
-        icon: Icons.cloud_off_outlined,
+        icon: AppIcons.cloud_off_outlined,
         text: l10n.contentUnavailableNotice,
       );
     }
@@ -87,7 +87,7 @@ class ContentOmittedNotice extends StatelessWidget {
     ];
     final unique = names.toSet().join(l10n.omittedSeparator);
     return SystemNotice(
-      icon: Icons.content_cut,
+      icon: AppIcons.content_cut,
       text: l10n.contentOmittedNotice(
         unique.isEmpty ? l10n.omittedContent : unique,
       ),

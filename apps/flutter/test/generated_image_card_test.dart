@@ -11,6 +11,7 @@ import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_rows.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 void main() {
   for (final width in [360.0, 800.0, 1280.0]) {
@@ -116,7 +117,7 @@ void main() {
         });
         await t.pump();
         expect(find.byKey(const Key('msg-image-0')), findsOneWidget);
-        expect(find.byIcon(Icons.broken_image_outlined), findsNothing);
+        expect(find.byIcon(AppIcons.broken_image_outlined), findsNothing);
         expect(t.takeException(), isNull);
         if (captureDirectory.isNotEmpty) {
           await t.runAsync(() async {

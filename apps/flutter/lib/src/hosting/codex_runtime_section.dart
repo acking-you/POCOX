@@ -6,11 +6,13 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/acp_host_form.dart';
-import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Horizontal padding of each Codex source segment.
 const _sourceSegmentPadding = EdgeInsets.symmetric(horizontal: 12);
@@ -237,7 +239,8 @@ class CodexRuntimeSection extends StatelessWidget {
     required this.enabled,
     required this.onBrowse,
     this.fixedName = false,
-    this.hint,
+    this.info,
+    this.takenNames = const {},
   });
 
   /// The fields.
@@ -246,8 +249,11 @@ class CodexRuntimeSection extends StatelessWidget {
   /// A running host: its name is shown, not editable.
   final bool fixedName;
 
-  /// Replaces the new-host hint under the title.
-  final String? hint;
+  /// Names this device's other hosts use; a new host's name must differ.
+  final Set<String> takenNames;
+
+  /// Replaces the new host's explanation behind the title's info mark.
+  final String? info;
 
   /// Whether the fields can be edited.
   final bool enabled;
@@ -263,7 +269,7 @@ class CodexRuntimeSection extends StatelessWidget {
       builder: (context, _) => GroupCard(
         key: const Key('codex-runtime-section'),
         title: l10n.hostRuntimeInfo,
-        hint: hint ?? l10n.localHostHint,
+        info: info ?? l10n.localHostHint,
         children: [EditorBlock(child: _fields(context, l10n))],
       ),
     );
@@ -271,7 +277,6 @@ class CodexRuntimeSection extends StatelessWidget {
 
   Widget _fields(BuildContext context, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
-    final small = Theme.of(context).textTheme.bodySmall;
     final children = <Widget>[
       LayoutBuilder(
         builder: (context, constraints) => SegmentedButton<bool>(
@@ -285,20 +290,20 @@ class CodexRuntimeSection extends StatelessWidget {
           ),
           segments: [
             ButtonSegment(value: false, label: Text(l10n.codexSourceExternal)),
-            // The built-in engine is not implemented: shown, never selectable.
+            // The built-in engine is not implemented: shown, marked as such,
+            // never selectable.
             ButtonSegment(
               value: true,
               enabled: false,
-              label: Text(l10n.codexSourceBuiltin),
+              tooltip: l10n.codexBuiltinNote,
+              label: Text(_builtinLabel(l10n)),
             ),
           ],
           selected: const {false},
           onSelectionChanged: enabled ? (_) {} : null,
         ),
       ),
-      const SizedBox(height: 8),
-      Text(l10n.codexBuiltinNote, style: small),
-      const SizedBox(height: 12),
+      const SizedBox(height: 14),
     ];
     if (!form.checked) {
       children.add(const LinearProgressIndicator());
@@ -319,7 +324,7 @@ class CodexRuntimeSection extends StatelessWidget {
                 TextButton.icon(
                   key: const Key('redetect-codex-btn'),
                   onPressed: enabled ? form.detect : null,
-                  icon: const Icon(Icons.refresh, size: 16),
+                  icon: const Icon(AppIcons.refresh, size: 16),
                   label: Text(l10n.codexRedetect),
                 ),
               ],
@@ -329,7 +334,8 @@ class CodexRuntimeSection extends StatelessWidget {
       }
       children.add(
         Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          // The button is centred on the field it fills.
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: TextField(
@@ -354,25 +360,42 @@ class CodexRuntimeSection extends StatelessWidget {
         ),
       );
     }
+    final clash = fixedName ? null : hostNameClash(form.name.text, takenNames);
     children
       ..add(const SizedBox(height: 12))
       ..add(
-        TextField(
-          key: const Key('codex-name-field'),
-          controller: form.name,
-          enabled: enabled && !fixedName,
-          decoration: InputDecoration(
-            labelText: l10n.localHostName,
-            helperText: l10n.hostNameHelper,
+        FocusHelp(
+          help: fixedName || clash != null ? null : l10n.hostNameHelper,
+          child: TextField(
+            key: const Key('codex-name-field'),
+            controller: form.name,
+            enabled: enabled && !fixedName,
+            decoration: InputDecoration(
+              labelText: l10n.localHostName,
+              errorText: switch (clash) {
+                final other? => l10n.hostNameInUse(other),
+                null => null,
+              },
+            ),
+            onChanged: (_) => form.nameEdited(),
           ),
-          onChanged: (_) => form.nameEdited(),
         ),
       )
+      ..add(const SizedBox(height: 6))
       ..add(
         SwitchListTile(
           key: const Key('use-proxy-switch'),
           contentPadding: EdgeInsets.zero,
           title: Text(l10n.useProxy),
+          // Without one, what that risks: the switch's own consequence.
+          subtitle: form.useProxy
+              ? null
+              : Text(
+                  l10n.noProxyWarning,
+                  style: helpTextStyle(
+                    Theme.of(context),
+                  ).copyWith(color: cautionColor(scheme)),
+                ),
           value: form.useProxy,
           onChanged: enabled
               ? (v) {
@@ -382,20 +405,18 @@ class CodexRuntimeSection extends StatelessWidget {
               : null,
         ),
       );
-    children.add(
-      form.useProxy
-          ? TextField(
-              key: const Key('proxy-field'),
-              controller: form.proxy,
-              enabled: enabled,
-              decoration: InputDecoration(labelText: l10n.proxyLabel),
-              onChanged: (_) => form.edited(),
-            )
-          : Text(
-              l10n.noProxyWarning,
-              style: TextStyle(color: cautionColor(scheme)),
-            ),
-    );
+    if (form.useProxy) {
+      children.add(
+        TextField(
+          key: const Key('proxy-field'),
+          controller: form.proxy,
+          enabled: enabled,
+          decoration: InputDecoration(labelText: l10n.proxyLabel),
+          onChanged: (_) => form.edited(),
+        ),
+      );
+    }
+    children.add(const SizedBox(height: 6));
     children.add(
       AdvancedToggle(
         key: const Key('codex-advanced-toggle'),
@@ -408,16 +429,16 @@ class CodexRuntimeSection extends StatelessWidget {
     );
     if (form.advanced) {
       children.add(
-        TextField(
-          key: const Key('codex-port-field'),
-          controller: form.port,
-          enabled: enabled,
-          decoration: InputDecoration(
-            labelText: l10n.localHostPort,
-            helperText: l10n.localHostPortHelper,
+        FocusHelp(
+          help: l10n.localHostPortHelper,
+          child: TextField(
+            key: const Key('codex-port-field'),
+            controller: form.port,
+            enabled: enabled,
+            decoration: InputDecoration(labelText: l10n.localHostPort),
+            keyboardType: TextInputType.number,
+            onChanged: (_) => form.portEdited(),
           ),
-          keyboardType: TextInputType.number,
-          onChanged: (_) => form.portEdited(),
         ),
       );
     }
@@ -433,7 +454,7 @@ class CodexRuntimeSection extends StatelessWidget {
     final status = Row(
       children: [
         Icon(
-          Icons.check_circle,
+          AppIcons.check_circle,
           size: 18,
           color: successColor(theme.colorScheme),
         ),
@@ -441,7 +462,9 @@ class CodexRuntimeSection extends StatelessWidget {
         Expanded(
           child: Text(
             l10n.codexFoundAt(form.found!),
-            style: theme.textTheme.bodySmall,
+            style: helpTextStyle(
+              theme,
+            ).copyWith(color: theme.colorScheme.onSurface),
             overflow: TextOverflow.ellipsis,
           ),
         ),
@@ -473,6 +496,10 @@ class CodexRuntimeSection extends StatelessWidget {
     );
   }
 
+  /// The disabled built-in segment's label, marked as not implemented.
+  static String _builtinLabel(AppLocalizations l10n) =>
+      '${l10n.codexSourceBuiltin} · ${l10n.codexBuiltinUnavailable}';
+
   /// Whether the Codex source segments fit side by side in [width], each
   /// label on one line beside the selected segment's check mark.
   static bool _sourceFitsAcross(BuildContext context, double width) {
@@ -483,7 +510,7 @@ class CodexRuntimeSection extends StatelessWidget {
     // its own icon padding (12 + 16) and gap (8), both at most at 1× text.
     final segment = math.max(
       12 + 16 + 18 + 8 + text(l10n.codexSourceExternal),
-      _sourceSegmentPadding.horizontal + text(l10n.codexSourceBuiltin),
+      _sourceSegmentPadding.horizontal + text(_builtinLabel(l10n)),
     );
     // Two segments plus the outer and dividing borders.
     return 2 * segment + 3 <= width;

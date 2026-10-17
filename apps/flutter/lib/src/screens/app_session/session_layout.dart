@@ -44,90 +44,111 @@ extension _SessionLayout on _AppSessionState {
         : (width - 480).clamp(200.0, 520.0);
     final maxReview = (width - 360).clamp(400.0, 1200.0);
     final sidebarWidth = _leftWidth.clamp(200.0, maxLeft);
+    final slide = _paneDragging
+        ? Duration.zero
+        : Motion.of(context, Motion.medium);
+    // The window in its layers: the backdrop, the sidebar drawn straight on
+    // it, and the conversation on a rounded sheet beside it.
     return Scaffold(
-      body: Row(
-        children: [
-          // The sidebar slides rather than snapping: the chat column visibly
-          // takes over the space, so the user sees where the list went. The
-          // content keeps its open width and is clipped while it slides, so
-          // rows never reflow mid-animation. A drag resizes without easing.
-          ClipRect(
-            child: AnimatedContainer(
-              duration: _paneDragging
-                  ? Duration.zero
-                  : Motion.of(context, Motion.medium),
-              curve: Motion.move,
-              width: _leftOpen ? sidebarWidth + 5 : 0,
-              onEnd: () {
-                if (_sidebarClosing && mounted) {
-                  _updateState(() => _sidebarClosing = false);
-                }
-              },
-              child: OverflowBox(
-                alignment: Alignment.centerRight,
-                minWidth: sidebarWidth + 5,
-                maxWidth: sidebarWidth + 5,
-                child: _leftOpen || _sidebarClosing
-                    ? Row(
-                        children: [
-                          SizedBox(width: sidebarWidth, child: _sidebar(l10n)),
-                          _splitter(
-                            key: const Key('left-splitter'),
-                            ground: surfaceSidebar(scheme),
-                            onDragStart: () =>
-                                _updateState(() => _paneDragging = true),
-                            onDrag: (dx) => _updateState(
-                              () => _leftWidth = (_leftWidth + dx).clamp(
-                                200,
-                                maxLeft,
+      backgroundColor: backdropBase(scheme),
+      body: AppBackdrop(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Row(
+                children: [
+                  // The sidebar slides rather than snapping: the sheet
+                  // visibly takes over the space, so the user sees where the
+                  // list went. The content keeps its open width and is
+                  // clipped while it slides, so rows never reflow
+                  // mid-animation. A drag resizes without easing.
+                  ClipRect(
+                    child: AnimatedContainer(
+                      duration: slide,
+                      curve: Motion.move,
+                      width: _leftOpen ? sidebarWidth + kSheetInset : 0,
+                      onEnd: () {
+                        if (_sidebarClosing && mounted) {
+                          _updateState(() => _sidebarClosing = false);
+                        }
+                      },
+                      child: OverflowBox(
+                        alignment: Alignment.centerRight,
+                        minWidth: sidebarWidth + kSheetInset,
+                        maxWidth: sidebarWidth + kSheetInset,
+                        child: _leftOpen || _sidebarClosing
+                            ? Row(
+                                children: [
+                                  SizedBox(
+                                    width: sidebarWidth,
+                                    child: _sidebar(l10n),
+                                  ),
+                                  // The gap before the sheet is the handle.
+                                  _splitter(
+                                    key: const Key('left-splitter'),
+                                    width: kSheetInset,
+                                    line: false,
+                                    onDragStart: () => _updateState(
+                                      () => _paneDragging = true,
+                                    ),
+                                    onDrag: (dx) => _updateState(
+                                      () => _leftWidth = (_leftWidth + dx)
+                                          .clamp(200, maxLeft),
+                                    ),
+                                    onDragEnd: () {
+                                      _updateState(() => _paneDragging = false);
+                                      ref
+                                          .read(uiPrefsProvider.notifier)
+                                          .setSidebarWidth(_leftWidth);
+                                    },
+                                  ),
+                                ],
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: AnimatedPadding(
+                      duration: slide,
+                      curve: Motion.move,
+                      padding: EdgeInsets.fromLTRB(
+                        _leftOpen ? 0 : kSheetInset,
+                        kSheetInset,
+                        kSheetInset,
+                        kSheetInset,
+                      ),
+                      child: ContentSheet(
+                        child: Column(
+                          children: [
+                            _contentTopBar(l10n, width),
+                            if (needsCodexSetup) _codexSetupBar(l10n),
+                            Expanded(
+                              child: _reviewLayer(
+                                canRight: canRight,
+                                width: _reviewWidth.clamp(400, maxReview),
+                                chat: _dropWrap(_chatPane(l10n), l10n),
                               ),
                             ),
-                            onDragEnd: () {
-                              _updateState(() => _paneDragging = false);
-                              ref
-                                  .read(uiPrefsProvider.notifier)
-                                  .setSidebarWidth(_leftWidth);
-                            },
-                          ),
-                        ],
-                      )
-                    : const SizedBox.shrink(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                _contentTopBar(l10n, width),
-                if (needsCodexSetup) _codexSetupBar(l10n),
-                Expanded(
-                  child: Row(
-                    children: [
-                      Expanded(child: _dropWrap(_chatPane(l10n), l10n)),
-                      if (canRight && _reviewOpen) ...[
-                        _splitter(
-                          key: const Key('review-splitter'),
-                          // Dragging left widens a right-hand pane, hence the
-                          // negation.
-                          onDrag: (dx) => _updateState(
-                            () => _reviewWidth = (_reviewWidth - dx).clamp(
-                              400,
-                              1200,
-                            ),
-                          ),
-                        ),
-                        SizedBox(
-                          width: _reviewWidth.clamp(400, maxReview),
-                          child: _reviewSplit(l10n),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+            // The gap above the sheet is window chrome too: it drags.
+            if (isFramelessDesktop)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: kSheetInset,
+                child: WindowDragArea(),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -138,6 +159,46 @@ extension _SessionLayout on _AppSessionState {
     AppLocalizations l10n, {
     required bool needsCodexSetup,
   }) {
+    final page = _phoneChat(l10n, needsCodexSetup: needsCodexSetup);
+    final duration = Motion.of(context, Motion.medium);
+    // The review is a page of its own here, sliding in over the
+    // conversation; back (or a swipe to the right) returns to it.
+    return PopScope(
+      canPop: !_reviewOpen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _reviewOpen) _closeReview();
+      },
+      child: Stack(
+        children: [
+          Positioned.fill(child: page),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_reviewOpen,
+              child: AnimatedSlide(
+                offset: _reviewOpen ? Offset.zero : const Offset(1, 0),
+                duration: duration,
+                curve: Motion.move,
+                onEnd: _reviewSettled,
+                child: _reviewTarget == null
+                    ? const SizedBox.shrink()
+                    : GestureDetector(
+                        onHorizontalDragEnd: (d) {
+                          if ((d.primaryVelocity ?? 0) > 400) _closeReview();
+                        },
+                        child: Material(
+                          color: sheetColor(Theme.of(context).colorScheme),
+                          child: SafeArea(child: _reviewPanel(page: true)),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _phoneChat(AppLocalizations l10n, {required bool needsCodexSetup}) {
     return Scaffold(
       appBar: WindowTitleBar(
         bottom: needsCodexSetup ? _codexSetupBar(l10n) : null,
@@ -145,7 +206,7 @@ extension _SessionLayout on _AppSessionState {
           builder: (ctx) => IconButton(
             key: const Key('sidebar-open-btn'),
             tooltip: l10n.conversationsSection,
-            icon: const Icon(Icons.menu),
+            icon: const Icon(AppIcons.menu),
             onPressed: () => LayeredNavigation.maybeOf(ctx)?.open(),
           ),
         ),
@@ -189,6 +250,118 @@ extension _SessionLayout on _AppSessionState {
     );
   }
 
+  /// A closed review, once it has slid away, stops being built.
+  void _reviewSettled() {
+    if (!_reviewOpen && _reviewTarget != null) {
+      _updateState(() => _reviewTarget = null);
+    }
+  }
+
+  /// The conversation and the review beside it. A wide window gives the
+  /// review a resizable sidebar that slides open; a narrower one lays it
+  /// over the conversation's right side, dimming the rest.
+  Widget _reviewLayer({
+    required bool canRight,
+    required double width,
+    required Widget chat,
+  }) {
+    final duration = _paneDragging
+        ? Duration.zero
+        : Motion.of(context, Motion.medium);
+    if (canRight) {
+      return Row(
+        children: [
+          Expanded(child: chat),
+          // The sidebar is laid out at its full width throughout and only
+          // revealed by the slide, so its rows never reflow mid-animation.
+          TweenAnimationBuilder<double>(
+            tween: Tween(end: _reviewOpen ? 1 : 0),
+            duration: duration,
+            curve: Motion.move,
+            onEnd: _reviewSettled,
+            builder: (context, shown, child) =>
+                (shown == 0 && !_reviewOpen) || child == null
+                ? const SizedBox.shrink()
+                : ClipRect(
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: shown,
+                      child: child,
+                    ),
+                  ),
+            child: _reviewTarget == null
+                ? null
+                : SizedBox(
+                    width: width + 5,
+                    child: Row(
+                      children: [
+                        _splitter(
+                          key: const Key('review-splitter'),
+                          // Dragging left widens a right-hand pane, hence
+                          // the negation.
+                          onDragStart: () =>
+                              _updateState(() => _paneDragging = true),
+                          onDrag: (dx) => _updateState(
+                            () => _reviewWidth = (_reviewWidth - dx).clamp(
+                              400,
+                              1200,
+                            ),
+                          ),
+                          onDragEnd: () =>
+                              _updateState(() => _paneDragging = false),
+                        ),
+                        Expanded(child: _reviewPanel()),
+                      ],
+                    ),
+                  ),
+          ),
+        ],
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, box) {
+        final panel = math.min(560.0, box.maxWidth - 48);
+        return Stack(
+          children: [
+            Positioned.fill(child: chat),
+            // A tap beside the panel puts it away.
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !_reviewOpen,
+                child: GestureDetector(
+                  onTap: _closeReview,
+                  child: AnimatedOpacity(
+                    opacity: _reviewOpen ? 1 : 0,
+                    duration: duration,
+                    child: ColoredBox(
+                      color: Colors.black.withValues(alpha: 0.12),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            AnimatedPositioned(
+              duration: duration,
+              curve: Motion.move,
+              onEnd: _reviewSettled,
+              top: 8,
+              bottom: 8,
+              right: _reviewOpen ? 8 : -panel - 24,
+              width: panel,
+              child: _reviewTarget == null
+                  ? const SizedBox.shrink()
+                  : Glass(
+                      depth: GlassDepth.overlay,
+                      borderRadius: BorderRadius.circular(kPanelRadius),
+                      child: _reviewPanel(),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   /// The phone's full-screen sessions list, lying under the conversation:
   /// the brand and a close control on top, then the same pane the desktop
   /// sidebar shows.
@@ -197,42 +370,45 @@ extension _SessionLayout on _AppSessionState {
     final scheme = theme.colorScheme;
     return Material(
       key: const Key('phone-sidebar'),
-      // The desktop sidebar's ground, composited onto the page so it stays
-      // opaque whatever the scheme's alpha.
-      color: Color.alphaBlend(surfaceSidebar(scheme), scheme.surface),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
-              child: Row(
-                children: [
-                  const BrandLogo(size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      l10n.appTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
+      // The window's backdrop: the list lies on the same lit ground as the
+      // desktop sidebar, under the conversation that slides aside.
+      color: backdropBase(scheme),
+      child: AppBackdrop(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
+                child: Row(
+                  children: [
+                    const BrandLogo(size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.appTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                  ),
-                  Builder(
-                    builder: (ctx) => IconButton(
-                      key: const Key('sidebar-close-btn'),
-                      tooltip: l10n.hideSidebar,
-                      icon: const Icon(Icons.close),
-                      onPressed: () => LayeredNavigation.maybeOf(ctx)?.close(),
+                    Builder(
+                      builder: (ctx) => IconButton(
+                        key: const Key('sidebar-close-btn'),
+                        tooltip: l10n.hideSidebar,
+                        icon: const Icon(AppIcons.close),
+                        onPressed: () =>
+                            LayeredNavigation.maybeOf(ctx)?.close(),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            _voiceStatus(l10n),
-            Expanded(child: _sessionsPane(l10n, inDrawer: true)),
-          ],
+              _voiceStatus(l10n),
+              Expanded(child: _sessionsPane(l10n, inDrawer: true)),
+            ],
+          ),
         ),
       ),
     );
@@ -244,7 +420,6 @@ extension _SessionLayout on _AppSessionState {
   /// over its leading inset, then the brand, then the collapse control. The
   /// strip also drags the window.
   Widget _sidebar(AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
     final mac = isFramelessDesktop && isMacDesktop;
     // The strip shares the content header's height, so the collapse control,
     // the traffic lights and the title all sit on one centre line. On macOS
@@ -281,13 +456,13 @@ extension _SessionLayout on _AppSessionState {
               _chromeButton(
                 key: const Key('sidebar-collapse-btn'),
                 tooltip: _withShortcut(l10n.hideSidebar, 'B'),
-                icon: Icons.view_sidebar_outlined,
+                icon: AppIcons.view_sidebar_outlined,
                 onPressed: () => _setLeftOpen(false),
               ),
               _chromeButton(
                 key: const Key('sidebar-new-conversation-btn'),
                 tooltip: _withShortcut(l10n.newConversation, 'N'),
-                icon: Icons.edit_square,
+                icon: AppIcons.edit_square,
                 onPressed: () => _newConversationInProject(_cwd, context),
               ),
               const SizedBox(width: 8),
@@ -297,9 +472,8 @@ extension _SessionLayout on _AppSessionState {
       ),
     );
     return Material(
-      // A step off the page, like a macOS source list; the splitter's hairline
-      // carries the actual edge.
-      color: surfaceSidebar(scheme),
+      // Drawn straight on the backdrop: the sheet beside it is the page.
+      type: MaterialType.transparency,
       child: Column(
         children: [
           strip,
@@ -374,6 +548,8 @@ extension _SessionLayout on _AppSessionState {
     VoidCallback? onDragStart,
     VoidCallback? onDragEnd,
     Color? ground,
+    double width = 5,
+    bool line = true,
   }) => MouseRegion(
     key: key,
     cursor: SystemMouseCursors.resizeLeftRight,
@@ -384,12 +560,16 @@ extension _SessionLayout on _AppSessionState {
       onHorizontalDragEnd: (_) => onDragEnd?.call(),
       onHorizontalDragCancel: () => onDragEnd?.call(),
       child: Container(
-        width: 5,
-        color: ground,
+        width: width,
+        color: ground ?? Colors.transparent,
         alignment: Alignment.centerRight,
+        // Beside a toned pane the change of ground is the seam; a drawn rule
+        // only where two equal grounds meet.
         child: VerticalDivider(
           width: 1,
-          color: Theme.of(context).colorScheme.outlineVariant,
+          color: ground != null || !line
+              ? Colors.transparent
+              : Theme.of(context).colorScheme.outlineVariant,
         ),
       ),
     ),

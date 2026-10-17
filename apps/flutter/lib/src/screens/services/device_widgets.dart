@@ -11,6 +11,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.capabilityCount,
     required this.onSelect,
     required this.filled,
+    this.relayDown = false,
   });
 
   final String relay;
@@ -25,6 +26,9 @@ class _DeviceColumn extends StatelessWidget {
   /// Whether to take the height it is given and scroll the device list inside.
   /// False sizes to the list instead, for a column that is the whole page.
   final bool filled;
+
+  /// The relay could not be reached.
+  final bool relayDown;
 
   @override
   Widget build(BuildContext context) {
@@ -44,103 +48,104 @@ class _DeviceColumn extends StatelessWidget {
           onTap: () => onSelect(device),
         ),
     ];
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: filled ? MainAxisSize.max : MainAxisSize.min,
-        children: [
-          // The identity opens settings, where the account, the relay, the key
-          // and signing out already live — a second account page would only
-          // duplicate that group. Self-host mode has no account, but the relay
-          // and key are configured there too, so it leads to the same place.
-          Tooltip(
-            message: l10n.settingsTitle,
-            child: InkWell(
-              key: const Key('identity-open-settings'),
-              mouseCursor: clickable,
-              onTap: () => context.push('/settings'),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final identity = Text(
-                    accountLogin == null ? relay : '@$accountLogin',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  );
-                  final status = StatusChip(
-                    color: online,
-                    label: l10n.statusOnline,
-                    filled: true,
-                  );
-                  // The status sits beside the identity while both stay
-                  // readable there, otherwise under it.
-                  final beside =
-                      constraints.maxWidth >=
-                      _identityRowWidth(context, l10n.statusOnline);
-                  return Padding(
-                    padding: const EdgeInsets.all(_identityPadding),
-                    child: Row(
-                      children: [
-                        GitHubAvatar(
-                          accountId: accountId,
-                          fallbackIcon: accountLogin == null
-                              ? Icons.dns_outlined
-                              : Icons.person_outline,
-                          size: _avatarSize,
-                        ),
-                        const SizedBox(width: _avatarGap),
-                        if (beside) ...[
-                          Expanded(child: identity),
-                          status,
-                        ] else
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                identity,
-                                const SizedBox(height: 4),
-                                status,
-                              ],
-                            ),
-                          ),
-                        Icon(
-                          Icons.chevron_right,
-                          size: _chevronSize,
-                          color: scheme.outline,
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-          Divider(height: 1, color: scheme.outlineVariant),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 13, 14, 7),
-            child: Text(
-              l10n.servicesDevices.toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          if (filled)
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                children: tiles,
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              child: Column(children: tiles),
-            ),
-        ],
+    // The relay (or account) this list comes from, as a small raised card;
+    // the devices below it are rows on the sheet itself, the chosen one
+    // lifted into a card of its own — one level of plates, not a slab.
+    final identity = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(kCardRadius),
+        boxShadow: raisedCardShadows(scheme),
       ),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Tooltip(
+          message: l10n.settingsTitle,
+          child: InkWell(
+            key: const Key('identity-open-settings'),
+            mouseCursor: clickable,
+            onTap: () => context.push('/settings'),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final identity = Text(
+                  accountLogin == null ? relay : '@$accountLogin',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                );
+                final label = relayDown
+                    ? l10n.statusUnreachable
+                    : l10n.statusOnline;
+                final status = StatusChip(
+                  color: relayDown ? scheme.error : online,
+                  label: label,
+                  filled: true,
+                );
+                // The status sits beside the identity while both stay
+                // readable there, otherwise under it.
+                final beside =
+                    constraints.maxWidth >= _identityRowWidth(context, label);
+                return Padding(
+                  padding: const EdgeInsets.all(_identityPadding),
+                  child: Row(
+                    children: [
+                      GitHubAvatar(
+                        accountId: accountId,
+                        fallbackIcon: accountLogin == null
+                            ? AppIcons.lan_outlined
+                            : AppIcons.person_outline,
+                        size: _avatarSize,
+                      ),
+                      const SizedBox(width: _avatarGap),
+                      if (beside) ...[
+                        Expanded(child: identity),
+                        status,
+                      ] else
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              identity,
+                              const SizedBox(height: 4),
+                              status,
+                            ],
+                          ),
+                        ),
+                      Icon(
+                        AppIcons.chevron_right,
+                        size: _chevronSize,
+                        color: scheme.outline,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: filled ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        identity,
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 20, 14, 8),
+          child: Text(
+            l10n.servicesDevices.toUpperCase(),
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (filled)
+          Expanded(
+            child: ListView(padding: EdgeInsets.zero, children: tiles),
+          )
+        else
+          Column(children: tiles),
+      ],
     );
   }
 }
@@ -195,26 +200,35 @@ class _DeviceTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: selected ? surfaceSelection(scheme) : Colors.transparent,
-        borderRadius: BorderRadius.circular(kControlRadius),
+        // The chosen device is lifted into a card of its own; the rest are
+        // rows on the sheet.
+        color: selected ? raisedCardColor(scheme) : Colors.transparent,
+        elevation: selected ? 1 : 0,
+        shadowColor: sidebarSelectionShadow(scheme),
+        animationDuration: Motion.of(context, Motion.fast),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(kRowRadius),
+          side: selected
+              ? BorderSide(color: raisedCardEdge(scheme))
+              : BorderSide.none,
+        ),
         child: InkWell(
           mouseCursor: clickable,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(kControlRadius),
+          borderRadius: BorderRadius.circular(kRowRadius),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
             child: Row(
               children: [
                 Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: surfacePanel(scheme),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: scheme.outlineVariant),
+                    color: softWash(scheme),
+                    shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    Icons.dns_outlined,
+                    AppIcons.computer,
                     size: 17,
                     color: selected
                         ? scheme.onSurface
@@ -272,23 +286,13 @@ class _DeviceDetailHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: _rowOrStacked(
         context,
-        leading: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(kControlRadius + 2),
-            ),
-            child: Icon(Icons.dns_outlined, color: scheme.onSurface),
-          ),
-          const SizedBox(width: 12),
-        ],
+        // The device list beside it already carries the device's glyph;
+        // the heading is its name alone.
+        leading: const [SizedBox(width: 4)],
         body: Text(
           device ?? l10n.servicesDevices,
           style: Theme.of(
@@ -304,7 +308,7 @@ class _DeviceDetailHeader extends StatelessWidget {
             TextButton.icon(
               key: const Key('device-clean-unreachable'),
               onPressed: onClean,
-              icon: const Icon(Icons.cleaning_services_outlined, size: 17),
+              icon: const Icon(AppIcons.cleaning_services_outlined, size: 17),
               label: Text(l10n.batchRemoveEnter),
             ),
           ],

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/service_key.dart';
 
 part 'support/fake_bridge/state.dart';
@@ -26,13 +27,8 @@ class FakeBridgeApi extends _FakeBridgeState
   static AppServeStatus openCodeHost(
     String name, {
     String? binary,
-    OpenCodeHostStatus? status = const OpenCodeHostStatus(
-      version: '1.19.0',
-      providersConnected: 1,
-      models: 2,
-      defaultModel: 'fixture/test',
-      agents: ['build', 'plan'],
-    ),
+    bool separateHistory = false,
+    OpenCodeHostStatus? status,
   }) => AppServeStatus(
     name: name,
     device: 'local',
@@ -47,6 +43,15 @@ class FakeBridgeApi extends _FakeBridgeState
     provider: 'opencode',
     protocol: 'opencode-http',
     providerName: 'OpenCode',
-    opencode: status,
+    opencode:
+        status ??
+        OpenCodeHostStatus(
+          version: '1.19.0',
+          providersConnected: 1,
+          models: 2,
+          defaultModel: 'fixture/test',
+          agents: const ['build', 'plan'],
+          separateHistory: separateHistory,
+        ),
   );
 }

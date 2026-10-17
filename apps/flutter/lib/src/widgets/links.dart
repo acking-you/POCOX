@@ -65,7 +65,7 @@ final _cjkBeforeUrl = RegExp(r'([　-〿一-鿿＀-￯])(https?://)');
 String autolinkifyMarkdown(String data) =>
     data.replaceAllMapped(_cjkBeforeUrl, (m) => '${m[1]} ${m[2]}');
 
-/// `onTapLink` handler for `MarkdownBody`: opens the tapped href in the browser.
+/// Tap handler for Markdown links: opens the tapped href in the browser.
 /// (`text` and `title` are part of the callback signature but unused here.)
 void onTapMarkdownLink(
   BuildContext context,

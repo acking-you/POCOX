@@ -39,9 +39,10 @@ class UiPrefs {
   /// The ACP agents the user left hosted, restored on a desktop cold start.
   final List<AutoHostAcpPrefs> autoHostAcp;
 
-  /// The native OpenCode host the user left running, restored on a desktop
-  /// cold start. One per device: Pocket hosts one `opencode serve` per
-  /// OpenCode database.
+  /// The native OpenCode host on OpenCode's default database the user left
+  /// running, restored on a desktop cold start (one host serves that
+  /// database at a time). Hosts with a history of their own are restored
+  /// from the bridge's records only.
   final AutoHostOpenCodePrefs? autoHostOpenCode;
 
   /// Full relay key of the app service explicitly chosen as the default host.
@@ -619,8 +620,9 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
     return (p.copyWith(autoHostAcp: [...others, host]), true);
   });
 
-  /// Remember the native OpenCode host the user just started; it replaces
-  /// any earlier record (one OpenCode host per device).
+  /// Remember the native OpenCode host the user just started on OpenCode's
+  /// default database; it replaces any earlier record (one host serves that
+  /// database at a time).
   void setAutoHostOpenCode(AutoHostOpenCodePrefs host) => _mutate((p) {
     final saved = p.autoHostOpenCode;
     if (saved?.name == host.name && saved?.binary == host.binary) return null;

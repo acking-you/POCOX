@@ -219,7 +219,7 @@ void _registerDiscovery() {
     // The header shows the signed-in GitHub identity…
     expect(find.text('@acking-you'), findsOneWidget);
     // …and never the confusing "(no relay configured)" placeholder.
-    expect(find.text('(未配置 relay)'), findsNothing);
+    expect(find.text('（未配置 relay）'), findsNothing);
   });
 
   testWidgets('the identity row is the way into settings', (t) async {
@@ -523,12 +523,12 @@ void _registerDiscovery() {
     await t.pumpWidget(host(const ServicesScreen(), api));
     await t.pumpAndSettle();
     await openDevice(t);
-    expect(find.text('App-server'), findsOneWidget);
+    expect(find.textContaining('App-server'), findsOneWidget);
 
     // Tapping refresh re-discovers (skeleton flashes, then data) without error.
     await t.tap(find.byKey(const Key('refresh-btn')));
     await t.pumpAndSettle();
-    expect(find.text('App-server'), findsOneWidget);
+    expect(find.textContaining('App-server'), findsOneWidget);
   });
 
   testWidgets('Services screen shows a loading skeleton before data', (
@@ -553,6 +553,6 @@ void _registerDiscovery() {
     // Data arrived → skeleton gone, the capability is listed.
     expect(find.byType(ListLoadingSkeleton), findsNothing);
     await openDevice(t);
-    expect(find.text('App-server'), findsOneWidget);
+    expect(find.textContaining('App-server'), findsOneWidget);
   });
 }

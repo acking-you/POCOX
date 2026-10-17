@@ -100,7 +100,8 @@ void _registerRestore() {
     );
     expect(plan.codex.map((h) => h.name), ['legacy']);
     expect(plan.overrides.map((o) => o.name), ['remote-added', 'oc-new']);
-    // One OpenCode per device: the override's wins over the legacy record.
+    // One host at a time on OpenCode's default database: the override's
+    // wins over the legacy record.
     expect(plan.opencode, isNull);
     expect(plan.names.codex, {'legacy', 'remote-added'});
     expect(plan.names.acp, {'oc-new'});
@@ -298,6 +299,48 @@ void _registerRestore() {
     expect(api.startConfiguredCalls, isEmpty);
   });
 
+  test('OpenCode hosts with their own history all restore; one host on '
+      'the default database', () {
+    HostRestorePlan plan(List<AppServeStatus> local) => planHostRestore(
+      const UiPrefs(),
+      local,
+      codexAttempted: const {},
+      acpAttempted: const {},
+      acpSupported: true,
+      overrides: const [
+        HostRestoreOverride(
+          name: 'oc-a',
+          revision: 1,
+          runtime: HostRuntime.opencode(),
+        ),
+        HostRestoreOverride(
+          name: 'oc-b',
+          revision: 2,
+          runtime: HostRuntime.opencode(separateHistory: true),
+        ),
+        HostRestoreOverride(
+          name: 'oc-c',
+          revision: 3,
+          runtime: HostRuntime.opencode(separateHistory: true),
+        ),
+        HostRestoreOverride(
+          name: 'oc-d',
+          revision: 4,
+          runtime: HostRuntime.opencode(),
+        ),
+      ],
+    );
+    expect(plan(const []).overrides.map((o) => o.name), [
+      'oc-a',
+      'oc-b',
+      'oc-c',
+    ]);
+    expect(
+      plan([FakeBridgeApi.openCodeHost('busy')]).overrides.map((o) => o.name),
+      ['oc-b', 'oc-c'],
+    );
+  });
+
   test('a skipped OpenCode restore keeps its restore record', () {
     // The plan is made from the record; nothing in a refused restore
     // touches preferences, so the next launch plans it again.
@@ -444,8 +487,12 @@ void _registerRestore() {
       await _start(t);
       expect(api.lastServeName, 'default', reason: 'hosting started');
       expect(find.byType(LocalHostDialog), findsNothing);
+      // One toast: the start, and the warning beside it.
       expect(
-        find.text(en.managedRestoreProblem('storage is read-only')),
+        find.text(
+          '${en.managedStarted('default')}\n'
+          '${en.managedRestoreProblem('storage is read-only')}',
+        ),
         findsOneWidget,
       );
     });

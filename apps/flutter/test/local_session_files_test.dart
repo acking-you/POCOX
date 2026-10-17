@@ -14,6 +14,7 @@ import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 
 import 'fake_bridge_api.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 final _png = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgaPj/HwAEggJ/59habAAAAABJRU5ErkJggg==',
@@ -146,7 +147,7 @@ void main() {
       );
       await t.pump();
       expect(decodeError, isNull);
-      expect(find.byIcon(Icons.broken_image_outlined), findsNothing);
+      expect(find.byIcon(AppIcons.broken_image_outlined), findsNothing);
       await t.tap(
         find.ancestor(of: thumbnail, matching: find.byType(AttachmentTile)),
       );

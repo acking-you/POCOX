@@ -11,6 +11,7 @@ import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Where a host switch stands. Owned by the home, which does the switching,
 /// and shown wherever the user is looking: the switcher row and the strip
@@ -162,6 +163,7 @@ class _HostSwitcherState extends State<HostSwitcher> {
 
   Future<void> _openSheet() => showAdaptivePanel<void>(
     context: context,
+    anchored: true,
     builder: (c) => ValueListenableBuilder(
       valueListenable: _services,
       builder: (_, services, _) => _HostList(
@@ -261,7 +263,7 @@ class _HostSwitcherState extends State<HostSwitcher> {
                 ),
                 if (opens && !busy)
                   Icon(
-                    Icons.unfold_more_rounded,
+                    AppIcons.unfold_more_rounded,
                     size: 16,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -421,7 +423,7 @@ class _HostList extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.add, size: 16, color: scheme.onSurfaceVariant),
+                  Icon(AppIcons.add, size: 16, color: scheme.onSurfaceVariant),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -504,7 +506,7 @@ class _HostList extends StatelessWidget {
               size: 8,
             ),
             if (isCurrent)
-              Icon(Icons.check, size: 16, color: signalColor(scheme)),
+              Icon(AppIcons.check, size: 16, color: signalColor(scheme)),
           ],
         ),
       ),
@@ -565,7 +567,7 @@ class HostSwitchBanner extends StatelessWidget {
         key: const Key('host-switch-banner'),
         margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
         decoration: BoxDecoration(
-          color: failed ? scheme.errorContainer : accentWash(scheme),
+          color: failed ? scheme.errorContainer : softWash(scheme),
           borderRadius: BorderRadius.circular(kPanelRadius),
         ),
         clipBehavior: Clip.antiAlias,
@@ -578,7 +580,9 @@ class HostSwitchBanner extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    failed ? Icons.cloud_off_outlined : Icons.sync_rounded,
+                    failed
+                        ? AppIcons.cloud_off_outlined
+                        : AppIcons.sync_rounded,
                     size: 18,
                     color: failed
                         ? scheme.onErrorContainer
@@ -637,7 +641,7 @@ class HostSwitchBanner extends StatelessWidget {
                       tooltip: MaterialLocalizations.of(
                         context,
                       ).closeButtonTooltip,
-                      icon: const Icon(Icons.close, size: 18),
+                      icon: const Icon(AppIcons.close, size: 18),
                       onPressed: onDismiss,
                     ),
                   ],
@@ -723,7 +727,7 @@ class _RefreshServicesRowState extends State<_RefreshServicesRow> {
                       strokeWidth: 2,
                       color: scheme.tertiary,
                     )
-                  : Icon(Icons.refresh, size: 16, color: scheme.tertiary),
+                  : Icon(AppIcons.refresh, size: 16, color: scheme.tertiary),
             ),
             const SizedBox(width: 12),
             Expanded(

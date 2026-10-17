@@ -1178,6 +1178,11 @@ pub fn classify_turn_state(path: &Path) -> Result<TurnState> {
 #[path = "rollout_state_cache.rs"]
 mod state_cache;
 
+#[path = "rollout_inline_image.rs"]
+mod inline_image;
+
+pub use inline_image::inline_user_image;
+
 /// Classify turn state from an ordered iterator of rollout lines.
 ///
 /// Pure and allocation-light: a cheap substring prefilter skips the

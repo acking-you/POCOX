@@ -19,6 +19,7 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/screen_harness.dart';
+import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 
 const _acp = 'pcx:dev:acp:agent';
 
@@ -637,9 +638,7 @@ void main() {
           await t.pumpAndSettle();
           expect(
             t
-                .widgetList<CheckedPopupMenuItem<String>>(
-                  find.byType(CheckedPopupMenuItem<String>),
-                )
+                .widgetList<ChoiceRow<String>>(find.byType(ChoiceRow<String>))
                 .map((item) => item.value),
             unorderedEquals(['gw/model-x', 'gw/model-y']),
           );
@@ -663,9 +662,7 @@ void main() {
 
 /// The values the open menu offers, and those it shows checked.
 ({List<String> values, List<String> checked}) _openMenu(WidgetTester t) {
-  final items = t.widgetList<CheckedPopupMenuItem<String>>(
-    find.byType(CheckedPopupMenuItem<String>),
-  );
+  final items = t.widgetList<ChoiceRow<String>>(find.byType(ChoiceRow<String>));
   return (
     values: [for (final item in items) item.value!],
     checked: [
@@ -677,17 +674,14 @@ void main() {
 
 /// Dismiss the open menu without choosing.
 Future<void> _closeMenu(WidgetTester t) async {
-  Navigator.of(
-    t.element(find.byType(CheckedPopupMenuItem<String>).first),
-  ).pop();
+  Navigator.of(t.element(find.byType(ChoiceRow<String>).first)).pop();
   await t.pumpAndSettle();
-  expect(find.byType(CheckedPopupMenuItem<String>), findsNothing);
+  expect(find.byType(ChoiceRow<String>), findsNothing);
 }
 
 /// The open menu's item for [value].
-Finder _menuItem(String value) => find.byWidgetPredicate(
-  (w) => w is CheckedPopupMenuItem<String> && w.value == value,
-);
+Finder _menuItem(String value) =>
+    find.byWidgetPredicate((w) => w is ChoiceRow<String> && w.value == value);
 
 /// The chip of [option] announces and shows `title: full`, and its visible
 /// text, whatever the font, keeps [tail]: either the whole label or "…" and

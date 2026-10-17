@@ -17,6 +17,7 @@ import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/theme.dart';
 
 import 'support/ui_preview.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 const _sizes = [
   ('phone320', Size(320, 640)),
@@ -204,7 +205,7 @@ void main() {
       ),
     );
     expect(
-      find.descendant(of: anthropic, matching: find.byIcon(Icons.check)),
+      find.descendant(of: anthropic, matching: find.byIcon(AppIcons.check)),
       findsOneWidget,
     );
     final responses = find.byKey(const Key('host-protocol-responses'));
@@ -219,7 +220,7 @@ void main() {
       ),
     );
     expect(
-      find.descendant(of: responses, matching: find.byIcon(Icons.check)),
+      find.descendant(of: responses, matching: find.byIcon(AppIcons.check)),
       findsNothing,
     );
 

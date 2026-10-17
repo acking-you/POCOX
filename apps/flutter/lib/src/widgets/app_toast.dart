@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Transient confirmations and failures, in the app's own surface language.
 ///
@@ -117,9 +119,9 @@ SnackBar _bar({
   required bool wide,
 }) {
   final (IconData icon, Color color) = switch (tone) {
-    _Tone.ok => (Icons.check_circle_outline, successColor(scheme)),
-    _Tone.error => (Icons.error_outline, scheme.error),
-    _Tone.neutral => (Icons.info_outline, infoColor(scheme)),
+    _Tone.ok => (AppIcons.check_circle_outline, successColor(scheme)),
+    _Tone.error => (AppIcons.error_outline, scheme.error),
+    _Tone.neutral => (AppIcons.info_outline, infoColor(scheme)),
   };
   return SnackBar(
     // The SnackBar is only the positioning and the timing; every pixel of the
@@ -131,18 +133,12 @@ SnackBar _bar({
     duration: tone == _Tone.error ? _longEnoughToRead : _briefly,
     width: wide ? _desktopWidth : null,
     margin: wide ? null : const EdgeInsets.all(12),
-    content: DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(kPanelRadius),
-        boxShadow: panelShadow(scheme),
-      ),
-      child: Container(
+    // A pane of glass over whatever the page shows beneath it.
+    content: Glass(
+      depth: GlassDepth.overlay,
+      borderRadius: BorderRadius.circular(kPanelRadius),
+      child: Padding(
         padding: _cardPadding,
-        decoration: BoxDecoration(
-          color: surfacePanel(scheme),
-          borderRadius: BorderRadius.circular(kPanelRadius),
-          border: Border.all(color: scheme.outline),
-        ),
         child: Row(
           children: [
             Icon(icon, size: _glyphSize, color: color),

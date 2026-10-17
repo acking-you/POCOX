@@ -5,7 +5,7 @@ class MainFlutterWindow: NSWindow {
   /// Height of the app's own top strip (`WindowChrome.barHeight` in Dart).
   /// The traffic lights are centred in it, the way a unified toolbar window
   /// places them, so the sidebar and header controls share their centre line.
-  static let titleStripHeight: CGFloat = 52
+  static let titleStripHeight: CGFloat = 60
 
   /// Leading inset of the close button, matching AppKit's toolbar layout.
   static let trafficLightInset: CGFloat = 20

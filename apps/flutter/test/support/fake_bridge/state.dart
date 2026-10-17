@@ -121,6 +121,9 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// When set, [appServeStart] waits for it (then clears it).
   Completer<void>? serveStartGate;
 
+  /// Thrown by the next [appServeStart] (then cleared).
+  Object? serveStartError;
+
   AppServeStatus _withTunnel(AppServeStatus h, String kind, bool registered) =>
       AppServeStatus(
         name: h.name,
@@ -470,7 +473,7 @@ abstract class _FakeBridgeState implements BridgeApi {
       providerName: agent?.displayName ?? h.providerName,
       profileId: agent?.profileId ?? h.profileId,
       agentPhase: h.agentPhase,
-      opencode: h.opencode,
+      opencode: _withHistory(h.opencode, runtime),
       configSource: config?.source ?? h.configSource ?? 'inherited',
       configRevision: config?.revision ?? h.configRevision ?? 0,
       incarnation: nextIncarnation(),

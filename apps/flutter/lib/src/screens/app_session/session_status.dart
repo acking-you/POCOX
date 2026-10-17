@@ -12,7 +12,7 @@ extension _SessionStatus on _AppSessionState {
       return (
         color: infoColor(scheme),
         label: l10n.guardianReadOnly,
-        icon: Icons.policy_outlined,
+        icon: AppIcons.policy_outlined,
         nominal: false,
       );
     }
@@ -39,7 +39,9 @@ extension _SessionStatus on _AppSessionState {
         label: resumable
             ? l10n.sessionInUseElsewhere
             : l10n.sessionRunningElsewhere,
-        icon: resumable ? Icons.lock_open_outlined : Icons.lock_clock_outlined,
+        icon: resumable
+            ? AppIcons.lock_open_outlined
+            : AppIcons.lock_clock_outlined,
         nominal: false,
       );
     }
@@ -47,7 +49,7 @@ extension _SessionStatus on _AppSessionState {
       return (
         color: cautionColor(scheme),
         label: l10n.stateReconnecting,
-        icon: Icons.autorenew,
+        icon: AppIcons.autorenew,
         nominal: false,
       );
     }
@@ -55,7 +57,7 @@ extension _SessionStatus on _AppSessionState {
       return (
         color: scheme.error,
         label: l10n.stateDisconnected,
-        icon: Icons.cloud_off,
+        icon: AppIcons.cloud_off,
         nominal: false,
       );
     }
@@ -63,7 +65,7 @@ extension _SessionStatus on _AppSessionState {
       return (
         color: signalColor(scheme),
         label: _planActive ? l10n.statePlanning : l10n.stateWorking,
-        icon: Icons.autorenew,
+        icon: AppIcons.autorenew,
         nominal: false,
       );
     }
@@ -71,7 +73,7 @@ extension _SessionStatus on _AppSessionState {
       return (
         color: cautionColor(scheme),
         label: l10n.statePlanMode,
-        icon: Icons.checklist_rtl,
+        icon: AppIcons.checklist_rtl,
         nominal: false,
       );
     }
@@ -82,7 +84,7 @@ extension _SessionStatus on _AppSessionState {
     return (
       color: scheme.onSurfaceVariant,
       label: l10n.stateReady,
-      icon: Icons.check_circle_outline,
+      icon: AppIcons.check_circle_outline,
       nominal: true,
     );
   }
@@ -127,9 +129,9 @@ extension _SessionStatus on _AppSessionState {
       duration: Motion.of(context, Motion.medium),
       curve: Motion.move,
       width: double.infinity,
-      // At rest the bar is part of the page — the header's ground under one
-      // hairline. A state that needs attention tints the whole strip, so
-      // colour arriving here means something actually changed.
+      // At rest the bar is part of the page — the header's own ground, with
+      // no rule under it. A state that needs attention tints the whole strip,
+      // so colour arriving here means something actually changed.
       decoration: BoxDecoration(
         color: st.nominal
             ? surfaceBackground(scheme)
@@ -137,7 +139,6 @@ extension _SessionStatus on _AppSessionState {
                 st.color.withValues(alpha: 0.08),
                 surfaceBackground(scheme),
               ),
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
       ),
       padding: EdgeInsets.fromLTRB(isDesktop ? 18 : 14, 3, 14, 5),
       child: Row(
@@ -185,12 +186,6 @@ extension _SessionStatus on _AppSessionState {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.auto_awesome,
-                        size: 12,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 4),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 180),
                         child: Text(
@@ -202,15 +197,24 @@ extension _SessionStatus on _AppSessionState {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 3),
-                      Icon(
-                        activeModel.confirmed
-                            ? Icons.check_circle_outline
-                            : Icons.hourglass_empty,
-                        size: 11,
-                        color: activeModel.confirmed
-                            ? additionColor(scheme)
-                            : scheme.onSurfaceVariant,
+                      const SizedBox(width: 6),
+                      // Confirmed by the server: a solid dot; still
+                      // pending: a hollow one.
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: activeModel.confirmed
+                              ? additionColor(scheme)
+                              : null,
+                          border: activeModel.confirmed
+                              ? null
+                              : Border.all(
+                                  color: scheme.onSurfaceVariant,
+                                  width: 1.2,
+                                ),
+                        ),
                       ),
                     ],
                   ),
@@ -223,14 +227,17 @@ extension _SessionStatus on _AppSessionState {
           // into its transcript footnote; an external turn counts from when
           // this read-only observer attached and disappears when it finishes.
           if (running) ...[
-            Icon(Icons.schedule, size: 12, color: st.color),
+            Icon(AppIcons.schedule, size: 12, color: st.color),
             const SizedBox(width: 4),
-            Text(
-              _fmtElapsed(_elapsedSecs),
-              style: TextStyle(
-                fontSize: 12,
-                color: st.color,
-                fontFeatures: const [FontFeature.tabularFigures()],
+            ValueListenableBuilder<int>(
+              valueListenable: _elapsed,
+              builder: (context, secs, _) => Text(
+                _fmtElapsed(secs),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: st.color,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -272,7 +279,7 @@ extension _SessionStatus on _AppSessionState {
                         )
                       else
                         Icon(
-                          Icons.account_tree_outlined,
+                          AppIcons.account_tree_outlined,
                           size: 12,
                           color: scheme.onSurfaceVariant,
                         ),
@@ -358,7 +365,7 @@ extension _SessionStatus on _AppSessionState {
     return HostSwitchBanner(
       pending: pending,
       targetLabel: match.isEmpty
-          ? _AppSessionState._serviceLabelFromKey(pending.target)
+          ? serviceKeyLabel(pending.target)
           : hostLabel(match.first),
       onRetry: () => widget.onSwitchService?.call(pending.target),
       onDismiss: () => widget.onDismissHostSwitch?.call(),

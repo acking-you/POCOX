@@ -2,7 +2,11 @@ import 'transcript_model.dart';
 import 'activity_cards.dart' show AgentTurn, TurnWork;
 
 /// Build stable, collapsed timeline rows in linear time.
-List<Object> buildTranscriptRows(List<TranscriptItem> items) {
+List<Object> buildTranscriptRows(List<TranscriptItem> source) {
+  // A blank reply has nothing to show; as a row it would only be a gap.
+  final items = source.any((item) => item.isBlankReply)
+      ? source.where((item) => !item.isBlankReply).toList()
+      : source;
   final finalReply = List<bool>.filled(items.length, false);
   var activityAfter = false;
   String? nextTurn;

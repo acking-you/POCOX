@@ -18,9 +18,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/screens/app_session/option_picker.dart';
 import 'package:pocket_codex/src/text_measure.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// [options] in display order: model, thought level, mode, then the others,
 /// each group in agent order.
@@ -236,8 +240,17 @@ class AgentSessionOptions extends StatefulWidget {
   /// narrowest a segment gets.
   static const double _segmentChrome = 54;
 
+  /// The least of a label a shared line must still show: two glyphs and
+  /// the ellipsis.
+  static const double _minLabelGlimpse = 24;
+
+  /// The widest a non-model segment grows: room for a whole mode name such
+  /// as "Bypass permissions" on a desktop composer, a phone's share of the
+  /// line on touch.
+  static double get _optionCap => isDesktop ? 200 : 160;
+
   /// The capsule's own edge and inner padding.
-  static const double _capsuleChrome = 6;
+  static const double _capsuleChrome = 2;
 
   /// Each segment's label and widest width, in display order.
   static List<({String label, double cap})> _segments(
@@ -248,7 +261,7 @@ class AgentSessionOptions extends StatefulWidget {
       for (final option in orderedOptions(settings.configOptions))
         (
           label: option.currentLabel,
-          cap: option.category == 'model' ? 220 : 160,
+          cap: option.category == 'model' ? 220 : _optionCap,
         ),
     if (settings != null && showsLegacyModes(settings))
       (
@@ -258,7 +271,7 @@ class AgentSessionOptions extends StatefulWidget {
                 .firstOrNull
                 ?.name ??
             modeTitle,
-        cap: 160,
+        cap: _optionCap,
       ),
   ];
 
@@ -269,7 +282,7 @@ class AgentSessionOptions extends StatefulWidget {
             measureTextLine(
               context,
               label,
-              const TextStyle(fontSize: 12.5),
+              optionLabelStyle,
             ).width.ceilToDouble(),
       );
 
@@ -367,12 +380,12 @@ class AgentSessionOptions extends StatefulWidget {
                       .firstOrNull ??
                   option.currentValue,
               icon: switch (option.category) {
-                'model' => Icons.auto_awesome,
-                'thought_level' => Icons.psychology_outlined,
-                'mode' => Icons.swap_horiz,
-                _ => Icons.tune,
+                'model' => AppIcons.auto_awesome,
+                'thought_level' => AppIcons.psychology_outlined,
+                'mode' => AppIcons.swap_horiz,
+                _ => AppIcons.tune,
               },
-              maxWidth: fit(option.category == 'model' ? 220 : 160),
+              maxWidth: fit(option.category == 'model' ? 220 : _optionCap),
               enabled: enabled,
               entries: [
                 for (final value in option.values)
@@ -400,8 +413,8 @@ class AgentSessionOptions extends StatefulWidget {
                     .firstOrNull
                     ?.name ??
                 l10n.agentMode,
-            icon: Icons.swap_horiz,
-            maxWidth: fit(160),
+            icon: AppIcons.swap_horiz,
+            maxWidth: fit(_optionCap),
             enabled: enabled,
             entries: [
               for (final mode in settings.modes)
@@ -415,41 +428,27 @@ class AgentSessionOptions extends StatefulWidget {
           ),
         ),
     ];
-    final scheme = Theme.of(context).colorScheme;
     if (chips.isEmpty) return _stateSegment(context, l10n, room);
-    // One capsule, one hairline between neighbours: the options read as a
-    // single control for "how the agent works", not a row of loose pills.
-    final divider = Container(
-      width: 1,
-      height: 18,
-      color: scheme.outlineVariant.withValues(alpha: 0.7),
-    );
+    // Loose quiet chips, the way an assistant's composer offers its model and
+    // mode: no frame of their own, each one filling in on hover or while its
+    // menu is open.
+    const divider = SizedBox(width: 2);
     Widget capsule(List<Widget> chips, {Key? key}) => ConstrainedBox(
       constraints: BoxConstraints(maxWidth: room),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
-          border: Border.all(color: scheme.outlineVariant),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(2),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: SingleChildScrollView(
-              key: key,
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var i = 0; i < chips.length; i++) ...[
-                    if (i > 0) divider,
-                    chips[i],
-                  ],
-                ],
-              ),
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: SingleChildScrollView(
+          key: key,
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < chips.length; i++) ...[
+                if (i > 0) divider,
+                chips[i],
+              ],
+            ],
           ),
         ),
       ),
@@ -479,7 +478,11 @@ class AgentSessionOptions extends StatefulWidget {
   static List<double>? _shares(List<double> natural, double inner) {
     if (natural.isEmpty || !inner.isFinite) return null;
     final total = natural.fold(0.0, (sum, w) => sum + w);
-    if (total <= inner || inner < natural.length * _segmentChrome) {
+    // Sharing must leave every label a readable glimpse; a line that can
+    // only give each segment its icon and chevron scrolls whole labels
+    // instead of showing three ellipses.
+    if (total <= inner ||
+        inner < natural.length * (_segmentChrome + _minLabelGlimpse)) {
       return null;
     }
     final order = List.generate(natural.length, (i) => i)
@@ -532,7 +535,7 @@ class AgentSessionOptions extends StatefulWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (failed)
-              Icon(Icons.refresh_rounded, size: 15, color: scheme.error)
+              Icon(AppIcons.refresh_rounded, size: 15, color: scheme.error)
             else
               SizedBox.square(
                 dimension: 13,
@@ -681,26 +684,18 @@ class _OptionChipState extends State<_OptionChip> {
     List<({String id, String label, bool selected})> entries,
   ) {
     final box = context.findRenderObject()! as RenderBox;
-    final overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-    final position = RelativeRect.fromRect(
-      Rect.fromPoints(
-        box.localToGlobal(box.size.bottomLeft(Offset.zero), ancestor: overlay),
-        box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-      ),
-      Offset.zero & overlay.size,
-    );
-    return showMenu<String>(
+    final anchor = box.localToGlobal(Offset.zero) & box.size;
+    String? current;
+    for (final entry in entries) {
+      if (entry.selected) current = entry.id;
+    }
+    return showChoicePanel<String>(
       context: context,
-      position: position,
-      items: [
-        for (final entry in entries)
-          CheckedPopupMenuItem<String>(
-            value: entry.id,
-            checked: entry.selected,
-            child: Text(entry.label, overflow: TextOverflow.ellipsis),
-          ),
-      ],
+      title: widget.title,
+      anchor: anchor,
+      current: current,
+      maxWidth: 340,
+      choices: [for (final entry in entries) (entry.id, entry.label)],
     );
   }
 
@@ -741,8 +736,7 @@ class _OptionChipState extends State<_OptionChip> {
             Flexible(
               child: TailEllipsisText(
                 widget.label,
-                style: TextStyle(
-                  fontSize: 12.5,
+                style: optionLabelStyle.copyWith(
                   color: usable || _pending
                       ? scheme.onSurface
                       : scheme.onSurfaceVariant,
@@ -750,7 +744,7 @@ class _OptionChipState extends State<_OptionChip> {
               ),
             ),
             Icon(
-              widget.onSearch == null ? Icons.expand_more : Icons.search,
+              AppIcons.expand_more,
               size: 15,
               color: scheme.onSurfaceVariant,
             ),
@@ -770,6 +764,7 @@ class _OptionChipState extends State<_OptionChip> {
       child: Tooltip(
         message: tooltip,
         child: InkWell(
+          mouseCursor: clickable,
           borderRadius: BorderRadius.circular(999),
           onTap: usable ? _activate : null,
           child: face,
@@ -778,6 +773,12 @@ class _OptionChipState extends State<_OptionChip> {
     );
   }
 }
+
+/// The type of an option chip's label; measured and drawn alike.
+const TextStyle optionLabelStyle = TextStyle(
+  fontSize: 13,
+  fontWeight: FontWeight.w500,
+);
 
 /// One line of [text] that, when too long, drops its START ("…tail"). Agent
 /// labels tend to lead with what all values share (a provider) and end with

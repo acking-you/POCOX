@@ -6,6 +6,7 @@ import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The light/dark toggle, for a window's own controls.
 ///
@@ -27,9 +28,9 @@ class ThemeToggle extends ConsumerWidget {
     final next = dark ? 'light' : 'dark';
     return IconButton(
       key: const Key('theme-toggle-btn'),
-      // Cross-fade + rotate rather than a hard swap: the whole UI is mid-
-      // transition for 200 ms, so an icon that jumped would be the one thing
-      // in the window that didn't move.
+      // Cross-fade + rotate rather than a hard swap: the rest of the window
+      // is changing under a reveal, so an icon that jumped would be the one
+      // thing in it that didn't move.
       icon: AnimatedSwitcher(
         duration: Motion.of(context, Motion.medium),
         transitionBuilder: (child, animation) => RotationTransition(
@@ -37,7 +38,7 @@ class ThemeToggle extends ConsumerWidget {
           child: FadeTransition(opacity: animation, child: child),
         ),
         child: Icon(
-          dark ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+          dark ? AppIcons.dark_mode_outlined : AppIcons.light_mode_outlined,
           // The key is what makes the switcher animate: same type + no key
           // reads as the same widget and swaps silently.
           key: ValueKey(dark),

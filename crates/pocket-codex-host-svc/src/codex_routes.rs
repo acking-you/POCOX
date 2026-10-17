@@ -252,6 +252,9 @@ const MAX_INLINE_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 ///    could name `~/.ssh/id_rsa` and have the controller fetch it;
 ///  * only image suffixes are served;
 ///  * `403` for anything unreferenced, `400` for a non-file.
+///
+/// An attachment whose file is gone (the system clears its temp directory)
+/// is served from the copy the model request carried, which the rollout keeps.
 pub(super) async fn read_thread_image(
     Query(q): Query<ThreadImageQuery>,
 ) -> Result<Vec<u8>, ApiError> {
@@ -270,6 +273,9 @@ pub(super) async fn read_thread_image(
         return Err(ApiError(anyhow!("path is outside the configured project roots")));
     }
     let requested = std::path::PathBuf::from(&q.path);
+    if !requested.exists() {
+        return inline_attachment(q.thread, q.path).await;
+    }
     if !requested.is_file() {
         return Err(ApiError(anyhow!("path is not a file")));
     }
@@ -287,6 +293,24 @@ pub(super) async fn read_thread_image(
         .await
         .with_context(|| format!("reading {}", requested.display()))?;
     Ok(bytes)
+}
+
+/// The rollout's inline copy of the attachment `path` of `thread`, decoded;
+/// "not a file" when it recorded none or it is too large to inline.
+async fn inline_attachment(thread: String, path: String) -> Result<Vec<u8>, ApiError> {
+    use base64::Engine as _;
+    let url = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<String>> {
+        let rollout = sessions::rollout_path(&thread)?;
+        Ok(pocket_codex_codex::rollout::inline_user_image(&rollout, &path)?)
+    })
+    .await
+    .context("rollout image task panicked")??;
+    let bytes = url
+        .as_deref()
+        .and_then(|url| url.split_once(";base64,"))
+        .and_then(|(_, data)| base64::engine::general_purpose::STANDARD.decode(data).ok())
+        .filter(|bytes| !bytes.is_empty() && bytes.len() as u64 <= MAX_INLINE_IMAGE_BYTES);
+    bytes.ok_or_else(|| ApiError(anyhow!("path is not a file")))
 }
 
 /// Whether `item` explicitly generated `path` or a user named it — as an

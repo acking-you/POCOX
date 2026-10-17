@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// An anchored project switcher — the desktop idiom for "which checkout is
 /// this conversation about". Opens directly under whatever [builder] renders
@@ -133,7 +134,7 @@ class _ProjectMenuState extends State<ProjectMenu> {
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     isDense: true,
-                    prefixIcon: const Icon(Icons.search, size: 16),
+                    prefixIcon: const Icon(AppIcons.search, size: 16),
                     prefixIconConstraints: const BoxConstraints(
                       minWidth: 30,
                       minHeight: 30,
@@ -183,7 +184,7 @@ class _ProjectMenuState extends State<ProjectMenu> {
                               child: Row(
                                 children: [
                                   Icon(
-                                    Icons.folder_outlined,
+                                    AppIcons.folder_outlined,
                                     size: 16,
                                     color: scheme.onSurfaceVariant,
                                   ),
@@ -201,7 +202,7 @@ class _ProjectMenuState extends State<ProjectMenu> {
                                   ),
                                   if (p == widget.current)
                                     Icon(
-                                      Icons.check,
+                                      AppIcons.check,
                                       size: 16,
                                       color: scheme.primary,
                                     ),
@@ -232,13 +233,13 @@ class _ProjectMenuState extends State<ProjectMenu> {
               const Divider(height: 9),
               action(
                 const Key('project-menu-new'),
-                Icons.add,
+                AppIcons.add,
                 l10n.newProject,
                 widget.onBrowse,
               ),
               action(
                 const Key('project-menu-none'),
-                Icons.close,
+                AppIcons.close,
                 l10n.workOutsideProject,
                 widget.onClear,
               ),

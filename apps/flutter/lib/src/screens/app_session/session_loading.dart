@@ -83,7 +83,12 @@ extension _SessionLoading on _AppSessionState {
             if (!ahead.contains(t.id) || t.id == _threadId) t,
         ];
       }
-      if (mounted) _updateState(() => _threads = mine);
+      if (mounted) {
+        _updateState(() {
+          _threads = mine;
+          _threadsListed = true;
+        });
+      }
       _openLoadDone(_kThreadsLoad);
       // Reaching here proves the service answers, which the subscribe-time
       // quota fetch can't assume on a cold open (it races the connection).
@@ -145,7 +150,14 @@ extension _SessionLoading on _AppSessionState {
   /// reconnect path will refresh it.
   void _retryOpenLoad(String key) {
     final attempt = _openLoadRetries[key] ?? 0;
-    if (attempt >= _kOpenLoadMaxRetries) return;
+    if (attempt >= _kOpenLoadMaxRetries) {
+      // Out of retries: the sessions pane stops waiting and shows what it
+      // has (the reconnect path lists again).
+      if (key == _kThreadsLoad && !_threadsListed) {
+        _updateState(() => _threadsListed = true);
+      }
+      return;
+    }
     _openLoadRetries[key] = attempt + 1;
     _openLoadTimers[key]?.cancel();
     _openLoadTimers[key] = Timer(Duration(seconds: 1 << attempt), () {
@@ -233,6 +245,9 @@ extension _SessionLoading on _AppSessionState {
       _items.clear();
       _itemIndex.clear();
       _rowAnchors.clear();
+      _list.reset();
+      // A conversation opens at its end.
+      _scroll.stickToEnd = true;
       // The previous thread's turns and pagination say nothing about this one.
       _turnSummaries = const [];
       _hasOlder = false;
@@ -242,7 +257,6 @@ extension _SessionLoading on _AppSessionState {
       _sequentialHistoryIds.clear();
       _firstTurnId = null;
       _cachedRows = null;
-      _loadingOlder = false;
       _navigatingTurn = null;
       _navigationLoading = false;
       _historyLoad = null;
@@ -254,7 +268,7 @@ extension _SessionLoading on _AppSessionState {
       _diff = null;
       _branch = null;
       _reviewOpen = false;
-      _reviewFile = null;
+      _reviewTarget = null;
       _streaming = false;
       // Drop the previous thread's turn id; the engine tracks the active turn
       // per thread, so interrupt still works for a thread that's already
@@ -419,7 +433,7 @@ extension _SessionLoading on _AppSessionState {
     }
     if (!mounted) return;
     final ctrl = TextEditingController(text: _cwd ?? '');
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(l10n.newProject),
@@ -443,7 +457,7 @@ extension _SessionLoading on _AppSessionState {
                     );
                     if (picked != null) setInner(() => ctrl.text = picked);
                   },
-                  icon: const Icon(Icons.folder_open, size: 18),
+                  icon: const Icon(AppIcons.folder_open, size: 18),
                   label: Text(l10n.browseProjectFolder),
                 ),
                 const SizedBox(height: 12),
@@ -459,7 +473,6 @@ extension _SessionLoading on _AppSessionState {
                 decoration: InputDecoration(
                   labelText: l10n.remotePathLabel,
                   hintText: l10n.remotePathHint,
-                  border: const OutlineInputBorder(),
                 ),
               ),
             ],

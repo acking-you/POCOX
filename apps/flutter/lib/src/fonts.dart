@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Font configuration.
 ///
-/// The design system is set in Figtree (prose) and Geist Mono (code), both
+/// The design system is set in Google Sans Flex (prose) and Geist Mono (code), both
 /// bundled on every platform — see the `fonts:` block in pubspec.yaml. Neither
 /// face carries a single CJK glyph, so Chinese never renders *from* them: it
 /// resolves down the fallback chains below.
@@ -21,27 +21,21 @@ import 'package:flutter/foundation.dart';
 /// it — which is why [cjkFontFallback] can't name it unconditionally.
 
 /// The design system's prose face, bundled on every platform. Latin only.
-const appFontFamily = 'Figtree';
+const appFontFamily = 'GoogleSansFlex';
 
-/// Flutter's proxy for the Apple system text face (SF Pro), resolved by the
-/// engine on macOS / iOS and ignored elsewhere.
-const appleSystemFontFamily = 'CupertinoSystemText';
-
-/// The UI face actually in use: the system font on Apple platforms, where an
-/// app that doesn't speak SF Pro reads as a port, and the bundled Figtree
-/// everywhere else, where the system faces (Segoe UI, Roboto) vary too much to
-/// design against. Resolved from [defaultTargetPlatform], so tests — forced to
-/// android — keep rendering Figtree.
+/// The UI face actually in use: the bundled Google Sans Flex everywhere —
+/// a humanist sans drawn for screens whose open, friendly shapes give the
+/// app its own voice beside native windows — except Windows.
 ///
-/// Windows uses its own UI face too. Figtree is a geometric display-leaning
-/// sans with thin joins; Flutter renders text with grayscale antialiasing
-/// rather than ClearType, and at 13–15 px on a 100%/125% display those joins
-/// smear. Segoe UI is drawn and hinted for exactly those sizes, and is on
-/// every Windows install since Vista.
+/// Windows keeps its own UI face: Flutter renders text with grayscale
+/// antialiasing rather than ClearType, and at 13–15 px on a 100%/125% display
+/// a bundled face's joins smear. Segoe UI is drawn and hinted for exactly
+/// those sizes, and is on every Windows install since Vista. Resolved from
+/// [defaultTargetPlatform], so tests — forced to android — render the bundled
+/// face.
 String get uiFontFamily {
   if (kIsWeb) return appFontFamily;
   return switch (defaultTargetPlatform) {
-    TargetPlatform.macOS || TargetPlatform.iOS => appleSystemFontFamily,
     TargetPlatform.windows => windowsUiFontFamily,
     _ => appFontFamily,
   };
@@ -67,7 +61,7 @@ bool get isDesktop =>
         defaultTargetPlatform == TargetPlatform.macOS ||
         defaultTargetPlatform == TargetPlatform.linux);
 
-/// CJK fallback behind [appFontFamily]. Figtree is Latin-only, so every Han
+/// CJK fallback behind [appFontFamily]. Google Sans Flex is Latin-only, so every Han
 /// glyph in the app resolves from this chain rather than the primary family.
 ///
 /// The bundled Noto Sans SC leads: on desktop it wins, which is the whole point
@@ -84,8 +78,8 @@ const cjkFontFallback = [
 ];
 
 /// The CJK chain behind [uiFontFamily]. On Apple platforms PingFang SC leads:
-/// it is the face SF Pro is designed to sit beside, and the bundled Noto Sans
-/// SC exists to fix Windows, not to override a Mac's own Chinese font.
+/// it is the system's own Chinese face, and the bundled Noto Sans SC exists
+/// to fix Windows, not to override a Mac's own Chinese font.
 ///
 /// On Windows, Microsoft YaHei UI leads: Segoe UI's designed companion, hinted
 /// for screen sizes, and present on every Chinese and international install.

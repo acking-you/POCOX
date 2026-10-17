@@ -90,91 +90,111 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
           curve: Curves.easeOutCubic,
           child: !_expanded
               ? const SizedBox.shrink()
-              : Container(
+              : Glass(
                   key: const Key('turn-progress-panel'),
-                  constraints: const BoxConstraints(maxHeight: 210),
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceBright,
-                    borderRadius: BorderRadius.circular(kPanelRadius),
-                    border: Border.all(color: scheme.outlineVariant),
-                    boxShadow: panelShadow(scheme),
-                  ),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [for (final step in widget.steps) _step(step)],
+                  depth: GlassDepth.floating,
+                  lift: 0.6,
+                  borderRadius: BorderRadius.circular(kPanelRadius),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 210),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final step in widget.steps) _step(step),
+                        ],
+                      ),
                     ),
                   ),
                 ),
         ),
         const SizedBox(height: 4),
-        Material(
+        Glass(
           key: const Key('turn-progress-summary'),
-          color: scheme.surfaceBright,
-          shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
+          depth: GlassDepth.floating,
+          lift: 0.6,
+          borderRadius: BorderRadius.circular(999),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              InkWell(
-                mouseCursor: clickable,
-                customBorder: const StadiumBorder(),
-                onTap: () => setState(() => _expanded = !_expanded),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 13,
-                        height: 13,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.8,
-                          color: signalColor(scheme),
+              // The labels give way (ellipsis) before the pill outgrows a
+              // narrow conversation.
+              Flexible(
+                child: InkWell(
+                  mouseCursor: clickable,
+                  customBorder: const StadiumBorder(),
+                  onTap: () => setState(() => _expanded = !_expanded),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 13,
+                          height: 13,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.8,
+                            color: signalColor(scheme),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        l10n.turnProgressStep(
-                          _currentStep,
-                          widget.steps.length,
-                        ),
-                        style: TextStyle(fontSize: 12, color: muted),
-                      ),
-                      if (widget.changedFiles > 0) ...[
-                        Text('  ·  ', style: TextStyle(color: muted)),
-                        if (!widget.compact) ...[
-                          Text(
-                            l10n.envFilesChanged(widget.changedFiles),
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            l10n.turnProgressStep(
+                              _currentStep,
+                              widget.steps.length,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: muted),
                           ),
-                          const SizedBox(width: 5),
-                        ],
-                        Text(
-                          '+${widget.added}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: additionColor(scheme),
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
                         ),
-                        const SizedBox(width: 3),
-                        Text(
-                          '−${widget.removed}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: scheme.error,
-                            fontFeatures: const [FontFeature.tabularFigures()],
+                        if (widget.changedFiles > 0) ...[
+                          Text('  ·  ', style: TextStyle(color: muted)),
+                          if (!widget.compact) ...[
+                            Flexible(
+                              child: Text(
+                                l10n.envFilesChanged(widget.changedFiles),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(fontSize: 12, color: muted),
+                              ),
+                            ),
+                            const SizedBox(width: 5),
+                          ],
+                          Text(
+                            '+${widget.added}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: additionColor(scheme),
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '−${widget.removed}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: scheme.error,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(width: 3),
+                        Icon(
+                          _expanded
+                              ? AppIcons.expand_less
+                              : AppIcons.expand_more,
+                          size: 16,
+                          color: muted,
                         ),
                       ],
-                      const SizedBox(width: 3),
-                      Icon(
-                        _expanded ? Icons.expand_less : Icons.expand_more,
-                        size: 16,
-                        color: muted,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -196,7 +216,7 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
                     height: 30,
                   ),
                   onPressed: widget.onViewDiff,
-                  icon: const Icon(Icons.difference_outlined, size: 16),
+                  icon: const Icon(AppIcons.difference_outlined, size: 16),
                 ),
               ],
             ],
@@ -210,7 +230,11 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
     final icon = switch (step.status) {
-      'completed' => Icon(Icons.check_circle_outline, size: 15, color: muted),
+      'completed' => Icon(
+        AppIcons.check_circle_outline,
+        size: 15,
+        color: muted,
+      ),
       'in_progress' => SizedBox(
         width: 15,
         height: 15,
@@ -219,7 +243,7 @@ class _TurnProgressTrackerState extends State<TurnProgressTracker> {
           color: signalColor(scheme),
         ),
       ),
-      _ => Icon(Icons.circle_outlined, size: 15, color: muted),
+      _ => Icon(AppIcons.circle_outlined, size: 15, color: muted),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
@@ -286,7 +310,7 @@ class _PlanCardState extends State<PlanCard> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.checklist_rounded,
+                    AppIcons.checklist_rounded,
                     size: 17,
                     color: scheme.primary,
                   ),
@@ -304,7 +328,7 @@ class _PlanCardState extends State<PlanCard> {
                   ],
                   const Spacer(),
                   Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    _expanded ? AppIcons.expand_less : AppIcons.expand_more,
                     size: 18,
                     color: muted,
                   ),
@@ -335,9 +359,9 @@ class _PlanCardState extends State<PlanCard> {
   Widget _stepRow(PlanStep s) {
     final scheme = Theme.of(context).colorScheme;
     final (icon, color) = switch (s.status) {
-      'completed' => (Icons.check_circle_rounded, additionColor(scheme)),
-      'in_progress' => (Icons.timelapse_rounded, signalColor(scheme)),
-      _ => (Icons.radio_button_unchecked, scheme.onSurfaceVariant),
+      'completed' => (AppIcons.check_circle_rounded, additionColor(scheme)),
+      'in_progress' => (AppIcons.timelapse_rounded, signalColor(scheme)),
+      _ => (AppIcons.radio_button_unchecked, scheme.onSurfaceVariant),
     };
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),

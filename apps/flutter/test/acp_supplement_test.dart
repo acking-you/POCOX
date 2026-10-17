@@ -289,8 +289,10 @@ void main() {
     expect(api.supplementCalls, isEmpty);
     expect(api.turnStartCount, 0);
     expect(composerText(t), 'later');
-    await t.tap(find.text('完成'));
+    // The note is a popover: Escape (or a click outside) closes it.
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
     await frames(t);
+    expect(find.text('补充说明不可用'), findsNothing);
     await t.tap(find.byKey(const Key('send-btn')));
     await frames(t);
     expect(api.supplementCalls, isEmpty);

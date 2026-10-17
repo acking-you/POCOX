@@ -13,6 +13,8 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/desktop_theme.dart';
 
 /// Pick a runtime installed on the remote computer behind [serviceKey], then
 /// open its editor for a new service. Only what the computer reports is
@@ -25,7 +27,7 @@ Future<void> showManagedAddService(
 }) async {
   final kind = await showAdaptivePanel<String>(
     context: context,
-    builder: (_) => _AddServicePanel(serviceKey: serviceKey, hosts: hosts),
+    builder: (_) => _AddServicePanel(serviceKey: serviceKey),
   );
   if (kind == null || !context.mounted) return;
   await showManagedHostEditor(
@@ -38,10 +40,9 @@ Future<void> showManagedAddService(
 }
 
 class _AddServicePanel extends ConsumerStatefulWidget {
-  const _AddServicePanel({required this.serviceKey, required this.hosts});
+  const _AddServicePanel({required this.serviceKey});
 
   final String serviceKey;
-  final List<ManagedHost> hosts;
 
   @override
   ConsumerState<_AddServicePanel> createState() => _AddServicePanelState();
@@ -126,9 +127,6 @@ class _AddServicePanelState extends ConsumerState<_AddServicePanel> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final runtimes = ref.watch(managedRuntimesProvider(widget.serviceKey));
-    final openCodeTaken = widget.hosts.any(
-      (h) => h.engine == 'opencode' && h.running,
-    );
     // The adaptive panel adds no side insets; the body brings the same 20 px
     // the other panels use.
     return Padding(
@@ -183,7 +181,6 @@ class _AddServicePanelState extends ConsumerState<_AddServicePanel> {
                 if (i > 0) const SizedBox(height: 8),
                 _RuntimeRow(
                   runtime: runtime,
-                  blocked: runtime.kind == 'opencode' && openCodeTaken,
                   claude: runtime.kind == 'claude' ? _claude : null,
                   claudeError: runtime.kind == 'claude' ? _claudeError : null,
                   onPrepare: _starting || (_claude?.running ?? false)
@@ -201,32 +198,40 @@ class _AddServicePanelState extends ConsumerState<_AddServicePanel> {
 }
 
 /// One installed runtime: its name and a short availability line first;
-/// paths, versions and longer explanations behind an explicit Details
-/// button (a tap target, so it works on touch too).
-class _RuntimeRow extends StatelessWidget {
+/// paths, versions and longer explanations unfold in place under an explicit
+/// Details toggle (a tap target, so it works on touch too).
+class _RuntimeRow extends StatefulWidget {
   const _RuntimeRow({
     required this.runtime,
     required this.onChoose,
-    this.blocked = false,
     this.claude,
     this.claudeError,
     this.onPrepare,
   });
 
   final ManagedRuntimeAvailability runtime;
-
-  /// OpenCode already runs on that computer (one per computer).
-  final bool blocked;
   final AcpClaudeSetup? claude;
   final String? claudeError;
   final VoidCallback? onPrepare;
   final VoidCallback onChoose;
 
-  bool get _ready => runtime.ready && !blocked;
+  @override
+  State<_RuntimeRow> createState() => _RuntimeRowState();
+}
+
+class _RuntimeRowState extends State<_RuntimeRow> {
+  bool _expanded = false;
+
+  ManagedRuntimeAvailability get runtime => widget.runtime;
+  AcpClaudeSetup? get claude => widget.claude;
+  String? get claudeError => widget.claudeError;
+  VoidCallback? get onPrepare => widget.onPrepare;
+  VoidCallback get onChoose => widget.onChoose;
+
+  bool get _ready => runtime.ready;
 
   /// The short availability line and whether it is a caution.
   (String, bool) _status(AppLocalizations l10n) {
-    if (blocked) return (l10n.managedOpenCodeRunning, true);
     if (!runtime.ready) {
       return runtime.canPrepare
           ? (l10n.managedRuntimeNeedsSetup, true)
@@ -238,47 +243,35 @@ class _RuntimeRow extends StatelessWidget {
 
   /// The longer explanations, shown under Details.
   List<String> _notes(AppLocalizations l10n) => [
-    if (blocked) l10n.managedOpenCodeTaken,
     if (!runtime.ready) ?runtime.problem,
     if (runtime.ready && runtime.needsHostLogin) l10n.managedNeedsHostLogin,
   ];
 
-  Future<void> _details(BuildContext context) {
+  /// Paths, versions and the longer notes, unfolded under the row.
+  Widget _details(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final name = managedKindLabel(l10n, runtime.kind);
-    return showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        key: Key('managed-runtime-details-dialog-${runtime.kind}'),
-        // Phone-width room for long paths, and a title that stays a title
-        // at large text sizes.
-        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-        titleTextStyle: Theme.of(context).textTheme.titleLarge,
-        title: Text(l10n.managedRuntimeDetailsTitle(name)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final note in _notes(l10n)) ...[
-                Text(note),
-                const SizedBox(height: 12),
-              ],
-              if (runtime.version case final version?)
-                DiagnosticLine(
-                  label: l10n.managedRuntimeVersion,
-                  value: version,
-                ),
-              if (runtime.path case final path?)
-                DiagnosticLine(label: l10n.managedRuntimePath, value: path),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(l10n.done),
-          ),
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: Key('managed-runtime-details-dialog-${runtime.kind}'),
+      width: double.infinity,
+      margin: const EdgeInsetsDirectional.fromSTEB(0, 12, 12, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: insetPlate(scheme),
+        borderRadius: BorderRadius.circular(kControlRadius + 2),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final note in _notes(l10n)) ...[
+            Text(note),
+            const SizedBox(height: 10),
+          ],
+          if (runtime.version case final version?)
+            DiagnosticLine(label: l10n.managedRuntimeVersion, value: version),
+          if (runtime.path case final path?)
+            DiagnosticLine(label: l10n.managedRuntimePath, value: path),
         ],
       ),
     );
@@ -294,7 +287,7 @@ class _RuntimeRow extends StatelessWidget {
         runtime.path != null ||
         runtime.version != null ||
         _notes(l10n).isNotEmpty;
-    return Card.outlined(
+    return Card(
       key: Key('managed-runtime-${runtime.kind}'),
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -338,15 +331,32 @@ class _RuntimeRow extends StatelessWidget {
                     IconButton(
                       key: Key('managed-runtime-details-${runtime.kind}'),
                       tooltip: l10n.managedRuntimeDetails,
-                      icon: Icon(Icons.info_outline, color: scheme.tertiary),
-                      onPressed: () => _details(context),
+                      isSelected: _expanded,
+                      icon: Icon(
+                        _expanded
+                            ? AppIcons.expand_less
+                            : AppIcons.info_outline,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                      onPressed: () => setState(() => _expanded = !_expanded),
                     ),
                   if (_ready)
                     Padding(
                       padding: const EdgeInsetsDirectional.only(end: 8),
-                      child: Icon(Icons.chevron_right, color: scheme.tertiary),
+                      child: Icon(
+                        AppIcons.chevron_right,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                 ],
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _expanded && hasDetails
+                    ? _details(context)
+                    : const SizedBox(width: double.infinity),
               ),
               if (!runtime.ready && runtime.canPrepare) ...[
                 const SizedBox(height: 10),

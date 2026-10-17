@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A running ACP host: its agent's state (starting, running, not running and
 /// why, sign-in needed), a restart action, what the agent negotiated and the
@@ -114,7 +115,7 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, size: 10, color: phaseColor),
+                Icon(AppIcons.circle, size: 10, color: phaseColor),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -149,7 +150,7 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
           child: OutlinedButton.icon(
             key: const Key('acp-restart'),
             onPressed: _restarting ? null : _restart,
-            icon: const Icon(Icons.restart_alt),
+            icon: const Icon(AppIcons.restart_alt),
             label: Text(l10n.acpRestart),
           ),
         ),

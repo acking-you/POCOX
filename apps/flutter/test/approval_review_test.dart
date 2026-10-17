@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/screens/app_session/approval_review_card.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_view.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 String request(String command) =>
     '''Retained context from previous steps.
@@ -241,7 +242,7 @@ void main() {
         expect(units.first >= 0xDC00 && units.first <= 0xDFFF, isFalse);
         expect(units.last >= 0xD800 && units.last <= 0xDBFF, isFalse);
       }
-      await t.tap(find.byIcon(Icons.content_copy_outlined));
+      await t.tap(find.byIcon(AppIcons.content_copy_outlined));
       await t.pump();
       expect(copied, raw);
       await t.pump(const Duration(seconds: 4));

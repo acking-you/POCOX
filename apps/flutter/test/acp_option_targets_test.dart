@@ -26,6 +26,10 @@ import 'package:pocket_codex/src/theme.dart';
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/screen_harness.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+
+import 'support/ui_preview.dart';
+import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 
 const _acp = 'pcx:dev:acp:agent';
 
@@ -118,14 +122,14 @@ Future<void> _choose(WidgetTester t, String value) async {
   final target = listed.evaluate().isNotEmpty
       ? listed
       : find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
+          (w) => w is ChoiceRow<String> && w.value == value,
         );
   expect(target, findsOneWidget);
   await t.ensureVisible(target);
   await t.pump();
   await t.tap(target);
   await _frames(t);
-  expect(find.byType(CheckedPopupMenuItem<String>), findsNothing);
+  expect(find.byType(ChoiceRow<String>), findsNothing);
   expect(find.byKey(const Key('agent-option-list')), findsNothing);
 }
 
@@ -317,7 +321,7 @@ void main() {
       // Invoking the action opens the menu.
       _semanticsTap(t, chip);
       await t.pumpAndSettle();
-      expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(4));
+      expect(find.byType(ChoiceRow<String>), findsNWidgets(4));
       handle.dispose();
     });
 
@@ -345,7 +349,7 @@ void main() {
       await t.pump();
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pumpAndSettle();
-      expect(find.byType(CheckedPopupMenuItem<String>), findsNWidgets(4));
+      expect(find.byType(ChoiceRow<String>), findsNWidgets(4));
     });
   });
 
@@ -426,7 +430,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const Key('agent-option-value-p/vendor/m0')),
-          matching: find.byIcon(Icons.check),
+          matching: find.byIcon(AppIcons.check),
         ),
         findsOneWidget,
       );
@@ -469,14 +473,7 @@ void main() {
     // Real metrics: the app's bundled prose face (read from the test asset
     // bundle, no download) under the app theme, as the chip renders it.
     setUpAll(() async {
-      final prose = FontLoader('Figtree');
-      for (final weight in ['Regular', 'Medium', 'SemiBold']) {
-        prose.addFont(rootBundle.load('assets/fonts/Figtree-$weight.ttf'));
-      }
-      await prose.load();
-      await (FontLoader(
-        'MaterialIcons',
-      )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
+      await loadPreviewFonts(always: true);
     });
 
     const longLabel = 'Some Very Long Provider Name/claude-sonnet-4-5';
@@ -721,9 +718,6 @@ void main() {
     await _open(t, api, thread: 'ses-a');
     await _openChip(t, 'model');
     expect(find.byKey(const Key('agent-option-search')), findsNothing);
-    expect(
-      find.byType(CheckedPopupMenuItem<String>),
-      findsNWidgets(kOptionMenuLimit),
-    );
+    expect(find.byType(ChoiceRow<String>), findsNWidgets(kOptionMenuLimit));
   });
 }

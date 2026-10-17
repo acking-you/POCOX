@@ -20,7 +20,6 @@ import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
 import 'package:pocket_codex/src/rust/frb_generated.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:window_manager/window_manager.dart';
 
 const _relay = String.fromEnvironment('PCX_RELAY');
@@ -76,6 +75,12 @@ Future<void> _until(WidgetTester tester, bool Function() ready) async {
   await Future<void>.delayed(const Duration(milliseconds: 100));
 }
 
+/// The conversation's scroll view (the sidebar has lists of its own).
+final _transcript = find.descendant(
+  of: find.byKey(const Key('chat-conversation-layer')),
+  matching: find.byType(CustomScrollView),
+);
+
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
@@ -130,10 +135,7 @@ void main() {
           ),
         );
         await _until(tester, () => api.histories.containsKey(threadId));
-        await _until(
-          tester,
-          () => find.byType(SuperListView).evaluate().isNotEmpty,
-        );
+        await _until(tester, () => _transcript.evaluate().isNotEmpty);
         expect(api.histories[threadId]!.items, isNotEmpty);
         expect(api.appIsConnected(_service), isTrue);
         expect(tester.takeException(), isNull);
@@ -147,10 +149,9 @@ void main() {
       // Opening settles the transcript at its end over several layout frames.
       await Future<void>.delayed(const Duration(milliseconds: 500));
       final pagesBeforeScroll = api.olderPages.length;
-      final transcript = tester.widget<SuperListView>(
-        find.byType(SuperListView),
-      );
-      transcript.controller!.jumpTo(0);
+      final transcript = tester.widget<CustomScrollView>(_transcript);
+      final scroll = transcript.controller!;
+      scroll.jumpTo(scroll.position.minScrollExtent);
       final olderButton = find.byKey(const Key('chat-older-history-load'));
       await _until(
         tester,

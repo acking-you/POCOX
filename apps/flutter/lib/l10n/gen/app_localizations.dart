@@ -164,6 +164,18 @@ abstract class AppLocalizations {
   /// **'MSG_HEADER_KEY must be exactly 32 bytes'**
   String get keyLengthError;
 
+  /// No description provided for @accountWelcomeHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to PocketCodex'**
+  String get accountWelcomeHeadline;
+
+  /// No description provided for @accountWelcomeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to pick up your conversations on any device.'**
+  String get accountWelcomeSubtitle;
+
   /// No description provided for @accountSignInTitle.
   ///
   /// In en, this message translates to:
@@ -2306,6 +2318,12 @@ abstract class AppLocalizations {
   /// **'Not implemented yet. Use external Codex.'**
   String get codexBuiltinNote;
 
+  /// No description provided for @codexBuiltinUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not implemented yet'**
+  String get codexBuiltinUnavailable;
+
   /// No description provided for @hostRuntimeInfo.
   ///
   /// In en, this message translates to:
@@ -2515,6 +2533,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Offline'**
   String get tunnelOffline;
+
+  /// No description provided for @tunnelNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Not connected'**
+  String get tunnelNotConnected;
 
   /// No description provided for @logsTitle.
   ///
@@ -3170,34 +3194,16 @@ abstract class AppLocalizations {
   /// **'Custom provider'**
   String get codexSetupProviderSection;
 
-  /// No description provided for @codexSetupProviderDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Point codex at a third-party or self-hosted model service with its Base URL and API key.'**
-  String get codexSetupProviderDesc;
-
-  /// No description provided for @codexSetupModelLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Model (optional, default gpt-5.5)'**
-  String get codexSetupModelLabel;
-
-  /// No description provided for @codexSetupSaveProvider.
-  ///
-  /// In en, this message translates to:
-  /// **'Save and use'**
-  String get codexSetupSaveProvider;
-
   /// No description provided for @codexSetupLoginSection.
   ///
   /// In en, this message translates to:
-  /// **'ChatGPT login'**
+  /// **'ChatGPT sign-in'**
   String get codexSetupLoginSection;
 
   /// No description provided for @codexSetupLoginDesc.
   ///
   /// In en, this message translates to:
-  /// **'Run the model on your ChatGPT subscription; codex generates the credential itself.'**
+  /// **'Run the model on your ChatGPT subscription; Codex creates the credential itself.'**
   String get codexSetupLoginDesc;
 
   /// No description provided for @codexSetupLoginButton.
@@ -3221,7 +3227,7 @@ abstract class AppLocalizations {
   /// No description provided for @codexSetupMethodsHint.
   ///
   /// In en, this message translates to:
-  /// **'Pick either one — codex uses whichever you configured last.'**
+  /// **'If Codex\'s own configuration selects a custom provider, that provider is used instead of the ChatGPT sign-in.'**
   String get codexSetupMethodsHint;
 
   /// No description provided for @codexSetupInUse.
@@ -3230,16 +3236,10 @@ abstract class AppLocalizations {
   /// **'In use'**
   String get codexSetupInUse;
 
-  /// No description provided for @codexSetupSwitchTo.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch to this'**
-  String get codexSetupSwitchTo;
-
   /// No description provided for @codexSetupProxyNote.
   ///
   /// In en, this message translates to:
-  /// **'On a restricted network this needs a proxy: set one when you start local hosting.'**
+  /// **'On a restricted network, sign-in needs a proxy: set one in a host\'s editor and sign in there.'**
   String get codexSetupProxyNote;
 
   /// No description provided for @codexSetupAdvanced.
@@ -3272,24 +3272,6 @@ abstract class AppLocalizations {
   /// **'openai/codex#30364'**
   String get codexSetupNonDegradedIssue;
 
-  /// No description provided for @codexSetupNeedFields.
-  ///
-  /// In en, this message translates to:
-  /// **'Please fill in both Base URL and API Key.'**
-  String get codexSetupNeedFields;
-
-  /// No description provided for @codexSetupProviderSaved.
-  ///
-  /// In en, this message translates to:
-  /// **'Provider saved. Restart local hosting to use it.'**
-  String get codexSetupProviderSaved;
-
-  /// No description provided for @codexSetupNeedHost.
-  ///
-  /// In en, this message translates to:
-  /// **'Start local hosting under Services first, then sign in with ChatGPT.'**
-  String get codexSetupNeedHost;
-
   /// No description provided for @codexSetupLoginOpened.
   ///
   /// In en, this message translates to:
@@ -3317,8 +3299,8 @@ abstract class AppLocalizations {
   /// No description provided for @codexSetupLoginSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Signed in ({method}).'**
-  String codexSetupLoginSuccess(String method);
+  /// **'Signed in.'**
+  String get codexSetupLoginSuccess;
 
   /// No description provided for @codexSetupLoginTimeout.
   ///
@@ -3332,12 +3314,6 @@ abstract class AppLocalizations {
   /// **'Custom provider configured'**
   String get codexSetupStatusProvider;
 
-  /// No description provided for @codexSetupStatusAuth.
-  ///
-  /// In en, this message translates to:
-  /// **'Signed in ({method})'**
-  String codexSetupStatusAuth(String method);
-
   /// No description provided for @codexSetupStatusNeedSetup.
   ///
   /// In en, this message translates to:
@@ -3347,13 +3323,13 @@ abstract class AppLocalizations {
   /// No description provided for @codexSetupStatusNeedSetupHint.
   ///
   /// In en, this message translates to:
-  /// **'codex cannot make a model call yet. Configure either method below.'**
+  /// **'Codex cannot make a model call yet. Set up either method below.'**
   String get codexSetupStatusNeedSetupHint;
 
   /// No description provided for @codexSetupStatusReadyHint.
   ///
   /// In en, this message translates to:
-  /// **'codex can make model calls.'**
+  /// **'Codex can make model calls.'**
   String get codexSetupStatusReadyHint;
 
   /// No description provided for @codexSetupCodexHomeLabel.
@@ -3362,28 +3338,52 @@ abstract class AppLocalizations {
   /// **'Config directory'**
   String get codexSetupCodexHomeLabel;
 
-  /// No description provided for @codexSetupCredentialExists.
+  /// No description provided for @codexSignedInChatgpt.
   ///
   /// In en, this message translates to:
-  /// **'credential present'**
-  String get codexSetupCredentialExists;
+  /// **'Signed in with ChatGPT'**
+  String get codexSignedInChatgpt;
+
+  /// No description provided for @codexSignedInApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'Using an API key'**
+  String get codexSignedInApiKey;
+
+  /// No description provided for @codexSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in'**
+  String get codexSignedIn;
+
+  /// No description provided for @codexSetupStatusInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex\'s config.toml could not be read'**
+  String get codexSetupStatusInvalid;
+
+  /// No description provided for @codexSetupStatusInvalidHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix the file before hosts on \"Existing configuration\" can use it.'**
+  String get codexSetupStatusInvalidHint;
 
   /// No description provided for @codexSetupProviderPerHost.
   ///
   /// In en, this message translates to:
-  /// **'Set per host: each host\'s own model service can use a custom provider.'**
+  /// **'Each host can use its own custom provider, chosen in that host\'s editor.'**
   String get codexSetupProviderPerHost;
 
   /// No description provided for @codexSetupProviderScope.
   ///
   /// In en, this message translates to:
-  /// **'This page sets up Codex itself (its config directory below): the ChatGPT sign-in and the prompt option. Hosts set to \"Existing configuration\" use it. A host\'s own custom provider or official account is chosen in that host\'s editor.'**
+  /// **'This page sets up Codex itself (the config directory above): the ChatGPT sign-in and the prompt option. Hosts set to \"Existing configuration\" use them; a host\'s own custom provider or official account is chosen in that host\'s editor.'**
   String get codexSetupProviderScope;
 
   /// No description provided for @codexSetupGlobalProvider.
   ///
   /// In en, this message translates to:
-  /// **'Codex\'s own configuration already selects a custom provider. Hosts set to \"Existing configuration\" keep using it.'**
+  /// **'Codex\'s own configuration already selects a custom provider; hosts set to \"Existing configuration\" keep using it.'**
   String get codexSetupGlobalProvider;
 
   /// No description provided for @codexSetupConfigureHost.
@@ -3397,6 +3397,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hosting runs on a desktop; set a host\'s provider there.'**
   String get codexSetupHostingDesktopOnly;
+
+  /// No description provided for @codexSetupLoginDesktopOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in on the computer where Codex is installed.'**
+  String get codexSetupLoginDesktopOnly;
 
   /// No description provided for @settingsHosting.
   ///
@@ -3895,12 +3901,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reset height'**
   String get resetComposerHeight;
-
-  /// No description provided for @composerKeyboardHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter to send · Shift+Enter for a new line'**
-  String get composerKeyboardHint;
 
   /// No description provided for @selectText.
   ///
@@ -4409,7 +4409,7 @@ abstract class AppLocalizations {
   /// No description provided for @acpSecretsNote.
   ///
   /// In en, this message translates to:
-  /// **'Saved agents are stored on this device in plain text. Avoid secrets in arguments; prefer the agent\'s own sign-in.'**
+  /// **'Saved in plain text on this computer. Keep secrets out of the arguments.'**
   String get acpSecretsNote;
 
   /// No description provided for @acpProgramNotFound.
@@ -4423,6 +4423,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Claude environment'**
   String get claudeEnvTitle;
+
+  /// No description provided for @claudeRuntimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Runtime components'**
+  String get claudeRuntimeTitle;
 
   /// No description provided for @claudeAdapterInstalled.
   ///
@@ -4849,12 +4855,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Custom provider'**
   String get hostSourceCustom;
-
-  /// No description provided for @hostInheritedOnly.
-  ///
-  /// In en, this message translates to:
-  /// **'This agent is launched with its own configuration. Pocket-Codex does not know a provider setting it supports.'**
-  String get hostInheritedOnly;
 
   /// No description provided for @hostInheritedAcp.
   ///
@@ -5726,12 +5726,6 @@ abstract class AppLocalizations {
   /// **'Native server'**
   String get agentChoiceNativeServer;
 
-  /// No description provided for @agentChoiceRunningAs.
-  ///
-  /// In en, this message translates to:
-  /// **'Running as {name}'**
-  String agentChoiceRunningAs(String name);
-
   /// No description provided for @hostInheritedOpenCode.
   ///
   /// In en, this message translates to:
@@ -5777,8 +5771,50 @@ abstract class AppLocalizations {
   /// No description provided for @openCodeAlreadyHosted.
   ///
   /// In en, this message translates to:
-  /// **'OpenCode is already hosted on this computer. Open that host instead.'**
+  /// **'Another host already uses this OpenCode history. Choose “This host only” for this host, or stop that host first.'**
   String get openCodeAlreadyHosted;
+
+  /// No description provided for @hostNameInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'A host on this computer already uses the name “{name}”. Choose another name.'**
+  String hostNameInUse(String name);
+
+  /// No description provided for @managedNameInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'A service on that computer already uses the name “{name}”. Choose another name.'**
+  String managedNameInUse(String name);
+
+  /// No description provided for @openCodeHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'History'**
+  String get openCodeHistoryTitle;
+
+  /// No description provided for @openCodeHistoryShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared with OpenCode'**
+  String get openCodeHistoryShared;
+
+  /// No description provided for @openCodeHistoryOwn.
+  ///
+  /// In en, this message translates to:
+  /// **'This host only'**
+  String get openCodeHistoryOwn;
+
+  /// No description provided for @openCodeHistoryInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared: this computer\'s own OpenCode sessions, the same ones the OpenCode terminal app shows. One host can use them at a time.\n\nThis host only: sessions are kept in this host\'s own database, apart from other hosts and the OpenCode terminal app.'**
+  String get openCodeHistoryInfo;
+
+  /// No description provided for @openCodeHistoryTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'“{name}” is using the shared history, and only one host can at a time. Choose “This host only”.'**
+  String openCodeHistoryTaken(String name);
 
   /// No description provided for @openCodePath.
   ///
@@ -6368,12 +6404,6 @@ abstract class AppLocalizations {
   /// **'Needs sign-in on that computer to use its own account; a custom provider works without it.'**
   String get managedNeedsHostLogin;
 
-  /// No description provided for @managedOpenCodeTaken.
-  ///
-  /// In en, this message translates to:
-  /// **'OpenCode already runs on that computer; one OpenCode service per computer.'**
-  String get managedOpenCodeTaken;
-
   /// No description provided for @managedKindUnknown.
   ///
   /// In en, this message translates to:
@@ -6599,14 +6629,20 @@ abstract class AppLocalizations {
   /// No description provided for @managedSwitchOn.
   ///
   /// In en, this message translates to:
-  /// **'On. Your signed-in devices can add, configure, start and stop services here while this computer is online.'**
+  /// **'On'**
   String get managedSwitchOn;
 
   /// No description provided for @managedSwitchOff.
   ///
   /// In en, this message translates to:
-  /// **'Off. Only this computer can change its services.'**
+  /// **'Off'**
   String get managedSwitchOff;
+
+  /// No description provided for @managedSwitchInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'When on, your other signed-in devices can add, configure, start and stop services here while this computer is online. When off, only this computer can change them.'**
+  String get managedSwitchInfo;
 
   /// No description provided for @managedSwitchConnecting.
   ///
@@ -6643,12 +6679,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ready · sign in on that computer'**
   String get managedRuntimeSignInThere;
-
-  /// No description provided for @managedOpenCodeRunning.
-  ///
-  /// In en, this message translates to:
-  /// **'Already running · one per computer'**
-  String get managedOpenCodeRunning;
 
   /// No description provided for @managedRuntimeDetails.
   ///
@@ -6691,6 +6721,186 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Refresh this computer'**
   String get managedRefreshComputer;
+
+  /// No description provided for @composerWrite.
+  ///
+  /// In en, this message translates to:
+  /// **'Write'**
+  String get composerWrite;
+
+  /// No description provided for @composerSplit.
+  ///
+  /// In en, this message translates to:
+  /// **'Split'**
+  String get composerSplit;
+
+  /// No description provided for @composerPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get composerPreview;
+
+  /// No description provided for @composerPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to preview yet. Write Markdown on the left and it renders here.'**
+  String get composerPreviewEmpty;
+
+  /// No description provided for @composerPreviewEmptyTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing to preview yet.'**
+  String get composerPreviewEmptyTab;
+
+  /// No description provided for @reviewSessionSource.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation'**
+  String get reviewSessionSource;
+
+  /// No description provided for @reviewWorkspaceSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace'**
+  String get reviewWorkspaceSource;
+
+  /// No description provided for @reviewNoSessionChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'This conversation hasn\'t changed any files yet.'**
+  String get reviewNoSessionChanges;
+
+  /// No description provided for @reviewEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit {index}'**
+  String reviewEdit(int index);
+
+  /// No description provided for @reviewAllEdits.
+  ///
+  /// In en, this message translates to:
+  /// **'Show every edit'**
+  String get reviewAllEdits;
+
+  /// No description provided for @reviewEditCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} edits'**
+  String reviewEditCount(int count);
+
+  /// No description provided for @reviewFilterFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter files'**
+  String get reviewFilterFiles;
+
+  /// No description provided for @reviewOpenFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the whole file'**
+  String get reviewOpenFile;
+
+  /// No description provided for @reviewShowChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the changes'**
+  String get reviewShowChanges;
+
+  /// No description provided for @reviewFileLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the file…'**
+  String get reviewFileLoading;
+
+  /// No description provided for @reviewFileUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This file can\'t be read from the host.'**
+  String get reviewFileUnavailable;
+
+  /// No description provided for @copyPath.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy path'**
+  String get copyPath;
+
+  /// No description provided for @openInReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in review'**
+  String get openInReview;
+
+  /// No description provided for @showTurnNavigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show conversation controls'**
+  String get showTurnNavigation;
+
+  /// No description provided for @automationRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Automation'**
+  String get automationRun;
+
+  /// No description provided for @reviewWorkspaceLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading the working tree\'s changes…'**
+  String get reviewWorkspaceLoading;
+
+  /// No description provided for @reviewWorkspaceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The working tree\'s changes couldn\'t be read.'**
+  String get reviewWorkspaceUnavailable;
+
+  /// No description provided for @relayVirtualAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'The system DNS resolved {host} to {address}, a proxy\'s or VPN\'s virtual address that nothing routes right now. Reconnect that proxy or VPN, then retry.'**
+  String relayVirtualAddress(String host, String address);
+
+  /// No description provided for @relayNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'{relay} didn\'t answer.'**
+  String relayNoAnswer(String relay);
+
+  /// No description provided for @homeRelayLocalOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'The relay can\'t be reached, so this computer\'s own service opened directly.'**
+  String get homeRelayLocalOnly;
+
+  /// No description provided for @hostStopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping…'**
+  String get hostStopping;
+
+  /// No description provided for @hostSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get hostSaving;
+
+  /// No description provided for @hostRestarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Restarting…'**
+  String get hostRestarting;
+
+  /// No description provided for @hostStoppedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} stopped.'**
+  String hostStoppedToast(String name);
+
+  /// No description provided for @conversationsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading conversations…'**
+  String get conversationsLoading;
 }
 
 class _AppLocalizationsDelegate

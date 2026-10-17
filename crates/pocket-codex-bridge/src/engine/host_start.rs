@@ -37,6 +37,8 @@ pub enum NewHost {
     OpenCode {
         /// Explicit executable or child PATH.
         binary: Option<String>,
+        /// Its own database instead of OpenCode's default one.
+        separate_history: bool,
     },
 }
 
@@ -54,8 +56,10 @@ impl From<Runtime> for NewHost {
             },
             Runtime::OpenCode {
                 binary,
+                separate_history,
             } => Self::OpenCode {
                 binary,
+                separate_history,
             },
             Runtime::Acp(spec) => Self::Acp(spec),
         }
@@ -147,8 +151,10 @@ fn start_checked_in(
         NewHost::Acp(spec) => Runtime::Acp(spec.clone()),
         NewHost::OpenCode {
             binary,
+            separate_history,
         } => Runtime::OpenCode {
             binary: binary.clone(),
+            separate_history: *separate_history,
         },
     };
     let change = Change {
@@ -213,9 +219,9 @@ fn launch(
     match host {
         NewHost::OpenCode {
             binary,
-        } => {
-            serve_opencode::start_locked(lease, binary.as_deref(), provider).map(Started::OpenCode)
-        },
+            separate_history,
+        } => serve_opencode::start_locked(lease, binary.as_deref(), separate_history, provider)
+            .map(Started::OpenCode),
         NewHost::Codex {
             port,
             binary,
@@ -248,6 +254,7 @@ mod tests {
             Some("revoked-new-host"),
             super::NewHost::OpenCode {
                 binary: None,
+                separate_history: false,
             },
             super::Change {
                 input: super::host_profiles::ProfileInput {

@@ -7,6 +7,8 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 enum _MessageAction { copy, select, edit, share }
 
@@ -85,17 +87,17 @@ class _MessageActionsState extends State<MessageActions> {
             enabled: false,
             child: Text(label, style: Theme.of(context).textTheme.bodySmall),
           ),
-        _entry(_MessageAction.copy, Icons.content_copy_outlined, l10n.copy),
+        _entry(_MessageAction.copy, AppIcons.content_copy_outlined, l10n.copy),
         _entry(
           _MessageAction.select,
-          Icons.text_snippet_outlined,
+          AppIcons.text_snippet_outlined,
           l10n.selectText,
         ),
         if (onEdit != null)
-          _entry(_MessageAction.edit, Icons.edit_outlined, l10n.editMessage),
+          _entry(_MessageAction.edit, AppIcons.edit_outlined, l10n.editMessage),
         _entry(
           _MessageAction.share,
-          Icons.ios_share_outlined,
+          AppIcons.ios_share_outlined,
           widget.isUser ? l10n.sharePrompt : l10n.shareMessage,
         ),
       ],
@@ -109,8 +111,9 @@ class _MessageActionsState extends State<MessageActions> {
       case _MessageAction.copy:
         await _copyMessage(context, text);
       case _MessageAction.select:
-        await showDialog<void>(
+        await showAppDialog<void>(
           context: context,
+          fullscreen: true,
           builder: (_) => _MessageSelection(text: text),
         );
       case _MessageAction.edit:
@@ -237,7 +240,7 @@ class _MessageSelection extends StatelessWidget {
             IconButton(
               tooltip: l10n.copy,
               onPressed: () => _copyMessage(context, text),
-              icon: const Icon(Icons.content_copy_outlined),
+              icon: const Icon(AppIcons.content_copy_outlined),
             ),
           ],
         ),

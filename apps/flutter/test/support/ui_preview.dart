@@ -1,8 +1,8 @@
 // Shared preview support for layout tests: real bundled fonts and optional
 // PNG export. Set PCX_UI_PREVIEW_DIR to write each captured layout as a PNG.
 //
-// Fonts come from the test asset bundle (Figtree, Geist Mono, Material
-// Icons) and, for Chinese, the desktop-only Noto Sans SC read from the
+// Fonts come from the test asset bundle (Google Sans Flex, Geist Mono,
+// Lucide and Material Icons) and, for Chinese, the desktop-only Noto Sans SC read from the
 // source tree. Nothing is downloaded and the mobile asset bundle is
 // unchanged.
 
@@ -28,15 +28,22 @@ Future<void> loadPreviewFonts({bool always = false}) async {
   await (FontLoader(
     'MaterialIcons',
   )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-  // Figtree also stands in for the Apple system face, which the headless
-  // engine lacks, so iOS-platform previews measure real Latin text.
-  for (final family in ['Figtree', 'CupertinoSystemText']) {
-    final prose = FontLoader(family);
-    for (final weight in ['Light', 'Regular', 'Medium', 'SemiBold', 'Bold']) {
-      prose.addFont(rootBundle.load('assets/fonts/Figtree-$weight.ttf'));
-    }
-    await prose.load();
+  await (FontLoader('packages/lucide_icons_flutter/Lucide')..addFont(
+        rootBundle.load('packages/lucide_icons_flutter/assets/lucide.ttf'),
+      ))
+      .load();
+  // The app draws its icons at Lucide's 300 stroke weight.
+  await (FontLoader('packages/lucide_icons_flutter/Lucide300')..addFont(
+        rootBundle.load(
+          'packages/lucide_icons_flutter/assets/build_font/LucideVariable-w300.ttf',
+        ),
+      ))
+      .load();
+  final prose = FontLoader('GoogleSansFlex');
+  for (final weight in ['Light', 'Regular', 'Medium', 'SemiBold', 'Bold']) {
+    prose.addFont(rootBundle.load('assets/fonts/GoogleSansFlex-$weight.ttf'));
   }
+  await prose.load();
   final mono = FontLoader('GeistMono');
   for (final weight in ['Regular', 'Medium', 'SemiBold']) {
     mono.addFont(rootBundle.load('assets/fonts/GeistMono-$weight.ttf'));

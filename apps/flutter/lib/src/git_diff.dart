@@ -2,6 +2,15 @@
 /// Avoids a heavy dependency — codex returns a standard `git diff`.
 library;
 
+import 'package:pocket_codex/src/lru_cache.dart';
+
+/// Diffs already parsed, by their text: a transcript rebuilds its edit cards
+/// and the review reads every edit again, and a long diff is costly to split.
+final _parsed = LruCache<String, DiffModel>(
+  maxWeight: 8 << 20,
+  weigh: (raw, _) => raw.length,
+);
+
 /// Kind of a single diff line, used to colour it.
 enum DiffLineKind {
   /// Unchanged context line.
@@ -65,6 +74,11 @@ class DiffModel {
 
   /// Whether the diff has no files.
   bool get isEmpty => files.isEmpty;
+
+  /// [parse], remembered: the same text always reads the same, so a diff is
+  /// split once however often it is shown.
+  static DiffModel cached(String raw) =>
+      _parsed.putIfAbsent(raw, () => parse(raw));
 
   /// Parse a unified diff string. Tolerant of missing `diff --git` headers
   /// (falls back to `+++`/`---` file markers) and of an empty input.

@@ -138,6 +138,11 @@ pub enum Runtime {
         /// Explicit executable, or the child PATH when absent.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         binary: Option<String>,
+        /// Keep this host's sessions in a database of its own rather than
+        /// OpenCode's default one, which only one host can serve at a time.
+        /// Absent in records saved before it existed (the default database).
+        #[serde(default, rename = "separateHistory", skip_serializing_if = "std::ops::Not::not")]
+        separate_history: bool,
     },
 }
 
@@ -157,7 +162,12 @@ impl std::fmt::Debug for Runtime {
                 .finish(),
             Self::OpenCode {
                 binary,
-            } => f.debug_struct("OpenCode").field("binary", binary).finish(),
+                separate_history,
+            } => f
+                .debug_struct("OpenCode")
+                .field("binary", binary)
+                .field("separate_history", separate_history)
+                .finish(),
             Self::Acp(spec) => f.debug_tuple("Acp").field(spec).finish(),
         }
     }
@@ -184,8 +194,10 @@ impl Runtime {
             },
             Self::OpenCode {
                 binary,
+                separate_history,
             } => Ok(Self::OpenCode {
                 binary: trimmed(binary.as_deref()),
+                separate_history: *separate_history,
             }),
             Self::Acp(spec) => {
                 spec.validate().map_err(|e| anyhow!("{e}"))?;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/src/theme.dart';
 
 /// The Pocket-Codex brand mark: the bare "cloud terminal" glyph.
 ///
@@ -23,6 +24,41 @@ class BrandLogo extends StatelessWidget {
       width: size,
       height: size,
       filterQuality: FilterQuality.medium,
+    );
+  }
+}
+
+/// A headline painted in the brand spectrum — the greeting on a first-run or
+/// sign-in page. Reserved for those moments; ordinary titles stay in ink.
+class BrandHeadline extends StatelessWidget {
+  /// Paints [text] in the brand gradient.
+  const BrandHeadline(this.text, {super.key, this.style, this.textAlign});
+
+  /// The words.
+  final String text;
+
+  /// Overrides the default headline style (colour is ignored).
+  final TextStyle? style;
+
+  /// Alignment within the line.
+  final TextAlign? textAlign;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gradient = brandGradient(theme.colorScheme);
+    return ShaderMask(
+      blendMode: BlendMode.srcIn,
+      shaderCallback: gradient.createShader,
+      child: Text(
+        text,
+        textAlign: textAlign,
+        style: (style ?? theme.textTheme.headlineMedium)?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.4,
+        ),
+      ),
     );
   }
 }

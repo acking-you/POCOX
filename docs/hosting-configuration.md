@@ -4,8 +4,10 @@ The hosting editor (`apps/flutter/lib/src/hosting/host_editor_page.dart`) is one
 page for creating a local host and for editing a running one. Each host has a
 saved configuration for its instance name on this device: a **model service**
 (where its agent sends model requests) and, optionally, a **desired runtime**
-(Codex executable, port and proxy, an OpenCode executable, or an ACP program
-and arguments).
+(Codex executable, port and proxy, an OpenCode executable and history, or
+an ACP program and arguments). Instance names are unique per device, compared
+as the relay compares them; every new-host editor refuses a taken one before
+starting.
 
 ## Sources
 

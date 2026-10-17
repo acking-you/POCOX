@@ -6,7 +6,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
@@ -17,6 +16,9 @@ import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/theme.dart';
 
 import 'fake_bridge_api.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+
+import 'support/ui_preview.dart';
 
 const _service = 'pcx:host:app:default';
 final _input = find.byKey(const Key('composer-input'));
@@ -93,16 +95,7 @@ TextEditingController _controller(WidgetTester t) =>
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUpAll(() async {
-    if (Platform.environment['PCX_UI_PREVIEW_DIR'] == null) return;
-    await (FontLoader(
-      'MaterialIcons',
-    )..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'))).load();
-    await (FontLoader(
-      'Figtree',
-    )..addFont(rootBundle.load('assets/fonts/Figtree-Regular.ttf'))).load();
-    await (FontLoader(
-      'GeistMono',
-    )..addFont(rootBundle.load('assets/fonts/GeistMono-Regular.ttf'))).load();
+    await loadPreviewFonts();
   });
   setUp(AppSessionScreen.debugResetThreadMemory);
 
@@ -287,7 +280,7 @@ void main() {
           cwd: '/work/a-project-with-a-long-name-to-check-wrapping',
         );
         expect(find.byKey(const Key('project-switcher-btn')), findsOneWidget);
-        expect(find.byIcon(Icons.terminal_rounded), findsNothing);
+        expect(find.byIcon(AppIcons.terminal_rounded), findsNothing);
         expect(find.text('Explore this codebase'), findsNothing);
         expect(t.getRect(_input).bottom, lessThanOrEqualTo(device.size.height));
         expect(t.takeException(), isNull);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Mounts a button that raises a toast, so each test drives the real
 /// `ScaffoldMessenger` path rather than the builder in isolation.
@@ -27,7 +28,7 @@ void main() {
     await _tap(t);
 
     expect(find.text('saved'), findsOneWidget);
-    final icon = t.widget<Icon>(find.byIcon(Icons.check_circle_outline));
+    final icon = t.widget<Icon>(find.byIcon(AppIcons.check_circle_outline));
     // The success hue, so the tone is legible before the text is read.
     expect(icon.color, successColor(lightTheme().colorScheme));
   });
@@ -37,7 +38,7 @@ void main() {
     await _tap(t);
 
     expect(find.text('upload failed'), findsOneWidget);
-    final icon = t.widget<Icon>(find.byIcon(Icons.error_outline));
+    final icon = t.widget<Icon>(find.byIcon(AppIcons.error_outline));
     expect(icon.color, lightTheme().colorScheme.error);
   });
 
@@ -45,9 +46,9 @@ void main() {
     await t.pumpWidget(_host((c) => showToast(c, 'resumed')));
     await _tap(t);
 
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
-    expect(find.byIcon(Icons.check_circle_outline), findsNothing);
-    expect(find.byIcon(Icons.error_outline), findsNothing);
+    expect(find.byIcon(AppIcons.info_outline), findsOneWidget);
+    expect(find.byIcon(AppIcons.check_circle_outline), findsNothing);
+    expect(find.byIcon(AppIcons.error_outline), findsNothing);
   });
 
   testWidgets('it draws its own surface instead of Material\'s slab', (

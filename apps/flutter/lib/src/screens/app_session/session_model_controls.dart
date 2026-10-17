@@ -33,12 +33,12 @@ extension _SessionModelControls on _AppSessionState {
   Widget _modelChip(AppLocalizations l10n) {
     Widget pill(VoidCallback onTap) => _pill(
       pillKey: const Key('model-chip'),
-      icon: Icons.auto_awesome,
+      icon: AppIcons.auto_awesome,
       label: _modelChipLabel(l10n),
       // Plan is the one setting here that changes what a turn *does*, and a
       // long model name can ellipsize its label away — so it tints the chip.
       active: _plan,
-      trailing: Icons.expand_more,
+      trailing: AppIcons.expand_more,
       onTap: onTap,
     );
     if (!_isDesktop) return pill(() => _showConfigSheet(l10n));
@@ -142,8 +142,8 @@ extension _SessionModelControls on _AppSessionState {
                           duration: Motion.of(context, Motion.medium),
                           curve: Motion.move,
                           color: m.id == selectedId
-                              ? accentWash(scheme)
-                              : accentWash(scheme).withValues(alpha: 0),
+                              ? softWash(scheme)
+                              : softWash(scheme).withValues(alpha: 0),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
@@ -161,7 +161,7 @@ extension _SessionModelControls on _AppSessionState {
                                 ),
                                 if (m.id == selectedId)
                                   Icon(
-                                    Icons.check,
+                                    AppIcons.check,
                                     size: 16,
                                     color: scheme.tertiary,
                                   ),
@@ -180,9 +180,9 @@ extension _SessionModelControls on _AppSessionState {
           ListTile(
             key: const Key('advanced-turn-settings'),
             dense: true,
-            leading: const Icon(Icons.tune, size: 16),
+            leading: const Icon(AppIcons.tune, size: 16),
             title: Text(l10n.advancedSettings),
-            trailing: const Icon(Icons.chevron_right, size: 16),
+            trailing: const Icon(AppIcons.chevron_right, size: 16),
             onTap: () {
               _modelMenu.close();
               _showAdvancedSettings(l10n);
@@ -212,7 +212,7 @@ extension _SessionModelControls on _AppSessionState {
           Row(
             children: [
               Icon(
-                Icons.psychology_outlined,
+                AppIcons.psychology_outlined,
                 size: 16,
                 color: scheme.onSurfaceVariant,
               ),
@@ -326,19 +326,19 @@ extension _SessionModelControls on _AppSessionState {
       options: [
         _PickerOption(
           value: 'model',
-          icon: Icons.auto_awesome,
+          icon: AppIcons.auto_awesome,
           label: l10n.model,
           description: model,
         ),
         _PickerOption(
           value: 'effort',
-          icon: Icons.psychology_outlined,
+          icon: AppIcons.psychology_outlined,
           label: l10n.effort,
           description: _effectiveEffort?.label(l10n),
         ),
         _PickerOption(
           value: 'advanced',
-          icon: Icons.tune,
+          icon: AppIcons.tune,
           label: l10n.advancedSettings,
         ),
         // The working directory is fixed once the thread exists, so offer it
@@ -346,7 +346,7 @@ extension _SessionModelControls on _AppSessionState {
         if (_threadId == null)
           _PickerOption(
             value: 'project',
-            icon: Icons.folder_outlined,
+            icon: AppIcons.folder_outlined,
             label: l10n.projectsSection,
             description: _projectName(),
           ),
@@ -372,7 +372,7 @@ extension _SessionModelControls on _AppSessionState {
       options: [
         _PickerOption(
           value: 'plan',
-          icon: Icons.checklist_rtl,
+          icon: AppIcons.checklist_rtl,
           label: l10n.planMode,
           description: l10n.planModeDescription,
         ),
@@ -384,10 +384,10 @@ extension _SessionModelControls on _AppSessionState {
   IconData _modeIcon() => _modeIconFor(_mode);
 
   IconData _modeIconFor(PermissionMode m) => switch (m) {
-    PermissionMode.full => Icons.lock_open,
-    PermissionMode.readOnly => Icons.lock_outline,
-    PermissionMode.auto => Icons.person_outline,
-    PermissionMode.autoReview => Icons.verified_user_outlined,
+    PermissionMode.full => AppIcons.lock_open,
+    PermissionMode.readOnly => AppIcons.lock_outline,
+    PermissionMode.auto => AppIcons.person_outline,
+    PermissionMode.autoReview => AppIcons.verified_user_outlined,
   };
 
   ModelInfo? get _effectiveModel {

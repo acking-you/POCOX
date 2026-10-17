@@ -16,10 +16,9 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/context_status.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/screens/app_session/diff_view.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A blocking choice box for a server approval request (run a command, edit
 /// files, grant permission, …). Decisions use the v2 wire values
@@ -34,15 +33,15 @@ class ApprovalCard extends StatelessWidget {
   ({IconData icon, String title}) _meta(AppLocalizations l10n) {
     final k = prompt.kind;
     if (k.contains('fileChange')) {
-      return (icon: Icons.edit_document, title: l10n.approvalFilePrompt);
+      return (icon: AppIcons.edit_document, title: l10n.approvalFilePrompt);
     }
     if (k.contains('permissions')) {
       return (
-        icon: Icons.shield_outlined,
+        icon: AppIcons.shield_outlined,
         title: l10n.approvalPermissionPrompt,
       );
     }
-    return (icon: Icons.terminal, title: l10n.approvalPrompt);
+    return (icon: AppIcons.terminal, title: l10n.approvalPrompt);
   }
 
   /// Best-effort detail from the request params (command / cwd / reason / files).
@@ -528,242 +527,4 @@ class _GaugePainter extends CustomPainter {
   @override
   bool shouldRepaint(_GaugePainter old) =>
       old.fraction != fraction || old.color != color || old.track != track;
-}
-
-/// The environment side panel: where this conversation is actually running —
-/// the checkout it acts on, the branch, and everything it has changed there,
-/// with each changed file expandable to its colour-coded hunks.
-///
-/// Every row is state the app genuinely knows; deliberately no commit/push or
-/// pull-request controls, because nothing on the host side implements them and
-/// a button that does nothing is worse than no button.
-class EnvPanel extends StatelessWidget {
-  const EnvPanel({super.key, required this.diff, this.branch, this.cwd});
-  final DiffModel? diff;
-  final String? branch;
-
-  /// Project root this conversation runs in (the checkout being changed).
-  final String? cwd;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final d = diff;
-    final hasChanges = d != null && !d.isEmpty;
-    // The whole panel is content to read and copy — branch, path, and above
-    // all the diff. Wrapping it in a SelectionArea makes every bit of that
-    // drag-selectable (desktop) / long-press-selectable (touch), the same as
-    // the transcript.
-    return SelectionArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.envTitle,
-                    style: Theme.of(context).textTheme.titleSmall,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Expanded(child: _body(context, scheme, l10n, hasChanges, d)),
-        ],
-      ),
-    );
-  }
-
-  /// The scrolling body. ONE scrollable, and a lazy one: the file rows are
-  /// built by index so an expanded 1,400-line diff isn't laid out on every
-  /// frame of a scroll through the other 54 files.
-  Widget _body(
-    BuildContext context,
-    ColorScheme scheme,
-    AppLocalizations l10n,
-    bool hasChanges,
-    DiffModel? d,
-  ) {
-    final leading = <Widget>[
-      // Where the work lands: branch + working-tree totals, as one card.
-      Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-        child: _card(context, scheme, l10n, hasChanges, d),
-      ),
-      if (cwd != null && cwd!.trim().isNotEmpty) ...[
-        _heading(context, l10n.envProject),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-          child: Row(
-            children: [
-              Icon(
-                Icons.folder_outlined,
-                size: 14,
-                color: scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Tooltip(
-                  message: cwd!,
-                  child: Text(
-                    cwd!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: monoFontFamily,
-                      fontFamilyFallback: monoCjkFallback,
-                      fontSize: 11.5,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-      _heading(context, l10n.envSource),
-      if (!hasChanges)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-          child: Text(
-            l10n.noChanges,
-            style: TextStyle(fontSize: 12.5, color: scheme.onSurfaceVariant),
-          ),
-        ),
-    ];
-    final files = hasChanges ? d!.files : const <DiffFile>[];
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 16),
-      itemCount: leading.length + files.length,
-      itemBuilder: (c, i) {
-        if (i < leading.length) return leading[i];
-        final f = files[i - leading.length];
-        return DiffFileTile(
-          // Lazy building recycles elements, so the expanded/collapsed state
-          // has to live somewhere that survives scrolling off-screen.
-          key: PageStorageKey<String>('env-diff-${f.path}'),
-          file: f,
-          initiallyExpanded: false,
-        );
-      },
-    );
-  }
-
-  /// The branch card: which checkout state the agent is writing into.
-  Widget _card(
-    BuildContext context,
-    ColorScheme scheme,
-    AppLocalizations l10n,
-    bool hasChanges,
-    DiffModel? d,
-  ) => Container(
-    padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-    decoration: BoxDecoration(
-      color: scheme.surfaceContainerLow,
-      border: Border.all(color: scheme.outlineVariant, width: 0.5),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.computer, size: 14, color: scheme.primary),
-            const SizedBox(width: 7),
-            Text(
-              l10n.envLocal,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(
-              Icons.account_tree_outlined,
-              size: 14,
-              color: scheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Text(
-                branch ?? '—',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: monoFontFamily,
-                  fontFamilyFallback: monoCjkFallback,
-                  fontSize: 12.5,
-                  color: scheme.onSurface,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (hasChanges) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                '+${d!.added}',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: additionColor(scheme),
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '−${d.removed}',
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.error,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  l10n.envFilesChanged(d.files.length),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
-    ),
-  );
-
-  /// A small all-caps section heading, the panel's only structural chrome.
-  Widget _heading(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-    child: Text(
-      text.toUpperCase(),
-      style: TextStyle(
-        fontSize: 10.5,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.7,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    ),
-  );
 }

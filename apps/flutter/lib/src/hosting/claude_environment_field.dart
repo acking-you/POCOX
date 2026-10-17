@@ -8,6 +8,8 @@ import 'package:pocket_codex/src/hosting/model_service_section.dart'
     show ServiceChoice;
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The credentials Claude accepts, in the order they are offered. One is
 /// used at a time: [ClaudeEnvironmentDraft.setOverride] clears the others.
@@ -158,7 +160,7 @@ class ClaudeValueControl extends StatelessWidget {
           hintText: stored ? l.claudeEnvStored : l.claudeEnvValue,
           hintMaxLines: 2,
           prefixIcon: variable.secret
-              ? const Icon(Icons.lock_outline, size: 18)
+              ? const Icon(AppIcons.lock_outline, size: 18)
               : null,
           helperText: missing ? l.claudeEnvNeedsValue : null,
           helperMaxLines: 3,
@@ -347,14 +349,19 @@ class ClaudeCredentialChoice extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
-            l.claudeEnvCredential,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w500,
+          // That only one credential is used is behind the info mark.
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: InfoTitle(
+              title: Text(
+                l.claudeEnvCredential,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              info: l.claudeEnvCredentialNote,
             ),
           ),
-          const SizedBox(height: 2),
-          EditorNote(l.claudeEnvCredentialNote),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,

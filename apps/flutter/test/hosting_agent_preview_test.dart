@@ -26,6 +26,7 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/screens/services_screen.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
 
 import 'fake_bridge_api.dart';
@@ -65,8 +66,9 @@ const _savedFixture = AcpAgentSpec(
 );
 
 /// The chooser with a saved configuration named like the fixture preset:
-/// each section revealed in turn, its heading and both tiles' source
-/// subtitles whole on screen; frames are `$name-presets` and `$name-saved`.
+/// each section revealed in turn, its heading and tile whole on screen, the
+/// tile's source in its tooltip and label; frames are `$name-presets` and
+/// `$name-saved`.
 Future<void> _captureSameName(
   WidgetTester t,
   Size size,
@@ -101,7 +103,7 @@ Future<void> _captureSameName(
       find.ancestor(of: group, matching: find.byType(Scrollable)).first,
     );
     // Under large text the heading and the tile may not fit together: the
-    // tile, whose subtitle names its source too, then ends the view.
+    // tile, whose tooltip and label name its source too, then ends the view.
     final together = t.getRect(shownTile).bottom <= view.bottom + 0.5;
     if (!large) {
       expect(together, isTrue, reason: 'heading and tile together ($frame)');
@@ -115,7 +117,6 @@ Future<void> _captureSameName(
     for (final text in [
       if (together) find.descendant(of: group, matching: find.text(heading)),
       find.descendant(of: shownTile, matching: find.text('Fixture Agent')),
-      find.descendant(of: shownTile, matching: find.text(source)),
     ]) {
       expect(text, findsOneWidget, reason: '$text');
       final rect = t.getRect(text);
@@ -134,6 +135,15 @@ Future<void> _captureSameName(
       find.bySemanticsLabel('Fixture Agent, $source'),
       findsOneWidget,
       reason: 'one node names the tile and its source',
+    );
+    expect(
+      t
+          .widget<Tooltip>(
+            find.ancestor(of: shownTile, matching: find.byType(Tooltip)).first,
+          )
+          .message,
+      source,
+      reason: 'the tile names its source on hover',
     );
     await capturePreview(t, '$name-$frame');
   }
@@ -381,7 +391,13 @@ void main() {
           // shown and disabled.
           final l10n = lookupAppLocalizations(locale);
           _oneLine(t, find.text(l10n.codexSourceExternal));
-          _oneLine(t, find.text(l10n.codexSourceBuiltin));
+          // Marked as not implemented on the segment itself.
+          _oneLine(
+            t,
+            find.text(
+              '${l10n.codexSourceBuiltin} · ${l10n.codexBuiltinUnavailable}',
+            ),
+          );
           final source = t.widget<SegmentedButton<bool>>(
             find.byKey(const Key('codex-source')),
           );
@@ -701,8 +717,8 @@ void main() {
   }
 
   // The agent chooser under 3× text on a phone: section headings and tile
-  // subtitles wrap instead of clipping, and both same-name preset tiles
-  // still say where they come from.
+  // names stay whole, and both same-name preset tiles still say where they
+  // come from.
   for (final brightness in Brightness.values) {
     for (final language in ['en', 'zh']) {
       final locale = Locale(language);
@@ -787,7 +803,8 @@ void main() {
           );
           await capturePreview(t, 'services-scaled-$variant');
 
-          // One device's detail: the capabilities title and its count.
+          // One device's detail: its hosts, each the one row of its chat
+          // service, whole inside the window.
           final tile = find.byWidgetPredicate((w) {
             final key = w.key;
             return key is ValueKey<String> &&
@@ -800,31 +817,25 @@ void main() {
           await t.tap(tile.first);
           await t.pumpAndSettle();
           expect(t.takeException(), isNull, reason: 'no overflow (detail)');
-          final title = find.text(l10n.servicesCapabilities);
-          final card = t.getRect(
-            find.ancestor(of: title, matching: find.byType(Card)).first,
+          final section = find.text(l10n.localHostingSection);
+          expect(section, findsOneWidget);
+          final group = t.getRect(
+            find.ancestor(of: section, matching: find.byType(GroupCard)).first,
           );
-          final count = find.textContaining(
-            RegExp(
-              r'^\d+ ' +
-                  RegExp.escape(
-                    l10n
-                        .servicesDeviceCapabilityCount(0)
-                        .replaceFirst('0 ', ''),
-                  ) +
-                  r'$',
-            ),
-          );
-          for (final shown in [title, count]) {
-            expect(shown, findsOneWidget, reason: '$shown');
-            final rect = t.getRect(shown);
-            expect(
-              _inside(rect, size, card),
-              isTrue,
-              reason: '$shown $rect inside its card $card',
-            );
-          }
+          expect(_inside(t.getRect(section), size, group), isTrue);
           _operable(t, find.byKey(const Key('device-back')));
+          for (final name in ['default', 'fixture']) {
+            final mark = find.byKey(Key('local-host-icon-$name'));
+            expect(mark, findsOneWidget, reason: name);
+            await t.ensureVisible(mark);
+            await t.pumpAndSettle();
+            final shown = t.getRect(
+              find
+                  .ancestor(of: section, matching: find.byType(GroupCard))
+                  .first,
+            );
+            expect(_inside(t.getRect(mark), size, shown), isTrue, reason: name);
+          }
           await capturePreview(t, 'services-scaled-detail-$variant');
           await t.pumpWidget(const SizedBox());
         } finally {

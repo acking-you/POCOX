@@ -5,10 +5,11 @@ library;
 import 'package:pocket_codex/src/bridge_api.dart';
 
 /// The running host of [hosts] that serves native [provider] sessions
-/// (`opencode`: the native OpenCode host; `claude`: a Claude ACP host),
-/// preferring [preferred] (the host last chatted on); null when none runs.
-/// Opening a session there resolves its access through that host; nothing
-/// is forked or copied.
+/// (`opencode`: the OpenCode host on OpenCode's default database, not one
+/// with a history of its own; `claude`: a Claude ACP host), preferring
+/// [preferred] (the host last chatted on); null when none runs. Opening a
+/// session there resolves its access through that host; nothing is forked or
+/// copied.
 AppServeStatus? nativeContinueHost(
   List<AppServeStatus> hosts,
   String provider, {
@@ -18,7 +19,7 @@ AppServeStatus? nativeContinueHost(
       host.alive &&
       host.appServiceKey.isNotEmpty &&
       switch (provider) {
-        'opencode' => host.isOpenCode,
+        'opencode' => host.servesOpenCodeHistory,
         'claude' => host.isAcp && host.profileId == 'claude',
         _ => false,
       };

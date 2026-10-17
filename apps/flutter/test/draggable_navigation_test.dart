@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/widgets/draggable_navigation.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 void main() {
   testWidgets('drag stays inside viewport across rebuilds and resize', (
@@ -20,7 +21,7 @@ void main() {
               height: 100,
               child: Material(
                 child: IconButton(
-                  icon: const Icon(Icons.arrow_upward),
+                  icon: const Icon(AppIcons.arrow_upward),
                   onPressed: () => taps++,
                 ),
               ),

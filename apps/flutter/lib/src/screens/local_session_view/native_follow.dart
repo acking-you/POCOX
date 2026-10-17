@@ -132,12 +132,12 @@ extension _NativeFollow on _LocalSessionViewState {
         if (_live?.heldOpen != true)
           Text(
             l10n.nativeHistoryReadOnly,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: helpTextStyle(Theme.of(context)),
           ),
         if (_native.truncated)
           Text(
             l10n.nativeHistoryWindowHint,
-            style: Theme.of(context).textTheme.bodySmall,
+            style: helpTextStyle(Theme.of(context)),
           ),
         if (_error != null && _items.isNotEmpty)
           Text(
@@ -153,7 +153,7 @@ extension _NativeFollow on _LocalSessionViewState {
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.expand_less),
+                : const Icon(AppIcons.expand_less),
             label: Text(l10n.nativeHistoryLoadOlder),
           ),
       ],

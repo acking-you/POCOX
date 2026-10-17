@@ -42,6 +42,7 @@ extension _SessionQuota on _AppSessionState {
     if (_rate == null) unawaited(_loadQuota());
     await showAdaptivePanel<void>(
       context: context,
+      anchored: true,
       // Rebuilt on every quota change, so a fetch that lands while the panel
       // is open fills the bars in place.
       builder: (c) => ValueListenableBuilder<int>(
@@ -201,7 +202,7 @@ extension _SessionQuota on _AppSessionState {
             Row(
               children: [
                 Icon(
-                  Icons.data_usage,
+                  AppIcons.data_usage,
                   size: 13,
                   color: scheme.onSurfaceVariant,
                 ),

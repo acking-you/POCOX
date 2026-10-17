@@ -31,8 +31,9 @@ extension _SessionComposer on _AppSessionState {
     _updateState(() => _editorOpen = true);
     _inputFocus.unfocus();
     _input.selection = selection;
-    await showDialog<void>(
+    await showAppDialog<void>(
       context: context,
+      fullscreen: true,
       builder: (_) =>
           ExpandedComposer(controller: _input, focusNode: _expandedInputFocus),
     );
@@ -51,8 +52,9 @@ extension _SessionComposer on _AppSessionState {
     final draft = _draft;
     _updateState(() => _editorOpen = true);
     _inputFocus.unfocus();
-    final edited = await showDialog<String>(
+    final edited = await showAppDialog<String>(
       context: context,
+      fullscreen: true,
       builder: (_) => MessageEditor(
         text: text,
         hasDraft: draft.value.text.isNotEmpty || draft.attachments.isNotEmpty,
@@ -154,7 +156,7 @@ extension _SessionComposer on _AppSessionState {
           key: const Key('fast-mode-btn'),
           tooltip: l10n.fastModeHint,
           label: l10n.fastMode,
-          icon: Icons.bolt,
+          icon: AppIcons.bolt,
           selected: _effectiveServiceTier == 'priority',
           onSelected: _sending
               ? null
@@ -182,7 +184,7 @@ extension _SessionComposer on _AppSessionState {
           message: l10n.steerUnavailableHint,
           child: ActionChip(
             key: const Key('supplement-unavailable'),
-            avatar: const Icon(Icons.info_outline, size: 15),
+            avatar: const Icon(AppIcons.info_outline, size: 15),
             label: Text(l10n.steerQueueOnly),
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: touch
@@ -192,19 +194,10 @@ extension _SessionComposer on _AppSessionState {
               fontSize: 12.5,
               color: scheme.onSurfaceVariant,
             ),
-            onPressed: () => showDialog<void>(
+            onPressed: () => showInfoPanel(
               context: context,
-              builder: (context) => AlertDialog(
-                scrollable: true,
-                title: Text(l10n.steerUnavailableTitle),
-                content: Text(l10n.steerUnavailableDetails(supplementAgent)),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(l10n.done),
-                  ),
-                ],
-              ),
+              title: l10n.steerUnavailableTitle,
+              body: l10n.steerUnavailableDetails(supplementAgent),
             ),
           ),
         ),
@@ -330,6 +323,8 @@ extension _SessionComposer on _AppSessionState {
                   : l10n.messageHint,
               hintStyle: inputStyle.copyWith(color: scheme.onSurfaceVariant),
               border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
               isCollapsed: true,
               // Override the shared form-field padding inside this compact card.
               contentPadding: EdgeInsets.zero,
@@ -357,10 +352,10 @@ extension _SessionComposer on _AppSessionState {
           resizeEdge,
           Padding(
             padding: EdgeInsets.fromLTRB(
-              touch ? 12 : 14,
-              0,
+              touch ? 14 : 18,
+              touch ? 0 : 4,
+              touch ? 10 : 12,
               touch ? 8 : 10,
-              touch ? 6 : 8,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -416,14 +411,14 @@ extension _SessionComposer on _AppSessionState {
                           fieldTool(
                             key: const Key('composer-expand'),
                             tooltip: l10n.expandComposer,
-                            icon: Icons.open_in_full,
+                            icon: AppIcons.open_in_full,
                             onPressed: _expandComposer,
                           ),
                           if (grown)
                             fieldTool(
                               key: const Key('composer-reset-height'),
                               tooltip: l10n.resetComposerHeight,
-                              icon: Icons.unfold_less,
+                              icon: AppIcons.unfold_less,
                               onPressed: () =>
                                   resize(defaultHeight, save: true),
                             ),
@@ -432,10 +427,8 @@ extension _SessionComposer on _AppSessionState {
                     ),
                   ],
                 ),
-                if (!inlineModes && modeChips.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 6, runSpacing: 4, children: modeChips),
-                ],
+                // The turn modes that do not ride in the toolbar head its
+                // line above (see [_composerToolbar]).
                 SizedBox(height: touch ? 4 : 8),
                 toolbar,
               ],
@@ -448,32 +441,26 @@ extension _SessionComposer on _AppSessionState {
     final card = ListenableBuilder(
       listenable: _inputFocus,
       builder: (context, child) {
-        // The edge says what the composer is doing: firmer while focused, the
-        // live signal while the agent is answering (anything sent now queues).
-        // A take outranks everything: the card is where the voice is going.
+        // The card is a pane of glass over the transcript's foot: what
+        // scrolls beneath shows through it, blurred. Its edge says what the
+        // composer is doing — the live signal while the agent answers
+        // (anything sent now queues), the voice colour during a take — and
+        // focus lifts it a little further off the page.
         final edge = _dictationTake != DictationTake.idle
             ? dictationColor(scheme).withValues(alpha: 0.7)
             : _streaming
-            ? signalColor(scheme).withValues(alpha: 0.55)
+            ? signalColor(scheme).withValues(alpha: 0.5)
             : _inputFocus.hasFocus
-            ? scheme.outline
-            // A phone's idle card is found by its tone and shadow; a full
-            // hairline around it is noise at arm's length.
-            : touch
-            ? scheme.outlineVariant.withValues(alpha: 0.6)
-            : scheme.outlineVariant;
-        return AnimatedContainer(
-          duration: Motion.of(context, Motion.fast),
-          curve: Motion.move,
-          decoration: BoxDecoration(
-            color: surfacePanel(scheme),
-            borderRadius: BorderRadius.circular(
-              touch ? kTouchComposerRadius : kComposerRadius,
-            ),
-            border: Border.all(color: edge),
-            boxShadow: panelShadow(scheme, blur: 16),
+            ? scheme.onSurface.withValues(alpha: 0.16)
+            : null;
+        return Glass(
+          depth: GlassDepth.floating,
+          borderRadius: BorderRadius.circular(
+            touch ? kTouchComposerRadius : kComposerRadius,
           ),
-          child: child,
+          lift: _inputFocus.hasFocus ? 1 : 0.7,
+          edge: edge,
+          child: child!,
         );
       },
       child: LayoutBuilder(
@@ -505,33 +492,14 @@ extension _SessionComposer on _AppSessionState {
                 child: card,
               ),
             ),
-            // Desktop: where this turn will land — host, branch — and how to
-            // send it, as a footnote under the card rather than chrome inside
-            // it. A phone shows the same facts in the status bar.
+            // Desktop: where this turn will land — host, branch — as a
+            // footnote under the card rather than chrome inside it; the facts
+            // ellipsize rather than overflow. A phone shows them in the
+            // status bar.
             if (doc)
               Padding(
-                padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
-                // The keyboard hint is the first thing to go when the column
-                // narrows (the review pane is open); the context facts shrink
-                // after it and ellipsize rather than overflow.
-                child: LayoutBuilder(
-                  builder: (context, box) => Row(
-                    children: [
-                      Expanded(child: _composerContext(l10n)),
-                      if (_isDesktop && box.maxWidth >= 520) ...[
-                        const SizedBox(width: 12),
-                        Text(
-                          l10n.composerKeyboardHint,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(6, 7, 6, 0),
+                child: _composerContext(l10n),
               ),
           ],
         ),
@@ -556,7 +524,7 @@ extension _SessionComposer on _AppSessionState {
         foregroundColor: scheme.onSurface,
         shape: const CircleBorder(),
       ),
-      icon: const Icon(Icons.stop_rounded, size: 18),
+      icon: const Icon(AppIcons.stop_rounded, size: 18),
     );
   }
 
@@ -565,7 +533,7 @@ extension _SessionComposer on _AppSessionState {
   /// changeable up until the thread exists.
   Widget _composerContext(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
-    final muted = TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant);
+    final muted = TextStyle(fontSize: 12, color: scheme.onSurfaceVariant);
     Widget chip(
       IconData icon,
       String label, {
@@ -573,6 +541,7 @@ extension _SessionComposer on _AppSessionState {
       Key? key,
       String? tip,
       bool busy = false,
+      bool showIcon = false,
     }) {
       final row = Row(
         mainAxisSize: MainAxisSize.min,
@@ -586,9 +555,9 @@ extension _SessionComposer on _AppSessionState {
                 color: scheme.onSurfaceVariant,
               ),
             )
-          else
+          else if (showIcon)
             Icon(icon, size: 13, color: scheme.onSurfaceVariant),
-          const SizedBox(width: 5),
+          if (busy || showIcon) const SizedBox(width: 5),
           // Flexible, not a bare ConstrainedBox: when the review split narrows
           // the chat, the label must be able to shrink below its natural width
           // and ellipsize rather than overflow the row.
@@ -609,6 +578,7 @@ extension _SessionComposer on _AppSessionState {
         // Static chips still explain themselves on hover — a phone user reads
         // the same fact in the status bar, so this is the desktop affordance.
         return Tooltip(
+          key: key,
           message: tip ?? label,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
@@ -635,6 +605,12 @@ extension _SessionComposer on _AppSessionState {
     // line reads "Claude · host · project" for every agent alike.
     final caps = _caps;
     final project = _cwd?.trim() ?? '';
+    // Facts are told apart by position and a quiet separator, not by a row
+    // of look-alike glyphs.
+    final dot = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Text('·', style: muted.copyWith(color: onSurfaceMuted(scheme))),
+    );
     return Row(
       children: [
         if (caps.hostAccess && caps.providerName.isNotEmpty) ...[
@@ -668,20 +644,27 @@ extension _SessionComposer on _AppSessionState {
               ),
             ),
           ),
-          const SizedBox(width: 10),
+          dot,
         ],
-        Flexible(child: chip(Icons.computer, _hostLabel(l10n))),
+        Flexible(
+          child: chip(
+            AppIcons.computer,
+            _hostLabel(l10n),
+            key: const Key('composer-host-chip'),
+          ),
+        ),
         if (caps.hostAccess && project.isNotEmpty) ...[
-          const SizedBox(width: 10),
+          dot,
           Flexible(
-            child: chip(Icons.folder_outlined, _projectName(), tip: project),
+            child: chip(AppIcons.folder_outlined, _projectName(), tip: project),
           ),
         ],
         if (_branch != null) ...[
-          const SizedBox(width: 10),
+          dot,
           Flexible(
             child: chip(
-              Icons.account_tree_outlined,
+              AppIcons.account_tree_outlined,
+              showIcon: true,
               _branch!,
               key: const Key('composer-branch-chip'),
               tip: _diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff,
@@ -707,7 +690,7 @@ extension _SessionComposer on _AppSessionState {
             .where((s) => s.key == widget.serviceKey)
             .firstOrNull
             ?.device ??
-        _AppSessionState._serviceLabelFromKey(widget.serviceKey);
+        serviceKeyLabel(widget.serviceKey);
   }
 
   /// The `+` attachment menu. One button instead of three icons: on a phone the
@@ -728,7 +711,7 @@ extension _SessionComposer on _AppSessionState {
           )
         : null,
     icon: Icon(
-      Icons.add,
+      AppIcons.add,
       size: isDesktop ? 19 : 22,
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     ),
@@ -741,12 +724,15 @@ extension _SessionComposer on _AppSessionState {
         PopupMenuItem<void>(
           key: const Key('attach-btn'),
           onTap: _pickImages,
-          child: _menuRow(Icons.add_photo_alternate_outlined, l10n.attachImage),
+          child: _menuRow(
+            AppIcons.add_photo_alternate_outlined,
+            l10n.attachImage,
+          ),
         ),
       PopupMenuItem<void>(
         key: const Key('attach-file-btn'),
         onTap: _pickFiles,
-        child: _menuRow(Icons.attach_file, l10n.attachFile),
+        child: _menuRow(AppIcons.attach_file, l10n.attachFile),
       ),
       // Browsing / transferring host files uses the desktop save/open dialogs,
       // so it is gated the same way saving is.
@@ -754,7 +740,7 @@ extension _SessionComposer on _AppSessionState {
         PopupMenuItem<void>(
           key: const Key('host-files-btn'),
           onTap: () => showFileBrowser(context, serviceKey: widget.serviceKey),
-          child: _menuRow(Icons.folder_open_outlined, l10n.hostFiles),
+          child: _menuRow(AppIcons.folder_open_outlined, l10n.hostFiles),
         ),
       // Always here too (where dictation exists), so a card too narrow for
       // the inline microphone still has it.
@@ -763,7 +749,7 @@ extension _SessionComposer on _AppSessionState {
           key: const Key('dictate-menu'),
           enabled: !_voice.busy && !_dictation.taking && !_externalWriterMode,
           onTap: _startDictation,
-          child: _menuRow(Icons.mic_none_rounded, l10n.dictate),
+          child: _menuRow(AppIcons.mic_none_rounded, l10n.dictate),
         ),
     ],
   );
@@ -792,31 +778,44 @@ extension _SessionComposer on _AppSessionState {
         scale: hasDraft ? 1 : 0.94,
         duration: Motion.of(context, Motion.fast),
         curve: Motion.enter,
-        child: IconButton.filled(
-          key: const Key('send-btn'),
-          onPressed: canSend ? _submit : null,
-          tooltip: _restoringSettings
-              ? l10n.restoringSessionSettings
-              : _streaming
-              ? (_supplement ? l10n.steerMessage : l10n.queueNextTurn)
-              : _awaitingTurnStart
-              ? l10n.queueNextTurn
-              : l10n.send,
-          style: IconButton.styleFrom(
-            minimumSize: Size(side, side),
-            fixedSize: Size(side, side),
-            padding: EdgeInsets.zero,
-            backgroundColor: scheme.onSurface,
-            foregroundColor: scheme.surface,
-            disabledBackgroundColor: scheme.onSurface.withValues(alpha: 0.08),
-            disabledForegroundColor: onSurfaceDisabled(scheme),
-            shape: const CircleBorder(),
-          ),
-          icon: Icon(
-            (_streaming && !_supplement) || _awaitingTurnStart
-                ? Icons.playlist_add
-                : Icons.arrow_upward_rounded,
-            size: touch ? 20 : 18,
+        child: PressScale(
+          scale: 0.9,
+          enabled: canSend,
+          child: IconButton.filled(
+            key: const Key('send-btn'),
+            onPressed: canSend ? _submit : null,
+            tooltip: _restoringSettings
+                ? l10n.restoringSessionSettings
+                : _streaming
+                ? (_supplement ? l10n.steerMessage : l10n.queueNextTurn)
+                : _awaitingTurnStart
+                ? l10n.queueNextTurn
+                : l10n.send,
+            style:
+                IconButton.styleFrom(
+                  minimumSize: Size(side, side),
+                  fixedSize: Size(side, side),
+                  padding: EdgeInsets.zero,
+                  backgroundColor: scheme.onSurface,
+                  foregroundColor: scheme.surface,
+                  disabledBackgroundColor: scheme.onSurface.withValues(
+                    alpha: 0.08,
+                  ),
+                  disabledForegroundColor: onSurfaceDisabled(scheme),
+                  shape: const CircleBorder(),
+                  elevation: canSend ? 2 : 0,
+                  shadowColor: Colors.black.withValues(alpha: 0.5),
+                ).copyWith(
+                  // The send action is the one lit control in the composer.
+                  backgroundBuilder: (context, states, child) =>
+                      LitFace(states: states, child: child),
+                ),
+            icon: Icon(
+              (_streaming && !_supplement) || _awaitingTurnStart
+                  ? AppIcons.playlist_add
+                  : AppIcons.arrow_upward_rounded,
+              size: touch ? 20 : 18,
+            ),
           ),
         ),
       );

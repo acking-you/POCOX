@@ -162,7 +162,7 @@ extension _SessionComposerToolbar on _AppSessionState {
                 onPressed: _canStartVoice && !_dictation.taking
                     ? _startVoice
                     : null,
-                icon: Icon(Icons.graphic_eq, size: touch ? 22 : 18),
+                icon: Icon(AppIcons.graphic_eq, size: touch ? 22 : 18),
                 // 40 px on touch: two buttons beside send must still leave
                 // the model pill room on a 320 px phone.
                 style: IconButton.styleFrom(
@@ -176,19 +176,38 @@ extension _SessionComposerToolbar on _AppSessionState {
             _sendButton(),
           ],
         );
-        if (!optionsOwnLine && !modelOwnLine) return row;
+        // Turn modes that do not ride in the row take the line above it,
+        // shared with the model chip when that moved up too, so a phone's
+        // composer spends one line on them, not two.
+        final modes = !inlineModes && modeChips.isNotEmpty
+            ? Wrap(spacing: 6, runSpacing: 4, children: modeChips)
+            : null;
+        if (!optionsOwnLine && !modelOwnLine) {
+          if (modes == null) return row;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [modes, const SizedBox(height: 6), row],
+          );
+        }
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (permissionUp)
+            if (agentOptions != null) ...[
+              if (modes != null) ...[modes, const SizedBox(height: 6)],
+              agentOptions,
+            ] else
               Wrap(
-                spacing: 4,
+                spacing: 6,
                 runSpacing: 4,
-                children: [_permissionChip(l10n), _modelChip(l10n)],
-              )
-            else
-              agentOptions ?? _modelChip(l10n),
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  if (!inlineModes) ...modeChips,
+                  if (permissionUp) _permissionChip(l10n),
+                  _modelChip(l10n),
+                ],
+              ),
             const SizedBox(height: 6),
             row,
           ],

@@ -21,6 +21,7 @@ import 'package:pocket_codex/src/theme.dart';
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/ui_preview.dart';
+import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 
 const _device = 'ackingliu-mc1';
 const _openCode = 'pcx:$_device:opencode:opencode';
@@ -176,7 +177,7 @@ void main() {
   setUpAll(() => loadPreviewFonts(always: true));
   setUp(AppSessionScreen.debugResetThreadMemory);
 
-  testWidgets('capability rows keep the title, provider, status and actions '
+  testWidgets('capability rows keep the title, status and actions '
       'whole at every phone width, language and text size', (t) async {
     await _onIos(t, () async {
       final row = find.byKey(const Key('device-capability-$_openCode'));
@@ -205,8 +206,16 @@ void main() {
           lessThanOrEqualTo(size.height),
           reason: 'row on screen $at',
         );
-        _whole(t, row, l10n.servicesChatCapability, 'title $at');
-        _whole(t, row, 'OpenCode', 'provider $at');
+        // The provider names the row; its kind rides the facts line.
+        _whole(t, row, 'OpenCode', 'title $at');
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.textContaining(l10n.servicesChatCapability),
+          ),
+          findsOneWidget,
+          reason: 'kind $at',
+        );
         _whole(t, row, l10n.statusConnected, 'status $at');
         _reachable(
           t,
@@ -254,10 +263,7 @@ void main() {
       expect(t.takeException(), isNull);
       final l10n = lookupAppLocalizations(const Locale('en'));
       final title = t.getRect(
-        find.descendant(
-          of: row,
-          matching: find.text(l10n.servicesChatCapability),
-        ),
+        find.descendant(of: row, matching: find.text('OpenCode')),
       );
       final status = t.getRect(
         find.descendant(of: row, matching: find.text(l10n.statusConnected)),
@@ -321,7 +327,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(
         find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == 'high',
+          (w) => w is ChoiceRow<String> && w.value == 'high',
         ),
       );
       await _frames(t);
@@ -422,6 +428,78 @@ void main() {
         closeTo(send.center.dy, 1),
         reason: 'one toolbar line',
       );
+    });
+  });
+
+  testWidgets('a new conversation sits above the composer on a phone, its '
+      'other projects in one row', (t) async {
+    await _onIos(t, () async {
+      const screen = AppSessionScreen(
+        serviceKey: _codex,
+        home: true,
+        cwd: _cwd,
+      );
+      for (final (size, locale, scale) in _cases) {
+        final api = _api()
+          ..appThreads.addAll([
+            for (final (i, cwd) in [
+              _cwd,
+              '/w/alpha',
+              '/w/beta',
+              '/w/gamma',
+            ].indexed)
+              ThreadMeta(id: 't$i', preview: 'p$i', cwd: cwd, updatedAt: i),
+          ]);
+        await api.appConnect(_codex, 1);
+        await _mount(t, api, screen, size: size, scale: scale, locale: locale);
+        final at = '$size ${locale.languageCode} ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        // Nothing of the view lies under the composer's glass.
+        final composerTop = t
+            .getRect(find.byKey(const Key('composer-input')))
+            .top;
+        final above = Offset.zero & Size(size.width, composerTop);
+        _reachable(
+          t,
+          find.byKey(const Key('project-switcher-btn')),
+          above,
+          'project $at',
+        );
+        final row = find.byKey(const Key('agent-welcome-recent-row'));
+        final alpha = find.byKey(const Key('agent-welcome-recent-/w/alpha'));
+        // At default text the row waits just above the composer; with the
+        // largest text the view scrolls to it as one column.
+        if (scale == 1) {
+          expect(
+            t.getRect(row).bottom,
+            lessThanOrEqualTo(composerTop),
+            reason: 'projects row $at',
+          );
+        } else {
+          await t.ensureVisible(alpha);
+          await _frames(t, 3);
+        }
+        _reachable(t, alpha, above, 'recent project $at');
+        // One row that swipes, however many projects, ending with the
+        // folder chooser.
+        expect(
+          t.getRect(find.byKey(const Key('agent-welcome-recent-/w/gamma'))).top,
+          t.getRect(alpha).top,
+          reason: 'one row $at',
+        );
+        expect(
+          find.descendant(
+            of: row,
+            matching: find.byKey(const Key('agent-welcome-choose-folder')),
+          ),
+          findsOneWidget,
+        );
+        await capturePreview(
+          t,
+          'responsive-new-conversation-${size.width.toInt()}-'
+          '${locale.languageCode}-$scale',
+        );
+      }
     });
   });
 

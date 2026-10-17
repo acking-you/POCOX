@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
 import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// What a running host is, most important first: its state, the default
 /// project folder and the key actions, with tunnels, keys and executables
@@ -59,7 +60,7 @@ class HostStatusSection extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, size: 10, color: color),
+                Icon(AppIcons.circle, size: 10, color: color),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(

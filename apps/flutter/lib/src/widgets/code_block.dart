@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/code_highlight.dart';
+import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A framed, syntax-highlighted block of code with its language and a copy
 /// button: one look for a fenced block in a reply, a tool call's command or
@@ -64,7 +67,7 @@ class CodeBlock extends StatelessWidget {
       // to one position.
       primary: false,
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.fromLTRB(16, 2, 16, 14),
       child: Text.rich(
         highlightCode(
           code: code,
@@ -79,40 +82,41 @@ class CodeBlock extends StatelessWidget {
     return Container(
       width: double.infinity,
       margin: margin,
+      // A soft sunken plate: no outline, the tone alone separates code from
+      // prose.
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: scheme.outlineVariant),
+        color: codeSurface(scheme),
+        borderRadius: BorderRadius.circular(kPanelRadius - 2),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  label ?? (language.isEmpty ? 'text' : language),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: monoFontFamily,
-                    fontFamilyFallback: monoCjkFallback,
-                    fontSize: 11,
-                    color: scheme.onSurfaceVariant,
+          SizedBox(
+            height: 36,
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    label ?? (language.isEmpty ? 'text' : language),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-              ...?trailing,
-              CopyTextButton(text: code),
-            ],
-          ),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              border: Border(top: BorderSide(color: scheme.outlineVariant)),
+                ...?trailing,
+                CopyTextButton(text: code),
+                const SizedBox(width: 4),
+              ],
             ),
+          ),
+          SizedBox(
+            width: double.infinity,
             child: maxHeight == null
                 ? body
                 : ConstrainedBox(
@@ -168,9 +172,14 @@ class CopyTextButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     return IconButton(
-      icon: const Icon(Icons.content_copy_outlined, size: 14),
-      iconSize: 14,
+      icon: const Icon(AppIcons.content_copy_outlined, size: 15),
+      iconSize: 15,
       visualDensity: VisualDensity.compact,
+      style: IconButton.styleFrom(
+        minimumSize: const Size(30, 30),
+        fixedSize: const Size(30, 30),
+        padding: EdgeInsets.zero,
+      ),
       tooltip: l10n.copy,
       color: Theme.of(context).colorScheme.onSurfaceVariant,
       onPressed: () {

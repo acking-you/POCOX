@@ -20,6 +20,7 @@
 /// header line is wire format: changing it orphans chips in old transcripts.
 library;
 
+import 'package:pocket_codex/src/automation_prompt.dart';
 import 'package:pocket_codex/src/ide_context.dart';
 
 /// Header line introducing the attached-files block (English on purpose — it
@@ -111,6 +112,9 @@ String previewWithoutFileRefs(String preview, String placeholder) {
   // A voice handoff is the user's own turn, wrapped — show what they said.
   final spoken = realtimeDelegationInput(preview);
   if (spoken != null) return spoken;
+  // An automation's run reads as the task it set.
+  final automation = AutomationPrompt.parse(preview);
+  if (automation != null) return automation.instructions;
   final text = splitIdeContext(preview).text;
   final split = splitFileRefs(text);
   return split.paths.isEmpty ? text : split.text;

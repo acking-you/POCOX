@@ -19,7 +19,6 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/turn_minimap.dart';
-import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:window_manager/window_manager.dart';
 
 class _MemoryPrefs extends UiPrefsStore {
@@ -100,7 +99,13 @@ void main() {
         );
         await _until(
           () =>
-              find.byType(SuperListView).evaluate().isNotEmpty &&
+              find
+                  .descendant(
+                    of: find.byKey(const Key('chat-conversation-layer')),
+                    matching: find.byType(CustomScrollView),
+                  )
+                  .evaluate()
+                  .isNotEmpty &&
               find.byType(ChatLoadingSkeleton).evaluate().isEmpty,
         );
         samples.add(start.elapsedMilliseconds);
@@ -165,7 +170,7 @@ void main() {
         );
         for (var swipe = 0; swipe < 3; swipe++) {
           await tester.timedDrag(
-            find.byType(SuperListView).first,
+            find.byKey(const Key('chat-conversation-layer')),
             const Offset(0, -260),
             const Duration(milliseconds: 400),
           );

@@ -10,7 +10,10 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/action_row.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The official Codex (ChatGPT) sign-in, in place.
 ///
@@ -36,6 +39,7 @@ class OfficialLoginPanel extends ConsumerStatefulWidget {
     this.proxy,
     this.onChanged,
     this.enabled = true,
+    this.header,
   });
 
   /// What `CODEX_HOME` has on disk: a configured credential, not a verified
@@ -55,9 +59,22 @@ class OfficialLoginPanel extends ConsumerStatefulWidget {
   /// Whether the controls can be used.
   final bool enabled;
 
+  /// What the sign-in control sits beside: the caller's own row (a title
+  /// and description), in place of the sign-in state the panel shows by
+  /// itself.
+  final Widget? header;
+
   @override
   ConsumerState<OfficialLoginPanel> createState() => _OfficialLoginPanelState();
 }
+
+/// What a credential in `CODEX_HOME` signs in with, in words.
+String codexSignedInLabel(AppLocalizations l10n, String? authMode) =>
+    switch (authMode) {
+      'chatgpt' || 'chatgptAuthTokens' => l10n.codexSignedInChatgpt,
+      'apikey' => l10n.codexSignedInApiKey,
+      _ => l10n.codexSignedIn,
+    };
 
 /// How many 2 s polls one sign-in waits (~5 minutes, codex's own window).
 const _maxPolls = 150;
@@ -233,7 +250,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
         _polling = false;
         _deviceCode = null;
         _deviceUrl = null;
-        _info = official ? l10n.codexSetupLoginSuccess('chatgpt') : null;
+        _info = official ? l10n.codexSetupLoginSuccess : null;
         _error = official
             ? null
             : completed
@@ -304,47 +321,24 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
     final scheme = theme.colorScheme;
     final status = widget.status;
     final enabled = widget.enabled && !_busy;
-    final children = <Widget>[];
-    if (status?.hasAuth == true) {
-      children.add(
-        Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              size: 18,
-              color: successColor(scheme),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                // A credential on disk, not a verified sign-in.
-                l10n.codexSetupStatusAuth(
-                  status!.authMode ?? l10n.codexSetupCredentialExists,
-                ),
-                key: const Key('codex-login-done'),
-                style: TextStyle(color: scheme.onSurfaceVariant),
-              ),
-            ),
-            OutlinedButton(
-              key: const Key('codex-logout-btn'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: scheme.error,
-                side: BorderSide(color: scheme.error),
-              ),
-              onPressed: enabled ? _signOut : null,
-              child: Text(l10n.accountSignOut),
-            ),
-          ],
-        ),
+    final signedIn = status?.hasAuth == true;
+    final Widget action;
+    if (signedIn) {
+      action = OutlinedButton(
+        key: const Key('codex-logout-btn'),
+        onPressed: enabled ? _signOut : null,
+        child: Text(l10n.accountSignOut),
       );
     } else {
-      children.add(
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            FilledButton.icon(
+      action = Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          // Where the sign-in runs is the button's tooltip.
+          Tooltip(
+            message: l10n.hostOfficialNote,
+            child: FilledButton.icon(
               key: const Key('codex-login-chatgpt'),
               onPressed: (!enabled || _polling) ? null : () => _signIn(l10n),
               icon: _polling || _busy
@@ -353,33 +347,51 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
                       height: 15,
                       child: CircularProgressIndicator(strokeWidth: 1.8),
                     )
-                  : const Icon(Icons.open_in_new, size: 18),
+                  : const Icon(AppIcons.open_in_new, size: 18),
               label: Text(
                 _polling
                     ? l10n.codexSetupLoginWaiting
                     : l10n.codexSetupLoginButton,
               ),
             ),
-            if (_polling)
-              TextButton(
-                key: const Key('codex-login-cancel'),
-                onPressed: _cancel,
-                child: Text(l10n.cancel),
-              ),
-          ],
-        ),
-      );
-      children
-        ..add(const SizedBox(height: 8))
-        ..add(
-          Text(
-            l10n.hostOfficialNote,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: onSurfaceMuted(scheme),
-            ),
           ),
-        );
+          if (_polling)
+            TextButton(
+              key: const Key('codex-login-cancel'),
+              onPressed: _cancel,
+              child: Text(l10n.cancel),
+            ),
+        ],
+      );
     }
+    final lead =
+        widget.header ??
+        (signedIn
+            ? Row(
+                children: [
+                  Icon(
+                    AppIcons.check_circle_outline,
+                    size: 18,
+                    color: successColor(scheme),
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      // A credential on disk, not a verified sign-in.
+                      codexSignedInLabel(l10n, status!.authMode),
+                      key: const Key('codex-login-done'),
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              )
+            : null);
+    final children = <Widget>[
+      if (lead == null)
+        Align(alignment: AlignmentDirectional.centerStart, child: action)
+      else
+        ActionRow(lead: lead, action: action),
+    ];
     if (_deviceCode case final code? when code.isNotEmpty) {
       children
         ..add(const SizedBox(height: 12))
@@ -397,7 +409,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
           Text(
             message,
             key: key,
-            style: theme.textTheme.bodySmall?.copyWith(color: color),
+            style: helpTextStyle(theme).copyWith(color: color),
           ),
         );
     }
@@ -442,7 +454,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
               IconButton(
                 key: const Key('codex-device-code-copy'),
                 tooltip: l10n.accountCopyCode,
-                icon: const Icon(Icons.copy, size: 20),
+                icon: const Icon(AppIcons.copy, size: 20),
                 onPressed: () async {
                   final messenger = ToastMessenger.of(context);
                   await Clipboard.setData(ClipboardData(text: code));
@@ -457,7 +469,7 @@ class _OfficialLoginPanelState extends ConsumerState<OfficialLoginPanel> {
                 Uri.parse(url),
                 mode: LaunchMode.externalApplication,
               ),
-              icon: const Icon(Icons.open_in_new, size: 16),
+              icon: const Icon(AppIcons.open_in_new, size: 16),
               label: Text(l10n.codexSetupDeviceReopen),
             ),
         ],

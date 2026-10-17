@@ -124,11 +124,17 @@ class DesktopTray with TrayListener, WindowListener {
     windowManager.addListener(this);
 
     trayManager.addListener(this);
-    // Keep the blue brand tile independent of the macOS menu-bar appearance.
-    // Template images are system-tinted; Windows still needs a real .ico.
+    // The macOS menu bar gets a template glyph, which AppKit paints in the
+    // bar's own colour like every other status item (a colour tile is the one
+    // item that does not belong there). Windows needs a real .ico; Linux keeps
+    // the brand tile.
     await trayManager.setIcon(
-      _isWindows ? 'assets/tray/tray.ico' : 'assets/tray/tray.png',
-      isTemplate: false,
+      _isMacOS
+          ? 'assets/tray/tray_template.png'
+          : _isWindows
+          ? 'assets/tray/tray.ico'
+          : 'assets/tray/tray.png',
+      isTemplate: _isMacOS,
     );
     // appindicator (Linux) has no hover tooltip; setting one is a harmless
     // no-op, but skip it to keep the platform log clean.

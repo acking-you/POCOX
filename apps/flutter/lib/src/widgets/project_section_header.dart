@@ -7,6 +7,7 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A quiet project heading with pointer, keyboard and touch actions.
 class ProjectSectionHeader extends StatefulWidget {
@@ -136,13 +137,13 @@ class _ProjectSectionHeaderState extends State<ProjectSectionHeader> {
                     ),
                   ),
                   ListTile(
-                    leading: const Icon(Icons.add),
+                    leading: const Icon(AppIcons.add),
                     title: Text(label),
                     onTap: () => Navigator.pop(ctx, _ProjectAction.create),
                   ),
                   if (widget.path.isNotEmpty)
                     ListTile(
-                      leading: const Icon(Icons.copy_outlined),
+                      leading: const Icon(AppIcons.copy_outlined),
                       title: Text(l10n.copyProjectPath),
                       onTap: () => Navigator.pop(ctx, _ProjectAction.copyPath),
                     ),
@@ -221,20 +222,13 @@ class _ProjectSectionHeaderState extends State<ProjectSectionHeader> {
                             minHeight: dense ? 30 : 48,
                           ),
                           child: Padding(
-                            padding: const EdgeInsets.only(left: 6, right: 4),
+                            padding: const EdgeInsets.only(left: 10, right: 4),
                             child: Row(
                               children: [
-                                // The folder is the heading's identity; the
-                                // chevron after the name says it folds. Rows
-                                // below indent to the name, under the folder.
-                                Icon(
-                                  widget.collapsed
-                                      ? Icons.folder_outlined
-                                      : Icons.folder_open_outlined,
-                                  size: 15,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(width: 7),
+                                // The name is the heading's identity (no
+                                // folder glyph repeated on every project);
+                                // the chevron after it says it folds, and
+                                // rows below indent beneath it.
                                 Flexible(
                                   child: Text(
                                     widget.name,
@@ -256,7 +250,7 @@ class _ProjectSectionHeaderState extends State<ProjectSectionHeader> {
                                   duration: Motion.of(context, Motion.fast),
                                   curve: Motion.move,
                                   child: Icon(
-                                    Icons.keyboard_arrow_right,
+                                    AppIcons.keyboard_arrow_right,
                                     size: 15,
                                     color: scheme.onSurfaceVariant,
                                   ),
@@ -292,7 +286,7 @@ class _ProjectSectionHeaderState extends State<ProjectSectionHeader> {
                           key: Key('project-new-${widget.path}'),
                           mouseCursor: clickable,
                           tooltip: createLabel,
-                          icon: const Icon(Icons.add, size: 16),
+                          icon: const Icon(AppIcons.add, size: 16),
                           color: scheme.onSurfaceVariant,
                           style: dense
                               ? IconButton.styleFrom(

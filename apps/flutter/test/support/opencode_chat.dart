@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import '../fake_bridge_api.dart';
 import 'screen_harness.dart';
+import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 
 /// The native OpenCode service key the suites use.
 const openCodeService = 'pcx:local:opencode:opencode';
@@ -49,7 +50,7 @@ Finder optionChoice(String value) {
   return listed.evaluate().isNotEmpty
       ? listed
       : find.byWidgetPredicate(
-          (w) => w is CheckedPopupMenuItem<String> && w.value == value,
+          (w) => w is ChoiceRow<String> && w.value == value,
         );
 }
 

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
 
 /// One turn on the minimap: where to jump, and what to show while hovering it.
 @immutable
@@ -612,54 +613,54 @@ class _TurnPreviewCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final reply = item.assistantText?.trim() ?? '';
     final question = item.userText.trim();
-    return Container(
+    // Glass over the prose it previews: the hairline keeps its edge on a
+    // light page, the blur keeps the text beneath from competing.
+    return SizedBox(
       key: const Key('turn-minimap-preview'),
       width: width,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-      decoration: BoxDecoration(
-        color: surfacePreview(scheme),
+      child: Glass(
+        depth: GlassDepth.overlay,
         borderRadius: BorderRadius.circular(kPanelRadius),
-        // A hairline as well as a shadow: this floats over prose, where a
-        // shadow alone leaves a light card on a light page with no edge.
-        border: Border.all(color: scheme.outline),
-        boxShadow: panelShadow(scheme, blur: 18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '${index + 1} / $total',
-            style: theme.textTheme.labelSmall?.copyWith(color: scheme.primary),
-          ),
-          const SizedBox(height: 4),
-          // An attachment-only turn has no words of its own to head the card, so
-          // the reply stands alone rather than under an empty line.
-          if (question.isNotEmpty)
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Text(
-              question,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                fontFamilyFallback: uiCjkFallback,
-                color: scheme.onSurface,
+              '${index + 1} / $total',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.primary,
               ),
             ),
-          if (reply.isNotEmpty) ...[
-            if (question.isNotEmpty) const SizedBox(height: 4),
-            Text(
-              reply,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-                height: 1.4,
-                fontFamilyFallback: uiCjkFallback,
+            const SizedBox(height: 4),
+            // An attachment-only turn has no words of its own to head the card, so
+            // the reply stands alone rather than under an empty line.
+            if (question.isNotEmpty)
+              Text(
+                question,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontFamilyFallback: uiCjkFallback,
+                  color: scheme.onSurface,
+                ),
               ),
-            ),
+            if (reply.isNotEmpty) ...[
+              if (question.isNotEmpty) const SizedBox(height: 4),
+              Text(
+                reply,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                  height: 1.4,
+                  fontFamilyFallback: uiCjkFallback,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -118,7 +118,7 @@ class _GroupedActivityCardState extends State<GroupedActivityCard> {
                     )
                   else
                     Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      _expanded ? AppIcons.expand_less : AppIcons.expand_more,
                       size: 18,
                       color: muted.withValues(alpha: 0.7),
                     ),
@@ -255,7 +255,7 @@ class _ActivityCardState extends State<ActivityCard> {
                     )
                   else if (expandable)
                     Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      _expanded ? AppIcons.expand_less : AppIcons.expand_more,
                       size: 18,
                       color: muted.withValues(alpha: 0.7),
                     ),

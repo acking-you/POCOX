@@ -1,50 +1,107 @@
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import 'package:pocket_codex/src/motion.dart';
 
-/// A whole-window cross-fade for a light/dark switch.
+/// A whole-window light/dark switch that spreads from where it was asked for.
 ///
-/// `MaterialApp` already lerps [ThemeData], but every colour chosen by
-/// `brightness` (diff greens, caution ambers, shadows, the many
-/// `light ? a : b` decisions) flips at the halfway point, so the switch reads
-/// as a jump with some colours sliding around it. Instead this freezes the
-/// last frame as an image, applies the new theme underneath, and fades the
-/// image out: every pixel moves from its old colour to its new one at once.
+/// The last frame is frozen as an image, the new theme is applied underneath
+/// at once (`MaterialApp` does not lerp it: half the colours are chosen by
+/// brightness and would flip midway), and the old frame is then wiped away
+/// by a soft-edged circle growing from the control that was pressed, until
+/// it covers the window. Every pixel changes exactly once, in one motion.
 ///
 /// Install [ThemeTransitionHost] once, around the app's content, and switch
-/// through [ThemeTransition.run]. A system-driven change, which has no call
-/// site to wrap, keeps the stock lerp.
+/// through [ThemeTransition.run]. A switch the system makes, which has no
+/// call site, cross-fades the same frozen frame instead.
 abstract final class ThemeTransition {
   static final _boundary = GlobalKey();
-  static final _snapshot = ValueNotifier<ui.Image?>(null);
+  static final _snapshot = ValueNotifier<_Snapshot?>(null);
+
+  // Where the last pointer was released, in global coordinates: the control
+  // a switch was chosen on, however many layers (a menu, a sheet) it closed.
+  static Offset? _lastTap;
+  static DateTime? _lastTapAt;
 
   /// Capture the current frame, then run [apply] (which changes the theme).
-  /// Falls back to a plain [apply] when there is nothing to capture or motion
-  /// is reduced.
+  /// The change still happens, without the reveal, when there is nothing to
+  /// capture or motion is reduced.
   static void run(BuildContext context, VoidCallback apply) {
     try {
-      final boundary = _boundary.currentContext?.findRenderObject();
-      final animate = Motion.of(context, Motion.slow) > Duration.zero;
-      if (!animate || boundary is! RenderRepaintBoundary) return;
-      // Flutter's debugNeedsPaint getter throws when assertions are disabled.
-      if (kDebugMode && boundary.debugNeedsPaint) return;
+      final boundary = _capturable(context);
+      if (boundary == null) return;
       final ratio = MediaQuery.devicePixelRatioOf(context);
-      final image = boundary.toImageSync(pixelRatio: ratio);
-      _snapshot.value?.dispose();
-      _snapshot.value = image;
+      _show(
+        boundary.toImageSync(pixelRatio: ratio),
+        boundary.globalToLocal(_origin(context, boundary)),
+      );
     } catch (_) {
       // Image capture is optional; it must never prevent the preference change.
     } finally {
       apply();
     }
   }
+
+  /// Freeze the frame before the system's own brightness change repaints it,
+  /// so that change cross-fades instead of snapping.
+  static void systemChange(BuildContext context) {
+    try {
+      final boundary = _capturable(context);
+      if (boundary == null) return;
+      final ratio = MediaQuery.devicePixelRatioOf(context);
+      _show(boundary.toImageSync(pixelRatio: ratio), null);
+    } catch (_) {
+      // Optional, as in [run].
+    }
+  }
+
+  static RenderRepaintBoundary? _capturable(BuildContext context) {
+    final boundary = _boundary.currentContext?.findRenderObject();
+    final animate = Motion.of(context, Motion.slow) > Duration.zero;
+    if (!animate || boundary is! RenderRepaintBoundary) return null;
+    if (!boundary.attached || boundary.size.isEmpty) return null;
+    // Flutter's debugNeedsPaint getter throws when assertions are disabled.
+    if (kDebugMode && boundary.debugNeedsPaint) return null;
+    return boundary;
+  }
+
+  static void _show(ui.Image image, Offset? origin) {
+    _snapshot.value?.image.dispose();
+    _snapshot.value = _Snapshot(image, origin);
+  }
+
+  /// The pressed control: the last release if it was just now, else the
+  /// centre of [context]'s box, else the window's centre.
+  static Offset _origin(BuildContext context, RenderBox window) {
+    final at = _lastTapAt;
+    if (_lastTap != null &&
+        at != null &&
+        DateTime.now().difference(at) < const Duration(seconds: 2)) {
+      return _lastTap!;
+    }
+    final box = context.findRenderObject();
+    if (box is RenderBox && box.attached && box.hasSize) {
+      return box.localToGlobal(box.size.center(Offset.zero));
+    }
+    return window.localToGlobal(window.size.center(Offset.zero));
+  }
 }
 
-/// Hosts the frame [ThemeTransition] captures and the fading snapshot.
+class _Snapshot {
+  _Snapshot(this.image, this.origin);
+
+  final ui.Image image;
+
+  /// Where the reveal starts, in the host's coordinates; null cross-fades.
+  final Offset? origin;
+}
+
+/// Hosts the frame [ThemeTransition] captures and the snapshot leaving it.
 class ThemeTransitionHost extends StatelessWidget {
   /// Wraps [child], the app's routed content.
   const ThemeTransitionHost({super.key, required this.child});
@@ -53,51 +110,68 @@ class ThemeTransitionHost extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Stack(
-    textDirection: TextDirection.ltr,
-    fit: StackFit.passthrough,
-    children: [
-      RepaintBoundary(key: ThemeTransition._boundary, child: child),
-      ValueListenableBuilder<ui.Image?>(
-        valueListenable: ThemeTransition._snapshot,
-        builder: (context, image, _) => image == null
-            ? const SizedBox.shrink()
-            : _FadingSnapshot(key: ObjectKey(image), image: image),
-      ),
-    ],
+  Widget build(BuildContext context) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerUp: (e) {
+      if (e.kind == PointerDeviceKind.trackpad) return;
+      ThemeTransition._lastTap = e.position;
+      ThemeTransition._lastTapAt = DateTime.now();
+    },
+    child: Stack(
+      textDirection: TextDirection.ltr,
+      fit: StackFit.passthrough,
+      children: [
+        RepaintBoundary(key: ThemeTransition._boundary, child: child),
+        ValueListenableBuilder<_Snapshot?>(
+          valueListenable: ThemeTransition._snapshot,
+          builder: (context, snapshot, _) => snapshot == null
+              ? const SizedBox.shrink()
+              : _LeavingSnapshot(key: ObjectKey(snapshot), snapshot: snapshot),
+        ),
+      ],
+    ),
   );
 }
 
-class _FadingSnapshot extends StatefulWidget {
-  const _FadingSnapshot({super.key, required this.image});
-  final ui.Image image;
+class _LeavingSnapshot extends StatefulWidget {
+  const _LeavingSnapshot({super.key, required this.snapshot});
+  final _Snapshot snapshot;
 
   @override
-  State<_FadingSnapshot> createState() => _FadingSnapshotState();
+  State<_LeavingSnapshot> createState() => _LeavingSnapshotState();
 }
 
-class _FadingSnapshotState extends State<_FadingSnapshot>
+class _LeavingSnapshotState extends State<_LeavingSnapshot>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _fade = AnimationController(
+  late final AnimationController _progress = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 380),
+    // A reveal travels the whole window, so it gets longer than a fade.
+    duration: Duration(
+      milliseconds: widget.snapshot.origin == null ? 320 : 560,
+    ),
+  );
+  late final _curve = CurvedAnimation(
+    parent: _progress,
+    curve: Curves.easeInOutCubic,
   );
 
   @override
   void initState() {
     super.initState();
-    _fade.forward().whenComplete(() {
+    _progress.forward().whenComplete(() {
       if (!mounted) return;
-      if (identical(ThemeTransition._snapshot.value, widget.image)) {
+      final snapshot = widget.snapshot;
+      if (identical(ThemeTransition._snapshot.value, snapshot)) {
         ThemeTransition._snapshot.value = null;
-        widget.image.dispose();
+        snapshot.image.dispose();
       }
     });
   }
 
   @override
   void dispose() {
-    _fade.dispose();
+    _curve.dispose();
+    _progress.dispose();
     super.dispose();
   }
 
@@ -105,16 +179,72 @@ class _FadingSnapshotState extends State<_FadingSnapshot>
   Widget build(BuildContext context) => Positioned.fill(
     // Never intercept input: the new theme underneath is already live.
     child: IgnorePointer(
-      child: FadeTransition(
-        opacity: ReverseAnimation(
-          CurvedAnimation(parent: _fade, curve: Curves.easeInOutCubic),
-        ),
-        child: RawImage(
-          image: widget.image,
-          fit: BoxFit.fill,
-          filterQuality: FilterQuality.none,
-        ),
+      child: RepaintBoundary(
+        child: CustomPaint(painter: _SnapshotPainter(widget.snapshot, _curve)),
       ),
     ),
   );
+}
+
+/// The old frame, minus a soft-edged circle of radius growing with
+/// [progress] around the snapshot's origin (or faded out, without one).
+class _SnapshotPainter extends CustomPainter {
+  _SnapshotPainter(this.snapshot, this.progress) : super(repaint: progress);
+
+  final _Snapshot snapshot;
+  final Animation<double> progress;
+
+  /// Width of the reveal's soft edge.
+  static const _feather = 56.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final t = progress.value;
+    final origin = snapshot.origin;
+    if (origin == null) {
+      paintImage(
+        canvas: canvas,
+        rect: rect,
+        image: snapshot.image,
+        fit: BoxFit.fill,
+        filterQuality: FilterQuality.none,
+        opacity: 1 - t,
+      );
+      return;
+    }
+    // Far enough to clear the farthest corner, edge included.
+    final reach = [
+      rect.topLeft,
+      rect.topRight,
+      rect.bottomLeft,
+      rect.bottomRight,
+    ].map((c) => (c - origin).distance).reduce(math.max);
+    final radius = (reach + _feather) * t;
+    canvas.saveLayer(rect, Paint());
+    paintImage(
+      canvas: canvas,
+      rect: rect,
+      image: snapshot.image,
+      fit: BoxFit.fill,
+      filterQuality: FilterQuality.none,
+    );
+    final outer = radius + _feather;
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..blendMode = BlendMode.dstOut
+        ..shader = ui.Gradient.radial(
+          origin,
+          outer,
+          const [Color(0xFF000000), Color(0xFF000000), Color(0x00000000)],
+          [0, radius / outer, 1],
+        ),
+    );
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SnapshotPainter old) =>
+      !identical(old.snapshot, snapshot) || old.progress != progress;
 }

@@ -13,13 +13,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get webUnsupported =>
-      'PocketCodex 需要本地网络与文件访问,暂不支持 Web。\n请使用 Android / iOS / 桌面版。';
+      'PocketCodex 需要本地网络与文件访问，暂不支持 Web。\n请使用 Android / iOS / 桌面版。';
 
   @override
   String get onboardingTitle => '连接到 pb-mapper relay';
 
   @override
-  String get importFieldLabel => 'pcx1: 分享串(一键导入)';
+  String get importFieldLabel => 'pcx1: 分享串（一键导入）';
 
   @override
   String get importButton => '导入';
@@ -28,7 +28,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get relayFieldLabel => 'relay host:port';
 
   @override
-  String get keyFieldLabel => 'MSG_HEADER_KEY (32 字节)';
+  String get keyFieldLabel => 'MSG_HEADER_KEY（32 字节）';
 
   @override
   String get save => '保存';
@@ -41,6 +41,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get keyLengthError => 'MSG_HEADER_KEY 必须是 32 字节';
+
+  @override
+  String get accountWelcomeHeadline => '欢迎使用 PocketCodex';
+
+  @override
+  String get accountWelcomeSubtitle => '登录后，在任意设备上继续你的对话。';
 
   @override
   String get accountSignInTitle => '登录';
@@ -61,11 +67,11 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountSignInAgain => '重新登录';
 
   @override
-  String get accountWebFailed => '登录未完成,请重试。';
+  String get accountWebFailed => '登录未完成，请重试。';
 
   @override
   String get accountWebTrouble =>
-      '浏览器登录未完成 —— 可能是 GitHub 页面打不开,也可能是浏览器无法把结果交回给应用。下方的设备码登录不需要这一步交接。';
+      '浏览器登录未完成 —— 可能是 GitHub 页面打不开，也可能是浏览器无法把结果交回给应用。下方的设备码登录不需要这一步交接。';
 
   @override
   String get accountSignedIn => '已登录';
@@ -76,7 +82,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get accountEnterCode => '在 GitHub 上输入此代码以完成登录:';
+  String get accountEnterCode => '在 GitHub 上输入此代码以完成登录：';
 
   @override
   String get accountCopyCode => '复制代码';
@@ -88,7 +94,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountWaiting => '等待你在 GitHub 上授权…';
 
   @override
-  String get accountCodeExpired => '代码已过期,请重试。';
+  String get accountCodeExpired => '代码已过期，请重试。';
 
   @override
   String get accountDenied => 'GitHub 登录被拒绝。';
@@ -100,7 +106,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountAdvanced => '高级 / 自部署';
 
   @override
-  String get accountBackendHint => '后端地址(留空用默认)';
+  String get accountBackendHint => '后端地址（留空用默认）';
 
   @override
   String get accountSection => '账户';
@@ -129,7 +135,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noThreads => '暂无会话';
 
   @override
-  String get untitledThread => '(未命名)';
+  String get untitledThread => '（未命名）';
 
   @override
   String get renameConversation => '重命名';
@@ -225,12 +231,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String imageSaveFailed(String error) {
-    return '保存图片失败:$error';
+    return '保存图片失败：$error';
   }
 
   @override
   String imageOnHost(String path) {
-    return '主机上的图片文件:$path';
+    return '主机上的图片文件：$path';
   }
 
   @override
@@ -303,11 +309,11 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get turnFailed =>
-      '本轮未完成 —— 连接中断或远程 codex 异常。请重试,或检查主机上的 codex(可能需重新登录)。';
+      '本轮未完成 —— 连接中断或远程 codex 异常。请重试，或检查主机上的 codex（可能需重新登录）。';
 
   @override
   String get sandboxHelperUnavailable =>
-      '此自带会话无法启动命令沙箱,因此智能体在这里无法执行命令或读取文件。请切换到「完全放行」模式(不使用沙箱运行),或连接到外部/远程 codex 主机。';
+      '此自带会话无法启动命令沙箱，因此智能体在这里无法执行命令或读取文件。请切换到「完全放行」模式（不使用沙箱运行），或连接到外部/远程 codex 主机。';
 
   @override
   String get disconnect => '断开连接';
@@ -344,7 +350,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String newSessionTitleIn(String project) {
-    return '要在 $project 内开发什么?';
+    return '要在 $project 内开发什么？';
   }
 
   @override
@@ -528,7 +534,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String modelErrorModel(String model) {
-    return '模型:$model';
+    return '模型：$model';
   }
 
   @override
@@ -555,7 +561,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelErrorQuota => '服务商的用量额度已用完。请检查账户或换一个模型。';
 
   @override
-  String get modelErrorContext => '对话长度超出此模型的上限。请换用上下文更大的模型,或开始新对话。';
+  String get modelErrorContext => '对话长度超出此模型的上限。请换用上下文更大的模型，或开始新对话。';
 
   @override
   String get modelErrorOutput => '模型在完成前达到了输出上限。可以让它继续。';
@@ -567,7 +573,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelErrorInvalid => '服务商拒绝了此请求。请检查模型和消息后重试。';
 
   @override
-  String get modelErrorUnknown => '模型未能完成回复。请重试,或换一个模型。';
+  String get modelErrorUnknown => '模型未能完成回复。请重试，或换一个模型。';
 
   @override
   String get modelErrorRetry => '重试';
@@ -576,18 +582,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modelErrorChangeModel => '更换模型';
 
   @override
-  String get modelErrorIncomplete => '这条失败的消息在此处不完整,无法按原样重新发送。请编辑后发送,或发送新消息。';
+  String get modelErrorIncomplete => '这条失败的消息在此处不完整，无法按原样重新发送。请编辑后发送，或发送新消息。';
 
   @override
   String modelChangeFailed(String reason) {
-    return '无法切换模型:$reason。仍保留之前的模型,草稿未改动。';
+    return '无法切换模型：$reason。仍保留之前的模型，草稿未改动。';
   }
 
   @override
   String get modelErrorRetryHint => '以当前选择的模型重新发送这条消息。';
 
   @override
-  String get reasoningOutputNote => '模型将这段内容作为思考返回,没有单独的回答。';
+  String get reasoningOutputNote => '模型将这段内容作为思考返回，没有单独的回答。';
 
   @override
   String get queuedPausedHint => '已暂停。重试或发送消息后继续。';
@@ -672,18 +678,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get statusUnreachable => '不可达';
 
   @override
-  String get unreachableReason => '中继上的注册仍在,但远端 app-server 没有响应——它可能未启动,或已经宕机。';
+  String get unreachableReason => '中继上的注册仍在，但远端 app-server 没有响应——它可能未启动，或已经宕机。';
 
   @override
   String get unreachableAuthRejected =>
-      '中继拒绝了这次连接:认证码缺失或已失效。隧道本身是通的,远端并没有宕机——请在「服务管理」里重新登录账号,或重新填写中继密钥。';
+      '中继拒绝了这次连接：认证码缺失或已失效。隧道本身是通的，远端并没有宕机——请在「服务管理」里重新登录账号，或重新填写中继密钥。';
 
   @override
   String get unreachableSilent =>
-      '隧道已建立,但远端 app-server 在超时前没有应答——它可能正在启动、已卡死,或已经退出。';
+      '隧道已建立，但远端 app-server 在超时前没有应答——它可能正在启动、已卡死，或已经退出。';
 
   @override
-  String get apiUnreachableReason => '中继上的注册仍在,但远端 API 服务没有响应——它可能未启动,或已经宕机。';
+  String get apiUnreachableReason => '中继上的注册仍在，但远端 API 服务没有响应——它可能未启动，或已经宕机。';
 
   @override
   String get subscribedAlive => '已订阅';
@@ -816,7 +822,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolActivity => '活动';
 
   @override
-  String get relayNotConfigured => '(未配置 relay)';
+  String get relayNotConfigured => '（未配置 relay）';
 
   @override
   String get retry => '重试';
@@ -837,7 +843,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get portRangeError => '端口必须是 1 到 65535 之间的整数';
 
   @override
-  String get noAuthWarning => '⚠ 本地端点无鉴权,仅监听 127.0.0.1。仅在 App 前台存活。';
+  String get noAuthWarning => '⚠ 本地端点无鉴权，仅监听 127.0.0.1。仅在 App 前台存活。';
 
   @override
   String get subscribeFailed => '无法启动订阅';
@@ -911,22 +917,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get relayRow => 'relay';
 
   @override
-  String get notConfigured => '(未配置)';
+  String get notConfigured => '（未配置）';
 
   @override
   String get keyRow => 'MSG_HEADER_KEY';
 
   @override
-  String get keySet => '•••••••• (已设置)';
+  String get keySet => '••••••••（已设置）';
 
   @override
-  String get keyNotSet => '(未设置)';
+  String get keyNotSet => '（未设置）';
 
   @override
   String get activeSubscriptions => '活跃订阅';
 
   @override
-  String get none => '(无)';
+  String get none => '（无）';
 
   @override
   String get exportShareString => '导出 pcx1: 分享串';
@@ -959,10 +965,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get appearanceDark => '暗黑';
 
   @override
-  String get newSessionTitle => '我们该构建什么?';
+  String get newSessionTitle => '我们该构建什么？';
 
   @override
-  String get newSessionSubtitle => '选一个起点,或直接在下方输入你的任务。';
+  String get newSessionSubtitle => '选一个起点，或直接在下方输入你的任务。';
 
   @override
   String get suggestExploreTitle => '了解项目';
@@ -974,7 +980,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get suggestTestsTitle => '运行并修复测试';
 
   @override
-  String get suggestTestsPrompt => '运行测试套件,并修复所有失败的用例。';
+  String get suggestTestsPrompt => '运行测试套件，并修复所有失败的用例。';
 
   @override
   String get suggestDiffTitle => '审查改动';
@@ -986,7 +992,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get suggestPlanTitle => '规划功能';
 
   @override
-  String get suggestPlanPrompt => '在写代码之前,帮我规划一个新功能。';
+  String get suggestPlanPrompt => '在写代码之前，帮我规划一个新功能。';
 
   @override
   String get searchConversations => '搜索会话';
@@ -1187,7 +1193,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexBinaryPath => 'codex 程序路径';
 
   @override
-  String get codexNotFound => '未在 PATH 中找到 codex —— 请在下方填写完整路径,或安装后点击「重新检测」。';
+  String get codexNotFound => '未在 PATH 中找到 codex —— 请在下方填写完整路径，或安装后点击「重新检测」。';
 
   @override
   String get codexRedetect => '重新检测';
@@ -1200,6 +1206,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get codexBuiltinNote => '暂未实现，请使用外置 Codex。';
+
+  @override
+  String get codexBuiltinUnavailable => '暂未实现';
 
   @override
   String get hostRuntimeInfo => '运行信息';
@@ -1320,6 +1329,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tunnelOffline => '已下架';
+
+  @override
+  String get tunnelNotConnected => '未连通';
 
   @override
   String get logsTitle => '运行日志';
@@ -1576,7 +1588,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String fileDownloadFailed(Object error) {
-    return '下载失败:$error';
+    return '下载失败：$error';
   }
 
   @override
@@ -1586,7 +1598,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String hostFileUploadFailed(Object error) {
-    return '上传失败:$error';
+    return '上传失败：$error';
   }
 
   @override
@@ -1681,25 +1693,16 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get codexSetupStepDesc =>
-      '用 ChatGPT 官方登录,或在托管时为它设置自己的供应商,并可切换「非降智」system prompt。';
+      '用 ChatGPT 官方登录，或在托管时为它设置自己的供应商，并可切换「非降智」system prompt。';
 
   @override
-  String get codexSetupProviderSection => '自定义 Provider';
-
-  @override
-  String get codexSetupProviderDesc => '填服务商的 Base URL 和 API Key,用第三方或自建的模型服务。';
-
-  @override
-  String get codexSetupModelLabel => '模型(可选,默认 gpt-5.5)';
-
-  @override
-  String get codexSetupSaveProvider => '保存并使用';
+  String get codexSetupProviderSection => '自定义供应商';
 
   @override
   String get codexSetupLoginSection => 'ChatGPT 登录';
 
   @override
-  String get codexSetupLoginDesc => '用你的 ChatGPT 订阅跑模型,凭证由 codex 自己生成。';
+  String get codexSetupLoginDesc => '用你的 ChatGPT 订阅运行模型，凭证由 Codex 自己生成。';
 
   @override
   String get codexSetupLoginButton => '使用 ChatGPT 登录';
@@ -1711,16 +1714,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexSetupMethodsTitle => '模型接入方式';
 
   @override
-  String get codexSetupMethodsHint => '两种任选一种,codex 用你最后配置的那种。';
+  String get codexSetupMethodsHint =>
+      '如果 Codex 自身的配置已选用自定义供应商，会优先使用该供应商，而不是 ChatGPT 登录。';
 
   @override
   String get codexSetupInUse => '使用中';
 
   @override
-  String get codexSetupSwitchTo => '改用此项';
-
-  @override
-  String get codexSetupProxyNote => '受限网络下需要代理:在启动本机托管时填写。';
+  String get codexSetupProxyNote => '网络受限时，登录需要代理：请在托管的编辑页中填写代理，并在那里登录。';
 
   @override
   String get codexSetupAdvanced => '高级';
@@ -1730,7 +1731,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get codexSetupNonDegradedDesc =>
-      '移除会打断思维链的 commentary / 进度汇报指令,让模型把预算用在推理上。';
+      '去掉打断思维链的 commentary / 进度汇报指令，把预算留给推理。';
 
   @override
   String get codexSetupNonDegradedScope => '对之后新建的会话生效';
@@ -1739,19 +1740,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexSetupNonDegradedIssue => 'openai/codex#30364';
 
   @override
-  String get codexSetupNeedFields => '请填写 Base URL 和 API Key。';
+  String get codexSetupLoginOpened => '已在浏览器打开登录页，完成后自动检测…';
 
   @override
-  String get codexSetupProviderSaved => 'Provider 已保存,重新开始本机托管后即可使用。';
-
-  @override
-  String get codexSetupNeedHost => '请先在「服务」页启动本机托管,再进行官方登录。';
-
-  @override
-  String get codexSetupLoginOpened => '已在浏览器打开登录页,完成后自动检测…';
-
-  @override
-  String get codexSetupDeviceOpened => '已在浏览器打开验证页面。请在页面中输入下方验证码,完成后自动检测…';
+  String get codexSetupDeviceOpened => '已在浏览器打开验证页面。请在页面中输入下方验证码，完成后自动检测…';
 
   @override
   String get codexSetupDeviceCodeLabel => '验证码';
@@ -1760,52 +1752,60 @@ class AppLocalizationsZh extends AppLocalizations {
   String get codexSetupDeviceReopen => '重新打开验证页面';
 
   @override
-  String codexSetupLoginSuccess(String method) {
-    return '登录成功($method)。';
-  }
+  String get codexSetupLoginSuccess => '登录成功。';
 
   @override
-  String get codexSetupLoginTimeout => '登录超时,请重试。';
+  String get codexSetupLoginTimeout => '登录超时，请重试。';
 
   @override
-  String get codexSetupStatusProvider => '已配置自定义 Provider';
-
-  @override
-  String codexSetupStatusAuth(String method) {
-    return '已登录($method)';
-  }
+  String get codexSetupStatusProvider => '已配置自定义供应商';
 
   @override
   String get codexSetupStatusNeedSetup => '尚未配置';
 
   @override
-  String get codexSetupStatusNeedSetupHint => 'codex 还不能发起模型调用。在下面任选一种方式配置。';
+  String get codexSetupStatusNeedSetupHint => 'Codex 还不能发起模型调用。请在下面任选一种方式配置。';
 
   @override
-  String get codexSetupStatusReadyHint => 'codex 可以发起模型调用了。';
+  String get codexSetupStatusReadyHint => 'Codex 可以发起模型调用了。';
 
   @override
   String get codexSetupCodexHomeLabel => '配置目录';
 
   @override
-  String get codexSetupCredentialExists => '凭证已存在';
+  String get codexSignedInChatgpt => '已通过 ChatGPT 登录';
 
   @override
-  String get codexSetupProviderPerHost => '按托管分别设置:每个托管的模型服务都可以使用自定义供应商。';
+  String get codexSignedInApiKey => '正在使用 API 密钥';
+
+  @override
+  String get codexSignedIn => '已登录';
+
+  @override
+  String get codexSetupStatusInvalid => '无法读取 Codex 的 config.toml';
+
+  @override
+  String get codexSetupStatusInvalidHint => '修复这个文件后，选择「现有配置」的托管才能使用它。';
+
+  @override
+  String get codexSetupProviderPerHost => '每个托管都可以在自己的编辑页中选用自定义供应商。';
 
   @override
   String get codexSetupProviderScope =>
-      '本页配置 Codex 本身(下方的配置目录):ChatGPT 登录和提示词选项。选择「现有配置」的托管会使用它;托管自己的自定义供应商或官方账号在该托管的编辑页中选择。';
+      '本页配置 Codex 本身（上方的配置目录）：ChatGPT 登录和提示词选项。选择「现有配置」的托管会使用这些设置；托管自己的自定义供应商或官方账号，在该托管的编辑页中选择。';
 
   @override
   String get codexSetupGlobalProvider =>
-      'Codex 自身的配置已选用一个自定义供应商,选择「现有配置」的托管会继续使用它。';
+      'Codex 自身的配置已选用一个自定义供应商，选择「现有配置」的托管会继续使用它。';
 
   @override
   String get codexSetupConfigureHost => '配置托管';
 
   @override
-  String get codexSetupHostingDesktopOnly => '托管只在桌面端运行,请在桌面端为托管设置供应商。';
+  String get codexSetupHostingDesktopOnly => '托管只在桌面端运行，请在桌面端为托管设置供应商。';
+
+  @override
+  String get codexSetupLoginDesktopOnly => '请在装有 Codex 的电脑上登录。';
 
   @override
   String get settingsHosting => '托管与模型服务';
@@ -1814,17 +1814,17 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsHostingDesc => '托管的智能体、模型服务与登录';
 
   @override
-  String get hostPickTitle => '配置哪个托管?';
+  String get hostPickTitle => '配置哪个托管？';
 
   @override
   String get hostPickHint =>
-      '每个托管有各自的模型服务。选择后只会打开它的编辑页。保存不会改动正在运行的托管,保存的配置在「应用并重启」后才生效。';
+      '每个托管有各自的模型服务。选择后只会打开它的编辑页。保存不会改动正在运行的托管，保存的配置在「应用并重启」后才生效。';
 
   @override
   String get hostPickNew => '新建托管';
 
   @override
-  String get hostPickLoadFailed => '无法读取正在运行的托管,仍可新建托管。';
+  String get hostPickLoadFailed => '无法读取正在运行的托管，仍可新建托管。';
 
   @override
   String get resizeComposer => '拖动调整输入框高度；双击恢复默认';
@@ -2072,9 +2072,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get resetComposerHeight => '重置输入框高度';
-
-  @override
-  String get composerKeyboardHint => 'Enter 发送 · Shift+Enter 换行';
 
   @override
   String get selectText => '选择文本';
@@ -2335,13 +2332,16 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get acpSecretsNote => '保存的智能体以明文存储在本机。请勿在参数中放入密钥，优先使用智能体自己的登录。';
+  String get acpSecretsNote => '以明文保存在本机，请勿在参数中放入密钥。';
 
   @override
   String get acpProgramNotFound => '本机未找到该程序。';
 
   @override
   String get claudeEnvTitle => 'Claude 环境变量';
+
+  @override
+  String get claudeRuntimeTitle => '运行组件';
 
   @override
   String claudeAdapterInstalled(String path) {
@@ -2593,29 +2593,26 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostSourceCustom => '自定义供应商';
 
   @override
-  String get hostInheritedOnly => '此智能体使用它自己的配置启动。Pocket-Codex 不了解它支持的供应商设置。';
-
-  @override
-  String get hostInheritedAcp => '智能体沿用它自己的配置文件和环境变量,不做改动。';
+  String get hostInheritedAcp => '智能体沿用它自己的配置文件和环境变量，不做改动。';
 
   @override
   String hostInheritedCodexCustom(String provider) {
-    return 'Codex 的 config.toml 已选择供应商 $provider,无需其他设置。';
+    return 'Codex 的 config.toml 已选择供应商 $provider，无需其他设置。';
   }
 
   @override
-  String get hostInheritedCodexAccount => 'Codex 已登录,无需其他设置。';
+  String get hostInheritedCodexAccount => 'Codex 已登录，无需其他设置。';
 
   @override
   String get hostInheritedCodexInvalid =>
-      '无法读取 Codex 的 config.toml。请修复它,或在下方选择其他方式。';
+      '无法读取 Codex 的 config.toml。请修复它，或在下方选择其他方式。';
 
   @override
-  String get hostInheritedCodexNone => 'Codex 尚未登录,也没有配置供应商。请登录或添加自定义供应商。';
+  String get hostInheritedCodexNone => 'Codex 尚未登录，也没有配置供应商。请登录或添加自定义供应商。';
 
   @override
   String hostInheritedCodexHome(String path) {
-    return '配置目录:$path';
+    return '配置目录：$path';
   }
 
   @override
@@ -2640,13 +2637,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostApiKeyStored => '已保存密钥。留空则保持不变。';
 
   @override
-  String get hostKeyEnvNote => '仅保存在本设备,在智能体启动时交给它,不会出现在命令行中。';
+  String get hostKeyEnvNote => '仅保存在本设备，在智能体启动时交给它，不会出现在命令行中。';
 
   @override
   String get hostApiKeyRemove => '删除已保存的密钥';
 
   @override
-  String get hostModelOptional => '模型(可选)';
+  String get hostModelOptional => '模型（可选）';
 
   @override
   String get hostBaseUrlRequired => '请输入供应商的 Base URL。';
@@ -2667,45 +2664,45 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostSaveAndRestart => '保存并重启';
 
   @override
-  String get hostApplyNote => '重启会短暂停止智能体并断开已打开的会话。若新配置启动失败,将恢复之前的配置。';
+  String get hostApplyNote => '重启会短暂停止智能体并断开已打开的会话。若新配置启动失败，将恢复之前的配置。';
 
   @override
   String get hostApplied => '已使用新配置重启。';
 
   @override
   String hostApplyRestored(String error) {
-    return '新配置启动失败,已恢复之前的配置:$error';
+    return '新配置启动失败，已恢复之前的配置：$error';
   }
 
   @override
   String hostApplyFailed(String error) {
-    return '重启失败,主机已停止:$error';
+    return '重启失败，主机已停止：$error';
   }
 
   @override
-  String get hostOfficialNote => '登录在本机私有的 Codex 服务上进行,无需先运行主机。';
+  String get hostOfficialNote => '登录在本机私有的 Codex 服务上进行，无需先运行主机。';
 
   @override
   String get hostAgentEditNote => '修改启动命令将在重启后生效。';
 
   @override
-  String get hostCodexRuntimeFixed => '主机当前的运行配置。在下方修改运行时并保存,然后应用以使用它重启。';
+  String get hostCodexRuntimeFixed => '主机当前的运行配置。在下方修改运行时并保存，然后应用以使用它重启。';
 
   @override
   String hostLoginRefreshFailed(String error) {
-    return '无法检查登录状态,正在重试:$error';
+    return '无法检查登录状态，正在重试：$error';
   }
 
   @override
-  String get hostLoginNotOfficial => 'Codex 已完成登录,但不是 ChatGPT 账户。请重新登录。';
+  String get hostLoginNotOfficial => 'Codex 已完成登录，但不是 ChatGPT 账户。请重新登录。';
 
   @override
   String hostLoginFailed(String error) {
-    return '登录失败:$error';
+    return '登录失败：$error';
   }
 
   @override
-  String get hostSourceUnsupported => '已保存的模型服务不适用于此智能体,请另选一个。';
+  String get hostSourceUnsupported => '已保存的模型服务不适用于此智能体，请另选一个。';
 
   @override
   String get hostModelRequired => '请输入此供应商使用的默认模型。';
@@ -2717,10 +2714,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostModelDefault => '默认模型';
 
   @override
-  String get hostModelDefaultNote => '供应商用于新会话的模型。对话自身的模型在对话中选择,不保存在这里。';
+  String get hostModelDefaultNote => '供应商用于新会话的模型。对话自身的模型在对话中选择，不保存在这里。';
 
   @override
-  String get hostLeaveTitle => '放弃未保存的更改?';
+  String get hostLeaveTitle => '放弃未保存的更改？';
 
   @override
   String get hostLeaveBody => '对此主机的更改尚未保存。';
@@ -2738,14 +2735,14 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get hostApplyConfirmBody =>
-      '主机将停止并以已保存的配置重新启动。正在进行的回合会被中断,打开的对话会重新连接。本设备上的草稿、附件和排队消息会保留。其他主机不受影响。';
+      '主机将停止并以已保存的配置重新启动。正在进行的回合会被中断，打开的对话会重新连接。本设备上的草稿、附件和排队消息会保留。其他主机不受影响。';
 
   @override
-  String get hostReplaced => '此页面读取后,该主机已在别处重启。请先重新加载再应用。';
+  String get hostReplaced => '此页面读取后，该主机已在别处重启。请先重新加载再应用。';
 
   @override
   String hostApplyStopped(String error, String restoreError) {
-    return '新配置启动失败($error),恢复之前的配置也失败了($restoreError)。主机已停止。';
+    return '新配置启动失败（$error），恢复之前的配置也失败了（$restoreError）。主机已停止。';
   }
 
   @override
@@ -2755,25 +2752,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get hostConfigReload => '重新加载';
 
   @override
-  String get hostConfigNewer => '存在更新的已保存配置。重新加载以查看(将放弃你的编辑)。';
+  String get hostConfigNewer => '存在更新的已保存配置。重新加载以查看（将放弃你的编辑）。';
 
   @override
   String get hostConfigLoadFailedTitle => '配置不可用';
 
   @override
   String hostConfigLoadFailed(String error) {
-    return '无法读取此主机已保存的配置:$error';
+    return '无法读取此主机已保存的配置：$error';
   }
 
   @override
-  String get hostRuntimeEditNote => '保存的更改在应用后生效;名称保持不变。';
+  String get hostRuntimeEditNote => '保存的更改在应用后生效；名称保持不变。';
 
   @override
-  String get hostAgentUnknown => '此主机未报告其智能体,无法在此编辑。';
+  String get hostAgentUnknown => '此主机未报告其智能体，无法在此编辑。';
 
   @override
   String get hostApiProxyNote =>
-      '此主机还会发布一个独立的 Responses API 服务(api:<name>)。它始终使用本设备的官方 Codex 登录,而不是这里选择的供应商。';
+      '此主机还会发布一个独立的 Responses API 服务（api:<name>）。它始终使用本设备的官方 Codex 登录，而不是这里选择的供应商。';
 
   @override
   String get claudePrepareStageWorking => '正在准备 Claude ACP 适配器…';
@@ -3080,11 +3077,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get agentChoiceNativeServer => '原生服务';
 
   @override
-  String agentChoiceRunningAs(String name) {
-    return '正在以 $name 运行';
-  }
-
-  @override
   String get hostInheritedOpenCode => '使用这台电脑上 OpenCode 自己的提供方和登录。';
 
   @override
@@ -3110,7 +3102,36 @@ class AppLocalizationsZh extends AppLocalizations {
       '没有已登录的提供方。请在这台电脑上运行 `opencode auth login`，然后刷新。';
 
   @override
-  String get openCodeAlreadyHosted => '这台电脑已经托管了 OpenCode，请打开那个主机。';
+  String get openCodeAlreadyHosted =>
+      '这份 OpenCode 历史记录已由另一个托管主机使用。请为这个主机选择“仅此主机”，或先停止那个主机。';
+
+  @override
+  String hostNameInUse(String name) {
+    return '这台电脑已有托管实例使用“$name”这个名称。请换一个名称。';
+  }
+
+  @override
+  String managedNameInUse(String name) {
+    return '那台电脑已有服务使用“$name”这个名称。请换一个名称。';
+  }
+
+  @override
+  String get openCodeHistoryTitle => '历史记录';
+
+  @override
+  String get openCodeHistoryShared => '与 OpenCode 共用';
+
+  @override
+  String get openCodeHistoryOwn => '仅此主机';
+
+  @override
+  String get openCodeHistoryInfo =>
+      '共用：显示这台电脑上 OpenCode 自己的会话，与终端里的 OpenCode 相同；同一时间只能有一个主机使用。\n\n仅此主机：会话保存在这个主机自己的数据库中，与其他主机和终端里的 OpenCode 分开。';
+
+  @override
+  String openCodeHistoryTaken(String name) {
+    return '“$name”正在使用共用历史记录，同一时间只能有一个主机使用。请选择“仅此主机”。';
+  }
 
   @override
   String get openCodePath => 'OpenCode 可执行文件';
@@ -3458,9 +3479,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get managedNeedsHostLogin => '使用其自有账号需要先在那台电脑上登录；自定义提供方无需登录。';
 
   @override
-  String get managedOpenCodeTaken => '那台电脑已在运行 OpenCode；每台电脑只能有一个 OpenCode 服务。';
-
-  @override
   String get managedKindUnknown => '未知智能体';
 
   @override
@@ -3583,10 +3601,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get managedSwitchTitle => '允许我的其他设备管理这台电脑';
 
   @override
-  String get managedSwitchOn => '已开启。你的已授权设备可在这台电脑在线时添加、配置、启动和停止服务。';
+  String get managedSwitchOn => '已开启';
 
   @override
-  String get managedSwitchOff => '已关闭。只有这台电脑能修改它的服务。';
+  String get managedSwitchOff => '已关闭';
+
+  @override
+  String get managedSwitchInfo =>
+      '开启后，你已登录的其他设备可在这台电脑在线时添加、配置、启动和停止它的服务；关闭后只有这台电脑能修改。';
 
   @override
   String get managedSwitchConnecting => '已开启，暂未连通。';
@@ -3607,9 +3629,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get managedRuntimeSignInThere => '可用 · 需在那台电脑上登录';
-
-  @override
-  String get managedOpenCodeRunning => '已在运行 · 每台电脑仅一个';
 
   @override
   String get managedRuntimeDetails => '详情';
@@ -3633,4 +3652,104 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get managedRefreshComputer => '刷新这台电脑';
+
+  @override
+  String get composerWrite => '编辑';
+
+  @override
+  String get composerSplit => '分栏';
+
+  @override
+  String get composerPreview => '预览';
+
+  @override
+  String get composerPreviewEmpty => '还没有可预览的内容。在左侧用 Markdown 书写，这里会实时渲染。';
+
+  @override
+  String get composerPreviewEmptyTab => '还没有可预览的内容。';
+
+  @override
+  String get reviewSessionSource => '本对话';
+
+  @override
+  String get reviewWorkspaceSource => '工作区';
+
+  @override
+  String get reviewNoSessionChanges => '本对话还没有修改文件。';
+
+  @override
+  String reviewEdit(int index) {
+    return '第 $index 次修改';
+  }
+
+  @override
+  String get reviewAllEdits => '显示全部修改';
+
+  @override
+  String reviewEditCount(int count) {
+    return '$count 次修改';
+  }
+
+  @override
+  String get reviewFilterFiles => '筛选文件';
+
+  @override
+  String get reviewOpenFile => '查看完整文件';
+
+  @override
+  String get reviewShowChanges => '查看变更';
+
+  @override
+  String get reviewFileLoading => '正在读取文件…';
+
+  @override
+  String get reviewFileUnavailable => '无法从主机读取此文件。';
+
+  @override
+  String get copyPath => '复制路径';
+
+  @override
+  String get openInReview => '在审阅中打开';
+
+  @override
+  String get showTurnNavigation => '显示对话导航';
+
+  @override
+  String get automationRun => '自动化任务';
+
+  @override
+  String get reviewWorkspaceLoading => '正在读取工作区变更…';
+
+  @override
+  String get reviewWorkspaceUnavailable => '无法读取工作区的变更。';
+
+  @override
+  String relayVirtualAddress(String host, String address) {
+    return '系统 DNS 把 $host 解析成了代理或 VPN 的虚拟地址 $address，目前没有路由能到达它。重新连接那个代理或 VPN 后再试。';
+  }
+
+  @override
+  String relayNoAnswer(String relay) {
+    return '$relay 没有响应。';
+  }
+
+  @override
+  String get homeRelayLocalOnly => 'relay 暂时连不上，已直接打开本机的服务。';
+
+  @override
+  String get hostStopping => '停止中…';
+
+  @override
+  String get hostSaving => '保存中…';
+
+  @override
+  String get hostRestarting => '重启中…';
+
+  @override
+  String hostStoppedToast(String name) {
+    return '$name 已停止。';
+  }
+
+  @override
+  String get conversationsLoading => '正在加载会话…';
 }

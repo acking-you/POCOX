@@ -104,6 +104,10 @@ class TranscriptItem {
   /// Whether this row is a message from either side (vs. a tool call).
   bool get isMessage => isUser || isAgent;
 
+  /// Whether this is a reply with nothing in it: a quiet automation run ends
+  /// on one, and a live reply starts as one before its first delta.
+  bool get isBlankReply => isAgent && images.isEmpty && text.trim().isEmpty;
+
   /// Rows that render on their own and are never folded into a turn's work,
   /// because they are *about* a turn rather than part of one:
   ///

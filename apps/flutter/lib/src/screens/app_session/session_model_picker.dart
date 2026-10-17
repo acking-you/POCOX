@@ -116,6 +116,7 @@ extension _SessionModelPicker on _AppSessionState {
     final scheme = Theme.of(context).colorScheme;
     return showAdaptivePanel<T>(
       context: context,
+      anchored: true,
       // The body ends in a ListView of options; it scrolls itself.
       scrollable: false,
       // It also draws its own grab bar, which is its top edge.
@@ -244,7 +245,7 @@ extension _SessionModelPicker on _AppSessionState {
                     child: AnimatedOpacity(
                       opacity: selected ? 1 : 0,
                       duration: duration,
-                      child: Icon(Icons.check, size: 18, color: accent),
+                      child: Icon(AppIcons.check, size: 18, color: accent),
                     ),
                   ),
                 ],
@@ -267,13 +268,13 @@ extension _SessionModelPicker on _AppSessionState {
       options: [
         _PickerOption(
           value: null,
-          icon: Icons.star_outline,
+          icon: AppIcons.star_outline,
           label: l10n.modelDefault,
         ),
         for (final m in models)
           _PickerOption(
             value: m,
-            icon: Icons.auto_awesome,
+            icon: AppIcons.auto_awesome,
             label: m.displayName,
             description: m.description.isEmpty ? null : m.description,
           ),
@@ -335,13 +336,13 @@ extension _SessionModelPicker on _AppSessionState {
   }
 
   IconData _effortIcon(ReasoningEffort e) => switch (e.wire) {
-    'none' => Icons.battery_0_bar,
-    'minimal' => Icons.battery_2_bar,
-    'low' => Icons.battery_3_bar,
-    'medium' => Icons.battery_4_bar,
-    'high' => Icons.battery_5_bar,
-    'xhigh' => Icons.battery_full,
-    _ => Icons.bolt, // unknown / custom level the model advertised
+    'none' => AppIcons.battery_0_bar,
+    'minimal' => AppIcons.battery_2_bar,
+    'low' => AppIcons.battery_3_bar,
+    'medium' => AppIcons.battery_4_bar,
+    'high' => AppIcons.battery_5_bar,
+    'xhigh' => AppIcons.battery_full,
+    _ => AppIcons.bolt, // unknown / custom level the model advertised
   };
 
   Future<void> _pickEffort() async {
@@ -447,6 +448,7 @@ extension _SessionModelPicker on _AppSessionState {
     ].join(' · ');
     showAdaptivePanel<void>(
       context: context,
+      anchored: true,
       builder: (c) {
         final scheme = Theme.of(c).colorScheme;
         Widget row(IconData icon, String label, String value, {String? sub}) =>
@@ -476,23 +478,23 @@ extension _SessionModelPicker on _AppSessionState {
                     ),
                   ),
                   row(
-                    Icons.auto_awesome,
+                    AppIcons.auto_awesome,
                     l10n.modelLabel,
                     modelLabel,
                     sub: modelSub,
                   ),
-                  row(Icons.psychology_outlined, l10n.effort, effortText),
+                  row(AppIcons.psychology_outlined, l10n.effort, effortText),
                   if (_caps.permissionPresets)
                     row(_modeIcon(), l10n.permissionLabel, permText),
-                  row(Icons.checklist_rtl, l10n.planMode, planText),
+                  row(AppIcons.checklist_rtl, l10n.planMode, planText),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                     child: Row(
                       children: [
                         Icon(
                           rt != null && rt.confirmedByUpdate
-                              ? Icons.verified_outlined
-                              : Icons.info_outline,
+                              ? AppIcons.verified_outlined
+                              : AppIcons.info_outline,
                           size: 14,
                           color: rt != null && rt.confirmedByUpdate
                               ? additionColor(scheme)

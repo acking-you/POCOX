@@ -43,8 +43,11 @@ List<Object> buildHistoryRows(
       for (var missing = previous + 1; missing < index; missing++) {
         final id = turns[missing].turnId;
         final cached = windows[id];
-        if (cached != null && cached.items.isEmpty && !cached.hasMore) continue;
-        gap(HistoryGap(id));
+        // A turn read to its end shows nothing more (all of it may have been
+        // context the transcript hides): reading it again would only repeat
+        // the same page. One read in part continues where it stopped.
+        if (cached != null && !cached.hasMore) continue;
+        gap(HistoryGap(id, continuation: cached != null));
         break;
       }
     }

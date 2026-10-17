@@ -9,11 +9,14 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/hosting/argv_editor.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// What the ACP form currently describes.
 class AcpFormValue {
@@ -141,7 +144,7 @@ class AcpHostForm extends ConsumerStatefulWidget {
   final bool enabled;
 
   /// Instance names running hosts already use on this device; the suggested
-  /// name avoids them.
+  /// name avoids them and a typed one must differ.
   final Set<String> takenNames;
 
   @override
@@ -397,7 +400,7 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final small = Theme.of(context).textTheme.bodySmall;
+    final small = helpTextStyle(Theme.of(context));
     final api = ref.watch(bridgeApiProvider);
     final enabled = widget.enabled;
     if (!api.acpHostingSupported()) {
@@ -407,6 +410,9 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
         style: TextStyle(color: cautionColor(scheme)),
       );
     }
+    final clash = widget.fixedName == null
+        ? hostNameClash(_name.text, widget.takenNames)
+        : null;
     final program = _program.text.trim();
     final status = program.isEmpty || _locating
         ? null
@@ -417,7 +423,7 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
               Expanded(
                 child: Text(
                   _locateError!,
-                  style: small?.copyWith(color: scheme.error),
+                  style: small.copyWith(color: scheme.error),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -440,12 +446,12 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
         ? Text(
             l10n.acpProgramNotFound,
             key: const Key('acp-program-missing'),
-            style: small?.copyWith(color: scheme.error),
+            style: small.copyWith(color: scheme.error),
           )
         : Text(
             l10n.acpProgramFound(_located!),
             key: const Key('acp-program-found'),
-            style: small?.copyWith(color: successColor(scheme)),
+            style: small.copyWith(color: successColor(scheme)),
             overflow: TextOverflow.ellipsis,
             maxLines: 2,
           );
@@ -468,47 +474,51 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
       child: Text(l10n.acpProgramBrowse, maxLines: 1, softWrap: false),
     );
     final programFields = <Widget>[
-      LayoutBuilder(
-        builder: (context, constraints) {
-          // Side by side only while the field keeps room for a short program
-          // name and its label beside the button; otherwise the button goes
-          // under the field, which then has the whole width.
-          final scaler = MediaQuery.textScalerOf(context);
-          final browseWidth =
-              _browsePadding.horizontal +
-              _textWidth(
-                context,
-                l10n.acpProgramBrowse,
-                OutlinedButtonTheme.of(
-                      context,
-                    ).style?.textStyle?.resolve(const {}) ??
-                    Theme.of(context).textTheme.labelLarge,
+      const SizedBox(height: 4),
+      // What a program may be is shown while it is being entered.
+      FocusHelp(
+        help: l10n.acpProgramHint,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Side by side only while the field keeps room for a short program
+            // name and its label beside the button; otherwise the button goes
+            // under the field, which then has the whole width.
+            final scaler = MediaQuery.textScalerOf(context);
+            final browseWidth =
+                _browsePadding.horizontal +
+                _textWidth(
+                  context,
+                  l10n.acpProgramBrowse,
+                  OutlinedButtonTheme.of(
+                        context,
+                      ).style?.textStyle?.resolve(const {}) ??
+                      Theme.of(context).textTheme.labelLarge,
+                );
+            final fieldMinimum = scaler.scale(16) * _programFieldGlyphs;
+            if (constraints.maxWidth - 8 - browseWidth >= fieldMinimum) {
+              return Row(
+                // The button is centred on the field it fills.
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: programField),
+                  const SizedBox(width: 8),
+                  browse,
+                ],
               );
-          final fieldMinimum = scaler.scale(16) * _programFieldGlyphs;
-          if (constraints.maxWidth - 8 - browseWidth >= fieldMinimum) {
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(child: programField),
-                const SizedBox(width: 8),
-                browse,
+                programField,
+                const SizedBox(height: 8),
+                Align(alignment: AlignmentDirectional.centerEnd, child: browse),
               ],
             );
-          }
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              programField,
-              const SizedBox(height: 8),
-              Align(alignment: AlignmentDirectional.centerEnd, child: browse),
-            ],
-          );
-        },
+          },
+        ),
       ),
-      const SizedBox(height: 4),
-      Text(l10n.acpProgramHint, style: small),
-      const SizedBox(height: 12),
+      const SizedBox(height: 18),
       ArgvEditor(
         key: const Key('acp-argv-editor'),
         initial: _argsSeed,
@@ -524,8 +534,6 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(l10n.acpHostHint, style: small),
-        const SizedBox(height: 12),
         if (_isCustom) ...[
           TextField(
             key: const Key('acp-display-name-field'),
@@ -534,23 +542,32 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
             decoration: InputDecoration(labelText: l10n.acpAgentName),
             onChanged: (_) => _emit(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
         ],
-        TextField(
-          key: const Key('acp-instance-name-field'),
-          controller: _name,
-          enabled: enabled && widget.fixedName == null,
-          decoration: InputDecoration(
-            labelText: l10n.localHostName,
-            helperText: l10n.hostNameHelper,
+        FocusHelp(
+          help: widget.fixedName == null && clash == null
+              ? l10n.hostNameHelper
+              : null,
+          child: TextField(
+            key: const Key('acp-instance-name-field'),
+            controller: _name,
+            enabled: enabled && widget.fixedName == null,
+            decoration: InputDecoration(
+              labelText: l10n.localHostName,
+              errorText: switch (clash) {
+                final other? => l10n.hostNameInUse(other),
+                null => null,
+              },
+            ),
+            onChanged: (_) {
+              // The clash check below reads the typed name.
+              setState(() => _nameEdited = true);
+              _emit();
+            },
           ),
-          onChanged: (_) {
-            _nameEdited = true;
-            _emit();
-          },
         ),
-        if (status != null) ...[const SizedBox(height: 8), status],
-        const SizedBox(height: 4),
+        if (status != null) ...[const SizedBox(height: 10), status],
+        const SizedBox(height: 6),
         AdvancedToggle(
           key: const Key('acp-advanced-toggle'),
           open: _advanced,
@@ -563,19 +580,21 @@ class _AcpHostFormState extends ConsumerState<AcpHostForm> {
         ),
         if (_advanced) ...programFields,
         if (_isCustom) ...[
-          CheckboxListTile(
+          const SizedBox(height: 6),
+          // What saving means for secrets is the switch's own subtitle.
+          SwitchListTile(
             key: const Key('acp-save-agent'),
             contentPadding: EdgeInsets.zero,
             value: _save,
             title: Text(l10n.acpSaveAgent),
+            subtitle: Text(l10n.acpSecretsNote, style: small),
             onChanged: !enabled
                 ? null
                 : (value) {
-                    setState(() => _save = value ?? false);
+                    setState(() => _save = value);
                     _emit();
                   },
           ),
-          Text(l10n.acpSecretsNote, style: small),
         ],
       ],
     );
@@ -610,35 +629,74 @@ class ClaudeEnvironment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final small = Theme.of(context).textTheme.bodySmall;
-    final ok = small?.copyWith(color: successColor(scheme));
-    final caution = small?.copyWith(color: cautionColor(scheme));
-    final bad = small?.copyWith(color: scheme.error);
-    Widget line(String key, String text, TextStyle? style) => Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Text(text, key: Key(key), style: style),
-    );
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final body = helpTextStyle(theme);
+    // One row per component: a state mark and what was found. A found
+    // component is one line, its full path in the tooltip; a problem wraps,
+    // since what to do about it is the information.
+    Widget line(String key, String text, _Tone tone) {
+      final (icon, color) = switch (tone) {
+        _Tone.ok => (AppIcons.check_circle, successColor(scheme)),
+        _Tone.caution => (AppIcons.warning_amber_rounded, cautionColor(scheme)),
+        _Tone.bad => (AppIcons.error_outline, scheme.error),
+        _Tone.neutral => (AppIcons.info_outline, scheme.onSurfaceVariant),
+      };
+      final wrap = tone == _Tone.caution || tone == _Tone.bad;
+      final row = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(icon, size: 15, color: color),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              key: Key(key),
+              maxLines: wrap ? null : 1,
+              overflow: wrap ? null : TextOverflow.ellipsis,
+              style: body.copyWith(
+                color: tone == _Tone.bad ? scheme.error : scheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      );
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: wrap
+            ? row
+            : Tooltip(
+                message: text,
+                waitDuration: const Duration(milliseconds: 600),
+                excludeFromSemantics: true,
+                child: row,
+              ),
+      );
+    }
+
     final adapter = switch (status.adapter) {
       'installed' => line(
         'claude-adapter',
         l10n.claudeAdapterInstalled(status.adapterPath ?? ''),
-        ok,
+        _Tone.ok,
       ),
       'prepared' => line(
         'claude-adapter',
         l10n.claudeAdapterPrepared(status.adapterPath ?? ''),
-        ok,
+        _Tone.ok,
       ),
       _ when status.canPrepare => line(
         'claude-adapter-will-prepare',
         l10n.claudeAdapterWillPrepare(status.package),
-        caution,
+        _Tone.caution,
       ),
       _ => line(
         'claude-adapter-missing',
         l10n.claudeAdapterMissing(status.package),
-        bad,
+        _Tone.bad,
       ),
     };
     final version = status.runtimeVersion ?? '';
@@ -646,24 +704,32 @@ class ClaudeEnvironment extends StatelessWidget {
       'found' => line(
         'claude-node',
         l10n.claudeNodeFound(version, status.runtimePath ?? ''),
-        ok,
+        _Tone.ok,
       ),
-      'tooOld' => line('claude-node-old', l10n.claudeNodeTooOld(version), bad),
-      'missing' => line('claude-node-missing', l10n.claudeNodeMissing, bad),
+      'tooOld' => line(
+        'claude-node-old',
+        l10n.claudeNodeTooOld(version),
+        _Tone.bad,
+      ),
+      'missing' => line(
+        'claude-node-missing',
+        l10n.claudeNodeMissing,
+        _Tone.bad,
+      ),
       _ => null,
     };
     final cli = switch (status.cli) {
       'found' => line(
         'claude-cli',
         l10n.claudeCliFound(status.cliPath ?? ''),
-        small,
+        _Tone.ok,
       ),
       'inherited' => line(
         'claude-cli-inherited',
         l10n.claudeCliInherited,
-        small,
+        _Tone.ok,
       ),
-      _ => line('claude-cli-bundled', l10n.claudeCliBundled, small),
+      _ => line('claude-cli-bundled', l10n.claudeCliBundled, _Tone.neutral),
     };
     final problem = status.problem;
     return Column(
@@ -675,8 +741,10 @@ class ClaudeEnvironment extends StatelessWidget {
           children: [
             Expanded(
               child: Text(
-                l10n.claudeEnvTitle,
-                style: small?.copyWith(fontWeight: FontWeight.w600),
+                l10n.claudeRuntimeTitle,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             TextButton(
@@ -690,13 +758,13 @@ class ClaudeEnvironment extends StatelessWidget {
         ?runtime,
         cli,
         if (!status.ready && !status.canPrepare && problem != null)
-          line('claude-problem', problem, bad),
+          line('claude-problem', problem, _Tone.bad),
         if (!status.ready && status.canPrepare && onPrepare != null) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           OutlinedButton.icon(
             key: const Key('claude-prepare-environment'),
             onPressed: enabled ? onPrepare : null,
-            icon: const Icon(Icons.download_rounded, size: 18),
+            icon: const Icon(AppIcons.download_rounded, size: 18),
             label: Text(l10n.claudePrepareEnvironment),
           ),
         ],
@@ -704,6 +772,9 @@ class ClaudeEnvironment extends StatelessWidget {
     );
   }
 }
+
+/// How a runtime component's line reads.
+enum _Tone { ok, caution, bad, neutral }
 
 /// A compact "Advanced" disclosure, shared by the Codex and ACP forms: a text button with a chevron that
 /// reveals rarely-changed fields below it.
@@ -729,7 +800,7 @@ class AdvancedToggle extends StatelessWidget {
       child: TextButton.icon(
         onPressed: () => onChanged(!open),
         icon: Icon(
-          open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+          open ? AppIcons.expand_less_rounded : AppIcons.expand_more_rounded,
           size: 18,
         ),
         label: Text(l10n.hostAdvanced),

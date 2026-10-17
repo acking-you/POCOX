@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Everything [MarkdownView] actually painted, concatenated. `includePlaceholders`
 /// keeps `WidgetSpan`s (the favicons) out of the string.
@@ -68,7 +69,7 @@ void main() {
 
     // The network favicon can't load in a test binding, so the generic globe
     // stands in — that is the same fallback a blocked or 404ing host gets.
-    expect(find.byIcon(Icons.public), findsOneWidget);
+    expect(find.byIcon(AppIcons.public), findsOneWidget);
     final text = renderedText(tester);
     expect(text, contains('苹果官网'));
     expect(text, isNot(contains('https://')));
@@ -94,7 +95,7 @@ void main() {
   testWidgets('a non-web link gets no favicon', (tester) async {
     await pumpMarkdown(tester, '见 [第二节](#section-2) 说明。');
 
-    expect(find.byIcon(Icons.public), findsNothing);
+    expect(find.byIcon(AppIcons.public), findsNothing);
     expect(renderedText(tester), contains('第二节'));
   });
 

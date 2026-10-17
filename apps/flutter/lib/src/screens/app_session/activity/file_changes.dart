@@ -20,10 +20,11 @@ class _FileChangeCardState extends State<FileChangeCard> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
-    final diff = DiffModel.parse(widget.item.text);
+    final diff = DiffModel.cached(widget.item.text);
     final hasDiff = !diff.isEmpty;
     final title = widget.item.title.trim();
     final expandable = hasDiff || widget.item.text.trim().isNotEmpty;
+    final review = SessionFeatureScope.maybeOf(context)?.onReviewChange;
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       decoration: stepCardDecoration(scheme),
@@ -41,7 +42,7 @@ class _FileChangeCardState extends State<FileChangeCard> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.edit_document,
+                    AppIcons.edit_document,
                     size: 17,
                     color: activityTint('fileChange', scheme),
                   ),
@@ -82,9 +83,24 @@ class _FileChangeCardState extends State<FileChangeCard> {
                     ),
                     const SizedBox(width: 4),
                   ],
+                  if (hasDiff && review != null)
+                    IconButton(
+                      key: Key('file-change-review-${widget.item.id}'),
+                      tooltip: l10n.openInReview,
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints(
+                        minWidth: 30,
+                        minHeight: 30,
+                      ),
+                      padding: EdgeInsets.zero,
+                      iconSize: 16,
+                      color: muted,
+                      icon: const Icon(AppIcons.panel_right_open),
+                      onPressed: () => review(widget.item.id),
+                    ),
                   if (expandable)
                     Icon(
-                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      _expanded ? AppIcons.expand_less : AppIcons.expand_more,
                       size: 18,
                       color: muted.withValues(alpha: 0.7),
                     ),
@@ -168,7 +184,7 @@ class _CopyablePath extends StatelessWidget {
             },
             child: Padding(
               padding: const EdgeInsets.all(2),
-              child: Icon(Icons.copy_outlined, size: 14, color: muted),
+              child: Icon(AppIcons.copy_outlined, size: 14, color: muted),
             ),
           ),
         ),

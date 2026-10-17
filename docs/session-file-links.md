@@ -46,6 +46,9 @@ links never trigger an automatic favicon request.
   describes the response before any negotiated compression. Responses specify
   `Cache-Control: no-store`. The client verifies length and removes incomplete
   downloads; a stalled body fails after 30 seconds.
+- The review's whole-file view and its unchanged-line expansion read through
+  the same preview route (falling back to root-confined `/fs/read` on hosts
+  without it); a preview the host had to truncate is not shown as the file.
 - Files must be within configured project roots, within the session cwd after
   canonicalization, or explicitly referenced by the selected session's
   transcript. Missing/invalid sessions cannot grant access. Paths outside roots

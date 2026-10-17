@@ -21,7 +21,6 @@ void _openCodeHostTests() {
     expect(find.byKey(const Key('host-source-inherited')), findsOneWidget);
     expect(find.byKey(const Key('host-source-custom')), findsOneWidget);
     expect(find.byKey(const Key('host-source-official')), findsNothing);
-    expect(find.text(_l10n(t).hostInheritedOnly), findsNothing);
     await _tapKey(t, 'start-hosting-btn');
 
     final (name, runtime, input, action, key) = api.startConfiguredCalls.single;
@@ -94,6 +93,13 @@ void _openCodeHostTests() {
       find.byKey(const Key('host-protocol-chat-completions')),
       findsOneWidget,
     );
+    // A key is stored: removing it is offered, and the field says so
+    // while it is being edited.
+    expect(find.byKey(const Key('host-api-key-remove')), findsOneWidget);
+    expect(find.text(_l10n(t).hostApiKeyStored), findsNothing);
+    await t.ensureVisible(find.byKey(const Key('host-api-key')));
+    await t.tap(find.byKey(const Key('host-api-key')));
+    await t.pumpAndSettle();
     expect(find.text(_l10n(t).hostApiKeyStored), findsOneWidget);
     final field = t.widget<TextField>(find.byKey(const Key('host-api-key')));
     expect(field.controller!.text, isEmpty, reason: 'no key is read back');
@@ -144,24 +150,105 @@ void _openCodeHostTests() {
     expect(find.byType(HostingEditor), findsOneWidget);
   });
 
-  testWidgets('a running OpenCode host is opened, never started twice', (
-    t,
-  ) async {
+  testWidgets('a second OpenCode host gets a free name and its own history; '
+      'sharing a taken one or a taken name is refused first', (t) async {
     final api = FakeBridgeApi();
     api.serveHosts.add(FakeBridgeApi.openCodeHost('studio'));
     await _pumpEditor(t, api);
     final l10n = _l10n(t);
-    expect(find.text(l10n.agentChoiceRunningAs('studio')), findsOneWidget);
     await _tapKey(t, 'agent-choice-opencode');
-    // The tile opened that host's own page.
+    // An ordinary new host, not the running one's page.
+    expect(find.byKey(const Key('opencode-runtime-section')), findsOneWidget);
+    expect(find.byKey(const Key('opencode-host-details')), findsNothing);
+    final history = find.byKey(const Key('opencode-history'));
+    bool separate() => t.widget<SegmentedButton<bool>>(history).selected.single;
+    expect(separate(), isTrue, reason: '"studio" serves the default one');
+    expect(find.byKey(const Key('opencode-history-taken')), findsNothing);
+
+    // The shared history is one host's at a time.
+    await _tapKey(t, 'opencode-history-shared');
+    expect(find.text(l10n.openCodeHistoryTaken('studio')), findsOneWidget);
+    await _tapKey(t, 'start-hosting-btn');
+    expect(api.startConfiguredCalls, isEmpty);
+    expect(find.text(l10n.openCodeHistoryTaken('studio')), findsNWidgets(2));
+    await _tapKey(t, 'opencode-history-own');
+
+    // So is a name, in any spelling the relay treats as the same.
+    await _enter(t, 'opencode-name-field', 'Studio');
+    expect(find.text(l10n.hostNameInUse('studio')), findsOneWidget);
+    await _tapKey(t, 'start-hosting-btn');
+    expect(api.startConfiguredCalls, isEmpty);
+    await _enter(t, 'opencode-name-field', 'opencode');
+
+    await _tapKey(t, 'start-hosting-btn');
+    final (name, runtime, _, _, _) = api.startConfiguredCalls.single;
+    expect(name, 'opencode');
+    expect(runtime.separateHistory, isTrue);
+    expect(api.serveHosts.where((h) => h.isOpenCode), hasLength(2));
+    expect(find.byType(HostingEditor), findsNothing);
+  });
+
+  testWidgets('a running host changes its history by save and restart; a '
+      'shared one another host serves is refused first', (t) async {
+    final api = FakeBridgeApi();
+    final work = FakeBridgeApi.openCodeHost('work', separateHistory: true);
+    api.serveHosts
+      ..add(FakeBridgeApi.openCodeHost('studio'))
+      ..add(work);
+    api.hostConfigs['work'] = const HostConfig(
+      revision: 1,
+      runtime: HostRuntime.opencode(separateHistory: true),
+    );
+    await _pumpEditor(t, api, existing: work);
+    final l10n = _l10n(t);
+    await _tapKey(t, 'opencode-history-shared');
+    expect(find.text(l10n.openCodeHistoryTaken('studio')), findsOneWidget);
+    await _tapKey(t, 'host-config-apply');
+    expect(api.applyCalls, isEmpty, reason: 'nothing restarts');
+    expect(api.hostConfigSaves, isEmpty);
+    // Its own history again: no edit is left.
+    await _tapKey(t, 'opencode-history-own');
+    expect(find.byKey(const Key('opencode-history-taken')), findsNothing);
+    expect(
+      t
+          .widget<OutlinedButton>(find.byKey(const Key('host-config-save')))
+          .onPressed,
+      isNull,
+    );
+  });
+
+  testWidgets('the host on the shared history can take its own; the edit is '
+      'saved like any runtime field', (t) async {
+    final api = FakeBridgeApi();
+    final studio = FakeBridgeApi.openCodeHost('studio');
+    api.serveHosts.add(studio);
+    api.hostConfigs['studio'] = const HostConfig(
+      revision: 1,
+      runtime: HostRuntime.opencode(),
+    );
+    await _pumpEditor(t, api, existing: studio);
+    await _tapKey(t, 'opencode-history-own');
+    await _tapKey(t, 'host-config-save');
+    expect(api.hostConfigSaveRuntimes.last?.separateHistory, isTrue);
+    expect(
+      api.serveHosts.single.opencode?.separateHistory,
+      isFalse,
+      reason: 'saving restarts nothing',
+    );
+  });
+
+  testWidgets('a running OpenCode host folds its longer notes into '
+      'diagnostics', (t) async {
+    final api = FakeBridgeApi();
+    final running = FakeBridgeApi.openCodeHost('studio');
+    api.serveHosts.add(running);
+    await _pumpEditor(t, api, existing: running);
     expect(find.byKey(const Key('opencode-host-details')), findsOneWidget);
-    // The longer notes are folded into diagnostics.
     expect(find.byKey(const Key('opencode-scope-note')), findsNothing);
     await t.ensureVisible(find.byKey(const Key('host-diagnostics')));
     await t.tap(find.byKey(const Key('host-diagnostics')));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('opencode-scope-note')), findsOneWidget);
-    expect(api.startConfiguredCalls, isEmpty);
   });
 
   testWidgets('a running host without a provider says so; Refresh re-reads', (

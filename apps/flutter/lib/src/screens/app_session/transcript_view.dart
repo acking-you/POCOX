@@ -7,6 +7,8 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/src/automation_prompt.dart';
+import 'package:pocket_codex/src/screens/app_session/automation_prompt_card.dart';
 import 'approval_review.dart';
 import 'async_questions.dart';
 import 'generated_image_card.dart';
@@ -25,16 +27,16 @@ import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/realtime_delegation.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 import 'package:pocket_codex/src/widgets/realtime_handoff_card.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The "this reply is a plan" marker.
 Widget _planBadge(BuildContext context, ColorScheme scheme) => Row(
   mainAxisSize: MainAxisSize.min,
   children: [
-    Icon(Icons.checklist_rounded, size: 16, color: scheme.primary),
+    Icon(AppIcons.checklist_rounded, size: 16, color: scheme.primary),
     const SizedBox(width: 6),
     Text(
       AppLocalizations.of(context).toolPlan,
@@ -81,9 +83,8 @@ class _MessageViewState extends State<MessageView> {
   ApprovalReviewRequest? _reviewRequest;
   ApprovalReviewResult? _reviewResult;
   // Hover drives only the copy-button fade. Held in a notifier (not setState)
-  // so a hover repaint doesn't rebuild the message content — Linkify /
-  // MarkdownBody allocate fresh TapGestureRecognizers per link on every build
-  // and never dispose the old ones, so rebuilding them on hover leaks.
+  // so a hover repaint doesn't rebuild the message content: its Markdown,
+  // highlighted code and link recognizers.
   final ValueNotifier<bool> _hover = ValueNotifier(false);
 
   @override
@@ -175,6 +176,15 @@ class _MessageViewState extends State<MessageView> {
         result: _reviewResult,
       );
     }
+    // An automation's run is not something the user typed: it names the
+    // automation and keeps its instructions a tap away.
+    final automation = isUser ? AutomationPrompt.parse(item.text) : null;
+    if (automation != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: AutomationPromptCard(prompt: automation),
+      );
+    }
     // A Live voice handoff is a different kind of turn: a stretch of spoken
     // back-and-forth, not one typed message. It gets its own card.
     final handoff = isUser ? parseRealtimeDelegation(item.text) : null;
@@ -199,14 +209,16 @@ class _MessageViewState extends State<MessageView> {
     // stored text, and the copy action, keep the message verbatim.
     final ide = isUser
         ? splitIdeContext(displayAsyncQuestionReply(item.text))
-        : (text: item.text, files: const <IdeMentionedFile>[]);
+        : plainIdeSplit(item.text);
     final refs = isUser
         ? splitFileRefs(ide.text)
         : (text: ide.text, paths: const <String>[]);
+    // Reply passages the user annotated read as quotes ahead of the request.
+    final shown = ideDisplayText(refs.text, ide.annotations);
     final images = [
       ...item.images,
-      for (final f in ide.files)
-        if (looksLikeImagePath(f.path)) ResolvedImage.hostFile(f.path),
+      for (final path in unattachedImageMentions(ide.files, item.images))
+        ResolvedImage.hostFile(path),
     ];
     final paths = [
       for (final f in ide.files)
@@ -256,40 +268,36 @@ class _MessageViewState extends State<MessageView> {
                 ),
                 // Only when text follows: a bare attachment shouldn't leave
                 // trailing space under the last row.
-                if (refs.text.isNotEmpty) const SizedBox(height: 6),
+                if (shown.isNotEmpty) const SizedBox(height: 6),
               ],
               // A message with no text at all is just its attachments — an
               // empty bubble under them would be a visible artifact.
-              if (refs.text.isNotEmpty)
+              if (shown.isNotEmpty)
                 Container(
                   constraints: const BoxConstraints(maxWidth: 640),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
+                    horizontal: 18,
+                    vertical: 11,
                   ),
-                  // One step above the page, with a tighter corner on the
+                  // A soft neutral bubble with a tucked corner on the
                   // speaker's side, so the user's turns read as theirs
                   // without a colour of their own.
                   decoration: BoxDecoration(
-                    color: Color.alphaBlend(
-                      accentWash(scheme, strength: 0.8),
-                      scheme.surfaceContainer,
-                    ),
+                    color: userBubbleColor(scheme),
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(kComposerRadius),
-                      topRight: Radius.circular(kComposerRadius),
-                      bottomLeft: Radius.circular(kComposerRadius),
-                      bottomRight: Radius.circular(kRowRadius),
+                      topLeft: Radius.circular(kUserBubbleRadius),
+                      topRight: Radius.circular(6),
+                      bottomLeft: Radius.circular(kUserBubbleRadius),
+                      bottomRight: Radius.circular(kUserBubbleRadius),
                     ),
                   ),
-                  // The tighter 1.3 line: a bubble is a transcription of one
-                  // utterance, not a paragraph to read down.
-                  child: linkifyText(
-                    context,
-                    refs.text,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(height: 1.5),
+                  // Typed Markdown renders as Markdown — a pasted snippet in
+                  // backticks or a short list reads the way it was written
+                  // — while every line break the user typed is kept.
+                  child: MarkdownView(
+                    data: shown,
+                    dense: true,
+                    keepLineBreaks: true,
                   ),
                 ),
             ],
@@ -338,7 +346,7 @@ class _MessageViewState extends State<MessageView> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     MessageAction(
-                      icon: Icons.content_copy_outlined,
+                      icon: AppIcons.content_copy_outlined,
                       tooltip: AppLocalizations.of(context).copy,
                       onPressed: _copy,
                     ),
@@ -452,7 +460,7 @@ class TurnDurationFooter extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.schedule, size: 12, color: muted),
+              Icon(AppIcons.schedule, size: 12, color: muted),
               const SizedBox(width: 4),
               Text(
                 l10n.turnElapsed(duration),
@@ -464,7 +472,7 @@ class TurnDurationFooter extends StatelessWidget {
               ),
               if (modelText != null) ...[
                 const SizedBox(width: 8),
-                Icon(Icons.auto_awesome, size: 11, color: muted),
+                Icon(AppIcons.auto_awesome, size: 11, color: muted),
                 const SizedBox(width: 4),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 260),
@@ -478,7 +486,7 @@ class TurnDurationFooter extends StatelessWidget {
                 if (rerouted) ...[
                   const SizedBox(width: 3),
                   Icon(
-                    Icons.sync_problem,
+                    AppIcons.sync_problem,
                     size: 11,
                     color: cautionColor(scheme),
                   ),

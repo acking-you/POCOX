@@ -6884,14 +6884,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   HostRuntimeDto dco_decode_host_runtime_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return HostRuntimeDto(
       kind: dco_decode_String(arr[0]),
       binary: dco_decode_opt_String(arr[1]),
       port: dco_decode_u_16(arr[2]),
       proxy: dco_decode_opt_String(arr[3]),
       agent: dco_decode_opt_box_autoadd_acp_agent_spec_dto(arr[4]),
+      separateHistory: dco_decode_bool(arr[5]),
     );
   }
 
@@ -7297,8 +7298,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   OpenCodeHostStatusDto dco_decode_open_code_host_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return OpenCodeHostStatusDto(
       version: dco_decode_String(arr[0]),
       providersConnected: dco_decode_u_32(arr[1]),
@@ -7306,6 +7307,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       defaultModel: dco_decode_opt_String(arr[3]),
       agents: dco_decode_list_String(arr[4]),
       problem: dco_decode_opt_String(arr[5]),
+      separateHistory: dco_decode_bool(arr[6]),
     );
   }
 
@@ -8740,12 +8742,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_port = sse_decode_u_16(deserializer);
     var var_proxy = sse_decode_opt_String(deserializer);
     var var_agent = sse_decode_opt_box_autoadd_acp_agent_spec_dto(deserializer);
+    var var_separateHistory = sse_decode_bool(deserializer);
     return HostRuntimeDto(
       kind: var_kind,
       binary: var_binary,
       port: var_port,
       proxy: var_proxy,
       agent: var_agent,
+      separateHistory: var_separateHistory,
     );
   }
 
@@ -9376,6 +9380,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_defaultModel = sse_decode_opt_String(deserializer);
     var var_agents = sse_decode_list_String(deserializer);
     var var_problem = sse_decode_opt_String(deserializer);
+    var var_separateHistory = sse_decode_bool(deserializer);
     return OpenCodeHostStatusDto(
       version: var_version,
       providersConnected: var_providersConnected,
@@ -9383,6 +9388,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       defaultModel: var_defaultModel,
       agents: var_agents,
       problem: var_problem,
+      separateHistory: var_separateHistory,
     );
   }
 
@@ -10804,6 +10810,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_u_16(self.port, serializer);
     sse_encode_opt_String(self.proxy, serializer);
     sse_encode_opt_box_autoadd_acp_agent_spec_dto(self.agent, serializer);
+    sse_encode_bool(self.separateHistory, serializer);
   }
 
   @protected
@@ -11309,6 +11316,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.defaultModel, serializer);
     sse_encode_list_String(self.agents, serializer);
     sse_encode_opt_String(self.problem, serializer);
+    sse_encode_bool(self.separateHistory, serializer);
   }
 
   @protected

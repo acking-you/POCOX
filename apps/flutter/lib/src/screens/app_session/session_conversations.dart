@@ -95,7 +95,7 @@ extension _SessionConversations on _AppSessionState {
               l10n: l10n,
               // Only rows NOT already sitting under a project heading carry
               // their own project name — under one it's just noise.
-              project: showProject ? _AppSessionState._leafOf(t.cwd) : null,
+              project: showProject ? _leafOf(t.cwd) : null,
               onTap: () {
                 closeDrawerIfOpen(ctx);
                 if (t.id != _threadId) _openThread(t.id, t.cwd);
@@ -264,7 +264,7 @@ extension _SessionConversations on _AppSessionState {
               ListTile(
                 key: const Key('drawer-back-to-sessions'),
                 dense: true,
-                leading: const Icon(Icons.arrow_back),
+                leading: const Icon(AppIcons.arrow_back),
                 title: Text(l10n.backToSessions),
                 onTap: () {
                   closeDrawerIfOpen(ctx);
@@ -285,66 +285,74 @@ extension _SessionConversations on _AppSessionState {
                   : const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: _sidebarAction(
                 key: const Key('new-conversation-btn'),
-                icon: Icons.edit_square,
+                icon: AppIcons.edit_square,
                 label: l10n.newConversation,
                 onTap: () => _newConversationInProject(_cwd, ctx),
               ),
             ),
-            // Quick filter — shown once there are enough conversations to scan.
-            if (_threads.length > 6)
-              Padding(
-                padding: isDesktop
-                    ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
-                    : const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                child: SizedBox(
-                  height: isDesktop ? 32 : 44,
-                  child: TextField(
-                    key: const Key('conv-search'),
-                    focusNode: _convSearchFocus,
-                    onChanged: (v) => _updateState(() => _convQuery = v),
-                    style: TextStyle(fontSize: isDesktop ? 13 : 15),
-                    textAlignVertical: TextAlignVertical.center,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      prefixIcon: Icon(
-                        Icons.search,
-                        size: isDesktop ? 16 : 20,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      prefixIconConstraints: BoxConstraints(
-                        minWidth: isDesktop ? 32 : 44,
-                        minHeight: 32,
-                      ),
-                      hintText: l10n.searchConversations,
-                      hintStyle: TextStyle(
-                        fontSize: isDesktop ? 13 : 15,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      filled: true,
-                      fillColor: scheme.onSurface.withValues(alpha: 0.05),
-                      contentPadding: EdgeInsets.zero,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+            // Quick filter — shown once there are enough conversations to
+            // scan, opening as the listing arrives rather than jolting the
+            // list down.
+            Motion.resize(
+              context,
+              alignment: Alignment.topCenter,
+              child: _threads.length <= 6
+                  ? const SizedBox(width: double.infinity)
+                  : Padding(
+                      padding: isDesktop
+                          ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
+                          : const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                      child: SizedBox(
+                        height: isDesktop ? 32 : 44,
+                        child: TextField(
+                          key: const Key('conv-search'),
+                          focusNode: _convSearchFocus,
+                          onChanged: (v) => _updateState(() => _convQuery = v),
+                          style: TextStyle(fontSize: isDesktop ? 13 : 15),
+                          textAlignVertical: TextAlignVertical.center,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            prefixIcon: Icon(
+                              AppIcons.search,
+                              size: isDesktop ? 16 : 20,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            prefixIconConstraints: BoxConstraints(
+                              minWidth: isDesktop ? 32 : 44,
+                              minHeight: 32,
+                            ),
+                            hintText: l10n.searchConversations,
+                            hintStyle: TextStyle(
+                              fontSize: isDesktop ? 13 : 15,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            filled: true,
+                            fillColor: backdropFieldFill(scheme),
+                            contentPadding: EdgeInsets.zero,
+                            border: FieldBorder(
+                              borderRadius: BorderRadius.circular(
+                                isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                              ),
+                            ),
+                            enabledBorder: FieldBorder(
+                              borderRadius: BorderRadius.circular(
+                                isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                              ),
+                            ),
+                            focusedBorder: FieldBorder(
+                              borderRadius: BorderRadius.circular(
+                                isDesktop ? kRowRadius + 1 : kTouchRowRadius,
+                              ),
+                              borderSide: BorderSide(
+                                color: scheme.onSurface.withValues(alpha: 0.35),
+                              ),
+                              glow: scheme.tertiary.withValues(alpha: 0.16),
+                            ),
+                          ),
                         ),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
-                        ),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          isDesktop ? kRowRadius + 1 : kTouchRowRadius,
-                        ),
-                        borderSide: BorderSide(color: scheme.outline),
                       ),
                     ),
-                  ),
-                ),
-              ),
+            ),
             // List heading: what the list is grouped by, with the toggle that
             // regroups it. Group by project, or by when it happened — two ways
             // of asking "what was I doing", so it's a toggle rather than a
@@ -383,7 +391,7 @@ extension _SessionConversations on _AppSessionState {
                           ),
                         ),
                         icon: Icon(
-                          Icons.my_location_rounded,
+                          AppIcons.my_location_rounded,
                           size: 15,
                           color: signalColor(scheme),
                         ),
@@ -405,8 +413,8 @@ extension _SessionConversations on _AppSessionState {
                       ),
                       icon: Icon(
                         _activityView
-                            ? Icons.folder_outlined
-                            : Icons.history_toggle_off,
+                            ? AppIcons.folder_outlined
+                            : AppIcons.history_toggle_off,
                         size: 15,
                         color: scheme.onSurfaceVariant,
                       ),
@@ -428,7 +436,7 @@ extension _SessionConversations on _AppSessionState {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.folder_outlined,
+                      AppIcons.folder_outlined,
                       size: 13,
                       color: scheme.onSurfaceVariant,
                     ),
@@ -447,30 +455,54 @@ extension _SessionConversations on _AppSessionState {
                   ],
                 ),
               ),
+            // Until the host first lists its conversations the pane is
+            // loading, not empty: a skeleton, cross-fading into the list. The
+            // open conversation's own metadata (or a running one discovered
+            // meanwhile) is no listing; a conversation sent from here is.
             Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Text(
-                          q.isEmpty ? l10n.noThreads : l10n.noMatchingThreads,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
+              child: AnimatedSwitcher(
+                duration: Motion.of(context, Motion.slow),
+                switchInCurve: Motion.enter,
+                switchOutCurve: Curves.easeIn,
+                layoutBuilder: (current, previous) => Stack(
+                  fit: StackFit.expand,
+                  children: [...previous, ?current],
+                ),
+                child: !_threadsListed && _threads.isEmpty
+                    ? ConversationListSkeleton(
+                        key: const ValueKey('conv-loading'),
+                        touch: !isDesktop,
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('conv-content'),
+                        child: filtered.isEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    q.isEmpty
+                                        ? l10n.noThreads
+                                        : l10n.noMatchingThreads,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            // SuperListView so the locate button can reach a
+                            // row that has never been built (a long list lays
+                            // rows out lazily).
+                            : SuperListView.builder(
+                                listController: _convListCtl,
+                                controller: _convScroll,
+                                padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                                itemCount: rows.length,
+                                itemBuilder: (_, i) => rows[i](),
+                              ),
                       ),
-                    )
-                  // SuperListView so the locate button can reach a row that
-                  // has never been built (a long list lays rows out lazily).
-                  : SuperListView.builder(
-                      listController: _convListCtl,
-                      controller: _convScroll,
-                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-                      itemCount: rows.length,
-                      itemBuilder: (_, i) => rows[i](),
-                    ),
+              ),
             ),
             // Account quota, always visible rather than buried behind the
             // gauge: it is warm from connect (see _loadQuota), so this row
@@ -480,9 +512,8 @@ extension _SessionConversations on _AppSessionState {
             // the chat — management, the host's session browser (incl. force
             // takeover), logs, settings — one tap from the sidebar.
             if (widget.home) ...[
-              const Divider(height: 1),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
                 // Each button keeps its own share of the row instead of its
                 // intrinsic width: the sidebar drags down to 200 px, where a
                 // fixed-width row of five (manage / sessions / logs / theme /
@@ -492,7 +523,7 @@ extension _SessionConversations on _AppSessionState {
                     Expanded(
                       child: _paneShortcut(
                         key: 'sidebar-manage-btn',
-                        icon: Icons.dns_outlined,
+                        icon: AppIcons.dns_outlined,
                         tooltip: l10n.manageServices,
                         ctx: ctx,
                         route: '/manage',
@@ -507,7 +538,7 @@ extension _SessionConversations on _AppSessionState {
                       Expanded(
                         child: _paneShortcut(
                           key: 'sidebar-history-btn',
-                          icon: Icons.history,
+                          icon: AppIcons.history,
                           tooltip: l10n.hostSessions,
                           ctx: ctx,
                           route: Uri(
@@ -519,7 +550,7 @@ extension _SessionConversations on _AppSessionState {
                     Expanded(
                       child: _paneShortcut(
                         key: 'sidebar-logs-btn',
-                        icon: Icons.article_outlined,
+                        icon: AppIcons.article_outlined,
                         tooltip: l10n.logsTitle,
                         ctx: ctx,
                         route: '/logs',
@@ -528,7 +559,7 @@ extension _SessionConversations on _AppSessionState {
                     Expanded(
                       child: _paneShortcut(
                         key: 'sidebar-settings-btn',
-                        icon: Icons.settings_outlined,
+                        icon: AppIcons.settings_outlined,
                         tooltip: l10n.settingsTitle,
                         ctx: ctx,
                         route: '/settings',
@@ -693,7 +724,7 @@ extension _SessionConversations on _AppSessionState {
           return Row(
             children: [
               if (thread.isVoice) ...[
-                Icon(Icons.graphic_eq, size: 15, color: muted),
+                Icon(AppIcons.graphic_eq, size: 15, color: muted),
                 const SizedBox(width: 6),
               ],
               Expanded(
@@ -722,6 +753,7 @@ extension _SessionConversations on _AppSessionState {
         child: InkWell(
           mouseCursor: clickable,
           borderRadius: BorderRadius.circular(kRowRadius),
+          hoverColor: backdropHover(Theme.of(context).colorScheme),
           onTap: onTap,
           child: running
               ? RunningSheen(color: signal, child: content)
@@ -847,7 +879,7 @@ extension _SessionConversations on _AppSessionState {
     // The home pane spans projects, so its rows say where they live; a
     // project-scoped pane has only one, and repeating it per row is noise.
     final meta = [
-      if (widget.home) _AppSessionState._leafOf(thread.cwd),
+      if (widget.home) _leafOf(thread.cwd),
       if (when.isNotEmpty) when,
     ].where((s) => s.isNotEmpty).join(' · ');
     return Padding(
@@ -863,7 +895,7 @@ extension _SessionConversations on _AppSessionState {
           child: _activitySheen(
             running: running,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
@@ -876,31 +908,42 @@ extension _SessionConversations on _AppSessionState {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
-                            // Heavier than the project tree's rows: here the
-                            // title has a summary under it to stand apart from.
-                            fontWeight: FontWeight.w600,
+                            height: 1.35,
+                            // A step above the project tree's rows (the title
+                            // has a summary under it to stand apart from), and
+                            // bold only for the open conversation.
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
                             color: fg,
                           ),
                         ),
                         if (summary.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             summary,
                             key: Key('activity-summary-${thread.id}'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontSize: 12, color: muted),
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.4,
+                              color: muted,
+                            ),
                           ),
                         ],
                         if (meta.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+                          const SizedBox(height: 2),
                           Text(
                             meta,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 11,
-                              color: running ? signalColor(scheme) : muted,
+                              height: 1.35,
+                              color: running
+                                  ? signalColor(scheme)
+                                  : onSurfaceMuted(scheme),
                             ),
                           ),
                         ],

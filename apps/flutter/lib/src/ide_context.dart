@@ -14,22 +14,44 @@
 /// a message that was typed as "为什么仍然黑屏" displays as a wall of wire text.
 ///
 /// [kUserMessageBegin] is the protocol constant (`USER_MESSAGE_BEGIN`,
-/// `deps/codex/codex-rs/protocol/src/protocol.rs:120`) and is the ONLY thing
-/// this module treats as contract. The shape of the context ahead of it varies
-/// by client — the vendored codex renders `## Active file:` while the desktop
-/// app emits `# Files mentioned by the user:` — so [splitIdeContext] reads
-/// mentions out of that prefix on a best-effort basis. A prefix it cannot
+/// `deps/codex/codex-rs/protocol/src/protocol.rs:120`). The ChatGPT desktop
+/// app writes its own shorter heading, [kDesktopRequestBegin], after the
+/// context blocks it serializes (`# Files mentioned by the user:`,
+/// `# Response annotations:`, an `<in-app-browser-context>` block). The shape
+/// of the context ahead of either marker varies by client — the vendored
+/// codex renders `## Active file:` — so [splitIdeContext] reads mentions and
+/// annotations out of that prefix on a best-effort basis. A prefix it cannot
 /// parse costs thumbnails, never the message text.
 library;
+
+import 'dart:convert';
 
 /// The marker separating serialized IDE context from the user's own request.
 /// Wire format: changing it orphans every transcript written by another client.
 const String kUserMessageBegin = '## My request for Codex:';
 
+/// The request heading the ChatGPT desktop app writes after its context
+/// blocks. Only honoured after one of them ([_desktopContextHeads]), so a
+/// message that merely contains the heading keeps it.
+const String kDesktopRequestBegin = '## My request:';
+
+const _desktopContextHeads = [
+  '# Files mentioned by the user:',
+  '# Context from my IDE setup:',
+  '# Response annotations:',
+  '<in-app-browser-context',
+];
+
+final _desktopMarker = RegExp(r'^## My request:[ \t]*$', multiLine: true);
+
 /// A file the sending client named in its IDE context.
 class IdeMentionedFile {
   /// Creates a mention of [path], labelled [name].
-  const IdeMentionedFile({required this.name, required this.path});
+  const IdeMentionedFile({
+    required this.name,
+    required this.path,
+    this.attachedImage = false,
+  });
 
   /// Display label the client used (usually the basename).
   final String name;
@@ -37,7 +59,35 @@ class IdeMentionedFile {
   /// The path as written — absolute on the sending machine, or workspace
   /// relative. Not resolved here; the widget layer decides what it can read.
   final String path;
+
+  /// The client marked it `Image attachment: true`: the same picture also
+  /// rides the message as an image.
+  final bool attachedImage;
 }
+
+/// A passage of an earlier reply the user selected, with their comment on
+/// it (the desktop app's response annotations).
+class IdeAnnotation {
+  /// Creates an annotation of [quote].
+  const IdeAnnotation({required this.quote, this.comment});
+
+  /// The selected text.
+  final String quote;
+
+  /// What the user wrote about it, if anything.
+  final String? comment;
+}
+
+/// What [splitIdeContext] reads out of a message.
+typedef IdeSplit = ({
+  String text,
+  List<IdeMentionedFile> files,
+  List<IdeAnnotation> annotations,
+});
+
+/// A message without any IDE context: [text] as it is.
+IdeSplit plainIdeSplit(String text) =>
+    (text: text, files: const [], annotations: const []);
 
 // `## <label>: <path>` — the shape both known context renderers use for a
 // file line. The label may contain spaces; the path runs to end of line.
@@ -48,24 +98,98 @@ final _mentionLine = RegExp(r'^##[ \t]+(.+?):[ \t]+(\S.*)$', multiLine: true);
 // has no value after the colon and never reaches here; a bare word would.
 final _looksLikePath = RegExp(r'^(/|[A-Za-z]:[/\\]|\\\\)|[/\\]');
 
-/// Split a raw user message into what the user actually typed and the files the
-/// sending client mentioned around it.
+/// Split a raw user message into what the user actually typed and the files
+/// and reply passages the sending client mentioned around it.
 ///
 /// Mirrors upstream's `extract_prompt_request_with_offset`: the request is
-/// everything after the LAST [kUserMessageBegin]. A message without the marker
-/// is returned unchanged with no mentions — the common case, since our own
-/// composer never writes one.
-({String text, List<IdeMentionedFile> files}) splitIdeContext(String raw) {
-  final at = raw.lastIndexOf(kUserMessageBegin);
-  if (at < 0) return (text: raw, files: const []);
-  final text = raw.substring(at + kUserMessageBegin.length).trim();
+/// everything after the LAST marker ([kUserMessageBegin], or the desktop
+/// app's [kDesktopRequestBegin] on a line of its own after its context). A
+/// message without one is returned unchanged with no mentions — the common
+/// case, since our own composer never writes one.
+IdeSplit splitIdeContext(String raw) {
+  var at = raw.lastIndexOf(kUserMessageBegin);
+  var marker = kUserMessageBegin.length;
+  final desktop = _desktopRequestAt(raw);
+  if (desktop != null && desktop > at) {
+    at = desktop;
+    marker = kDesktopRequestBegin.length;
+  }
+  if (at < 0) return plainIdeSplit(raw);
+  final text = raw.substring(at + marker).trim();
+  final prefix = raw.substring(0, at);
   final files = <IdeMentionedFile>[];
-  for (final m in _mentionLine.allMatches(raw.substring(0, at))) {
+  for (final m in _mentionLine.allMatches(prefix)) {
     final path = m[2]!.trim();
     if (!_looksLikePath.hasMatch(path)) continue;
-    files.add(IdeMentionedFile(name: m[1]!.trim(), path: path));
+    final rest = prefix.substring(m.end).trimLeft();
+    files.add(
+      IdeMentionedFile(
+        name: m[1]!.trim(),
+        path: path,
+        attachedImage: rest.startsWith('Image attachment: true'),
+      ),
+    );
   }
-  return (text: text, files: files);
+  return (text: text, files: files, annotations: _annotations(prefix));
+}
+
+int? _desktopRequestAt(String raw) {
+  final head = raw.trimLeft();
+  if (!_desktopContextHeads.any(head.startsWith)) return null;
+  final matches = _desktopMarker.allMatches(raw);
+  return matches.isEmpty ? null : matches.last.start;
+}
+
+final _annotationBlock = RegExp(
+  r'<response-annotations>([\s\S]*?)</response-annotations>',
+);
+
+/// The `[{"text", "annotation"}]` list inside `<response-annotations>`;
+/// empty when there is none or it does not parse.
+List<IdeAnnotation> _annotations(String prefix) {
+  final block = _annotationBlock.firstMatch(prefix);
+  if (block == null) return const [];
+  try {
+    final list = jsonDecode(block[1]!.trim());
+    if (list is! List) return const [];
+    return [
+      for (final e in list)
+        if (e is Map && e['text'] is String && (e['text'] as String).isNotEmpty)
+          IdeAnnotation(
+            quote: e['text'] as String,
+            comment: switch (e['annotation']) {
+              final String c when c.trim().isNotEmpty => c.trim(),
+              _ => null,
+            },
+          ),
+    ];
+  } on FormatException {
+    return const [];
+  }
+}
+
+/// [request] as Markdown to display after its [annotations]: each annotated
+/// passage as a quote (long ones cut short) with the comment under it.
+String ideDisplayText(String request, List<IdeAnnotation> annotations) {
+  if (annotations.isEmpty) return request;
+  final out = StringBuffer();
+  for (final a in annotations) {
+    final quote = a.quote.trim();
+    final cut = quote.length > 280
+        ? '${quote.substring(0, 280).trimRight()}…'
+        : quote;
+    for (final line in cut.split('\n')) {
+      out.writeln('> $line');
+    }
+    out.writeln();
+    if (a.comment != null) {
+      out
+        ..writeln(a.comment)
+        ..writeln();
+    }
+  }
+  out.write(request);
+  return out.toString().trim();
 }
 
 // Section headers the two known context renderers open with. Only used to
@@ -74,13 +198,17 @@ final _looksLikePath = RegExp(r'^(/|[A-Za-z]:[/\\]|\\\\)|[/\\]');
 const _contextHeaders = [
   '# Files mentioned by the user:',
   '# Context from my IDE setup:',
+  '# Response annotations:',
+  '<in-app-browser-context',
 ];
 
 /// Whether [preview] is the start of an IDE-context block with no request in
 /// it yet — i.e. a server-truncated preview whose visible part is all wire.
 bool isTruncatedIdeContext(String preview) {
   final t = preview.trimLeft();
-  if (t.contains(kUserMessageBegin)) return false;
+  if (t.contains(kUserMessageBegin) || _desktopRequestAt(t) != null) {
+    return false;
+  }
   return _contextHeaders.any(t.startsWith);
 }
 

@@ -13,12 +13,39 @@ when preferences load and are never relaunched as a generic ACP agent.
 
 ## Hosting
 
-- **One host per history source.** The host owns its `opencode serve`
-  process. One OpenCode host runs per real database source across Pocket
-  processes on a device; a second start is refused and the editor's
-  OpenCode tile reads "Running as <name>" and opens that host instead.
-- **Desired runtime:** the executable only (`HostRuntime.opencode`, kind
-  `opencode` with `binary`). The editor detects it (`opencode_detect`:
+- **Several hosts, one per history source.** Each host owns its own
+  `opencode serve` process, and a device can run several, like Codex and
+  ACP hosts, each under its own instance name. One host at a time serves a
+  given database across Pocket processes (a claim keyed by its canonical
+  path, `opencode_already_hosted` when taken), so each host chooses its
+  **history**:
+  - *Shared with OpenCode* (the default, and what every record saved before
+    the choice existed means): OpenCode's default database, the sessions the
+    OpenCode terminal app shows and Local sessions reads. One host at a time.
+  - *This host only* (`separateHistory`): the host's own database,
+    `OPENCODE_DB=pocket-codex-<canonical name>.db`, which OpenCode resolves
+    in its data directory beside its default database (a digest replaces a
+    very long name). Detection, the claim and the server all use it; the
+    same instance name finds the same history again. OpenCode's
+    configuration, `auth.json` sign-ins, snapshots and logs stay shared;
+    what OpenCode keeps in its database (sessions, and its newer account and
+    integration records) does not.
+
+  The editor's OpenCode tile always starts a new host: a free name
+  (`opencode`, `opencode-2`, …) and, beside a host serving the shared
+  history, *This host only*. Choosing *Shared* while another host serves it
+  says so under the choice, and Start is refused with that reason before
+  anything starts. A remote add picks the same way on the host computer (a
+  remote edit keeps the saved choice). Changing the history of a running
+  host is a runtime edit: saved, then applied with a restart.
+- **Instance names are unique per device**, compared as the relay compares
+  them (`My Host` and `my-host` are one instance). A new host's editor —
+  Codex, OpenCode, ACP, and the remote editor — shows a taken name under
+  the field and refuses Start without asking the bridge; a refusal from the
+  bridge (a host that appeared meanwhile) says the same. A name published on
+  the relay by another computer keeps its own relay message.
+- **Desired runtime:** the executable and the history (`HostRuntime.opencode`,
+  kind `opencode` with `binary` and `separateHistory`). The editor detects it (`opencode_detect`:
   path, version, problem) and offers a path override with Browse and
   re-detect. A detection problem (not found, a version that cannot be
   read or used) is said before anything starts; a running host without a
@@ -60,11 +87,13 @@ when preferences load and are never relaunched as a generic ACP agent.
   macOS every native quit (Cmd+Q, menu, Dock) takes this path
   ([Hosting configuration](hosting-configuration.md#identity-save-and-apply)).
   Closing the window hides the app to the tray and leaves hosts running.
-- **Restore on launch:** a single record (`autoHostOpenCode`: name, optional
-  executable), not restored beside a running OpenCode host. It starts with
-  the host's saved model service and desired runtime (`host_config_get`,
-  stored key kept); an unreadable configuration restores nothing rather than
-  replace it.
+- **Restore on launch:** every host with a bridge restore record, with its
+  saved model service and desired runtime (`host_config_get`, stored key
+  kept); an unreadable configuration restores nothing rather than replace
+  it. Hosts with their own history all restore; at most one host on the
+  shared history does, never beside a running one. The older single UI
+  record (`autoHostOpenCode`: name, optional executable) is written only for
+  a host on the shared history and follows the same rule.
 - **New conversations need a project folder.** OpenCode creates a session
   only in a folder: without one the welcome asks for it, and a send opens
   the folder picker instead of sending (nothing is shown as sent; button,
@@ -292,6 +321,17 @@ continued by opening it on the running OpenCode host (**Continue in
 <host>**), or by hosting OpenCode first.
 
 ## Verification
+
+Several hosts (2026-10-16): the real bridge lifecycle test also starts a
+second host with its own history beside the first, reads its status and
+stops it alone, while a second host on the shared database is still refused
+(`opencode_already_hosted`). In the macOS app, beside running Claude, Codex
+and shared-history OpenCode hosts, the OpenCode tile offered `opencode-2`
+with *This host only*; a typed `OpenCode` and the shared choice were each
+refused before anything started; `opencode-2` then ran its own
+`opencode serve` on `pocket-codex-opencode-2.db`, connected with an empty
+session list, and stopped alone. No message was sent. Rust 855 passed (24
+ignored); remote add and edit by tests only.
 
 On one Mac with installed OpenCode 1.19.0, the full Rust (831 passed, 24
 ignored) and Flutter (1557 passed, 5 skipped, plus 160 focused) suites

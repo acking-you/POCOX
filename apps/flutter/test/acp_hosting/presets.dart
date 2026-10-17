@@ -132,7 +132,10 @@ void _registerPresets() {
           .evaluate()
           .length;
       await t.enterText(find.byKey(Key('acp-arg-field-${index - 1}')), value);
-      await t.pump();
+      // Done on the keyboard, as a user would: the field's selection
+      // handle hangs below it, over the add button.
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await t.pumpAndSettle();
     }
     // Reorder: move the last (empty) argument above the second.
     await t.ensureVisible(find.byKey(const Key('acp-arg-up-2')));
@@ -254,13 +257,17 @@ void _registerPresets() {
     expect(agentKindOf(provider: 'acp'), AgentKind.other);
   });
 
-  test('suggested instance names avoid every running host', () {
+  test('suggested instance names avoid every running host, as the bridge '
+      'compares names', () {
     expect(uniqueHostName('default', const []), 'default');
     expect(uniqueHostName('default', const ['default']), 'default-2');
     expect(
-      uniqueHostName('default', const ['default', 'default-2']),
+      uniqueHostName('default', const ['Default', 'default-2']),
       'default-3',
     );
+    expect(hostNameClash('My Host', const ['other', 'my-host']), 'my-host');
+    expect(hostNameClash('mine', const ['my-host']), isNull);
+    expect(hostNameClash(' ', const ['default']), isNull);
   });
 
   testWidgets('a name another host owns gets localized guidance', (t) async {
@@ -271,7 +278,8 @@ void _registerPresets() {
     await _pumpDialog(t, api);
     await _chooseAcp(t);
     await _start(t);
-    expect(find.textContaining('already online from another'), findsOneWidget);
+    final l10n = lookupAppLocalizations(const Locale('en'));
+    expect(find.text(l10n.hostNameInUse('fixture')), findsOneWidget);
   });
 
   test('protocols come from the key kind', () {

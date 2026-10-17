@@ -5,6 +5,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 
 import 'transcript_model.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 Map<String, dynamic> _details(String text) {
   try {
@@ -65,7 +66,9 @@ class GeneratedImageCard extends StatelessWidget {
           Row(
             children: [
               Icon(
-                failed ? Icons.error_outline : Icons.auto_awesome_outlined,
+                failed
+                    ? AppIcons.error_outline
+                    : AppIcons.auto_awesome_outlined,
                 size: 18,
                 color: failed ? scheme.error : scheme.primary,
               ),

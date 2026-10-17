@@ -67,7 +67,7 @@ extension _SessionSetup on _AppSessionState {
             child: Row(
               children: [
                 Icon(
-                  Icons.warning_amber_rounded,
+                  AppIcons.warning_amber_rounded,
                   size: 18,
                   color: scheme.onErrorContainer,
                 ),

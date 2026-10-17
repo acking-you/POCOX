@@ -183,7 +183,7 @@ extension _SessionVoice on _AppSessionState {
     _updateState(() => _voiceStarting = true);
     try {
       final api = ref.read(bridgeApiProvider);
-      final settings = await showDialog<VoiceSettings>(
+      final settings = await showAppDialog<VoiceSettings>(
         context: context,
         builder: (_) =>
             VoiceSetupDialog(api: api, serviceKey: widget.serviceKey),
@@ -249,7 +249,7 @@ extension _SessionVoice on _AppSessionState {
   void _voiceHistory() {
     final id = _threadId;
     if (id == null) return;
-    showDialog<void>(
+    showAppDialog<void>(
       context: context,
       builder: (_) => VoiceHistoryDialog(
         api: ref.read(bridgeApiProvider),
@@ -297,18 +297,18 @@ extension _SessionVoice on _AppSessionState {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                const Icon(Icons.graphic_eq),
+                const Icon(AppIcons.graphic_eq),
                 const SizedBox(width: 8),
                 Expanded(child: Text(l10n.voiceLive)),
                 IconButton(
                   tooltip: l10n.voiceHistory,
                   onPressed: _voiceHistory,
-                  icon: const Icon(Icons.history),
+                  icon: const Icon(AppIcons.history),
                 ),
                 IconButton(
                   tooltip: l10n.voiceStart,
                   onPressed: _canStartVoice ? _startVoice : null,
-                  icon: const Icon(Icons.play_arrow),
+                  icon: const Icon(AppIcons.play_arrow),
                 ),
               ],
             ),

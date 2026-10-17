@@ -6,6 +6,8 @@ import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/managed/management_failure.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// This computer's own remote-management switch, plus its automatic-restore
 /// warnings. Only this computer can turn it on or off; managing services
@@ -77,8 +79,16 @@ class _DeviceManagementSwitchState
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Icon(Icons.devices_outlined, color: scheme.primary),
-          title: Text(l10n.managedSwitchTitle),
+              : Icon(AppIcons.devices_outlined, color: scheme.primary),
+          // What the switch allows is behind the info mark; the subtitle
+          // is only its state.
+          title: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: InfoTitle(
+              title: Text(l10n.managedSwitchTitle),
+              info: l10n.managedSwitchInfo,
+            ),
+          ),
           subtitle: Text(subtitle),
           value: value?.enabled ?? false,
           onChanged: value == null || _busy ? null : _set,

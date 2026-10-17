@@ -5,6 +5,7 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A machine-facing value — a relay key, a path, an address — shown as
 /// selectable mono text with a copy button.
@@ -78,7 +79,7 @@ class CodeRow extends StatelessWidget {
           IconButton(
             key: copyKey,
             tooltip: l10n.copy,
-            icon: const Icon(Icons.copy, size: 15),
+            icon: const Icon(AppIcons.copy, size: 15),
             visualDensity: VisualDensity.compact,
             onPressed: () async {
               final messenger = ToastMessenger.of(context);

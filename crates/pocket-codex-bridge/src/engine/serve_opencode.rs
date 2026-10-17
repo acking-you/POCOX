@@ -81,6 +81,10 @@ pub struct OpenCodeStatus {
     pub agents: Vec<String>,
     /// Safe catalog or lifecycle failure, if any.
     pub problem: Option<String>,
+    /// The host keeps its sessions in a database of its own, not in
+    /// OpenCode's default one.
+    #[serde(default)]
+    pub separate_history: bool,
 }
 impl OpenCodeStatus {
     fn new(
@@ -95,6 +99,7 @@ impl OpenCodeStatus {
             default_model,
             agents: Vec::new(),
             problem: None,
+            separate_history: false,
         };
         match catalog {
             Ok(catalog) => {
@@ -131,6 +136,8 @@ pub(super) struct Prepared {
     launch: Launch,
     discovery_problem: Option<String>,
     pub(super) provider: host_profiles::Resolved,
+    /// Launched with its own database ([`history_database`]).
+    pub(super) separate_history: bool,
 }
 /// Running host identity and exact launch.
 pub(super) struct Relaunch {
@@ -174,6 +181,31 @@ fn launch_for(binary: Option<&str>) -> Result<Launch> {
     })
 }
 
+/// The database file of a host that keeps its own history: in OpenCode's
+/// data directory, beside its default database, named after the canonical
+/// instance (so one instance keeps its history across stops and restarts).
+/// `OPENCODE_DB` resolves a bare file name against that directory.
+fn history_database(name: &str) -> Result<String> {
+    let name = super::host_names::canonical(name)?;
+    // A file name, whatever the instance name's length.
+    Ok(if name.len() <= 96 {
+        format!("pocket-codex-{name}.db")
+    } else {
+        let digest = pocket_codex_core::history_sync::digest_bytes(name.as_bytes());
+        format!("pocket-codex-{}.db", &digest[..32])
+    })
+}
+
+/// The running host that serves OpenCode's default database, if any: a
+/// second host on it would be refused, so it keeps a history of its own.
+pub(super) fn shared_history_host() -> Option<String> {
+    hosts()
+        .hosts
+        .values()
+        .find(|host| !host.prepared.separate_history)
+        .map(|host| host.prepared.name.clone())
+}
+
 /// Resolve and inspect the installed external executable without starting a
 /// host.
 pub fn detect(binary: Option<&str>) -> Result<(String, String)> {
@@ -185,6 +217,7 @@ pub fn detect(binary: Option<&str>) -> Result<(String, String)> {
 pub(super) fn prepare(
     name: &str,
     binary: Option<&str>,
+    separate_history: bool,
     provider: host_profiles::Resolved,
 ) -> Result<Prepared> {
     host_profiles::Engine::OpenCode
@@ -201,21 +234,29 @@ pub(super) fn prepare(
             std::env::var_os("OPENCODE_CONFIG_CONTENT").as_deref(),
         ))?;
     launch.env = environment;
+    if separate_history {
+        // Detection, the source claim and the server all use this database.
+        launch
+            .env
+            .push(("OPENCODE_DB".into(), history_database(name)?.into()));
+    }
     runtime::runtime().block_on(launch.detect())?;
     Ok(Prepared {
         name: name.into(),
         launch,
         discovery_problem,
         provider,
+        separate_history,
     })
 }
 
 pub(super) fn start_locked(
     lease: &host_lease::Lease,
     binary: Option<&str>,
+    separate_history: bool,
     provider: host_profiles::Resolved,
 ) -> Result<Report> {
-    launch_prepared(prepare(lease.name(), binary, provider)?)
+    launch_prepared(prepare(lease.name(), binary, separate_history, provider)?)
 }
 
 pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
@@ -433,7 +474,10 @@ pub(super) fn status() -> Vec<ServeStatus> {
             incarnation: Some(host.host.info().identity.host_id),
             busy: host_lease::holder(&host.prepared.name).map(|op| op.label().into()),
             agent_error: host.status.problem.clone(),
-            opencode: Some(host.status.clone()),
+            opencode: Some(OpenCodeStatus {
+                separate_history: host.prepared.separate_history,
+                ..host.status.clone()
+            }),
             ..ServeStatus::default()
         })
         .collect()

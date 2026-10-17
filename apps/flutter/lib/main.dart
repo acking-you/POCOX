@@ -13,12 +13,15 @@ import 'package:pocket_codex/src/quit_status.dart';
 import 'package:pocket_codex/src/router.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
+import 'package:pocket_codex/src/widgets/popover.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
 import 'package:pocket_codex/src/rust/frb_generated.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Popovers open from the control that was pressed (see popover.dart).
+  PopoverAnchor.install();
 
   // A transient bridge error must never take down the whole app. Uncaught async
   // errors (e.g. a host dropping mid-session, or any stream-setup error that
@@ -122,10 +125,43 @@ class PocketCodexApp extends ConsumerStatefulWidget {
   ConsumerState<PocketCodexApp> createState() => _PocketCodexAppState();
 }
 
-class _PocketCodexAppState extends ConsumerState<PocketCodexApp> {
+class _PocketCodexAppState extends ConsumerState<PocketCodexApp>
+    with WidgetsBindingObserver {
   // Built once so a locale change (which rebuilds this widget) does not
   // recreate the router and reset the navigation stack.
   late final _router = buildRouter(initialLocation: widget.initialLocation);
+
+  // Built once too: a new ThemeData never equals the last one (its button
+  // styles hold closures), and MaterialApp would re-theme the whole app on
+  // every preference write — the sidebar toggling, a thread opening.
+  ThemeData? _light;
+  ThemeData? _dark;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void reassemble() {
+    super.reassemble();
+    _light = null;
+    _dark = null;
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    final followsSystem =
+        ref.read(uiPrefsProvider).valueOrNull?.themeMode == null;
+    if (followsSystem) ThemeTransition.systemChange(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,15 +177,13 @@ class _PocketCodexAppState extends ConsumerState<PocketCodexApp> {
     };
     return MaterialApp.router(
       onGenerateTitle: (context) => AppLocalizations.of(context).appTitle,
-      theme: lightTheme(),
-      darkTheme: darkTheme(),
+      theme: _light ??= lightTheme(),
+      darkTheme: _dark ??= darkTheme(),
       themeMode: themeMode,
-      // Material already cross-fades every themed colour; these just make it
-      // read as a deliberate transition rather than a fast dissolve. Eased
-      // rather than linear so the change settles instead of stopping dead —
-      // a whole-window colour shift is the most visible animation in the app.
-      themeAnimationDuration: const Duration(milliseconds: 350),
-      themeAnimationCurve: Curves.easeInOutCubic,
+      // No lerp: ThemeTransition reveals the new theme over a frozen frame
+      // of the old one, and a lerp underneath would flip brightness-chosen
+      // colours halfway through it.
+      themeAnimationDuration: Duration.zero,
       locale: locale,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

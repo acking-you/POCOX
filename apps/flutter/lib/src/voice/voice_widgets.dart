@@ -7,6 +7,8 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/voice/voice_controller.dart';
 import 'package:pocket_codex/src/voice/waveform.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// Session-only speech settings; an empty model preserves the host default.
 class VoiceSettings {
@@ -107,7 +109,7 @@ class _VoiceSetupDialogState extends State<VoiceSetupDialog> {
                   l.voiceUnavailable,
                   style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
-                Text(_error!, style: Theme.of(context).textTheme.bodySmall),
+                Text(_error!, style: helpTextStyle(Theme.of(context))),
                 TextButton(onPressed: _load, child: Text(l.retry)),
               ] else if (_voices == null)
                 const LinearProgressIndicator()
@@ -152,19 +154,20 @@ class _VoiceSetupDialogState extends State<VoiceSetupDialog> {
                     key: const Key('voice-model-custom'),
                     controller: _model,
                     autofocus: true,
+                    // Empty falls back to the host's model: the placeholder
+                    // says so; the length limit needs no counter.
                     decoration: InputDecoration(
                       labelText: l.voiceModelCustomLabel,
-                      helperText: l.voiceModelHint,
+                      hintText: l.voiceModelHint,
+                      counterText: '',
                     ),
                     maxLength: 128,
                   ),
                 ],
-                const SizedBox(height: 4),
+                const SizedBox(height: 14),
                 Text(
                   l.voiceTaskContinues,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                  style: helpTextStyle(Theme.of(context)),
                 ),
               ],
             ],
@@ -353,7 +356,7 @@ class _VoiceStatusEntryState extends State<VoiceStatusEntry> {
         action(
           key: const Key('voice-status-mute'),
           tooltip: c.muted ? l.voiceUnmute : l.voiceMute,
-          icon: c.muted ? Icons.mic_off_rounded : Icons.mic_none_rounded,
+          icon: c.muted ? AppIcons.mic_off_rounded : AppIcons.mic_none_rounded,
           onPressed: c.toggleMuted,
           color: c.muted ? scheme.error : null,
         ),
@@ -361,7 +364,7 @@ class _VoiceStatusEntryState extends State<VoiceStatusEntry> {
         action(
           key: const Key('voice-status-hangup'),
           tooltip: l.voiceHangUp,
-          icon: Icons.call_end_rounded,
+          icon: AppIcons.call_end_rounded,
           onPressed: c.hangUp,
           color: Colors.white,
           background: const Color(0xFFD93A3A),
@@ -370,7 +373,7 @@ class _VoiceStatusEntryState extends State<VoiceStatusEntry> {
         action(
           key: const Key('voice-status-dismiss'),
           tooltip: MaterialLocalizations.of(context).closeButtonLabel,
-          icon: Icons.close_rounded,
+          icon: AppIcons.close_rounded,
           onPressed: () => setState(() => _showEnded = false),
         ),
     ];
@@ -651,13 +654,13 @@ class VoicePanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.graphic_eq, size: 20),
+                  const Icon(AppIcons.graphic_eq, size: 20),
                   const SizedBox(width: 8),
                   Expanded(child: Text(label, maxLines: 2)),
                   IconButton(
                     tooltip: l.voiceHistory,
                     onPressed: onHistory,
-                    icon: const Icon(Icons.history),
+                    icon: const Icon(AppIcons.history),
                   ),
                   if (c.phase == VoicePhase.active ||
                       c.phase == VoicePhase.reconnecting)
@@ -665,20 +668,20 @@ class VoicePanel extends StatelessWidget {
                       key: const Key('voice-mute'),
                       tooltip: c.muted ? l.voiceUnmute : l.voiceMute,
                       onPressed: c.toggleMuted,
-                      icon: Icon(c.muted ? Icons.mic_off : Icons.mic),
+                      icon: Icon(c.muted ? AppIcons.mic_off : AppIcons.mic),
                     ),
                   if (c.busy)
                     IconButton(
                       key: const Key('voice-stop'),
                       tooltip: l.voiceStop,
                       onPressed: c.hangUp,
-                      icon: const Icon(Icons.call_end),
+                      icon: const Icon(AppIcons.call_end),
                     )
                   else if (c.phase != VoicePhase.stopping)
                     IconButton(
                       tooltip: l.voiceStart,
                       onPressed: onRetry,
-                      icon: const Icon(Icons.play_arrow),
+                      icon: const Icon(AppIcons.play_arrow),
                     ),
                 ],
               ),

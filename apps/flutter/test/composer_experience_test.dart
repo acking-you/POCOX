@@ -9,48 +9,8 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
+import 'support/composer_harness.dart';
 import 'support/screen_harness.dart';
-
-const _service = 'pcx:host:app:default';
-final _input = find.byKey(const Key('composer-input'));
-
-Future<void> _mount(
-  WidgetTester t,
-  FakeBridgeApi api, {
-  String service = _service,
-  String? thread = 'a',
-  String? cwd,
-  bool settle = true,
-}) async {
-  await api.appConnect(service, 28080);
-  await t.pumpWidget(
-    host(
-      AppSessionScreen(
-        key: ValueKey(service),
-        serviceKey: service,
-        threadId: thread,
-        cwd: cwd,
-        home: true,
-      ),
-      api,
-      locale: const Locale('en'),
-    ),
-  );
-  if (settle) {
-    await t.pumpAndSettle();
-  } else {
-    await _frames(t);
-  }
-}
-
-Future<void> _frames(WidgetTester t) async {
-  for (var i = 0; i < 8; i++) {
-    await t.pump(const Duration(milliseconds: 50));
-  }
-}
-
-TextEditingController _controller(WidgetTester t) =>
-    t.widget<TextField>(_input).controller!;
 
 class _UploadingApi extends FakeBridgeApi {
   final upload = Completer<String>();
@@ -148,14 +108,14 @@ void main() {
   Future<void> switchProject(WidgetTester t, String cwd) async {
     if (find.byKey(const Key('project-switcher-btn')).evaluate().isEmpty) {
       await t.longPress(find.byKey(Key('project-header-$cwd')));
-      await _frames(t);
+      await composerFrames(t);
       await t.tap(find.text('New conversation in ${cwd.split('/').last}'));
     } else {
       await t.tap(find.byKey(const Key('project-switcher-btn')));
-      await _frames(t);
+      await composerFrames(t);
       await t.tap(find.byKey(Key('project-menu-item-$cwd')));
     }
-    await _frames(t);
+    await composerFrames(t);
   }
 
   testWidgets(
@@ -179,14 +139,14 @@ void main() {
             updatedAt: 1,
           ),
         ]);
-      await _mount(t, api, thread: null, cwd: '/alpha');
-      await t.enterText(_input, 'Start alpha');
+      await mountComposer(t, api, thread: null, cwd: '/alpha');
+      await t.enterText(composerInput, 'Start alpha');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       await switchProject(t, '/beta');
       await switchProject(t, '/alpha');
-      await t.enterText(_input, 'Alpha followup');
+      await t.enterText(composerInput, 'Alpha followup');
       await t.pump();
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
@@ -195,7 +155,7 @@ void main() {
       api.start.complete();
       await t.pumpAndSettle();
       expect(api.sentTo, ['thread-0']);
-      expect(_controller(t).text, 'Alpha followup');
+      expect(composerController(t).text, 'Alpha followup');
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
         isNotNull,
@@ -229,19 +189,19 @@ void main() {
             updatedAt: 1,
           ),
         ]);
-      await _mount(t, api, thread: null, cwd: '/alpha');
-      await t.enterText(_input, 'Start alpha');
+      await mountComposer(t, api, thread: null, cwd: '/alpha');
+      await t.enterText(composerInput, 'Start alpha');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       await switchProject(t, '/beta');
       await switchProject(t, '/alpha');
-      await t.enterText(_input, 'Queued alpha');
+      await t.enterText(composerInput, 'Queued alpha');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump();
       expect(find.byKey(const Key('queued-0')), findsOneWidget);
       api.start.complete();
-      await _frames(t);
+      await composerFrames(t);
       expect(api.sentTo, ['thread-0']);
       api.turnAck!.complete();
       await t.pumpAndSettle();
@@ -257,25 +217,25 @@ void main() {
     'late defaults cannot replace a draft whose first send is pending',
     (t) async {
       final api = _LateDefaultStartingApi();
-      await _mount(t, api, thread: null, cwd: '/alpha');
-      await t.enterText(_input, 'Saved alpha draft');
+      await mountComposer(t, api, thread: null, cwd: '/alpha');
+      await t.enterText(composerInput, 'Saved alpha draft');
       await t.pumpWidget(
         host(const SizedBox(), api, locale: const Locale('en')),
       );
-      await _mount(t, api, thread: null, settle: false);
-      await t.enterText(_input, 'Send in the current working directory');
+      await mountComposer(t, api, thread: null, settle: false);
+      await t.enterText(composerInput, 'Send in the current working directory');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       expect(api.starting, isTrue);
       api.project.complete(const ProjectConfig(defaultProject: '/alpha'));
       await t.pumpAndSettle();
-      expect(_controller(t).text, isEmpty);
+      expect(composerController(t).text, isEmpty);
       api.start.complete();
       await t.pumpAndSettle();
       expect(api.sentTo, ['thread-0']);
       expect(api.lastCwd, isNull);
-      await t.enterText(_input, 'Followup');
+      await t.enterText(composerInput, 'Followup');
       await t.pump();
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
@@ -300,21 +260,21 @@ void main() {
         MemXFile(Uint8List.fromList([1, 2]), 'alpha.txt'),
       ];
     addTearDown(() => fsel.FileSelectorPlatform.instance = previous);
-    await _mount(t, api, thread: null, cwd: '/alpha');
+    await mountComposer(t, api, thread: null, cwd: '/alpha');
     await t.tap(find.byKey(const Key('attach-menu-btn')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('attach-file-btn')));
     await t.pump();
     await switchProject(t, '/beta');
-    await t.enterText(_input, 'Beta draft');
+    await t.enterText(composerInput, 'Beta draft');
     api.upload.complete('/host/alpha.txt');
     await t.pumpAndSettle();
     expect(find.text('alpha.txt'), findsNothing);
     await switchProject(t, '/alpha');
     expect(find.text('alpha.txt'), findsOneWidget);
-    expect(_controller(t).text, isEmpty);
+    expect(composerController(t).text, isEmpty);
     await switchProject(t, '/beta');
-    expect(_controller(t).text, 'Beta draft');
+    expect(composerController(t).text, 'Beta draft');
     expect(find.text('alpha.txt'), findsNothing);
   });
 
@@ -328,91 +288,46 @@ void main() {
       ..appThreads.add(
         const ThreadMeta(id: 'b', preview: 'Beta', cwd: '/beta', updatedAt: 0),
       );
-    await _mount(t, api, thread: null, cwd: '/alpha');
-    await t.enterText(_input, 'Start alpha');
+    await mountComposer(t, api, thread: null, cwd: '/alpha');
+    await t.enterText(composerInput, 'Start alpha');
     await t.pump();
     await t.tap(find.byKey(const Key('send-btn')));
     await t.pump();
-    await t.enterText(_input, 'Alpha followup');
+    await t.enterText(composerInput, 'Alpha followup');
     await switchProject(t, '/beta');
-    await t.enterText(_input, 'Beta draft');
+    await t.enterText(composerInput, 'Beta draft');
     api.start.complete();
     await t.pumpAndSettle();
     expect(api.lastCwd, '/alpha');
     expect(api.sentTo, ['thread-0']);
-    expect(_controller(t).text, 'Beta draft');
+    expect(composerController(t).text, 'Beta draft');
     await t.tap(find.byKey(const Key('conv-tile-thread-0')));
     await t.pumpAndSettle();
-    expect(_controller(t).text, 'Alpha followup');
+    expect(composerController(t).text, 'Alpha followup');
     await t.tap(find.byKey(const Key('new-conversation-btn')));
     await t.pumpAndSettle();
-    expect(_controller(t).text, isEmpty);
+    expect(composerController(t).text, isEmpty);
     await switchProject(t, '/beta');
-    expect(_controller(t).text, 'Beta draft');
+    expect(composerController(t).text, 'Beta draft');
   });
 
   testWidgets(
     'reopening the default project restores its existing unsent draft',
     (t) async {
       final api = FakeBridgeApi();
-      api.projectConfigs[_service] = const ProjectConfig(
+      api.projectConfigs[composerService] = const ProjectConfig(
         defaultProject: '/alpha',
       );
-      await _mount(t, api, thread: null, cwd: '/alpha');
-      await t.enterText(_input, 'Remember alpha');
+      await mountComposer(t, api, thread: null, cwd: '/alpha');
+      await t.enterText(composerInput, 'Remember alpha');
       await t.pumpWidget(
         host(const SizedBox(), api, locale: const Locale('en')),
       );
-      await _mount(t, api, thread: null);
-      expect(_controller(t).text, 'Remember alpha');
+      await mountComposer(t, api, thread: null);
+      expect(composerController(t).text, 'Remember alpha');
       expect(find.text('alpha'), findsWidgets);
     },
   );
-
-  testWidgets('growing the composer preserves the message being read', (
-    t,
-  ) async {
-    t.view.devicePixelRatio = 1;
-    t.view.physicalSize = const Size(390, 844);
-    addTearDown(t.view.reset);
-    final api = FakeBridgeApi()
-      ..readResult = ThreadHistory(
-        items: List.generate(
-          80,
-          (i) => ThreadItem(
-            id: 'u$i',
-            itemType: 'userMessage',
-            title: '',
-            text: 'History message $i',
-          ),
-        ),
-        running: false,
-      );
-    await _mount(t, api);
-    final layer = find.byKey(const Key('chat-conversation-layer'));
-    await t.drag(layer, const Offset(0, 400));
-    await t.pumpAndSettle();
-    final viewport = t.getRect(layer);
-    final visible = find
-        .textContaining('History message')
-        .evaluate()
-        .where((e) {
-          final rect = t.getRect(find.byWidget(e.widget));
-          return rect.top > viewport.top && rect.bottom < viewport.bottom;
-        })
-        .first
-        .widget;
-    final text = visible as Text;
-    final anchorText = text.data ?? text.textSpan!.toPlainText();
-    final anchor = find.byWidgetPredicate(
-      (w) => w is Text && (w.data ?? w.textSpan?.toPlainText()) == anchorText,
-    );
-    final top = t.getTopLeft(anchor).dy;
-    await t.enterText(_input, List.filled(20, 'A growing draft').join('\n'));
-    await t.pumpAndSettle();
-    expect(t.getTopLeft(anchor).dy, closeTo(top, 1));
-    expect(t.takeException(), isNull);
-  });
 
   testWidgets(
     'draft text and selection follow conversations and survive navigation',
@@ -435,10 +350,10 @@ void main() {
             updatedAt: 0,
           ),
         ]);
-      await _mount(t, api);
-      await t.enterText(_input, 'Unfinished alpha');
+      await mountComposer(t, api);
+      await t.enterText(composerInput, 'Unfinished alpha');
       const selection = TextSelection(baseOffset: 3, extentOffset: 8);
-      _controller(t).selection = selection;
+      composerController(t).selection = selection;
       await t.pump();
       expect(
         find.descendant(
@@ -449,25 +364,25 @@ void main() {
       );
       await t.tap(find.byKey(const Key('conv-tile-b')));
       await t.pumpAndSettle();
-      expect(_controller(t).text, isEmpty);
-      await t.enterText(_input, 'Unfinished beta');
+      expect(composerController(t).text, isEmpty);
+      await t.enterText(composerInput, 'Unfinished beta');
       await t.tap(find.byKey(const Key('conv-tile-a')));
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'Unfinished alpha');
-      expect(_controller(t).selection, selection);
+      expect(composerController(t).text, 'Unfinished alpha');
+      expect(composerController(t).selection, selection);
       await t.pumpWidget(
         host(const SizedBox(), api, locale: const Locale('en')),
       );
-      await _mount(t, api);
-      expect(_controller(t).text, 'Unfinished alpha');
-      await _mount(t, api, service: 'pcx:other:app:default');
+      await mountComposer(t, api);
+      expect(composerController(t).text, 'Unfinished alpha');
+      await mountComposer(t, api, service: 'pcx:other:app:default');
       expect(
-        _controller(t).text,
+        composerController(t).text,
         isEmpty,
         reason: 'Hosts must not share drafts.',
       );
-      await _mount(t, api);
-      expect(_controller(t).text, 'Unfinished alpha');
+      await mountComposer(t, api);
+      expect(composerController(t).text, 'Unfinished alpha');
       expect(t.takeException(), isNull);
     },
   );
@@ -487,31 +402,31 @@ void main() {
             updatedAt: 0,
           ),
         );
-      await _mount(t, api, thread: null);
-      await t.enterText(_input, 'First message');
+      await mountComposer(t, api, thread: null);
+      await t.enterText(composerInput, 'First message');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       expect(api.starting, isTrue);
-      await t.enterText(_input, 'Next draft for the new conversation');
+      await t.enterText(composerInput, 'Next draft for the new conversation');
       await t.tap(find.byKey(const Key('conv-tile-b')));
       await t.pumpAndSettle();
-      await t.enterText(_input, 'Unfinished beta');
+      await t.enterText(composerInput, 'Unfinished beta');
       api.start.complete();
       await t.pumpAndSettle();
       expect(api.sentTo, ['thread-0']);
-      expect(_controller(t).text, 'Unfinished beta');
+      expect(composerController(t).text, 'Unfinished beta');
       // A second send must still target the conversation the user selected.
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pumpAndSettle();
       expect(api.sentTo, ['thread-0', 'b']);
-      await t.enterText(_input, 'Keep beta');
+      await t.enterText(composerInput, 'Keep beta');
       await t.tap(find.byKey(const Key('conv-tile-thread-0')));
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'Next draft for the new conversation');
+      expect(composerController(t).text, 'Next draft for the new conversation');
       await t.tap(find.byKey(const Key('conv-tile-b')));
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'Keep beta');
+      expect(composerController(t).text, 'Keep beta');
       expect(t.takeException(), isNull);
     },
   );
@@ -531,20 +446,20 @@ void main() {
             updatedAt: 0,
           ),
         );
-      await _mount(t, api, thread: null, cwd: '/project');
-      await t.enterText(_input, 'First message');
+      await mountComposer(t, api, thread: null, cwd: '/project');
+      await t.enterText(composerInput, 'First message');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       expect(api.starting, isTrue);
-      await t.enterText(_input, 'Next message');
+      await t.enterText(composerInput, 'Next message');
       await t.tap(find.byKey(const Key('conv-tile-b')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('new-conversation-btn')));
       await t.pumpAndSettle();
       api.start.complete();
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'Next message');
+      expect(composerController(t).text, 'Next message');
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pumpAndSettle();
       expect(api.sentTo, ['thread-0', 'thread-0']);
@@ -567,23 +482,23 @@ void main() {
             updatedAt: 0,
           ),
         );
-      await _mount(t, api, thread: null, cwd: '/project');
-      await t.enterText(_input, 'First message');
+      await mountComposer(t, api, thread: null, cwd: '/project');
+      await t.enterText(composerInput, 'First message');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       expect(api.starting, isTrue);
-      await t.enterText(_input, 'Next draft');
+      await t.enterText(composerInput, 'Next draft');
       await t.tap(find.byKey(const Key('conv-tile-b')));
       await t.pumpAndSettle();
-      await t.enterText(_input, 'Unfinished beta');
+      await t.enterText(composerInput, 'Unfinished beta');
       api.start.completeError(StateError('Thread creation failed'));
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'Unfinished beta');
+      expect(composerController(t).text, 'Unfinished beta');
       expect(api.sentTo, isEmpty);
       await t.tap(find.byKey(const Key('new-conversation-btn')));
       await t.pumpAndSettle();
-      expect(_controller(t).text, 'First message\n\nNext draft');
+      expect(composerController(t).text, 'First message\n\nNext draft');
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
         isNotNull,
@@ -627,18 +542,18 @@ void main() {
       ];
     fsel.FileSelectorPlatform.instance = selector;
     addTearDown(() => fsel.FileSelectorPlatform.instance = previous);
-    await _mount(t, api, settle: false);
+    await mountComposer(t, api, settle: false);
     await t.tap(find.byKey(const Key('attach-menu-btn')));
-    await _frames(t);
+    await composerFrames(t);
     await t.tap(find.byKey(const Key('attach-file-btn')));
-    await _frames(t);
+    await composerFrames(t);
     // The composer's own tile for the staged file.
     expect(
       find.descendant(of: sentTile, matching: find.text('sent.txt')),
       findsOneWidget,
     );
     await t.tap(find.byKey(const Key('supplement-toggle')));
-    await t.enterText(_input, 'Accepted supplement');
+    await t.enterText(composerInput, 'Accepted supplement');
     await t.tap(find.byKey(const Key('send-btn')));
     await t.pump();
     return (api, selector);
@@ -664,12 +579,16 @@ void main() {
   testWidgets('an owned supplement clears exactly what it sent, keeping a '
       'later edit', (t) async {
     final (api, _) = await supplementFixture(t);
-    await t.enterText(_input, 'Later edit');
+    await t.enterText(composerInput, 'Later edit');
     await t.pump();
     api.steerGate!.complete();
-    await _frames(t);
+    await composerFrames(t);
     expectOneSupplement(api);
-    expect(_controller(t).text, 'Later edit', reason: 'not what was sent');
+    expect(
+      composerController(t).text,
+      'Later edit',
+      reason: 'not what was sent',
+    );
     expect(sentTile, findsNothing, reason: 'its file left the composer');
     expect(
       find.byKey(const Key('attachment-remove-0')),
@@ -694,29 +613,29 @@ void main() {
       (t) async {
         final (api, selector) = await supplementFixture(t);
         await t.tap(find.byKey(const Key('conv-tile-b')));
-        await _frames(t);
-        await t.enterText(_input, 'Unfinished beta');
+        await composerFrames(t);
+        await t.enterText(composerInput, 'Unfinished beta');
         if (returnBeforeAck) {
           await t.tap(find.byKey(const Key('conv-tile-a')));
-          await _frames(t);
-          await t.enterText(_input, 'Newer alpha draft');
+          await composerFrames(t);
+          await t.enterText(composerInput, 'Newer alpha draft');
           selector.files = [
             MemXFile(Uint8List.fromList([3]), 'new.txt'),
           ];
           await t.tap(find.byKey(const Key('attach-menu-btn')));
-          await _frames(t);
+          await composerFrames(t);
           await t.tap(find.byKey(const Key('attach-file-btn')));
-          await _frames(t);
+          await composerFrames(t);
         }
         api.steerGate!.complete();
-        await _frames(t);
+        await composerFrames(t);
         if (!returnBeforeAck) {
-          expect(_controller(t).text, 'Unfinished beta');
+          expect(composerController(t).text, 'Unfinished beta');
           await t.tap(find.byKey(const Key('conv-tile-a')));
-          await _frames(t);
+          await composerFrames(t);
         }
         expect(
-          _controller(t).text,
+          composerController(t).text,
           returnBeforeAck ? 'Newer alpha draft' : 'Accepted supplement',
         );
         expect(find.text('sent.txt'), findsOneWidget, reason: 'kept');
@@ -724,8 +643,8 @@ void main() {
           expect(find.text('new.txt'), findsOneWidget, reason: 'added after');
         }
         await t.tap(find.byKey(const Key('conv-tile-b')));
-        await _frames(t);
-        expect(_controller(t).text, 'Unfinished beta');
+        await composerFrames(t);
+        expect(composerController(t).text, 'Unfinished beta');
         expectOneSupplement(api);
         expect(api.turnStartCount, 0, reason: 'nothing queued or replayed');
         expect(t.takeException(), isNull);
@@ -758,7 +677,7 @@ void main() {
       final selector = _DelayedFileSelector();
       fsel.FileSelectorPlatform.instance = selector;
       addTearDown(() => fsel.FileSelectorPlatform.instance = previous);
-      await _mount(t, api);
+      await mountComposer(t, api);
       await t.tap(find.byKey(const Key('attach-menu-btn')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('attach-file-btn')));
@@ -776,13 +695,13 @@ void main() {
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
         isNotNull,
       );
-      await t.enterText(_input, 'Keep this attachment');
+      await t.enterText(composerInput, 'Keep this attachment');
       await t.pumpWidget(
         host(const SizedBox(), api, locale: const Locale('en')),
       );
-      await _mount(t, api);
+      await mountComposer(t, api);
       expect(find.text('late.txt'), findsOneWidget);
-      expect(_controller(t).text, 'Keep this attachment');
+      expect(composerController(t).text, 'Keep this attachment');
       expect(t.takeException(), isNull);
     },
   );
@@ -798,7 +717,7 @@ void main() {
         ];
       fsel.FileSelectorPlatform.instance = selector;
       addTearDown(() => fsel.FileSelectorPlatform.instance = previous);
-      await _mount(t, api);
+      await mountComposer(t, api);
       await t.tap(find.byKey(const Key('attach-menu-btn')));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('attach-file-btn')));
@@ -809,7 +728,7 @@ void main() {
       );
       api.upload.complete('/host/draft.txt');
       await t.pump();
-      await _mount(t, api);
+      await mountComposer(t, api);
       expect(find.text('draft.txt'), findsOneWidget);
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
@@ -820,81 +739,19 @@ void main() {
   );
 
   testWidgets(
-    'desktop Enter sends, Shift+Enter adds a line, IME Enter never sends',
-    (t) async {
-      final api = FakeBridgeApi();
-      await _mount(t, api);
-      await t.enterText(_input, 'First line');
-      await t.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-      await t.sendKeyEvent(LogicalKeyboardKey.enter);
-      await t.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-      await t.pump();
-      // The engine/IME, absent from widget tests, delivers newline text.
-      expect(
-        t.widget<TextField>(_input).textInputAction,
-        TextInputAction.newline,
-      );
-      t.testTextInput.updateEditingValue(
-        const TextEditingValue(
-          text: 'First line\n',
-          selection: TextSelection.collapsed(offset: 11),
-        ),
-      );
-      expect(_controller(t).text, 'First line\n');
-      expect(api.lastTurnText, isNull);
-      t.testTextInput.updateEditingValue(
-        const TextEditingValue(
-          text: 'ni',
-          selection: TextSelection.collapsed(offset: 2),
-          composing: TextRange(start: 0, end: 2),
-        ),
-      );
-      await t.sendKeyEvent(LogicalKeyboardKey.enter);
-      await t.pump();
-      expect(api.lastTurnText, isNull);
-      await t.enterText(_input, 'Confirmed 你好');
-      await t.sendKeyEvent(LogicalKeyboardKey.enter);
-      await t.pumpAndSettle();
-      expect(api.lastTurnText, 'Confirmed 你好');
-      expect(_controller(t).text, isEmpty);
-    },
-    variant: const TargetPlatformVariant({TargetPlatform.windows}),
-  );
-
-  testWidgets(
-    'mobile keyboard uses newline and the button sends',
-    (t) async {
-      final api = FakeBridgeApi();
-      await _mount(t, api);
-      expect(
-        t.widget<TextField>(_input).textInputAction,
-        TextInputAction.newline,
-      );
-      await t.enterText(_input, 'First\nSecond');
-      await t.testTextInput.receiveAction(TextInputAction.newline);
-      await t.pump();
-      expect(api.lastTurnText, isNull);
-      await t.tap(find.byKey(const Key('send-btn')));
-      await t.pumpAndSettle();
-      expect(api.lastTurnText, 'First\nSecond');
-    },
-    variant: const TargetPlatformVariant({TargetPlatform.android}),
-  );
-
-  testWidgets(
     'queue action and stop coexist; queue flushing preserves a newer draft',
     (t) async {
       final api = FakeBridgeApi()..autoCompleteTurn = false;
       t.view.devicePixelRatio = 1;
       t.view.physicalSize = const Size(360, 800);
       addTearDown(t.view.reset);
-      await _mount(t, api);
-      await t.enterText(_input, 'First');
+      await mountComposer(t, api);
+      await t.enterText(composerInput, 'First');
       await t.pump();
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pump();
       expect(find.byKey(const Key('stop-btn')), findsOneWidget);
-      await t.enterText(_input, 'Second');
+      await t.enterText(composerInput, 'Second');
       await t.pump();
       expect(
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).tooltip,
@@ -904,76 +761,16 @@ void main() {
       await t.pump();
       expect(find.byKey(const Key('queued-0')), findsOneWidget);
       expect(api.lastTurnText, 'First');
-      await t.enterText(_input, 'Still editing the third');
+      await t.enterText(composerInput, 'Still editing the third');
       api.pushEvent(
-        _service,
+        composerService,
         const AppEvent(kind: 'turn/completed', threadId: 'a', raw: '{}'),
       );
       await t.pump();
       expect(api.lastTurnText, 'Second');
-      expect(_controller(t).text, 'Still editing the third');
+      expect(composerController(t).text, 'Still editing the third');
       expect(find.byKey(const Key('queued-0')), findsNothing);
       expect(t.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'expanded editor preserves selection and edits without sending',
-    (t) async {
-      final api = FakeBridgeApi();
-      await _mount(t, api);
-      await t.enterText(_input, 'A longer message');
-      const selection = TextSelection(baseOffset: 2, extentOffset: 8);
-      _controller(t).selection = selection;
-      await t.tap(find.byKey(const Key('composer-expand')));
-      await t.pumpAndSettle();
-      final expanded = find.byKey(const Key('composer-expanded-input'));
-      final controller = t.widget<TextField>(expanded).controller!;
-      expect(controller.selection, selection);
-      await t.enterText(expanded, 'Edited in a bigger space');
-      await t.sendKeyEvent(LogicalKeyboardKey.enter);
-      await t.pump();
-      expect(api.lastTurnText, isNull);
-      expect(
-        t.widget<TextField>(expanded).textInputAction,
-        TextInputAction.newline,
-      );
-      t.testTextInput.updateEditingValue(
-        const TextEditingValue(
-          text: 'Edited in a bigger space\n',
-          selection: TextSelection.collapsed(offset: 24),
-        ),
-      );
-      final editedSelection = controller.selection;
-      await t.tap(find.byKey(const Key('composer-editor-done')));
-      await t.pumpAndSettle();
-      expect(_controller(t).text, 'Edited in a bigger space\n');
-      expect(_controller(t).selection, editedSelection);
-      expect(t.widget<TextField>(_input).focusNode!.hasFocus, isTrue);
-      expect(t.takeException(), isNull);
-    },
-    variant: const TargetPlatformVariant({TargetPlatform.windows}),
-  );
-
-  testWidgets(
-    'visible height reset keeps the draft and resumes compact automatic sizing',
-    (t) async {
-      final api = FakeBridgeApi();
-      await _mount(t, api);
-      final area = find.byKey(const Key('composer-input-area'));
-      final initialHeight = t.getSize(area).height;
-      await t.drag(
-        find.byKey(const Key('composer-resize-handle')),
-        const Offset(0, -100),
-      );
-      await t.pumpAndSettle();
-      expect(t.getSize(area).height, greaterThan(initialHeight));
-      await t.enterText(_input, 'Keep this');
-      await t.tap(find.byKey(const Key('composer-reset-height')));
-      await t.pumpAndSettle();
-      expect(t.getSize(area).height, initialHeight);
-      expect(_controller(t).text, 'Keep this');
-      expect(find.byKey(const Key('composer-reset-height')), findsNothing);
     },
   );
 }

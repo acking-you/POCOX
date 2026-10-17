@@ -49,7 +49,8 @@ void main() {
         .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
         .controller;
     final before = controller.offset;
-    expect(before, greaterThan(500));
+    // Opened at the end, far below the conversation's start.
+    expect(controller.position.extentBefore, greaterThan(500));
     final mouse = await t.createGesture(
       kind: PointerDeviceKind.mouse,
       buttons: kMiddleMouseButton,

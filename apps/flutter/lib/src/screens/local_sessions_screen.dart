@@ -18,6 +18,7 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/time_ago.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/search_field.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
@@ -25,6 +26,8 @@ import 'package:pocket_codex/src/widgets/takeover_dialog.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
 
 import 'session_source.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 export 'session_source.dart';
 part 'local_sessions/native_inventory.dart';
 
@@ -192,17 +195,26 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
         if (!_localUnavailable)
           IconButton(
             key: const Key('local-sessions-refresh'),
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(AppIcons.refresh),
             tooltip: l10n.refreshStatus,
             onPressed: _loading ? null : _load,
           ),
       ],
-      body: Column(
-        children: [
-          if (!_source.isRemote && !_localUnavailable) _providerBar(l10n),
-          Expanded(child: body),
-          if (_source.isNative && !_loading) _inventoryFooter(l10n),
-        ],
+      // A reading measure rather than the window's full width: a session row
+      // stretched across a wide monitor puts its status a long glance away
+      // from its title.
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1120),
+          child: Column(
+            children: [
+              if (!_source.isRemote && !_localUnavailable) _providerBar(l10n),
+              Expanded(child: body),
+              if (_source.isNative && !_loading) _inventoryFooter(l10n),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -211,7 +223,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     if (_localUnavailable) {
       return _emptyState(
         key: const ValueKey('local-unavailable'),
-        icon: Icons.devices_outlined,
+        icon: AppIcons.devices_outlined,
         title: l10n.localSessionsUnavailable,
         description: l10n.localSessionsMobileHint,
       );
@@ -222,7 +234,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     if (_error != null) {
       return _emptyState(
         key: const ValueKey('local-error'),
-        icon: Icons.folder_off_outlined,
+        icon: AppIcons.folder_off_outlined,
         title: l10n.sessionsReadFailed,
         description: widget.source.isRemote
             ? l10n.remoteSessionsReadHint
@@ -234,7 +246,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     if (_sessions.isEmpty) {
       return _emptyState(
         key: const ValueKey('local-empty'),
-        icon: Icons.history_outlined,
+        icon: AppIcons.history_outlined,
         title: widget.source.isRemote
             ? l10n.noHostSessions
             : l10n.noLocalSessions,
@@ -288,14 +300,14 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
                   if (retry)
                     OutlinedButton.icon(
                       onPressed: _load,
-                      icon: const Icon(Icons.refresh),
+                      icon: const Icon(AppIcons.refresh),
                       label: Text(l10n.retry),
                     ),
                   if (!widget.source.isRemote)
                     FilledButton.icon(
                       key: const Key('local-sessions-services'),
                       onPressed: () => context.go('/manage'),
-                      icon: const Icon(Icons.devices_outlined),
+                      icon: const Icon(AppIcons.devices_outlined),
                       label: Text(l10n.manageServices),
                     ),
                 ],
@@ -614,14 +626,10 @@ class _SessionRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
             child: Row(
               children: [
-                Icon(
-                  session.heldOpen
-                      ? Icons.lock_outline
-                      : Icons.chat_bubble_outline,
-                  size: 18,
-                  color: session.heldOpen ? scheme.error : scheme.primary,
-                ),
-                const SizedBox(width: 10),
+                // No per-row glyph: every row is a session, and the one
+                // fact that differs (held open by another process) is the
+                // status at the end of the row.
+                const SizedBox(width: 4),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,7 +806,7 @@ Future<void> resumeLocalSession(
   }
 
   if (requiresTakeover) {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppDialog<bool>(
       context: context,
       builder: (_) =>
           TakeoverDialog(holders: holders, hasTarget: target != null),

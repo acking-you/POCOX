@@ -11,6 +11,8 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 /// The host's default project folder: where a new conversation starts when
 /// nobody chose a folder. Shows the host's automatic folder (created only
@@ -226,7 +228,11 @@ class _DefaultProjectTileState extends ConsumerState<DefaultProjectTile> {
     final children = <Widget>[
       Row(
         children: [
-          Icon(Icons.folder_special_outlined, size: 20, color: scheme.primary),
+          Icon(
+            AppIcons.folder_special_outlined,
+            size: 20,
+            color: scheme.primary,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -295,7 +301,7 @@ class _DefaultProjectTileState extends ConsumerState<DefaultProjectTile> {
             FilledButton.tonalIcon(
               key: const Key('default-project-change'),
               onPressed: _locked ? null : _change,
-              icon: const Icon(Icons.drive_file_move_outline, size: 18),
+              icon: const Icon(AppIcons.drive_file_move_outline, size: 18),
               label: Text(l10n.defaultProjectChange),
             ),
             if (!settings.legacy && !settings.automatic)
@@ -383,7 +389,7 @@ class _DefaultProjectTileState extends ConsumerState<DefaultProjectTile> {
                   IconButton(
                     key: Key('remove-project-$root'),
                     tooltip: l10n.removeProjectFolder,
-                    icon: Icon(Icons.close, size: 18, color: scheme.error),
+                    icon: Icon(AppIcons.close, size: 18, color: scheme.error),
                     onPressed: _locked ? null : () => _removeRoot(root),
                   ),
                 ],
@@ -393,7 +399,7 @@ class _DefaultProjectTileState extends ConsumerState<DefaultProjectTile> {
               child: OutlinedButton.icon(
                 key: const Key('add-project-folder-btn'),
                 onPressed: _locked ? null : _addRoot,
-                icon: const Icon(Icons.create_new_folder_outlined, size: 18),
+                icon: const Icon(AppIcons.create_new_folder_outlined, size: 18),
                 label: Text(l10n.addProjectFolder),
               ),
             ),
@@ -444,7 +450,7 @@ class _PathLine extends StatelessWidget {
         IconButton(
           key: const Key('default-project-copy'),
           tooltip: l10n.copy,
-          icon: const Icon(Icons.copy, size: 18),
+          icon: const Icon(AppIcons.copy, size: 18),
           onPressed: () {
             Clipboard.setData(ClipboardData(text: path));
             showToast(context, l10n.copied);
@@ -457,7 +463,7 @@ class _PathLine extends StatelessWidget {
 
 /// Ask for an absolute host folder by path (a remote host has no native
 /// picker here).
-Future<String?> _typedFolder(BuildContext context) => showDialog<String>(
+Future<String?> _typedFolder(BuildContext context) => showAppDialog<String>(
   context: context,
   builder: (_) => const _TypedFolderDialog(),
 );

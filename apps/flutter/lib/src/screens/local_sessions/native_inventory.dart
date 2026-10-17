@@ -30,19 +30,26 @@ extension _NativeInventory on _LocalSessionsState {
                   _load();
                 },
               ),
+            // That native history is read directly, and read-only.
+            if (_source.isNative)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: InfoTip(l10n.nativeLocalHistoryHint),
+              ),
           ],
         ),
-        if (_source.isNative) ...[
+        if (_source.isNative && _location != null) ...[
           const SizedBox(height: 8),
-          Text(
-            l10n.nativeLocalHistoryHint,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          if (_location != null)
-            SelectableText(
-              _location!,
-              style: Theme.of(context).textTheme.bodySmall,
+          SelectableText(
+            _location!,
+            maxLines: 1,
+            style: TextStyle(
+              fontFamily: monoFontFamily,
+              fontFamilyFallback: monoCjkFallback,
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+          ),
         ],
       ],
     ),
@@ -67,7 +74,7 @@ extension _NativeInventory on _LocalSessionsState {
                     dimension: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Icon(Icons.expand_more),
+                : const Icon(AppIcons.expand_more),
             label: Text(l10n.nativeHistoryLoadMore),
           ),
       ],

@@ -171,21 +171,30 @@ extension _SessionAgentPrepare on _AppSessionState {
       .firstOrNull
       ?.currentLabel;
 
-  /// The opening view of an ACP conversation that has sent nothing yet.
+  /// The opening view of a conversation that has sent nothing yet, the same
+  /// for every engine: the agent's own mark, the project and where the
+  /// session stands.
   Widget _agentWelcome(AppLocalizations l10n) {
     final caps = _caps;
     final phase = _agentPhase;
     final hasProject = _cwd?.trim().isNotEmpty ?? false;
+    // Codex creates its thread with the first message, in a project or not.
+    final codex = !caps.hostAccess;
     return AgentWelcome(
-      agentKind: agentKindOf(
-        provider: caps.isOpenCode ? 'opencode' : 'acp',
-        profileId: caps.profileId,
-      ),
+      agentKind: codex
+          ? AgentKind.codex
+          : agentKindOf(
+              provider: caps.isOpenCode ? 'opencode' : 'acp',
+              profileId: caps.profileId,
+            ),
       agentName: caps.providerName,
       project: _projectSwitcher(
         l10n,
-        // These engines cannot work outside a project.
-        label: _newProjectLabel(l10n, l10n.chooseFolder),
+        // ACP agents and OpenCode cannot work outside a project.
+        label: _newProjectLabel(
+          l10n,
+          codex ? l10n.workOutsideProject : l10n.chooseFolder,
+        ),
         style: Theme.of(
           context,
         ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w500),
@@ -201,14 +210,16 @@ extension _SessionAgentPrepare on _AppSessionState {
       onHostSettings: _canOpenAgentHost(watch: true)
           ? _openAgentHostSettings
           : null,
-      connecting: _reconnecting || _connectionLost || !caps.negotiated,
-      // OpenCode creates its session on the first message; its options are
-      // the draft's own until then.
+      connecting:
+          _reconnecting || _connectionLost || (!codex && !caps.negotiated),
+      // Codex and OpenCode create their session on the first message; the
+      // latter's options are the draft's own until then.
       opensOnFirstMessage:
+          codex ||
           caps.negotiated &&
-          (!caps.sessionConfig ||
-              caps.draftOptions ||
-              (!hasProject && _automaticProject != null)),
+              (!caps.sessionConfig ||
+                  caps.draftOptions ||
+                  (!hasProject && _automaticProject != null)),
     );
   }
 }

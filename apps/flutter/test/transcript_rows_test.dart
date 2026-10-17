@@ -8,6 +8,7 @@ void main() {
     final reply = TranscriptItem(
       id: 'reply',
       type: 'agentMessage',
+      text: 'done',
       turnId: 'old',
     );
     final rows = buildTranscriptRows([
@@ -42,12 +43,37 @@ void main() {
 
   test('final replies stay separate across known turn boundaries', () {
     final rows = buildTranscriptRows([
-      TranscriptItem(id: 'a', type: 'agentMessage', turnId: 'one'),
-      TranscriptItem(id: 'b', type: 'agentMessage', turnId: 'one'),
-      TranscriptItem(id: 'c', type: 'agentMessage', turnId: 'two'),
+      TranscriptItem(id: 'a', type: 'agentMessage', text: 'a', turnId: 'one'),
+      TranscriptItem(id: 'b', type: 'agentMessage', text: 'b', turnId: 'one'),
+      TranscriptItem(id: 'c', type: 'agentMessage', text: 'c', turnId: 'two'),
     ]);
     expect(rows, hasLength(2));
     expect((rows.first as AgentTurn).items.map((item) => item.id), ['a', 'b']);
     expect((rows.last as TranscriptItem).id, 'c');
+  });
+
+  test('a reply with nothing in it leaves no row', () {
+    // A quiet automation run: a preamble, its work, then an empty answer.
+    final rows = buildTranscriptRows([
+      TranscriptItem(id: 'run', type: 'userMessage', turnId: 'one'),
+      TranscriptItem(
+        id: 'say',
+        type: 'agentMessage',
+        text: 'checking',
+        turnId: 'one',
+      ),
+      TranscriptItem(id: 'tool', type: 'commandExecution', turnId: 'one'),
+      TranscriptItem(
+        id: 'end',
+        type: 'agentMessage',
+        text: ' \n',
+        turnId: 'one',
+      ),
+    ]);
+    expect(rows, hasLength(2));
+    expect((rows.last as TurnWork).items.map((item) => item.id), [
+      'say',
+      'tool',
+    ]);
   });
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/managed/management_failure.dart';
@@ -11,6 +12,8 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// Open the editor for [host] on the remote computer behind [serviceKey], or
 /// for a new service of runtime [kind] (`codex`, `opencode`, `claude`).
@@ -150,13 +153,11 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
     program: 'claude-agent-acp',
   );
 
-  String _defaultName(String kind) {
-    final taken = {for (final n in widget.takenNames) n.toLowerCase()};
-    if (!taken.contains(kind)) return kind;
-    for (var i = 2; ; i++) {
-      if (!taken.contains('$kind-$i')) return '$kind-$i';
-    }
-  }
+  String _defaultName(String kind) => uniqueHostName(kind, widget.takenNames);
+
+  /// The name on that computer a new service's typed name collides with.
+  String? get _nameClash =>
+      _fresh ? hostNameClash(_name.text, widget.takenNames) : null;
 
   /// Show [host] in every field, discarding edits (a load, a save, or an
   /// explicit reload).
@@ -212,6 +213,7 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
   String? _problem(AppLocalizations l10n) {
     if (_host?.config.problem != null) return null;
     if (_fresh && _name.text.trim().isEmpty) return l10n.managedNameRequired;
+    if (_nameClash case final other?) return l10n.managedNameInUse(other);
     final port = int.tryParse(_port.text.trim());
     if (_kind == 'codex' && (port == null || port < 0 || port > 65535)) {
       return l10n.managedPortInvalid;
@@ -429,6 +431,8 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
     return GroupCard(
       key: const Key('managed-runtime-section'),
       title: l10n.hostRuntimeInfo,
+      // Where the program and its arguments are managed.
+      info: l10n.managedRuntimeNote,
       children: [
         EditorBlock(
           child: Column(
@@ -462,15 +466,20 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
               ),
               const SizedBox(height: 12),
               if (_fresh)
-                TextField(
-                  key: const Key('managed-name'),
-                  controller: _name,
-                  enabled: !_busy,
-                  autocorrect: false,
-                  decoration: InputDecoration(
-                    labelText: l10n.localHostName,
-                    helperText: l10n.managedNameHelper,
-                    helperMaxLines: 2,
+                FocusHelp(
+                  help: _nameClash == null ? l10n.managedNameHelper : null,
+                  child: TextField(
+                    key: const Key('managed-name'),
+                    controller: _name,
+                    enabled: !_busy,
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      labelText: l10n.localHostName,
+                      errorText: switch (_nameClash) {
+                        final other? => l10n.managedNameInUse(other),
+                        null => null,
+                      },
+                    ),
                   ),
                 )
               else
@@ -480,18 +489,21 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               if (_kind == 'codex') ...[
-                const SizedBox(height: 12),
-                TextField(
-                  key: const Key('managed-port'),
-                  controller: _port,
-                  enabled: !_busy,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: l10n.managedPortLabel,
-                    helperText: l10n.managedPortHelper,
+                const SizedBox(height: 14),
+                FocusHelp(
+                  help: l10n.managedPortHelper,
+                  child: TextField(
+                    key: const Key('managed-port'),
+                    controller: _port,
+                    enabled: !_busy,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: l10n.managedPortLabel,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
+                // Empty inherits; the placeholder says so while typing.
                 TextField(
                   key: const Key('managed-proxy'),
                   controller: _proxy,
@@ -499,12 +511,10 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
                   autocorrect: false,
                   decoration: InputDecoration(
                     labelText: l10n.hostProxyLabel,
-                    helperText: l10n.hostProxyInherit,
+                    hintText: l10n.hostProxyInherit,
                   ),
                 ),
               ],
-              const SizedBox(height: 8),
-              EditorNote(l10n.managedRuntimeNote),
               if (status != null && host!.config.pendingApply) ...[
                 const SizedBox(height: 8),
                 EditorNote(
@@ -737,7 +747,7 @@ Future<bool> confirmManaged(
   String body,
   String action,
 ) async {
-  final ok = await showDialog<bool>(
+  final ok = await showAppDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
       key: const Key('managed-confirm'),

@@ -10,6 +10,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Show the host folder chooser and return the absolute host path the user
 /// picks, or null if they cancel.
@@ -308,7 +309,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
               if (_stack.isNotEmpty)
                 IconButton(
                   key: const Key('folder-up-btn'),
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(AppIcons.arrow_back),
                   tooltip: l10n.folderUp,
                   onPressed: _loading ? null : _up,
                 )
@@ -326,14 +327,14 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
                 IconButton(
                   key: const Key('folder-local-btn'),
                   tooltip: l10n.folderOnThisComputer,
-                  icon: const Icon(Icons.computer_outlined),
+                  icon: const Icon(AppIcons.computer_outlined),
                   onPressed: _pickingLocal ? null : _pickLocal,
                 ),
               IconButton(
                 key: const Key('folder-edit-path'),
                 tooltip: l10n.folderTypePath,
                 isSelected: _editing,
-                icon: const Icon(Icons.edit_location_alt_outlined),
+                icon: const Icon(AppIcons.edit_location_alt_outlined),
                 onPressed: _toggleEditing,
               ),
             ],
@@ -380,7 +381,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
             suffixIcon: IconButton(
               key: const Key('folder-path-go'),
               tooltip: l10n.folderTypePath,
-              icon: const Icon(Icons.arrow_forward),
+              icon: const Icon(AppIcons.arrow_forward),
               onPressed: () => _submitPath(_path.text),
             ),
           ),
@@ -425,7 +426,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
               for (var i = 0; i < crumbs.length; i++) ...[
                 if (i > 0)
                   Icon(
-                    Icons.chevron_right,
+                    AppIcons.chevron_right,
                     size: 16,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -496,7 +497,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
     if (_typed != null) {
       return _notice(
         const Key('folder-outside-note'),
-        Icons.info_outline,
+        AppIcons.info_outline,
         l10n.folderOutsideRootsNote,
         muted,
       );
@@ -505,7 +506,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
       if (_entries.isEmpty) {
         return _notice(
           const Key('folder-picker-empty'),
-          Icons.folder_open_outlined,
+          AppIcons.folder_open_outlined,
           l10n.folderNoSubfolders,
           muted,
         );
@@ -546,7 +547,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
         ListTile(
           key: Key('folder-recent-$p'),
           dense: isDesktop,
-          leading: Icon(Icons.history, color: scheme.onSurfaceVariant),
+          leading: Icon(AppIcons.history, color: scheme.onSurfaceVariant),
           title: Text(_leaf(p), maxLines: 1, overflow: TextOverflow.ellipsis),
           subtitle: Text(
             p,
@@ -599,13 +600,13 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
         FilledButton.tonalIcon(
           key: const Key('folder-local-start'),
           onPressed: _pickingLocal ? null : _pickLocal,
-          icon: const Icon(Icons.computer_outlined, size: 18),
+          icon: const Icon(AppIcons.computer_outlined, size: 18),
           label: Text(l10n.folderOnThisComputer),
         ),
       OutlinedButton.icon(
         key: const Key('folder-type-start'),
         onPressed: _editing ? null : _toggleEditing,
-        icon: const Icon(Icons.edit_location_alt_outlined, size: 18),
+        icon: const Icon(AppIcons.edit_location_alt_outlined, size: 18),
         label: Text(l10n.folderTypePath),
       ),
     ],
@@ -632,7 +633,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
     key: Key('folder-row-${e.path}'),
     dense: isDesktop,
     leading: Icon(
-      e.isGitRepo ? Icons.source_outlined : Icons.folder_outlined,
+      e.isGitRepo ? AppIcons.source_outlined : AppIcons.folder_outlined,
       color: e.isGitRepo ? scheme.primary : scheme.onSurfaceVariant,
     ),
     title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -644,7 +645,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
         : subtitle == null
         ? null
         : Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-    trailing: const Icon(Icons.chevron_right, size: 20),
+    trailing: const Icon(AppIcons.chevron_right, size: 20),
     onTap: _loading ? null : () => _enter(e.path),
   );
 
@@ -701,7 +702,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
                     onPressed: target == null || _loading
                         ? null
                         : () => Navigator.of(context).pop(target),
-                    icon: const Icon(Icons.check, size: 18),
+                    icon: const Icon(AppIcons.check, size: 18),
                     label: Text(l10n.useThisFolder),
                   ),
                 ],

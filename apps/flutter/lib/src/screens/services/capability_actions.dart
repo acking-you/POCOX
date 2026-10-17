@@ -72,7 +72,12 @@ class _CapabilityRow extends StatelessWidget {
     this.onSetDefault,
     this.onDeregister,
     this.onReregister,
+    this.host,
   });
+
+  /// This computer's host behind a chat row, when the row is that host's
+  /// card: it then leads with the host's name and opens its editor on tap.
+  final AppServeStatus? host;
 
   final IconData icon;
   final String title;
@@ -113,25 +118,65 @@ class _CapabilityRow extends StatelessWidget {
   /// offered both.
   final VoidCallback? onReregister;
 
+  /// The agent's own name for a chat row (Codex, OpenCode, the ACP agent).
+  String? _providerLabel(AppLocalizations l10n) {
+    final p = provider;
+    if (p == null) return null;
+    final agent = providerName?.trim() ?? '';
+    return switch (p) {
+      'acp' => agent.isNotEmpty ? agent : l10n.providerAcpAgent,
+      'opencode' => l10n.providerOpenCode,
+      _ => l10n.providerCodex,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final agent = _providerLabel(l10n);
+    // A chat row leads with the agent itself — its mark and name — so rows
+    // differ at a glance instead of repeating one generic glyph and label.
+    final heading = host?.name ?? agent ?? title;
+    final facts = [
+      if (host != null && agent != null) agent,
+      // A host card is a chat service by being one; only a bare row says so.
+      if (host == null && agent != null) title,
+      protocol,
+    ].join('  ·  ');
+    final override = _HostStatus.maybeOf(context);
+    final shownStatus = override ?? status;
     return Container(
       constraints: const BoxConstraints(minHeight: 64),
       padding: const EdgeInsets.fromLTRB(12, 8, 7, 8),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: scheme.outlineVariant)),
-      ),
       child: _rowOrStacked(
         context,
         // Default, status, the action and the overflow take ~260 px; below
         // this the title and provider would be squeezed to a fragment
         // beside them (every phone width).
         stackBelow: 440,
+        // Every row leads with the same soft disc: the agent's own mark, or
+        // the capability's glyph.
         leading: [
-          IconBadge(icon: icon, size: 36, accent: true),
-          const SizedBox(width: 11),
+          Container(
+            key: host == null ? null : Key('local-host-icon-${host!.name}'),
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: softWash(scheme),
+              shape: BoxShape.circle,
+            ),
+            child: provider != null
+                ? AgentIcon.of(
+                    provider: provider!,
+                    profileId: profileId,
+                    name: agent ?? '',
+                    size: 19,
+                  )
+                : Icon(icon, size: 18, color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(width: 12),
         ],
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -139,24 +184,11 @@ class _CapabilityRow extends StatelessWidget {
           children: [
             // The provider badge follows the title, or goes under it where
             // both do not fit, so neither is cut to a fragment.
-            Wrap(
-              spacing: 6,
-              runSpacing: 2,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (provider != null)
-                  ProviderBadge(
-                    provider: provider!,
-                    name: providerName,
-                    profileId: profileId,
-                  ),
-              ],
+            Text(
+              heading,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             // One rich line rather than a Row, so a long address ellipsises
             // with the protocol instead of overflowing the row.
@@ -166,7 +198,7 @@ class _CapabilityRow extends StatelessWidget {
                   context,
                 ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
                 children: [
-                  TextSpan(text: protocol),
+                  TextSpan(text: facts),
                   if (localAddr != null) ...[
                     TextSpan(
                       text: '  ·  ',
@@ -205,7 +237,7 @@ class _CapabilityRow extends StatelessWidget {
             _CountPill(label: l10n.servicesDefault, accent: true),
             const SizedBox(width: 8),
           ],
-          if (status != null) ...[status!, const SizedBox(width: 6)],
+          if (shownStatus != null) ...[shownStatus, const SizedBox(width: 6)],
           // The action and its overflow wrap together, never apart.
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -215,7 +247,7 @@ class _CapabilityRow extends StatelessWidget {
                 PopupMenuButton<VoidCallback>(
                   key: menuKey,
                   tooltip: l10n.moreActions,
-                  icon: const Icon(Icons.more_horiz),
+                  icon: const Icon(AppIcons.more_horiz),
                   onSelected: (action) => action(),
                   itemBuilder: (_) => [
                     for (final item in _overflow)
@@ -246,6 +278,20 @@ class _CapabilityRow extends StatelessWidget {
     if (onDeregister != null)
       _RowAction((l) => l.deregister, onDeregister!, danger: true),
   ];
+}
+
+/// A host's own status, shown on its row in place of the relay status while
+/// the host itself is not healthy (starting, unresponsive, failed to stop).
+class _HostStatus extends InheritedWidget {
+  const _HostStatus({required this.chip, required super.child});
+
+  final Widget? chip;
+
+  static Widget? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_HostStatus>()?.chip;
+
+  @override
+  bool updateShouldNotify(_HostStatus old) => chip != old.chip;
 }
 
 /// One entry of a capability row's overflow menu. The label is resolved late so
@@ -297,7 +343,7 @@ Future<void> _batchRemove(
   final l10n = AppLocalizations.of(context);
   final scheme = Theme.of(context).colorScheme;
   if (entries.isEmpty) return;
-  final ok = await showDialog<bool>(
+  final ok = await showAppDialog<bool>(
     context: context,
     builder: (_) => AlertDialog(
       key: const Key('batch-remove-dialog'),
@@ -417,7 +463,7 @@ Future<void> _confirmDeregister(
   // "remove from your list" wording instead of the "stop that host" wording,
   // which doesn't apply when no reachable host exists.
   final isOrphan = unreachable && !isLocal;
-  final ok = await showDialog<bool>(
+  final ok = await showAppDialog<bool>(
     context: context,
     builder: (_) => AlertDialog(
       key: const Key('deregister-dialog'),

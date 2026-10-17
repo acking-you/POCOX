@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/widgets/github_avatar.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 Widget _host(Widget child) => MaterialApp(
   home: Scaffold(body: Center(child: child)),
@@ -20,7 +21,7 @@ void main() {
       _host(
         const GitHubAvatar(
           accountId: '73544345',
-          fallbackIcon: Icons.person_outline,
+          fallbackIcon: AppIcons.person_outline,
         ),
       ),
     );
@@ -37,10 +38,10 @@ void main() {
 
     // The glyph holds the slot before the fetch resolves, so a slow network
     // never leaves a hole where the identity should be…
-    expect(find.byIcon(Icons.person_outline), findsOneWidget);
+    expect(find.byIcon(AppIcons.person_outline), findsOneWidget);
     // …and it is still there once the fetch has failed.
     await t.pumpAndSettle();
-    expect(find.byIcon(Icons.person_outline), findsOneWidget);
+    expect(find.byIcon(AppIcons.person_outline), findsOneWidget);
   });
 
   testWidgets('no account id renders the fallback without a request', (
@@ -48,30 +49,36 @@ void main() {
   ) async {
     await t.pumpWidget(
       _host(
-        const GitHubAvatar(accountId: null, fallbackIcon: Icons.dns_outlined),
+        const GitHubAvatar(
+          accountId: null,
+          fallbackIcon: AppIcons.dns_outlined,
+        ),
       ),
     );
 
     // A self-hosted user has no GitHub identity, so nothing should be fetched.
     expect(find.byType(Image), findsNothing);
-    expect(find.byIcon(Icons.dns_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.dns_outlined), findsOneWidget);
   });
 
   testWidgets('a blank account id is treated as absent', (t) async {
     await t.pumpWidget(
       _host(
-        const GitHubAvatar(accountId: '   ', fallbackIcon: Icons.dns_outlined),
+        const GitHubAvatar(
+          accountId: '   ',
+          fallbackIcon: AppIcons.dns_outlined,
+        ),
       ),
     );
 
     expect(find.byType(Image), findsNothing);
-    expect(find.byIcon(Icons.dns_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.dns_outlined), findsOneWidget);
   });
 
   testWidgets('a failed id is not re-requested on the next build', (t) async {
     const avatar = GitHubAvatar(
       accountId: '999001',
-      fallbackIcon: Icons.person_outline,
+      fallbackIcon: AppIcons.person_outline,
     );
     await t.pumpWidget(_host(avatar));
     await t.pumpAndSettle();
@@ -81,6 +88,6 @@ void main() {
     await t.pumpWidget(_host(const SizedBox()));
     await t.pumpWidget(_host(avatar));
     expect(find.byType(Image), findsNothing);
-    expect(find.byIcon(Icons.person_outline), findsOneWidget);
+    expect(find.byIcon(AppIcons.person_outline), findsOneWidget);
   });
 }

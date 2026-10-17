@@ -8,7 +8,7 @@ import 'package:file_selector/file_selector.dart' show openFiles;
 import 'package:flutter/foundation.dart'
     show listEquals, setEquals, defaultTargetPlatform, TargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
+import 'package:flutter/rendering.dart' show RenderSliver, ScrollDirection;
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_modes.dart';
 import 'package:pocket_codex/src/attachment_refs.dart';
@@ -58,6 +58,9 @@ import 'package:pocket_codex/src/screens/app_session/history_merge.dart';
 import 'package:pocket_codex/src/screens/app_session/history_rows.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_view.dart';
 import 'package:pocket_codex/src/motion.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/widgets/floating_status.dart';
+import 'package:pocket_codex/src/widgets/height_reporter.dart';
 import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/animated_label.dart';
@@ -65,7 +68,9 @@ import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/brand_logo.dart';
-import 'package:pocket_codex/src/widgets/diff_review.dart';
+import 'package:pocket_codex/src/widgets/centered_scroll.dart';
+import 'package:pocket_codex/src/review/review_panel.dart';
+import 'package:pocket_codex/src/review/session_changes.dart';
 import 'package:pocket_codex/src/widgets/draggable_navigation.dart';
 import 'package:pocket_codex/src/widgets/history_arrival.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
@@ -83,9 +88,12 @@ import 'package:pocket_codex/src/widgets/status_dots.dart';
 import 'package:pocket_codex/src/widgets/takeover_dialog.dart';
 import 'package:pocket_codex/src/widgets/theme_toggle.dart';
 import 'package:pocket_codex/src/widgets/turn_minimap.dart';
+import 'package:pocket_codex/src/widgets/turn_navigation_handle.dart';
 import 'package:pocket_codex/src/widgets/turn_outline.dart';
 import 'package:pocket_codex/src/screens/app_session/approval_review.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 part 'app_session/composer_drafts.dart';
 part 'app_session/session_access.dart';
@@ -120,6 +128,7 @@ part 'app_session/session_title.dart';
 part 'app_session/session_transcript.dart';
 part 'app_session/session_voice.dart';
 part 'app_session/session_types.dart';
+part 'app_session/transcript_list.dart';
 
 /// Local port for the app-server ws tunnel (shared with the service screen).
 /// `0` is a sentinel: the bridge assigns a free OS port *per service* so several
@@ -232,11 +241,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   late final _ComposerDrafts _drafts;
   late _ComposerDraft _draft;
   bool _editorOpen = false;
-  final _scroll = ScrollController();
-  // Index-based scrolling for the transcript (super_sliver_list): powers the
-  // turn minimap and the compact prev/next-turn jumps via `visibleRange` +
-  // `animateToItem`.
-  final _listCtl = ListController();
+  final _scroll = CenteredScrollController();
+  // The transcript's two lists around its centre row (transcript_list.dart).
+  late final _list = _TranscriptGeometry(_scroll);
 
   /// The transcript's visible row range, republished on scroll.
   ///
@@ -427,7 +434,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // are written back when the user changes them (see [_setLeftOpen] and the
   // splitter's drag end), so a restart reopens the window as it was left.
   bool _leftOpen = true;
-  bool _reviewOpen = false; // the right-hand review split is showing
+  bool _reviewOpen = false; // the review sidebar (or page) is showing
   double _leftWidth = 280;
   bool _paneDragging = false;
   bool _sidebarClosing = false;
@@ -438,9 +445,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // every pointer move — which is what made the edge lag the cursor.
   final ValueNotifier<double?> _composerDragHeight = ValueNotifier(null);
   int _settingsRevision = 0;
-  double _reviewWidth = 760; // width of the whole review split (diff + tree)
-  double _treeWidth = 250; // the tree sub-pane inside the review
-  String? _reviewFile; // path selected in the review, null = first changed
+  double _reviewWidth = 760; // width of the review sidebar
+  ReviewTarget? _reviewTarget; // where the review last opened
 
   /// Anchors the desktop turn-settings popover to the composer's model chip.
   final MenuController _modelMenu = MenuController();
@@ -448,6 +454,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// Anchors the environment-info popover to the app-bar button.
   final MenuController _envMenu = MenuController();
   List<ThreadMeta> _threads = const [];
+
+  /// Whether the host has listed its conversations at least once: until then
+  /// the sessions pane is loading, not empty.
+  bool _threadsListed = false;
   final Map<String, ThreadMeta> _discoveredThreads = {};
 
   /// Sessions the host reported deleted (`thread/deleted`), by
@@ -522,7 +532,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // turn end. Local-only (not persisted), like the "stopped" marker.
   DateTime? _turnStartedAt;
   Timer? _elapsedTicker;
-  int _elapsedSecs = 0;
+  // The running turn's clock, in a notifier: its tick repaints the labels
+  // showing it, not the whole conversation.
+  final _elapsed = ValueNotifier<int>(0);
   // True while a thread's history is being (re)loaded, so the chat shows a
   // smooth skeleton instead of flashing empty when switching sessions.
   bool _loading = false;
@@ -595,6 +607,14 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// turn's end.
   final List<String> _endedTurns = [];
   bool _atBottom = true; // is the list scrolled to the latest message?
+
+  /// The height of what floats over the transcript's foot — the composer
+  /// and the cards above it — which the transcript reserves as end padding
+  /// so its last message rests above them.
+  double _composerOverlay = 0;
+
+  /// The composer block's own height, inside [_composerOverlay].
+  double _composerBlock = 0;
   // Every turn of the open thread, oldest first — including turns whose items
   // aren't loaded. The rail shows the conversation's shape, so it reads this
   // rather than the loaded rows. Empty for a thread that arrived whole, whose
@@ -611,9 +631,6 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   List<Object>? _cachedRows;
   TurnWork? _lastWork;
   List<(TranscriptItem, String, String)> _rowSources = const [];
-  // True while an older page (or a single turn's items) is in flight, so a
-  // scroll frame can't queue the same fetch twice.
-  bool _loadingOlder = false;
   (String?, bool)? _historyTarget;
   TurnMinimapItem? _navigatingTurn;
   bool _navigationLoading = false;
@@ -621,19 +638,17 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   List<TurnSummary>? _minimapTurns;
   String? _minimapLastText;
   List<TurnMinimapItem> _minimapEntries = const [];
+  // The older page (or single turn's items) in flight, so a scroll frame
+  // can't queue the same fetch twice.
   Future<void>? _historyLoad;
+  bool get _loadingOlder => _historyLoad != null;
   int _historyGeneration = 0;
   int _turnNavigation = 0;
   int _scrollIntent = 0;
-  int _settleEpoch = 0;
   bool _historyFromTop = false;
   Key? _historyArrivalRow;
   int _historyArrivalRevision = 0;
   Locale? _minimapLocale;
-  // True while `_scrollToEnd(force: true)` is re-jumping to the bottom. Those
-  // jumps fire scroll events from positions that can look like the top of the
-  // list, which would fetch older history nobody asked for.
-  bool _settlingToEnd = false;
   String? _error;
   VoidCallback? _retry; // action for the error banner's retry button
   int _threadLoadGeneration = 0;
@@ -690,6 +705,12 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
             api: ref.read(bridgeApiProvider),
             serviceKey: widget.serviceKey,
             createTransport: ref.read(dictationTransportFactoryProvider),
+            // On iOS and Android an open media link takes the device's audio
+            // from other apps, so the line exists only while a take runs.
+            keepOpen: switch (defaultTargetPlatform) {
+              TargetPlatform.iOS || TargetPlatform.android => false,
+              _ => true,
+            },
           )
           ..onDelta = _onDictationDelta
           ..onTakeEnded = _onDictationEnded
@@ -747,17 +768,32 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       // Without external-writer discovery the inventory is only running ids
       // (no preview/cwd): the thread list already names every root session.
       if (!_caps.externalWriterMonitor) return;
+      final found = [
+        for (final session in sessions)
+          if (!_isDeleted(session.threadId))
+            ThreadMeta(
+              id: session.threadId,
+              preview: session.preview,
+              threadSource: session.threadSource,
+              parentThreadId: session.parentThreadId,
+              cwd: session.cwd ?? '',
+              updatedAt: session.updatedAt,
+            ),
+      ];
+      // Each poll answers again; only news is worth rebuilding the screen.
+      bool known(ThreadMeta meta) => switch (_discoveredThreads[meta.id]) {
+        final had? =>
+          had.preview == meta.preview &&
+              had.threadSource == meta.threadSource &&
+              had.parentThreadId == meta.parentThreadId &&
+              had.cwd == meta.cwd &&
+              had.updatedAt == meta.updatedAt,
+        null => false,
+      };
+      if (found.every(known)) return;
       setState(() {
-        for (final session in sessions) {
-          if (_isDeleted(session.threadId)) continue;
-          _discoveredThreads[session.threadId] = ThreadMeta(
-            id: session.threadId,
-            preview: session.preview,
-            threadSource: session.threadSource,
-            parentThreadId: session.parentThreadId,
-            cwd: session.cwd ?? '',
-            updatedAt: session.updatedAt,
-          );
+        for (final meta in found) {
+          _discoveredThreads[meta.id] = meta;
         }
       });
     }, fireImmediately: true);
@@ -838,11 +874,15 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     // service red on the strength of a screen that no longer exists.
     //
     // Here rather than in `dispose`: Riverpod forbids touching `ref` once the
-    // element is disposed, and doing so threw while finalizing the widget tree.
+    // element is disposed. The change itself waits for the frame to end, as
+    // the tree is still being built while it deactivates.
     final observed = ref.read(observedDisconnectedProvider.notifier);
-    if (observed.state.contains(widget.serviceKey)) {
-      observed.state = {...observed.state}..remove(widget.serviceKey);
-    }
+    final key = widget.serviceKey;
+    scheduleMicrotask(() {
+      if (observed.mounted && observed.state.contains(key)) {
+        observed.state = {...observed.state}..remove(key);
+      }
+    });
     super.deactivate();
   }
 
@@ -884,8 +924,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     if (_isDesktop) HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
-    _listCtl.dispose();
+    _list.dispose();
     _visibleRows.dispose();
+    _elapsed.dispose();
     _quotaRev.dispose();
     _titleCtrl.dispose();
     _titleFocus.dispose();
@@ -917,25 +958,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     cwd: _cwd,
     child: SessionFeatureScope(
       guardianReviews: _caps.guardian,
+      onReviewChange: _openChangeInReview,
       child: _buildSession(context),
     ),
   );
-
-  /// `device · name` fallback parsed from the key, for when the switcher's
-  /// service list doesn't contain the active one.
-  ///
-  /// This used to read the device as `parts[1]`, which is the USER in an
-  /// account-mode `pcxu:<user>:<device>:…` key — so a hosted service was
-  /// labelled with the account rather than the machine.
-  static String _serviceLabelFromKey(String key) => serviceKeyLabel(key);
-
-  /// Leaf folder name of [cwd], or empty when unknown.
-  static String _leafOf(String cwd) {
-    final c = cwd.trim();
-    if (c.isEmpty) return '';
-    final segs = c.split(RegExp(r'[\\/]'))..removeWhere((s) => s.isEmpty);
-    return segs.isEmpty ? c : segs.last;
-  }
 
   /// Narrowest composer card that keeps the dictation microphone inline;
   /// below it the `+` menu carries it.

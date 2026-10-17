@@ -200,7 +200,6 @@ extension _SessionRecovery on _AppSessionState {
         _mergeHistoryLiveItems(liveItems, partialItems);
         _asyncQuestions.addEntries(liveQuestions);
         _cachedRows = null;
-        _loadingOlder = false;
         _historyLoad = null;
         _historyGeneration++;
         // Events received during the read are newer than its lifecycle snapshot.
@@ -227,7 +226,7 @@ extension _SessionRecovery on _AppSessionState {
             _elapsedTicker = null;
             _turnStartedAt = null;
             if (_streaming) {
-              _elapsedSecs = 0;
+              _elapsed.value = 0;
               _startElapsedTicker();
             }
           }
@@ -445,7 +444,7 @@ extension _SessionRecovery on _AppSessionState {
     final tid = _threadId;
     if (tid == null) return;
     final l10n = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showAppDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(l10n.compact),

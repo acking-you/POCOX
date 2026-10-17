@@ -25,7 +25,11 @@ client; the wire contract lives in the Rust host and bridge.
 
 - **Add service** lists only runtimes the host reports as installed: Codex,
   native OpenCode, the Claude preset, or a saved configuration. No executable
-  path or argv is accepted remotely. OpenCode is one per computer.
+  path or argv is accepted remotely. Several OpenCode services may run; one
+  added beside a service on OpenCode's shared history gets a history of its
+  own, chosen on the host ([Native OpenCode](opencode-native.md#hosting)). A
+  new service's name must differ from every service there, compared as the
+  relay compares names; the editor says so before Start.
 - Discovery never installs or signs in. Claude's adapter is prepared only
   by an explicit **Prepare**, with measured progress. A runtime that needs a
   sign-in on the host explains that the sign-in happens there.

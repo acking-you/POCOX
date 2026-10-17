@@ -37,8 +37,12 @@ extension _SessionReview on _AppSessionState {
     _updateState(() => _diffLoading = false);
   }
 
-  /// Open the diff viewer: the inline review split on desktop (≥1100px), a tall
-  /// bottom sheet on narrower screens.
+  /// Whether the host can diff this conversation's project folder.
+  bool get _workspaceReview =>
+      _caps.gitDiff && (_cwd?.trim().isNotEmpty ?? false);
+
+  /// Open the review on the project's working tree (or, where the host cannot
+  /// diff it, on this conversation's edits).
   ///
   /// Opens on whatever diff is already in hand and refreshes behind the review,
   /// rather than making every press wait on a `gitDiffToRemote` round-trip. The
@@ -53,12 +57,12 @@ extension _SessionReview on _AppSessionState {
       _cancelDiff();
       return;
     }
-    final compact = MediaQuery.of(context).size.width < 1100;
-    // The sheet takes a snapshot of the diff when it's built, so a refresh
-    // behind it couldn't reach the open sheet — only the review split, which
-    // rebuilds from state, gets the background update.
-    if (_diff != null && !compact) {
-      _openReview();
+    if (!_workspaceReview) {
+      _openReview(target: const ReviewTarget(source: ReviewSource.session));
+      return;
+    }
+    if (_diff != null) {
+      _openReview(target: const ReviewTarget(source: ReviewSource.workspace));
       _refreshDiff();
       return;
     }
@@ -69,30 +73,22 @@ extension _SessionReview on _AppSessionState {
     // (or the cancel) owns the UI now, so this one must not touch it.
     if (!mounted || token != _diffFetch) return;
     _updateState(() => _diffLoading = false);
-    if (compact) {
-      await _showDiffSheet();
-    } else {
-      _openReview();
-    }
+    _openReview(target: const ReviewTarget(source: ReviewSource.workspace));
   }
 
-  /// The narrow-screen diff viewer.
-  Future<void> _showDiffSheet() => showModalBottomSheet<void>(
-    context: context,
-    showDragHandle: true,
-    isScrollControlled: true,
-    builder: (c) => FractionallySizedBox(
-      heightFactor: 0.9,
-      child: EnvPanel(diff: _diff, branch: _branch, cwd: _cwd),
-    ),
-  );
+  /// Open the review on one edit of the conversation (a `fileChange` step).
+  void _openChangeInReview(String itemId) =>
+      _openReview(target: ReviewTarget(edit: itemId));
 
-  /// Read a reviewed file's current lines so the review can expand an elided
-  /// gap. The gap lines are unchanged, so the working-tree file holds them
-  /// verbatim; [relPath] is relative to the conversation's cwd. Best-effort:
-  /// returns null when there's no cwd or the host won't serve the read (no meta
-  /// tunnel, or the file sits outside a configured root), and the gap then
-  /// simply stays collapsed.
+  /// Read a reviewed file's current lines, for the whole-file view and to
+  /// expand an elided gap (unchanged lines, so the working tree holds them
+  /// verbatim); [relPath] is relative to the conversation's cwd.
+  ///
+  /// Through the session's own file route, which serves what lies in its
+  /// working directory, so a project outside the host's shared roots still
+  /// reads; a host too old for it gets the root-confined read. Null when
+  /// neither serves the whole file: the gap stays collapsed and the view says
+  /// it cannot be read.
   Future<List<String>?> _loadReviewFile(String relPath) async {
     final cwd = _cwd?.trim();
     if (cwd == null || cwd.isEmpty) return null;
@@ -103,34 +99,60 @@ extension _SessionReview on _AppSessionState {
         : cwd.contains('\\')
         ? '$cwd\\${relPath.replaceAll('/', '\\')}'
         : '$cwd/$relPath';
+    final api = ref.read(bridgeApiProvider);
+    Uint8List? bytes;
     try {
-      final bytes = await ref
-          .read(bridgeApiProvider)
-          .metaReadFile(widget.serviceKey, abs);
-      return utf8.decode(bytes, allowMalformed: true).split(RegExp(r'\r?\n'));
+      final preview = await api.metaFilePreview(
+        widget.serviceKey,
+        _threadId,
+        abs,
+      );
+      // Part of a file would misplace every line after the cut.
+      if (preview.truncated) return null;
+      bytes = preview.bytes;
     } catch (_) {
-      return null;
+      try {
+        bytes = await api.metaReadFile(widget.serviceKey, abs);
+      } catch (_) {
+        return null;
+      }
     }
+    return utf8.decode(bytes, allowMalformed: true).split(RegExp(r'\r?\n'));
   }
 
-  /// Open the desktop review split, defaulting the selected file to [path] (or
-  /// the first changed file).
+  /// Show the review: a sidebar beside the conversation on a wide window, a
+  /// panel over it on a narrower one, a page of its own on a phone. Opening
+  /// it again with a new [target] moves it there.
   ///
   /// Deliberately does NOT fetch: every caller either just awaited a fetch or is
   /// opening on data it already has. Refreshing here as well meant one press
   /// paid for two round-trips of the same `gitDiffToRemote`, the second of which
   /// nobody was waiting on but which still had to finish.
-  void _openReview({String? path}) {
+  void _openReview({ReviewTarget? target}) {
     _updateState(() {
       _reviewOpen = true;
-      final files = _diff?.files ?? const [];
-      _reviewFile =
-          path ??
-          (files.any((f) => f.path == _reviewFile)
-              ? _reviewFile
-              : files.firstOrNull?.path);
+      _reviewTarget = target ?? _reviewTarget ?? const ReviewTarget();
     });
   }
+
+  void _closeReview() => _updateState(() => _reviewOpen = false);
+
+  /// The review, live: what the conversation and the working tree changed.
+  Widget _reviewPanel({bool page = false}) => ReviewPanel(
+    key: const Key('review-panel'),
+    session: SessionChanges.of(_items),
+    workspace: _diff,
+    workspaceAvailable: _workspaceReview,
+    workspaceLoading: _diffLoading,
+    onRefreshWorkspace: _refreshDiff,
+    onCancelRefresh: _cancelDiff,
+    branch: _branch,
+    root: _cwd,
+    target: _reviewTarget,
+    onLoadFile: _loadReviewFile,
+    onClose: _closeReview,
+    page: page,
+  );
 
   /// The app-bar environment button + its popover: a floating summary card
   /// (changes, host, branch) and the changed-file list. Picking a file — or
@@ -138,7 +160,13 @@ extension _SessionReview on _AppSessionState {
   Widget _envButton(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final d = _diff;
-    final files = d?.files ?? const <DiffFile>[];
+    // A diff can name one path twice (staged and unstaged hunks); the menu
+    // lists each file once, and its keys must stay unique.
+    final seen = <String>{};
+    final files = [
+      for (final f in d?.files ?? const <DiffFile>[])
+        if (seen.add(f.path)) f,
+    ];
     Widget line(IconData icon, String label, {Widget? trailing}) => Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       child: Row(
@@ -174,7 +202,7 @@ extension _SessionReview on _AppSessionState {
                 ),
               ),
               line(
-                Icons.difference_outlined,
+                AppIcons.difference_outlined,
                 l10n.changesTitle,
                 trailing: (d != null && !d.isEmpty)
                     ? Row(
@@ -207,8 +235,9 @@ extension _SessionReview on _AppSessionState {
                         ),
                       ),
               ),
-              line(Icons.computer, _hostLabel(l10n)),
-              if (_branch != null) line(Icons.account_tree_outlined, _branch!),
+              line(AppIcons.computer, _hostLabel(l10n)),
+              if (_branch != null)
+                line(AppIcons.account_tree_outlined, _branch!),
               if (files.isNotEmpty) ...[
                 const Divider(height: 9),
                 Padding(
@@ -230,7 +259,11 @@ extension _SessionReview on _AppSessionState {
                         key: const Key('env-review-all'),
                         onPressed: () {
                           _envMenu.close();
-                          _openReview();
+                          _openReview(
+                            target: const ReviewTarget(
+                              source: ReviewSource.workspace,
+                            ),
+                          );
                         },
                         style: TextButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -255,7 +288,12 @@ extension _SessionReview on _AppSessionState {
                             key: Key('env-file-${f.path}'),
                             onTap: () {
                               _envMenu.close();
-                              _openReview(path: f.path);
+                              _openReview(
+                                target: ReviewTarget(
+                                  source: ReviewSource.workspace,
+                                  path: f.path,
+                                ),
+                              );
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -265,7 +303,7 @@ extension _SessionReview on _AppSessionState {
                               child: Row(
                                 children: [
                                   Icon(
-                                    Icons.description_outlined,
+                                    AppIcons.description_outlined,
                                     size: 14,
                                     color: scheme.onSurfaceVariant,
                                   ),
@@ -316,7 +354,7 @@ extension _SessionReview on _AppSessionState {
       builder: (ctx, ctrl, _) => _chromeButton(
         key: const Key('env-panel-btn'),
         tooltip: l10n.envTitle,
-        icon: _reviewOpen ? Icons.difference : Icons.difference_outlined,
+        icon: _reviewOpen ? AppIcons.difference : AppIcons.difference_outlined,
         onPressed: () {
           if (ctrl.isOpen) {
             ctrl.close();
@@ -326,117 +364,6 @@ extension _SessionReview on _AppSessionState {
           }
         },
       ),
-    );
-  }
-
-  /// The desktop review split: the selected file's diff beside the changed-file
-  /// tree, with a draggable divider between them and a close button.
-  Widget _reviewSplit(AppLocalizations l10n) {
-    final scheme = Theme.of(context).colorScheme;
-    final files = _diff?.files ?? const <DiffFile>[];
-    final selected =
-        files.where((f) => f.path == _reviewFile).firstOrNull ??
-        files.firstOrNull;
-    return Column(
-      children: [
-        // Review header: title + refresh + close.
-        Container(
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: scheme.outlineVariant, width: 1),
-            ),
-          ),
-          padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-          child: Row(
-            children: [
-              Icon(Icons.rate_review_outlined, size: 16, color: scheme.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  l10n.reviewTitle,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-              ),
-              // Refreshing in place: the same cancellable fetch as the badge, so
-              // a slow re-read spins here and can be called off, rather than
-              // leaving the tree looking current while it isn't.
-              if (_diffLoading)
-                IconButton(
-                  key: const Key('review-refresh-cancel'),
-                  icon: SizedBox(
-                    width: 15,
-                    height: 15,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.6,
-                      color: signalColor(scheme),
-                    ),
-                  ),
-                  tooltip: l10n.cancelDiffLoad,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _cancelDiff,
-                )
-              else
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 17),
-                  tooltip: l10n.envRefresh,
-                  visualDensity: VisualDensity.compact,
-                  onPressed: _refreshDiff,
-                ),
-              IconButton(
-                key: const Key('review-close'),
-                icon: const Icon(Icons.close, size: 18),
-                tooltip: l10n.cancel,
-                visualDensity: VisualDensity.compact,
-                onPressed: () => _updateState(() => _reviewOpen = false),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: files.isEmpty
-              ? Center(
-                  child: Text(
-                    l10n.reviewNoFiles,
-                    style: TextStyle(color: scheme.onSurfaceVariant),
-                  ),
-                )
-              : Row(
-                  children: [
-                    Expanded(
-                      child: selected == null
-                          ? Center(
-                              child: Text(
-                                l10n.reviewPickFile,
-                                style: TextStyle(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            )
-                          : DiffReviewView(
-                              key: ValueKey(selected.path),
-                              file: selected,
-                              branch: _branch,
-                              onLoadFile: _loadReviewFile,
-                            ),
-                    ),
-                    _splitter(
-                      key: const Key('review-tree-splitter'),
-                      onDrag: (dx) => _updateState(
-                        () => _treeWidth = (_treeWidth - dx).clamp(180, 420),
-                      ),
-                    ),
-                    SizedBox(
-                      width: _treeWidth.clamp(180, 420),
-                      child: ChangedFileTree(
-                        files: files,
-                        selected: selected?.path,
-                        onSelect: (p) => _updateState(() => _reviewFile = p),
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ],
     );
   }
 
@@ -454,7 +381,7 @@ extension _SessionReview on _AppSessionState {
       child: Row(
         children: [
           Icon(
-            Icons.checklist_rtl,
+            AppIcons.checklist_rtl,
             size: 18,
             color: scheme.onTertiaryContainer,
           ),
@@ -546,7 +473,7 @@ extension _SessionReview on _AppSessionState {
               ),
               IconButton(
                 key: const Key('session-error-dismiss'),
-                icon: const Icon(Icons.close, size: 18),
+                icon: const Icon(AppIcons.close, size: 18),
                 tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                 onPressed: () => _updateState(() {
                   _error = null;

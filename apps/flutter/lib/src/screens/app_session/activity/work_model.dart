@@ -107,40 +107,40 @@ class ActivityGroup {
   AppLocalizations l10n,
 ) {
   return switch (type) {
-    'webSearch' => (icon: Icons.travel_explore, label: l10n.toolSearched),
-    'commandExecution' => (icon: Icons.terminal, label: l10n.toolRan),
-    'fileChange' => (icon: Icons.edit_document, label: l10n.toolEdited),
+    'webSearch' => (icon: AppIcons.travel_explore, label: l10n.toolSearched),
+    'commandExecution' => (icon: AppIcons.terminal, label: l10n.toolRan),
+    'fileChange' => (icon: AppIcons.edit_document, label: l10n.toolEdited),
     'mcpToolCall' ||
-    'dynamicToolCall' => (icon: Icons.extension, label: l10n.toolCalled),
+    'dynamicToolCall' => (icon: AppIcons.extension, label: l10n.toolCalled),
     'collabAgentToolCall' => (
-      icon: Icons.groups_outlined,
+      icon: AppIcons.groups_outlined,
       label: l10n.toolCollaborated,
     ),
     'subAgentActivity' => (
-      icon: Icons.account_tree_outlined,
+      icon: AppIcons.account_tree_outlined,
       label: l10n.toolSubAgent,
     ),
     'imageView' => (
-      icon: Icons.image_search_outlined,
+      icon: AppIcons.image_search_outlined,
       label: l10n.toolViewedImage,
     ),
     'imageGeneration' => (
-      icon: Icons.auto_awesome_outlined,
+      icon: AppIcons.auto_awesome_outlined,
       label: l10n.toolGeneratedImage,
     ),
-    'sleep' => (icon: Icons.hourglass_empty, label: l10n.toolWaited),
-    'hookPrompt' => (icon: Icons.webhook_outlined, label: l10n.toolHook),
+    'sleep' => (icon: AppIcons.hourglass_empty, label: l10n.toolWaited),
+    'hookPrompt' => (icon: AppIcons.webhook_outlined, label: l10n.toolHook),
     'enteredReviewMode' => (
-      icon: Icons.fact_check_outlined,
+      icon: AppIcons.fact_check_outlined,
       label: l10n.toolEnteredReview,
     ),
     'exitedReviewMode' => (
-      icon: Icons.fact_check_outlined,
+      icon: AppIcons.fact_check_outlined,
       label: l10n.toolExitedReview,
     ),
-    'reasoning' => (icon: Icons.lightbulb_outline, label: l10n.toolThinking),
-    'plan' => (icon: Icons.checklist, label: l10n.toolPlan),
-    _ => (icon: Icons.bolt, label: l10n.toolActivity),
+    'reasoning' => (icon: AppIcons.lightbulb_outline, label: l10n.toolThinking),
+    'plan' => (icon: AppIcons.checklist, label: l10n.toolPlan),
+    _ => (icon: AppIcons.bolt, label: l10n.toolActivity),
   };
 }
 
@@ -160,7 +160,7 @@ Color activityTint(String type, ColorScheme scheme) {
     'dynamicToolCall' ||
     'collabAgentToolCall' ||
     'subAgentActivity' =>
-      light ? const Color(0xFFB0306E) : const Color(0xFFF08DBA),
+      light ? const Color(0xFFA63D55) : const Color(0xFFEE8FA2),
     _ => scheme.onSurfaceVariant,
   };
 }

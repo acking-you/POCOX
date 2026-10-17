@@ -1,9 +1,9 @@
 /// The in-transcript diff surface: one changed file as a collapsible tile over
 /// its syntax-highlighted hunks.
 ///
-/// Distinct from `widgets/diff_review.dart`, which is the *desktop review split*
-/// — a file tree beside a full-height diff. This is the compact form that sits
-/// inline in a `fileChange` row, so it is height-bounded and collapsed by
+/// Distinct from the review (`src/review/`), which reads a file's changes at
+/// full height beside or over the conversation. This is the compact form that
+/// sits inline in a `fileChange` row, so it is height-bounded and collapsed by
 /// default. The shared diff parsing and hunk-header helpers are in
 /// `src/git_diff.dart`.
 library;
@@ -15,6 +15,7 @@ import 'package:pocket_codex/src/code_highlight.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/git_diff.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Most diff lines rendered for one expanded file. Everything inside a
 /// [SingleChildScrollView] is laid out whether or not it is on screen, so this
@@ -102,7 +103,7 @@ class DiffFileTile extends StatelessWidget {
           IconButton(
             tooltip: l10n.copy,
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.copy_outlined, size: 15),
+            icon: const Icon(AppIcons.copy_outlined, size: 15),
             onPressed: () => Clipboard.setData(ClipboardData(text: file.path)),
           ),
         ],

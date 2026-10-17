@@ -11,6 +11,8 @@ import 'package:pocket_codex/src/file_links.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/file_preview.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 const _previewLimit = 8 * 1024 * 1024;
 const _textLimit = 1024 * 1024;
@@ -38,7 +40,7 @@ class SessionFileLinks extends StatelessWidget {
     open: (context, href) async {
       final uri = Uri.tryParse(href.trim());
       if (uri != null && isHostLocalWebUrl(uri)) {
-        await showDialog<void>(
+        await showAppDialog<void>(
           context: context,
           builder: (_) =>
               _HostWebLink(api: api, serviceKey: serviceKey, url: href),
@@ -47,7 +49,7 @@ class SessionFileLinks extends StatelessWidget {
       }
       final link = FileLink.parse(href, cwd: cwd);
       if (link == null) return false;
-      await showDialog<void>(
+      await showAppDialog<void>(
         context: context,
         builder: (_) => _FileLinkDialog(
           api: api,
@@ -313,7 +315,7 @@ class _FileLinkDialogState extends State<_FileLinkDialog> {
         ),
         FilledButton.icon(
           onPressed: _busy ? null : () => _run(true),
-          icon: const Icon(Icons.download),
+          icon: const Icon(AppIcons.download),
           label: Text(l10n.fileLinkDownload),
         ),
       ],

@@ -508,12 +508,17 @@ class HostRuntimeDto {
   /// ACP: the agent's profile and exact command line.
   final AcpAgentSpecDto? agent;
 
+  /// OpenCode: keep this host's sessions in a database of its own instead
+  /// of OpenCode's default one (which one host serves at a time).
+  final bool separateHistory;
+
   const HostRuntimeDto({
     required this.kind,
     this.binary,
     required this.port,
     this.proxy,
     this.agent,
+    required this.separateHistory,
   });
 
   @override
@@ -522,7 +527,8 @@ class HostRuntimeDto {
       binary.hashCode ^
       port.hashCode ^
       proxy.hashCode ^
-      agent.hashCode;
+      agent.hashCode ^
+      separateHistory.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -533,7 +539,8 @@ class HostRuntimeDto {
           binary == other.binary &&
           port == other.port &&
           proxy == other.proxy &&
-          agent == other.agent;
+          agent == other.agent &&
+          separateHistory == other.separateHistory;
 }
 
 /// A host started by [`app_serve_start_configured`].

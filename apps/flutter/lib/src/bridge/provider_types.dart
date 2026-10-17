@@ -63,17 +63,19 @@ class HostRuntime {
   /// A native Codex runtime.
   const HostRuntime.codex({this.binary, this.port = 0, this.proxy})
     : kind = 'codex',
-      agent = null;
+      agent = null,
+      separateHistory = false;
 
   /// An ACP agent runtime.
   const HostRuntime.acp(AcpAgentSpec this.agent)
     : kind = 'acp',
       binary = null,
       port = 0,
-      proxy = null;
+      proxy = null,
+      separateHistory = false;
 
   /// A native OpenCode runtime (`opencode serve`, owned by the host).
-  const HostRuntime.opencode({this.binary})
+  const HostRuntime.opencode({this.binary, this.separateHistory = false})
     : kind = 'opencode',
       port = 0,
       proxy = null,
@@ -94,6 +96,10 @@ class HostRuntime {
 
   /// ACP: the agent's profile and exact command line.
   final AcpAgentSpec? agent;
+
+  /// OpenCode: the host keeps its sessions in a database of its own, not in
+  /// OpenCode's default one (which one host serves at a time).
+  final bool separateHistory;
 
   /// Whether this is a native Codex runtime.
   bool get isCodex => kind == 'codex';

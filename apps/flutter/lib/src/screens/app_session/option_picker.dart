@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// At most this many values open as a plain menu; more open the searchable
 /// list.
@@ -51,6 +52,7 @@ Future<String?> showOptionPicker(
   final sheet = MediaQuery.sizeOf(context).width < kDesktopPanelWidth;
   return showAdaptivePanel<String>(
     context: context,
+    anchored: true,
     scrollable: false,
     maxWidth: 520,
     builder: (_) => OptionPickerList(option: option, avoidKeyboard: sheet),
@@ -129,7 +131,7 @@ class _OptionPickerListState extends State<OptionPickerList> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-        trailing: selected ? const Icon(Icons.check, size: 18) : null,
+        trailing: selected ? const Icon(AppIcons.check, size: 18) : null,
         onTap: () => Navigator.of(context).pop(value.value),
       );
     }
@@ -156,7 +158,7 @@ class _OptionPickerListState extends State<OptionPickerList> {
             autofocus: true,
             decoration: InputDecoration(
               isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 18),
+              prefixIcon: const Icon(AppIcons.search, size: 18),
               hintText: l10n.agentOptionSearch(option.name),
             ),
             onChanged: (_) => setState(() {}),

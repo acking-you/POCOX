@@ -6842,12 +6842,14 @@ impl SseDecode for crate::api::bridge::host_config::HostRuntimeDto {
         let mut var_proxy = <Option<String>>::sse_decode(deserializer);
         let mut var_agent =
             <Option<crate::api::bridge::hosting::AcpAgentSpecDto>>::sse_decode(deserializer);
+        let mut var_separateHistory = <bool>::sse_decode(deserializer);
         return crate::api::bridge::host_config::HostRuntimeDto {
             kind: var_kind,
             binary: var_binary,
             port: var_port,
             proxy: var_proxy,
             agent: var_agent,
+            separate_history: var_separateHistory,
         };
     }
 }
@@ -7465,6 +7467,7 @@ impl SseDecode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
         let mut var_defaultModel = <Option<String>>::sse_decode(deserializer);
         let mut var_agents = <Vec<String>>::sse_decode(deserializer);
         let mut var_problem = <Option<String>>::sse_decode(deserializer);
+        let mut var_separateHistory = <bool>::sse_decode(deserializer);
         return crate::api::bridge::hosting::OpenCodeHostStatusDto {
             version: var_version,
             providers_connected: var_providersConnected,
@@ -7472,6 +7475,7 @@ impl SseDecode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
             default_model: var_defaultModel,
             agents: var_agents,
             problem: var_problem,
+            separate_history: var_separateHistory,
         };
     }
 }
@@ -9928,6 +9932,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::host_config::HostRunt
             self.port.into_into_dart().into_dart(),
             self.proxy.into_into_dart().into_dart(),
             self.agent.into_into_dart().into_dart(),
+            self.separate_history.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -10302,6 +10307,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::hosting::OpenCodeHost
             self.default_model.into_into_dart().into_dart(),
             self.agents.into_into_dart().into_dart(),
             self.problem.into_into_dart().into_dart(),
+            self.separate_history.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -11364,6 +11370,7 @@ impl SseEncode for crate::api::bridge::host_config::HostRuntimeDto {
         <u16>::sse_encode(self.port, serializer);
         <Option<String>>::sse_encode(self.proxy, serializer);
         <Option<crate::api::bridge::hosting::AcpAgentSpecDto>>::sse_encode(self.agent, serializer);
+        <bool>::sse_encode(self.separate_history, serializer);
     }
 }
 
@@ -11816,6 +11823,7 @@ impl SseEncode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
         <Option<String>>::sse_encode(self.default_model, serializer);
         <Vec<String>>::sse_encode(self.agents, serializer);
         <Option<String>>::sse_encode(self.problem, serializer);
+        <bool>::sse_encode(self.separate_history, serializer);
     }
 }
 

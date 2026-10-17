@@ -305,8 +305,6 @@ void main() {
         await _frames(t);
         expect(find.byType(CodexSetupScreen), findsOneWidget);
 
-        await t.tap(find.byKey(const Key('codex-method-chatgpt')));
-        await _frames(t);
         final open = Completer<void>();
         api.localSessionGate = open;
         await t.ensureVisible(find.byKey(const Key('codex-login-chatgpt')));

@@ -106,6 +106,7 @@ extension _SessionHistory on _AppSessionState {
     final keys = rows.map(_rowKey).toSet();
     _lastWork = rows.whereType<TurnWork>().lastOrNull;
     _rowAnchors.removeWhere((key, _) => !keys.contains(key));
+    _indexRows(rows);
     return _cachedRows = rows;
   }
 
@@ -388,23 +389,35 @@ extension _SessionHistory on _AppSessionState {
     bool fromTop = false,
     bool reveal = false,
   }) {
-    final tid = _threadId!;
+    _historyError = false;
+    _historyTarget = (turnId, loadMore);
+    _historyFromTop = fromTop;
+    // The fetch is in flight before anything can throw, and only it clears
+    // its own mark once it has finished: a rebuild that could not be
+    // scheduled, or a fetch that failed at once, never leaves "loading" with
+    // nothing loading or a finished load still marked.
+    late final Future<void> load;
+    load =
+        _fetchHistory(
+          _threadId!,
+          _historyGeneration,
+          turnId,
+          loadMore,
+          preserveAnchor,
+          reveal,
+          _scrollIntent,
+          _turnNavigation,
+        ).whenComplete(() {
+          if (mounted && identical(_historyLoad, load)) {
+            _updateState(() {
+              _historyLoad = null;
+            });
+          }
+        });
     _updateState(() {
-      _loadingOlder = true;
-      _historyError = false;
-      _historyTarget = (turnId, loadMore);
-      _historyFromTop = fromTop;
+      _historyLoad = load;
     });
-    return _historyLoad = _fetchHistory(
-      tid,
-      _historyGeneration,
-      turnId,
-      loadMore,
-      preserveAnchor,
-      reveal,
-      _scrollIntent,
-      _turnNavigation,
-    );
+    return load;
   }
 
   Future<void> _fetchHistory(
@@ -448,7 +461,9 @@ extension _SessionHistory on _AppSessionState {
       }
       final anchor = preserveAnchor ? _captureHistoryAnchor() : null;
       _updateState(() {
-        _spliceTranscriptItems(items, atStart: true);
+        // A continuation is the later part of a turn already showing its
+        // start; everything else reads backwards.
+        _spliceTranscriptItems(items, atStart: !(turn != null && loadMore));
         if (turnId == null) {
           _hasOlder = older!.hasOlder;
           _sequentialHistoryIds.addAll(items.map((item) => item.id));
@@ -466,16 +481,17 @@ extension _SessionHistory on _AppSessionState {
           (row) => _rowItems(row).any((item) => arrived.contains(item.id)),
         );
         if (rowIndex >= 0) {
+          final arrival = _historyArrivalRevision + 1;
           _updateState(() {
             _historyArrivalRow = _rowKey(_rows[rowIndex]);
-            _historyArrivalRevision++;
+            _historyArrivalRevision = arrival;
           });
-          await WidgetsBinding.instance.endOfFrame;
-          if (current() &&
-              intent == _scrollIntent &&
-              navigation == _turnNavigation) {
-            _scrollToRow(rowIndex);
-          }
+          // The highlight plays once: a row scrolled away and back is the
+          // same history, not a new arrival (no rebuild needed to forget it).
+          Timer(const Duration(milliseconds: 1600), () {
+            if (_historyArrivalRevision == arrival) _historyArrivalRow = null;
+          });
+          _scrollToRow(rowIndex);
         }
         if (mounted && current() && navigation == _turnNavigation) {
           final l10n = AppLocalizations.of(context);
@@ -491,84 +507,7 @@ extension _SessionHistory on _AppSessionState {
       }
     } catch (_) {
       if (current()) _updateState(() => _historyError = true);
-    } finally {
-      if (current()) {
-        _updateState(() {
-          _loadingOlder = false;
-          _historyLoad = null;
-        });
-      }
     }
-  }
-
-  /// Capture at response time so scrolling during a slow request is respected.
-  (Key, double)? _captureHistoryAnchor() {
-    if (!_listCtl.isAttached || !_scroll.hasClients) return null;
-    final visible = _listCtl.visibleRange;
-    final rows = _rows;
-    if (visible == null || rows.isEmpty) return null;
-    var index = (visible.$1 - 1).clamp(0, rows.length - 1);
-    while (index < rows.length - 1 && rows[index] is HistoryGap) {
-      index++;
-    }
-    final key = _rowKey(rows[index]);
-    final box = _rowAnchors[key]?.currentContext?.findRenderObject();
-    if (box is! RenderBox || !box.hasSize) return null;
-    return (key, box.localToGlobal(Offset.zero).dy);
-  }
-
-  void _restoreHistoryAnchor((Key, double) anchor, int generation) {
-    final navigation = _turnNavigation;
-    final intent = _scrollIntent;
-    final epoch = ++_settleEpoch;
-    _settlingToEnd = true;
-    void restore(int remaining) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted ||
-            generation != _historyGeneration ||
-            navigation != _turnNavigation ||
-            intent != _scrollIntent ||
-            epoch != _settleEpoch) {
-          if (epoch == _settleEpoch) _settlingToEnd = false;
-          return;
-        }
-        if (!_scroll.hasClients || !_listCtl.isAttached) {
-          _settlingToEnd = false;
-          return;
-        }
-        final index = _rows.indexWhere((row) => _rowKey(row) == anchor.$1);
-        if (index < 0) {
-          _settlingToEnd = false;
-          return;
-        }
-        final box = _rowAnchors[anchor.$1]?.currentContext?.findRenderObject();
-        if (box is RenderBox && box.hasSize) {
-          final delta = box.localToGlobal(Offset.zero).dy - anchor.$2;
-          if (delta.abs() > 0.5) {
-            _scroll.jumpTo(
-              (_scroll.offset + delta).clamp(
-                _scroll.position.minScrollExtent,
-                _scroll.position.maxScrollExtent,
-              ),
-            );
-          }
-        } else {
-          _listCtl.jumpToItem(
-            index: index + 1,
-            scrollController: _scroll,
-            alignment: 0,
-          );
-        }
-        if (remaining > 0) {
-          restore(remaining - 1);
-          WidgetsBinding.instance.scheduleFrame();
-        } else {
-          _settlingToEnd = false;
-        }
-      });
-    }
-
-    restore(2);
   }
 
   GlobalKey _anchorKey(Object row) =>

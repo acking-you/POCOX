@@ -12,6 +12,7 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/error_retry.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Show the host file-transfer panel over [serviceKey]'s meta tunnel: browse
 /// the host's configured project roots, download a host file to local disk, or
@@ -214,7 +215,7 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
               if (!atRoots)
                 IconButton(
                   key: const Key('file-up-btn'),
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(AppIcons.arrow_back),
                   tooltip: l10n.folderUp,
                   onPressed: (_loading || _busy) ? null : _up,
                 ),
@@ -271,7 +272,7 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
                   // Upload targets the current folder; disabled at the roots
                   // list (no folder chosen) or while busy.
                   onPressed: (_current == null || _busy) ? null : _upload,
-                  icon: const Icon(Icons.upload_file, size: 18),
+                  icon: const Icon(AppIcons.upload_file, size: 18),
                   label: Text(l10n.fileUpload),
                 ),
               ],
@@ -329,18 +330,18 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
           ListTile(
             key: Key('file-dir-${d.path}'),
             leading: Icon(
-              d.isGitRepo ? Icons.source_outlined : Icons.folder_outlined,
+              d.isGitRepo ? AppIcons.source_outlined : AppIcons.folder_outlined,
               color: d.isGitRepo ? scheme.primary : scheme.onSurfaceVariant,
             ),
             title: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-            trailing: const Icon(Icons.chevron_right, size: 20),
+            trailing: const Icon(AppIcons.chevron_right, size: 20),
             onTap: (_loading || _busy) ? null : () => _enter(d.path),
           ),
         for (final f in _files)
           ListTile(
             key: Key('file-row-${f.path}'),
             leading: Icon(
-              Icons.insert_drive_file_outlined,
+              AppIcons.insert_drive_file_outlined,
               color: scheme.onSurfaceVariant,
             ),
             title: Text(f.name, maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -350,7 +351,7 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
             ),
             trailing: IconButton(
               key: Key('file-download-${f.path}'),
-              icon: const Icon(Icons.download_outlined),
+              icon: const Icon(AppIcons.download_outlined),
               tooltip: l10n.fileDownload,
               onPressed: _busy ? null : () => _download(f),
             ),

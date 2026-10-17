@@ -1,4 +1,5 @@
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 
 /// Which saved hosting to bring back on a desktop cold start.
@@ -49,23 +50,13 @@ class HostRestorePlan {
   );
 }
 
-/// Instance names compare as the bridge canonicalizes them
-/// (`pocket_codex_core::service::sanitize_component`): lowercase, keep
-/// `a-z0-9_.`, turn every other run into one `-`, trim dashes, else `default`.
-String _canonical(String name) {
-  final id = name
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9_.]+'), '-')
-      .replaceAll(RegExp(r'^-+|-+$'), '');
-  return id.isEmpty ? 'default' : id;
-}
-
 /// Plan the restore: each name at most once per run (callers track the
 /// attempts by instance name, per provider), and only names this device does
 /// not host already. Names are shared by every provider on a device, so a
-/// name taken by any running host is not restored over it. One OpenCode host
-/// per device: none is restored beside a running one.
+/// name taken by any running host is not restored over it. Instance names
+/// compare as the bridge canonicalizes them ([canonicalHostName]). One host
+/// at a time serves OpenCode's default database: no second one is restored
+/// beside it, while hosts with a history of their own all are.
 ///
 /// An override for a name, even one that only says "stopped", replaces that
 /// name's UI record, so a stopped host is never brought back from stale
@@ -80,7 +71,7 @@ HostRestorePlan planHostRestore(
 }) {
   // Identities only; the bridge still receives each record's original name.
   Set<String> ids(Iterable<String> names) => {
-    for (final n in names) _canonical(n),
+    for (final n in names) canonicalHostName(n),
   };
   final hosted = ids(local.map((h) => h.name));
   final overridden = ids(overrides.map((o) => o.name));
@@ -89,28 +80,28 @@ HostRestorePlan planHostRestore(
   // Names this plan already restores: an alias is planned once.
   final planned = <String>{};
   bool open(String name, Set<String> tried) {
-    final id = _canonical(name);
+    final id = canonicalHostName(name);
     return !tried.contains(id) &&
         !hosted.contains(id) &&
         !overridden.contains(id) &&
         planned.add(id);
   }
 
-  var openCodeTaken = local.any((h) => h.isOpenCode);
+  var sharedHistoryTaken = local.any((h) => h.servesOpenCodeHistory);
 
   final chosen = <HostRestoreOverride>[];
   for (final o in overrides) {
     final runtime = o.runtime;
     if (runtime == null) continue;
-    final id = _canonical(o.name);
+    final id = canonicalHostName(o.name);
     final tried = runtime.isCodex ? codexTried : acpTried;
     if (tried.contains(id) || hosted.contains(id) || planned.contains(id)) {
       continue;
     }
     if (!runtime.isCodex && !acpSupported) continue;
-    if (runtime.isOpenCode) {
-      if (openCodeTaken) continue;
-      openCodeTaken = true;
+    if (runtime.isOpenCode && !runtime.separateHistory) {
+      if (sharedHistoryTaken) continue;
+      sharedHistoryTaken = true;
     }
     planned.add(id);
     chosen.add(o);
@@ -126,11 +117,12 @@ HostRestorePlan planHostRestore(
           for (final saved in prefs.autoHostAcp)
             if (open(saved.name, acpTried)) saved,
         ];
+  // The legacy record predates separate histories: OpenCode's default one.
   final saved = prefs.autoHostOpenCode;
   final opencode =
       saved == null ||
           !acpSupported ||
-          openCodeTaken ||
+          sharedHistoryTaken ||
           !open(saved.name, acpTried)
       ? null
       : saved;

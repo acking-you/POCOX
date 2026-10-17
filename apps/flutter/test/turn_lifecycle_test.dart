@@ -83,6 +83,11 @@ SessionLiveness liveness(bool running) => SessionLiveness(
 );
 
 Future<void> mount(WidgetTester t, FakeBridgeApi api) async {
+  // Tall enough that a failed turn's banner and the composer, which float
+  // over the transcript's foot, leave its rows in view.
+  t.view.physicalSize = const Size(900, 1000);
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
   await api.appConnect(service, 28080);
   await t.pumpWidget(
     host(

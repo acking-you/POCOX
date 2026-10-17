@@ -360,8 +360,11 @@ void main() {
     expect(find.text('My Agent'), findsOneWidget);
     expect(find.text('Claude'), findsNothing);
     expect(find.byKey(const Key('claude-environment-section')), findsNothing);
-    expect(find.byKey(const Key('host-source-inherited')), findsOneWidget);
+    // Its own configuration is the only model service: no choice is shown,
+    // only what it uses.
+    expect(find.byKey(const Key('host-source-inherited')), findsNothing);
     expect(find.byKey(const Key('host-source-custom')), findsNothing);
+    expect(find.text(_en.managedInheritedNote), findsOneWidget);
     expect(find.byKey(const Key('managed-port')), findsNothing);
     expect(
       managedModelSummary(_en, host),

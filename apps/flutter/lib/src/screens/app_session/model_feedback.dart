@@ -17,6 +17,8 @@ import 'package:pocket_codex/src/screens/app_session/activity_cards.dart'
 import 'package:pocket_codex/src/screens/app_session/message_actions.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// A `modelError` item's body (also a classified terminal `turn.error`):
 /// `{code, statusCode?, retryable, model, provider, itemId, turnId}`.
@@ -159,7 +161,7 @@ class ModelErrorCard extends StatelessWidget {
         TextButton.icon(
           key: const Key('model-error-change-model'),
           onPressed: change,
-          icon: const Icon(Icons.auto_awesome, size: 16),
+          icon: const Icon(AppIcons.auto_awesome, size: 16),
           label: Text(l10n.modelErrorChangeModel),
         ),
       if (retry)
@@ -173,7 +175,7 @@ class ModelErrorCard extends StatelessWidget {
                     dimension: 14,
                     child: CircularProgressIndicator(strokeWidth: 1.5),
                   )
-                : const Icon(Icons.refresh_rounded, size: 16),
+                : const Icon(AppIcons.refresh_rounded, size: 16),
             label: Text(l10n.modelErrorRetry),
           ),
         ),
@@ -194,7 +196,11 @@ class ModelErrorCard extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.only(top: 1),
-              child: Icon(Icons.error_outline, size: 16, color: scheme.error),
+              child: Icon(
+                AppIcons.error_outline,
+                size: 16,
+                color: scheme.error,
+              ),
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -209,7 +215,7 @@ class ModelErrorCard extends StatelessWidget {
                     Text(
                       details,
                       key: const Key('model-error-details'),
-                      style: TextStyle(fontSize: 11.5, color: muted),
+                      style: helpTextStyle(theme).copyWith(color: muted),
                     ),
                   ],
                   if (actions?.incomplete ?? false) ...[
@@ -262,12 +268,14 @@ class ReasoningOutputView extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(Icons.lightbulb_outline, size: 13, color: muted),
+              Icon(AppIcons.lightbulb_outline, size: 13, color: muted),
               const SizedBox(width: 5),
               Flexible(
                 child: Text(
                   l10n.reasoningOutputNote,
-                  style: TextStyle(fontSize: 11.5, color: muted),
+                  style: helpTextStyle(
+                    Theme.of(context),
+                  ).copyWith(color: muted),
                 ),
               ),
             ],
@@ -281,7 +289,7 @@ class ReasoningOutputView extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: MessageAction(
-                icon: Icons.content_copy_outlined,
+                icon: AppIcons.content_copy_outlined,
                 tooltip: l10n.copy,
                 onPressed: () {
                   Clipboard.setData(ClipboardData(text: text));

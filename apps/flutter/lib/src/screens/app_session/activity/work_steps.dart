@@ -79,7 +79,7 @@ class _TurnWorkCardState extends State<TurnWorkCard> {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Material(
             color: running
-                ? accentWash(scheme)
+                ? softWash(scheme)
                 : scheme.surfaceContainer.withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(kControlRadius),
             child: InkWell(
@@ -105,7 +105,11 @@ class _TurnWorkCardState extends State<TurnWorkCard> {
                         ),
                       )
                     else
-                      Icon(Icons.construction_rounded, size: 14, color: muted),
+                      Icon(
+                        AppIcons.construction_rounded,
+                        size: 14,
+                        color: muted,
+                      ),
                     const SizedBox(width: 7),
                     Flexible(
                       child: Text(
@@ -132,8 +136,8 @@ class _TurnWorkCardState extends State<TurnWorkCard> {
                           children: [
                             Icon(
                               reviews.refused > 0
-                                  ? Icons.gpp_bad_outlined
-                                  : Icons.verified_user_outlined,
+                                  ? AppIcons.gpp_bad_outlined
+                                  : AppIcons.verified_user_outlined,
                               size: 13,
                               color: reviews.refused > 0 ? scheme.error : muted,
                             ),
@@ -160,7 +164,7 @@ class _TurnWorkCardState extends State<TurnWorkCard> {
                       duration: Motion.of(context, Motion.fast),
                       curve: Motion.move,
                       child: Icon(
-                        Icons.keyboard_arrow_right_rounded,
+                        AppIcons.keyboard_arrow_right_rounded,
                         size: 16,
                         color: muted,
                       ),
@@ -335,7 +339,7 @@ class _WorkStepsState extends State<_WorkSteps> {
   Future<void> _choose() async {
     final l10n = AppLocalizations.of(context);
     var input = '${_start + 1}';
-    final picked = await showDialog<int>(
+    final picked = await showAppDialog<int>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(l10n.jumpToStep),
@@ -387,14 +391,14 @@ class _WorkStepsState extends State<_WorkSteps> {
             ),
             IconButton(
               tooltip: l10n.previousSteps,
-              icon: const Icon(Icons.chevron_left),
+              icon: const Icon(AppIcons.chevron_left),
               onPressed: start == 0
                   ? null
                   : () => _go(math.max(0, start - _pageSize)),
             ),
             IconButton(
               tooltip: l10n.nextSteps,
-              icon: const Icon(Icons.chevron_right),
+              icon: const Icon(AppIcons.chevron_right),
               onPressed: end == widget.items.length ? null : () => _go(end),
             ),
             TextButton(onPressed: _latest, child: Text(l10n.latestSteps)),
@@ -460,7 +464,7 @@ class _CollapseRow extends StatelessWidget {
       padding: const EdgeInsets.only(top: 4),
       child: TextButton.icon(
         onPressed: onTap,
-        icon: const Icon(Icons.keyboard_arrow_up_rounded, size: 18),
+        icon: const Icon(AppIcons.keyboard_arrow_up_rounded, size: 18),
         label: Text(label),
         style: TextButton.styleFrom(
           foregroundColor: scheme.onSurfaceVariant,

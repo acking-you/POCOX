@@ -43,6 +43,8 @@ import 'package:re_highlight/languages/xml.dart';
 import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
 
+import 'package:pocket_codex/src/lru_cache.dart';
+
 /// The registry, built once. Grammar compilation is not free, and a streaming
 /// turn re-renders every code block in the transcript on every chunk.
 final Highlight _hl = () {
@@ -137,11 +139,12 @@ const int _maxHighlightChars = 20000;
 /// which is the intended behaviour: an unrecognised token is not a colour.
 Map<String, TextStyle> _syntaxTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
-  final keyword = dark ? const Color(0xFFEF6E9F) : const Color(0xFFA62457);
+  // No purple, and few hues: numbers share the types' amber.
+  final keyword = dark ? const Color(0xFFF07A8A) : const Color(0xFFAD3445);
   final type = dark ? const Color(0xFFD9A054) : const Color(0xFF96540A);
-  final function = dark ? const Color(0xFFB49AEC) : const Color(0xFF6E4DBE);
+  final function = dark ? const Color(0xFF8EB0F0) : const Color(0xFF2B5CB8);
   final string = dark ? const Color(0xFF5BC4AF) : const Color(0xFF0E7264);
-  final number = dark ? const Color(0xFF74A9EC) : const Color(0xFF1F63BC);
+  final number = type;
   final comment = dark ? const Color(0xFF8A8177) : const Color(0xFF8C8579);
   final meta = dark ? const Color(0xFF8FA3CE) : const Color(0xFF5F6E8C);
   final punctuation = dark ? const Color(0xFF938D82) : const Color(0xFF6F6A60);
@@ -201,6 +204,30 @@ TextSpan highlightCode({
   if (lang == null || code.length > _maxHighlightChars) {
     return TextSpan(text: code, style: base);
   }
+  // A block scrolled back into view (or re-laid out for a theme switch it
+  // has already seen) reuses its spans: the sweep is the costly part.
+  return _highlights.putIfAbsent((
+    code,
+    lang,
+    base,
+    brightness,
+    allowItalic,
+  ), () => _highlight(code, lang, base, brightness, allowItalic));
+}
+
+final _highlights =
+    LruCache<(String, String, TextStyle, Brightness, bool), TextSpan>(
+      maxWeight: 1 << 21,
+      weigh: (key, _) => key.$1.length,
+    );
+
+TextSpan _highlight(
+  String code,
+  String lang,
+  TextStyle base,
+  Brightness brightness,
+  bool allowItalic,
+) {
   try {
     final result = _hl.highlight(code: code, language: lang);
     final renderer = TextSpanRenderer(base, _syntaxTheme(brightness));

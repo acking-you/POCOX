@@ -170,9 +170,10 @@ extension _SessionTitle on _AppSessionState {
     final scheme = Theme.of(context).colorScheme;
     // No rule under the header: the status line below it continues the same
     // block (title, then its facts) and carries the one hairline.
-    return Container(
-      height: WindowChrome.barHeight,
-      color: surfaceBackground(scheme),
+    // The bar heads the sheet: transparent on it, and centred on the traffic
+    // lights' line.
+    return SizedBox(
+      height: WindowChrome.sheetBarHeight,
       child: Stack(
         // Centre the row on the strip, so every control shares the traffic
         // lights' centre line.
@@ -183,17 +184,17 @@ extension _SessionTitle on _AppSessionState {
             children: [
               // With the sidebar hidden this strip owns the leading corner, so
               // it clears the traffic lights itself.
-              SizedBox(width: _leftOpen ? 10 : 8 + WindowChrome.leadingInset),
+              SizedBox(width: _leftOpen ? 10 : WindowChrome.leadingInset),
               if (!_leftOpen) ...[
                 _chromeButton(
                   key: const Key('sidebar-expand-btn'),
                   tooltip: _withShortcut(l10n.showSidebar, 'B'),
-                  icon: Icons.view_sidebar_outlined,
+                  icon: AppIcons.panel_left_open,
                   onPressed: () => _setLeftOpen(true),
                 ),
                 _chromeButton(
                   tooltip: _withShortcut(l10n.newConversation, 'N'),
-                  icon: Icons.edit_square,
+                  icon: AppIcons.edit_square,
                   onPressed: () => _newConversationInProject(_cwd, context),
                 ),
                 const SizedBox(width: 4),
@@ -201,7 +202,7 @@ extension _SessionTitle on _AppSessionState {
               if (!widget.home)
                 _chromeButton(
                   tooltip: l10n.backToSessions,
-                  icon: Icons.arrow_back,
+                  icon: AppIcons.arrow_back,
                   onPressed: _backToSessions,
                 ),
               const SizedBox(width: 6),
@@ -241,7 +242,7 @@ extension _SessionTitle on _AppSessionState {
                 PopupMenuButton<String>(
                   tooltip: l10n.moreActions,
                   icon: Icon(
-                    Icons.more_horiz,
+                    AppIcons.more_horiz,
                     size: 18,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -329,7 +330,6 @@ extension _SessionTitle on _AppSessionState {
                 horizontal: 8,
                 vertical: 6,
               ),
-              border: const OutlineInputBorder(),
             ),
             onSubmitted: _renameThread,
             onTapOutside: (_) {

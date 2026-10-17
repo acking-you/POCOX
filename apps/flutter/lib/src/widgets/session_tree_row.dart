@@ -5,6 +5,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/motion.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Parent/child affordances shared by live and on-disk session inventories.
 ///
@@ -162,7 +163,7 @@ class SessionTreeRow extends StatelessWidget {
           child: Transform.flip(
             flipX: rtl,
             child: Icon(
-              Icons.keyboard_arrow_right,
+              AppIcons.keyboard_arrow_right,
               size: isDesktop ? 16 : 20,
               color: scheme.onSurfaceVariant,
             ),

@@ -16,6 +16,8 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 /// Event kind of an ACP permission request.
 const agentPermissionKind = 'acp/permission/requested';
@@ -159,7 +161,7 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
     if (_sending) return;
     if (option.remembers) {
       final l10n = AppLocalizations.of(context);
-      final ok = await showDialog<bool>(
+      final ok = await showAppDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(l10n.permissionRememberTitle),
@@ -232,7 +234,7 @@ class _AgentPermissionCardState extends State<AgentPermissionCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.shield_outlined, size: 18, color: scheme.primary),
+                Icon(AppIcons.shield_outlined, size: 18, color: scheme.primary),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(

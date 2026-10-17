@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
 import 'package:pocket_codex/src/widgets/turn_minimap.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A searchable, virtualized index; opening or searching it never loads history.
 Future<TurnMinimapItem?> showTurnOutline(
@@ -78,7 +79,7 @@ class _TurnOutlineState extends State<_TurnOutline> {
                 IconButton(
                   tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(AppIcons.close),
                 ),
               ],
             ),
@@ -88,7 +89,7 @@ class _TurnOutlineState extends State<_TurnOutline> {
             child: TextField(
               key: const Key('turn-outline-search'),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon: const Icon(AppIcons.search),
                 hintText: l10n.searchTurns,
               ),
               onChanged: (value) {

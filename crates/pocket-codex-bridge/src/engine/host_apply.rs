@@ -90,6 +90,7 @@ pub fn active(name: &str) -> Option<Active> {
             incarnation: native.incarnation,
             runtime: Runtime::OpenCode {
                 binary: Some(native.prepared.binary()),
+                separate_history: native.prepared.separate_history,
             },
             source: native.prepared.provider.source,
             revision: native.prepared.provider.revision,
@@ -295,14 +296,20 @@ fn apply_opencode(
         },
         expected,
         || {
-            let binary = match &desired.runtime {
+            let (binary, separate_history) = match &desired.runtime {
                 Some(Runtime::OpenCode {
                     binary,
-                }) => binary.clone(),
-                None => Some(running.prepared.binary()),
+                    separate_history,
+                }) => (binary.clone(), *separate_history),
+                None => (Some(running.prepared.binary()), running.prepared.separate_history),
                 Some(_) => bail!("the saved runtime is not an OpenCode runtime"),
             };
-            serve_opencode::prepare(lease.name(), binary.as_deref(), desired.clone())
+            serve_opencode::prepare(
+                lease.name(),
+                binary.as_deref(),
+                separate_history,
+                desired.clone(),
+            )
         },
         || serve_opencode::retire(lease.name()),
         |prepared| serve_opencode::launch_prepared(prepared).map(drop),

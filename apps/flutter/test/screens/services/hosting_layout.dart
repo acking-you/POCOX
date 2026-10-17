@@ -232,7 +232,7 @@ void _registerHostingLayout() {
     }
   });
 
-  testWidgets('large text keeps the identity, status and capability count '
+  testWidgets('large text keeps the identity, status and capability title '
       'whole', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     addTearDown(t.view.reset);
@@ -252,7 +252,6 @@ void _registerHostingLayout() {
       const relay = 'relay.example:7666';
       const online = 'Online';
       const title = 'Available capabilities';
-      const count = '1 capabilities';
       final identity = find.byKey(const Key('identity-open-settings'));
       final narrowList = find.byKey(const ValueKey('svc-narrow-devices'));
       Rect rectOf(Finder f) => t.getRect(f);
@@ -295,26 +294,21 @@ void _registerHostingLayout() {
         expect(status.didExceedMaxLines, isFalse);
       }
 
-      // The capabilities title and its count inside their card.
-      final card = find
-          .ancestor(of: find.text(title), matching: find.byType(Card))
-          .first;
-      Finder inCard(String text) =>
-          find.descendant(of: card, matching: find.text(text));
+      // The capabilities title inside its group.
       void countWhole(Size size) {
-        final bounds = rectOf(card);
-        for (final text in [title, count]) {
-          expect(inCard(text), findsOneWidget, reason: text);
-          final rect = rectOf(inCard(text));
-          expect(within(rect, bounds), isTrue, reason: text);
-          expect(within(rect, Offset.zero & size), isTrue, reason: text);
-        }
+        final card = find
+            .ancestor(of: find.text(title), matching: find.byType(GroupCard))
+            .first;
+        final rect = rectOf(find.text(title));
+        expect(within(rect, rectOf(card)), isTrue, reason: title);
+        expect(within(rect, Offset.zero & size), isTrue, reason: title);
+        final text = t.renderObject<RenderParagraph>(find.text(title));
+        expect(text.didExceedMaxLines, isFalse, reason: title);
       }
 
       for (final brightness in Brightness.values) {
         // Regular text on a desktop: the column beside the detail, the
-        // status beside the identity, the count at the end of the title's
-        // line.
+        // status beside the identity.
         await show(const Size(1440, 900), 1, brightness);
         expect(narrowList, findsNothing, reason: 'side by side');
         identityWhole(const Size(1440, 900));
@@ -326,11 +320,6 @@ void _registerHostingLayout() {
           reason: 'status on the identity line',
         );
         countWhole(const Size(1440, 900));
-        expect(
-          rectOf(inCard(count)).left,
-          greaterThan(rectOf(inCard(title)).right),
-          reason: 'count beside the title',
-        );
 
         // 3× text on a tablet: one level at a time, everything whole.
         await show(const Size(800, 900), 3, brightness);

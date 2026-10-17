@@ -12,6 +12,7 @@ import 'package:pocket_codex/src/hosting/claude_preparation_progress.dart';
 import 'package:pocket_codex/src/theme.dart';
 
 import 'support/ui_preview.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 final _catalog = [
   const ClaudeVariable(name: 'ANTHROPIC_BASE_URL', group: 'connection'),
@@ -143,8 +144,7 @@ Future<void> _mount(
 
 void main() {
   setUpAll(() async {
-    // Bundled fonts only: Figtree also stands in for the Apple system face,
-    // and the source-tree Noto Sans SC for the Apple CJK face, so previews
+    // Bundled fonts only: the source-tree Noto Sans SC for the Apple CJK face, so previews
     // do not depend on the fonts installed on this machine.
     await loadPreviewFonts(always: true);
     await (FontLoader('PingFang SC')..addFont(
@@ -247,7 +247,7 @@ void main() {
         final header = find.byKey(const Key('claude-env-group-models'));
         final glyph = find.descendant(
           of: header,
-          matching: find.byIcon(Icons.expand_more),
+          matching: find.byIcon(AppIcons.expand_more),
         );
         await _show(t, header);
         Focus.of(t.element(glyph)).requestFocus();

@@ -18,30 +18,47 @@ import 'package:flutter/material.dart';
 /// that a literal at every site drifts. They live here rather than in
 /// `theme.dart` because that file imports this one.
 
-/// Cards, panels, code blocks, message bubbles, menus.
-const double kPanelRadius = 12.0;
+/// Cards, panels, code blocks, message bubbles.
+const double kPanelRadius = 16.0;
 
 /// The composer card and other large raised frames.
-const double kComposerRadius = 16.0;
+const double kComposerRadius = 26.0;
 
 /// The phone composer: rounder, so the card reads as one soft control.
-const double kTouchComposerRadius = 22.0;
+const double kTouchComposerRadius = 28.0;
 
-/// Small controls: chips, pills, suggestion rows, hover chips.
-const double kControlRadius = 8.0;
+/// Small controls: chips, suggestion rows, hover chips, menu items.
+const double kControlRadius = 10.0;
 
-/// Sidebar rows and other list selections — the macOS source-list radius.
-const double kRowRadius = 6.0;
+/// Sidebar rows and other list selections.
+const double kRowRadius = 14.0;
 
-/// Rows and fields of the phone sidebar: a finger-sized list wants a softer
-/// corner than the desktop source list.
-const double kTouchRowRadius = 14.0;
+/// Rows and fields of the phone sidebar: a finger-sized list reads as a pill.
+const double kTouchRowRadius = 22.0;
+
+/// Grouped cards on secondary pages.
+const double kCardRadius = 20.0;
+
+/// The user's message bubble.
+const double kUserBubbleRadius = 22.0;
 
 /// Dialogs and modal panels.
-const double kDialogRadius = 14.0;
+const double kDialogRadius = 24.0;
+
+/// The content sheet laid over the window's backdrop.
+const double kSheetRadius = 18.0;
+
+/// The backdrop left showing around a content sheet.
+const double kSheetInset = 8.0;
+
+/// Text fields outside the composer.
+const double kFieldRadius = 14.0;
+
+/// Popup and context menus.
+const double kMenuRadius = 14.0;
 
 /// The desktop corner radius. Follows the design's control radius so a
-/// desktop-tuned button and a chat-surface chip round the same amount.
+/// desktop-tuned control and a chat-surface chip round the same amount.
 const double kDesktopRadius = kControlRadius;
 
 /// Every lift in the design is a single offsetless shadow of the ink at a low
@@ -140,32 +157,33 @@ MouseCursor _clickableCursor(Set<WidgetState> states) =>
     ? SystemMouseCursors.basic
     : SystemMouseCursors.click;
 
-/// Re-tune [base] for the desktop design language. Same colour scheme, denser
-/// and flatter chrome.
+/// Re-tune [base] for the desktop design language. Same colour scheme and
+/// shapes, denser chrome and pointer feedback instead of touch ripples.
 ThemeData desktopize(ThemeData base) {
   final scheme = base.colorScheme;
-  final border = BorderSide(color: scheme.outlineVariant, width: 1);
-  final radius = BorderRadius.circular(kDesktopRadius);
-  final shape = RoundedRectangleBorder(borderRadius: radius);
-  // Menus float over arbitrary content, so they sit on the opaque raised card
-  // rather than a wash — a translucent menu would let text read through it.
-  final menuColor = scheme.surfaceBright;
-  // A menu's hairline is a step firmer than a panel's, for the same reason.
-  final menuShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(kControlRadius + 2),
-    side: BorderSide(color: scheme.outlineVariant),
-  );
-  // Menus and dialogs float, so they get the one real shadow in the app.
-  final floatShadow = scheme.brightness == Brightness.light
-      ? Colors.black.withValues(alpha: 0.16)
-      : Colors.black.withValues(alpha: 0.5);
+  const pill = StadiumBorder();
+  const density = EdgeInsets.symmetric(horizontal: 16);
+  // `merge` keeps the receiver's values, so the desktop overrides come first.
+  ButtonStyle tune(ButtonStyle? style, {EdgeInsets padding = density}) =>
+      ButtonStyle(
+        // Standard density: compact would take another 8 px off a button
+        // that is already sized for a pointer.
+        visualDensity: VisualDensity.standard,
+        minimumSize: const WidgetStatePropertyAll(Size(36, 36)),
+        padding: WidgetStatePropertyAll(padding),
+        shape: const WidgetStatePropertyAll(pill),
+        textStyle: WidgetStatePropertyAll(
+          style?.textStyle
+              ?.resolve(const <WidgetState>{})
+              ?.copyWith(fontSize: 13.5),
+        ),
+        mouseCursor: clickable,
+      ).merge(style);
 
   return base.copyWith(
     // Denser rows, buttons, list tiles — desktop packs more per screen.
     visualDensity: VisualDensity.compact,
     // Hover is the desktop's primary affordance; the ripple is a touch idiom.
-    // Both are ink washes off the container ladder, so they composite correctly
-    // on the page and on a raised card alike.
     splashFactory: NoSplash.splashFactory,
     // Ink washes rather than opaque steps, so a hover reads the same over the
     // page, the sidebar and a raised card.
@@ -176,98 +194,57 @@ ThemeData desktopize(ThemeData base) {
     // widgets (`WidgetStateMouseCursor.adaptiveClickable`) resolves to a click
     // cursor ONLY on web — on a native desktop build it returns `basic`, so
     // every button, list row and chip in the app hovered as if it were inert
-    // content. Set once here rather than per widget: 90-odd call sites would
-    // each have had to remember, and a missed one is invisible until someone
-    // notices the arrow never changes.
+    // content. Set once here rather than per widget.
     //
     // Text and text-like surfaces are NOT affected — `TextField`,
     // `SelectionArea` and links resolve their own cursor (`textable` /
     // per-span), so an I-beam still wins where the content is selectable.
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
-        minimumSize: const Size(36, 36),
-      ).copyWith(mouseCursor: clickable),
+        minimumSize: const Size(34, 34),
+        iconSize: 18,
+      ).copyWith(mouseCursor: clickable).merge(base.iconButtonTheme.style),
     ),
     listTileTheme: base.listTileTheme.copyWith(mouseCursor: clickable),
     checkboxTheme: base.checkboxTheme.copyWith(mouseCursor: clickable),
     radioTheme: base.radioTheme.copyWith(mouseCursor: clickable),
     switchTheme: base.switchTheme.copyWith(mouseCursor: clickable),
-    segmentedButtonTheme: base.segmentedButtonTheme.copyWith(
-      style: ButtonStyle(mouseCursor: clickable),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: const ButtonStyle(
+        mouseCursor: clickable,
+      ).merge(base.segmentedButtonTheme.style),
     ),
-    dividerTheme: base.dividerTheme.copyWith(
-      color: scheme.outlineVariant,
-      thickness: 1,
-      space: 1,
-    ),
-    // Cards keep the base theme's panel look (raised card + panel radius);
-    // the lift is a soft shadow, not a Material elevation, on desktop too.
-    dialogTheme: base.dialogTheme.copyWith(
-      elevation: 24,
-      shadowColor: floatShadow,
-      backgroundColor: scheme.surfaceBright,
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kDialogRadius),
-        side: BorderSide(color: scheme.outlineVariant),
-      ),
+    menuButtonTheme: MenuButtonThemeData(
+      style: const ButtonStyle(
+        minimumSize: WidgetStatePropertyAll(Size(0, 34)),
+        mouseCursor: clickable,
+      ).merge(base.menuButtonTheme.style),
     ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
-      elevation: 8,
-      shadowColor: floatShadow,
-      color: menuColor,
-      surfaceTintColor: Colors.transparent,
-      shape: menuShape,
-      menuPadding: const EdgeInsets.symmetric(vertical: 4),
-      textStyle: TextStyle(fontSize: 13, color: scheme.onSurface),
-    ),
-    menuTheme: MenuThemeData(
-      style: MenuStyle(
-        elevation: const WidgetStatePropertyAll(8),
-        shadowColor: WidgetStatePropertyAll(floatShadow),
-        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
-        backgroundColor: WidgetStatePropertyAll(menuColor),
-        shape: WidgetStatePropertyAll(menuShape),
-        padding: const WidgetStatePropertyAll(EdgeInsets.all(4)),
-      ),
-    ),
-    // A quick, quiet tooltip — no long delay, no heavy chrome.
-    tooltipTheme: base.tooltipTheme.copyWith(
-      waitDuration: const Duration(milliseconds: 500),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: scheme.inverseSurface,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      textStyle: TextStyle(color: scheme.onInverseSurface, fontSize: 12),
+      textStyle: base.popupMenuTheme.textStyle?.copyWith(fontSize: 13),
     ),
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        shape: shape,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      ).copyWith(mouseCursor: clickable),
+      style: tune(base.filledButtonTheme.style),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        shape: shape,
-        side: border,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      ).copyWith(mouseCursor: clickable),
+      style: tune(base.outlinedButtonTheme.style),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(
-        shape: shape,
-      ).copyWith(mouseCursor: clickable),
+      style: tune(
+        base.textButtonTheme.style,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
-      style: const ButtonStyle(mouseCursor: clickable),
+      style: tune(base.elevatedButtonTheme.style),
     ),
     // Inputs are left to the widgets: the composer wants a borderless field
     // inside its own frame, the search pills want a filled borderless look, and
-    // dialogs want the default outline. A global input theme fights all three,
-    // so a desktop-bordered field is an opt-in (a future primitive), not a
-    // blanket override. Just tighten the default density.
-    inputDecorationTheme: base.inputDecorationTheme.copyWith(isDense: true),
+    // dialogs want the default outline. Just tighten the default density.
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    ),
     extensions: [DesktopTokens.of(scheme)],
   );
 }

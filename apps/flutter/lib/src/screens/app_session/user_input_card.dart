@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// One question parsed from an elicitation.
 class _UiQuestion {
@@ -191,7 +192,7 @@ class _UserInputCardState extends State<UserInputCard> {
           children: [
             Row(
               children: [
-                Icon(Icons.help_outline, size: 18, color: scheme.primary),
+                Icon(AppIcons.help_outline, size: 18, color: scheme.primary),
                 const SizedBox(width: 9),
                 Expanded(
                   child: Semantics(
@@ -334,7 +335,6 @@ class _UserInputCardState extends State<UserInputCard> {
                   style: const TextStyle(fontSize: 13),
                   decoration: InputDecoration(
                     isDense: true,
-                    border: const OutlineInputBorder(),
                     labelText: q.header.isEmpty ? null : q.header,
                   ),
                 ),

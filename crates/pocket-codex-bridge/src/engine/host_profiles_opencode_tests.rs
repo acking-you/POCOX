@@ -108,6 +108,7 @@ fn change(protocol: ApiProtocol, model: Option<&str>, key: KeyChange) -> Change 
         key,
         runtime: RuntimeChange::Set(Runtime::OpenCode {
             binary: None,
+            separate_history: false,
         }),
     }
 }

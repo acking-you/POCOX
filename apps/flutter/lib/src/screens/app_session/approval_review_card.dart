@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 
 import 'approval_review.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Historical model-review presentation, with the original payload preserved.
 class ApprovalReviewCard extends StatelessWidget {
@@ -93,10 +94,10 @@ class ApprovalReviewCard extends StatelessWidget {
             children: [
               Icon(
                 decision == null
-                    ? Icons.policy_outlined
+                    ? AppIcons.policy_outlined
                     : allowed
-                    ? Icons.check_circle_outline
-                    : Icons.block,
+                    ? AppIcons.check_circle_outline
+                    : AppIcons.block,
                 size: 18,
                 color: color,
               ),
@@ -249,8 +250,8 @@ class _CompactReviewState extends State<_CompactReview> {
                     else
                       Icon(
                         allowed
-                            ? Icons.verified_user_outlined
-                            : Icons.gpp_bad_outlined,
+                            ? AppIcons.verified_user_outlined
+                            : AppIcons.gpp_bad_outlined,
                         size: 15,
                         color: color,
                       ),
@@ -288,8 +289,8 @@ class _CompactReviewState extends State<_CompactReview> {
                     if (decision != null) const Spacer(),
                     Icon(
                       _open
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
+                          ? AppIcons.keyboard_arrow_up_rounded
+                          : AppIcons.keyboard_arrow_down_rounded,
                       size: 16,
                       color: scheme.onSurfaceVariant,
                     ),
@@ -376,7 +377,7 @@ class _RawReviewState extends State<_RawReview> {
                   key: const Key('review-raw-toggle'),
                   onPressed: () => setState(() => _expanded = !_expanded),
                   icon: Icon(
-                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    _expanded ? AppIcons.expand_less : AppIcons.expand_more,
                     size: 16,
                   ),
                   label: Text(l10n.reviewRaw),
@@ -385,7 +386,7 @@ class _RawReviewState extends State<_RawReview> {
             ),
             IconButton(
               tooltip: l10n.copy,
-              icon: const Icon(Icons.content_copy_outlined, size: 16),
+              icon: const Icon(AppIcons.content_copy_outlined, size: 16),
               onPressed: () {
                 Clipboard.setData(ClipboardData(text: widget.raw));
                 showToastOk(context, l10n.copied);

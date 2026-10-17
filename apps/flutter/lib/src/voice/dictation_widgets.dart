@@ -6,6 +6,7 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/voice/dictation.dart';
 import 'package:pocket_codex/src/voice/waveform.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The composer's dictation microphone.
 ///
@@ -86,7 +87,7 @@ class DictationButton extends StatelessWidget {
                   ),
                 )
               : Icon(
-                  live ? Icons.check_rounded : Icons.mic_none_rounded,
+                  live ? AppIcons.check_rounded : AppIcons.mic_none_rounded,
                   key: ValueKey(live),
                   size: iconSize,
                 ),
@@ -301,7 +302,7 @@ class DictationBar extends StatelessWidget {
               key: const Key('dictation-cancel'),
               tooltip: l10n.dictationCancel,
               onPressed: onCancel,
-              icon: const Icon(Icons.close_rounded, size: 17),
+              icon: const Icon(AppIcons.close_rounded, size: 17),
               style: IconButton.styleFrom(
                 minimumSize: const Size.square(30),
                 fixedSize: const Size.square(30),

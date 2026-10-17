@@ -211,7 +211,10 @@ void main() {
 
   group('nativeContinueHost', () {
     final open = FakeBridgeApi.openCodeHost('opencode');
+    // Its own database holds none of this computer's OpenCode sessions.
+    final apart = FakeBridgeApi.openCodeHost('apart', separateHistory: true);
     final hosts = [
+      apart,
       _acp('claude', 'claude'),
       _acp('claude-2', 'claude'),
       _acp('gemini', 'gemini'),
@@ -220,6 +223,11 @@ void main() {
 
     test('matches the provider and prefers the last used host', () {
       expect(nativeContinueHost(hosts, 'opencode'), same(open));
+      expect(
+        nativeContinueHost(hosts, 'opencode', preferred: apart.appServiceKey),
+        same(open),
+      );
+      expect(nativeContinueHost([apart], 'opencode'), isNull);
       expect(nativeContinueHost(hosts, 'claude')!.name, 'claude');
       expect(
         nativeContinueHost(
@@ -293,7 +301,8 @@ void main() {
       expect(unnamed.autoHostOpenCode, isNull);
     });
 
-    test('restore once, never beside a running OpenCode host', () {
+    test('restore once, never beside another host on OpenCode\'s default '
+        'database', () {
       final prefs = UiPrefs.fromJson({
         'autoHostOpenCode': {'name': 'opencode'},
       });
@@ -312,6 +321,12 @@ void main() {
       expect(plan(const [], attempted: {'opencode'}).opencode, isNull);
       expect(plan(const [], supported: false).opencode, isNull);
       expect(plan([FakeBridgeApi.openCodeHost('other')]).opencode, isNull);
+      expect(
+        plan([
+          FakeBridgeApi.openCodeHost('other', separateHistory: true),
+        ]).opencode?.name,
+        'opencode',
+      );
       expect(plan([_acp('opencode', 'claude')]).opencode, isNull);
     });
   });

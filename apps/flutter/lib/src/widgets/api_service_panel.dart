@@ -13,6 +13,7 @@ import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/code_row.dart';
 import 'package:pocket_codex/src/widgets/icon_badge.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Subscribe to an API capability and expose it on a local OpenAI-compatible
 /// port, as a transient panel over the capability list.
@@ -119,7 +120,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
           Row(
             children: [
               const IconBadge(
-                icon: Icons.bolt_outlined,
+                icon: AppIcons.bolt_outlined,
                 size: 36,
                 accent: true,
               ),
@@ -151,7 +152,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
               IconButton(
                 key: const Key('api-panel-close'),
                 tooltip: l10n.cancel,
-                icon: const Icon(Icons.close, size: 18),
+                icon: const Icon(AppIcons.close, size: 18),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
@@ -196,7 +197,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
     FilledButton.icon(
       key: const Key('subscribe-btn'),
       onPressed: _busy ? null : _subscribe,
-      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+      icon: const Icon(AppIcons.play_arrow_rounded, size: 20),
       label: Text(l10n.startSubscription),
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(44)),
     ),
@@ -233,7 +234,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
             ),
             IconButton(
               tooltip: l10n.copy,
-              icon: const Icon(Icons.copy, size: 17),
+              icon: const Icon(AppIcons.copy, size: 17),
               onPressed: () => _copy('http://${_sub!.localAddr}/v1'),
             ),
           ],
@@ -255,7 +256,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            Icons.warning_amber_rounded,
+            AppIcons.warning_amber_rounded,
             size: 17,
             color: scheme.onErrorContainer,
           ),
@@ -303,7 +304,7 @@ class _ProviderSnippet extends StatelessWidget {
                 const Text('~/.codex/config.toml'),
                 IconButton(
                   tooltip: AppLocalizations.of(context).copy,
-                  icon: const Icon(Icons.copy, size: 17),
+                  icon: const Icon(AppIcons.copy, size: 17),
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: snippet));
                     showToastOk(context, AppLocalizations.of(context).copied);

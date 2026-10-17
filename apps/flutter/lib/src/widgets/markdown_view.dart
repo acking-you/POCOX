@@ -1,14 +1,19 @@
+import 'dart:convert';
+
 import 'package:pocket_codex/src/file_links.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
+import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
+import 'package:pocket_codex/src/lru_cache.dart';
 import 'package:pocket_codex/src/markdown_cjk.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/code_block.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// One Markdown renderer for every agent-authored surface (replies, plan
 /// proposals, plan explanations), so they share the CJK fixes, the table
@@ -19,141 +24,333 @@ import 'package:pocket_codex/src/widgets/links.dart';
 /// of that unified selection instead of joining it.
 class MarkdownView extends StatefulWidget {
   /// Renders [data] as Markdown.
-  const MarkdownView({super.key, required this.data, this.muted = false});
+  const MarkdownView({
+    super.key,
+    required this.data,
+    this.muted = false,
+    this.dense = false,
+    this.keepLineBreaks = false,
+  });
 
   /// Raw Markdown source, as written by the model.
   final String data;
+
+  /// Keep every single line break as written, instead of CommonMark's
+  /// joining of a paragraph's lines. For text a person typed (their own
+  /// messages, a draft's preview), where a line break is meant.
+  final bool keepLineBreaks;
 
   /// Secondary text colour, for prose that sits behind the main reply —
   /// reasoning summaries, an activity card's detail.
   final bool muted;
 
+  /// Tighter spacing for Markdown inside a message bubble: no trailing
+  /// paragraph gap, smaller headings.
+  final bool dense;
+
   @override
   State<MarkdownView> createState() => _MarkdownViewState();
 }
 
-class _MarkdownViewState extends State<MarkdownView> {
+class _MarkdownViewState extends State<MarkdownView>
+    implements MarkdownBuilderDelegate {
   // Stateful only to own the link builder's gesture recognizers: a streaming
   // reply rebuilds this widget on every token, and a recognizer allocated per
   // link per build is never disposed by anyone.
   late final _LinkBuilder _links = _LinkBuilder();
+  final _recognizers = <GestureRecognizer>[];
+  List<Widget> _children = const [];
+  MarkdownStyleSheet? _style;
+  // This row's parse and the text it was made from.
+  List<md.Node>? _nodes;
+  String? _nodesFor;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _build();
+  }
+
+  @override
+  void didUpdateWidget(MarkdownView old) {
+    super.didUpdateWidget(old);
+    if (old.data != widget.data ||
+        old.keepLineBreaks != widget.keepLineBreaks ||
+        old.muted != widget.muted ||
+        old.dense != widget.dense) {
+      _build();
+    }
+  }
 
   @override
   void dispose() {
+    // A row leaving the viewport hands its parse on: if it comes back (or
+    // the same text is shown elsewhere), the parse is still there. A reply
+    // still streaming never stores the prefixes it passed through.
+    final nodes = _nodes;
+    final data = _nodesFor;
+    if (nodes != null && data != null) _parses.put(data, nodes);
+    _disposeRecognizers();
     _links.dispose();
     super.dispose();
   }
 
+  /// Lay the (cached) parse out as widgets. Runs when the text, the variant
+  /// or the theme changed — never on an unrelated rebuild, and a row that
+  /// scrolls back into view reuses the parse instead of redoing it.
+  void _build() {
+    final style = markdownStyle(
+      context,
+      muted: widget.muted,
+      dense: widget.dense,
+    );
+    _style = style;
+    _disposeRecognizers();
+    final builder = MarkdownBuilder(
+      delegate: this,
+      selectable: false,
+      styleSheet: style,
+      imageDirectory: null,
+      imageBuilder: null,
+      checkboxBuilder: (checked) => _checkbox(context, checked),
+      bulletBuilder: (p) => _bullet(context, p),
+      builders: <String, MarkdownElementBuilder>{
+        'a': _links,
+        'pre': _CodeBlockBuilder(),
+      },
+      paddingBuilders: const {},
+      fitContent: true,
+      listItemCrossAxisAlignment: MarkdownListItemCrossAxisAlignment.baseline,
+      onTapText: null,
+      softLineBreak: widget.keepLineBreaks,
+    );
+    final data = widget.data;
+    if (_nodesFor != data) {
+      _nodes = _parses.get(data) ?? _parse(data);
+      _nodesFor = data;
+    }
+    _children = builder.build(_nodes!);
+  }
+
+  void _disposeRecognizers() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    _recognizers.clear();
+  }
+
   @override
-  Widget build(BuildContext context) => MarkdownBody(
-    data: autolinkifyMarkdown(widget.data),
-    selectable: false,
-    extensionSet: markdownExtensionSet,
-    styleSheet: markdownStyle(context, muted: widget.muted),
-    builders: <String, MarkdownElementBuilder>{
-      'a': _links,
-      'pre': _CodeBlockBuilder(),
-    },
-    // Unreachable while the 'a' builder above owns links, but MarkdownBody
+  GestureRecognizer createLink(String text, String? href, String title) {
+    // Unreachable while the 'a' builder above owns links, but the builder
     // also routes image taps here — keep the handler wired.
-    onTapLink: (text, href, title) =>
-        onTapMarkdownLink(context, text, href, title),
+    final recognizer = TapGestureRecognizer()
+      ..onTap = () => onTapMarkdownLink(context, text, href, title);
+    _recognizers.add(recognizer);
+    return recognizer;
+  }
+
+  @override
+  TextSpan formatText(MarkdownStyleSheet styleSheet, String code) => TextSpan(
+    style: styleSheet.code,
+    text: code.replaceAll(RegExp(r'\n$'), ''),
   );
+
+  @override
+  Widget build(BuildContext context) {
+    // A theme change rebuilds through didChangeDependencies; this only
+    // places what is already laid out.
+    assert(_style != null);
+    return _children.length == 1
+        ? _children.single
+        : Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: _children,
+          );
+  }
 }
+
+/// Parsed Markdown by source text, from rows that left the viewport: one
+/// scrolling back reuses its parse. Bounded by the characters parsed, about
+/// a long session's worth of replies.
+final _parses = LruCache<String, List<md.Node>>(
+  maxWeight: 4 << 20,
+  weigh: (data, _) => data.length,
+);
+
+List<md.Node> _parse(String data) => md.Document(
+  extensionSet: markdownExtensionSet,
+  encodeHtml: false,
+).parseLines(const LineSplitter().convert(autolinkifyMarkdown(data)));
 
 // Stylesheets handed out so far, keyed by the theme they came from. Building
 // one costs ~40 TextStyles, and every message in the transcript asks for it on
 // every frame of a streaming turn; the theme only changes on a light/dark or
 // platform switch, so memoising removes essentially all of that work.
 ThemeData? _styleTheme;
-final Map<bool, MarkdownStyleSheet> _styleCache = {};
+final Map<(bool, bool), MarkdownStyleSheet> _styleCache = {};
 
-/// Theme-derived Markdown styling: comfortable line height, tinted code
-/// blocks, and tables that read as rows of data rather than a spreadsheet
-/// grid — no vertical rules, a divider between rows, left-aligned headers.
-/// [muted] tints body text for prose that sits behind the main reply.
-MarkdownStyleSheet markdownStyle(BuildContext context, {bool muted = false}) {
+/// Theme-derived Markdown styling: an airy reading measure, headings that
+/// step down in weight rather than shouting, rounded tables with a tinted
+/// header row, quiet quotes and rules. [muted] tints body text for prose that
+/// sits behind the main reply; [dense] tightens it for a message bubble.
+MarkdownStyleSheet markdownStyle(
+  BuildContext context, {
+  bool muted = false,
+  bool dense = false,
+}) {
   final theme = Theme.of(context);
   if (!identical(_styleTheme, theme)) {
     _styleTheme = theme;
     _styleCache.clear();
   }
-  return _styleCache.putIfAbsent(
+  return _styleCache.putIfAbsent((
     muted,
-    () => _buildMarkdownStyle(context, muted),
-  );
+    dense,
+  ), () => _buildMarkdownStyle(context, muted, dense));
 }
 
-MarkdownStyleSheet _buildMarkdownStyle(BuildContext context, bool muted) {
+MarkdownStyleSheet _buildMarkdownStyle(
+  BuildContext context,
+  bool muted,
+  bool dense,
+) {
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
+  final text = theme.textTheme;
+  // One reading measure: 15 px at a line height that suits Han and Latin
+  // alike, no tracking (the theme's), and a paragraph gap of about two
+  // thirds of a line.
   final body = muted
-      ? theme.textTheme.bodyMedium?.copyWith(
-          height: 1.6,
-          color: scheme.onSurfaceVariant,
-        )
-      : theme.textTheme.bodyLarge?.copyWith(height: 1.65);
+      ? text.bodyMedium?.copyWith(height: 1.6, color: scheme.onSurfaceVariant)
+      : dense
+      ? text.bodyLarge?.copyWith(height: 1.55)
+      : text.bodyLarge?.copyWith(height: 1.7);
   // CJK text needs less weight than Latin to read as emphasised: at w700 a
   // bold Han glyph turns into a dark blob at body size.
   final strongWeight = isDesktop ? FontWeight.w600 : FontWeight.w700;
   final divider = scheme.outlineVariant;
+  TextStyle? heading(double size, {double height = 1.35}) => body?.copyWith(
+    fontSize: dense ? (size - 3).clamp(15, 18).toDouble() : size,
+    height: height,
+    fontWeight: FontWeight.w600,
+    letterSpacing: size >= 20 ? -0.2 : 0,
+    color: scheme.onSurface,
+  );
+  final cellPadding = const EdgeInsets.symmetric(horizontal: 14, vertical: 9);
   return MarkdownStyleSheet.fromTheme(theme).copyWith(
     p: body,
-    listBullet: body,
+    listBullet: body?.copyWith(color: onSurfaceMuted(scheme)),
+    checkbox: body,
     // Weight only: this style is *merged onto* the enclosing one, so carrying a
     // size or height here would blow up bold text inside a table cell or a
     // heading to body size.
     strong: TextStyle(fontWeight: strongWeight),
+    em: const TextStyle(fontStyle: FontStyle.italic),
+    del: TextStyle(
+      decoration: TextDecoration.lineThrough,
+      color: scheme.onSurfaceVariant,
+    ),
     a: linkStyleOf(context),
-    pPadding: const EdgeInsets.only(bottom: 8),
-    h1Padding: const EdgeInsets.only(top: 10, bottom: 4),
-    h2Padding: const EdgeInsets.only(top: 10, bottom: 4),
-    h3Padding: const EdgeInsets.only(top: 8, bottom: 4),
-    listBulletPadding: const EdgeInsets.only(right: 6),
-    blockSpacing: 10,
-    h1: theme.textTheme.titleLarge,
-    h2: theme.textTheme.titleMedium?.copyWith(fontSize: 17),
-    h3: theme.textTheme.titleMedium,
-    h4: theme.textTheme.titleSmall?.copyWith(fontSize: 14),
+    // Paragraphs carry most of the gap themselves, so the block spacing
+    // (which also separates list items) stays tight: 16 px between
+    // paragraphs, 8 between the items of a tight list.
+    pPadding: dense ? EdgeInsets.zero : const EdgeInsets.only(bottom: 8),
+    h1: heading(22, height: 1.3),
+    h2: heading(19),
+    h3: heading(16.5),
+    h4: heading(15.5),
+    h5: heading(15),
+    h6: heading(14)?.copyWith(color: scheme.onSurfaceVariant),
+    // More room above a heading than below it, so it binds to its section.
+    h1Padding: EdgeInsets.only(top: dense ? 2 : 18, bottom: dense ? 0 : 4),
+    h2Padding: EdgeInsets.only(top: dense ? 2 : 14, bottom: dense ? 0 : 2),
+    h3Padding: EdgeInsets.only(top: dense ? 2 : 10, bottom: dense ? 0 : 2),
+    h4Padding: EdgeInsets.only(top: dense ? 0 : 6),
+    listIndent: 22,
+    listBulletPadding: const EdgeInsets.only(right: 4),
+    blockSpacing: dense ? 6 : 8,
     // `IntrinsicColumnWidth` is load-bearing, not cosmetic: flutter_markdown_plus
     // only wraps a table in a horizontal scroll view for intrinsic/fixed column
     // widths. With the default `FlexColumnWidth` a wide table is squeezed into
     // the viewport and its last columns are clipped off-screen.
     tableColumnWidth: const IntrinsicColumnWidth(),
     tableBorder: TableBorder(
-      horizontalInside: BorderSide(color: divider, width: 1),
-      bottom: BorderSide(color: divider, width: 1),
+      top: BorderSide(color: divider),
+      bottom: BorderSide(color: divider),
+      left: BorderSide(color: divider),
+      right: BorderSide(color: divider),
+      horizontalInside: BorderSide(color: divider),
+      borderRadius: BorderRadius.circular(kControlRadius + 2),
     ),
-    tableHead: theme.textTheme.bodyMedium?.copyWith(
-      fontWeight: strongWeight,
+    tableHeadCellsDecoration: BoxDecoration(color: scheme.surfaceContainerLow),
+    tableCellsDecoration: const BoxDecoration(),
+    tableHead: text.bodyMedium?.copyWith(
+      fontWeight: FontWeight.w600,
       height: 1.4,
     ),
-    tableBody: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+    tableBody: text.bodyMedium?.copyWith(height: 1.45),
     tableHeadAlign: TextAlign.left,
-    tableCellsPadding: const EdgeInsets.fromLTRB(0, 10, 28, 10),
-    tablePadding: const EdgeInsets.only(bottom: 10),
-    code: theme.textTheme.bodyMedium?.copyWith(
+    tableCellsPadding: cellPadding,
+    tableHeadCellsPadding: cellPadding,
+    tableVerticalAlignment: TableCellVerticalAlignment.middle,
+    tablePadding: const EdgeInsets.only(bottom: 4),
+    code: text.bodyMedium?.copyWith(
       fontFamily: monoFontFamily,
       fontFamilyFallback: monoCjkFallback,
-      // Accent-tinted ink on a matching wash: an identifier in prose reads
-      // as code from across the screen, not as a grey smudge.
       color: inlineCodeColor(scheme),
-      backgroundColor: accentWash(scheme),
-      fontSize: (theme.textTheme.bodyMedium?.fontSize ?? 14) - 1,
+      backgroundColor: inlineCodeWash(scheme),
+      fontSize: (text.bodyMedium?.fontSize ?? 14) - 1,
     ),
     // `_CodeBlockBuilder` draws the block's own card; the stylesheet's
     // wrapper stays invisible so there is one outline, not two.
     codeblockDecoration: const BoxDecoration(),
     codeblockPadding: EdgeInsets.zero,
+    blockquote: body?.copyWith(color: scheme.onSurfaceVariant),
+    blockquotePadding: const EdgeInsets.fromLTRB(16, 2, 4, 2),
     blockquoteDecoration: BoxDecoration(
-      color: scheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(8),
-      border: Border(
-        left: BorderSide(
-          color: signalColor(scheme).withValues(alpha: 0.6),
-          width: 3,
-        ),
+      border: Border(left: BorderSide(color: scheme.outline, width: 3)),
+    ),
+    horizontalRuleDecoration: BoxDecoration(
+      border: Border(top: BorderSide(color: divider)),
+    ),
+  );
+}
+
+/// A list marker: a muted dot (hollow, then square as lists nest) or a
+/// tabular number, so the marker column lines up without competing with the
+/// items.
+Widget _bullet(BuildContext context, MarkdownBulletParameters p) {
+  final scheme = Theme.of(context).colorScheme;
+  final style = markdownStyle(context).listBullet;
+  if (p.style == BulletStyle.orderedList) {
+    return Text(
+      '${p.index + 1}.',
+      textAlign: TextAlign.right,
+      style: style?.copyWith(
+        fontWeight: FontWeight.w500,
+        fontFeatures: const [FontFeature.tabularFigures()],
       ),
+    );
+  }
+  const glyphs = ['•', '◦', '–'];
+  return Text(
+    glyphs[p.nestLevel % glyphs.length],
+    textAlign: TextAlign.center,
+    style: style?.copyWith(color: scheme.onSurfaceVariant),
+  );
+}
+
+/// A task-list box in the app's own stroke icons.
+Widget _checkbox(BuildContext context, bool checked) {
+  final scheme = Theme.of(context).colorScheme;
+  final size = (markdownStyle(context).p?.fontSize ?? 15) + 1;
+  return Padding(
+    padding: const EdgeInsets.only(right: 6),
+    child: Icon(
+      checked ? AppIcons.check_box : AppIcons.check_box_outline_blank,
+      size: size,
+      color: checked ? scheme.onSurface : onSurfaceMuted(scheme),
     ),
   );
 }
@@ -310,10 +507,11 @@ class _Favicon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fallback = Icon(
-      Icons.public,
+      AppIcons.public,
       size: _size,
       color: Theme.of(context).colorScheme.onSurfaceVariant,
     );
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final missedAt = _faviconMisses[host];
     if (missedAt != null) {
       if (DateTime.now().difference(missedAt) < _faviconRetryAfter) {
@@ -337,8 +535,19 @@ class _Favicon extends StatelessWidget {
           _faviconMisses[host] = DateTime.now();
           return fallback;
         },
-        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) =>
-            frame == null && !wasSynchronouslyLoaded ? fallback : child,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (frame == null && !wasSynchronouslyLoaded) return fallback;
+          if (!dark) return child;
+          // Most favicons are drawn for a light tab strip (GitHub's is a
+          // black mark), so on a dark page they sit on a small light plate.
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F2F2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Padding(padding: const EdgeInsets.all(1.5), child: child),
+          );
+        },
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The app's filter box: a filled, borderless field on the control radius.
 ///
@@ -45,7 +46,7 @@ class SearchField extends StatelessWidget {
       style: const TextStyle(fontSize: _fontSize),
       decoration: InputDecoration(
         isDense: true,
-        prefixIcon: const Icon(Icons.search, size: _iconSize),
+        prefixIcon: const Icon(AppIcons.search, size: _iconSize),
         prefixIconConstraints: const BoxConstraints(
           minWidth: _iconWell,
           minHeight: _iconWell,

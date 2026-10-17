@@ -421,43 +421,88 @@ void main() {
         .widget<TextField>(find.byKey(const Key('composer-input')))
         .controller!;
 
-    testWidgets('words land at the cursor as they are spoken', (t) async {
-      final (api, media) = await pump(t);
-      await t.enterText(find.byKey(const Key('composer-input')), 'hello');
-      await t.pump();
-      // Focusing the composer warms the line in the background.
-      expect(api.methods, contains('thread/realtime/start'));
-      await t.pump();
-      expect(find.byKey(const Key('dictation-ready-dot')), findsOneWidget);
+    testWidgets(
+      'words land at the cursor as they are spoken',
+      (t) async {
+        final (api, media) = await pump(t);
+        await t.enterText(find.byKey(const Key('composer-input')), 'hello');
+        await t.pump();
+        // Focusing the composer warms the line in the background.
+        expect(api.methods, contains('thread/realtime/start'));
+        await t.pump();
+        expect(find.byKey(const Key('dictation-ready-dot')), findsOneWidget);
 
-      await t.tap(find.byKey(const Key('dictate')));
-      await t.pump();
-      await t.pump();
-      expect(media.micOpen, isTrue);
-      expect(find.byKey(const Key('dictation-bar')), findsOneWidget);
-      expect(find.byKey(const Key('dictation-waveform')), findsOneWidget);
+        await t.tap(find.byKey(const Key('dictate')));
+        await t.pump();
+        await t.pump();
+        expect(media.micOpen, isTrue);
+        expect(find.byKey(const Key('dictation-bar')), findsOneWidget);
+        expect(find.byKey(const Key('dictation-waveform')), findsOneWidget);
 
-      api.said(' world');
-      await t.pump();
-      expect(field(t).text, 'hello world');
-      api.said(', again');
-      await t.pump();
-      expect(field(t).text, 'hello world, again');
-      expect(field(t).selection.baseOffset, field(t).text.length);
+        api.said(' world');
+        await t.pump();
+        expect(field(t).text, 'hello world');
+        api.said(', again');
+        await t.pump();
+        expect(field(t).text, 'hello world, again');
+        expect(field(t).selection.baseOffset, field(t).text.length);
 
-      // Done: the take ends once the tail is quiet; the text stays.
-      await t.tap(find.byKey(const Key('dictate')));
-      await t.pump();
-      expect(media.micOpen, isFalse);
-      await t.pump(DictationLine.tailQuiet + const Duration(milliseconds: 50));
-      await t.pump(const Duration(milliseconds: 300));
-      expect(find.byKey(const Key('dictation-bar')), findsNothing);
-      expect(field(t).text, 'hello world, again');
-      // Nothing was sent: the user reviews before sending.
-      expect(api.methods, isNot(contains('turn/start')));
-      await t.pumpWidget(const SizedBox());
-      await t.pump(const Duration(seconds: 1));
-    });
+        // Done: the take ends once the tail is quiet; the text stays.
+        await t.tap(find.byKey(const Key('dictate')));
+        await t.pump();
+        expect(media.micOpen, isFalse);
+        await t.pump(
+          DictationLine.tailQuiet + const Duration(milliseconds: 50),
+        );
+        await t.pump(const Duration(milliseconds: 300));
+        expect(find.byKey(const Key('dictation-bar')), findsNothing);
+        expect(field(t).text, 'hello world, again');
+        // Nothing was sent: the user reviews before sending.
+        expect(api.methods, isNot(contains('turn/start')));
+        // On desktop the line stays up for the next take.
+        expect(media.closed, isFalse);
+        await t.pumpWidget(const SizedBox());
+        await t.pump(const Duration(seconds: 1));
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.linux),
+    );
+
+    testWidgets(
+      'on a phone the line holds no audio outside a take',
+      (t) async {
+        final (api, media) = await pump(t);
+        await t.enterText(find.byKey(const Key('composer-input')), 'hi');
+        await t.pump();
+        await t.pump();
+        // An open media link would stop other apps' audio: none before a take.
+        expect(api.methods, isNot(contains('thread/start')));
+
+        await t.tap(find.byKey(const Key('dictate')));
+        await t.pump();
+        await t.pump();
+        expect(media.micOpen, isTrue);
+        api.said(' there');
+        await t.pump();
+        expect(field(t).text, 'hi there');
+
+        await t.tap(find.byKey(const Key('dictate')));
+        await t.pump();
+        await t.pump(
+          DictationLine.tailQuiet + const Duration(milliseconds: 50),
+        );
+        await t.pump(const Duration(milliseconds: 300));
+        // The take is over, and so is the line that held the audio.
+        expect(field(t).text, 'hi there');
+        expect(media.closed, isTrue);
+        expect(
+          api.methods,
+          containsAllInOrder(['thread/realtime/stop', 'thread/unsubscribe']),
+        );
+        await t.pumpWidget(const SizedBox());
+        await t.pump(const Duration(seconds: 1));
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+    );
 
     testWidgets(
       'Esc discards exactly what the take wrote',

@@ -178,7 +178,8 @@ void main() {
             .where((card) => card.active),
         hasLength(1),
       );
-      expect(api.turnItemCalls, ['early', 'early', 'middle']);
+      // The jump read the turn above its landing place ahead of the reader.
+      expect(api.turnItemCalls, ['early', 'older', 'early', 'middle']);
       expect(api.threadReadIncludesPages.last, isFalse);
       expect(t.takeException(), isNull);
       await t.pumpWidget(const SizedBox.shrink());

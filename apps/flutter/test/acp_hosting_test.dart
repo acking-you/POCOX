@@ -16,7 +16,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/acp_host_form.dart';
-import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
+import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/hosting/host_restore.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/service_key.dart';
@@ -26,6 +26,7 @@ import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
 
 import 'fake_bridge_api.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 part 'acp_hosting/claude_preparation.dart';
 part 'acp_hosting/lifecycle.dart';
@@ -133,7 +134,7 @@ Future<void> _openAdvanced(WidgetTester t, String key) async {
   expect(
     find.descendant(
       of: find.byKey(Key(key)),
-      matching: find.byIcon(Icons.expand_less_rounded),
+      matching: find.byIcon(AppIcons.expand_less_rounded),
     ),
     findsOneWidget,
     reason: 'the advanced fields are unfolded',

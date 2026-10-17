@@ -86,7 +86,7 @@ class CjkStrongSyntax extends md.InlineSyntax {
   }
 }
 
-/// The extension set every `MarkdownBody` in the app renders with: GitHub
+/// The extension set all Markdown in the app renders with: GitHub
 /// flavour (tables, strikethrough, fenced code) plus [CjkStrongSyntax].
 ///
 /// `flutter_markdown_plus` defaults to `ExtensionSet.gitHubFlavored`; this

@@ -86,67 +86,73 @@ void main() {
       promptVariant: 'default',
     );
 
-    testWidgets('unconfigured leads with where a provider is set and says '
-        'why', (t) async {
+    testWidgets('unconfigured says why, and where each method is set', (
+      t,
+    ) async {
       final api = await pump(t, status: unconfigured);
 
       // The state card answers "is this working" before any method is offered.
       expect(find.text('尚未配置'), findsOneWidget); // codexSetupStatusNeedSetup
-      // The provider row leads, open: no global provider form any more, but
-      // where a provider is set (per host) and what this page sets up.
+      expect(find.text('使用中'), findsNothing);
+      // No global provider form: a provider is set per host.
       expect(find.byKey(const Key('codex-base-url')), findsNothing);
-      expect(find.byKey(const Key('codex-api-key')), findsNothing);
       expect(find.byKey(const Key('codex-save-provider')), findsNothing);
-      expect(find.textContaining('本页配置 Codex 本身'), findsOneWidget);
-      // This harness is a phone (android): hosting is desktop-only, so the
-      // way to a host's editor is replaced by saying so.
+      // What this page sets up is explained behind the section's info mark.
+      expect(
+        find.byWidgetPredicate(
+          (w) => w is Tooltip && (w.message ?? '').contains('本页配置 Codex 本身'),
+        ),
+        findsOneWidget,
+      );
+      // This harness is a phone (android): there is no local Codex to sign
+      // in on or host with, so both rows say where that happens instead.
+      expect(find.byKey(const Key('codex-login-chatgpt')), findsNothing);
+      expect(find.byKey(const Key('codex-login-desktop-only')), findsOneWidget);
+      expect(find.byKey(const Key('codex-provider-hosts')), findsNothing);
       expect(
         find.byKey(const Key('codex-provider-desktop-only')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('codex-provider-hosts')), findsNothing);
-      // ChatGPT is present but collapsed: its button is not on screen, only the
-      // way to switch to it.
-      expect(find.byKey(const Key('codex-login-chatgpt')), findsNothing);
-      expect(find.text('改用此项'), findsOneWidget); // codexSetupSwitchTo
       expect(api.lastProvider, isNull);
     });
 
-    testWidgets('signed in keeps the provider row closed', (t) async {
-      await pump(t, status: signedIn);
+    testWidgets(
+      'on a desktop each method has its control in its row',
+      (t) async {
+        await pump(t, status: signedIn);
 
-      // The live method leads, marked as such...
-      expect(find.text('使用中'), findsOneWidget); // codexSetupInUse
-      expect(find.byKey(const Key('codex-login-done')), findsOneWidget);
-      expect(find.byKey(const Key('codex-logout-btn')), findsOneWidget);
-      // ...and the provider row is only its title and the way to open it.
-      expect(
-        find.byKey(const Key('codex-provider-desktop-only')),
-        findsNothing,
-      );
-      expect(find.byKey(const Key('codex-base-url')), findsNothing);
-    });
+        // The state names what codex signs in with, in words.
+        expect(find.text('已通过 ChatGPT 登录'), findsOneWidget);
+        expect(find.text('使用中'), findsOneWidget); // codexSetupInUse
+        // Signed in: the row offers signing out, and the provider row the
+        // way to a host's editor.
+        expect(find.byKey(const Key('codex-logout-btn')), findsOneWidget);
+        expect(find.byKey(const Key('codex-login-chatgpt')), findsNothing);
+        expect(find.byKey(const Key('codex-provider-hosts')), findsOneWidget);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
 
-    testWidgets('switching to the collapsed method opens its controls', (
+    testWidgets('an unreadable config.toml is not reported as working', (
       t,
     ) async {
-      await pump(t, status: signedIn);
-      expect(
-        find.byKey(const Key('codex-provider-desktop-only')),
-        findsNothing,
+      await pump(
+        t,
+        status: const CodexSetupStatus(
+          codexHome: r'C:\Users\test\.codex',
+          hasConfig: true,
+          hasAuth: true,
+          hasCustomProvider: false,
+          authMode: 'chatgpt',
+          needsSetup: false,
+          promptVariant: 'default',
+          configError: true,
+          effectiveSource: 'invalid',
+        ),
       );
 
-      await t.tap(find.text('改用此项')); // codexSetupSwitchTo
-      await t.pumpAndSettle();
-
-      // The provider row is now open; the ChatGPT row keeps its "in use" pill
-      // (switching the disclosure must not pretend the live method changed).
-      expect(
-        find.byKey(const Key('codex-provider-desktop-only')),
-        findsOneWidget,
-      );
-      expect(find.byKey(const Key('codex-base-url')), findsNothing);
-      expect(find.text('使用中'), findsOneWidget);
+      expect(find.text('无法读取 Codex 的 config.toml'), findsOneWidget);
+      expect(find.text('使用中'), findsNothing);
     });
 
     testWidgets('a provider codex already selects is reported, not edited', (
@@ -166,7 +172,7 @@ void main() {
       );
 
       // codexSetupStatusProvider: the state card reads codex's own setup.
-      expect(find.text('已配置自定义 Provider'), findsOneWidget);
+      expect(find.text('已配置自定义供应商'), findsOneWidget);
       expect(find.text('使用中'), findsOneWidget);
       expect(find.byKey(const Key('codex-global-provider')), findsOneWidget);
       expect(find.byKey(const Key('codex-base-url')), findsNothing);
@@ -216,7 +222,7 @@ void main() {
     await t.pumpWidget(host(const SettingsScreen(), api));
     await t.pumpAndSettle();
     expect(find.text('lb7666.top:7666'), findsOneWidget);
-    expect(find.text('•••••••• (已设置)'), findsOneWidget);
+    expect(find.text('••••••••（已设置）'), findsOneWidget);
     expect(find.byKey(const Key('export-btn')), findsOneWidget);
   });
 
@@ -356,7 +362,7 @@ void main() {
     ); // poll fires → 'expired' → setState
     // 'expired' clears _device, so the spinner is gone and we can settle.
     await t.pumpAndSettle();
-    expect(find.text('代码已过期,请重试。'), findsOneWidget); // accountCodeExpired (zh)
+    expect(find.text('代码已过期，请重试。'), findsOneWidget); // accountCodeExpired (zh)
     expect(find.text('ABCD-1234'), findsNothing); // cleared, back to sign-in
     expect(find.text('HOME-ROUTE'), findsNothing); // did NOT navigate
   });

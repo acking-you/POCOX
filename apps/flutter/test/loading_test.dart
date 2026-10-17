@@ -33,24 +33,32 @@ BoxDecoration _firstSkeleton(WidgetTester t) =>
         as BoxDecoration;
 
 void main() {
-  testWidgets(
-    'history loading is delayed and static, and cancels on cache hit',
-    (t) async {
-      await t.pumpWidget(_host(const ChatLoadingSkeleton()));
-      expect(find.byType(Text), findsNothing);
-      await t.pump(const Duration(milliseconds: 200));
-      expect(find.byType(Text), findsNothing);
-      await t.pumpWidget(_host(const Text('cached conversation')));
-      await t.pump(const Duration(milliseconds: 300));
-      expect(find.text('cached conversation'), findsOneWidget);
-      await t.pumpWidget(_host(const ChatLoadingSkeleton()));
-      await t.pump(const Duration(milliseconds: 250));
-      expect(find.byType(Text), findsOneWidget);
-      expect(find.byType(Shimmer), findsNothing);
-      expect(t.binding.hasScheduledFrame, isFalse);
-      await t.pumpWidget(_host(const SizedBox()));
-    },
-  );
+  testWidgets('history loading is delayed, plain, and cancels on cache hit', (
+    t,
+  ) async {
+    await t.pumpWidget(_host(const ChatLoadingSkeleton()));
+    expect(find.byType(Text), findsNothing);
+    await t.pump(const Duration(milliseconds: 200));
+    expect(find.byType(Text), findsNothing);
+    await t.pumpWidget(_host(const Text('cached conversation')));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.text('cached conversation'), findsOneWidget);
+    await t.pumpWidget(_host(const ChatLoadingSkeleton()));
+    await t.pump(const Duration(milliseconds: 250));
+    expect(find.byType(Text), findsOneWidget);
+    expect(find.byType(Shimmer), findsNothing);
+    await t.pumpWidget(_host(const SizedBox()));
+  });
+
+  testWidgets('reduced motion leaves the loading label still', (t) async {
+    await t.pumpWidget(_host(const ChatLoadingSkeleton(), reduceMotion: true));
+    await t.pump(const Duration(milliseconds: 250));
+    await t.pump();
+    expect(find.byType(Text), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(t.binding.hasScheduledFrame, isFalse);
+    await t.pumpWidget(_host(const SizedBox()));
+  });
 
   testWidgets('a skeleton inside a shimmer paints a moving gradient', (
     t,

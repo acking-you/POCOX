@@ -17,6 +17,8 @@ import 'package:pocket_codex/src/widgets/brand_logo.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// First-run welcome guide, shown once per device right after the first
 /// account sign-in (`/welcome`; gated by [UiPrefs.guideSeen]).
@@ -91,10 +93,9 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
             children: [
               const Center(child: BrandLogo(size: 64)),
               const SizedBox(height: 16),
-              Text(
+              BrandHeadline(
                 l10n.welcomeTitle,
                 key: const Key('welcome-title'),
-                style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
@@ -154,7 +155,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                 child: FilledButton.icon(
                   key: const Key('welcome-start-hosting-btn'),
                   onPressed: _startHosting,
-                  icon: const Icon(Icons.rocket_launch_outlined, size: 18),
+                  icon: const Icon(AppIcons.rocket_launch_outlined, size: 18),
                   label: Text(l10n.startHosting),
                 ),
               )
@@ -205,7 +206,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
           child: FilledButton.tonalIcon(
             key: const Key('welcome-codex-setup-btn'),
             onPressed: () => context.push('/setup/codex'),
-            icon: const Icon(Icons.tune, size: 18),
+            icon: const Icon(AppIcons.tune, size: 18),
             label: Text(l10n.codexSetup),
           ),
         ),
@@ -234,7 +235,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
               context,
               'https://github.com/acking-you/pocket-codex/releases/latest',
             ),
-            icon: const Icon(Icons.download_outlined, size: 18),
+            icon: const Icon(AppIcons.download_outlined, size: 18),
             label: Text(l10n.welcomeDownloadDesktop),
           ),
         ),
@@ -298,14 +299,17 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
     Widget? child,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
+      // A done step says so with its green check and a faint wash, not a
+      // heavy outline.
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(kPanelRadius),
-        border: Border.all(
-          color: done ? successColor(scheme) : scheme.outlineVariant,
-          width: done ? 1.4 : 1,
-        ),
+        color: done
+            ? Color.alphaBlend(
+                successColor(scheme).withValues(alpha: 0.07),
+                cardFill(scheme),
+              )
+            : cardFill(scheme),
+        borderRadius: BorderRadius.circular(kCardRadius),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,7 +320,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                 radius: 13,
                 backgroundColor: done ? successColor(scheme) : scheme.primary,
                 child: done
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    ? const Icon(AppIcons.check, size: 16, color: Colors.white)
                     : Text(
                         '$number',
                         style: TextStyle(
@@ -339,12 +343,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
             const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.only(left: 36),
-              child: Text(
-                description,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-              ),
+              child: Text(description, style: helpTextStyle(Theme.of(context))),
             ),
           ],
           if (child != null) ...[

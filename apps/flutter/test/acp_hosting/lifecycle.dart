@@ -27,6 +27,14 @@ const _otherCodex = AutoHostPrefs(
 
 const _otherAcp = AutoHostAcpPrefs(name: 'other-acp', spec: _fixtureSpec);
 
+/// Lets a page whose operation is pending catch up: its progress runs
+/// until the operation ends, so the page never settles meanwhile.
+Future<void> _pumpPending(WidgetTester t) async {
+  for (var i = 0; i < 10; i++) {
+    await t.pump(const Duration(milliseconds: 100));
+  }
+}
+
 Future<_Held> _hold(WidgetTester t, _Op op) async {
   final api = FakeBridgeApi();
   if (op == _Op.codexStop) {
@@ -63,16 +71,25 @@ Future<_Held> _hold(WidgetTester t, _Op op) async {
   switch (op) {
     case _Op.codexStart:
       api.serveStartGate = gate;
-      await _start(t);
     case _Op.acpStart:
       await _chooseAcp(t);
       api.serveStartAcpGate = gate;
-      await _start(t);
     case _Op.codexStop || _Op.acpStop:
       api.serveStopGate = gate;
-      await t.tap(find.byKey(const Key('stop-hosting-btn')));
-      await t.pumpAndSettle();
   }
+  final action = find.byKey(
+    Key(_isStop(op) ? 'stop-hosting-btn' : 'start-hosting-btn'),
+  );
+  await t.ensureVisible(action);
+  await t.tap(action);
+  await _pumpPending(t);
+  // The pending operation shows on its own control.
+  expect(find.byKey(const Key('host-editor-progress')), findsOneWidget);
+  final en = lookupAppLocalizations(const Locale('en'));
+  expect(
+    find.text(_isStop(op) ? en.hostStopping : en.localHostStarting),
+    findsOneWidget,
+  );
   expect(find.byType(LocalHostDialog), findsOneWidget);
   return held;
 }
@@ -122,10 +139,10 @@ void _lifetimeTests() {
           'pending; completion records it', (t) async {
         final held = await _hold(t, op);
         await t.sendKeyEvent(LogicalKeyboardKey.escape);
-        await t.pumpAndSettle();
+        await _pumpPending(t);
         expect(find.byType(LocalHostDialog), findsOneWidget, reason: 'Escape');
         await t.binding.handlePopRoute();
-        await t.pumpAndSettle();
+        await _pumpPending(t);
         expect(find.byType(LocalHostDialog), findsOneWidget, reason: 'back');
 
         final discoveries = held.api.discoverCalls;

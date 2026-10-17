@@ -28,6 +28,9 @@ import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
 
 part 'activity/file_changes.dart';
 part 'activity/notices.dart';
@@ -42,18 +45,24 @@ class SessionFeatureScope extends InheritedWidget {
   const SessionFeatureScope({
     super.key,
     this.guardianReviews = true,
+    this.onReviewChange,
     required super.child,
   });
 
   /// Whether Guardian review envelopes render as review cards.
   final bool guardianReviews;
 
+  /// Open an edit (a `fileChange` item, by id) in the session's review;
+  /// null where there is no review to open it in.
+  final ValueChanged<String>? onReviewChange;
+
   static SessionFeatureScope? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<SessionFeatureScope>();
 
   @override
   bool updateShouldNotify(SessionFeatureScope oldWidget) =>
-      guardianReviews != oldWidget.guardianReviews;
+      guardianReviews != oldWidget.guardianReviews ||
+      onReviewChange != oldWidget.onReviewChange;
 }
 
 /// The widget for one non-message transcript row.

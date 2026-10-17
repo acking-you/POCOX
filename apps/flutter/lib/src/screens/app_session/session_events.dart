@@ -237,7 +237,7 @@ extension _SessionEvents on _AppSessionState {
           // A fresh turn hasn't produced output yet, so Esc undoes the send
           // until the first item lands.
           _outputStarted = false;
-          _elapsedSecs = 0;
+          _elapsed.value = 0;
           // Stamp what this turn runs with. A server that notifies settings
           // does so BEFORE turn/started, so a confirmed runtime is already
           // current here; otherwise fall back to what this app actually sent
@@ -665,17 +665,15 @@ extension _SessionEvents on _AppSessionState {
   }
 
   /// Begin ticking the running turn's elapsed clock once a second so the status
-  /// bar counts up live. Cheap: a single `_updateState` per second, only while a
-  /// turn runs.
+  /// bar counts up live. Only the labels showing it listen, so a tick costs
+  /// two text repaints, never a rebuild of the conversation.
   void _startElapsedTicker() {
     _turnStartedAt = DateTime.now();
     _elapsedTicker?.cancel();
     _elapsedTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       final started = _turnStartedAt;
       if (!mounted || started == null) return;
-      _updateState(
-        () => _elapsedSecs = DateTime.now().difference(started).inSeconds,
-      );
+      _elapsed.value = DateTime.now().difference(started).inSeconds;
     });
   }
 

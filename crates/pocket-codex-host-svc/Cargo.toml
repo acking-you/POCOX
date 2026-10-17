@@ -36,6 +36,9 @@ reqwest = { workspace = true, features = ["zstd", "gzip"] }
 thiserror = { workspace = true }
 futures = { workspace = true }
 bytes = { workspace = true }
+# Decodes a rollout's inline copy of a deleted attachment (already linked by
+# the bridge).
+base64 = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true, features = ["user"] }

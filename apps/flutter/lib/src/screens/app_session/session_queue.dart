@@ -342,7 +342,7 @@ extension _SessionQueue on _AppSessionState {
       children: [
         Row(
           children: [
-            Icon(Icons.schedule, size: 13, color: scheme.onSurfaceVariant),
+            Icon(AppIcons.schedule, size: 13, color: scheme.onSurfaceVariant),
             const SizedBox(width: 4),
             Flexible(
               child: Text(
@@ -381,7 +381,7 @@ extension _SessionQueue on _AppSessionState {
                         child: Tooltip(
                           message: l10n.queuedUncertain,
                           child: Icon(
-                            Icons.help_outline,
+                            AppIcons.help_outline,
                             key: Key('queued-uncertain-${q.id}'),
                             size: 14,
                             color: scheme.onSurfaceVariant,
@@ -414,7 +414,7 @@ extension _SessionQueue on _AppSessionState {
                         child: Padding(
                           padding: const EdgeInsets.all(2),
                           child: Icon(
-                            Icons.close,
+                            AppIcons.close,
                             size: 15,
                             color: scheme.onSurfaceVariant,
                           ),

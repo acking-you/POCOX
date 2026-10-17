@@ -301,7 +301,7 @@ extension _SessionAttachments on _AppSessionState {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.file_download_outlined, color: signalColor(scheme)),
+            Icon(AppIcons.file_download_outlined, color: signalColor(scheme)),
             const SizedBox(width: 10),
             Text(
               l10n.dropToAttach,
@@ -467,7 +467,7 @@ extension _SessionAttachments on _AppSessionState {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.refresh,
+                    AppIcons.refresh,
                     size: 18,
                     color: Theme.of(context).colorScheme.error,
                   ),
@@ -504,7 +504,7 @@ extension _SessionAttachments on _AppSessionState {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      Icons.description_outlined,
+                      AppIcons.description_outlined,
                       size: 22,
                       color: scheme.onSurfaceVariant,
                     ),

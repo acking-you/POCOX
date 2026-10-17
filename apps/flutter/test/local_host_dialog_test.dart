@@ -41,10 +41,11 @@ void main() {
         find.byType(SegmentedButton<bool>),
       );
       expect(selector.segments.singleWhere((s) => s.value).enabled, isFalse);
-      expect(find.text('暂未实现，请使用外置 Codex。'), findsOneWidget);
+      // Marked as not implemented on the segment itself.
+      final builtIn = find.text('内置引擎 · 暂未实现');
+      expect(builtIn, findsOneWidget);
       // Scrolled into view first: below the fold the tap would land on the
       // page's workspace navigation instead of the disabled segment.
-      final builtIn = find.text('内置引擎');
       await tester.ensureVisible(builtIn);
       await tester.pumpAndSettle();
       await tester.tap(builtIn);

@@ -179,11 +179,18 @@ extension _SessionAccess on _AppSessionState {
   }) async {
     if (!_followCurrent(thread, epoch)) return;
     if (_accessChecking) {
-      // The answer in flight was asked before; ask once more after it.
-      if (explicit) _accessCheckAsked = true;
+      // The answer in flight was asked before; ask once more after it. The
+      // check under way already shows as busy once this rebuild lands.
+      if (explicit) _updateState(() => _accessCheckAsked = true);
       return;
     }
-    _accessChecking = true;
+    // A check the reader asked for shows itself at once; a background one
+    // flips the flag without a rebuild of its own.
+    if (explicit) {
+      _updateState(() => _accessChecking = true);
+    } else {
+      _accessChecking = true;
+    }
     try {
       final access = await ref
           .read(bridgeApiProvider)
@@ -203,7 +210,11 @@ extension _SessionAccess on _AppSessionState {
       }
     } finally {
       if (_followCurrent(thread, epoch)) {
-        _accessChecking = false;
+        if (explicit || _accessCheckAsked) {
+          _updateState(() => _accessChecking = false);
+        } else {
+          _accessChecking = false;
+        }
         if (_accessCheckAsked) {
           _accessCheckAsked = false;
           unawaited(_checkAccess(thread, epoch, explicit: true));

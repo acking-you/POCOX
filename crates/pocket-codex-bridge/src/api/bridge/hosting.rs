@@ -114,6 +114,9 @@ pub struct OpenCodeHostStatusDto {
     pub agents: Vec<String>,
     /// Safe runtime or catalog diagnostic.
     pub problem: Option<String>,
+    /// The host keeps its sessions in a database of its own, not in
+    /// OpenCode's default one.
+    pub separate_history: bool,
 }
 impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusDto {
     fn from(s: crate::engine::serve_opencode::OpenCodeStatus) -> Self {
@@ -124,6 +127,7 @@ impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusD
             default_model: s.default_model,
             agents: s.agents,
             problem: s.problem,
+            separate_history: s.separate_history,
         }
     }
 }

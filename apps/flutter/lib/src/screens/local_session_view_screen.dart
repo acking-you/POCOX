@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/src/automation_prompt.dart';
+import 'package:pocket_codex/src/screens/app_session/automation_prompt_card.dart';
 import 'package:go_router/go_router.dart';
 import 'app_session/activity_cards.dart';
 import 'app_session/approval_review.dart';
@@ -38,6 +40,8 @@ import 'package:pocket_codex/src/widgets/utility_page.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 import 'local_session_view/native_window.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 part 'local_session_view/transcript_row.dart';
 part 'local_session_view/native_follow.dart';
@@ -341,7 +345,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
           if (widget.parentThreadId case final parent?)
             IconButton(
               tooltip: l10n.parentSession,
-              icon: const Icon(Icons.subdirectory_arrow_left),
+              icon: const Icon(AppIcons.subdirectory_arrow_left),
               onPressed: () => context.push(
                 Uri(
                   path: '/sessions/view',
@@ -356,7 +360,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
             ),
           IconButton(
             key: const Key('local-view-refresh'),
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(AppIcons.refresh),
             tooltip: l10n.refreshStatus,
             onPressed: _loading ? null : () => _load(initial: true),
           ),
@@ -391,7 +395,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       child: Row(
         children: [
           Icon(
-            running ? Icons.lock_clock : Icons.lock_outline,
+            running ? AppIcons.lock_clock : AppIcons.lock_outline,
             size: 16,
             color: color,
           ),
@@ -488,8 +492,8 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
                 onPressed: _resume,
                 icon: Icon(
                   live.requiresTakeover
-                      ? Icons.bolt
-                      : Icons.play_circle_outline,
+                      ? AppIcons.bolt
+                      : AppIcons.play_circle_outline,
                 ),
                 label: Text(
                   live.requiresTakeover
@@ -501,7 +505,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    Icons.lock_clock,
+                    AppIcons.lock_clock,
                     size: 16,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -545,7 +549,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
             cwd: widget.cwd,
           ),
         ),
-        icon: const Icon(Icons.play_circle_outline),
+        icon: const Icon(AppIcons.play_circle_outline),
         label: Text(l10n.nativeContinueOn(host.name)),
       );
     } else if (canHost) {
@@ -555,7 +559,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
           context,
           initialChoice: provider == 'claude' ? 'preset:claude' : 'opencode',
         ),
-        icon: const Icon(Icons.dns_outlined),
+        icon: const Icon(AppIcons.dns_outlined),
         label: Text(l10n.nativeHostToContinue(name)),
       );
     } else {

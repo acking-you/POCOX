@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/hosting/acp_host_form.dart';
 import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
 import 'package:pocket_codex/src/hosting/claude_preparation_progress.dart';
@@ -13,11 +14,15 @@ import 'package:pocket_codex/src/hosting/host_status_section.dart';
 import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/hosting/official_login_panel.dart';
 import 'package:pocket_codex/src/hosting/opencode_runtime_section.dart';
+import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/widgets/busy_label.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Open the hosting editor: a new host, or the running [existing] one.
 /// [initialChoice] preselects a new host's agent ([AgentChoice]).
@@ -87,9 +92,6 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
     final saved =
         ref.watch(uiPrefsProvider).valueOrNull?.acpAgents ??
         const <AcpAgentSpec>[];
-    final hosts =
-        ref.watch(localServeListProvider).valueOrNull ??
-        const <AppServeStatus>[];
     return GroupCard(
       key: const Key('host-agent-section'),
       title: AppLocalizations.of(context).hostSectionAgent,
@@ -100,20 +102,9 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
             presets: api.acpPresets(),
             saved: saved,
             onChanged: busy ? null : selectChoice,
-            openCodeHost: hosts.where((h) => h.isOpenCode).firstOrNull,
-            onOpenHost: _openRunning,
           ),
         ),
       ],
-    );
-  }
-
-  /// Open the running [host]'s own editor in place of this new-host page,
-  /// once this page may close.
-  Future<void> _openRunning(AppServeStatus host) async {
-    if (!await confirmLeave() || !mounted) return;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(builder: (_) => HostingEditor(existing: host)),
     );
   }
 
@@ -181,40 +172,42 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
           children: [
             OutlinedButton(
               key: const Key('host-config-save'),
+              style: running == HostAction.save
+                  ? OutlinedButton.styleFrom(
+                      disabledForegroundColor: scheme.onSurface,
+                    )
+                  : null,
               onPressed: busy || !ready || !dirty ? null : saveConfig,
-              child: Text(l10n.hostSaveConfig),
+              child: BusyLabel(
+                busy: running == HostAction.save,
+                label: l10n.hostSaveConfig,
+                busyLabel: l10n.hostSaving,
+              ),
             ),
-            FilledButton.icon(
-              key: const Key('host-config-apply'),
-              onPressed: busy || !ready || gone || !(configPending || dirty)
-                  ? null
-                  : applyConfig,
-              icon: const Icon(Icons.restart_alt, size: 18),
-              label: Text(
-                dirty ? l10n.hostSaveAndRestart : l10n.hostApplyRestart,
+            Tooltip(
+              message: l10n.hostApplyNote,
+              child: FilledButton(
+                key: const Key('host-config-apply'),
+                style: _working(
+                  HostAction.apply,
+                  scheme.primary,
+                  scheme.onPrimary,
+                ),
+                onPressed: busy || !ready || gone || !(configPending || dirty)
+                    ? null
+                    : applyConfig,
+                child: BusyLabel(
+                  busy: running == HostAction.apply,
+                  icon: AppIcons.restart_alt,
+                  label: dirty
+                      ? l10n.hostSaveAndRestart
+                      : l10n.hostApplyRestart,
+                  busyLabel: l10n.hostRestarting,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        EditorNote(l10n.hostApplyNote),
-      ],
-    );
-  }
-
-  /// Codex hosts also publish `api:<name>`; say what it uses.
-  Widget? _apiNote(AppLocalizations l10n) =>
-      isCodexHost ? EditorNote(l10n.hostApiProxyNote) : null;
-
-  Widget _footer(AppLocalizations l10n, AppServeStatus? live) {
-    final note = _apiNote(l10n);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (existing != null) _configActions(l10n, live),
-        if (existing != null && note != null) const SizedBox(height: 8),
-        ?note,
       ],
     );
   }
@@ -223,6 +216,11 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
       ModelServiceSection(
         draft: draft,
         enabled: !busy,
+        // Codex hosts also publish `api:<name>`, which keeps the official
+        // sign-in whatever is chosen here.
+        info: isCodexHost
+            ? '${l10n.hostSectionModelHint}\n\n${l10n.hostApiProxyNote}'
+            : null,
         inherited: _inherited(l10n),
         official: !isCodexHost
             ? null
@@ -233,7 +231,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
                 proxy: officialProxy,
                 onChanged: loadSetup,
               ),
-        footer: existing == null && !isCodexHost ? null : _footer(l10n, live),
+        footer: existing == null ? null : _configActions(l10n, live),
       );
 
   /// The running host's state notes: gone, replaced, a newer saved
@@ -305,7 +303,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
               OutlinedButton.icon(
                 key: const Key('host-config-retry'),
                 onPressed: loadConfig,
-                icon: const Icon(Icons.refresh, size: 18),
+                icon: const Icon(AppIcons.refresh, size: 18),
                 label: Text(l10n.retry),
               ),
             ],
@@ -322,7 +320,8 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
         enabled: !busy,
         onBrowse: browseOpenCode,
         fixedName: true,
-        hint: l10n.hostRuntimeEditNote,
+        info: l10n.hostRuntimeEditNote,
+        sharedHistoryHost: sharedHistoryHost,
       );
     }
     if (host.isCodex) {
@@ -331,14 +330,14 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
         enabled: !busy,
         onBrowse: browseCodex,
         fixedName: true,
-        hint: l10n.hostRuntimeEditNote,
+        info: l10n.hostRuntimeEditNote,
       );
     }
     final spec = editedSpecBase;
     return GroupCard(
       key: const Key('host-agent-edit'),
       title: l10n.hostSectionAgent,
-      hint: l10n.hostAgentEditNote,
+      info: l10n.hostAgentEditNote,
       children: [
         EditorBlock(
           child: spec == null
@@ -366,6 +365,8 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
   }
 
   List<Widget> _sections(AppLocalizations l10n) {
+    // Names and the shared OpenCode history follow the hosts that run.
+    ref.watch(localServeListProvider);
     final host = existing;
     final live = liveHost;
     if (host != null) {
@@ -387,11 +388,14 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
           form: openCode,
           enabled: !busy,
           onBrowse: browseOpenCode,
+          takenNames: takenNames,
+          sharedHistoryHost: sharedHistoryHost,
         )
       else if (isAcpChoice(choice))
         GroupCard(
           key: const Key('acp-runtime-section'),
           title: l10n.hostRuntimeInfo,
+          info: l10n.acpHostHint,
           children: [
             EditorBlock(
               child: Column(
@@ -420,6 +424,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
           form: runtime,
           enabled: !busy,
           onBrowse: browseCodex,
+          takenNames: takenNames,
         ),
       _model(l10n, null),
     ];
@@ -435,6 +440,83 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
       joined: !ownsClaudePrepare,
     ),
   );
+
+  /// A filled button's style while [action] runs: disabled like every
+  /// control, but in its working colours, so it reads as busy, not off.
+  ButtonStyle? _working(
+    HostAction action,
+    Color background,
+    Color foreground,
+  ) => running == action
+      ? FilledButton.styleFrom(
+          disabledBackgroundColor: background,
+          disabledForegroundColor: foreground,
+        )
+      : null;
+
+  /// The rule above the actions, with a thin running line along it while an
+  /// operation is under way.
+  Widget _rule(ColorScheme scheme) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      Divider(height: 1, color: scheme.outlineVariant),
+      Positioned(
+        left: 0,
+        right: 0,
+        // Over the hairline and the pixel above it, clear of the bar below.
+        top: -1,
+        child: IgnorePointer(
+          child: AnimatedSwitcher(
+            duration: Motion.of(context, Motion.fast),
+            child: busy
+                ? LinearProgressIndicator(
+                    key: const Key('host-editor-progress'),
+                    minHeight: 2,
+                    color: signalColor(scheme),
+                    backgroundColor: Colors.transparent,
+                  )
+                : const SizedBox(height: 2),
+          ),
+        ),
+      ),
+    ],
+  );
+
+  /// The last outcome, pinned above the actions so it is seen wherever the
+  /// form is scrolled: it rises in as it arrives, and the space it took
+  /// closes when it goes.
+  Widget _outcome(List<(Key, String, IconData, Color)> messages) =>
+      Motion.resize(
+        context,
+        alignment: Alignment.bottomCenter,
+        child: messages.isEmpty
+            ? const SizedBox(width: double.infinity)
+            : Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 680),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final (key, message, icon, color) in messages)
+                          EntranceMotion(
+                            key: ValueKey((key, message)),
+                            offset: 6,
+                            child: _OutcomeCard(
+                              textKey: key,
+                              message: message,
+                              icon: icon,
+                              color: color,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+      );
 
   Widget _actions(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
@@ -488,15 +570,35 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
                   style: FilledButton.styleFrom(
                     backgroundColor: scheme.error,
                     foregroundColor: scheme.onError,
+                    // Its working colours while it stops (see [_working]).
+                    disabledBackgroundColor: running == HostAction.stop
+                        ? scheme.error
+                        : null,
+                    disabledForegroundColor: running == HostAction.stop
+                        ? scheme.onError
+                        : null,
                   ),
                   onPressed: busy || hostGone(liveHost) ? null : stop,
-                  child: Text(l10n.stopHosting),
+                  child: BusyLabel(
+                    busy: running == HostAction.stop,
+                    label: l10n.stopHosting,
+                    busyLabel: l10n.hostStopping,
+                  ),
                 )
               else
                 FilledButton(
                   key: const Key('start-hosting-btn'),
+                  style: _working(
+                    HostAction.start,
+                    scheme.primary,
+                    scheme.onPrimary,
+                  ),
                   onPressed: busy ? null : start,
-                  child: Text(l10n.startHosting),
+                  child: BusyLabel(
+                    busy: running == HostAction.start,
+                    label: l10n.startHosting,
+                    busyLabel: l10n.localHostStarting,
+                  ),
                 ),
             ],
           ),
@@ -511,9 +613,20 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
     final scheme = Theme.of(context).colorScheme;
     final host = existing;
     final messages = [
+      if (error != null)
+        (
+          const Key('host-editor-error'),
+          error!,
+          AppIcons.error_outline,
+          scheme.error,
+        ),
       if (notice != null)
-        (const Key('host-editor-notice'), notice!, successColor(scheme)),
-      if (error != null) (const Key('host-editor-error'), error!, scheme.error),
+        (
+          const Key('host-editor-notice'),
+          notice!,
+          AppIcons.check_circle_outline,
+          successColor(scheme),
+        ),
     ];
     return PopScope(
       canPop: canLeave,
@@ -554,24 +667,76 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
                             section,
                             const SizedBox(height: 12),
                           ],
-                          for (final (key, message, color) in messages)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                message,
-                                key: key,
-                                style: TextStyle(color: color),
-                              ),
-                            ),
                         ],
                       ),
                     ),
                   ),
                 ),
               ),
-              Divider(height: 1, color: scheme.outlineVariant),
+              _outcome(messages),
+              _rule(scheme),
               _actions(l10n),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One outcome of the editor's last operation, on a raised card with its
+/// mark.
+class _OutcomeCard extends StatelessWidget {
+  const _OutcomeCard({
+    required this.textKey,
+    required this.message,
+    required this.icon,
+    required this.color,
+  });
+
+  final Key textKey;
+  final String message;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final radius = BorderRadius.circular(kPanelRadius);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: raisedCardShadows(theme.colorScheme),
+        ),
+        child: Card(
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: radius),
+          // A long failure scrolls within its card rather than squeezing the
+          // form away.
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 168),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(14, 11, 16, 11),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Icon(icon, size: 17, color: color),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      message,
+                      key: textKey,
+                      style: theme.textTheme.bodyMedium?.copyWith(color: color),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

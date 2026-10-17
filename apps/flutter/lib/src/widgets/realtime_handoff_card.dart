@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/realtime_delegation.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A Live voice exchange, rendered as its own kind of turn.
 ///
@@ -36,7 +37,7 @@ class RealtimeHandoffCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 11, 14, 7),
             child: Row(
               children: [
-                Icon(Icons.graphic_eq, size: 17, color: scheme.primary),
+                Icon(AppIcons.graphic_eq, size: 17, color: scheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   handoff.isSessionTail

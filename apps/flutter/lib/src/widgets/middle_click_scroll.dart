@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Browser-style vertical auto-scroll for a mouse-equipped transcript.
 ///
@@ -192,7 +193,7 @@ class _MiddleClickScrollState extends State<MiddleClickScroll>
                         border: Border.all(color: scheme.outline),
                       ),
                       child: Icon(
-                        Icons.unfold_more,
+                        AppIcons.unfold_more,
                         size: 20,
                         color: scheme.onSurface,
                       ),

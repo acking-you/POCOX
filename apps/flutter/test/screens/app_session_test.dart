@@ -10,8 +10,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_linkify/flutter_linkify.dart';
-import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart'
@@ -26,6 +24,7 @@ import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
 import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/widgets/markdown_view.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 import 'package:pocket_codex/src/widgets/turn_minimap.dart';
@@ -34,6 +33,14 @@ import 'package:pocket_codex/src/widgets/history_arrival.dart';
 
 import '../fake_bridge_api.dart';
 import '../support/screen_harness.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+
+/// A project's heading in the sidebar (a new conversation also names its
+/// project).
+Finder projectHeading(String path, String name) => find.descendant(
+  of: find.byKey(Key('project-header-$path')),
+  matching: find.text(name),
+);
 
 void main() {
   // AppSessionScreen keeps per-thread plan/effort memory in process-wide static
@@ -457,6 +464,54 @@ void main() {
     expect(find.textContaining('shot.png'), findsOneWidget);
   });
 
+  testWidgets('a user message from history renders its Markdown and keeps '
+      'its typed line breaks', (t) async {
+    final api = FakeBridgeApi(
+      config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
+    );
+    await api.appConnect('pcx:lb7666:app:default', 28080);
+    api.readResult = const ThreadHistory(
+      items: [
+        ThreadItem(
+          id: 'u1',
+          itemType: 'userMessage',
+          title: '',
+          text: 'Please **check** the build\nthen ship it',
+        ),
+      ],
+      running: false,
+    );
+    await t.pumpWidget(
+      host(
+        const AppSessionScreen(
+          serviceKey: 'pcx:lb7666:app:default',
+          threadId: 'th-md',
+        ),
+        api,
+      ),
+    );
+    await t.pumpAndSettle();
+
+    final markdown = find.byType(MarkdownView);
+    expect(
+      find.descendant(
+        of: markdown,
+        matching: find.text(
+          'Please check the build\nthen ship it',
+          findRichText: true,
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: markdown,
+        matching: find.textContaining('**', findRichText: true),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('injected fragments are dropped and a voice handoff unwrapped', (
     t,
   ) async {
@@ -585,7 +640,11 @@ void main() {
       );
       await t.pumpAndSettle();
 
-      // Two turns ⇒ prev/next-turn jumps are offered.
+      // Two turns ⇒ prev/next-turn jumps are offered, folded into a faint
+      // handle until it is touched.
+      expect(find.byKey(const Key('nav-prev-turn')), findsNothing);
+      await t.tap(find.byKey(const Key('turn-navigation-handle')));
+      await t.pumpAndSettle();
       expect(find.byKey(const Key('nav-prev-turn')), findsOneWidget);
       expect(find.byKey(const Key('nav-next-turn')), findsOneWidget);
       // They drive the list controller; tapping must not throw even when the
@@ -857,10 +916,10 @@ void main() {
       final thumb = find.byKey(const Key('msg-image-0'));
       expect(thumb, findsOneWidget);
       // `find.text` also matches the top-bar conversation title (it previews
-      // the first message), so scope to the linkified body in the transcript.
+      // the first message), so scope to the rendered body in the transcript.
       final body = find.descendant(
-        of: find.byType(Linkify),
-        matching: find.text('who is this?'),
+        of: find.byType(MarkdownView),
+        matching: find.text('who is this?', findRichText: true),
       );
       expect(body, findsOneWidget);
       final bubble = find
@@ -1316,14 +1375,14 @@ void main() {
     await t.tap(find.byKey(const Key('send-btn')));
     await t.pumpAndSettle();
 
-    // The copy action appears on hover (desktop). Hover the agent message,
-    // then tap its copy icon.
+    // The copy action appears on hover (desktop). Hover the agent message
+    // (the last one rendered, after the user's own), then tap its copy icon.
     final gesture = await t.createGesture(kind: PointerDeviceKind.mouse);
     await gesture.addPointer(location: Offset.zero);
     addTearDown(() => gesture.removePointer());
-    await gesture.moveTo(t.getCenter(find.byType(MarkdownBody)));
+    await gesture.moveTo(t.getCenter(find.byType(MarkdownView).last));
     await t.pumpAndSettle();
-    await t.tap(find.byIcon(Icons.content_copy_outlined).last);
+    await t.tap(find.byIcon(AppIcons.content_copy_outlined).last);
     await t.pump();
     expect(copied, isNotEmpty);
   });
@@ -1396,15 +1455,18 @@ void main() {
     // each with its own hover actions.
     expect(find.textContaining('part one', findRichText: true), findsWidgets);
     expect(find.textContaining('part three', findRichText: true), findsWidgets);
-    expect(find.byType(MarkdownBody), findsOneWidget);
+    final reply = find.byWidgetPredicate(
+      (w) => w is MarkdownView && w.data.contains('part one'),
+    );
+    expect(reply, findsOneWidget);
 
     // And copying takes the whole turn, not just the part under the pointer.
     final gesture = await t.createGesture(kind: PointerDeviceKind.mouse);
     await gesture.addPointer(location: Offset.zero);
     addTearDown(() => gesture.removePointer());
-    await gesture.moveTo(t.getCenter(find.byType(MarkdownBody)));
+    await gesture.moveTo(t.getCenter(reply));
     await t.pumpAndSettle();
-    await t.tap(find.byIcon(Icons.content_copy_outlined).last);
+    await t.tap(find.byIcon(AppIcons.content_copy_outlined).last);
     await t.pump();
     expect(copied.single, contains('part one'));
     expect(copied.single, contains('part three'));
@@ -1441,7 +1503,7 @@ void main() {
     );
     await t.pumpAndSettle();
     // Markdown produces RichText spans, not a Text bubble.
-    expect(find.byType(MarkdownBody), findsOneWidget);
+    expect(find.byType(MarkdownView), findsOneWidget);
     expect(find.textContaining('Title', findRichText: true), findsWidgets);
   });
 
@@ -1534,7 +1596,7 @@ void main() {
     // preserved as the preview (not "(未命名)" — the server preview is still
     // empty for a just-started thread, so the optimistic one must win).
     expect(convTiles(), findsOneWidget);
-    expect(find.text('(未命名)'), findsNothing);
+    expect(find.text('（未命名）'), findsNothing);
   });
 
   testWidgets('Empty-state title is the project switcher', (t) async {
@@ -1677,15 +1739,15 @@ void main() {
     await t.pumpAndSettle();
 
     // A heading per project, not per time bucket.
-    expect(find.text('alpha'), findsOneWidget);
-    expect(find.text('beta'), findsOneWidget);
+    expect(projectHeading('/work/alpha', 'alpha'), findsOneWidget);
+    expect(projectHeading('/work/beta', 'beta'), findsOneWidget);
     expect(find.text('今天'), findsNothing); // groupToday (zh)
     expect(find.text('更早'), findsNothing); // groupEarlier (zh)
 
     // Both of alpha's conversations sit under the alpha heading — including the
     // 5-day-old one, which recency bucketing would have split off.
-    final alphaY = t.getTopLeft(find.text('alpha')).dy;
-    final betaY = t.getTopLeft(find.text('beta')).dy;
+    final alphaY = t.getTopLeft(projectHeading('/work/alpha', 'alpha')).dy;
+    final betaY = t.getTopLeft(projectHeading('/work/beta', 'beta')).dy;
     expect(alphaY, lessThan(betaY)); // newest project first
     expect(t.getTopLeft(find.text('alpha newest')).dy, greaterThan(alphaY));
     final oldestY = t.getTopLeft(find.text('alpha oldest')).dy;
@@ -1725,20 +1787,22 @@ void main() {
 
     // The project is the tree's top level: a bold group heading above
     // regular-weight rows, which indent beneath its name.
-    final heading = t.widget<Text>(find.text('alpha'));
+    final heading = t.widget<Text>(projectHeading('/work/alpha', 'alpha'));
     final row = t.widget<Text>(find.text('a conversation'));
     expect(heading.style!.fontWeight, FontWeight.w600);
     expect(row.style!.fontWeight, FontWeight.w400);
     expect(
       t.getTopLeft(find.text('a conversation')).dx,
-      greaterThanOrEqualTo(t.getTopLeft(find.text('alpha')).dx),
+      greaterThanOrEqualTo(
+        t.getTopLeft(projectHeading('/work/alpha', 'alpha')).dx,
+      ),
     );
 
-    // Rows carry no leading glyph of their own; the heading's folder and fold
-    // chevron are the tree's only icons.
-    expect(find.byIcon(Icons.chat_bubble_outline), findsNothing);
-    expect(find.byIcon(Icons.folder_open_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.keyboard_arrow_right), findsOneWidget);
+    // Rows carry no leading glyph of their own and the heading no folder:
+    // the fold chevron is the tree's only icon.
+    expect(find.byIcon(AppIcons.chat_bubble_outline), findsNothing);
+    expect(find.byIcon(AppIcons.folder_open_outlined), findsNothing);
+    expect(find.byIcon(AppIcons.keyboard_arrow_right), findsOneWidget);
   });
 
   testWidgets('Clicking a project folder collapses its conversations', (
@@ -1783,7 +1847,10 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('alpha one'), findsNothing);
     expect(find.text('beta one'), findsOneWidget);
-    expect(find.text('alpha'), findsOneWidget); // the heading itself remains
+    expect(
+      projectHeading('/work/alpha', 'alpha'),
+      findsOneWidget,
+    ); // the heading itself remains
 
     // And clicking again brings them back.
     await t.tap(find.byKey(const Key('project-header-/work/alpha')));
@@ -3486,8 +3553,8 @@ void main() {
     ]) {
       expect(find.text(label), findsOneWidget);
     }
-    expect(find.byIcon(Icons.groups_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.image_search_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.groups_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.image_search_outlined), findsOneWidget);
   });
 
   testWidgets('Camel-case outputDelta keeps a command visibly running', (
@@ -3966,7 +4033,7 @@ void main() {
     await t.pumpAndSettle();
     // The rendered markdown shows the plan content but not the wrapper tags.
     final md = t
-        .widgetList<MarkdownBody>(find.byType(MarkdownBody))
+        .widgetList<MarkdownView>(find.byType(MarkdownView))
         .firstWhere((w) => w.data.contains('English Plan'));
     expect(md.data.contains('proposed_plan'), isFalse);
   });
@@ -4534,15 +4601,22 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    // The user bubble linkifies the URL (highlighted + tappable) rather than
-    // rendering it as inert text. flutter_linkify parses the bare URL into a
-    // UrlElement, so the rendered Linkify carries the link.
-    final linkifyWidgets = t.widgetList<Linkify>(find.byType(Linkify));
-    expect(linkifyWidgets, isNotEmpty);
-    final hasUrl = linkifyWidgets.any(
-      (w) => w.text.contains('https://example.com'),
-    );
-    expect(hasUrl, isTrue);
+    // The user bubble renders its bare URL as a link (highlighted and
+    // tappable) rather than as inert text: a span carrying a tap recognizer.
+    final linked = find.byWidgetPredicate((w) {
+      if (w is! RichText) return false;
+      var found = false;
+      w.text.visitChildren((span) {
+        if (span is TextSpan &&
+            span.recognizer != null &&
+            (span.text ?? '').contains('example.com')) {
+          found = true;
+        }
+        return !found;
+      });
+      return found;
+    });
+    expect(linked, findsWidgets);
   });
 
   testWidgets('A normal multi-step turn does not offer to implement', (
@@ -4870,22 +4944,22 @@ void main() {
     // Two states only — no third "auto" icon to land on.
     final btn = find.byKey(const Key('theme-toggle-btn'));
     expect(btn, findsOneWidget);
-    expect(find.byIcon(Icons.brightness_auto_outlined), findsNothing);
+    expect(find.byIcon(AppIcons.brightness_auto_outlined), findsNothing);
 
     // The test platform reports light, so the button offers dark and the icon
     // shows what is currently in effect.
-    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.light_mode_outlined), findsOneWidget);
     await t.tap(btn);
     await t.pumpAndSettle();
-    expect(find.byIcon(Icons.dark_mode_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.light_mode_outlined), findsNothing);
+    expect(find.byIcon(AppIcons.dark_mode_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.light_mode_outlined), findsNothing);
 
     // And back — tapping twice returns to where it started rather than
     // advancing into a third state.
     await t.tap(btn);
     await t.pumpAndSettle();
-    expect(find.byIcon(Icons.light_mode_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.brightness_auto_outlined), findsNothing);
+    expect(find.byIcon(AppIcons.light_mode_outlined), findsOneWidget);
+    expect(find.byIcon(AppIcons.brightness_auto_outlined), findsNothing);
 
     // It lives with the window's controls, not in the sessions pane, so
     // collapsing the sidebar must not take appearance away with it.
@@ -4929,7 +5003,7 @@ void main() {
     expect(find.byKey(const Key('composer-project-chip')), findsNothing);
     // The host chip stays: where the turn RUNS is the one fact only the
     // composer reports, and it isn't repeated in the sidebar.
-    expect(find.byIcon(Icons.computer), findsOneWidget);
+    expect(find.byKey(const Key('composer-host-chip')), findsOneWidget);
   });
 
   testWidgets('Git branch badge shows changes and opens the review split', (
@@ -5045,14 +5119,18 @@ void main() {
 
     // The press is acknowledged immediately: the badge spins instead of sitting
     // inert until the diff lands.
-    expect(find.byType(CircularProgressIndicator), findsWidgets);
+    final spinner = find.descendant(
+      of: find.byKey(const Key('status-branch-chip')),
+      matching: find.byType(CircularProgressIndicator),
+    );
+    expect(spinner, findsWidgets);
     expect(find.text('审阅'), findsNothing); // review not open yet
 
     // Tapping again while it's in flight cancels: the spinner goes away and the
     // review never opens, even once the underlying call finally returns.
     await t.tap(find.byKey(const Key('status-branch-chip')));
     await t.pump();
-    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(spinner, findsNothing);
 
     gate.complete();
     await t.pumpAndSettle();
@@ -5386,9 +5464,13 @@ void main() {
     expect(find.text('implement'), findsOneWidget);
     expect(find.text('test'), findsOneWidget);
     // Completed step shows a filled check; pending shows an empty circle.
-    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.timelapse_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.radio_button_unchecked), findsOneWidget);
+    // The step marks (16 px), not the status bar's own check.
+    Finder inPanel(IconData icon) => find.byWidgetPredicate(
+      (w) => w is Icon && w.icon == icon && w.size == 16,
+    );
+    expect(inPanel(AppIcons.check_circle_rounded), findsOneWidget);
+    expect(inPanel(AppIcons.timelapse_rounded), findsOneWidget);
+    expect(inPanel(AppIcons.radio_button_unchecked), findsOneWidget);
     // The explanation renders as Markdown above the steps.
     expect(
       find.textContaining('Add a feature', findRichText: true),
@@ -5696,7 +5778,8 @@ void main() {
           final scroll = t
               .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
               .controller;
-          expect(scroll.offset, greaterThan(500));
+          // Opened at the end, far below the conversation's start.
+          expect(scroll.position.extentBefore, greaterThan(500));
           final rail = t.getRect(find.byKey(const Key('turn-minimap-rail')));
           final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
           await mouse.addPointer(location: Offset.zero);
@@ -5722,7 +5805,7 @@ void main() {
           }
           await mouse.moveTo(const Offset(1500, 850));
           await t.pumpAndSettle();
-          expect(scroll.offset, lessThan(20));
+          expect(scroll.position.extentBefore, lessThan(20));
           expect(find.text('external question 0'), findsOneWidget);
           final firstTick = t.widget<Container>(
             find.byKey(const ValueKey('turn-minimap-tick-0')),
@@ -6163,7 +6246,7 @@ void main() {
       await t.pump(const Duration(milliseconds: 100));
     }
     expect(find.textContaining('live.dart'), findsWidgets);
-    Navigator.of(t.element(find.textContaining('live.dart').first)).pop();
+    await t.tap(find.byKey(const Key('review-close')));
     for (var i = 0; i < 4; i++) {
       await t.pump(const Duration(milliseconds: 100));
     }
@@ -6775,9 +6858,12 @@ void main() {
           agent('a4', 'fourth answer', 't4'),
         ],
       };
+      await t.tap(find.byKey(const Key('turn-navigation-handle')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('nav-prev-turn')));
       await t.pumpAndSettle();
-      expect(api.turnItemCalls, ['t4']);
+      // The turn above the landing place is read ahead of the reader.
+      expect(api.turnItemCalls, ['t4', 't3']);
       expect(find.text('fourth question'), findsOneWidget);
       final control = find.byKey(const Key('draggable-turn-navigation'));
       final before = t.getTopLeft(control);
@@ -6896,7 +6982,7 @@ void main() {
         expect(rail.items.last.rowIndex, -1);
         rail.onSelect(rail.items.last);
         await t.pumpAndSettle();
-        expect(api.turnItemCalls, ['t5']);
+        expect(api.turnItemCalls, ['t5', 't4']);
         expect(find.text('newest question'), findsOneWidget);
         expect(
           t.widget<TurnMinimap>(find.byType(TurnMinimap)).items.last.rowIndex,
@@ -6931,6 +7017,47 @@ void main() {
       });
     });
 
+    testWidgets('history filled in above the reader leaves the reader still', (
+      t,
+    ) async {
+      await onDesktop(() async {
+        await t.binding.setSurfaceSize(const Size(1600, 900));
+        addTearDown(() => t.binding.setSurfaceSize(null));
+        final api = await openPaginated(t, longTail: true);
+        api.turnItems['t1'] = [
+          user('u1', 'first question', 't1'),
+          agent('a1', 'first answer', 't1'),
+        ];
+        final rail = t.widget<TurnMinimap>(find.byType(TurnMinimap));
+        rail.onSelect(rail.items.first);
+        await t.pumpAndSettle();
+        // Read on past the gap the jump left, to the newest turn.
+        final scroll = t
+            .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
+            .controller;
+        final newest = find.byKey(const ValueKey('u5'));
+        final top = t
+            .getTopLeft(find.byKey(const Key('chat-conversation-layer')))
+            .dy;
+        scroll.jumpTo(scroll.offset + t.getTopLeft(newest).dy - top - 60);
+        await t.pumpAndSettle();
+        final pending = Completer<List<ThreadItem>>();
+        api.pendingTurnItems['t2'] = pending.future;
+        await t.drag(find.text('newest question'), const Offset(0, -40));
+        await t.pump();
+        expect(api.turnItemCalls, ['t1', 't2']);
+        final before = t.getTopLeft(newest).dy;
+        // The turn lands between the jump's landing place and the reader.
+        pending.complete([
+          user('u2', 'second question', 't2'),
+          agent('a2', 'second answer\n\n' * 30, 't2'),
+        ]);
+        await t.pumpAndSettle();
+        expect(t.getTopLeft(newest).dy, closeTo(before, 1));
+        expect(t.takeException(), isNull);
+      });
+    });
+
     testWidgets('repeated selection shares the in-flight request', (t) async {
       await onDesktop(() async {
         await t.binding.setSurfaceSize(const Size(1600, 900));
@@ -6942,7 +7069,7 @@ void main() {
         final controller = t
             .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
             .controller;
-        expect(controller.offset, greaterThan(500));
+        expect(controller.position.extentBefore, greaterThan(500));
         rail.onSelect(rail.items.first);
         await t.pump();
         rail.onSelect(rail.items.first);
@@ -6951,7 +7078,7 @@ void main() {
         response.complete([user('u1', 'first question', 't1')]);
         await t.pumpAndSettle();
         expect(api.turnItemCalls, ['t1']);
-        expect(controller.offset, lessThan(100));
+        expect(controller.position.extentBefore, lessThan(100));
         expect(find.text('first question'), findsOneWidget);
       });
     });
@@ -6984,14 +7111,15 @@ void main() {
               matching: find.byType(IconButton),
             ),
           );
-          await t.pump();
+          // It fades out.
+          await t.pumpAndSettle();
           expect(
             find.byKey(const Key('history-navigation-status')),
             findsNothing,
           );
           pending.complete([user('u1', 'first question', 't1')]);
           await t.pumpAndSettle();
-          expect(scroll.offset, greaterThan(500));
+          expect(scroll.position.extentBefore, greaterThan(500));
           expect(api.turnItemCalls, ['t1']);
           expect(t.takeException(), isNull);
         });
@@ -7048,7 +7176,7 @@ void main() {
       final scroll = t
           .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
           .controller;
-      scroll.jumpTo(0);
+      scroll.jumpTo(scroll.position.minScrollExtent);
       await t.pumpAndSettle();
       api.olderPages = [
         [
@@ -7077,7 +7205,7 @@ void main() {
       final scroll = t
           .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
           .controller;
-      scroll.jumpTo(0);
+      scroll.jumpTo(scroll.position.minScrollExtent);
       await t.pumpAndSettle();
       final anchor = find.byKey(const ValueKey('a5'));
       final before = t.getTopLeft(anchor).dy;

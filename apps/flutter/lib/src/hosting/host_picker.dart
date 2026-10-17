@@ -5,6 +5,9 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/host_editor_page.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
+import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 
 /// Open the hosting editor from a place that is not about one host (Settings,
 /// Codex setup): with no local host, the editor for a new one (nothing starts
@@ -36,7 +39,7 @@ Future<void> configureHosting(BuildContext context, WidgetRef ref) async {
     if (!context.mounted || !onTop()) return;
     var pick = const _Pick(null);
     if (hosts.isNotEmpty || failed) {
-      final picked = await showDialog<_Pick>(
+      final picked = await showAppDialog<_Pick>(
         context: context,
         builder: (_) => _HostPicker(hosts: hosts, failed: failed),
       );
@@ -91,28 +94,25 @@ class _HostPicker extends StatelessWidget {
     return AlertDialog(
       key: const Key('host-picker'),
       scrollable: true,
-      title: Text(l10n.hostPickTitle),
+      // What picking (and saving) does is behind the title's info mark.
+      title: InfoTitle(
+        title: Text(l10n.hostPickTitle),
+        info: l10n.hostPickHint,
+      ),
       content: SizedBox(
         width: 420,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              l10n.hostPickHint,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
             if (failed) ...[
-              const SizedBox(height: 8),
               Text(
                 l10n.hostPickLoadFailed,
                 key: const Key('host-pick-failed'),
-                style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+                style: helpTextStyle(theme).copyWith(color: scheme.error),
               ),
+              const SizedBox(height: 8),
             ],
-            const SizedBox(height: 8),
             for (final host in hosts)
               ListTile(
                 key: Key('host-pick-${host.appServiceKey}'),
@@ -125,13 +125,13 @@ class _HostPicker extends StatelessWidget {
                 ),
                 title: Text(host.name),
                 subtitle: Text(_agent(host)),
-                trailing: const Icon(Icons.chevron_right),
+                trailing: const Icon(AppIcons.chevron_right),
                 onTap: () => _close(context, _Pick(host)),
               ),
             ListTile(
               key: const Key('host-pick-new'),
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.add),
+              leading: const Icon(AppIcons.add),
               title: Text(l10n.hostPickNew),
               onTap: () => _close(context, const _Pick(null)),
             ),

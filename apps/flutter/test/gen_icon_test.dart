@@ -34,7 +34,11 @@
 // Outputs (in-app — the bare glyph, no tile):
 //   assets/logo/glyph_light.png / glyph_dark.png
 // Outputs (tray):
-//   assets/tray/tray.png       macOS / Linux tray (loaded as a PNG)
+//   assets/tray/tray_template.png
+//                              macOS menu bar: the bare glyph as a template
+//                              image, which AppKit tints like every other
+//                              status item
+//   assets/tray/tray.png       Linux tray (loaded as a PNG)
 //   assets/tray/tray.ico       Windows tray (multi-size .ico)
 // Outputs (repository art, both copies kept identical):
 //   assets/logo/logo.png, apps/flutter/assets/logo/logo.png
@@ -84,6 +88,15 @@ class MarkStyle {
     Color(0xFFEDEDEF),
     Color(0xFF93A6F5),
   );
+
+  /// The macOS menu-bar template: one colour, drawn without a tile. AppKit
+  /// keeps only a template image's alpha and paints it in the menu bar's own
+  /// foreground, so the arcs cannot keep a colour of their own.
+  static const template = MarkStyle(
+    [Color(0x00000000)],
+    Color(0xFF000000),
+    Color(0xFF000000),
+  );
 }
 
 /// Draws the brand mark as vectors at exactly [px] pixels: a tile with the
@@ -99,7 +112,7 @@ class MarkStyle {
 /// (0 for a full-bleed square); [tile] false draws the glyph alone on a
 /// transparent canvas and [glyph] false the tile alone; [glyphScale] shrinks
 /// the glyph within the tile (Android adaptive icons and the Android 12 splash
-/// keep it inside their safe circle).
+/// keep it inside their safe circle); [weight] thickens every stroke.
 Future<img.Image> renderMark(
   int px, {
   double margin = 0,
@@ -108,6 +121,7 @@ Future<img.Image> renderMark(
   bool tile = true,
   bool glyph = true,
   double glyphScale = 1,
+  double weight = 1,
 }) async {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
@@ -130,14 +144,20 @@ Future<img.Image> renderMark(
       fill,
     );
   }
-  if (glyph) _drawGlyph(canvas, rect, style, glyphScale);
+  if (glyph) _drawGlyph(canvas, rect, style, glyphScale, weight);
   final image = await recorder.endRecording().toImage(px, px);
   final png = await image.toByteData(format: ui.ImageByteFormat.png);
   return img.decodePng(png!.buffer.asUint8List())!;
 }
 
 /// The cloud, prompt and arcs inside [tile]. Geometry is in tile units (0..1).
-void _drawGlyph(Canvas canvas, Rect tile, MarkStyle style, double scale) {
+void _drawGlyph(
+  Canvas canvas,
+  Rect tile,
+  MarkStyle style,
+  double scale,
+  double weight,
+) {
   final side = tile.width;
   // The glyph is drawn slightly larger in a small tile, where the margin it
   // gets at full size would cost pixels the strokes need.
@@ -159,7 +179,7 @@ void _drawGlyph(Canvas canvas, Rect tile, MarkStyle style, double scale) {
 
   double len(double v) => v * zoom * side;
   // Never thinner than ~1.45 px, or a stroke turns into a grey haze.
-  double stroke(double v) => math.max(len(v), 1.45);
+  double stroke(double v) => math.max(len(v) * weight, 1.45);
 
   final ink = Paint()
     ..color = style.ink
@@ -415,11 +435,32 @@ void main() {
     ).writeAsBytes(img.IcoEncoder().encodeImages(frames));
   }, skip: skip);
 
+  test('derive the macOS menu-bar template', () async {
+    Directory('assets/tray').createSync(recursive: true);
+
+    // Menu-bar items are monochrome glyphs in the bar's own colour (white on
+    // a dark or tinted bar, black on a light one); a colour tile there is the
+    // one item that does not belong. 36 px is the @2x size of tray_manager's
+    // 18 pt item, drawn at that size so no stroke is resampled. The glyph is
+    // scaled to fill the square (a cloud is wider than tall) and its strokes
+    // thickened to the weight of the system's own menu-bar glyphs.
+    await _png(
+      'assets/tray/tray_template.png',
+      await renderMark(
+        36,
+        style: MarkStyle.template,
+        tile: false,
+        glyphScale: 1.19,
+        weight: 1.25,
+      ),
+    );
+  }, skip: skip);
+
   test('derive tray assets (png + multi-size ico)', () async {
     Directory('assets/tray').createSync(recursive: true);
 
-    // macOS and Linux use the same blue tile in both appearances. At 64 px
-    // it stays crisp when scaled to the menu bar or notification area.
+    // Linux uses the blue tile in both appearances. At 64 px it stays crisp
+    // when scaled to the notification area.
     await _png('assets/tray/tray.png', await renderMark(64));
 
     // Windows: LoadImage(IMAGE_ICON) needs a true .ico. Full-colour rounded

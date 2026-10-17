@@ -198,10 +198,8 @@ void main() {
     await _pump(t, items: _items(4), gutter: 60);
     await _hoverTick(t, 0);
 
-    final card = t.widget<Container>(
-      find.byKey(const Key('turn-minimap-preview')),
-    );
-    expect(card.constraints!.maxWidth, lessThan(300));
+    final card = t.getSize(find.byKey(const Key('turn-minimap-preview')));
+    expect(card.width, lessThan(300));
   });
 
   testWidgets('clicking a tick jumps to that turn by row index', (t) async {

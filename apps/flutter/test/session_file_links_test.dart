@@ -179,6 +179,20 @@ void main() {
             }
           })().timeout(const Duration(seconds: 5));
         });
+        // The directory can be gone before the deletion's completion reaches
+        // the dialog: build what it shows now, then let real events in until
+        // it is no longer busy.
+        await tester.pump();
+        for (
+          var i = 0;
+          i < 250 && find.byType(LinearProgressIndicator).evaluate().isNotEmpty;
+          i++
+        ) {
+          await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)),
+          );
+          await tester.pump();
+        }
         await tester.pumpAndSettle();
         expect(api.destination, isNotNull);
         expect(File(api.destination!).existsSync(), isFalse);

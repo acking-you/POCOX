@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/widgets/layered_navigation.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 const _width = 400.0;
 final _nav = find.byType(LayeredNavigation);
@@ -58,7 +59,7 @@ Future<List<bool>> _mount(
                   Builder(
                     builder: (c) => IconButton(
                       key: const Key('close'),
-                      icon: const Icon(Icons.close),
+                      icon: const Icon(AppIcons.close),
                       onPressed: () => LayeredNavigation.maybeOf(c)!.close(),
                     ),
                   ),
@@ -84,7 +85,7 @@ Future<List<bool>> _mount(
                 leading: Builder(
                   builder: (c) => IconButton(
                     key: const Key('menu'),
-                    icon: const Icon(Icons.menu),
+                    icon: const Icon(AppIcons.menu),
                     onPressed: () => LayeredNavigation.maybeOf(c)!.open(),
                   ),
                 ),

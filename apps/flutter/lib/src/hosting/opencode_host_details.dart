@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/managed/default_project_tile.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/provider_badge.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// A running native OpenCode host: its version, what OpenCode's own
 /// configuration provides (providers, models, default model, agents) and the
@@ -109,7 +110,7 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, size: 10, color: stateColor),
+                Icon(AppIcons.circle, size: 10, color: stateColor),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -152,7 +153,7 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
                       dimension: 16,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Icon(Icons.refresh, size: 16),
+                  : const Icon(AppIcons.refresh, size: 16),
               label: Text(l10n.refresh),
             ),
           ),

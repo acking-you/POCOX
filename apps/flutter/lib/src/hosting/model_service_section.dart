@@ -6,7 +6,9 @@ import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/hosting/claude_environment_section.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// The model service being edited for one host: where it gets its model
 /// (the agent's existing configuration, the official Codex account, or a
@@ -207,10 +209,15 @@ class ModelServiceSection extends StatelessWidget {
     this.official,
     this.enabled = true,
     this.footer,
+    this.info,
   });
 
   /// The configuration being edited.
   final ModelServiceDraft draft;
+
+  /// What the section is for, behind the title's info mark; the general
+  /// explanation when null.
+  final String? info;
 
   /// What the agent's existing configuration provides.
   final Widget inherited;
@@ -246,7 +253,7 @@ class ModelServiceSection extends StatelessWidget {
       builder: (context, _) => GroupCard(
         key: const Key('host-model-service'),
         title: l10n.hostSectionModel,
-        hint: l10n.hostSectionModelHint,
+        info: info ?? l10n.hostSectionModelHint,
         children: [
           EditorBlock(child: _body(context, l10n)),
           if (draft.support.claudeVariables.isNotEmpty)
@@ -266,21 +273,25 @@ class ModelServiceSection extends StatelessWidget {
   Widget _body(BuildContext context, AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final sources = draft.support.sources;
+    // A single source is not a choice: only what it provides is shown.
+    final choose = sources.length > 1 || draft.incompatible;
     final children = <Widget>[
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final source in sources)
-            ServiceChoice(
-              key: Key('host-source-$source'),
-              label: _sourceLabel(l10n, source),
-              selected: draft.source == source,
-              onSelected: enabled ? () => draft.source = source : null,
-            ),
-        ],
-      ),
-      const SizedBox(height: 12),
+      if (choose) ...[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final source in sources)
+              ServiceChoice(
+                key: Key('host-source-$source'),
+                label: _sourceLabel(l10n, source),
+                selected: draft.source == source,
+                onSelected: enabled ? () => draft.source = source : null,
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+      ],
     ];
     if (draft.incompatible) {
       children
@@ -291,10 +302,6 @@ class ModelServiceSection extends StatelessWidget {
             color: scheme.error,
           ),
         )
-        ..add(const SizedBox(height: 8));
-    } else if (sources.length == 1) {
-      children
-        ..add(EditorNote(l10n.hostInheritedOnly))
         ..add(const SizedBox(height: 8));
     }
     switch (draft.source) {
@@ -338,7 +345,7 @@ class ModelServiceSection extends StatelessWidget {
             ),
         ],
       ),
-      const SizedBox(height: 12),
+      const SizedBox(height: 14),
       TextField(
         key: const Key('host-base-url'),
         controller: draft.baseUrl,
@@ -354,20 +361,19 @@ class ModelServiceSection extends StatelessWidget {
         ),
         onChanged: (_) => draft.edited(),
       ),
-      const SizedBox(height: 12),
-      TextField(
-        key: const Key('host-api-key'),
-        controller: draft.key,
-        enabled: enabled && !draft.removeKey,
-        obscureText: true,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: InputDecoration(
-          labelText: l10n.hostApiKey,
-          helperText: keySet ? l10n.hostApiKeyStored : l10n.hostKeyEnvNote,
-          helperMaxLines: 3,
+      const SizedBox(height: 14),
+      FocusHelp(
+        help: keySet ? l10n.hostApiKeyStored : l10n.hostKeyEnvNote,
+        child: TextField(
+          key: const Key('host-api-key'),
+          controller: draft.key,
+          enabled: enabled && !draft.removeKey,
+          obscureText: true,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(labelText: l10n.hostApiKey),
+          onChanged: (_) => draft.edited(),
         ),
-        onChanged: (_) => draft.edited(),
       ),
       if (keySet)
         CheckboxListTile(
@@ -379,23 +385,24 @@ class ModelServiceSection extends StatelessWidget {
           value: draft.removeKey,
           onChanged: enabled ? (v) => draft.removeKey = v ?? false : null,
         ),
-      const SizedBox(height: 12),
-      TextField(
-        key: const Key('host-model'),
-        controller: draft.model,
-        enabled: enabled,
-        autocorrect: false,
-        enableSuggestions: false,
-        decoration: InputDecoration(
-          labelText: draft.support.modelRequired
-              ? l10n.hostModelDefault
-              : l10n.hostModelOptional,
-          // The provider's model for new sessions; a conversation's own
-          // model choice is made in the conversation and not stored here.
-          helperText: l10n.hostModelDefaultNote,
-          helperMaxLines: 3,
+      const SizedBox(height: 14),
+      // The provider's model for new sessions; a conversation's own model
+      // choice is made in the conversation and not stored here.
+      FocusHelp(
+        help: l10n.hostModelDefaultNote,
+        child: TextField(
+          key: const Key('host-model'),
+          controller: draft.model,
+          enabled: enabled,
+          autocorrect: false,
+          enableSuggestions: false,
+          decoration: InputDecoration(
+            labelText: draft.support.modelRequired
+                ? l10n.hostModelDefault
+                : l10n.hostModelOptional,
+          ),
+          onChanged: (_) => draft.edited(),
         ),
-        onChanged: (_) => draft.edited(),
       ),
       if (draft.problem(l10n) case final problem? when !draft.incompatible) ...[
         const SizedBox(height: 8),
@@ -476,7 +483,7 @@ class ServiceChoice extends StatelessWidget {
                 children: [
                   if (selected) ...[
                     Icon(
-                      Icons.check,
+                      AppIcons.check,
                       size: 18,
                       color: enabled ? chip.checkmarkColor ?? color : color,
                     ),

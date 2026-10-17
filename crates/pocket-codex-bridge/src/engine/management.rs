@@ -176,6 +176,11 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
         },
         RuntimeChoice::Opencode {} => Ok(Runtime::OpenCode {
             binary: None,
+            separate_history: separate_history(
+                host_profiles::get(name)?.runtime.as_ref(),
+                super::serve_opencode::shared_history_host().as_deref(),
+                name,
+            ),
         }),
         RuntimeChoice::Claude {} => {
             if !super::claude_setup::status()?.ready {
@@ -191,6 +196,18 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
         RuntimeChoice::Saved {} => host_profiles::get(name)?
             .runtime
             .ok_or_else(|| anyhow!("no saved runtime for this host")),
+    }
+}
+
+/// Where a remotely chosen OpenCode host keeps its sessions: as this name
+/// saved, else in a database of its own while `shared_holder` (another host)
+/// serves OpenCode's default one, which one host serves at a time.
+fn separate_history(saved: Option<&Runtime>, shared_holder: Option<&str>, name: &str) -> bool {
+    match saved {
+        Some(Runtime::OpenCode {
+            separate_history, ..
+        }) => *separate_history,
+        _ => shared_holder.is_some_and(|holder| !super::host_names::same(holder, name)),
     }
 }
 
@@ -317,7 +334,7 @@ fn mask_runtime(runtime: &mut Runtime) {
             spec.args.clear();
         },
         Runtime::OpenCode {
-            binary,
+            binary, ..
         } => *binary = None,
     }
 }
@@ -543,6 +560,7 @@ mod tests {
             },
             Runtime::OpenCode {
                 binary: Some("/private/secret/opencode".into()),
+                separate_history: false,
             },
         ] {
             mask_runtime(&mut runtime);
@@ -550,6 +568,26 @@ mod tests {
                 .expect("JSON")
                 .contains("secret"));
         }
+    }
+
+    #[test]
+    fn a_remote_opencode_host_keeps_its_history_or_avoids_a_shared_one() {
+        let shared = Runtime::OpenCode {
+            binary: None,
+            separate_history: false,
+        };
+        let own = Runtime::OpenCode {
+            binary: None,
+            separate_history: true,
+        };
+        // A new name beside a host on OpenCode's default database gets its own.
+        assert!(separate_history(None, Some("opencode"), "work"));
+        assert!(!separate_history(None, None, "work"));
+        // The holder itself, under any spelling, is not "another" host.
+        assert!(!separate_history(None, Some("my-host"), "My Host"));
+        // An edit keeps what the name saved.
+        assert!(!separate_history(Some(&shared), Some("other"), "work"));
+        assert!(separate_history(Some(&own), None, "work"));
     }
 
     #[test]

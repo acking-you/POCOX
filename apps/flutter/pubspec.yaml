@@ -95,6 +95,9 @@ dependencies:
   # Flutter team's package). Pinned exactly: a renderer bump can change
   # what a preview looks like.
   flutter_svg: 2.3.0
+  # The app's one icon family (Lucide, ISC): a consistent stroke set mapped
+  # in lib/src/app_icons.dart. Pinned exactly so a glyph redraw is a choice.
+  lucide_icons_flutter: 3.1.25
 
 dev_dependencies:
   flutter_test:
@@ -118,35 +121,37 @@ flutter:
   # Only the theme-matched brand marks ship in the bundle. logo.png stays in
   # the repo as marketing material — bundling it would add dead weight.
   #
-  # The tray icons (tray.png for macOS/Linux, tray.ico for Windows) are tiny and
-  # only loaded on desktop; tray_manager resolves them relative to
-  # data/flutter_assets, so they must ship as bundled assets. Generated from
-  # icon/logo_dark.png by test/gen_icon_test.dart.
+  # The tray icons (tray_template.png for the macOS menu bar, tray.png for
+  # Linux, tray.ico for Windows) are tiny and only loaded on desktop;
+  # tray_manager resolves them relative to data/flutter_assets, so they must
+  # ship as bundled assets. Drawn by test/gen_icon_test.dart.
   assets:
     - assets/logo/mark_light.png
     - assets/logo/mark_dark.png
     - assets/logo/glyph_light.png
     - assets/logo/glyph_dark.png
+    - assets/tray/tray_template.png
     - assets/tray/tray.png
     - assets/tray/tray.ico
-  # The design system's typefaces (SIL OFL, see assets/fonts/OFL-*.txt): Figtree
-  # for prose, Geist Mono for code. Static instances rather than the variable
+  # The design system's typefaces (SIL OFL, see assets/fonts/OFL-*.txt): Google
+  # Sans Flex for prose (static instances cut from the variable master at
+  # opsz 16 / wdth 100), Geist Mono for code. Static instances rather than the variable
   # TTFs — Flutter maps FontWeight to the nearest *declared* weight and would
-  # not interpolate a weight axis. ~740 KB total, so unlike Noto Sans SC these
+  # not interpolate a weight axis. ~850 KB total, so unlike Noto Sans SC these
   # ship on every platform; neither face has any CJK glyph, so Chinese falls
   # through to the fallback chain in lib/src/fonts.dart.
   fonts:
-    - family: Figtree
+    - family: GoogleSansFlex
       fonts:
-        - asset: assets/fonts/Figtree-Light.ttf
+        - asset: assets/fonts/GoogleSansFlex-Light.ttf
           weight: 300
-        - asset: assets/fonts/Figtree-Regular.ttf
+        - asset: assets/fonts/GoogleSansFlex-Regular.ttf
           weight: 400
-        - asset: assets/fonts/Figtree-Medium.ttf
+        - asset: assets/fonts/GoogleSansFlex-Medium.ttf
           weight: 500
-        - asset: assets/fonts/Figtree-SemiBold.ttf
+        - asset: assets/fonts/GoogleSansFlex-SemiBold.ttf
           weight: 600
-        - asset: assets/fonts/Figtree-Bold.ttf
+        - asset: assets/fonts/GoogleSansFlex-Bold.ttf
           weight: 700
     - family: GeistMono
       fonts:

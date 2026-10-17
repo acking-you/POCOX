@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/motion.dart';
 
 /// Drives the sweep for the skeleton shapes ([SkeletonBox]) beneath it, so a
 /// screen waiting on data reads as "content is coming" rather than as a frozen
@@ -125,7 +126,9 @@ class _SlideGradient extends GradientTransform {
       Matrix4.translationValues((t * 2 - 1) * bounds.width, 0, 0);
 }
 
-/// A quiet initial-history state. Fast cache hits never flash a loading shape.
+/// A quiet initial-history state: after a short delay, a label with a small
+/// spinner fades in. Fast cache hits never flash a loading shape, and no mock
+/// conversation stands in for the real one.
 class ChatLoadingSkeleton extends StatefulWidget {
   const ChatLoadingSkeleton({super.key});
 
@@ -152,19 +155,45 @@ class _ChatLoadingSkeletonState extends State<ChatLoadingSkeleton> {
   }
 
   @override
-  Widget build(BuildContext context) => Center(
-    child: _visible
-        ? Semantics(
-            liveRegion: true,
-            child: Text(
-              AppLocalizations.of(context).historyLoading,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          )
-        : const SizedBox.shrink(),
-  );
+  Widget build(BuildContext context) {
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
+    // Fades in rather than appearing, so a read that only just outlasts the
+    // delay doesn't flash.
+    return Center(
+      child: AnimatedOpacity(
+        opacity: _visible ? 1 : 0,
+        duration: Motion.of(context, Motion.slow),
+        curve: Motion.enter,
+        child: _visible
+            ? Semantics(
+                liveRegion: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Reduced motion keeps the label alone, perfectly still.
+                    if (Motion.ambientAllowed(context)) ...[
+                      SizedBox.square(
+                        dimension: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.6,
+                          color: muted,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
+                    Text(
+                      AppLocalizations.of(context).historyLoading,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: muted),
+                    ),
+                  ],
+                ),
+              )
+            : const SizedBox.shrink(),
+      ),
+    );
+  }
 }
 
 /// A shimmer skeleton mimicking a list (services / sessions) while it loads.
@@ -201,4 +230,122 @@ class ListLoadingSkeleton extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The sessions sidebar while its first listing is on its way: after a short
+/// delay, quiet rows under project headings fade in, so a listing that
+/// answers at once never flashes a placeholder.
+class ConversationListSkeleton extends StatefulWidget {
+  /// Creates the skeleton; [touch] lays it out with touch-sized rows.
+  const ConversationListSkeleton({super.key, this.touch = false});
+
+  /// Touch-sized rows rather than pointer-sized ones.
+  final bool touch;
+
+  @override
+  State<ConversationListSkeleton> createState() =>
+      _ConversationListSkeletonState();
+}
+
+class _ConversationListSkeletonState extends State<ConversationListSkeleton> {
+  // Each group: its heading's width, then its rows' title widths (fractions
+  // of the row), uneven the way real titles are.
+  static const _groups = [
+    (84.0, [0.78, 0.56, 0.68]),
+    (64.0, [0.62, 0.84]),
+    (96.0, [0.5, 0.72, 0.6]),
+  ];
+
+  bool _visible = false;
+  late final Timer _delay = Timer(const Duration(milliseconds: 180), () {
+    if (mounted) setState(() => _visible = true);
+  });
+
+  @override
+  void initState() {
+    super.initState();
+    _delay;
+  }
+
+  @override
+  void dispose() {
+    _delay.cancel();
+    super.dispose();
+  }
+
+  // A pointer row: the title, its time at the end of the line.
+  Widget _pointerRow(double title) => SizedBox(
+    height: 34,
+    child: Row(
+      children: [
+        Expanded(
+          child: FractionallySizedBox(
+            alignment: AlignmentDirectional.centerStart,
+            widthFactor: title,
+            child: const SkeletonBox(height: 10, radius: 5),
+          ),
+        ),
+        const SizedBox(width: 14),
+        const SkeletonBox(width: 22, height: 8, radius: 4),
+      ],
+    ),
+  );
+
+  // A touch row: the title, its time on the line below.
+  Widget _touchRow(double title) => SizedBox(
+    height: 58,
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FractionallySizedBox(
+          widthFactor: title,
+          child: const SkeletonBox(height: 11, radius: 5.5),
+        ),
+        const SizedBox(height: 9),
+        const SkeletonBox(width: 52, height: 8, radius: 4),
+      ],
+    ),
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = <Widget>[
+      for (final (heading, titles) in _groups) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(10, 16, 10, 10),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: SkeletonBox(width: heading, height: 9, radius: 4.5),
+          ),
+        ),
+        for (final title in titles)
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(28, 0, 10, 0),
+            child: widget.touch ? _touchRow(title) : _pointerRow(title),
+          ),
+      ],
+    ];
+    return Semantics(
+      label: AppLocalizations.of(context).conversationsLoading,
+      liveRegion: true,
+      child: ExcludeSemantics(
+        child: AnimatedOpacity(
+          opacity: _visible ? 1 : 0,
+          duration: Motion.of(context, Motion.slow),
+          curve: Motion.enter,
+          // Only once it shows: a hidden sweep would tick for nothing.
+          child: _visible
+              ? Shimmer(
+                  child: ListView(
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+                    children: rows,
+                  ),
+                )
+              : const SizedBox.expand(),
+        ),
+      ),
+    );
+  }
 }

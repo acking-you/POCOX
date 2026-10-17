@@ -10,11 +10,13 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/text_measure.dart';
-import 'package:pocket_codex/src/widgets/brand_logo.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/widgets/workspace_navigation.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Shared shell for secondary, full-window pages.
 ///
@@ -65,6 +67,9 @@ class UtilityPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final wide = MediaQuery.sizeOf(context).width >= 1000;
+    if (wide) {
+      return AppPageShortcuts(currentRoute: route, child: _sheetShell(context));
+    }
     final scaffold = Scaffold(
       appBar: UtilityPageTitleBar(
         route: route,
@@ -73,153 +78,82 @@ class UtilityPage extends StatelessWidget {
         actions: actions,
         primaryAction: primaryAction,
       ),
-      body: wide
-          ? Row(
-              children: [
-                SizedBox(
-                  width: 208,
-                  child: _WorkspaceNavigation(route: parent?.route ?? route),
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: body),
-              ],
-            )
-          : body,
+      body: body,
       bottomNavigationBar:
-          bottomNavigationBar ??
-          (wide
-              ? null
-              : _WorkspaceNavigation(
-                  route: parent?.route ?? route,
-                  compact: true,
-                )),
+          bottomNavigationBar ?? _navigation(context, compact: true),
       floatingActionButton: floatingActionButton,
     );
     return AppPageShortcuts(currentRoute: route, child: scaffold);
   }
-}
 
-/// Persistent destinations use the same order on touch and wide layouts.
-class _WorkspaceNavigation extends StatelessWidget {
-  const _WorkspaceNavigation({required this.route, this.compact = false});
-  final String route;
-  final bool compact;
+  /// The workspace destinations, with a detail page's section current.
+  Widget _navigation(BuildContext context, {bool compact = false}) {
+    final current = parent?.route ?? route;
+    return WorkspaceNavigation(
+      route: current,
+      compact: compact,
+      onOpen: (target) => _openUtilityRoute(context, current, target),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
+  /// Wide windows lay the page out in the app's layers: the navigation
+  /// straight on the backdrop, the page on a grouped sheet beside it, its
+  /// title bar inside the sheet.
+  Widget _sheetShell(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final entries = [
-      ('/', Icons.chat_bubble_outline_rounded, l10n.utilityChat),
-      ('/manage', Icons.dns_outlined, l10n.manageServices),
-      ('/sessions', Icons.history_rounded, l10n.localSessionsTitle),
-      ('/logs', Icons.article_outlined, l10n.logsTitle),
-      ('/settings', Icons.settings_outlined, l10n.settingsTitle),
-    ];
-    Widget destination((String, IconData, String) entry) {
-      final selected = entry.$1 == route;
-      return Semantics(
-        selected: selected,
-        button: true,
-        child: Tooltip(
-          message: entry.$3,
-          child: Material(
-            color: selected ? surfaceSelection(scheme) : Colors.transparent,
-            borderRadius: BorderRadius.circular(kRowRadius),
-            child: InkWell(
-              key: Key('workspace-nav-${entry.$1}'),
-              mouseCursor: clickable,
-              borderRadius: BorderRadius.circular(kRowRadius),
-              onTap: selected
-                  ? null
-                  : () => _openUtilityRoute(context, route, entry.$1),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: compact ? 8 : 10,
-                  vertical: compact ? 12 : 8,
-                ),
-                child: Row(
-                  mainAxisAlignment: compact
-                      ? MainAxisAlignment.center
-                      : MainAxisAlignment.start,
-                  children: [
-                    Icon(
-                      entry.$2,
-                      size: compact ? 21 : 18,
-                      color: selected
-                          ? scheme.onSurface
-                          : scheme.onSurfaceVariant,
-                    ),
-                    if (!compact) ...[
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          entry.$3,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: selected
-                                ? scheme.onSurface
-                                : scheme.onSurfaceVariant,
+    return Scaffold(
+      backgroundColor: backdropBase(scheme),
+      body: AppBackdrop(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: workspaceNavigationWidth,
+                    child: _navigation(context),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        0,
+                        kSheetInset,
+                        kSheetInset,
+                        kSheetInset,
+                      ),
+                      child: ContentSheet(
+                        grouped: true,
+                        child: Scaffold(
+                          backgroundColor: Colors.transparent,
+                          appBar: UtilityPageTitleBar(
+                            route: route,
+                            title: title,
+                            parent: parent,
+                            actions: actions,
+                            primaryAction: primaryAction,
+                            inSheet: true,
                           ),
+                          body: EntranceMotion(child: body),
+                          bottomNavigationBar: bottomNavigationBar,
+                          floatingActionButton: floatingActionButton,
                         ),
                       ),
-                    ],
-                  ],
-                ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-        ),
-      );
-    }
-
-    return Material(
-      color: scheme.surfaceContainerLow,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: EdgeInsets.all(compact ? 8 : 10),
-          child: compact
-              ? Row(
-                  children: [
-                    for (final entry in entries)
-                      Expanded(child: destination(entry)),
-                  ],
-                )
-              : Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 18),
-                      child: Row(
-                        children: [
-                          const BrandLogo(size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              l10n.appTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    for (final entry in entries) ...[
-                      destination(entry),
-                      const SizedBox(height: 2),
-                    ],
-                  ],
-                ),
+            // The gap above the sheet is window chrome too: it drags.
+            if (isFramelessDesktop)
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: kSheetInset,
+                child: WindowDragArea(),
+              ),
+          ],
         ),
       ),
     );
@@ -379,7 +313,12 @@ class UtilityPageTitleBar extends ConsumerWidget
     this.parent,
     this.actions = const [],
     this.primaryAction,
+    this.inSheet = false,
   });
+
+  /// Whether the bar heads a content sheet beside the navigation, rather
+  /// than spanning the window.
+  final bool inSheet;
 
   /// The current top-level route.
   final String route;
@@ -399,11 +338,14 @@ class UtilityPageTitleBar extends ConsumerWidget
   /// The narrowest a title keeps before it ellipsizes: about four glyphs.
   static const double _titleMinimum = 4 * 15;
 
+  /// The bar's own height: inside a sheet it is centred on the traffic
+  /// lights' line rather than filling the window's strip.
+  double get _barHeight => isFramelessDesktop
+      ? (inSheet ? WindowChrome.sheetBarHeight : WindowChrome.barHeight)
+      : kToolbarHeight;
+
   @override
-  Size get preferredSize => Size.fromHeight(
-    (isFramelessDesktop ? WindowChrome.barHeight : kToolbarHeight) +
-        (isDesktop ? 1 : 0),
-  );
+  Size get preferredSize => Size.fromHeight(_barHeight + (isDesktop ? 1 : 0));
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -478,14 +420,12 @@ class UtilityPageTitleBar extends ConsumerWidget
     bool compact,
   ) {
     final reserved =
-        WindowChrome.leadingInset +
+        (inSheet ? 0 : WindowChrome.leadingInset) +
         WindowChrome.trailingInset +
         2 * NavigationToolbar.kMiddleSpacing +
         (actions.length + 1) * kMinInteractiveDimension +
         _titleRowMinimum(context, compact);
-    final height =
-        (isFramelessDesktop ? WindowChrome.barHeight : kToolbarHeight) -
-        2 * UtilityPrimaryAction._barInset;
+    final height = _barHeight - 2 * UtilityPrimaryAction._barInset;
     return action.labelledWidth(context) <= width - reserved &&
             action.labelledHeight(context) <= height
         ? action.labelled()
@@ -508,7 +448,7 @@ class UtilityPageTitleBar extends ConsumerWidget
           key: const Key('utility-chat-origin'),
           tooltip: l10n.utilityChat,
           onPressed: () => _openUtilityRoute(context, route, '/'),
-          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+          icon: const Icon(AppIcons.chevron_left_rounded, size: 20),
           constraints: const BoxConstraints.tightFor(width: 30, height: 30),
           padding: EdgeInsets.zero,
           style: IconButton.styleFrom(
@@ -550,7 +490,7 @@ class UtilityPageTitleBar extends ConsumerWidget
         TextButton.icon(
           key: const Key('utility-chat-origin'),
           onPressed: () => _openUtilityRoute(context, route, '/'),
-          icon: const Icon(Icons.chevron_left_rounded, size: 20),
+          icon: const Icon(AppIcons.chevron_left_rounded, size: 20),
           label: Text(l10n.utilityChat),
           style: TextButton.styleFrom(
             foregroundColor: scheme.onSurfaceVariant,
@@ -587,11 +527,13 @@ class UtilityPageTitleBar extends ConsumerWidget
       ],
     );
     return WindowTitleBar(
+      clearTrafficLights: !inSheet,
+      height: _barHeight,
       automaticallyImplyLeading: false,
       // A breadcrumb reads from the leading edge, so it is not centred even on
       // macOS; it starts clear of the traffic lights instead.
       centerTitle: false,
-      backgroundColor: surfaceBackground(scheme),
+      backgroundColor: inSheet ? Colors.transparent : surfaceBackground(scheme),
       // The full breadcrumb only where the title slot itself holds it at its
       // narrowest: the slot is what the bar leaves after its actions, which
       // the window width alone does not tell (large text, many actions).
@@ -611,16 +553,21 @@ class UtilityPageTitleBar extends ConsumerWidget
           key: const Key('utility-page-menu'),
           tooltip: l10n.utilitySwitchPage,
           position: PopupMenuPosition.under,
-          icon: const Icon(Icons.more_horiz),
+          icon: const Icon(AppIcons.more_horiz),
           onSelected: (value) {
             if (value == _themeValue) {
               final dark = Theme.of(context).brightness == Brightness.dark;
-              ThemeTransition.run(
-                context,
-                () => ref
-                    .read(uiPrefsProvider.notifier)
-                    .setThemeMode(dark ? 'light' : 'dark'),
-              );
+              // After the menu has closed, so the reveal starts from the
+              // page rather than a frozen menu.
+              Future<void>.delayed(const Duration(milliseconds: 220), () {
+                if (!context.mounted) return;
+                ThemeTransition.run(
+                  context,
+                  () => ref
+                      .read(uiPrefsProvider.notifier)
+                      .setThemeMode(dark ? 'light' : 'dark'),
+                );
+              });
               return;
             }
             _openUtilityRoute(context, route, value);
@@ -632,7 +579,11 @@ class UtilityPageTitleBar extends ConsumerWidget
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Divider(height: 1, color: scheme.outlineVariant),
+        // Kept for the bar's height; the page's own ground is the seam.
+        child: Divider(
+          height: 1,
+          color: inSheet ? Colors.transparent : scheme.surface,
+        ),
       ),
     );
   }
@@ -702,7 +653,7 @@ class _BreadcrumbLink extends StatelessWidget {
         visualDensity: VisualDensity.compact,
       ),
       child: compact
-          ? const Icon(Icons.chevron_left, size: 17)
+          ? const Icon(AppIcons.chevron_left, size: 17)
           : Text(
               label,
               overflow: TextOverflow.ellipsis,
@@ -720,31 +671,31 @@ List<PopupMenuEntry<String>> _menuItems(BuildContext context, String route) {
       <({String route, IconData icon, String label, String shortcut})>[
         (
           route: '/',
-          icon: Icons.chat_bubble_outline,
+          icon: AppIcons.chat_bubble_outline,
           label: l10n.utilityChat,
           shortcut: '$modifier 0',
         ),
         (
           route: '/manage',
-          icon: Icons.dns_outlined,
+          icon: AppIcons.dns_outlined,
           label: l10n.manageServices,
           shortcut: '$modifier 1',
         ),
         (
           route: '/sessions',
-          icon: Icons.history,
+          icon: AppIcons.history,
           label: l10n.localSessionsTitle,
           shortcut: '$modifier 2',
         ),
         (
           route: '/logs',
-          icon: Icons.article_outlined,
+          icon: AppIcons.article_outlined,
           label: l10n.logsTitle,
           shortcut: '$modifier 3',
         ),
         (
           route: '/settings',
-          icon: Icons.settings_outlined,
+          icon: AppIcons.settings_outlined,
           label: l10n.settingsTitle,
           shortcut: '$modifier ,',
         ),
@@ -775,7 +726,7 @@ List<PopupMenuEntry<String>> _menuItems(BuildContext context, String route) {
     PopupMenuItem<String>(
       value: _themeValue,
       child: _PageMenuRow(
-        icon: dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+        icon: dark ? AppIcons.light_mode_outlined : AppIcons.dark_mode_outlined,
         label: dark ? l10n.appearanceLight : l10n.appearanceDark,
       ),
     ),

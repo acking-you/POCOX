@@ -2,16 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/widgets/brand_logo.dart';
-
-/// Standalone form fields on this page keep an outline, matching the codex setup
-/// wizard; the filled, borderless variant is for filters (see `SearchField`).
-final _fieldBorder = OutlineInputBorder(
-  borderRadius: BorderRadius.circular(kControlRadius),
-);
 
 /// First-run setup: import a `pcx1:` string or type relay + key.
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -92,10 +85,7 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _import,
-                  decoration: InputDecoration(
-                    labelText: l10n.importFieldLabel,
-                    border: _fieldBorder,
-                  ),
+                  decoration: InputDecoration(labelText: l10n.importFieldLabel),
                 ),
                 const SizedBox(height: 8),
                 FilledButton(
@@ -108,18 +98,12 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
                 const Divider(height: 32),
                 TextField(
                   controller: _relay,
-                  decoration: InputDecoration(
-                    labelText: l10n.relayFieldLabel,
-                    border: _fieldBorder,
-                  ),
+                  decoration: InputDecoration(labelText: l10n.relayFieldLabel),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _key,
-                  decoration: InputDecoration(
-                    labelText: l10n.keyFieldLabel,
-                    border: _fieldBorder,
-                  ),
+                  decoration: InputDecoration(labelText: l10n.keyFieldLabel),
                 ),
                 const SizedBox(height: 8),
                 FilledButton.tonal(

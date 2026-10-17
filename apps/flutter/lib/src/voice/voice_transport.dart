@@ -1,6 +1,35 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+/// A peer connection for a call or dictation media link, once the platform
+/// audio policy both share is in place.
+///
+/// On Android the WebRTC plugin takes audio focus while a link is up and
+/// gives it back when the last one closes. It asks for focus for good by
+/// default, and players that lose it that way stay stopped; a transient
+/// request lets what was playing pause and resume afterwards.
+Future<RTCPeerConnection> openPeerConnection() async {
+  await (_audioPolicy ??= _applyAudioPolicy());
+  return createPeerConnection({'iceServers': <Object>[]});
+}
+
+Future<void>? _audioPolicy;
+
+Future<void> _applyAudioPolicy() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+  try {
+    await Helper.setAndroidAudioConfiguration(
+      AndroidAudioConfiguration(
+        androidAudioFocusMode: AndroidAudioFocusMode.gainTransient,
+      ),
+    );
+  } catch (_) {
+    // A link works without it; other audio just stays paused afterwards.
+  }
+}
 
 /// Client-owned media connection; credentials and Codex remain on the host.
 abstract interface class VoiceTransport {
@@ -84,7 +113,7 @@ class WebRtcVoiceTransport implements VoiceTransport {
     required void Function(String) onFailure,
     void Function()? onInterrupted,
   }) async {
-    final peer = await createPeerConnection({'iceServers': <Object>[]});
+    final peer = await openPeerConnection();
     if (_closed) {
       await peer.dispose();
       _checkOpen();

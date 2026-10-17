@@ -12,6 +12,7 @@ import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/search_field.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Real-time viewer for the app's captured runtime logs (`tracing` events from
 /// the Rust bridge — hosting, tunnels, sessions, embedded codex, …). Reads the
@@ -134,9 +135,8 @@ class _LogViewScreenState extends State<LogViewScreen> {
               ? Container(
                   margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
                   decoration: BoxDecoration(
-                    color: scheme.surfaceBright,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: scheme.outlineVariant),
+                    color: codeSurface(scheme),
+                    borderRadius: BorderRadius.circular(kPanelRadius),
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: _list(scheme),
@@ -161,12 +161,12 @@ class _LogViewScreenState extends State<LogViewScreen> {
           ),
         IconButton(
           tooltip: l10n.logsCopy,
-          icon: const Icon(Icons.copy_all_outlined),
+          icon: const Icon(AppIcons.copy_all_outlined),
           onPressed: _filtered.isEmpty ? null : _copy,
         ),
         IconButton(
           tooltip: l10n.logsClear,
-          icon: const Icon(Icons.clear_all),
+          icon: const Icon(AppIcons.clear_all),
           onPressed: () {
             _logs.clear();
             _applyFilters();
@@ -213,7 +213,7 @@ class _LogViewScreenState extends State<LogViewScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.arrow_downward, size: 16),
+                        const Icon(AppIcons.arrow_downward, size: 16),
                         const SizedBox(width: 7),
                         Text(
                           l10n.logsScrollBottom,
@@ -268,7 +268,7 @@ class _LogViewScreenState extends State<LogViewScreen> {
         builder: (_, value, _) => value.text.isEmpty
             ? const SizedBox.shrink()
             : IconButton(
-                icon: const Icon(Icons.clear, size: 17),
+                icon: const Icon(AppIcons.clear, size: 17),
                 tooltip: l10n.cancel,
                 onPressed: () {
                   _keywordCtrl.clear();
@@ -377,12 +377,12 @@ class _LogViewScreenState extends State<LogViewScreen> {
   Widget _bottomBar(AppLocalizations l10n, ColorScheme scheme) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     decoration: BoxDecoration(
-      border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      border: Border(top: BorderSide(color: scheme.surface)),
     ),
     child: Row(
       children: [
         Icon(
-          _followTail ? Icons.vertical_align_bottom : Icons.pause,
+          _followTail ? AppIcons.vertical_align_bottom : AppIcons.pause,
           size: 16,
           color: scheme.onSurfaceVariant,
         ),

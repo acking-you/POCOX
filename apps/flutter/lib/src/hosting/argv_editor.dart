@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/src/widgets/field_help.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 
 import '../fonts.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// Edits an argument vector one argument per row.
 ///
@@ -83,12 +85,10 @@ class _ArgvEditorState extends State<ArgvEditor> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final small = Theme.of(context).textTheme.bodySmall;
     final enabled = widget.enabled;
     return LayoutBuilder(
       builder: (context, constraints) => _rowsColumn(
         l10n,
-        small,
         enabled,
         constraints.maxWidth >= 340,
         constraints.maxWidth,
@@ -100,7 +100,6 @@ class _ArgvEditorState extends State<ArgvEditor> {
   /// field stays wide enough to read.
   Widget _rowsColumn(
     AppLocalizations l10n,
-    TextStyle? small,
     bool enabled,
     bool reorder,
     double width,
@@ -110,9 +109,17 @@ class _ArgvEditorState extends State<ArgvEditor> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(l10n.acpArguments, style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 2),
-        Text(l10n.acpArgumentsHint, style: small),
+        // How arguments are passed is behind the label's info mark.
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: InfoTitle(
+            title: Text(
+              l10n.acpArguments,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            info: l10n.acpArgumentsHint,
+          ),
+        ),
         const SizedBox(height: 6),
         for (var i = 0; i < _rows.length; i++)
           Padding(
@@ -124,7 +131,7 @@ class _ArgvEditorState extends State<ArgvEditor> {
           child: TextButton.icon(
             key: const Key('acp-arg-add'),
             onPressed: enabled ? _add : null,
-            icon: const Icon(Icons.add),
+            icon: const Icon(AppIcons.add),
             label: Text(l10n.acpArgumentAdd),
           ),
         ),
@@ -162,13 +169,13 @@ class _ArgvEditorState extends State<ArgvEditor> {
         IconButton(
           key: Key('acp-arg-up-$i'),
           tooltip: l10n.acpArgumentMoveUp,
-          icon: const Icon(Icons.arrow_upward),
+          icon: const Icon(AppIcons.arrow_upward),
           onPressed: enabled && i > 0 ? () => _move(i, i - 1) : null,
         ),
         IconButton(
           key: Key('acp-arg-down-$i'),
           tooltip: l10n.acpArgumentMoveDown,
-          icon: const Icon(Icons.arrow_downward),
+          icon: const Icon(AppIcons.arrow_downward),
           onPressed: enabled && i < _rows.length - 1
               ? () => _move(i, i + 1)
               : null,
@@ -177,7 +184,7 @@ class _ArgvEditorState extends State<ArgvEditor> {
       IconButton(
         key: Key('acp-arg-remove-$i'),
         tooltip: l10n.acpArgumentRemove,
-        icon: const Icon(Icons.close),
+        icon: const Icon(AppIcons.close),
         onPressed: enabled ? () => _remove(i) : null,
       ),
     ];
@@ -202,8 +209,8 @@ class _ArgvEditorState extends State<ArgvEditor> {
 
 /// The field width [label] needs at rest: its text in the decorator's label
 /// style at the current text scale, plus the theme's horizontal content
-/// padding (Material's dense 12 px a side when the theme sets none) and the
-/// outline's 4 px gap a side around a floating label.
+/// padding (Material's dense 12 px a side when the theme sets none) and 4 px
+/// a side, so the label never meets the field's edge.
 double _labelRoom(BuildContext context, String label) {
   final theme = Theme.of(context);
   final direction = Directionality.of(context);

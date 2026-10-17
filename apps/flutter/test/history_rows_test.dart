@@ -127,6 +127,7 @@ void main() {
     final tail = TranscriptItem(
       id: 'first-answer',
       type: 'agentMessage',
+      text: 'answer',
       turnId: 'first',
     );
     final rows = buildHistoryRows(

@@ -697,6 +697,26 @@ fn a_runtime_is_saved_validated_and_kind_checked() {
 }
 
 #[test]
+fn an_opencode_history_choice_is_additive_on_disk() {
+    // A record saved before the choice existed means OpenCode's default
+    // database, and that default is still written exactly as before.
+    let old: Runtime =
+        serde_json::from_value(serde_json::json!({"kind": "opencode"})).expect("old record");
+    assert_eq!(old, Runtime::OpenCode {
+        binary: None,
+        separate_history: false,
+    });
+    assert_eq!(serde_json::to_value(&old).expect("json"), serde_json::json!({"kind": "opencode"}));
+    let own = Runtime::OpenCode {
+        binary: None,
+        separate_history: true,
+    };
+    let json = serde_json::to_value(&own).expect("json");
+    assert_eq!(json, serde_json::json!({"kind": "opencode", "separateHistory": true}));
+    assert_eq!(serde_json::from_value::<Runtime>(json).expect("round trip"), own);
+}
+
+#[test]
 fn malformed_records_are_reported_never_resolved_to_another_provider() {
     let dir = tempfile::tempdir().expect("tempdir");
     let write = |record: serde_json::Value| {

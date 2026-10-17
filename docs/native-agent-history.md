@@ -16,7 +16,8 @@ write access: writing goes through a connected host's session access (below).
 
 A native session is continued, never forked or copied, by opening it on a
 running host that serves its provider: **Continue in <host>** in the viewer
-(a native OpenCode host for OpenCode, a Claude ACP host for Claude), or
+(a native OpenCode host on OpenCode's shared history for OpenCode, never
+one with a history of its own; a Claude ACP host for Claude), or
 **Host <provider> to continue** when none runs on this desktop. Rows show
 whether the reader saw the session free, held idle or running elsewhere, or
 cannot tell.

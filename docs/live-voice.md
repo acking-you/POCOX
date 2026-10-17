@@ -82,10 +82,25 @@ operation. We do not infer a supported dictation workflow from those types alone
 Composer dictation is built from the same upstream V3 WebRTC realtime path, not
 from a transcription RPC (`apps/flutter/lib/src/voice/dictation.dart`):
 
-- Focusing the composer warms a background realtime session on an ephemeral
-  `pocket-codex-dictation` thread, with no microphone attached and a silent,
-  never-speaking prompt. It closes itself after an idle timeout and releases its
-  thread.
+- On desktop, focusing the composer warms a background realtime session on an
+  ephemeral `pocket-codex-dictation` thread, with no microphone attached and a
+  silent, never-speaking prompt. It closes itself after an idle timeout and
+  releases its thread.
+- On iOS and Android nothing is warmed: an open media link receives audio, and
+  receiving audio makes the WebRTC plugin take the device's audio (iOS activates
+  the app's audio session, Android requests audio focus), which stops music
+  playing in another app. The line opens with a take (about three seconds,
+  shown as connecting) and closes when the take is over. A send-only offer would
+  avoid the receiving side, but the realtime endpoint answers its audio as
+  `inactive`, so dictation keeps the send-receive offer.
+- When a call or take ends, the app gives the device's audio back. On iOS
+  devices WebRTC's AVAudioEngine activates the session when it starts and
+  nothing deactivated it; `ios/Runner/AudioSessionRelease.swift` observes the
+  engine and deactivates the session with `notifyOthersOnDeactivation` once the
+  engine is fully disabled (after a short delay, so a reconfiguration keeps it).
+  The simulator uses WebRTC's other audio module, which already deactivates.
+  On Android the plugin abandons audio focus when the last peer connection
+  closes; focus is requested as transient, so the interrupted player resumes.
 - A take attaches the microphone; the session's input-transcript deltas are
   inserted at the cursor of the draft the take started in. Finishing detaches the
   microphone and waits briefly for the tail; discarding removes exactly what the

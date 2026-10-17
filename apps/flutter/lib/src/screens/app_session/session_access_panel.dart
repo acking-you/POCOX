@@ -10,6 +10,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// How a non-writable state reads.
 enum AccessTone {
@@ -64,7 +65,7 @@ AccessView accessView(
       title: l10n.accessOpening,
       detail: null,
       next: null,
-      icon: Icons.lock_open_outlined,
+      icon: AppIcons.lock_open_outlined,
       tone: AccessTone.waiting,
     ),
     'released_here' => (
@@ -72,7 +73,7 @@ AccessView accessView(
       title: l10n.accessHandedBackTitle,
       detail: l10n.accessHandedBackDetail,
       next: null,
-      icon: Icons.output_rounded,
+      icon: AppIcons.output_rounded,
       tone: AccessTone.blocked,
     ),
     'not_opened' => (
@@ -80,7 +81,7 @@ AccessView accessView(
       title: l10n.accessNotOpenedTitle,
       detail: l10n.accessNotOpenedDetail,
       next: null,
-      icon: Icons.inventory_2_outlined,
+      icon: AppIcons.inventory_2_outlined,
       tone: AccessTone.blocked,
     ),
     'transition' => (
@@ -88,7 +89,7 @@ AccessView accessView(
       title: l10n.accessTransitionTitle,
       detail: l10n.accessTransitionDetail,
       next: l10n.accessNextAutomatic,
-      icon: Icons.sync,
+      icon: AppIcons.sync,
       tone: AccessTone.waiting,
     ),
     'host_stopped' => (
@@ -96,7 +97,7 @@ AccessView accessView(
       title: l10n.accessHostStoppedTitle(agent),
       detail: l10n.accessHostStoppedDetail,
       next: null,
-      icon: Icons.power_settings_new,
+      icon: AppIcons.power_settings_new,
       tone: AccessTone.blocked,
     ),
     'external_running' => (
@@ -104,7 +105,7 @@ AccessView accessView(
       title: l10n.accessExternalRunningTitle(client),
       detail: l10n.accessExternalRunningDetail,
       next: recheck ? l10n.accessNextWhenClosed : null,
-      icon: Icons.lock_clock_outlined,
+      icon: AppIcons.lock_clock_outlined,
       tone: AccessTone.running,
     ),
     'external_idle' => (
@@ -112,7 +113,7 @@ AccessView accessView(
       title: l10n.accessExternalIdleTitle(client),
       detail: l10n.accessExternalIdleDetail,
       next: recheck ? l10n.accessNextWhenClosed : null,
-      icon: Icons.lock_outline,
+      icon: AppIcons.lock_outline,
       tone: AccessTone.waiting,
     ),
     'external_source_open' => (
@@ -120,7 +121,7 @@ AccessView accessView(
       title: l10n.accessSourceOpenTitle,
       detail: l10n.accessSourceOpenDetail,
       next: null,
-      icon: Icons.folder_shared_outlined,
+      icon: AppIcons.folder_shared_outlined,
       tone: AccessTone.waiting,
     ),
     'pocket_host' => (
@@ -132,7 +133,7 @@ AccessView accessView(
           ? l10n.accessPocketHostRunning
           : l10n.accessPocketHostIdle,
       next: recheck ? l10n.accessNextAutomatic : null,
-      icon: Icons.devices_other_outlined,
+      icon: AppIcons.devices_other_outlined,
       tone: running ? AccessTone.running : AccessTone.waiting,
     ),
     'unsupported' => (
@@ -140,7 +141,7 @@ AccessView accessView(
       title: l10n.accessUnsupportedTitle(agent),
       detail: access?.detail,
       next: null,
-      icon: Icons.block,
+      icon: AppIcons.block,
       tone: AccessTone.blocked,
     ),
     'not_found' => (
@@ -148,7 +149,7 @@ AccessView accessView(
       title: l10n.accessNotFoundTitle,
       detail: access?.detail,
       next: null,
-      icon: Icons.search_off,
+      icon: AppIcons.search_off,
       tone: AccessTone.blocked,
     ),
     _ => (
@@ -156,7 +157,7 @@ AccessView accessView(
       title: l10n.accessUnknownTitle,
       detail: access?.detail ?? l10n.accessUnknownDetail,
       next: null,
-      icon: Icons.help_outline,
+      icon: AppIcons.help_outline,
       tone: AccessTone.waiting,
     ),
   };
@@ -226,7 +227,7 @@ class SessionAccessPanel extends StatelessWidget {
           key: const Key('access-open-holder'),
           style: buttonStyle,
           onPressed: busy ? null : open,
-          icon: const Icon(Icons.open_in_new, size: 18),
+          icon: const Icon(AppIcons.open_in_new, size: 18),
           label: Text(
             l10n.accessOpenIn(
               accessClientName(l10n, access?.holder, providerName),
@@ -238,7 +239,7 @@ class SessionAccessPanel extends StatelessWidget {
           key: const Key('access-start-host'),
           style: buttonStyle,
           onPressed: busy ? null : start,
-          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+          icon: const Icon(AppIcons.play_arrow_rounded, size: 18),
           label: Text(l10n.accessStartHost),
         ),
       if (onCheck case final check?)
@@ -246,7 +247,7 @@ class SessionAccessPanel extends StatelessWidget {
           key: const Key('access-check'),
           style: buttonStyle,
           onPressed: busy ? null : check,
-          icon: const Icon(Icons.refresh, size: 18),
+          icon: const Icon(AppIcons.refresh, size: 18),
           label: Text(l10n.accessCheckNow),
         ),
       if (onContinue case final resume?)
@@ -254,7 +255,7 @@ class SessionAccessPanel extends StatelessWidget {
           key: const Key('access-continue'),
           style: buttonStyle,
           onPressed: busy ? null : resume,
-          icon: const Icon(Icons.edit_outlined, size: 18),
+          icon: const Icon(AppIcons.edit_outlined, size: 18),
           label: Text(l10n.accessContinueHere),
         ),
     ];

@@ -191,6 +191,12 @@ class AppServeStatus {
   /// Whether this host owns a native `opencode serve`.
   bool get isOpenCode => provider == 'opencode';
 
+  /// Whether this host is the OpenCode host serving OpenCode's default
+  /// database (this computer's own OpenCode sessions); one host can at a
+  /// time.
+  bool get servesOpenCodeHistory =>
+      isOpenCode && !(opencode?.separateHistory ?? false);
+
   /// The relay kind of this host's session service.
   String get sessionKind => switch (provider) {
     'acp' => 'acp',
@@ -210,6 +216,7 @@ class OpenCodeHostStatus {
     this.defaultModel,
     this.agents = const [],
     this.problem,
+    this.separateHistory = false,
   });
 
   /// The running `opencode` version.
@@ -229,6 +236,11 @@ class OpenCodeHostStatus {
 
   /// Why the host cannot serve turns (`no_provider`, …), when it cannot.
   final String? problem;
+
+  /// The host keeps its sessions in a database of its own, not in
+  /// OpenCode's default one: this computer's other OpenCode sessions are
+  /// not among them.
+  final bool separateHistory;
 }
 
 /// The OpenCode executable found on this device.

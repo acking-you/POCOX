@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/motion.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
 
-/// Graphite neutrals, monochrome controls and one blue "signal".
+export 'package:pocket_codex/src/glass_recipe.dart';
+
+/// Calm graphite neutrals, ink controls and one blue "signal".
 ///
-/// The neutrals follow the macOS system greys (window, source list, control
-/// background) without a blue cast, so the app sits beside native windows on
-/// every desktop rather than reading as a tinted web page. Controls are drawn
-/// in ink — a filled button, the send action — the way current desktop apps
-/// do. Colour is reserved for meaning: the blue signal (taken from the
-/// logo's relay arcs) marks what is live, and success / caution / error / info
-/// keep their own hues, so a running turn never looks like a healthy service
-/// or a diff addition.
+/// Comfort over a long session decides every value: the neutrals carry no
+/// blue or violet cast (a tint is what the eye keeps adapting to), the page
+/// is a soft off-white rather than pure white, and only one hue appears
+/// often. Controls are drawn in ink — a filled pill, the send action — so
+/// colour stays free for meaning: the blue signal (taken from the logo's
+/// relay arcs) marks what is live, and success / caution / error / info keep
+/// their own hues, so a running turn never looks like a healthy service or a
+/// diff addition. No purple anywhere.
 ///
 /// Text roles are tuned for contrast on every ground they sit on:
 /// `onSurfaceVariant` stays above 4.5:1 for small secondary text on the page,
@@ -20,58 +23,74 @@ import 'package:pocket_codex/src/motion.dart';
 /// must not carry text.
 ColorScheme _flowScheme(Brightness brightness) {
   final light = brightness == Brightness.light;
+  const ink = Color(0xFF1D1D1F);
+  const paper = Color(0xFFE6E6E6);
   return ColorScheme.fromSeed(
-    seedColor: const Color(0xFF2548AE),
+    seedColor: const Color(0xFF2A52C4),
     brightness: brightness,
   ).copyWith(
-    primary: light ? const Color(0xFF1D1D1F) : const Color(0xFFEDEDEF),
-    onPrimary: light ? Colors.white : const Color(0xFF1D1D1F),
-    primaryContainer: light ? const Color(0xFFE6E6E4) : const Color(0xFF36363B),
-    onPrimaryContainer: light
-        ? const Color(0xFF1D1D1F)
-        : const Color(0xFFEDEDEF),
-    secondary: light ? const Color(0xFF4A4A50) : const Color(0xFFB8B8C0),
-    onSecondary: light ? Colors.white : const Color(0xFF1D1D1F),
+    primary: light ? ink : paper,
+    onPrimary: light ? Colors.white : const Color(0xFF19191B),
+    primaryContainer: light ? const Color(0xFFE6E6E4) : const Color(0xFF333336),
+    onPrimaryContainer: light ? ink : paper,
+    secondary: light ? const Color(0xFF4A4A4D) : const Color(0xFFBDBDC0),
+    onSecondary: light ? Colors.white : const Color(0xFF19191B),
     secondaryContainer: light
         ? const Color(0xFFE6E6E4)
-        : const Color(0xFF36363B),
-    onSecondaryContainer: light
-        ? const Color(0xFF1D1D1F)
-        : const Color(0xFFEDEDEF),
-    tertiary: light ? const Color(0xFF2A52C4) : const Color(0xFF93A6F5),
+        : const Color(0xFF333336),
+    onSecondaryContainer: light ? ink : paper,
+    tertiary: light ? const Color(0xFF2A52C4) : const Color(0xFF8EAAF2),
     onTertiary: light ? Colors.white : const Color(0xFF14245C),
     tertiaryContainer: light
-        ? const Color(0xFFE7EDFC)
-        : const Color(0xFF212B4C),
+        ? const Color(0xFFE8EDFA)
+        : const Color(0xFF222B45),
     onTertiaryContainer: light
         ? const Color(0xFF1D3B94)
         : const Color(0xFFD5DEFC),
     surface: light ? const Color(0xFFFBFBFA) : const Color(0xFF19191B),
     surfaceBright: light ? Colors.white : const Color(0xFF27272A),
     surfaceDim: light ? const Color(0xFFEDEDEB) : const Color(0xFF141416),
-    onSurface: light ? const Color(0xFF1D1D1F) : const Color(0xFFEDEDEF),
-    onSurfaceVariant: light ? const Color(0xFF4A4A50) : const Color(0xFFB8B8C0),
+    onSurface: light ? ink : paper,
+    onSurfaceVariant: light ? const Color(0xFF4A4A4D) : const Color(0xFFBDBDC0),
     surfaceContainerLowest: light ? Colors.white : const Color(0xFF141416),
     surfaceContainerLow: light
-        ? const Color(0xFFF3F3F1)
-        : const Color(0xFF202023),
-    surfaceContainer: light ? const Color(0xFFEDEDEB) : const Color(0xFF27272A),
+        ? const Color(0xFFF4F4F2)
+        : const Color(0xFF202022),
+    surfaceContainer: light ? const Color(0xFFEDEDEB) : const Color(0xFF262628),
     surfaceContainerHigh: light
         ? const Color(0xFFE6E6E4)
-        : const Color(0xFF2F2F33),
+        : const Color(0xFF2E2E31),
     surfaceContainerHighest: light
         ? const Color(0xFFDEDEDC)
-        : const Color(0xFF39393E),
-    outline: light ? const Color(0xFFC8C8CB) : const Color(0xFF4B4B51),
-    outlineVariant: light ? const Color(0xFFE4E4E2) : const Color(0xFF323236),
-    inverseSurface: light ? const Color(0xFF2B2B2E) : const Color(0xFFE6E6E8),
-    onInverseSurface: light ? const Color(0xFFF2F2F2) : const Color(0xFF1D1D1F),
-    error: light ? const Color(0xFFC4323F) : const Color(0xFFFF8A8F),
-    onError: light ? Colors.white : const Color(0xFF4A0D12),
-    errorContainer: light ? const Color(0xFFFCE9EA) : const Color(0xFF47201F),
-    onErrorContainer: light ? const Color(0xFF8C1F2A) : const Color(0xFFFFD7D8),
+        : const Color(0xFF38383B),
+    outline: light ? const Color(0xFFC8C8C6) : const Color(0xFF4C4C50),
+    outlineVariant: light ? const Color(0xFFE4E4E2) : const Color(0xFF313134),
+    inverseSurface: light ? const Color(0xFF2B2B2E) : const Color(0xFFE6E6E6),
+    onInverseSurface: light ? const Color(0xFFF2F2F2) : ink,
+    inversePrimary: light ? const Color(0xFFAFC2F6) : const Color(0xFF2A52C4),
+    // No elevation tint: a raised surface is told apart by tone and shadow.
+    surfaceTint: Colors.transparent,
+    error: light ? const Color(0xFFB3261E) : const Color(0xFFF2B8B5),
+    onError: light ? Colors.white : const Color(0xFF601410),
+    errorContainer: light ? const Color(0xFFFCE8E6) : const Color(0xFF3F1F1D),
+    onErrorContainer: light ? const Color(0xFF8C1D18) : const Color(0xFFF9DEDC),
   );
 }
+
+/// The brand's blues, from the logo's tile — for the few moments that are
+/// about the app itself rather than about status (the greeting on a first-run
+/// or sign-in page). Never a fill for a control.
+List<Color> brandSpectrum(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? const [Color(0xFF4F7DF2), Color(0xFF2443B0)]
+    : const [Color(0xFFA9BFF7), Color(0xFF6F8FEA)];
+
+/// [brandSpectrum] as a left-to-right gradient.
+LinearGradient brandGradient(ColorScheme scheme) => LinearGradient(
+  begin: Alignment.centerLeft,
+  end: Alignment.centerRight,
+  colors: brandSpectrum(scheme),
+);
 
 /// Ink for secondary chrome glyphs: placeholders, carets, quiet icons. Text
 /// that must be read uses `onSurfaceVariant` instead, which keeps contrast on
@@ -143,67 +162,238 @@ Color surfaceBackground(ColorScheme scheme) => scheme.surface;
 /// An opaque raised panel shared by cards, sheets, menus and the composer.
 Color surfacePanel(ColorScheme scheme) => scheme.surfaceBright;
 
+/// The composer's ground: a raised card that floats over the transcript on
+/// a soft shadow (see [floatingShadows]).
+Color composerFill(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? Colors.white
+    : scheme.surfaceContainerHigh;
+
+/// The plate behind a code block: a half step off the page.
+Color codeSurface(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? const Color(0xFFF3F3F1)
+    : const Color(0xFF202022);
+
+/// A grouped card's ground (settings groups, device cards): a soft fill with
+/// no outline, so groups read as calm plates on the page.
+Color cardFill(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? const Color(0xFFF3F3F1)
+    : scheme.surfaceContainer;
+
+/// A plate set inside a [cardFill] group: the page's own white in light, a
+/// lifted tone in dark.
+Color insetPlate(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? Colors.white
+    : scheme.surfaceContainerHigh;
+
 /// The sidebar ground: a step off the page, like a macOS source list.
 Color surfaceSidebar(ColorScheme scheme) => scheme.surfaceContainerLow;
 
-/// Selected row in a list: a neutral plate, not a coloured one — selection is
-/// position, not status, and colour stays free for status.
-Color surfaceSelection(ColorScheme scheme) => scheme.surfaceContainerHigh;
-
-/// The open conversation in the sidebar: a wash of the accent, so the one row
-/// that says "you are here" can be found in a long list without reading it.
-/// Plain list selection elsewhere stays the neutral [surfaceSelection].
-Color selectedRowColor(ColorScheme scheme) => Color.alphaBlend(
-  scheme.tertiary.withValues(
-    alpha: scheme.brightness == Brightness.light ? 0.11 : 0.20,
-  ),
-  surfaceSidebar(scheme),
-);
-
-/// The open conversation in the sidebar: a neutral plate raised out of the
-/// source list (the page's own white in light, a lifted graphite in dark),
-/// so "you are here" is found by its lift rather than a second accent, and the
-/// blue stays the signal for live work alone.
-Color sidebarSelection(ColorScheme scheme) =>
+/// Selected row in a list laid on the backdrop or a grouped sheet: a pane of
+/// chrome glass (see [GlassDepth.chrome]) — white and lit in light, a faint
+/// lift in dark. Selection is position, not status, so it takes no colour.
+Color surfaceSelection(ColorScheme scheme) =>
     scheme.brightness == Brightness.light
-    ? scheme.surfaceBright
-    : scheme.surfaceContainerHigh;
+    ? Colors.white.withValues(alpha: 0.82)
+    : Colors.white.withValues(alpha: 0.09);
 
-/// The hairline that edges [sidebarSelection].
+/// A highlighted row in a picker: the same neutral plate as a selection.
+Color selectedRowColor(ColorScheme scheme) => scheme.surfaceContainerHigh;
+
+/// The open conversation in the sidebar: the same glass pane as
+/// [surfaceSelection], raised off the backdrop by [sidebarSelectionShadow]
+/// and lit along [sidebarSelectionEdge].
+Color sidebarSelection(ColorScheme scheme) => surfaceSelection(scheme);
+
+/// The lit rim of [sidebarSelection].
 Color sidebarSelectionEdge(ColorScheme scheme) =>
     scheme.brightness == Brightness.light
-    ? scheme.outlineVariant
-    : Colors.white.withValues(alpha: 0.07);
+    ? Colors.white
+    : Colors.white.withValues(alpha: 0.08);
 
-/// The soft shadow under [sidebarSelection]; dark plates lift by tone alone.
+/// The shadow under [sidebarSelection].
 Color sidebarSelectionShadow(ColorScheme scheme) =>
     scheme.brightness == Brightness.light
-    ? Colors.black.withValues(alpha: 0.10)
-    : Colors.transparent;
+    ? Colors.black.withValues(alpha: 0.16)
+    : Colors.black.withValues(alpha: 0.8);
 
-/// A faint accent wash behind the user's own messages and inline code, so the
-/// two voices in a transcript, and code inside prose, separate at a glance.
-Color accentWash(ColorScheme scheme, {double strength = 1}) =>
-    scheme.tertiary.withValues(
-      alpha: (scheme.brightness == Brightness.light ? 0.08 : 0.16) * strength,
+/// The pointer's wash over a row on the backdrop: the row brightens toward
+/// glass rather than greying.
+Color backdropHover(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? Colors.white.withValues(alpha: 0.5)
+    : Colors.white.withValues(alpha: 0.05);
+
+/// A search or filter well laid on the backdrop: frosted, not grey.
+Color backdropFieldFill(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? Colors.white.withValues(alpha: 0.5)
+    : Colors.white.withValues(alpha: 0.06);
+
+/// A faint neutral wash: a highlighted option, a selected step, a chip that
+/// is "on" without being a status.
+Color softWash(ColorScheme scheme, {double strength = 1}) =>
+    scheme.onSurface.withValues(
+      alpha: (scheme.brightness == Brightness.light ? 0.06 : 0.09) * strength,
     );
 
-/// Ink for inline code in prose: the accent, deepened so it holds body-text
-/// contrast on its wash (light ≈ 6:1, dark ≈ 9.5:1).
+/// Ink for inline code in prose: the text's own ink, a shade softer. The
+/// monospace face and the plate already set an identifier apart; a coloured
+/// ink repeated through a technical answer only adds noise.
 Color inlineCodeColor(ColorScheme scheme) =>
     scheme.brightness == Brightness.light
-    ? const Color(0xFF2446A8)
-    : const Color(0xFFC2CEFA);
+    ? const Color(0xFF3A3A3D)
+    : const Color(0xFFDADADC);
+
+/// The plate behind inline code: a neutral container step, not a tint.
+Color inlineCodeWash(ColorScheme scheme) => scheme.surfaceContainerHigh;
+
+/// The user's own turn: a soft neutral bubble, one container step off the
+/// page.
+Color userBubbleColor(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? const Color(0xFFEDEDEB)
+    : const Color(0xFF262628);
 
 /// Selected rows carry no outline; kept as a function so call sites that draw
 /// a border can resolve it from one place.
 Color selectionBorder(ColorScheme scheme) => Colors.transparent;
+
+/// The well of a text field: a step darker than both the page and cards, so
+/// a field reads without an outline on either.
+Color fieldFill(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? const Color(0xFFEAEAE8)
+    : const Color(0xFF29292C);
+
+/// The ground of everything that floats over the page: popovers, menus and
+/// dialogs.
+Color floatingSurface(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? Colors.white
+    : scheme.surfaceContainerHigh;
+
+/// The two-layer shadow under floating surfaces: a wide, soft ambient layer
+/// for lift plus a tight contact layer that keeps the edge crisp on a light
+/// page (a single blur either smudges or vanishes).
+List<BoxShadow> floatingShadows(ColorScheme scheme, {double lift = 1}) {
+  final light = scheme.brightness == Brightness.light;
+  return [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: (light ? 0.10 : 0.40) * lift),
+      blurRadius: 32 * lift,
+      offset: Offset(0, 12 * lift),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: light ? 0.06 : 0.30),
+      blurRadius: 3,
+      offset: const Offset(0, 1),
+    ),
+  ];
+}
+
+/// The hairline that outlines floating surfaces in dark mode, where shadows
+/// alone disappear into the ground.
+Color floatingEdge(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? Colors.black.withValues(alpha: 0.05)
+    : Colors.white.withValues(alpha: 0.07);
 
 /// Floating previews need a stronger elevation step over the transcript.
 Color surfacePreview(ColorScheme scheme) =>
     scheme.brightness == Brightness.light
     ? scheme.surfaceBright
     : scheme.surfaceContainer;
+
+/// The window's own ground, behind the sidebar and the content sheet: a
+/// neutral a step below the page, lit from above by [backdropGlows] so the
+/// glass laid over it has light to catch.
+Color backdropBase(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? const Color(0xFFEAEAE8)
+    : const Color(0xFF0F0F10);
+
+/// Soft light painted on [backdropBase]: brighter at the top, fading below.
+/// Light only, never a hue — colour pooled in the corner of the eye for a
+/// whole session is what makes a screen tiring to look at. Each is a radial
+/// wash whose radius is a fraction of the window's shorter side.
+List<({Alignment center, double radius, Color color})> backdropGlows(
+  ColorScheme scheme,
+) => scheme.brightness == Brightness.light
+    ? const [
+        (center: Alignment(-1.0, -1.15), radius: 1.2, color: Color(0x73FFFFFF)),
+        (center: Alignment(1.1, -0.9), radius: 0.9, color: Color(0x40FFFFFF)),
+      ]
+    : const [
+        (center: Alignment(-1.0, -1.15), radius: 1.2, color: Color(0x0FFFFFFF)),
+      ];
+
+/// The content sheet laid over the backdrop: white for reading (the chat),
+/// a grouped grey for pages of cards (settings, services) so their white
+/// cards lift off it.
+Color sheetColor(ColorScheme scheme, {bool grouped = false}) =>
+    scheme.brightness == Brightness.light
+    ? (grouped ? const Color(0xFFF4F4F2) : scheme.surface)
+    : (grouped ? const Color(0xFF151517) : scheme.surface);
+
+/// The hairline that keeps the sheet's edge crisp against the backdrop.
+Color sheetEdge(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? Colors.black.withValues(alpha: 0.06)
+    : Colors.white.withValues(alpha: 0.07);
+
+/// The sheet's lift off the backdrop: a contact shadow plus a wide ambient
+/// one.
+List<BoxShadow> sheetShadows(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.05),
+          blurRadius: 2,
+          offset: const Offset(0, 1),
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.07),
+          blurRadius: 30,
+          offset: const Offset(0, 10),
+        ),
+      ]
+    : [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.5),
+          blurRadius: 30,
+          offset: const Offset(0, 12),
+        ),
+      ];
+
+/// A white card on a grouped sheet: the card itself.
+Color raisedCardColor(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? Colors.white
+    : const Color(0xFF212124);
+
+/// The hairline around a [raisedCardColor] card.
+Color raisedCardEdge(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? Colors.black.withValues(alpha: 0.05)
+    : Colors.white.withValues(alpha: 0.06);
+
+/// The soft lift under a [raisedCardColor] card.
+List<BoxShadow> raisedCardShadows(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.04),
+          blurRadius: 2,
+          offset: const Offset(0, 1),
+        ),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.045),
+          blurRadius: 16,
+          offset: const Offset(0, 4),
+        ),
+      ]
+    : [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.35),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ];
 
 /// The type scale, mapped onto Material's roles.
 ///
@@ -214,23 +404,36 @@ Color surfacePreview(ColorScheme scheme) =>
 /// The `label` roles are deliberately left at Material's defaults: `labelLarge`
 /// is what every Material button renders its text in, and the button themes
 /// are measured for it.
+///
+/// Tracking is set on every other role: Material's defaults (0.25-0.5 on
+/// body text) are tuned for Roboto and spread Google Sans Flex and CJK text
+/// apart. Every bare `TextStyle(fontSize: …)` inherits `bodyMedium`'s.
 TextTheme _textTheme(ColorScheme scheme) {
-  TextStyle t(double size, double height, [FontWeight w = FontWeight.w400]) =>
-      TextStyle(fontSize: size, height: height, fontWeight: w);
+  TextStyle t(
+    double size,
+    double height, [
+    FontWeight w = FontWeight.w400,
+    double tracking = 0,
+  ]) => TextStyle(
+    fontSize: size,
+    height: height,
+    fontWeight: w,
+    letterSpacing: tracking,
+  );
 
   return TextTheme(
-    displayLarge: t(48, 1.12),
-    displayMedium: t(40, 1.15),
-    displaySmall: t(34, 1.18),
-    headlineLarge: t(30, 1.2, FontWeight.w600),
-    headlineMedium: t(26, 1.22, FontWeight.w600),
-    headlineSmall: t(22, 1.25, FontWeight.w600),
-    titleLarge: t(19, 1.3, FontWeight.w600),
+    displayLarge: t(48, 1.12, FontWeight.w400, -0.5),
+    displayMedium: t(40, 1.15, FontWeight.w400, -0.4),
+    displaySmall: t(34, 1.18, FontWeight.w400, -0.3),
+    headlineLarge: t(30, 1.2, FontWeight.w600, -0.3),
+    headlineMedium: t(26, 1.22, FontWeight.w600, -0.2),
+    headlineSmall: t(22, 1.25, FontWeight.w600, -0.1),
+    titleLarge: t(19, 1.3, FontWeight.w600, -0.1),
     titleMedium: t(16, 1.35, FontWeight.w600),
     titleSmall: t(13, 1.4, FontWeight.w600),
     bodyLarge: t(15, 1.6),
-    bodyMedium: t(14, 1.55),
-    bodySmall: t(12, 1.45),
+    bodyMedium: t(14, 1.5),
+    bodySmall: t(12, 1.45, FontWeight.w400, 0.1),
   ).apply(
     fontFamily: uiFontFamily,
     fontFamilyFallback: uiCjkFallback,
@@ -241,17 +444,29 @@ TextTheme _textTheme(ColorScheme scheme) {
 
 /// Base Material 3 theme for [scheme] — shared by mobile and desktop; the
 /// desktop layer re-tunes density/hover on top (see `desktop_theme.dart`).
+///
+/// Shape language: every button is a pill, every icon button a circle,
+/// panels are generously rounded and lift by tone rather than by outline.
 ThemeData _base(ColorScheme scheme) {
   final background = surfaceBackground(scheme);
   final panel = surfacePanel(scheme);
   final radius = BorderRadius.circular(kPanelRadius);
-  TextStyle railLabel(Color color, FontWeight weight) => TextStyle(
-    fontSize: 12,
+  final light = scheme.brightness == Brightness.light;
+  TextStyle ui(
+    double size, {
+    FontWeight weight = FontWeight.w500,
+    Color? color,
+  }) => TextStyle(
+    fontSize: size,
     fontWeight: weight,
     color: color,
+    letterSpacing: 0.1,
     fontFamily: uiFontFamily,
     fontFamilyFallback: uiCjkFallback,
   );
+  const pill = StadiumBorder();
+  final floatShadow = Colors.black.withValues(alpha: light ? 0.14 : 0.5);
+  final menuColor = light ? Colors.white : scheme.surfaceContainerHigh;
   return ThemeData(
     colorScheme: scheme,
     useMaterial3: true,
@@ -261,104 +476,335 @@ ThemeData _base(ColorScheme scheme) {
     scaffoldBackgroundColor: background,
     canvasColor: background,
     pageTransitionsTheme: appPageTransitions,
+    splashFactory: InkSparkle.constantTurbulenceSeedSplashFactory,
+    hoverColor: scheme.onSurface.withValues(alpha: 0.05),
+    highlightColor: scheme.onSurface.withValues(alpha: 0.06),
     dividerTheme: DividerThemeData(
       color: scheme.outlineVariant,
       thickness: 1,
       space: 1,
     ),
+    // Buttons are lit capsules: the fill comes from the variant (ink for the
+    // filled action, a container tone for tonal), and [LitFace] lays a sheen
+    // and a top highlight over it, with a soft shadow that rises on hover and
+    // settles when pressed, so the control reads as a raised piece of glass
+    // rather than a flat shape.
     filledButtonTheme: FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 48),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kControlRadius),
-        ),
-        textStyle: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-          fontFamily: uiFontFamily,
-          fontFamilyFallback: uiCjkFallback,
-        ),
-      ),
+      style:
+          FilledButton.styleFrom(
+            minimumSize: const Size(48, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            shape: pill,
+            textStyle: ui(14.5, weight: FontWeight.w600),
+          ).copyWith(
+            elevation: WidgetStateProperty.resolveWith(
+              (states) =>
+                  states.contains(WidgetState.disabled) ||
+                      states.contains(WidgetState.pressed)
+                  ? 0
+                  : states.contains(WidgetState.hovered)
+                  ? 3
+                  : 1,
+            ),
+            shadowColor: WidgetStatePropertyAll(
+              light ? Colors.black.withValues(alpha: 0.38) : Colors.black,
+            ),
+            backgroundBuilder: (context, states, child) =>
+                LitFace(states: states, child: child),
+          ),
     ),
+    // The secondary action is a pane of chrome glass: translucent white, lit
+    // along its rim, edged by a hairline so it holds on a white card too.
     outlinedButtonTheme: OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(48, 48),
-        foregroundColor: scheme.onSurface,
-        side: BorderSide(color: scheme.outline),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kControlRadius),
-        ),
-      ),
+      style:
+          OutlinedButton.styleFrom(
+            minimumSize: const Size(48, 46),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            foregroundColor: scheme.onSurface,
+            shape: pill,
+            textStyle: ui(14.5),
+          ).copyWith(
+            backgroundColor: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.disabled)) {
+                return Colors.transparent;
+              }
+              final strong =
+                  states.contains(WidgetState.hovered) ||
+                  states.contains(WidgetState.pressed);
+              return light
+                  ? Colors.white.withValues(alpha: strong ? 0.95 : 0.7)
+                  : Colors.white.withValues(alpha: strong ? 0.12 : 0.07);
+            }),
+            side: WidgetStateProperty.resolveWith(
+              (states) => BorderSide(
+                color: states.contains(WidgetState.disabled)
+                    ? scheme.outlineVariant
+                    : light
+                    ? Colors.black.withValues(alpha: 0.09)
+                    : Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            elevation: WidgetStateProperty.resolveWith(
+              (states) =>
+                  states.contains(WidgetState.hovered) &&
+                      !states.contains(WidgetState.pressed)
+                  ? 2
+                  : 0,
+            ),
+            shadowColor: WidgetStatePropertyAll(
+              light ? Colors.black.withValues(alpha: 0.22) : Colors.black,
+            ),
+            overlayColor: WidgetStateProperty.resolveWith(
+              (states) => states.contains(WidgetState.pressed)
+                  ? scheme.onSurface.withValues(alpha: 0.06)
+                  : Colors.transparent,
+            ),
+            backgroundBuilder: (context, states, child) =>
+                LitFace(states: states, glass: true, child: child),
+          ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         minimumSize: const Size(48, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         foregroundColor: scheme.onSurface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kControlRadius),
-        ),
+        shape: pill,
+        textStyle: ui(14.5),
+      ),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        minimumSize: const Size(48, 46),
+        elevation: 0,
+        backgroundColor: scheme.surfaceContainerHigh,
+        foregroundColor: scheme.onSurface,
+        shape: pill,
+        textStyle: ui(14.5),
       ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(
         minimumSize: const Size(44, 44),
         foregroundColor: scheme.onSurfaceVariant,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kControlRadius),
-        ),
+        shape: const CircleBorder(),
+      ),
+    ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        shape: pill,
+        side: BorderSide(color: scheme.outlineVariant),
+        selectedBackgroundColor: scheme.surfaceContainerHigh,
+        selectedForegroundColor: scheme.onSurface,
+        foregroundColor: scheme.onSurfaceVariant,
+        textStyle: ui(13),
       ),
     ),
     chipTheme: ChipThemeData(
       backgroundColor: Colors.transparent,
-      selectedColor: scheme.tertiaryContainer,
-      checkmarkColor: scheme.onTertiaryContainer,
+      selectedColor: scheme.surfaceContainerHigh,
+      checkmarkColor: scheme.onSurface,
       side: BorderSide(color: scheme.outlineVariant),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kControlRadius),
-      ),
+      shape: pill,
       // An explicit style replaces the theme's font, so it carries the UI
       // family and CJK fallback itself (chip labels such as the hosting
       // provider picker otherwise render in the platform default).
-      labelStyle: TextStyle(
-        fontSize: 12.5,
-        color: scheme.onSurface,
-        fontFamily: uiFontFamily,
-        fontFamilyFallback: uiCjkFallback,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      labelStyle: ui(12.5, weight: FontWeight.w500, color: scheme.onSurface),
+      padding: const EdgeInsets.symmetric(horizontal: 6),
     ),
+    // Fields sit in a soft container with a hairline that firms up on focus,
+    // the way the composer does. Only `border` is set so a field that opts
+    // out with `InputBorder.none` (the composer, inline renames) does not get
+    // an enabled/focused outline back from the theme.
+    // Fields are soft filled wells with no outline at rest; focus draws a
+    // firm ink ring. One look for every form, search and prompt field.
     inputDecorationTheme: InputDecorationTheme(
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(kControlRadius),
-        borderSide: BorderSide(color: scheme.outline),
+      filled: true,
+      fillColor: fieldFill(scheme),
+      hoverColor: scheme.onSurface.withValues(alpha: 0.03),
+      // Filled, not outlined: a floating label stays inside the fill.
+      border: FieldBorder(borderRadius: BorderRadius.circular(kFieldRadius)),
+      enabledBorder: FieldBorder(
+        borderRadius: BorderRadius.circular(kFieldRadius),
       ),
-      // Only `border`: a field that opts out with `InputBorder.none` (the
-      // composer, inline renames) must not get an enabled/focused outline
-      // back from the theme.
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      hintStyle: TextStyle(color: scheme.onSurfaceVariant, fontSize: 14),
+      disabledBorder: FieldBorder(
+        borderRadius: BorderRadius.circular(kFieldRadius),
+      ),
+      focusedBorder: FieldBorder(
+        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderSide: BorderSide(
+          color: scheme.onSurface.withValues(alpha: light ? 0.5 : 0.55),
+          width: 1.5,
+        ),
+        glow: scheme.tertiary.withValues(alpha: light ? 0.16 : 0.28),
+      ),
+      errorBorder: FieldBorder(
+        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderSide: BorderSide(color: scheme.error.withValues(alpha: 0.7)),
+      ),
+      focusedErrorBorder: FieldBorder(
+        borderRadius: BorderRadius.circular(kFieldRadius),
+        borderSide: BorderSide(color: scheme.error, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      hintStyle: TextStyle(color: onSurfaceMuted(scheme), fontSize: 14),
+      labelStyle: TextStyle(color: scheme.onSurfaceVariant),
+      floatingLabelStyle: TextStyle(
+        color: scheme.onSurfaceVariant,
+        fontWeight: FontWeight.w500,
+      ),
+      helperStyle: TextStyle(
+        color: scheme.onSurfaceVariant,
+        fontSize: 12.5,
+        height: 1.45,
+      ),
+      errorStyle: TextStyle(color: scheme.error, fontSize: 12.5, height: 1.45),
+      // A field's problem wraps rather than ending in an ellipsis.
+      helperMaxLines: 3,
+      errorMaxLines: 3,
+      prefixIconColor: scheme.onSurfaceVariant,
+      suffixIconColor: scheme.onSurfaceVariant,
+    ),
+    textSelectionTheme: TextSelectionThemeData(
+      cursorColor: scheme.onSurface,
+      selectionColor: scheme.tertiary.withValues(alpha: light ? 0.22 : 0.35),
+      selectionHandleColor: scheme.tertiary,
     ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: scheme.onSurfaceVariant,
       linearTrackColor: scheme.surfaceContainerHighest,
+      circularTrackColor: Colors.transparent,
+      borderRadius: BorderRadius.circular(4),
     ),
     switchTheme: SwitchThemeData(
-      trackOutlineColor: WidgetStatePropertyAll(scheme.outline),
+      thumbColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? scheme.onPrimary
+            : scheme.outline,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? scheme.primary
+            : scheme.surfaceContainerHighest,
+      ),
+      trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+      thumbIcon: const WidgetStatePropertyAll(null),
     ),
+    checkboxTheme: CheckboxThemeData(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+      side: BorderSide(color: scheme.outline, width: 1.5),
+    ),
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.selected)
+            ? scheme.primary
+            : scheme.outline,
+      ),
+    ),
+    sliderTheme: SliderThemeData(
+      activeTrackColor: scheme.primary,
+      inactiveTrackColor: scheme.surfaceContainerHighest,
+      thumbColor: scheme.primary,
+      trackHeight: 4,
+    ),
+    listTileTheme: ListTileThemeData(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kControlRadius),
+      ),
+      iconColor: scheme.onSurfaceVariant,
+      titleTextStyle: ui(
+        14.5,
+        weight: FontWeight.w400,
+        color: scheme.onSurface,
+      ),
+      subtitleTextStyle: ui(
+        12.5,
+        weight: FontWeight.w400,
+        color: scheme.onSurfaceVariant,
+      ),
+      minLeadingWidth: 20,
+    ),
+    // Dialogs open over a blurred, dimmed page (see `showAppDialog`), so a
+    // slightly translucent body reads as frosted glass; the rim is lit.
     dialogTheme: DialogThemeData(
-      backgroundColor: panel,
+      backgroundColor: light
+          ? Colors.white.withValues(alpha: 0.9)
+          : const Color(0xFF252528).withValues(alpha: 0.92),
       surfaceTintColor: Colors.transparent,
+      elevation: 24,
+      shadowColor: floatShadow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(kDialogRadius),
+        side: BorderSide(
+          color: light ? Colors.white : Colors.white.withValues(alpha: 0.1),
+        ),
+      ),
+      titleTextStyle: ui(18, weight: FontWeight.w600, color: scheme.onSurface),
+      contentTextStyle: ui(
+        14,
+        weight: FontWeight.w400,
+        color: scheme.onSurfaceVariant,
+      ).copyWith(height: 1.55),
+      actionsPadding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      elevation: 10,
+      shadowColor: floatShadow,
+      color: menuColor,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(kMenuRadius),
+        side: BorderSide(color: floatingEdge(scheme)),
+      ),
+      menuPadding: const EdgeInsets.all(6),
+      textStyle: ui(14, weight: FontWeight.w400, color: scheme.onSurface),
+    ),
+    menuTheme: MenuThemeData(
+      style: MenuStyle(
+        elevation: const WidgetStatePropertyAll(10),
+        shadowColor: WidgetStatePropertyAll(floatShadow),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        backgroundColor: WidgetStatePropertyAll(menuColor),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(kMenuRadius),
+            side: BorderSide(color: floatingEdge(scheme)),
+          ),
+        ),
+        padding: const WidgetStatePropertyAll(EdgeInsets.all(6)),
+      ),
+    ),
+    menuButtonTheme: MenuButtonThemeData(
+      style: MenuItemButton.styleFrom(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(kControlRadius),
+        ),
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        textStyle: ui(14, weight: FontWeight.w400),
+      ),
+    ),
+    tooltipTheme: TooltipThemeData(
+      waitDuration: const Duration(milliseconds: 450),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.inverseSurface,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      textStyle: ui(
+        12,
+        weight: FontWeight.w500,
+        color: scheme.onInverseSurface,
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: panel,
+      backgroundColor: light ? Colors.white : scheme.surfaceContainer,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: scheme.outline,
+      dragHandleSize: const Size(36, 4),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
     ),
     scrollbarTheme: _scrollbarTheme,
@@ -371,24 +817,18 @@ ThemeData _base(ColorScheme scheme) {
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
-      titleTextStyle: TextStyle(
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        color: scheme.onSurface,
-        fontFamily: uiFontFamily,
-        fontFamilyFallback: uiCjkFallback,
-      ),
+      titleTextStyle: ui(17, weight: FontWeight.w600, color: scheme.onSurface),
     ),
-    // Panels over tone: cards are a lighter layer on the background with a
-    // barely-there outline, not a border-drawn box.
+    // Cards are white panes raised off a grouped sheet (see `ContentSheet`),
+    // edged by a hairline; `GroupCard` adds their soft shadow.
     cardTheme: CardThemeData(
       elevation: 0,
-      color: panel,
+      color: raisedCardColor(scheme),
       surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
-        borderRadius: radius,
-        side: BorderSide(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(kCardRadius),
+        side: BorderSide(color: raisedCardEdge(scheme)),
       ),
     ),
     drawerTheme: DrawerThemeData(
@@ -397,27 +837,32 @@ ThemeData _base(ColorScheme scheme) {
     ),
     navigationRailTheme: NavigationRailThemeData(
       backgroundColor: Colors.transparent,
-      indicatorColor: scheme.secondaryContainer,
-      selectedIconTheme: IconThemeData(
-        color: scheme.onSecondaryContainer,
-        size: 22,
-      ),
+      indicatorColor: scheme.surfaceContainerHigh,
+      indicatorShape: pill,
+      selectedIconTheme: IconThemeData(color: scheme.onSurface, size: 20),
       unselectedIconTheme: IconThemeData(
         color: scheme.onSurfaceVariant,
-        size: 22,
+        size: 20,
       ),
-      selectedLabelTextStyle: railLabel(scheme.onSurface, FontWeight.w600),
-      unselectedLabelTextStyle: railLabel(
-        scheme.onSurfaceVariant,
-        FontWeight.w400,
+      selectedLabelTextStyle: ui(
+        12,
+        weight: FontWeight.w600,
+        color: scheme.onSurface,
+      ),
+      unselectedLabelTextStyle: ui(
+        12,
+        weight: FontWeight.w400,
+        color: scheme.onSurfaceVariant,
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
       backgroundColor: panel,
       surfaceTintColor: Colors.transparent,
-      indicatorColor: scheme.secondaryContainer,
+      indicatorColor: scheme.surfaceContainerHigh,
+      indicatorShape: pill,
       elevation: 0,
     ),
+    iconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 20),
     // A fallback for any snack bar raised outside `app_toast.dart`, which draws
     // its own surface and ignores this.
     snackBarTheme: SnackBarThemeData(

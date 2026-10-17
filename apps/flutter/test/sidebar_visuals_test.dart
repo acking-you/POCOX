@@ -4,7 +4,10 @@
 // still and says "running" in words. The fold control sits in the title
 // gutter, so parents and plain rows share one title column. It folds by
 // keyboard, announces its expanded state, and in RTL mirrors to the start
-// side, with large text kept whole.
+// side, with large text kept whole. Until the host first lists its
+// conversations, the pane says it is loading rather than empty.
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,12 +16,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/running_sheen.dart';
 import 'package:pocket_codex/src/widgets/status_dots.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';
 import 'support/ui_preview.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 const _service = 'pcx:sidebar:app:default';
 const _parent = ThreadMeta(
@@ -106,7 +111,7 @@ Finder _title(String id, String text) =>
 final _toggle = find.byKey(const Key('session-children-parent'));
 final _glyph = find.descendant(
   of: _toggle,
-  matching: find.byIcon(Icons.keyboard_arrow_right),
+  matching: find.byIcon(AppIcons.keyboard_arrow_right),
 );
 
 double _turns(WidgetTester t) => t
@@ -118,6 +123,39 @@ double _turns(WidgetTester t) => t
 void main() {
   setUpAll(() => loadPreviewFonts(always: true));
   setUp(AppSessionScreen.debugResetThreadMemory);
+
+  testWidgets('the pane is loading, not empty, until the host lists', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(1280, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final list = Completer<void>();
+    final api = FakeBridgeApi()
+      ..appThreads.clear()
+      ..appThreads.add(_solo)
+      ..threadListGate = list.future;
+    await api.appConnect(_service, 28080);
+    // The open conversation reads its own metadata first; that is no listing.
+    await t.pumpWidget(
+      host(
+        const AppSessionScreen(
+          serviceKey: _service,
+          threadId: 'solo',
+          home: true,
+        ),
+        api,
+      ),
+    );
+    await _frames(t);
+    expect(find.byType(ConversationListSkeleton), findsOneWidget);
+    expect(find.text('暂无会话'), findsNothing, reason: 'loading, not empty');
+
+    list.complete();
+    await t.pumpAndSettle();
+    expect(find.byType(ConversationListSkeleton), findsNothing);
+    expect(find.byKey(const Key('conv-tile-solo')), findsOneWidget);
+  });
 
   testWidgets('the fold control sits in the title gutter and folds by '
       'keyboard', (t) async {
@@ -214,7 +252,6 @@ void main() {
         final scheme = theme.colorScheme;
         final open = t.widget<Material>(_tile('parent'));
         expect(open.color, sidebarSelection(scheme));
-        expect(open.color, isNot(selectedRowColor(scheme)));
         expect(open.elevation, 1);
         expect(
           (open.shape! as RoundedRectangleBorder).side.color,

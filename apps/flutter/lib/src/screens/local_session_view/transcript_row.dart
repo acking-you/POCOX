@@ -46,6 +46,14 @@ class _TranscriptRow extends StatelessWidget {
       );
     }
     switch (item.itemType) {
+      case 'userMessage' when AutomationPrompt.parse(item.text) != null:
+        // An automation's run, not something the user typed.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: AutomationPromptCard(
+            prompt: AutomationPrompt.parse(item.text)!,
+          ),
+        );
       case 'userMessage' when parseRealtimeDelegation(item.text) != null:
         // A Live voice handoff: spoken turns, not a typed message.
         return Padding(
@@ -61,57 +69,77 @@ class _TranscriptRow extends StatelessWidget {
         // typed text (display-only — the rollout on disk is untouched).
         final ide = splitIdeContext(item.text);
         final refs = splitFileRefs(ide.text);
+        final text = ideDisplayText(refs.text, ide.annotations);
         final shown = [
           ...images,
-          for (final f in ide.files)
-            if (looksLikeImagePath(f.path)) ResolvedImage.hostFile(f.path),
+          for (final path in unattachedImageMentions(ide.files, images))
+            ResolvedImage.hostFile(path),
         ];
         final paths = [
           for (final f in ide.files)
             if (!looksLikeImagePath(f.path)) f.path,
           ...refs.paths,
         ];
-        // Cap the bubble to a fraction of the *content* width (the centred
-        // column), not the whole screen — otherwise it stretches too wide on a
-        // desktop window.
-        return LayoutBuilder(
-          builder: (context, c) => Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              constraints: BoxConstraints(maxWidth: c.maxWidth * 0.82),
-              decoration: BoxDecoration(
-                color: scheme.primaryContainer,
-                borderRadius: BorderRadius.circular(kPanelRadius),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (shown.isNotEmpty)
-                    MessageImagesView(
-                      images: shown,
-                      hostImageLoader: hostImageLoader,
-                      cacheScope: imageCacheScope,
+        // The live transcript's shape: attachments above a soft neutral
+        // bubble with a tucked corner, both capped at the same width.
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              if (shown.isNotEmpty || paths.isNotEmpty)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 640),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (shown.isNotEmpty)
+                        MessageImagesView(
+                          images: shown,
+                          hostImageLoader: hostImageLoader,
+                          cacheScope: imageCacheScope,
+                        ),
+                      if (shown.isNotEmpty && paths.isNotEmpty)
+                        const SizedBox(height: 6),
+                      if (paths.isNotEmpty) FileRefChips(paths: paths),
+                    ],
+                  ),
+                ),
+              if ((shown.isNotEmpty || paths.isNotEmpty) && text.isNotEmpty)
+                const SizedBox(height: 6),
+              if (text.isNotEmpty)
+                MessageActions(
+                  text: refs.text,
+                  isUser: true,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 11,
                     ),
-                  if (shown.isNotEmpty &&
-                      (refs.text.isNotEmpty || paths.isNotEmpty))
-                    const SizedBox(height: 8),
-                  if (paths.isNotEmpty) FileRefChips(paths: paths),
-                  if (paths.isNotEmpty && refs.text.isNotEmpty)
-                    const SizedBox(height: 8),
-                  if (refs.text.isNotEmpty)
-                    MessageActions(
-                      text: refs.text,
-                      isUser: true,
-                      child: Text(refs.text),
+                    decoration: BoxDecoration(
+                      color: userBubbleColor(scheme),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(kUserBubbleRadius),
+                        topRight: Radius.circular(6),
+                        bottomLeft: Radius.circular(kUserBubbleRadius),
+                        bottomRight: Radius.circular(kUserBubbleRadius),
+                      ),
                     ),
-                ],
-              ),
-            ),
+                    child: MarkdownView(
+                      data: text,
+                      dense: true,
+                      keepLineBreaks: true,
+                    ),
+                  ),
+                ),
+            ],
           ),
         );
+      case 'agentMessage' when item.text.trim().isEmpty:
+        // A quiet automation run ends on an empty reply: nothing to show.
+        return const SizedBox.shrink();
       case 'agentMessage':
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
@@ -210,7 +238,7 @@ class _TurnContextCaption extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.auto_awesome, size: 11, color: muted),
+              Icon(AppIcons.auto_awesome, size: 11, color: muted),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -246,9 +274,8 @@ class _CommandBlock extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
+        color: codeSurface(scheme),
         borderRadius: BorderRadius.circular(kPanelRadius),
-        border: Border.all(color: scheme.outlineVariant, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -257,7 +284,11 @@ class _CommandBlock extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(12, 10, 12, output.isEmpty ? 10 : 6),
             child: Row(
               children: [
-                Icon(Icons.terminal, size: 15, color: scheme.onSurfaceVariant),
+                Icon(
+                  AppIcons.terminal,
+                  size: 15,
+                  color: scheme.onSurfaceVariant,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(

@@ -14,6 +14,7 @@ import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
 
 import 'fake_bridge_api.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 Widget _host(
   Widget child,
@@ -275,8 +276,8 @@ void main() {
           ),
           _utilityRoute(
             actions: [
-              IconButton(onPressed: null, icon: const Icon(Icons.copy)),
-              IconButton(onPressed: null, icon: const Icon(Icons.clear_all)),
+              IconButton(onPressed: null, icon: const Icon(AppIcons.copy)),
+              IconButton(onPressed: null, icon: const Icon(AppIcons.clear_all)),
             ],
           ),
         ],

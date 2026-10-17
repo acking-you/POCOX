@@ -62,10 +62,7 @@ void _signInTests() {
     await t.pump();
     expect(api.signInSessions, isEmpty);
     expect(api.closedSignInSessions, [session]);
-    expect(
-      find.text(_l10n(t).codexSetupLoginSuccess('chatgpt')),
-      findsOneWidget,
-    );
+    expect(find.text(_l10n(t).codexSetupLoginSuccess), findsOneWidget);
   });
 
   testWidgets('two attempts own their sessions: a late open, status or '
@@ -158,7 +155,7 @@ void _signInTests() {
     expect(within('panel-b', 'codex-login-cancel'), findsOneWidget);
     expect(within('panel-b', 'codex-login-info'), findsOneWidget);
     expect(
-      find.text(_l10nOf(t).codexSetupLoginSuccess('chatgpt')),
+      find.text(_l10nOf(t).codexSetupLoginSuccess),
       findsNothing,
       reason: 'no panel took the late completion as its own',
     );
@@ -215,7 +212,7 @@ void _signInTests() {
     await t.pump(const Duration(seconds: 2));
     await t.pump();
     expect(find.text(_l10n(t).hostLoginNotOfficial), findsOneWidget);
-    expect(find.text(_l10n(t).codexSetupLoginSuccess('chatgpt')), findsNothing);
+    expect(find.text(_l10n(t).codexSetupLoginSuccess), findsNothing);
   });
 
   testWidgets('a late session open after a new attempt is closed, and the '

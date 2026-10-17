@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/hosting/claude_environment_group.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/app_icons.dart';
 
 /// [bytes] in decimal units, as Finder counts them: `0 B`, `840 B`,
 /// `3.2 KB`, `12 MB`. One decimal below ten, whole numbers above.
@@ -113,20 +114,23 @@ class _ClaudePreparationProgressState extends State<ClaudePreparationProgress> {
   bool get _verifying => setup.running && setup.stage == 'verifying';
 
   (IconData, String) _heading(AppLocalizations l10n) => switch (setup.state) {
-    'done' => (Icons.check_circle_outline, l10n.claudePrepareStageDone),
-    'failed' => (Icons.error_outline, l10n.claudePrepareStageFailed),
-    'cancelled' => (Icons.block, l10n.claudePrepareStageCancelled),
+    'done' => (AppIcons.check_circle_outline, l10n.claudePrepareStageDone),
+    'failed' => (AppIcons.error_outline, l10n.claudePrepareStageFailed),
+    'cancelled' => (AppIcons.block, l10n.claudePrepareStageCancelled),
     _ => switch (setup.stage) {
-      'downloading' => (Icons.downloading, l10n.claudePrepareStageDownloading),
+      'downloading' => (
+        AppIcons.downloading,
+        l10n.claudePrepareStageDownloading,
+      ),
       'verifying' => (
-        Icons.verified_outlined,
+        AppIcons.verified_outlined,
         l10n.claudePrepareStageVerifying,
       ),
       'installing' => (
-        Icons.inventory_2_outlined,
+        AppIcons.inventory_2_outlined,
         l10n.claudePrepareStageInstalling,
       ),
-      _ => (Icons.hourglass_empty, l10n.claudePrepareStageWorking),
+      _ => (AppIcons.hourglass_empty, l10n.claudePrepareStageWorking),
     },
   };
 
@@ -146,13 +150,13 @@ class _ClaudePreparationProgressState extends State<ClaudePreparationProgress> {
       if (bytes != null)
         _Metric(
           key: const Key('claude-prepare-downloaded'),
-          icon: Icons.download,
+          icon: AppIcons.download,
           text: l10n.claudePrepareDownloaded(formatByteCount(bytes)),
         ),
       if (arriving && rate != null)
         _Metric(
           key: const Key('claude-prepare-speed'),
-          icon: Icons.speed,
+          icon: AppIcons.speed,
           text: '${formatByteCount(rate)}/s',
           label: l10n.claudePrepareSpeed('${formatByteCount(rate)}/s'),
           // A stalled transfer reads quieter, but still says zero.
@@ -161,7 +165,7 @@ class _ClaudePreparationProgressState extends State<ClaudePreparationProgress> {
       else if (arriving && bytes != null)
         _Metric(
           key: const Key('claude-prepare-speed-measuring'),
-          icon: Icons.speed,
+          icon: AppIcons.speed,
           text: l10n.claudePrepareSpeedMeasuring,
           color: scheme.onSurfaceVariant,
         ),
@@ -383,7 +387,7 @@ class _StepMark extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     if (step == _Step.done) {
-      return Icon(Icons.check_circle, size: 14, color: successColor(scheme));
+      return Icon(AppIcons.check_circle, size: 14, color: successColor(scheme));
     }
     final active = step == _Step.active;
     final ring = active ? signalColor(scheme) : scheme.outline;
