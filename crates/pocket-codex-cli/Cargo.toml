@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-cli"
-description = "User-facing CLI for managing codex app-server + pb-mapper from Pocket-Codex."
+description = "User-facing CLI for managing codex app-server + pb-mapper from POCOX."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

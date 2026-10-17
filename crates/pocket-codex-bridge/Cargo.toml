@@ -1,6 +1,6 @@
 [package]
 name = "pocket_codex_bridge"
-description = "Rust ↔ Dart bridge crate consumed by the Pocket-Codex Flutter app via flutter_rust_bridge."
+description = "Rust ↔ Dart bridge crate consumed by the POCOX Flutter app via flutter_rust_bridge."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

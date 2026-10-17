@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-backend"
-description = "Hosted Pocket-Codex backend: GitHub-login HTTP API + the broker that bridges authenticated clients to a loopback pb-mapper relay."
+description = "Hosted POCOX backend: GitHub-login HTTP API + the broker that bridges authenticated clients to a loopback pb-mapper relay."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

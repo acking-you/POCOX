@@ -1,4 +1,4 @@
-# Pocket-Codex Agent Guide
+# POCOX Agent Guide
 
 > This document is the contract between human contributors, AI coding
 > agents (Claude Code, Codex CLI, etc.) and the project itself. Read it
@@ -6,7 +6,7 @@
 
 ## 1. Project intent
 
-Pocket-Codex turns the upstream
+POCOX (from **PO**cket **CO**de**X**) turns the upstream
 [`codex app-server`](https://github.com/openai/codex) protocol into a
 portable, multi-device experience, and additionally exposes the host's
 Codex login as a relay-reachable Responses API endpoint for any device:
@@ -256,7 +256,7 @@ git submodule update --init --recursive
 ### 8.1 External Codex only; built-in engine is unimplemented
 
 **All platforms must run Codex as an external executable. Do not compile,
-link, bundle, or launch the Codex model runtime in Pocket-Codex.** The UI
+link, bundle, or launch the Codex model runtime in POCOX.** The UI
 reserves a disabled **Built-in engine / 内置引擎** option marked **Not
 implemented yet / 暂未实现**. Do not re-enable it through a Cargo feature,
 target-specific dependency, build script, or release packaging step without
@@ -332,7 +332,7 @@ The order below is our current best guess; it is not a contract.
    `pocket-codex connect` subscribes on the client side and prints the
    matching `codex --remote ...` command.
 5. **Multi-device service selection + direct API proxy (done).**
-   Pocket-Codex service keys use `pcx:<device>:<service>:<name>`;
+   POCOX service keys use `pcx:<device>:<service>:<name>`;
    clients can discover services, set a local default target and choose
    app-server or direct Responses API proxy flows independently.
 6. **Hosted account mode (done).** Optional `pocket-codex-backend`:
@@ -1220,6 +1220,21 @@ this file's roadmap so the source of truth stays in sync.
     (needs a model turn) or a controller app build. See
     `docs/app-server-protocol-sync.md`.
 
+38. **POCOX brand (2026-10-18).** The product is called POCOX, spelled out of
+    **PO**cket **CO**de**X**: prose, UI strings, app display names (iOS/macOS
+    `CFBundleDisplayName`, Android label, window and tray titles, Linux
+    desktop entries, the Windows installer name), CLI and backend messages.
+    Identifiers keep their names so installs, scripts and settings carry
+    over: the `pocket-codex` CLI and crates, the `pocket_codex` Dart package,
+    bundle and application IDs, `PRODUCT_NAME`, the Windows `ProductName` (it
+    names the `%APPDATA%` folder), config and state directories,
+    `POCKET_CODEX_*` variables, the `~/PocketCodex` default project folder,
+    `pcx:` keys, release artifact names, the repository URL and the provider
+    names written into Codex configuration (effective-route checks compare
+    them). The Windows installer keeps its AppId and removes shortcuts made
+    under the old name. The README poster is regenerated from the app's own
+    screens (`test/gen_poster_test.dart`).
+
 ### UI and history maintenance (2026-09-13)
 
 - Keep shared colors, typography, and control shapes in `theme.dart` /
@@ -1280,8 +1295,11 @@ this file's roadmap so the source of truth stays in sync.
   it, run `REGEN_ICONS=1 fvm flutter test test/gen_icon_test.dart`, then
   `fvm dart run flutter_launcher_icons` and
   `fvm dart run flutter_native_splash:create`, for every platform; keep both
-  README posters and logo copies in sync and the splash colours equal to the
-  `MarkStyle` tiles.
+  logo copies in sync and the splash colours equal to the `MarkStyle` tiles.
+  The README poster is composed by `test/gen_poster_test.dart` from that mark,
+  the POCOX wordmark and the app's own chat screens rendered with fixture data
+  (never a real session); rerun it with `REGEN_ICONS=1` when the mark or the
+  chat design changes.
 - Transcript rows must remain lazy and keyed. Preserve the visible message
   when prepending history (the centre anchor does this by construction, item
   34), and do not rescan the rest of a turn per item when grouping rows. Pagination failures require an explicit retry instead of a
@@ -1333,6 +1351,6 @@ this file's roadmap so the source of truth stays in sync.
 
 - Further reference: T3 Code's [bounded work list and long-message folding](https://github.com/pingdotgg/t3code/blob/af2baccd100604f9885d6af97a5fa99622dd1c4f/apps/web/src/components/chat/MessagesTimeline.tsx)
   preserves scroll anchors and virtualizes expanded activity. Our adaptive tick
-  sampling and step-range controls are Pocket-Codex adaptations, not claimed
+  sampling and step-range controls are POCOX adaptations, not claimed
   upstream behavior. Guardian format is defined by
   `deps/codex/codex-rs/core/src/guardian/prompt.rs`.

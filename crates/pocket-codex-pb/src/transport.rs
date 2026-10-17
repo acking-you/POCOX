@@ -34,7 +34,7 @@ use pocket_codex_core::service::ServiceId;
 
 use crate::RelaySession;
 
-/// How a device reaches Pocket-Codex services.
+/// How a device reaches POCOX services.
 ///
 /// `Debug` comes from [`RelaySession`]'s, which redacts the credential — so a
 /// transport can appear in a log line or a test assertion without leaking the

@@ -70,10 +70,10 @@ enum SessionProtocol {
   /// Native Codex app-server.
   codexAppServer,
 
-  /// The Pocket-Codex gateway to a host-owned ACP agent.
+  /// The POCOX gateway to a host-owned ACP agent.
   acp,
 
-  /// The Pocket-Codex gateway to a host-owned native `opencode serve`.
+  /// The POCOX gateway to a host-owned native `opencode serve`.
   opencode,
 }
 

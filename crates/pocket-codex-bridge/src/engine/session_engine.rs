@@ -5,7 +5,7 @@
 //! | kind       | protocol                    | engine                 |
 //! |------------|-----------------------------|------------------------|
 //! | `app`      | Codex app-server (native)   | [`CodexEngine`]        |
-//! | `acp`      | Pocket-Codex ACP gateway    | [`AcpEngine`]          |
+//! | `acp`      | POCOX ACP gateway    | [`AcpEngine`]          |
 //!
 //! Each `app_*` bridge call goes through [`engine`] once instead of testing
 //! the provider itself. Operations a protocol does not have fail with
@@ -32,7 +32,7 @@ use super::{
 pub enum Protocol {
     /// Native Codex app-server JSON-RPC.
     CodexAppServer,
-    /// The Pocket-Codex gateway to a host-owned ACP agent.
+    /// The POCOX gateway to a host-owned ACP agent.
     Acp,
     /// External OpenCode native HTTP/SSE gateway.
     OpenCode,
@@ -61,7 +61,7 @@ pub fn logical_key(service_key: &str) -> Option<String> {
     service_id_of(service_key).map(|id| id.key())
 }
 
-/// The protocol of `service_key`. Keys that are not Pocket-Codex session keys
+/// The protocol of `service_key`. Keys that are not POCOX session keys
 /// keep the historical behaviour of addressing the native app-server.
 pub fn protocol_of(service_key: &str) -> Protocol {
     match service_id_of(service_key).map(|id| id.kind) {

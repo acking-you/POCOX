@@ -1,6 +1,6 @@
 # Native image generation in remote sessions
 
-Ask the connected Codex to generate an image in the normal composer. Pocket-Codex
+Ask the connected Codex to generate an image in the normal composer. POCOX
 uses the external Codex runtime's native image tool; availability follows that
 runtime's model, provider, account and feature configuration. Plan mode is under
 **Turn settings → Advanced settings** on desktop and mobile. Explicitly saved
@@ -45,7 +45,7 @@ filename and an explicit Retry action, without an automatic request loop.
   a global filename cache. Remote reads still reuse the existing bounded on-disk
   preview cache under the App's shared history budget; it is not an offline archive.
 
-This feature covers image output in Pocket-Codex remote sessions. It does not
+This feature covers image output in POCOX remote sessions. It does not
 enable Codex's separate `remoteControl/*` pairing service.
 
 ## Verification
@@ -53,9 +53,9 @@ enable Codex's separate `remoteControl/*` pairing service.
 A live check on 2026-09-26 used an isolated external Codex 0.156.1 process and
 temporary `CODEX_HOME`/working directory. Its native image tool emitted the
 `in_progress` and `completed` lifecycle edges and saved a 787,265-byte PNG. The
-real Pocket-Codex meta HTTP router returned exactly the same bytes and refused an
+real POCOX meta HTTP router returned exactly the same bytes and refused an
 unreferenced path. Captured native events passed the bridge's live/history mapping
-check. No active Pocket-Codex host was restarted or reconfigured.
+check. No active POCOX host was restarted or reconfigured.
 
 The opt-in checks consume an existing isolated generation; they do not issue
 another model request. Set these paths to your own capture and artifact:

@@ -1,4 +1,4 @@
-# 设计:Pocket-Codex 中/英国际化(i18n)
+# 设计:POCOX 中/英国际化(i18n)
 
 - 日期:2026-06-01
 - 分支/PR:`feature/flutter-ui` / PR #8(在现有 PR 内完善,不新开)
@@ -66,8 +66,8 @@
 ### 5. ARB key 清单(en 值示意;zh 值 = 现有中文)
 
 ```
-appTitle               "Pocket-Codex"
-webUnsupported         "Pocket-Codex needs local network and file access; Web is not supported.\nUse Android / iOS / desktop."
+appTitle               "POCOX"
+webUnsupported         "POCOX needs local network and file access; Web is not supported.\nUse Android / iOS / desktop."
 onboardingTitle        "Connect to a pb-mapper relay"
 importFieldLabel       "pcx1: share string (one-tap import)"
 importButton           "Import"

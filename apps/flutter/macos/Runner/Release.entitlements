@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
-	<!-- Pocket-Codex is a non-App-Store desktop tool that networks extensively
+	<!-- POCOX is a non-App-Store desktop tool that networks extensively
 	     and spawns the user's codex binary for in-app hosting; the App Sandbox
 	     blocks both (no outbound without network.client, and it can't exec
 	     arbitrary external binaries). Windows/Linux aren't sandboxed — macOS

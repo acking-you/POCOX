@@ -1,4 +1,4 @@
-//! The Pocket-Codex ACP gateway (`/acp/v1`): how controllers reach a
+//! The POCOX ACP gateway (`/acp/v1`): how controllers reach a
 //! host-owned ACP client over loopback or a relay tunnel.
 //!
 //! This is **not** ACP. ACP is spoken only between the host and its agent

@@ -69,8 +69,8 @@ fn origin(
 pub(super) fn check_api(snapshot: &Value) -> Result<()> {
     match snapshot["info"]["api"].as_u64() {
         Some(1) => Ok(()),
-        Some(other) => bail!("this agent host speaks gateway API {other}; update Pocket-Codex"),
-        None => bail!("the service did not answer like a Pocket-Codex ACP gateway"),
+        Some(other) => bail!("this agent host speaks gateway API {other}; update POCOX"),
+        None => bail!("the service did not answer like a POCOX ACP gateway"),
     }
 }
 

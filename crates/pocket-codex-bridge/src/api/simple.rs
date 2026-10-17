@@ -1,7 +1,7 @@
 //! Sanity-check API surface that the Flutter app uses to verify the
 //! Rust↔Dart bridge is wired up correctly.
 
-/// Greet a Pocket-Codex user.
+/// Greet a POCOX user.
 ///
 /// `flutter_rust_bridge` exposes this synchronously to Dart so the
 /// front-end can call it without needing `await`.

@@ -1,10 +1,10 @@
 //! Read codex session *rollout* files directly from `CODEX_HOME`.
 //!
 //! Every codex client (the CLI, the desktop app, the VS Code extension,
-//! and Pocket-Codex's own spawned app-server) appends a JSON-Lines
+//! and POCOX's own spawned app-server) appends a JSON-Lines
 //! transcript — a *rollout* — under `$CODEX_HOME/sessions/YYYY/MM/DD/`
 //! as it runs. Because all those clients share one `CODEX_HOME`, reading
-//! the rollouts lets Pocket-Codex *observe* sessions it did not create
+//! the rollouts lets POCOX *observe* sessions it did not create
 //! (e.g. the ones the desktop app is driving) without going through any
 //! app-server.
 //!
@@ -87,7 +87,7 @@ pub struct SessionInfo {
 /// and non-empty, otherwise `~/.codex`.
 ///
 /// This mirrors how the codex binaries themselves resolve their home, so
-/// the path Pocket-Codex reads matches the one the desktop app / CLI
+/// the path POCOX reads matches the one the desktop app / CLI
 /// write to (assuming the same environment).
 pub fn codex_home() -> Result<PathBuf> {
     if let Some(dir) = std::env::var_os("CODEX_HOME") {

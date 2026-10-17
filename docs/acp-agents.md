@@ -1,6 +1,6 @@
 # ACP agents
 
-Pocket-Codex can host any agent that speaks the
+POCOX can host any agent that speaks the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP) v1 over stdio.
 An agent is configured as a program plus an argument list; it is never run
 through a shell. Claude is the built-in preset; it runs the
@@ -24,13 +24,13 @@ flowchart LR
   E --> C[CodexEngine]
   E --> A[AcpEngine]
   C <-->|"app: via relay / native WebSocket"| N[External codex app-server]
-  A <-->|"acp: via relay / HTTP + SSE"| G[Pocket-Codex /acp/v1 gateway]
+  A <-->|"acp: via relay / HTTP + SSE"| G[POCOX /acp/v1 gateway]
   G --> H[AgentHost: lifecycle and history]
   H <-->|ACP v1 stdio| P[External ACP agent: Claude adapter or custom]
   API <-->|"meta: via relay"| M[Host meta: files and uploads]
 ```
 
-The `/acp/v1` gateway is Pocket-Codex's controller transport. The host
+The `/acp/v1` gateway is POCOX's controller transport. The host
 contacts the spawned agent only through ACP stdio; adding an agent does not
 add an agent-specific HTTP client or another `SessionEngine` implementation.
 
@@ -159,7 +159,7 @@ reopened after an agent restart.
 `auth_required` (`-32000`) is surfaced as an `authRequired` host state with
 the agent's auth methods, whether it comes from `session/new`, a reopen or
 `session/prompt`; a prompt rejected this way ends its turn once as *failed*
-with a sign-in message. Pocket-Codex does not perform agent sign-in. Sign in
+with a sign-in message. POCOX does not perform agent sign-in. Sign in
 with the agent's own CLI on the host and restart hosting.
 
 Queued frames retain their delivery deadline in a bounded table owned by the
@@ -515,7 +515,7 @@ retry. Nothing global, no npm or shell configuration and no default Node.js
 is changed. Install scripts are skipped; the adapter's published package is
 assumed not to need them.
 
-On one Mac the Claude preset was run live with Pocket-Codex: with no
+On one Mac the Claude preset was run live with POCOX: with no
 adapter present, its first Start prepared exactly
 `@agentclientprotocol/claude-agent-acp@0.89.1` into a confined app cache
 beside a detected Node.js 22.11.0 and the native CLI, with no global
@@ -615,7 +615,7 @@ is added. Managed Claude policies and model support remain upstream decisions.
 
 Keep provider model IDs exact. For a gateway whose Opus model differs from
 Claude's built-in alias, set `ANTHROPIC_DEFAULT_OPUS_MODEL` to that gateway's ID;
-Pocket-Codex never guesses or rewrites it. See the upstream
+POCOX never guesses or rewrites it. See the upstream
 [environment reference](https://code.claude.com/docs/en/env-vars) and
 [model configuration](https://code.claude.com/docs/en/model-config).
 
@@ -629,7 +629,7 @@ opening that fixture's existing conversation restored the reply without
 sending another turn. No Claude login was performed. The original manual app
 and its conversations were left running; its reported error was not retested
 in place. A gateway may still need its own exact model alias, and no alias is
-hardcoded by Pocket-Codex.
+hardcoded by POCOX.
 
 The updated UI passed 32 real-font combinations (320/390/800/1440, English and
 Chinese, light and dark, 1×/2× text), keyboard/semantics checks, and the full
@@ -651,7 +651,7 @@ gaps.
 ## Accounts and older backends
 
 ACP hosting works in self-host mode with a relay key and in hosted-account
-mode with the normal Pocket-Codex account login. Agent authentication is
+mode with the normal POCOX account login. Agent authentication is
 separate and uses the agent’s own CLI. Service names are claimed in one table
 shared by Codex and ACP on a device, so two providers can never start under
 the same name. A
@@ -728,7 +728,7 @@ exercised. Windows hosting stays disabled.
 ### Earlier ACP acceptance (historical, former OpenCode preset)
 
 On 2026-10-10 the ACP engine was exercised end to end through the since-removed
-OpenCode ACP preset, hosted by the production Pocket-Codex host and driven by
+OpenCode ACP preset, hosted by the production POCOX host and driven by
 a separate bridge controller process through a public pb-mapper relay (two
 processes on one Mac, not a second physical device). It covered
 initialization and capability negotiation, session inventory and

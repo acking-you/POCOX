@@ -159,7 +159,7 @@ pub(crate) fn codex_provider_config(local_addr: &str) -> String {
         r#"model_provider = "pocket-codex-api"
 
 [model_providers.pocket-codex-api]
-name = "Pocket-Codex API"
+name = "POCOX API"
 base_url = "http://{local_addr}/v1"
 wire_api = "responses"
 requires_openai_auth = false

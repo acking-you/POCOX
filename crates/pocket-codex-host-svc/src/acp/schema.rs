@@ -25,7 +25,7 @@ pub fn initialize_params() -> Value {
         },
         "clientInfo": {
             "name": "pocket-codex",
-            "title": "Pocket-Codex",
+            "title": "POCOX",
             "version": env!("CARGO_PKG_VERSION"),
         },
     })

@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="assets/logo/poster.png" alt="Pocket-Codex poster" width="100%" />
+  <img src="assets/logo/poster.png" alt="POCOX poster" width="100%" />
 </p>
 
-<h1 align="center">Pocket-Codex</h1>
+<h1 align="center">POCOX</h1>
+
+<p align="center">
+  <strong>PO</strong>cket&nbsp;<strong>CO</strong>de<strong>X</strong>
+</p>
 
 <p align="center">
   <em>Carry your Codex in your pocket. Drive it natively from any device.</em>
@@ -20,7 +24,7 @@
 </p>
 
 > [!WARNING]
-> **Pocket-Codex is under active development.** Nothing here is stable
+> **POCOX is under active development.** Nothing here is stable
 > yet — APIs, on-disk layout, the protocol mapping and even the crate
 > boundaries are expected to change without notice. Do **not** depend on
 > it for production workloads. Pull requests, design feedback and bug
@@ -28,7 +32,7 @@
 
 ## What is this?
 
-Pocket-Codex is an experiment in turning the upstream
+POCOX (**PO**cket **CO**de**X**) is an experiment in turning the upstream
 [`codex app-server`](https://github.com/openai/codex) protocol into a
 portable, multi-device experience, and additionally exposing the host's
 Codex login as a relay-reachable Responses API endpoint for any device:
@@ -56,6 +60,9 @@ Codex login as a relay-reachable Responses API endpoint for any device:
   `pcxu:<user>:…` namespace, and devices then talk to the relay directly. The
   relay's administrator key is never handed to clients, accounts can't see each
   other, and the backend isn't in the middle of your traffic.
+
+The name is new; the command, crates, packages and app identifiers keep their
+`pocket-codex` names, so existing installs, scripts and settings carry over.
 
 In short: **one machine stays logged in to Codex; every other device —
 the Flutter UI, a remote `codex` CLI, or any OpenAI-compatible tool —
@@ -192,7 +199,7 @@ cargo build --workspace
 cargo run -p pocket-codex-cli -- --help
 ```
 
-A working `codex` binary is expected to exist on `$PATH`; Pocket-Codex
+A working `codex` binary is expected to exist on `$PATH`; POCOX
 does **not** vendor a model runtime. The CLI exposes:
 
 ```text
@@ -288,7 +295,7 @@ flutter_rust_bridge_codegen generate
 
 ## License
 
-Pocket-Codex is licensed under the [Apache License 2.0](LICENSE).
+POCOX is licensed under the [Apache License 2.0](LICENSE).
 
 The upstream projects under `deps/` keep their own licenses; consult
 each submodule for details.

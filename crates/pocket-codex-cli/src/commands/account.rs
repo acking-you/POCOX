@@ -339,9 +339,8 @@ async fn await_web_callback(
             "Sign-in could not be completed. You can close this tab and try again."
         };
         let body = format!(
-            "<!doctype html><meta charset=\"utf-8\"><title>Pocket-Codex</title><p \
-             style=\"font-family: system-ui, sans-serif; text-align:center; \
-             margin-top:4rem\">{message}</p>"
+            "<!doctype html><meta charset=\"utf-8\"><title>POCOX</title><p style=\"font-family: \
+             system-ui, sans-serif; text-align:center; margin-top:4rem\">{message}</p>"
         );
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: \

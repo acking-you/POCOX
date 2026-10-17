@@ -154,7 +154,7 @@ const String _landingPage = '''
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pocket-Codex</title>
+  <title>POCOX</title>
   <style>
     html, body { margin: 0; padding: 0; background: #F9F9F7; }
     main {
@@ -177,7 +177,7 @@ const String _landingPage = '''
 </head>
 <body>
   <main>
-    <h1>Pocket-Codex</h1>
+    <h1>POCOX</h1>
     <!-- Chinese as numeric entities, NOT literal characters: see the note on
          _landingPage. A raw CJK byte anywhere in this literal kills the
          listener before the response is sent. -->

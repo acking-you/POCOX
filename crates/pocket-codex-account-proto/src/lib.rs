@@ -1,4 +1,4 @@
-//! Shared wire types and pb-mapper key namespacing for the Pocket-Codex hosted
+//! Shared wire types and pb-mapper key namespacing for the POCOX hosted
 //! account model.
 //!
 //! The hosted backend lets users authenticate with GitHub and reach their own

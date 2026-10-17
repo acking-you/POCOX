@@ -1,7 +1,7 @@
-//! Bootstrap a usable `CODEX_HOME` from the Pocket-Codex onboarding UI.
+//! Bootstrap a usable `CODEX_HOME` from the POCOX onboarding UI.
 //!
 //! codex reads its provider + model credentials from `$CODEX_HOME/config.toml`
-//! and `$CODEX_HOME/auth.json`. A fresh machine has neither, so Pocket-Codex's
+//! and `$CODEX_HOME/auth.json`. A fresh machine has neither, so POCOX's
 //! external app-server can't make a single model call and hosting fails at
 //! the auth gate. This module lets the setup wizard bootstrap that config
 //! without the user hand-editing TOML:
@@ -19,7 +19,7 @@
 //!
 //! The official ChatGPT-login path is driven separately over the app-server's
 //! `account/login/*` RPC (codex writes `auth.json` itself); this module only
-//! owns what Pocket-Codex writes to disk. All edits are format-preserving
+//! owns what POCOX writes to disk. All edits are format-preserving
 //! (`toml_edit`) so a user's hand-written `config.toml` keeps its comments and
 //! ordering, and idempotent so re-running the wizard is safe.
 
@@ -30,7 +30,7 @@ use toml_edit::{value, DocumentMut, Item, Table};
 
 use crate::rollout::codex_home;
 
-/// The `model_providers` id Pocket-Codex writes for the custom provider. Chosen
+/// The `model_providers` id POCOX writes for the custom provider. Chosen
 /// to avoid codex's reserved ids (`openai` / `ollama` / `lmstudio` /
 /// `amazon-bedrock`), which `config.toml` refuses to override.
 pub const POCKET_PROVIDER_ID: &str = "pocket";
@@ -43,7 +43,7 @@ const POCKET_PROVIDER_NAME: &str = "Pocket-Codex Provider";
 /// the UI lets the user override.
 pub const DEFAULT_MODEL: &str = "gpt-5.5";
 
-/// Filename of the non-degraded system prompt Pocket-Codex drops into
+/// Filename of the non-degraded system prompt POCOX drops into
 /// `CODEX_HOME` and points `model_instructions_file` at.
 const NONDEGRADED_PROMPT_FILE: &str = "pocket-codex-nondegraded-prompt.md";
 

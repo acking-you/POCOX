@@ -629,9 +629,7 @@ async fn fetch_relay_credential(support_dir: &Path) -> Result<RelayCredentialRes
     // expects clients to tunnel through it. Say so, because the fix is a server
     // upgrade rather than anything the user can do here.
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
-        bail!(
-            "this backend does not support direct relay access yet; update the Pocket-Codex server"
-        );
+        bail!("this backend does not support direct relay access yet; update the POCOX server");
     }
     resp.error_for_status()
         .context("/v1/relay failed")?

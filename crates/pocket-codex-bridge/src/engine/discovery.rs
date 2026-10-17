@@ -1,11 +1,11 @@
-//! Relay service discovery: which Pocket-Codex services this device can see.
+//! Relay service discovery: which POCOX services this device can see.
 
 use anyhow::{Context, Result};
 use pocket_codex_core::service::ServiceId;
 
 use crate::engine::transport::Transport;
 
-/// List the Pocket-Codex services this transport can reach, dropping keys that
+/// List the POCOX services this transport can reach, dropping keys that
 /// are not ours.
 ///
 /// One relay query in both modes: an account credential is confined to its own

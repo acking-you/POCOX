@@ -311,7 +311,7 @@ impl AppClient {
                 serde_json::json!({
                     "clientInfo": {
                         "name": name,
-                        "title": "Pocket-Codex",
+                        "title": "POCOX",
                         "version": env!("CARGO_PKG_VERSION"),
                     },
                     "capabilities": { "experimentalApi": experimental_api },

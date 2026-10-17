@@ -1,4 +1,4 @@
-//! SQLite persistence for the Pocket-Codex hosted backend.
+//! SQLite persistence for the POCOX hosted backend.
 //!
 //! A thin, focused store over `sqlx` (SQLite, WAL, a connection pool): just the
 //! identity and credential tables — `users`, `refresh_tokens`, `device_flows`.

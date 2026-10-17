@@ -182,7 +182,7 @@ fn wire_keys(transport: &transport::Transport, status: &serve::ServeStatus) -> V
         .into_iter()
         .filter(|key| !key.is_empty())
         .map(|key| {
-            let id = session_engine::service_id_of(key).expect("a Pocket-Codex key");
+            let id = session_engine::service_id_of(key).expect("a POCOX key");
             transport.key(&id)
         })
         .collect()

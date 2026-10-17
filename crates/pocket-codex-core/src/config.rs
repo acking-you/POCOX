@@ -1,4 +1,4 @@
-//! Configuration schema for Pocket-Codex.
+//! Configuration schema for POCOX.
 //!
 //! ```text
 //!                          Config (config.toml)
@@ -36,7 +36,7 @@ use crate::{
     service::{sanitize_component, ServiceKind},
 };
 
-/// Top-level Pocket-Codex configuration.
+/// Top-level POCOX configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
@@ -83,7 +83,7 @@ impl Default for HistoryCacheConfig {
     }
 }
 
-/// Which transport the client uses to reach Pocket-Codex services.
+/// Which transport the client uses to reach POCOX services.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     /// Hosted account via the GitHub-login backend — the default experience.

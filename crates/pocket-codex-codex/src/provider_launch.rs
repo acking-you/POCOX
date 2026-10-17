@@ -175,6 +175,8 @@ pub fn codex_launch(
             let id = host_provider_id(instance, authority);
             let entry = format!("model_providers.{id}");
             let args = &mut launch.args;
+            // The former product name stays: hosts verify their effective
+            // route against it, including ones started by an older release.
             set(args, &format!("{entry}.name"), toml_string("Pocket-Codex host provider"));
             set(args, &format!("{entry}.base_url"), toml_string(&endpoint.base_url));
             set(args, &format!("{entry}.wire_api"), toml_string("responses"));

@@ -99,7 +99,7 @@ class ActivityGroup {
   final List<TranscriptItem> items;
 }
 
-/// Visual identity for every app-server v2 activity item PocketCodex exposes.
+/// Visual identity for every app-server v2 activity item POCOX exposes.
 /// Keeping this in one place prevents grouped and individual rows from drifting
 /// as upstream adds richer thread-item variants.
 ({IconData icon, String label}) activityMeta(

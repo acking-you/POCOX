@@ -1,4 +1,4 @@
-//! Hosted Pocket-Codex backend.
+//! Hosted POCOX backend.
 //!
 //! An identity and credential-vending service, and nothing more. It:
 //! - serves the GitHub-device-flow HTTP API ([`api::router`]) plus the

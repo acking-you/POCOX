@@ -34,7 +34,7 @@ async fn list(args: ServicesListArgs) -> Result<()> {
     if services.is_empty() {
         ui::muted(match transport.is_account() {
             true => "no services in your account",
-            false => "no Pocket-Codex services found",
+            false => "no POCOX services found",
         });
         return Ok(());
     }

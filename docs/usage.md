@@ -1,8 +1,8 @@
-# Pocket-Codex usage guide (GitHub account mode)
+# POCOX usage guide (GitHub account mode)
 
 > 中文版：[`docs/usage.zh-CN.md`](usage.zh-CN.md)
 
-The simplest way to use Pocket-Codex: **sign in with a GitHub account**. One
+The simplest way to use POCOX: **sign in with a GitHub account**. One
 machine stays logged in to Codex; every other device drives it after signing in
 to the **same** account. There is no relay address or shared key to manage — the
 backend issues your devices a credential and they find each other on the relay.

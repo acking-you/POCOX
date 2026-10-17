@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new capability, flow or surface area for Pocket-Codex.
+description: Propose a new capability, flow or surface area for POCOX.
 title: "feat: <short description>"
 labels: ["enhancement", "triage"]
 body:
@@ -10,14 +10,14 @@ body:
         you start:
 
         - **Lead with the problem, not the solution.** What are you trying
-          to do that Pocket-Codex makes hard or impossible today?
+          to do that POCOX makes hard or impossible today?
         - **KISS / YAGNI.** Per [`AGENTS.md` §4](https://github.com/acking-you/pocket-codex/blob/main/AGENTS.md#4-engineering-principles)
           we add traits when there are at least two real implementations
           and config knobs when there's at least one real user who needs
           them. Concrete use cases beat hypothetical flexibility.
         - **Faithful upstream behaviour > local heuristics.** If the
           feature concerns `codex` or `pb-mapper`, mirroring upstream is
-          usually preferred over a Pocket-Codex-only shim.
+          usually preferred over a POCOX-only shim.
 
   - type: checkboxes
     id: prechecks
@@ -33,7 +33,7 @@ body:
     id: problem
     attributes:
       label: Problem
-      description: What are you trying to do, and where does Pocket-Codex get in the way today? Concrete scenarios beat abstract goals.
+      description: What are you trying to do, and where does POCOX get in the way today? Concrete scenarios beat abstract goals.
       placeholder: "I want to drive Codex from a tablet that doesn't have `codex` installed, but …"
     validations:
       required: true

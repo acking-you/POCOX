@@ -1,4 +1,4 @@
-//! Persistent runtime state for Pocket-Codex.
+//! Persistent runtime state for POCOX.
 //!
 //! ```text
 //!                         RuntimeState (state.toml)
@@ -49,16 +49,16 @@ use crate::{
 #[serde(default, deny_unknown_fields)]
 pub struct RuntimeState {
     /// State of the local `codex app-server` process, if one is being
-    /// supervised by Pocket-Codex.
+    /// supervised by POCOX.
     pub codex: Option<CodexProcessInfo>,
 
-    /// pb-mapper sessions Pocket-Codex spawned. Indexed by their
+    /// pb-mapper sessions POCOX spawned. Indexed by their
     /// service `key` so a single host can register/subscribe several
     /// services in parallel.
     #[serde(default)]
     pub pb: Vec<PbSessionInfo>,
 
-    /// Direct Responses API proxy workers Pocket-Codex spawned.
+    /// Direct Responses API proxy workers POCOX spawned.
     #[serde(default)]
     pub api: Vec<ApiProxyInfo>,
 

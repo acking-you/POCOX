@@ -1,5 +1,5 @@
 [Unit]
-Description=Pocket-Codex hosted backend (account API + relay credential vending)
+Description=POCOX hosted backend (account API + relay credential vending)
 Documentation=https://github.com/acking-you/pocket-codex
 # The backend mints credentials against the relay, so start after it when the
 # relay is on this host.

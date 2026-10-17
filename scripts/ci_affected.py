@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Scope CI to the surfaces a change actually affects.
 
-Pocket-Codex has two independent CI surfaces:
+POCOX has two independent CI surfaces:
   * the Cargo workspace (crates/pocket-codex-*), gated by fmt/clippy/test
   * the Flutter app (apps/flutter), gated by the flutter job
 
@@ -61,7 +61,7 @@ def workspace_graph():
     """Return (dir2name, deps) parsed from the workspace manifests.
 
     deps[crate] = set of intra-workspace crates it depends on (any dep kind).
-    Pocket-Codex crates reference each other as `dep = { workspace = true }`
+    POCOX crates reference each other as `dep = { workspace = true }`
     (the path lives in the root `[workspace.dependencies]`), not as a local
     `{ path = .. }`, so an edge is recognised whenever a dependency *key*
     matches another member's package name. No cargo invocation, so the gate

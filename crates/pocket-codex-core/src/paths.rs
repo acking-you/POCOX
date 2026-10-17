@@ -1,4 +1,4 @@
-//! Well-known filesystem paths used by Pocket-Codex.
+//! Well-known filesystem paths used by POCOX.
 //!
 //! ```text
 //!     ProjectDirs("io.github", "acking-you", "pocket-codex")

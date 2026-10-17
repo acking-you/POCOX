@@ -1,6 +1,6 @@
-//! Pb-mapper register/subscribe glue used by Pocket-Codex.
+//! Pb-mapper register/subscribe glue used by POCOX.
 //!
-//! Pocket-Codex drives the published
+//! POCOX drives the published
 //! [`pb-mapper`](https://github.com/acking-you/pb-mapper) client SDK to:
 //!
 //! * **Register** a local `codex app-server` listener with a remote `pb-mapper`

@@ -1,7 +1,7 @@
 //! Combine a session's transcript state ([`crate::rollout`]) with its
 //! liveness ([`crate::liveness`]) into a single resume-safety verdict,
 //! and implement *force takeover*: evicting whatever live process holds a
-//! session's rollout open so Pocket-Codex's own app-server can resume it.
+//! session's rollout open so POCOX's own app-server can resume it.
 //!
 //! ## Why a force takeover exists
 //!
@@ -29,7 +29,7 @@ use crate::{
 /// held.
 const RELEASE_SETTLE: Duration = Duration::from_millis(150);
 
-/// Whether — and how safely — a session can be resumed by Pocket-Codex's
+/// Whether — and how safely — a session can be resumed by POCOX's
 /// app-server, given who currently owns it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResumeSafety {
@@ -178,7 +178,7 @@ impl ReleaseReport {
 }
 
 /// Best-effort eviction of every live process holding `rollout_path`
-/// open, except those in `exclude_pids` (always pass Pocket-Codex's own
+/// open, except those in `exclude_pids` (always pass POCOX's own
 /// app-server pid so we never kill the very server we are about to resume
 /// into).
 ///

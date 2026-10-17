@@ -1,5 +1,5 @@
 //! Detect whether a session's rollout file is currently *owned by a live
-//! process*, so Pocket-Codex never resumes a thread another codex client
+//! process*, so POCOX never resumes a thread another codex client
 //! (e.g. the desktop app) still has loaded.
 //!
 //! codex keeps a rollout file open for the whole time a thread is loaded

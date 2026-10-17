@@ -1,4 +1,4 @@
-# Pocket-Codex Mobile UI — P1 Implementation Plan
+# POCOX Mobile UI — P1 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -245,7 +245,7 @@ use anyhow::{anyhow, Context, Result};
 use pocket_codex_core::service::ServiceId;
 use tokio::net::lookup_host;
 
-/// One discovered Pocket-Codex service on the relay.
+/// One discovered POCOX service on the relay.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscoveredService {
     /// Device id segment.
@@ -267,7 +267,7 @@ pub async fn resolve_relay(relay: &str) -> Result<SocketAddr> {
         .ok_or_else(|| anyhow!("relay `{relay}` resolved to no addresses"))
 }
 
-/// List Pocket-Codex services registered on the relay (bare keys filtered).
+/// List POCOX services registered on the relay (bare keys filtered).
 pub async fn discover(relay: &str) -> Result<Vec<DiscoveredService>> {
     let addr = resolve_relay(relay).await?;
     let keys = pocket_codex_pb::keys(addr).await.context("querying relay keys")?;
@@ -938,7 +938,7 @@ class PocketCodexApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Pocket-Codex',
+      title: 'POCOX',
       theme: lightTheme(),
       darkTheme: darkTheme(),
       themeMode: ThemeMode.system,
@@ -1077,7 +1077,7 @@ class ServicesScreen extends ConsumerWidget {
     final config = ref.watch(configProvider).valueOrNull;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Pocket-Codex'),
+        title: const Text('POCOX'),
         actions: [
           IconButton(
             key: const Key('settings-btn'),
@@ -1288,7 +1288,7 @@ class _ProviderSnippet extends StatelessWidget {
   Widget build(BuildContext context) {
     final snippet = 'model_provider = "pocket-codex-api"\n\n'
         '[model_providers.pocket-codex-api]\n'
-        'name = "Pocket-Codex API"\n'
+        'name = "POCOX API"\n'
         'base_url = "http://$localAddr/v1"\n'
         'wire_api = "responses"\n'
         'requires_openai_auth = false\n'

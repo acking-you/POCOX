@@ -1,7 +1,7 @@
 //! Process management and protocol bridge for the upstream
 //! `codex app-server`.
 //!
-//! Pocket-Codex spawns the user's existing `codex` binary in
+//! POCOX spawns the user's existing `codex` binary in
 //! `app-server` mode and exposes a typed handle that the CLI / UI
 //! layers can use to:
 //!

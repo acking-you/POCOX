@@ -3,7 +3,7 @@
 //!
 //! These read `CODEX_HOME` and inspect/terminate local processes, so they
 //! act on the machine the bridge runs on (the host that owns the
-//! sessions). In Pocket-Codex's desktop setup the Flutter app runs
+//! sessions). In POCOX's desktop setup the Flutter app runs
 //! alongside the codex desktop app, so "list the sessions under this
 //! CODEX_HOME and tell me which are safe to resume" is answered locally.
 //!
@@ -40,7 +40,7 @@ pub struct SessionLivenessView {
     /// Whether resuming requires a force takeover.
     pub requires_takeover: bool,
     /// Processes a force takeover would attempt to terminate (already
-    /// excluding Pocket-Codex's own app-server).
+    /// excluding POCOX's own app-server).
     pub holders: Vec<Holder>,
 }
 
@@ -62,7 +62,7 @@ pub struct ForceResumeOutcome {
     pub resume_error: Option<String>,
 }
 
-/// PIDs that a force takeover must never terminate: Pocket-Codex's own
+/// PIDs that a force takeover must never terminate: POCOX's own
 /// supervised app-server (the very server we resume into) and the current
 /// process.
 ///
@@ -88,7 +88,7 @@ fn protected_pids() -> Vec<u32> {
 }
 
 /// Inspect one session's liveness in detail, listing the would-be
-/// takeover targets (with Pocket-Codex's own app-server excluded).
+/// takeover targets (with POCOX's own app-server excluded).
 pub fn session_liveness(thread_id: &str) -> Result<SessionLivenessView> {
     let path = rollout::rollout_path_for_thread(thread_id)
         .map_err(|e| anyhow!("locating rollout: {e}"))?
@@ -130,7 +130,7 @@ pub fn local_session_transcript(thread_id: &str) -> Result<Vec<rollout::Transcri
 /// Force-resume a session into the app-server behind `service_key`.
 ///
 /// Evicts live processes holding the session's rollout open (except
-/// Pocket-Codex's own app-server), then issues `thread/resume` only if the
+/// POCOX's own app-server), then issues `thread/resume` only if the
 /// release succeeded. The returned [`ForceResumeOutcome`] preserves failed
 /// releases and their cause without admitting another writer.
 ///

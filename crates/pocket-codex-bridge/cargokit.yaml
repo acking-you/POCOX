@@ -2,7 +2,7 @@
 # by `apps/flutter/rust_builder/cargokit` when Flutter builds the bridge.
 #
 # Keep debug archives compact while retaining file:line backtraces.
-# Only protocol types and the Pocket-Codex bridge are linked, never a Codex runtime.
+# Only protocol types and the POCOX bridge are linked, never a Codex runtime.
 cargo:
   debug:
     extra_flags:

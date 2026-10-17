@@ -9,11 +9,11 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'PocketCodex';
+  String get appTitle => 'POCOX';
 
   @override
   String get webUnsupported =>
-      'PocketCodex needs local network and file access; Web is not supported.\nUse Android / iOS / desktop.';
+      'POCOX needs local network and file access; Web is not supported.\nUse Android / iOS / desktop.';
 
   @override
   String get onboardingTitle => 'Connect to a pb-mapper relay';
@@ -43,7 +43,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get keyLengthError => 'MSG_HEADER_KEY must be exactly 32 bytes';
 
   @override
-  String get accountWelcomeHeadline => 'Welcome to PocketCodex';
+  String get accountWelcomeHeadline => 'Welcome to POCOX';
 
   @override
   String get accountWelcomeSubtitle =>
@@ -1112,7 +1112,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String takeoverBody(int n) {
-    return 'This session is held open by $n other process(es). PocketCodex will try to terminate them, then resume it here. Any unsaved work in those processes will be lost.';
+    return 'This session is held open by $n other process(es). POCOX will try to terminate them, then resume it here. Any unsaved work in those processes will be lost.';
   }
 
   @override
@@ -1409,7 +1409,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get homeNoServiceMobileHint =>
-      'Open PocketCodex on your computer and start hosting (app-server); this screen will enter the chat automatically.';
+      'Open POCOX on your computer and start hosting (app-server); this screen will enter the chat automatically.';
 
   @override
   String get homeAutoRetryNote => 'Keeps checking for hosts automatically.';
@@ -1591,7 +1591,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get removeProjectFolder => 'Remove';
 
   @override
-  String get welcomeTitle => 'Welcome to PocketCodex';
+  String get welcomeTitle => 'Welcome to POCOX';
 
   @override
   String get welcomeSubtitleDesktop =>
@@ -1599,7 +1599,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeSubtitleMobile =>
-      'PocketCodex remote-controls the Codex running on your computer. Set up hosting there once and you\'re ready.';
+      'POCOX remote-controls the Codex running on your computer. Set up hosting there once and you\'re ready.';
 
   @override
   String get welcomeStepHost => 'Start hosting on this computer';
@@ -1622,8 +1622,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get welcomeFoldersLocked => 'Available once hosting is up.';
 
   @override
-  String get welcomeMobileStep1 =>
-      'Install and open PocketCodex on your computer';
+  String get welcomeMobileStep1 => 'Install and open POCOX on your computer';
 
   @override
   String get welcomeMobileStep2 => 'Sign in with the same GitHub account';

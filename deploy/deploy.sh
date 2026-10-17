@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install/upgrade the Pocket-Codex hosted backend on a Linux server.
+# Install/upgrade the POCOX hosted backend on a Linux server.
 #
 # Run ON THE SERVER as a sudoer (e.g. after `ssh ubuntu@lb7666.top`). It is
 # idempotent: safe to re-run for upgrades. It does NOT fill in secrets or touch

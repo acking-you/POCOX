@@ -1,4 +1,4 @@
-//! Pocket-Codex hosted backend entrypoint.
+//! POCOX hosted backend entrypoint.
 
 use tracing_subscriber::EnvFilter;
 

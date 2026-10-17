@@ -1,4 +1,4 @@
-; Inno Setup script for the Pocket-Codex desktop app (Windows installer).
+; Inno Setup script for the POCOX desktop app (Windows installer).
 ;
 ; Invoked from .github/workflows/release.yml, e.g.:
 ;   ISCC.exe /DAppVersion=0.0.1 ^
@@ -20,9 +20,9 @@
   #define OutDir "dist"
 #endif
 
-#define MyAppName "PocketCodex"
+#define MyAppName "POCOX"
 #define MyAppExe "pocket_codex.exe"
-#define MyAppPublisher "PocketCodex Contributors"
+#define MyAppPublisher "POCOX Contributors"
 #define MyAppURL "https://github.com/acking-you/pocket-codex"
 
 [Setup]
@@ -57,6 +57,12 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 ; sandbox helper exes the release workflow stages there for the embedded codex.
 ; No separate entry: a second glob would double-include them.
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
+
+[InstallDelete]
+; Shortcuts an install made under the former display name (PocketCodex).
+Type: files; Name: "{group}\PocketCodex.lnk"
+Type: files; Name: "{group}\Uninstall PocketCodex.lnk"
+Type: files; Name: "{autodesktop}\PocketCodex.lnk"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"

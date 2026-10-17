@@ -74,7 +74,7 @@ pub struct SessionLivenessDto {
     pub allows_resume: bool,
     /// Whether resuming requires a force takeover.
     pub requires_takeover: bool,
-    /// Processes a force takeover would attempt to terminate (Pocket-Codex's
+    /// Processes a force takeover would attempt to terminate (POCOX's
     /// own app-server already excluded).
     pub holders: Vec<HolderDto>,
 }
@@ -192,7 +192,7 @@ pub fn app_local_session_transcript(thread_id: String) -> Result<Vec<ThreadItemD
 /// Force-resume a session into the app-server behind `service_key`.
 ///
 /// Terminates live processes holding the session's rollout open (never
-/// Pocket-Codex's own app-server), then issues `thread/resume` only after
+/// POCOX's own app-server), then issues `thread/resume` only after
 /// successful release. The UI must gate this on explicit
 /// user confirmation and must not offer it while a turn is actively
 /// running (`SessionLivenessDto::allows_resume == false`). The returned

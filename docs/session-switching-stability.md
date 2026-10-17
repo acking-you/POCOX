@@ -39,7 +39,7 @@ UI 打开 session 时先调用 `thread/resume`，再通过 `thread/read`、
 
 ## 验证结果
 
-- Pocket-Codex 完整 workspace：309 passed、7 ignored；ignored 项为手工测试。
+- POCOX 完整 workspace：309 passed、7 ignored；ignored 项为手工测试。
 - Flutter：457 passed、3 skipped；analyze 无问题；Rust/Dart 格式检查通过。
 - 两个仓库的 Clippy 通过。
 - pb-mapper 完整 workspace：207 passed、3 ignored；随后新增的本地 TCP
@@ -87,8 +87,8 @@ cargo test -p pocket_codex_bridge real_session_switch_soak -- --ignored --nocapt
 ## 接入与验证边界
 
 pb-mapper 修复已通过 [PR #10](https://github.com/acking-you/pb-mapper/pull/10)
-合入远端，并包含在供 Pocket-Codex 使用的 `pocket-codex` 分支中。
-Pocket-Codex 直接使用该 Git 分支，不再等待 crates.io 版本发布：
+合入远端，并包含在供 POCOX 使用的 `pocket-codex` 分支中。
+POCOX 直接使用该 Git 分支，不再等待 crates.io 版本发布：
 
 ```sh
 cargo test --workspace --locked

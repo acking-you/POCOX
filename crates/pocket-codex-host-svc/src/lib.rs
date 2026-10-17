@@ -1,4 +1,4 @@
-//! Host-side **meta service** for Pocket-Codex.
+//! Host-side **meta service** for POCOX.
 //!
 //! A small axum HTTP server, run on the machine that hosts a `codex`
 //! app-server, published on the relay as a third service (`meta:<name>`)

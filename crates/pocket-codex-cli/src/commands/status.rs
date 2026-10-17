@@ -7,13 +7,13 @@ use pocket_codex_core::{process::pid_alive, state::RuntimeState};
 
 use crate::commands::ui;
 
-/// Print the status of all Pocket-Codex managed sessions.
+/// Print the status of all POCOX managed sessions.
 pub fn run() -> Result<()> {
     let codex = codex_status()?;
     let state = RuntimeState::load()?;
 
     if codex.recorded.is_none() && state.api.is_empty() && state.pb.is_empty() {
-        ui::muted("no Pocket-Codex sessions are running");
+        ui::muted("no POCOX sessions are running");
         return Ok(());
     }
 
@@ -28,7 +28,7 @@ pub fn run() -> Result<()> {
         .and_then(|path| path.parent().map(|dir| dir.display().to_string()));
     let relay = state.pb.first().map(|session| session.relay_addr.clone());
 
-    ui::banner("Pocket-Codex runtime status", relay.as_deref());
+    ui::banner("POCOX runtime status", relay.as_deref());
     let mut table =
         ui::new_table(&["COMPONENT", "STATE", "PID", "ENDPOINT", "KEY", "UPTIME", "PB SDK"]);
 

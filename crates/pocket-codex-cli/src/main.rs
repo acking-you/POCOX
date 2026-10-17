@@ -1,6 +1,6 @@
 //! `pocket-codex` command-line entrypoint.
 //!
-//! Pocket-Codex orchestrates a local `codex app-server` process and a
+//! POCOX orchestrates a local `codex app-server` process and a
 //! `pb-mapper` register/subscribe session so users can drive Codex
 //! from any device. This binary wires the three library crates
 //! (`pocket-codex-core`, `pocket-codex-codex`, `pocket-codex-pb`)

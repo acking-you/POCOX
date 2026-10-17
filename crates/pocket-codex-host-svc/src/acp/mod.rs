@@ -5,7 +5,7 @@
 //! client: strict JSON-RPC 2.0 over stdio ([`jsonrpc`], [`peer`]), version
 //! and capability negotiation ([`schema`]), and the session, turn and
 //! permission lifecycle ([`host`], [`state`]). Controllers never speak ACP;
-//! they use the versioned Pocket-Codex gateway ([`api`], [`client`]) over
+//! they use the versioned POCOX gateway ([`api`], [`client`]) over
 //! loopback or a relay tunnel. Both sides fold updates with [`fold`]; a
 //! controller keeps its live folds aligned with the host's through
 //! [`replica`]. Session authority is recorded per agent source ([`store`]).

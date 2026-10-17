@@ -1,4 +1,4 @@
-//! Service identifiers used to map Pocket-Codex devices onto pb-mapper keys.
+//! Service identifiers used to map POCOX devices onto pb-mapper keys.
 //!
 //! ```text
 //!                     pcx : <device> : <kind> : <name>
@@ -26,13 +26,13 @@ use std::{fmt, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
-/// Prefix used for Pocket-Codex owned pb-mapper service keys.
+/// Prefix used for POCOX owned pb-mapper service keys.
 pub const SERVICE_KEY_PREFIX: &str = "pcx";
 
 /// Default service instance name used when the user does not provide one.
 pub const DEFAULT_SERVICE_NAME: &str = "default";
 
-/// A kind of Pocket-Codex service exposed through pb-mapper.
+/// A kind of POCOX service exposed through pb-mapper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ServiceKind {
@@ -40,10 +40,10 @@ pub enum ServiceKind {
     App,
     /// Responses API proxy service.
     Api,
-    /// Pocket-Codex ACP gateway (`/acp/v1`) in front of a host-owned ACP
+    /// POCOX ACP gateway (`/acp/v1`) in front of a host-owned ACP
     /// agent. The agent's identity is host metadata, never part of the key.
     Acp,
-    /// Pocket-Codex native OpenCode HTTP/SSE gateway (`/opencode/v1`).
+    /// POCOX native OpenCode HTTP/SSE gateway (`/opencode/v1`).
     OpenCode,
     /// Host-side meta service (session inventory + per-thread config), exposed
     /// alongside an `app`/`api` host so its local sessions are remote-viewable.
@@ -61,7 +61,7 @@ pub enum ServiceKind {
 }
 
 impl ServiceKind {
-    /// String segment used inside Pocket-Codex service keys.
+    /// String segment used inside POCOX service keys.
     pub fn as_key_segment(self) -> &'static str {
         match self {
             Self::App => "app",
@@ -97,7 +97,7 @@ impl FromStr for ServiceKind {
     }
 }
 
-/// Device and instance identity for one relay-exposed Pocket-Codex service.
+/// Device and instance identity for one relay-exposed POCOX service.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ServiceId {
     /// Device id selected by the host/user.
@@ -119,14 +119,14 @@ impl ServiceId {
         }
     }
 
-    /// Build the pb-mapper key for this Pocket-Codex service.
+    /// Build the pb-mapper key for this POCOX service.
     pub fn key(&self) -> String {
         format!("{SERVICE_KEY_PREFIX}:{}:{}:{}", self.device, self.kind.as_key_segment(), self.name)
     }
 
-    /// Parse a Pocket-Codex service key.
+    /// Parse a POCOX service key.
     ///
-    /// Returns `None` for non-Pocket-Codex keys so generic pb-mapper keys can
+    /// Returns `None` for non-POCOX keys so generic pb-mapper keys can
     /// continue to coexist in the same relay.
     pub fn parse_key(key: &str) -> Option<Self> {
         let mut parts = key.split(':');

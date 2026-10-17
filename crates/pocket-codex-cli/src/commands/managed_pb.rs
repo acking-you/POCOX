@@ -46,7 +46,7 @@ use pocket_codex_core::{
 
 use crate::commands::{relay::CREDENTIAL_ENV, ui};
 
-/// A pb-mapper worker process Pocket-Codex should supervise.
+/// A pb-mapper worker process POCOX should supervise.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PbWorkerSpec {
     /// Register or subscribe.

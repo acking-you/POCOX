@@ -21,6 +21,6 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.byType(MaterialApp), findsOneWidget);
-    expect(find.text('PocketCodex'), findsOneWidget);
+    expect(find.text('POCOX'), findsOneWidget);
   });
 }

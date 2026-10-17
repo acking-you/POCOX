@@ -1,6 +1,6 @@
 //! Host an **owned** ACP agent from the app: launch the configured
 //! executable + argument vector, be its ACP client, and publish the
-//! Pocket-Codex gateway as `acp:<name>` plus a provider-neutral `meta:<name>`
+//! POCOX gateway as `acp:<name>` plus a provider-neutral `meta:<name>`
 //! service (host files, uploads, project folders, session file links).
 //!
 //! Hosting works in both self-host and account mode through the shared

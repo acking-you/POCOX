@@ -3,7 +3,7 @@
 /// codex's input protocol carries only text and images inline; its native
 /// document workflow is a FILE PATH in the prompt text that the agent reads
 /// with its own tools (exactly what the TUI's `@file` mention inserts — a bare
-/// path, double-quoted only when it contains whitespace). Pocket-Codex uploads
+/// path, double-quoted only when it contains whitespace). POCOX uploads
 /// the controller-side file to the HOST first (over the meta tunnel), then
 /// appends a reference block in that same convention:
 ///

@@ -1,4 +1,4 @@
-# Pocket-Codex Rust toolchain pin.
+# POCOX Rust toolchain pin.
 #
 # We follow the same approach as our reference project (`static_flow`):
 # nightly is used purely so we can take advantage of advanced `rustfmt`

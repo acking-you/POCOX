@@ -1,4 +1,4 @@
-# Pocket-Codex rustfmt configuration.
+# POCOX rustfmt configuration.
 #
 # Mirrors the `static_flow` style so contributors who have worked on
 # either project see the same formatting rules. Run `cargo fmt --all`

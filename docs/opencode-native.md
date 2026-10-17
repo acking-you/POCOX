@@ -1,6 +1,6 @@
 # Native OpenCode
 
-OpenCode is Pocket-Codex's third engine, beside native Codex app-server and
+OpenCode is POCOX's third engine, beside native Codex app-server and
 generic ACP agents. The host runs the user's installed `opencode serve` and
 speaks OpenCode's own v1 HTTP + SSE API; controllers reach it through the
 relay under `pcx:<device>:opencode:<name>` (`pcxu:<user>:…` in account

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Pocket-Codex CLI installer for Windows (PowerShell).
+  POCOX CLI installer for Windows (PowerShell).
 
 .DESCRIPTION
   Downloads the `pocket-codex` binary from the latest GitHub release, matching

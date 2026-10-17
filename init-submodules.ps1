@@ -2,7 +2,7 @@
 Set-Location -LiteralPath $PSScriptRoot
 
 Write-Host ""
-Write-Host "=== Pocket-Codex 子模块初始化 ===" -ForegroundColor Cyan
+Write-Host "=== POCOX 子模块初始化 ===" -ForegroundColor Cyan
 Write-Host "仓库目录: $PSScriptRoot"
 Write-Host ""
 

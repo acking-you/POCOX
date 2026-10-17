@@ -41,7 +41,7 @@ async fn adopted_server(answer_list: bool, wildcard: bool) -> Result<(), Startup
             assert_eq!(request["method"], method);
             if method == "initialize" {
                 let params = &request["params"];
-                assert_eq!(params["clientInfo"]["title"], "Pocket-Codex");
+                assert_eq!(params["clientInfo"]["title"], "POCOX");
                 assert!(params["clientInfo"]["name"].as_str().is_some());
                 assert_eq!(params["clientInfo"]["version"], env!("CARGO_PKG_VERSION"));
                 assert_eq!(params["capabilities"]["experimentalApi"], true);

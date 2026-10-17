@@ -1,6 +1,6 @@
-# Pocket-Codex Flutter front-end
+# POCOX Flutter front-end
 
-Native Flutter UI for [Pocket-Codex](../../README.md). Talks to the Rust
+Native Flutter UI for [POCOX](../../README.md). Talks to the Rust
 workspace through [`flutter_rust_bridge`][frb] so every platform can
 drive a `codex app-server` — or the host's Responses API proxy — without
 re-implementing the model runtime.

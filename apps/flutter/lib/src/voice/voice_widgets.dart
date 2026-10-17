@@ -33,7 +33,7 @@ class VoiceSetupDialog extends StatefulWidget {
 /// Realtime models offered in the setup dialog.
 ///
 /// The app-server has no model catalogue for realtime (only voices), so this
-/// is the list the protocol itself names for the version Pocket-Codex speaks
+/// is the list the protocol itself names for the version POCOX speaks
 /// (V3, `gpt-live-1-codex` is its built-in default). "Host default" sends no
 /// model and lets the host's `experimental_realtime_ws_model` decide; a custom
 /// id stays available for a host configured with something else.

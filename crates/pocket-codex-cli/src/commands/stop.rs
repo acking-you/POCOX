@@ -12,7 +12,7 @@ use crate::{
     },
 };
 
-/// Stop Pocket-Codex managed sessions.
+/// Stop POCOX managed sessions.
 pub fn run(args: StopArgs) -> Result<()> {
     let filtering_pb = args.key.is_some() || args.role.is_some();
     if !filtering_pb {

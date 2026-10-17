@@ -6,7 +6,7 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// Greet a Pocket-Codex user.
+/// Greet a POCOX user.
 ///
 /// `flutter_rust_bridge` exposes this synchronously to Dart so the
 /// front-end can call it without needing `await`.

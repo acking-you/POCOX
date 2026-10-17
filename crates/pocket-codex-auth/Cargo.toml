@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-auth"
-description = "GitHub device-flow login, session JWTs and refresh tokens for the Pocket-Codex hosted backend."
+description = "GitHub device-flow login, session JWTs and refresh tokens for the POCOX hosted backend."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

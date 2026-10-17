@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/theme.dart';
 
-/// The Pocket-Codex brand mark: the bare "cloud terminal" glyph.
+/// The POCOX brand mark: the bare "cloud terminal" glyph.
 ///
 /// Two theme-matched variants ship in the bundle (drawn from the vector mark
 /// by `test/gen_icon_test.dart`): `glyph_light.png` (ink cloud, blue arcs) for

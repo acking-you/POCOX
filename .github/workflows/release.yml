@@ -35,7 +35,7 @@ env:
   FLUTTER_VERSION: "3.44.0"
   # Match rust-toolchain.toml so cargo/cross build with the pinned toolchain.
   RUST_TOOLCHAIN: nightly-2026-06-01
-  RELEASE_NAME: Pocket-Codex ${{ github.ref_name }}
+  RELEASE_NAME: POCOX ${{ github.ref_name }}
   IS_DRAFT: ${{ github.event_name == 'workflow_dispatch' }}
   # The backend server the CLI + app default to, baked at build time from the
   # repo-configurable variable (`gh variable set POCKET_CODEX_BACKEND_HOST`).
@@ -79,7 +79,7 @@ jobs:
               -f tag_name="${tag}" --jq '.body' 2>/dev/null || true)"
           fi
           {
-            echo "## Pocket-Codex ${tag}"
+            echo "## POCOX ${tag}"
             echo
             echo "Remote-control your codex sessions from any device. This release ships the desktop/mobile **app** and the **CLI**."
             echo
@@ -370,7 +370,7 @@ jobs:
           cp "${icon_png}" "$appdir/pocket-codex.png"
           cat > "$appdir/usr/share/applications/pocket-codex.desktop" <<'DESKTOP'
           [Desktop Entry]
-          Name=PocketCodex
+          Name=POCOX
           Comment=Remote-control codex sessions from any device
           Exec=pocket_codex
           Icon=pocket-codex
@@ -401,7 +401,7 @@ jobs:
           cp "${icon_png}" "$deb/usr/share/icons/hicolor/256x256/apps/pocket-codex.png"
           cat > "$deb/usr/share/applications/pocket-codex.desktop" <<'DESKTOP'
           [Desktop Entry]
-          Name=PocketCodex
+          Name=POCOX
           Comment=Remote-control codex sessions from any device
           Exec=/usr/lib/pocket-codex/pocket_codex
           Icon=pocket-codex
@@ -415,9 +415,9 @@ jobs:
           Section: utils
           Priority: optional
           Architecture: amd64
-          Maintainer: Pocket-Codex Contributors <noreply@github.com>
+          Maintainer: POCOX Contributors <noreply@github.com>
           Depends: libgtk-3-0, libayatana-appindicator3-1, libwebkit2gtk-4.1-0
-          Description: Pocket-Codex desktop app
+          Description: POCOX desktop app
            Remote-control your codex sessions from any device.
           CONTROL
           dpkg-deb --build --root-owner-group "$deb" \

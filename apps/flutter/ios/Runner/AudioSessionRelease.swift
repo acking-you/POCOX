@@ -6,7 +6,7 @@ import WebRTC
 /// On devices WebRTC plays and records through an AVAudioEngine. Starting the
 /// engine activates the app's audio session, which interrupts other apps, but
 /// nothing deactivates it again: music stopped by a call or a dictation take
-/// stayed stopped while Pocket Codex was open. This observer deactivates the
+/// stayed stopped while POCOX was open. This observer deactivates the
 /// session, telling the interrupted apps they may resume, once the engine is
 /// fully disabled. The release waits a moment, so an engine that is only being
 /// reconfigured (disabled and enabled again at once) keeps its session.

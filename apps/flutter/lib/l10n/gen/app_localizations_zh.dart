@@ -9,11 +9,11 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get appTitle => 'PocketCodex';
+  String get appTitle => 'POCOX';
 
   @override
   String get webUnsupported =>
-      'PocketCodex 需要本地网络与文件访问，暂不支持 Web。\n请使用 Android / iOS / 桌面版。';
+      'POCOX 需要本地网络与文件访问，暂不支持 Web。\n请使用 Android / iOS / 桌面版。';
 
   @override
   String get onboardingTitle => '连接到 pb-mapper relay';
@@ -43,7 +43,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get keyLengthError => 'MSG_HEADER_KEY 必须是 32 字节';
 
   @override
-  String get accountWelcomeHeadline => '欢迎使用 PocketCodex';
+  String get accountWelcomeHeadline => '欢迎使用 POCOX';
 
   @override
   String get accountWelcomeSubtitle => '登录后，在任意设备上继续你的对话。';
@@ -1076,7 +1076,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String takeoverBody(int n) {
-    return '该会话正被另外 $n 个进程占用。PocketCodex 将尝试终止它们后在此恢复。这些进程中未保存的工作将会丢失。';
+    return '该会话正被另外 $n 个进程占用。POCOX 将尝试终止它们后在此恢复。这些进程中未保存的工作将会丢失。';
   }
 
   @override
@@ -1367,7 +1367,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get homeNoServiceMobileHint =>
-      '在电脑上打开 PocketCodex 并开启托管（app-server），这里就会自动进入对话。';
+      '在电脑上打开 POCOX 并开启托管（app-server），这里就会自动进入对话。';
 
   @override
   String get homeAutoRetryNote => '会自动持续检测新主机。';
@@ -1541,14 +1541,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get removeProjectFolder => '移除';
 
   @override
-  String get welcomeTitle => '欢迎使用 PocketCodex';
+  String get welcomeTitle => '欢迎使用 POCOX';
 
   @override
   String get welcomeSubtitleDesktop => '只差一步：在本机开启托管，手机就能随时随地远程控制这台电脑上的 Codex。';
 
   @override
   String get welcomeSubtitleMobile =>
-      'PocketCodex 远程控制运行在你电脑上的 Codex。在电脑上完成一次托管配置即可开始。';
+      'POCOX 远程控制运行在你电脑上的 Codex。在电脑上完成一次托管配置即可开始。';
 
   @override
   String get welcomeStepHost => '在本机开启托管';
@@ -1569,7 +1569,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get welcomeFoldersLocked => '开启托管后即可配置。';
 
   @override
-  String get welcomeMobileStep1 => '在电脑上安装并打开 PocketCodex';
+  String get welcomeMobileStep1 => '在电脑上安装并打开 POCOX';
 
   @override
   String get welcomeMobileStep2 => '登录同一个 GitHub 账号';

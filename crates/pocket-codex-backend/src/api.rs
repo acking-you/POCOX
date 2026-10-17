@@ -192,13 +192,11 @@ async fn web_callback(
     {
         Ok(redirect) => Redirect::to(&redirect.location).into_response(),
         Err(AuthError::BadWebState | AuthError::WebDisabled) => web_callback_page(
-            "This sign-in link is no longer valid. Return to Pocket-Codex and try again.",
+            "This sign-in link is no longer valid. Return to POCOX and try again.",
         ),
         Err(e) => {
             tracing::error!(error = %e, "web callback failed");
-            web_callback_page(
-                "Something went wrong signing in. Return to Pocket-Codex and try again.",
-            )
+            web_callback_page("Something went wrong signing in. Return to POCOX and try again.")
         },
     }
 }
@@ -208,10 +206,10 @@ async fn web_callback(
 fn web_callback_page(message: &str) -> Response {
     let body = format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" \
-         content=\"width=device-width, initial-scale=1\"><title>Pocket-Codex</title></head><body \
+         content=\"width=device-width, initial-scale=1\"><title>POCOX</title></head><body \
          style=\"font-family: system-ui, sans-serif; max-width: 28rem; margin: 4rem auto; \
          padding: 0 1.5rem; text-align: center; color: #1a1a1a;\"><h1 style=\"font-size: \
-         1.25rem;\">Pocket-Codex</h1><p>{message}</p></body></html>"
+         1.25rem;\">POCOX</h1><p>{message}</p></body></html>"
     );
     Html(body).into_response()
 }

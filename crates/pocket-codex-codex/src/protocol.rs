@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 /// Request id used to correlate requests with responses.
 ///
-/// JSON-RPC allows either a string or a number; Pocket-Codex always
+/// JSON-RPC allows either a string or a number; POCOX always
 /// emits strings (UUIDs) but we accept both inbound.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]

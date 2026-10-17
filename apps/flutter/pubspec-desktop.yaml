@@ -8,7 +8,7 @@
 # KEEP IN SYNC: when you edit dependencies in pubspec.yaml, mirror the change
 # here (everything except the trailing `fonts:` block must match pubspec.yaml).
 name: pocket_codex
-description: "PocketCodex Flutter front-end. Drives codex app-server through flutter_rust_bridge."
+description: "POCOX Flutter front-end. Drives codex app-server through flutter_rust_bridge."
 publish_to: 'none'
 
 version: 0.3.0+33

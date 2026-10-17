@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-pb"
-description = "Pb-mapper register/subscribe glue used by Pocket-Codex to expose codex app-server remotely."
+description = "Pb-mapper register/subscribe glue used by POCOX to expose codex app-server remotely."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-core"
-description = "Shared types, configuration and codex app-server protocol primitives for Pocket-Codex."
+description = "Shared types, configuration and codex app-server protocol primitives for POCOX."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

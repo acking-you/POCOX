@@ -1,5 +1,5 @@
 #!/bin/sh
-# Pocket-Codex CLI installer for Linux and macOS.
+# POCOX CLI installer for Linux and macOS.
 #
 # One-liner:
 #   curl -fsSL https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.sh | sh

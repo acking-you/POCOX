@@ -1,8 +1,12 @@
 <p align="center">
-  <img src="assets/logo/poster.png" alt="Pocket-Codex poster" width="100%" />
+  <img src="assets/logo/poster.png" alt="POCOX poster" width="100%" />
 </p>
 
-<h1 align="center">Pocket-Codex</h1>
+<h1 align="center">POCOX</h1>
+
+<p align="center">
+  <strong>PO</strong>cket&nbsp;<strong>CO</strong>de<strong>X</strong>
+</p>
 
 <p align="center">
   <em>把你的 Codex 装进口袋，在任意设备上原生驱动它。</em>
@@ -20,13 +24,13 @@
 </p>
 
 > [!WARNING]
-> **Pocket-Codex 正在积极开发中。** 这里的一切都还不稳定——API、磁盘布局、
+> **POCOX 正在积极开发中。** 这里的一切都还不稳定——API、磁盘布局、
 > 协议映射，乃至 crate 的边界，都可能在不另行通知的情况下变动。请**不要**将其
 > 用于生产环境。在我们打地基的过程中，非常欢迎 PR、设计反馈与缺陷报告。
 
 ## 这是什么？
 
-Pocket-Codex 是一个实验：把上游
+POCOX（取自 **PO**cket **CO**de**X**）是一个实验：把上游
 [`codex app-server`](https://github.com/openai/codex) 协议变成一种可移植、
 多设备的体验；同时把宿主机的 Codex 登录态，暴露成一个经由中转（relay）可达、
 任意设备都能访问的 Responses API 端点：
@@ -48,6 +52,8 @@ Pocket-Codex 是一个实验：把上游
   （`pocket-codex login`，或在 App 里点「Sign in with GitHub」）；后端会以
   按用户隔离的 `pcxu:<user>:…` 键，替每个账号经中转代理其服务，因此中转的主
   密钥永远不会下发给客户端，账号之间也彼此不可见。
+
+改名只换了名字：命令、crate、包名与应用标识仍是 `pocket-codex`，已有安装、脚本和设置照常沿用。
 
 一句话：**一台机器保持登录 Codex；其它每台设备——Flutter 界面、远端的 `codex`
 CLI，或任意 OpenAI 兼容工具——都通过中转访问它**，要么用共享的中转密钥
@@ -161,7 +167,7 @@ cargo build --workspace
 cargo run -p pocket-codex-cli -- --help
 ```
 
-`$PATH` 中需有可用的 `codex` 程序；Pocket-Codex **不**自带模型运行时。CLI 提供：
+`$PATH` 中需有可用的 `codex` 程序；POCOX **不**自带模型运行时。CLI 提供：
 
 ```text
 pocket-codex login                          # 托管账号（GitHub）
@@ -252,6 +258,6 @@ flutter_rust_bridge_codegen generate
 
 ## 许可证
 
-Pocket-Codex 以 [Apache License 2.0](LICENSE) 授权。
+POCOX 以 [Apache License 2.0](LICENSE) 授权。
 
 `deps/` 下的上游项目各自保留其许可证；详情请查阅各子模块。

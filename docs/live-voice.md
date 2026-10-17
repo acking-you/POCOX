@@ -1,6 +1,6 @@
 # Live voice through Codex app-server
 
-Pocket-Codex starts a dedicated voice conversation from the waveform button
+POCOX starts a dedicated voice conversation from the waveform button
 above the composer. An existing voice conversation can be reopened and started
 again explicitly. Its waveform icon and “Live voice” label survive renaming,
 restart and opening it from a different controller because Codex persists

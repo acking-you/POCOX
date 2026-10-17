@@ -1,7 +1,7 @@
 //! Async wrappers around the Git-pinned `pb-mapper` client SDK.
 //!
 //! ```text
-//!     Pocket-Codex helper           pb-mapper SDK entrypoint
+//!     POCOX helper           pb-mapper SDK entrypoint
 //!     ──────────────────────────    ────────────────────────────────────────
 //!     register(RegisterOptions)   → Client::register(RegisterRequest)
 //!     subscribe(SubscribeOptions) → Client::connect(ConnectRequest)

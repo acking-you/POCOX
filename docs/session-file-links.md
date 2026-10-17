@@ -33,7 +33,7 @@ Unsupported or failed checks are treated as remote.
 For a remote session, an HTTP(S) link to localhost, a loopback address or a
 wildcard bind address displays pb-mapper mapping guidance. Register the web
 service's port on the host and subscribe to that service on the controller,
-then open the mapped local port with the original URL path/query. Pocket-Codex
+then open the mapped local port with the original URL path/query. POCOX
 does not create that port mapping automatically. For a verified same-device
 host, the original web address opens directly in the system browser. Loopback
 links never trigger an automatic favicon request.

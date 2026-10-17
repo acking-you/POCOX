@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Pocket-Codex isn't behaving the way the docs / CLI help say it should.
+description: Something in POCOX isn't behaving the way the docs / CLI help say it should.
 title: "bug: <short description>"
 labels: ["bug", "triage"]
 body:
@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for filing a bug. A few things that help us land the fix faster:
 
-        - **Pocket-Codex is pre-1.0.** APIs, on-disk layout and the protocol
+        - **POCOX is pre-1.0.** APIs, on-disk layout and the protocol
           mapping are all expected to change. Please include the exact
           commit / version you saw the bug on.
         - **Logs help.** `pocket-codex` uses `tracing`; running with
@@ -89,7 +89,7 @@ body:
   - type: input
     id: pcx-version
     attributes:
-      label: Pocket-Codex version
+      label: POCOX version
       description: Output of `pocket-codex version` (or the commit SHA you built from).
       placeholder: "pocket-codex 0.1.0 (commit abcdef0)"
     validations:

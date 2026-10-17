@@ -287,7 +287,7 @@ class _ProviderSnippet extends StatelessWidget {
     final snippet =
         'model_provider = "pocket-codex-api"\n\n'
         '[model_providers.pocket-codex-api]\n'
-        'name = "PocketCodex API"\n'
+        'name = "POCOX API"\n'
         'base_url = "http://$localAddr/v1"\n'
         'wire_api = "responses"\n'
         'requires_openai_auth = false\n'

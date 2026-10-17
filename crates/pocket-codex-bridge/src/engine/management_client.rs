@@ -133,7 +133,7 @@ pub fn device(key: &str) -> Result<management::DeviceView> {
     let view: management::DeviceView =
         request(key, Method::GET, &["manage", "v1", "device"], None::<&()>)?;
     if view.protocol != 1 {
-        bail!("update Pocket Codex to manage this computer");
+        bail!("update POCOX to manage this computer");
     }
     Ok(view)
 }

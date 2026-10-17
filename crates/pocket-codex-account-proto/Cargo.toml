@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-account-proto"
-description = "Wire types and pb-mapper key namespacing shared between the Pocket-Codex hosted backend and its CLI/app clients."
+description = "Wire types and pb-mapper key namespacing shared between the POCOX hosted backend and its CLI/app clients."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

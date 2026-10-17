@@ -1,5 +1,5 @@
 name: pocket_codex
-description: "PocketCodex Flutter front-end. Drives codex app-server through flutter_rust_bridge."
+description: "POCOX Flutter front-end. Drives codex app-server through flutter_rust_bridge."
 publish_to: 'none'
 
 version: 0.3.0+33

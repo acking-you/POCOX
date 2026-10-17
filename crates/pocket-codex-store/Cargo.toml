@@ -1,6 +1,6 @@
 [package]
 name = "pocket-codex-store"
-description = "SQLite persistence (users, refresh tokens, device flows) for the Pocket-Codex hosted backend."
+description = "SQLite persistence (users, refresh tokens, device flows) for the POCOX hosted backend."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

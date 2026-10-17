@@ -1,4 +1,4 @@
-//! Small process helpers shared by Pocket-Codex supervisors.
+//! Small process helpers shared by POCOX supervisors.
 //!
 //! The CLI tracks long-running `codex app-server` and pb-mapper worker
 //! processes by PID in `state.toml`. These helpers keep the platform
@@ -434,7 +434,7 @@ pub fn send_sigterm(pid: u32) {
 /// Unlike [`send_sigterm`], this is an immediate, non-graceful kill
 /// (`SIGKILL` on unix, `TerminateProcess` on Windows, both via sysinfo's
 /// [`sysinfo::Process::kill`]). It is the primitive behind a *force
-/// takeover*, where Pocket-Codex evicts another codex process that is
+/// takeover*, where POCOX evicts another codex process that is
 /// holding a session's rollout file open so it can resume that session
 /// itself. Returns `false` when the process is already gone or the kill
 /// could not be delivered; callers treat that as best-effort (the

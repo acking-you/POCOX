@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sign, notarize, staple and verify a Pocket-Codex release (macOS only)."""
+"""Sign, notarize, staple and verify a POCOX release (macOS only)."""
 
 import argparse
 import base64
@@ -212,7 +212,7 @@ def package(args):
             run("spctl", "--assess", "--type", "execute", "--verbose=2", app)
             (stage / "Applications").symlink_to("/Applications")
             candidate = work / output.name
-            run("hdiutil", "create", "-volname", "Pocket-Codex", "-srcfolder", stage,
+            run("hdiutil", "create", "-volname", "POCOX", "-srcfolder", stage,
                 "-format", "UDZO", candidate)
             run("codesign", "--sign", identity, "--timestamp", *signing, candidate)
             notarize(candidate, auth, logs)

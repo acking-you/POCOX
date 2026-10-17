@@ -1,6 +1,6 @@
 //! Spawn / inspect / stop a `codex app-server` child process.
 //!
-//! Pocket-Codex aims to behave like a small process supervisor: it
+//! POCOX aims to behave like a small process supervisor: it
 //! resolves the user's `codex` binary, starts it with the requested
 //! `--listen` URL (websocket or unix socket), captures its stdout and
 //! stderr to a log file, and persists enough metadata in

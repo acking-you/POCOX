@@ -1,5 +1,5 @@
 //! Controller-side engine for `acp` services: any ACP agent hosted behind
-//! the Pocket-Codex gateway (`/acp/v1`), on this device or another.
+//! the POCOX gateway (`/acp/v1`), on this device or another.
 //!
 //! # Ownership
 //!
@@ -223,7 +223,7 @@ fn key_in(context: &Context, service_key: &str) -> Result<Key> {
         bail!("this service belongs to another account or relay");
     }
     let logical = logical_key(service_key)
-        .ok_or_else(|| anyhow!("not a Pocket-Codex service key: {service_key}"))?;
+        .ok_or_else(|| anyhow!("not a POCOX service key: {service_key}"))?;
     Ok((context.id().to_string(), logical))
 }
 

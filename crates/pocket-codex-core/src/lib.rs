@@ -1,4 +1,4 @@
-//! Core primitives shared across the Pocket-Codex crates.
+//! Core primitives shared across the POCOX crates.
 //!
 //! This crate intentionally has a small surface area: it exposes the
 //! configuration schema, persisted runtime state, well-known filesystem
@@ -25,7 +25,7 @@ pub mod process;
 /// Persistent runtime state (PID, listen URL, pb-mapper sessions).
 pub mod state;
 
-/// Pocket-Codex service identifiers and relay key helpers.
+/// POCOX service identifiers and relay key helpers.
 pub mod service;
 
 /// Provider-independent, restart-safe history window synchronization.

@@ -1,8 +1,8 @@
-# Pocket-Codex 使用指南（GitHub 账号模式）
+# POCOX 使用指南（GitHub 账号模式）
 
 > English version: [`docs/usage.md`](usage.md)
 
-使用 Pocket-Codex 最简单的方式：**用 GitHub 账号登录**。一台机器保持登录
+使用 POCOX 最简单的方式：**用 GitHub 账号登录**。一台机器保持登录
 Codex，其它所有设备登录**同一个**账号后即可驱动它。无需配置中转地址（relay）
 或共享密钥——后端会替你代理这些服务。
 

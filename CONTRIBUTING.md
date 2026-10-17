@@ -1,6 +1,6 @@
-# Contributing to Pocket-Codex
+# Contributing to POCOX
 
-Thanks for taking the time to help shape Pocket-Codex. This guide
+Thanks for taking the time to help shape POCOX. This guide
 captures the practical bits — how to set up the toolchain, run the same
 checks CI runs, and land a clean change. The deeper *why* behind the
 project (intent, crate boundaries, engineering principles) lives in
@@ -32,7 +32,7 @@ project (intent, crate boundaries, engineering principles) lives in
 | Rust toolchain           | Pinned by [`rust-toolchain.toml`](rust-toolchain.toml) (nightly `2026-04-01`, with `rustfmt`, `clippy`, `rust-src`, target `wasm32-unknown-unknown`). `rustup` will pick this up automatically. |
 | Flutter                  | **3.44.0**, locked in lockstep across [`apps/flutter/.fvmrc`](apps/flutter/.fvmrc), [`apps/flutter/pubspec.yaml`](apps/flutter/pubspec.yaml) (`environment.flutter`) and CI (`subosito/flutter-action@v2`). Bump all three together. |
 | FVM                      | Recommended Flutter version manager. `brew tap leoafarias/fvm && brew install fvm` then `fvm install 3.44.0 --setup`. |
-| `codex`                  | A working `codex` binary on `$PATH` for any flow that exercises `pocket-codex serve` / `connect` / `api …` against a real app-server. Pocket-Codex deliberately does **not** vendor a model runtime. |
+| `codex`                  | A working `codex` binary on `$PATH` for any flow that exercises `pocket-codex serve` / `connect` / `api …` against a real app-server. POCOX deliberately does **not** vendor a model runtime. |
 | `flutter_rust_bridge_codegen` | Only needed when editing `crates/pocket-codex-bridge/src/api/`. |
 
 ## 3. Repository setup
@@ -166,7 +166,7 @@ Use the issue forms under [`.github/ISSUE_TEMPLATE`](.github/ISSUE_TEMPLATE):
 
 ## 10. License and sign-off
 
-Pocket-Codex is licensed under the [Apache License 2.0](LICENSE). By
+POCOX is licensed under the [Apache License 2.0](LICENSE). By
 contributing you agree your contributions are licensed under the same
 terms. Submodules under `deps/` keep their own licenses; consult each
 submodule for details.

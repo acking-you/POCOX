@@ -42,8 +42,8 @@
 //   assets/tray/tray.ico       Windows tray (multi-size .ico)
 // Outputs (repository art, both copies kept identical):
 //   assets/logo/logo.png, apps/flutter/assets/logo/logo.png
-//   assets/logo/poster.png, apps/flutter/assets/logo/poster.png
-//                              the poster's app tile redrawn in place
+// The README poster is composed from this mark and the app's own screens by
+// test/gen_poster_test.dart.
 //
 // Keep `flutter_native_splash.color` / `color_dark` in pubspec.yaml (and
 // pubspec-desktop.yaml) equal to [MarkStyle.light] / [MarkStyle.dark]'s tile.
@@ -292,10 +292,6 @@ const _safeZone = 33 / 54;
 /// common display scales (100/125/150/175/200/250%), so none is a resample.
 const _icoSizes = [16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 96, 128, 256];
 
-/// Where the poster's app tile sits (measured on the 1536x1024 poster): its
-/// bounding box, padded a few pixels to cover the anti-aliased edge.
-const _posterTile = (x: 437, y: 64, side: 128);
-
 Future<void> _png(String path, img.Image image) =>
     File(path).writeAsBytes(img.encodePng(image));
 
@@ -474,38 +470,10 @@ void main() {
     ).writeAsBytes(img.IcoEncoder().encodeImages(frames));
   }, skip: skip);
 
-  test('derive repository art: logo and poster', () async {
+  test('derive repository art: logo', () async {
     final logo = await renderMark(1024, margin: 51);
     for (final path in ['../../assets/logo/logo.png', 'assets/logo/logo.png']) {
       await _png(path, logo);
-    }
-
-    // The poster keeps its illustration; only its app tile is redrawn, over
-    // the poster's own background, so the README matches the launcher.
-    final poster = img.decodePng(
-      File('../../assets/logo/poster.png').readAsBytesSync(),
-    )!;
-    final t = _posterTile;
-    final under = poster.getPixel(t.x - 4, t.y + t.side ~/ 2);
-    img.fillRect(
-      poster,
-      x1: t.x,
-      y1: t.y,
-      x2: t.x + t.side - 1,
-      y2: t.y + t.side - 1,
-      color: img.ColorRgb8(under.r.toInt(), under.g.toInt(), under.b.toInt()),
-    );
-    img.compositeImage(
-      poster,
-      await renderMark(t.side, margin: 3, radius: 0.22),
-      dstX: t.x,
-      dstY: t.y,
-    );
-    for (final path in [
-      '../../assets/logo/poster.png',
-      'assets/logo/poster.png',
-    ]) {
-      await _png(path, poster);
     }
   }, skip: skip);
 }

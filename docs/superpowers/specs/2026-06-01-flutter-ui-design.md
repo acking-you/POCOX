@@ -1,4 +1,4 @@
-# 设计:Pocket-Codex 移动端 UI(响应式 / Material 3)
+# 设计:POCOX 移动端 UI(响应式 / Material 3)
 
 - 日期:2026-06-01
 - 状态:已通过设计评审,待 spec 复核

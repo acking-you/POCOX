@@ -85,7 +85,7 @@ class LocalSession {
 }
 
 /// One session's liveness detail, including the processes a force takeover
-/// would terminate (Pocket-Codex's own app-server already excluded).
+/// would terminate (POCOX's own app-server already excluded).
 class SessionLiveness {
   /// Creates a liveness view.
   const SessionLiveness({

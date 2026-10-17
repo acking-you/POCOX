@@ -353,7 +353,7 @@ void main() {
           findsOneWidget,
         );
         expect(find.byKey(const Key('connect-other-device')), findsNothing);
-        expect(find.text('打开 PocketCodex 对话与实时审批'), findsNothing);
+        expect(find.text('打开 POCOX 对话与实时审批'), findsNothing);
         expect(find.text('OpenAI 兼容的 /v1/responses 端点'), findsNothing);
         expect(find.text('浏览该主机上的会话与附件'), findsNothing);
         expect(

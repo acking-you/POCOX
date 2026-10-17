@@ -12,7 +12,7 @@ the request to pull latest. The new reference includes 225 further commits.
 It does not assert that an external Codex executable installed by a user was
 built from this commit.
 
-Pocket-Codex still launches the installed external executable. The submodule is
+POCOX still launches the installed external executable. The submodule is
 the wire-schema reference, not a bundled runtime or a linked protocol library.
 
 ```mermaid
@@ -27,7 +27,7 @@ flowchart LR
 
 ## Consumed surface
 
-| Upstream change since `c08819510` | Pocket-Codex behavior |
+| Upstream change since `c08819510` | POCOX behavior |
 | --- | --- |
 | `Turn.error` can accompany an interrupted turn; `tooManyDenials` and `flexUnavailable` error information added | Show explicit terminal errors on failed or interrupted live turns. Ordinary interruption without an error stays quiet. Preserve the raw error JSON. |
 | `thread/items/list.cursor` additionally accepts an item anchor object | Existing opaque string cursors remain supported and are passed back unchanged. No extra reads or translation are needed; Pocket does not expose item-anchor navigation. |
@@ -87,7 +87,7 @@ resolved workspace graph still contains no Codex runtime crate.
 `pocket-codex` branch. The resolved workspace graph is unchanged: no Codex
 runtime or protocol crate is linked.
 
-| Upstream change since `b38942ce7` | Pocket-Codex behavior |
+| Upstream change since `b38942ce7` | POCOX behavior |
 | --- | --- |
 | `imageGeneration` items carry either `result` or a file-backed `fileId` (attachment store), plus optional `inputImages` | The saved path still renders; a `fileId` with no saved path shows the existing unavailable state. Pocket never reads the attachment store. |
 | Experimental `thread/readState/update`, `thread/readState/changed`, `readState(s)` on `thread/read` / `thread/list`, and `thread/items/read` | Not called; unknown response fields are ignored. |

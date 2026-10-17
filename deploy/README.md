@@ -1,4 +1,4 @@
-# Deploying the Pocket-Codex hosted backend
+# Deploying the POCOX hosted backend
 
 The backend serves the account HTTP API and nothing else. It authenticates a
 client with GitHub, then hands it a **short-lived pb-mapper credential**; the

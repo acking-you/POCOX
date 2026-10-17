@@ -101,13 +101,13 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:
-  /// **'PocketCodex'**
+  /// **'POCOX'**
   String get appTitle;
 
   /// No description provided for @webUnsupported.
   ///
   /// In en, this message translates to:
-  /// **'PocketCodex needs local network and file access; Web is not supported.\nUse Android / iOS / desktop.'**
+  /// **'POCOX needs local network and file access; Web is not supported.\nUse Android / iOS / desktop.'**
   String get webUnsupported;
 
   /// No description provided for @onboardingTitle.
@@ -167,7 +167,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountWelcomeHeadline.
   ///
   /// In en, this message translates to:
-  /// **'Welcome to PocketCodex'**
+  /// **'Welcome to POCOX'**
   String get accountWelcomeHeadline;
 
   /// No description provided for @accountWelcomeSubtitle.
@@ -2075,7 +2075,7 @@ abstract class AppLocalizations {
   /// No description provided for @takeoverBody.
   ///
   /// In en, this message translates to:
-  /// **'This session is held open by {n} other process(es). PocketCodex will try to terminate them, then resume it here. Any unsaved work in those processes will be lost.'**
+  /// **'This session is held open by {n} other process(es). POCOX will try to terminate them, then resume it here. Any unsaved work in those processes will be lost.'**
   String takeoverBody(int n);
 
   /// No description provided for @takeoverWillTerminate.
@@ -2603,7 +2603,7 @@ abstract class AppLocalizations {
   /// No description provided for @homeNoServiceMobileHint.
   ///
   /// In en, this message translates to:
-  /// **'Open PocketCodex on your computer and start hosting (app-server); this screen will enter the chat automatically.'**
+  /// **'Open POCOX on your computer and start hosting (app-server); this screen will enter the chat automatically.'**
   String get homeNoServiceMobileHint;
 
   /// No description provided for @homeAutoRetryNote.
@@ -2903,7 +2903,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeTitle.
   ///
   /// In en, this message translates to:
-  /// **'Welcome to PocketCodex'**
+  /// **'Welcome to POCOX'**
   String get welcomeTitle;
 
   /// No description provided for @welcomeSubtitleDesktop.
@@ -2915,7 +2915,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeSubtitleMobile.
   ///
   /// In en, this message translates to:
-  /// **'PocketCodex remote-controls the Codex running on your computer. Set up hosting there once and you\'re ready.'**
+  /// **'POCOX remote-controls the Codex running on your computer. Set up hosting there once and you\'re ready.'**
   String get welcomeSubtitleMobile;
 
   /// No description provided for @welcomeStepHost.
@@ -2957,7 +2957,7 @@ abstract class AppLocalizations {
   /// No description provided for @welcomeMobileStep1.
   ///
   /// In en, this message translates to:
-  /// **'Install and open PocketCodex on your computer'**
+  /// **'Install and open POCOX on your computer'**
   String get welcomeMobileStep1;
 
   /// No description provided for @welcomeMobileStep2.
