@@ -37,7 +37,7 @@ start (its agent was uninstalled, its port is taken) is logged and left for
 repair from another device; it never keeps management offline. Only an
 unreadable restore ledger stops startup, since its choices would be guesses.
 Management remains online after the last service stops. SIGINT/SIGTERM (and on
-Windows Ctrl-Break, closing the console, logging off or shutting down) stops
+Windows Ctrl-Break, closing the console window or system shutdown) stops
 owned services without changing their restore choices. A process lock prevents
 two CLI supervisors from owning the same state directory.
 

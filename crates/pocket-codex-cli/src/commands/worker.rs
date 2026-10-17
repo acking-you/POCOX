@@ -178,8 +178,9 @@ async fn monitor(
 }
 
 /// Ctrl-C, or the platform's other polite stops: SIGTERM (how systemd stops a
-/// unit), or on Windows Ctrl-Break and closing the console, logging off or
-/// shutting down, so owned processes are stopped instead of orphaned.
+/// unit), or on Windows Ctrl-Break, closing the console window and system
+/// shutdown, so owned processes are stopped instead of orphaned. Not log-off:
+/// a process outside the user's session receives it whenever anyone signs out.
 pub(super) async fn shutdown_signal() -> Result<()> {
     #[cfg(unix)]
     {
@@ -191,13 +192,11 @@ pub(super) async fn shutdown_signal() -> Result<()> {
         use tokio::signal::windows;
         let mut brk = windows::ctrl_break()?;
         let mut close = windows::ctrl_close()?;
-        let mut logoff = windows::ctrl_logoff()?;
         let mut shutdown = windows::ctrl_shutdown()?;
         tokio::select! {
             result = tokio::signal::ctrl_c() => result?,
             _ = brk.recv() => {},
             _ = close.recv() => {},
-            _ = logoff.recv() => {},
             _ = shutdown.recv() => {},
         }
     }

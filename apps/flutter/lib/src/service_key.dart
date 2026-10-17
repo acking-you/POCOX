@@ -126,21 +126,46 @@ String shortId(String id) {
   return hex.length <= 8 ? hex : hex.substring(0, 8);
 }
 
-/// How [device] is named to people: `studio (WSL Ubuntu)` for a generated
-/// installation segment (its OS and the first word of its distribution; the
-/// selected device's header has the full platform), otherwise the segment
-/// itself.
+final _versionDash = RegExp(r'(\d)-(\d)');
+
+/// How [device] is named to people: `studio (WSL Ubuntu-24.04)` for a
+/// generated installation segment, otherwise the segment itself. A WSL
+/// distribution's name is its owner's choice, so all of it is kept; a native
+/// Linux source is its release's long name, of which the first word says
+/// enough (the selected device's header has the full platform).
 String deviceLabel(String device) {
   final installation = installationOf(device);
   if (installation == null) return device;
-  final [os, ...distribution] = installation.source.split('-');
+  final [os, ...words] = installation.source.split('-');
+  final distribution = os == 'wsl'
+      ? words.join('-').replaceAllMapped(_versionDash, (m) => '${m[1]}.${m[2]}')
+      : words.firstOrNull ?? '';
   final from = [
     osLabel(os),
-    if (distribution.firstOrNull case final word? when word.isNotEmpty)
-      word[0].toUpperCase() + word.substring(1),
+    if (distribution.isNotEmpty)
+      distribution[0].toUpperCase() + distribution.substring(1),
   ].join(' ');
   return '${installation.hostname} ($from)';
 }
+
+/// The devices among [devices] that share their [deviceLabel] with another
+/// one: those need their [deviceShortId] shown to be told apart.
+Set<String> sameNamedDevices(Iterable<String> devices) {
+  final byLabel = <String, Set<String>>{};
+  for (final device in devices) {
+    (byLabel[deviceLabel(device)] ??= {}).add(device);
+  }
+  return {
+    for (final same in byLabel.values)
+      if (same.length > 1) ...same,
+  };
+}
+
+/// The [shortId] of a generated installation segment; null for any other.
+String? deviceShortId(String device) => switch (installationOf(device)) {
+  final installation? => shortId(installation.id),
+  null => null,
+};
 
 /// The instance name in [key], falling back to the whole key so a label is never
 /// blank.

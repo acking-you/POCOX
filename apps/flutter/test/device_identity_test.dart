@@ -169,8 +169,8 @@ void main() {
     expect(find.byKey(const Key('add-local-host-card')), findsNothing);
   }, variant: windows);
 
-  testWidgets('legacy and unreachable hosts keep platform unknown and can '
-      'recover through refresh', (t) async {
+  testWidgets('legacy and unreachable hosts keep platform unknown; a failed '
+      'read retries by itself, an answer only on refresh', (t) async {
     const key = 'pcx:legacy:api:default';
     final api = FakeBridgeApi(
       services: const [
@@ -186,8 +186,14 @@ void main() {
     expect(find.byKey(const Key('add-local-host-card')), findsNothing);
     api.metadataError = null;
     api.serviceMetadata[key] = _wsl;
-    await tapKey(t, 'refresh-btn');
+    // The host came back: the failed read is retried without a refresh.
+    await t.pump(const Duration(seconds: 16));
+    await t.pumpAndSettle();
     expect(_platform(t), 'Linux · WSL · x86_64');
+    final reads = api.metadataReads.length;
+    await t.pump(const Duration(seconds: 16));
+    await t.pumpAndSettle();
+    expect(api.metadataReads, hasLength(reads), reason: 'answers are kept');
     expect(t.takeException(), isNull);
   }, variant: windows);
 

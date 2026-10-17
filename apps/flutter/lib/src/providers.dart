@@ -94,11 +94,20 @@ final localDeviceMetadataProvider = Provider<DeviceMetadata>(
 
 /// What the publisher of service [key] reports about itself; null for an older
 /// host without the route. Read for the selected device only, and discarded on
-/// account/relay changes or leaving the device.
+/// account/relay changes or leaving the device. An answer changes only when
+/// the host restarts, so it is kept until a manual refresh; a failed read is
+/// retried while the device stays selected.
 final serviceDeviceMetadataProvider = FutureProvider.autoDispose
-    .family<DeviceMetadata?, String>((ref, key) {
+    .family<DeviceMetadata?, String>((ref, key) async {
       ref.watch(configProvider);
-      return ref.watch(bridgeApiProvider).serviceDeviceMetadata(key);
+      final api = ref.watch(bridgeApiProvider);
+      try {
+        return await api.serviceDeviceMetadata(key);
+      } catch (_) {
+        final retry = Timer(const Duration(seconds: 15), ref.invalidateSelf);
+        ref.onDispose(retry.cancel);
+        rethrow;
+      }
     });
 
 /// Active local subscriptions.

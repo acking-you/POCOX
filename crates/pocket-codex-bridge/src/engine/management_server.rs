@@ -295,18 +295,22 @@ async fn supervise() {
         if enabled && serving.is_none() {
             match launch(generation).await {
                 Ok(ready) => serving = Some(ready),
-                Err(_) => {
+                Err(error) => {
+                    tracing::warn!("device management unavailable: {error:#}");
+                    let problem = if runtime::device_id().is_err() {
+                        "This computer's hosting identity cannot be read. Restore its saved \
+                         identity file to publish management."
+                    } else {
+                        "Device management is unavailable. Check the relay and whether another app \
+                         uses this device name."
+                    };
                     *STATUS.lock().unwrap_or_else(|p| p.into_inner()) = Some(LocalStatus {
                         supported: true,
                         enabled: true,
                         registered: false,
                         service_key: None,
                         listen_addr: None,
-                        problem: Some(
-                            "Device management is unavailable. Check the relay and whether \
-                             another app uses this device name."
-                                .into(),
-                        ),
+                        problem: Some(problem.into()),
                     });
                     tokio::time::sleep(Duration::from_secs(30)).await;
                     continue;

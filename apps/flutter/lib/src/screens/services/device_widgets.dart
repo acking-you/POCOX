@@ -37,24 +37,17 @@ class _DeviceColumn extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final online = successColor(scheme);
-    final labels = {
-      for (final device in devices)
-        device: device == _thisDevice ? localName : deviceLabel(device),
-    };
     // Installations that share a name (two copies of one WSL distribution,
     // say) are told apart by their stable ID. The platform is in the header.
-    bool shared(String label) =>
-        labels.values.where((other) => other == label).length > 1;
+    final sameNamed = sameNamedDevices(devices.where((d) => d != _thisDevice));
     final tiles = <Widget>[
       for (final device in devices)
         _DeviceTile(
           key: Key('device-$device'),
-          device: labels[device]!,
+          device: device == _thisDevice ? localName : deviceLabel(device),
           subtitle: [
             if (device == _thisDevice) l10n.servicesLocalDevice,
-            if (installationOf(device) case final installation?
-                when shared(labels[device]!))
-              shortId(installation.id),
+            if (sameNamed.contains(device)) ?deviceShortId(device),
             l10n.servicesDeviceCapabilityCount(capabilityCount(device)),
           ].join(' · '),
           selected: device == activeDevice,

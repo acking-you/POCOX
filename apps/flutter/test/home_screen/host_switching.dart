@@ -29,6 +29,38 @@ void _registerHostSwitching() {
     );
   });
 
+  testWidgets('same-name installations in the host switcher read as their '
+      'source, with an ID only where two would match', (t) async {
+    ServiceEntry app(String device) => ServiceEntry(
+      device: device,
+      kind: 'app',
+      name: 'default',
+      key: 'pcx:$device:app:default',
+    );
+    const id = '1234412381231234567890ab';
+    final windows = app('windows.studio.aaaa1111$id');
+    final copy = app('windows.studio.bbbb2222$id');
+    final wsl = app('wsl-ubuntu-24-04.studio.cccc3333$id');
+    final api = FakeBridgeApi(
+      config: _accountConfig,
+      services: [windows, copy, wsl],
+    );
+    await _pumpHome(t, api);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+    await t.pumpAndSettle();
+    Finder inItem(ServiceEntry s, String text) => find.descendant(
+      of: find.byKey(Key('host-switch-item-${s.key}')).last,
+      matching: find.textContaining(text),
+    );
+    expect(inItem(windows, 'studio (Windows)'), findsOneWidget);
+    expect(inItem(windows, 'aaaa1111'), findsOneWidget);
+    expect(inItem(copy, 'bbbb2222'), findsOneWidget);
+    expect(inItem(wsl, 'studio (WSL Ubuntu-24.04)'), findsOneWidget);
+    expect(inItem(wsl, 'cccc3333'), findsNothing);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('Switching to an unreachable host keeps the current chat', (
     t,
   ) async {

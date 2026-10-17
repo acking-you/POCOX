@@ -13,7 +13,9 @@ void main() {
       hostname: 'studio',
       id: id,
     ));
-    expect(deviceLabel(device), 'studio (WSL Ubuntu)');
+    // A WSL distribution keeps its whole name: two of them must differ.
+    expect(deviceLabel(device), 'studio (WSL Ubuntu-24.04)');
+    expect(deviceLabel('wsl-ubuntu.studio.$id'), 'studio (WSL Ubuntu)');
     expect(deviceLabel('windows.studio.$id'), 'studio (Windows)');
     expect(deviceLabel('macos.mbp.$id'), 'mbp (macOS)');
     expect(
@@ -28,9 +30,18 @@ void main() {
     expect(serviceKeyDevice('pcxu:user:$device:host:pocket'), device);
     expect(
       serviceKeyLabel('pcxu:user:$device:app:default'),
-      'studio (WSL Ubuntu) · default',
+      'studio (WSL Ubuntu-24.04) · default',
     );
     expect(shortId('12345678-1234-4123-8123-123456789abc'), '12345678');
+  });
+
+  test('only installations that read the same need their short ID', () {
+    const a = 'windows.studio.11111111123441238123123456789abc';
+    const b = 'windows.studio.22222222123441238123123456789abc';
+    const c = 'wsl-ubuntu.studio.33333333123441238123123456789abc';
+    expect(sameNamedDevices([a, b, c, a, 'lb7666']), {a, b});
+    expect(deviceShortId(b), '22222222');
+    expect(deviceShortId('lb7666'), isNull);
   });
   test('parses a self-hosted key', () {
     final parsed = parseServiceKey('pcx:lb7666:app:default');

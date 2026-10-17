@@ -395,6 +395,7 @@ class _HostList extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    final sameNamed = sameNamedDevices(services.map((s) => s.device));
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -408,7 +409,7 @@ class _HostList extends StatelessWidget {
             ).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
-        for (final s in services) _item(context, s),
+        for (final s in services) _item(context, s, sameNamed),
         if (onRefresh != null || onManage != null) const Divider(height: 9),
         if (onRefresh case final refresh?)
           _RefreshServicesRow(onRefresh: refresh, touch: touch),
@@ -441,7 +442,7 @@ class _HostList extends StatelessWidget {
     );
   }
 
-  Widget _item(BuildContext context, ServiceEntry s) {
+  Widget _item(BuildContext context, ServiceEntry s, Set<String> sameNamed) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final isCurrent = s.key == current;
@@ -474,11 +475,17 @@ class _HostList extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    failed
-                        ? l10n.hostSwitchLastFailed
-                        : isCurrent
-                        ? l10n.hostInUse(s.name)
-                        : s.name,
+                    [
+                      if (failed)
+                        l10n.hostSwitchLastFailed
+                      else if (isCurrent)
+                        l10n.hostInUse(s.name)
+                      else
+                        s.name,
+                      // Same-name installations differ only by their ID.
+                      if (sameNamed.contains(s.device))
+                        ?deviceShortId(s.device),
+                    ].join(' · '),
                     maxLines: touch ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

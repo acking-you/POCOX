@@ -70,6 +70,8 @@ pub struct Manager {
     /// The status file's current contents, so an unchanged state is not
     /// rewritten every tick.
     written: Vec<u8>,
+    /// Whether the last save failed, so a lasting failure is logged once.
+    save_failed: bool,
     _lock: File,
 }
 
@@ -84,8 +86,26 @@ fn lock(state: &Path) -> Result<File> {
         options.mode(0o600);
     }
     let file = options.open(state.join(OWNER_LOCK))?;
-    file.try_lock()
-        .context("another managed-host supervisor owns this state directory")?;
+    // A `pocket-codex status` probe holds the lock for an instant; only a
+    // holder that outlasts it is another supervisor.
+    for attempt in 0.. {
+        match file.try_lock() {
+            Ok(()) => break,
+            Err(TryLockError::WouldBlock) if attempt < 10 => {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            },
+            Err(error) => {
+                return Err(error)
+                    .context("another managed-host supervisor owns this state directory");
+            },
+        }
+    }
+    // A report left by a supervisor that did not exit cleanly is not ours.
+    match std::fs::remove_file(state.join(STATUS)) {
+        Ok(()) => {},
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+        Err(error) => return Err(error).context("removing a stale managed-host status"),
+    }
     Ok(file)
 }
 
@@ -110,6 +130,7 @@ impl Manager {
             state_dir: options.state_dir,
             stopped: false,
             written: Vec::new(),
+            save_failed: false,
             _lock: lock,
         };
         let initial = host_profiles::Runtime::Codex {
@@ -141,6 +162,7 @@ impl Manager {
         for (name, revision, runtime) in saved.chain(first_start) {
             if let Err(error) = host_lifecycle::restore(name, revision, runtime) {
                 tracing::warn!(service = name, "not restored: {error:#}");
+                host_lifecycle::record_restore_failure(name);
             }
         }
         management::set_enabled(true)?;
@@ -169,8 +191,15 @@ impl Manager {
         let bytes = serde_json::to_vec(&status)?;
         if bytes != self.written {
             match write_private(&self.state_dir.join(STATUS), &bytes) {
-                Ok(_) => self.written = bytes,
-                Err(error) => tracing::warn!("managed-host status not saved: {error:#}"),
+                Ok(_) => {
+                    self.written = bytes;
+                    self.save_failed = false;
+                },
+                Err(error) if !self.save_failed => {
+                    self.save_failed = true;
+                    tracing::warn!("managed-host status not saved: {error:#}");
+                },
+                Err(_) => {},
             }
         }
         Ok(status)
@@ -209,8 +238,12 @@ pub fn read_status(state_dir: &Path) -> Result<Option<Status>> {
         Err(error) => return Err(error).context("opening the managed-host lock"),
     };
     match owner.try_lock_shared() {
-        // Nobody holds it; dropping the file releases this probe.
-        Ok(()) => return Ok(None),
+        // Nobody holds it. Release the probe at once rather than on close,
+        // which Windows may delay, so a starting supervisor is not refused.
+        Ok(()) => {
+            let _ = owner.unlock();
+            return Ok(None);
+        },
         Err(TryLockError::WouldBlock) => {},
         Err(TryLockError::Error(error)) => {
             return Err(error).context("probing the managed-host lock");
