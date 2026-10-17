@@ -23,6 +23,38 @@ static RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static SUPPORT_DIR: OnceCell<PathBuf> = OnceCell::new();
 static REGISTRY: OnceCell<Mutex<HashMap<String, SubEntry>>> = OnceCell::new();
 
+pub(super) struct HostContext {
+    pub device: String,
+    pub profiles: PathBuf,
+    pub transport: Option<Transport>,
+}
+
+static HOST_CONTEXT: OnceCell<HostContext> = OnceCell::new();
+
+pub(super) fn configure_host(context: HostContext) -> Result<()> {
+    HOST_CONTEXT
+        .set(context)
+        .map_err(|_| anyhow!("the managed host is already initialized"))
+}
+
+/// This process's host identity, with the desktop default when not overridden.
+pub fn device_id() -> String {
+    HOST_CONTEXT
+        .get()
+        .map(|context| context.device.clone())
+        .unwrap_or_else(pocket_codex_core::service::default_device_id)
+}
+
+pub(super) fn host_profiles_dir() -> Option<PathBuf> {
+    HOST_CONTEXT.get().map(|context| context.profiles.clone())
+}
+
+pub(super) fn host_transport() -> Option<Transport> {
+    HOST_CONTEXT
+        .get()
+        .and_then(|context| context.transport.clone())
+}
+
 /// A registered tunnel. The entry owns its worker: dropping the entry —
 /// replaced, removed, or a creation that lost — stops the worker, so no
 /// tunnel ever outlives its registry slot detached.

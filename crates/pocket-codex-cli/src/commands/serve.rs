@@ -72,6 +72,9 @@ const MAX_RESTART_WARNINGS: u32 = 3;
 
 /// Run the host-side one-shot setup flow.
 pub async fn run(args: ServeArgs) -> Result<()> {
+    if args.allow_remote_management {
+        return super::managed_host::run(args).await;
+    }
     // Resolve the effective upstream proxy once (explicit flag or env). The
     // spawned app-server reads proxy settings only from its environment, never
     // from codex's config.toml, so we inject it there via SpawnOptions. Only an

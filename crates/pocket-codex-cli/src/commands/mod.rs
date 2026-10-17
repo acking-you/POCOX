@@ -15,6 +15,7 @@ mod codex;
 mod connect;
 mod init;
 mod managed_api;
+mod managed_host;
 mod managed_pb;
 mod pb;
 mod relay;
