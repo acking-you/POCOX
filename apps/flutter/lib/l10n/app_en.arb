@@ -539,7 +539,7 @@
   "manageServices": "Manage services",
   "servicesHostThisDevice": "Host this device",
   "servicesDevices": "Devices",
-  "servicesDeviceCapabilityCount": "{count} capabilities",
+  "servicesDeviceCapabilityCount": "{count, plural, =1{1 capability} other{{count} capabilities}}",
   "@servicesDeviceCapabilityCount": {
     "placeholders": { "count": { "type": "int" } }
   },

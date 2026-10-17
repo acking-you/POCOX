@@ -126,16 +126,19 @@ String shortId(String id) {
   return hex.length <= 8 ? hex : hex.substring(0, 8);
 }
 
-/// How [device] is named to people: `studio (WSL ubuntu)` for a generated
-/// installation segment, otherwise the segment itself.
+/// How [device] is named to people: `studio (WSL Ubuntu)` for a generated
+/// installation segment (its OS and the first word of its distribution; the
+/// selected device's header has the full platform), otherwise the segment
+/// itself.
 String deviceLabel(String device) {
   final installation = installationOf(device);
   if (installation == null) return device;
-  final source = installation.source;
-  final dash = source.indexOf('-');
-  final from = dash < 0
-      ? osLabel(source)
-      : '${osLabel(source.substring(0, dash))} ${source.substring(dash + 1)}';
+  final [os, ...distribution] = installation.source.split('-');
+  final from = [
+    osLabel(os),
+    if (distribution.firstOrNull case final word? when word.isNotEmpty)
+      word[0].toUpperCase() + word.substring(1),
+  ].join(' ');
   return '${installation.hostname} ($from)';
 }
 

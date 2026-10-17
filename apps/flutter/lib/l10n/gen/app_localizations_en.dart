@@ -1354,7 +1354,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String servicesDeviceCapabilityCount(int count) {
-    return '$count capabilities';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count capabilities',
+      one: '1 capability',
+    );
+    return '$_temp0';
   }
 
   @override

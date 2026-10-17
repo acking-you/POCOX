@@ -100,7 +100,7 @@ label contains a dot, so controllers split the segment without asking the host.
 All services from that installation share it. The saved device segment and
 `hostId` survive process restarts, hostname changes and distribution upgrades;
 only `instanceId` changes on restart. Routing always keeps the full key; people
-see `studio (WSL ubuntu)` in the device list, host switcher, composer and page
+see `studio (WSL Ubuntu)` in the device list, host switcher, composer and page
 titles, and the device list adds a short stable ID only where two installations
 would otherwise read the same. The selected device's header shows its reported
 platform and short ID. It never merges Windows and WSL by hostname. Explicit

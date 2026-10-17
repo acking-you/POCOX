@@ -2501,7 +2501,7 @@ abstract class AppLocalizations {
   /// No description provided for @servicesDeviceCapabilityCount.
   ///
   /// In en, this message translates to:
-  /// **'{count} capabilities'**
+  /// **'{count, plural, =1{1 capability} other{{count} capabilities}}'**
   String servicesDeviceCapabilityCount(int count);
 
   /// No description provided for @servicesLocalDevice.

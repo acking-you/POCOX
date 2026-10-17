@@ -266,9 +266,9 @@ void main() {
       matching: text,
     );
     expect(inTile(0, find.text('studio (Windows)')), findsOneWidget);
-    expect(inTile(1, find.text('studio (WSL ubuntu)')), findsOneWidget);
-    expect(inTile(2, find.text('studio (WSL debian)')), findsOneWidget);
-    expect(inTile(3, find.text('studio (WSL ubuntu)')), findsOneWidget);
+    expect(inTile(1, find.text('studio (WSL Ubuntu)')), findsOneWidget);
+    expect(inTile(2, find.text('studio (WSL Debian)')), findsOneWidget);
+    expect(inTile(3, find.text('studio (WSL Ubuntu)')), findsOneWidget);
     // Only the two copies of one distribution need their IDs to differ.
     expect(inTile(1, find.textContaining('22222222')), findsOneWidget);
     expect(inTile(3, find.textContaining('44444444')), findsOneWidget);

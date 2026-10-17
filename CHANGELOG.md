@@ -18,7 +18,7 @@ breaking change goes.
 - Windows, each WSL distribution and every separate installation on one
   computer now publish under their own stable name, so they can be hosted side
   by side. The services page keeps this computer's controls on its own entry,
-  names devices as `studio (WSL ubuntu)` and shows the platform each host
+  names devices as `studio (WSL Ubuntu)` and shows the platform each host
   reports. **Breaking:** a host started without `--device` publishes under its
   new installation name once; pick it again in the host switcher. Hosts with an
   explicit `--device` keep their name.

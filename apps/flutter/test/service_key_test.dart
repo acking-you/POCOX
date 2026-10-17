@@ -13,9 +13,13 @@ void main() {
       hostname: 'studio',
       id: id,
     ));
-    expect(deviceLabel(device), 'studio (WSL ubuntu-24-04)');
+    expect(deviceLabel(device), 'studio (WSL Ubuntu)');
     expect(deviceLabel('windows.studio.$id'), 'studio (Windows)');
     expect(deviceLabel('macos.mbp.$id'), 'mbp (macOS)');
+    expect(
+      deviceLabel('linux-debian-gnu-linux-12.build.$id'),
+      'build (Linux Debian)',
+    );
     // Explicit overrides and hostname-only devices are never reinterpreted.
     for (final other in ['my.explicit.device', 'lb7666', '.studio.$id']) {
       expect(installationOf(other), isNull, reason: other);
@@ -24,7 +28,7 @@ void main() {
     expect(serviceKeyDevice('pcxu:user:$device:host:pocket'), device);
     expect(
       serviceKeyLabel('pcxu:user:$device:app:default'),
-      'studio (WSL ubuntu-24-04) · default',
+      'studio (WSL Ubuntu) · default',
     );
     expect(shortId('12345678-1234-4123-8123-123456789abc'), '12345678');
   });
