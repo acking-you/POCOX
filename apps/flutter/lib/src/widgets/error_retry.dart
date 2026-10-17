@@ -48,7 +48,7 @@ class ErrorRetry extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     // A live automatic retry, if one is in flight for a host meta request.
     final retrying = ref.watch(metaRetryProvider).valueOrNull;
-    return Center(
+    return ScrollableCenter(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -89,6 +89,30 @@ class ErrorRetry extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// [child] centred in the height it is given, scrolling instead of
+/// overflowing when that height is too short (a phone sheet with large text).
+/// Without a bounded height it is a plain [Center].
+class ScrollableCenter extends StatelessWidget {
+  /// Creates the centred, scroll-safe slot.
+  const ScrollableCenter({super.key, required this.child});
+
+  /// What is centred.
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (!constraints.hasBoundedHeight) return Center(child: child);
+      return SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: Center(child: child),
+        ),
+      );
+    },
+  );
 }
 
 /// The "retrying n/10" line: a small spinner plus the attempt count.

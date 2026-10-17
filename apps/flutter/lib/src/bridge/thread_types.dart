@@ -94,6 +94,7 @@ class ThreadMeta {
     this.name,
     this.threadSource,
     this.parentThreadId,
+    this.originUrl,
   });
 
   /// Thread id.
@@ -119,6 +120,10 @@ class ThreadMeta {
   /// Working directory — the project this thread controls.
   final String cwd;
 
+  /// The repository's remote, when the agent reports one: what ties a managed
+  /// worktree to the checkout it came from.
+  final String? originUrl;
+
   /// Unix seconds of last update.
   final int updatedAt;
 
@@ -138,6 +143,7 @@ class ThreadMeta {
     threadSource: threadSource,
     parentThreadId: parentThreadId,
     cwd: cwd,
+    originUrl: originUrl,
     updatedAt: updatedAt,
   );
 }

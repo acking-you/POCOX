@@ -765,7 +765,7 @@ class _NarrowServices extends StatelessWidget {
                 ...detail,
               ],
             )
-          : Padding(
+          : SingleChildScrollView(
               key: const ValueKey('svc-narrow-devices'),
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
               child: deviceColumn,

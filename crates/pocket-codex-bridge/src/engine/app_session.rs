@@ -153,6 +153,10 @@ pub struct ThreadMeta {
     pub parent_thread_id: Option<String>,
     /// Working directory (the "project" the thread controls).
     pub cwd: String,
+    /// The repository's remote (`gitInfo.originUrl`), when the agent reports
+    /// one: what ties a managed worktree to the checkout it came from.
+    #[serde(default)]
+    pub origin_url: Option<String>,
     /// Unix seconds of last update.
     pub updated_at: i64,
 }

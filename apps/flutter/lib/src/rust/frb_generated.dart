@@ -7788,8 +7788,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ThreadMetaDto dco_decode_thread_meta_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return ThreadMetaDto(
       id: dco_decode_String(arr[0]),
       preview: dco_decode_String(arr[1]),
@@ -7797,7 +7797,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       threadSource: dco_decode_opt_String(arr[3]),
       parentThreadId: dco_decode_opt_String(arr[4]),
       cwd: dco_decode_String(arr[5]),
-      updatedAt: dco_decode_i_64(arr[6]),
+      originUrl: dco_decode_opt_String(arr[6]),
+      updatedAt: dco_decode_i_64(arr[7]),
     );
   }
 
@@ -10078,6 +10079,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_threadSource = sse_decode_opt_String(deserializer);
     var var_parentThreadId = sse_decode_opt_String(deserializer);
     var var_cwd = sse_decode_String(deserializer);
+    var var_originUrl = sse_decode_opt_String(deserializer);
     var var_updatedAt = sse_decode_i_64(deserializer);
     return ThreadMetaDto(
       id: var_id,
@@ -10086,6 +10088,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       threadSource: var_threadSource,
       parentThreadId: var_parentThreadId,
       cwd: var_cwd,
+      originUrl: var_originUrl,
       updatedAt: var_updatedAt,
     );
   }
@@ -11948,6 +11951,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.threadSource, serializer);
     sse_encode_opt_String(self.parentThreadId, serializer);
     sse_encode_String(self.cwd, serializer);
+    sse_encode_opt_String(self.originUrl, serializer);
     sse_encode_i_64(self.updatedAt, serializer);
   }
 

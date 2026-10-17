@@ -284,12 +284,7 @@ class _MessageViewState extends State<MessageView> {
                   // without a colour of their own.
                   decoration: BoxDecoration(
                     color: userBubbleColor(scheme),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(kUserBubbleRadius),
-                      topRight: Radius.circular(6),
-                      bottomLeft: Radius.circular(kUserBubbleRadius),
-                      bottomRight: Radius.circular(kUserBubbleRadius),
-                    ),
+                    borderRadius: kUserBubbleShape,
                   ),
                   // Typed Markdown renders as Markdown — a pasted snippet in
                   // backticks or a short list reads the way it was written

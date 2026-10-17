@@ -85,7 +85,13 @@ class _MessageActionsState extends State<MessageActions> {
         if (widget.completedAtLabel case final label?)
           PopupMenuItem<_MessageAction>(
             enabled: false,
-            child: Text(label, style: Theme.of(context).textTheme.bodySmall),
+            height: 36,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
         _entry(_MessageAction.copy, AppIcons.content_copy_outlined, l10n.copy),
         _entry(
@@ -153,8 +159,12 @@ class _MessageActionsState extends State<MessageActions> {
     value: action,
     child: Row(
       children: [
-        Icon(icon, size: 22),
-        const SizedBox(width: 16),
+        Icon(
+          icon,
+          size: 20,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(width: 14),
         Expanded(child: Text(label)),
       ],
     ),
@@ -190,21 +200,21 @@ class _MessageActionsState extends State<MessageActions> {
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
             : const Duration(milliseconds: 120),
+        // The app's neutral pressed layer in the message's own outline: the
+        // bubble darkens a step, the way every other control presses, with
+        // no outline or accent of its own.
         child: AnimatedContainer(
           key: const Key('message-press-feedback'),
           duration: MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
               : const Duration(milliseconds: 160),
           foregroundDecoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary.withValues(
-              alpha: _pressed || _menuOpen ? 0.10 : 0,
-            ),
-            borderRadius: BorderRadius.circular(kControlRadius),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.primary.withValues(
-                alpha: _pressed || _menuOpen ? 0.55 : 0,
-              ),
-            ),
+            color: _pressed || _menuOpen
+                ? Theme.of(context).highlightColor
+                : Colors.transparent,
+            borderRadius: widget.isUser
+                ? kUserBubbleShape
+                : BorderRadius.circular(kControlRadius),
           ),
           child: widget.child,
         ),

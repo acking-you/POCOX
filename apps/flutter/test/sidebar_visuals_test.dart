@@ -232,6 +232,10 @@ void main() {
   testWidgets('touch keeps a finger-sized fold target', (t) async {
     await _mount(t);
     expect(t.getSize(_toggle), const Size(44, 44));
+    // On the row's own plate, so a selected or hovered row is one shape.
+    final plate = t.getRect(_tile('parent'));
+    expect(plate.left, lessThanOrEqualTo(t.getRect(_toggle).left));
+    expect(plate.contains(t.getCenter(_toggle)), isTrue);
     await t.tap(_toggle);
     await _frames(t);
     expect(find.byKey(const Key('session-tree-reviewer')), findsOneWidget);

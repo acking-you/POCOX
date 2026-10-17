@@ -39,6 +39,15 @@ const double kCardRadius = 20.0;
 /// The user's message bubble.
 const double kUserBubbleRadius = 22.0;
 
+/// The user's bubble outline: round, with the corner on the speaker's side
+/// tucked in.
+const BorderRadius kUserBubbleShape = BorderRadius.only(
+  topLeft: Radius.circular(kUserBubbleRadius),
+  topRight: Radius.circular(6),
+  bottomLeft: Radius.circular(kUserBubbleRadius),
+  bottomRight: Radius.circular(kUserBubbleRadius),
+);
+
 /// Dialogs and modal panels.
 const double kDialogRadius = 24.0;
 

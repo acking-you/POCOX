@@ -120,12 +120,7 @@ class _TranscriptRow extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: userBubbleColor(scheme),
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(kUserBubbleRadius),
-                        topRight: Radius.circular(6),
-                        bottomLeft: Radius.circular(kUserBubbleRadius),
-                        bottomRight: Radius.circular(kUserBubbleRadius),
-                      ),
+                      borderRadius: kUserBubbleShape,
                     ),
                     child: MarkdownView(
                       data: text,

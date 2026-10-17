@@ -256,13 +256,18 @@ class _FileBrowserState extends ConsumerState<_FileBrowser> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: Row(
+            // Too narrow for both (large text): Upload on top, Cancel under.
+            child: OverflowBar(
+              alignment: MainAxisAlignment.spaceBetween,
+              spacing: 8,
+              overflowAlignment: OverflowBarAlignment.end,
+              overflowDirection: VerticalDirection.up,
+              overflowSpacing: 4,
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: Text(l10n.cancel),
                 ),
-                const Spacer(),
                 FilledButton.icon(
                   key: const Key('file-upload-btn'),
                   // Upload targets the current folder; disabled at the roots

@@ -6,7 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `history_dto`, `item_dto`, `turn_page_dto`
+// These functions are ignored because they are not marked as `pub`: `history_dto`, `item_dto`, `thread_meta_dto`, `turn_page_dto`
 
 /// Read or continue a selected turn, reusing its previously loaded pages.
 /// `delta_only` opts into new items only on continuation; omission preserves
@@ -744,6 +744,9 @@ class ThreadMetaDto {
   /// Working directory (the project the thread controls).
   final String cwd;
 
+  /// The repository's remote, when the agent reports one.
+  final String? originUrl;
+
   /// Unix seconds of last update.
   final PlatformInt64 updatedAt;
 
@@ -754,6 +757,7 @@ class ThreadMetaDto {
     this.threadSource,
     this.parentThreadId,
     required this.cwd,
+    this.originUrl,
     required this.updatedAt,
   });
 
@@ -765,6 +769,7 @@ class ThreadMetaDto {
       threadSource.hashCode ^
       parentThreadId.hashCode ^
       cwd.hashCode ^
+      originUrl.hashCode ^
       updatedAt.hashCode;
 
   @override
@@ -778,6 +783,7 @@ class ThreadMetaDto {
           threadSource == other.threadSource &&
           parentThreadId == other.parentThreadId &&
           cwd == other.cwd &&
+          originUrl == other.originUrl &&
           updatedAt == other.updatedAt;
 }
 

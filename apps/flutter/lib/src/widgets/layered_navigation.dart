@@ -15,10 +15,13 @@ import 'package:pocket_codex/src/motion.dart';
 /// is held, endpoints included, and nothing settles. On release it completes
 /// the direction the finger last clearly moved in — opening or closing —
 /// however short the drag was; reversing by more than [directionHysteresis]
-/// changes that direction, so tremor never flips it. Recognizing an opening
-/// gives one light haptic, and a gesture that settles fully open one
-/// completion haptic. Nested horizontal scrollables and text gestures win
+/// changes that direction, so tremor never flips it. A gesture that settles
+/// fully open gives one light haptic; nothing else does, so a swipe is felt
+/// once, when it lands. Nested horizontal scrollables and text gestures win
 /// the arena first, since deeper recognizers resolve first.
+///
+/// Opening parks focus on the sidebar itself, never on a field inside it, so
+/// a swipe never raises the keyboard.
 ///
 /// The sidebar stays mounted while hidden (offstage, tickers paused), so its
 /// scroll position and expanded rows survive opening and closing. While it is
@@ -83,7 +86,7 @@ class LayeredNavigationState extends State<LayeredNavigation>
   bool _settledOpen = false;
   bool _dragging = false;
 
-  /// Whether the current drag started closed: only those give haptics.
+  /// Whether the current drag started closed: only those give a haptic.
   bool _dragFromClosed = false;
 
   /// Where a release of the current drag goes: open, closed, or (before the
@@ -94,7 +97,6 @@ class LayeredNavigationState extends State<LayeredNavigation>
   /// point along the intended direction, in logical pixels.
   double _travel = 0;
   double _extreme = 0;
-  bool _openingFelt = false;
 
   /// A gesture-driven open in flight, owed a completion haptic.
   bool _completionOwed = false;
@@ -164,9 +166,12 @@ class LayeredNavigationState extends State<LayeredNavigation>
     if (!mounted) return;
     if (open && _completionOwed) {
       _completionOwed = false;
-      HapticFeedback.mediumImpact();
+      HapticFeedback.lightImpact();
     }
-    if (open) _sidebarScope.requestFocus();
+    // The scope itself, not the child it last focused: restoring the search
+    // field would open the keyboard on every swipe. Escape and back still
+    // reach the sidebar from here.
+    if (open) _sidebarScope.requestScopeFocus();
     // Rebuild so the hidden sidebar goes offstage and the page takes input.
     setState(() {});
     if (open == _settledOpen) return;
@@ -183,7 +188,6 @@ class LayeredNavigationState extends State<LayeredNavigation>
       _intentOpen = null;
       _travel = 0;
       _extreme = 0;
-      _openingFelt = false;
     });
   }
 
@@ -213,11 +217,6 @@ class LayeredNavigationState extends State<LayeredNavigation>
   void _setIntent(bool open) {
     _intentOpen = open;
     _extreme = _travel;
-    // One light haptic per drag, when it is first recognized as an opening.
-    if (open && _dragFromClosed && !_openingFelt) {
-      _openingFelt = true;
-      HapticFeedback.lightImpact();
-    }
   }
 
   void _dragEnd(DragEndDetails _) {

@@ -8144,6 +8144,7 @@ impl SseDecode for crate::api::bridge::threads::ThreadMetaDto {
         let mut var_threadSource = <Option<String>>::sse_decode(deserializer);
         let mut var_parentThreadId = <Option<String>>::sse_decode(deserializer);
         let mut var_cwd = <String>::sse_decode(deserializer);
+        let mut var_originUrl = <Option<String>>::sse_decode(deserializer);
         let mut var_updatedAt = <i64>::sse_decode(deserializer);
         return crate::api::bridge::threads::ThreadMetaDto {
             id: var_id,
@@ -8152,6 +8153,7 @@ impl SseDecode for crate::api::bridge::threads::ThreadMetaDto {
             thread_source: var_threadSource,
             parent_thread_id: var_parentThreadId,
             cwd: var_cwd,
+            origin_url: var_originUrl,
             updated_at: var_updatedAt,
         };
     }
@@ -10858,6 +10860,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::threads::ThreadMetaDt
             self.thread_source.into_into_dart().into_dart(),
             self.parent_thread_id.into_into_dart().into_dart(),
             self.cwd.into_into_dart().into_dart(),
+            self.origin_url.into_into_dart().into_dart(),
             self.updated_at.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -12397,6 +12400,7 @@ impl SseEncode for crate::api::bridge::threads::ThreadMetaDto {
         <Option<String>>::sse_encode(self.thread_source, serializer);
         <Option<String>>::sse_encode(self.parent_thread_id, serializer);
         <String>::sse_encode(self.cwd, serializer);
+        <Option<String>>::sse_encode(self.origin_url, serializer);
         <i64>::sse_encode(self.updated_at, serializer);
     }
 }

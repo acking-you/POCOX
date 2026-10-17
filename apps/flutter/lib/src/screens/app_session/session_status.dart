@@ -140,65 +140,166 @@ extension _SessionStatus on _AppSessionState {
               ),
       ),
       padding: EdgeInsets.fromLTRB(isDesktop ? 18 : 14, 3, 14, 5),
-      child: Row(
-        children: [
-          if (_externalWriterRunning || (_streaming && !st.nominal))
-            PulsingDot(
-              key: _externalWriterRunning
-                  ? const Key('chat-status-running-pulse')
-                  : null,
-              color: st.color,
-              size: 7,
-            )
-          else
-            Icon(st.icon, size: 13, color: st.color),
-          const SizedBox(width: 6),
-          _withAccessScope(
-            l10n,
-            Text(
-              st.label,
-              style: TextStyle(
-                fontSize: 12,
-                color: st.color,
-                // Resting state reads as a label, not an alert.
-                fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
-              ),
-            ),
-          ),
-          const Spacer(),
-          // The model actively handling this thread's requests — server truth
-          // when confirmed, else the best-known effective value. Tap for the
-          // full runtime configuration, so a model switch is verifiable.
-          if (activeModel != null) ...[
-            _activeModelChip(l10n, scheme, activeModel),
-            const SizedBox(width: 10),
-          ],
-          // Live elapsed clock for the running turn. A local turn freezes this
-          // into its transcript footnote; an external turn counts from when
-          // this read-only observer attached and disappears when it finishes.
-          if (running) ...[
-            Icon(AppIcons.schedule, size: 12, color: st.color),
-            const SizedBox(width: 4),
-            ValueListenableBuilder<int>(
-              valueListenable: _elapsed,
-              builder: (context, secs, _) => Text(
-                _fmtElapsed(secs),
-                style: TextStyle(
-                  fontSize: 12,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final labelStyle = TextStyle(
+            fontSize: 12,
+            color: st.color,
+            // Resting state reads as a label, not an alert.
+            fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
+          );
+          final fit = _statusFit(
+            box.maxWidth,
+            label: st.label,
+            labelStyle: labelStyle,
+            model: activeModel == null
+                ? null
+                : _modelDisplayLabel(activeModel.id),
+            running: running,
+            branch: _branch,
+          );
+          return Row(
+            children: [
+              if (_externalWriterRunning || (_streaming && !st.nominal))
+                PulsingDot(
+                  key: _externalWriterRunning
+                      ? const Key('chat-status-running-pulse')
+                      : null,
                   color: st.color,
-                  fontFeatures: const [FontFeature.tabularFigures()],
+                  size: 7,
+                )
+              else
+                Icon(st.icon, size: 13, color: st.color),
+              const SizedBox(width: 6),
+              // The state takes what the right side leaves, so the line
+              // never overflows; [_statusFit] keeps it whole when it can.
+              Expanded(
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _withAccessScope(
+                    l10n,
+                    Text(
+                      st.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: labelStyle,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-          ],
-          // Branch + working-tree change counts, tappable to open the diff.
-          // This is the single, unified place the git state lives (no separate
-          // app-bar chip), so the status bar is the one source of truth.
-          if (_branch case final branch?) _branchChip(l10n, scheme, branch),
-        ],
+              const SizedBox(width: 12),
+              // The model actively handling this thread's requests — server
+              // truth when confirmed, else the best-known effective value.
+              // Tap for the full runtime configuration, so a model switch is
+              // verifiable.
+              if (activeModel != null && fit.model != null) ...[
+                _activeModelChip(
+                  l10n,
+                  scheme,
+                  activeModel,
+                  nameWidth: fit.model!,
+                ),
+                const SizedBox(width: 10),
+              ],
+              // Live elapsed clock for the running turn. A local turn freezes
+              // this into its transcript footnote; an external turn counts
+              // from when this read-only observer attached and disappears
+              // when it finishes.
+              if (running && fit.clock) ...[
+                Icon(AppIcons.schedule, size: 12, color: st.color),
+                const SizedBox(width: 4),
+                ValueListenableBuilder<int>(
+                  valueListenable: _elapsed,
+                  builder: (context, secs, _) => Text(
+                    _fmtElapsed(secs),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: st.color,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
+              // Branch + working-tree change counts, tappable to open the
+              // diff. This is the single, unified place the git state lives
+              // (no separate app-bar chip), so the status bar is the one
+              // source of truth.
+              if (_branch case final branch?)
+                _branchChip(l10n, scheme, branch, nameWidth: fit.branch),
+            ],
+          );
+        },
       ),
     );
+  }
+
+  /// How much of the status bar's right side fits in [width]: the widths
+  /// for the model and branch names, and whether the model chip and clock
+  /// show at all. Mirrors the chips' own paddings and glyphs.
+  ///
+  /// The state label and the change counts always show. When the line is too
+  /// short the model name shortens first, then the branch name; then the
+  /// model chip (the composer names the model too) and the clock give way,
+  /// and last the branch name.
+  ({double? model, bool clock, double branch}) _statusFit(
+    double width, {
+    required String label,
+    required TextStyle labelStyle,
+    required String? model,
+    required bool running,
+    required String? branch,
+  }) {
+    const name = TextStyle(fontSize: 12);
+    const figures = [FontFeature.tabularFigures()];
+    const minName = 48.0;
+    double line(String text, TextStyle style) =>
+        measureTextLine(context, text, style).width.ceilToDouble();
+    final d = _diff;
+    final counts = d == null || d.isEmpty
+        ? 0.0
+        : 6 +
+              line(
+                '+${d.added} −${d.removed}',
+                const TextStyle(fontSize: 11.5, fontFeatures: figures),
+              );
+    // Icon, gap, label, gap.
+    final state = 13 + 6 + line(label, labelStyle) + 12;
+    // Padding, glyph, gap, counts.
+    final branchChip = branch == null ? 0.0 : 12 + 12 + 4 + counts;
+    // Padding, gap, dot, gap after.
+    const modelChip = 12 + 6 + 6 + 10.0;
+    final clockWidth = running
+        ? 12 +
+              4 +
+              line(
+                '88:88',
+                const TextStyle(fontSize: 12, fontFeatures: figures),
+              ) +
+              10
+        : 0.0;
+    var branchName = branch == null ? 0.0 : math.min(160.0, line(branch, name));
+    double? modelName = model == null
+        ? null
+        : math.min(180.0, line(model, name));
+    var clock = running;
+    double over() =>
+        state +
+        branchChip +
+        branchName +
+        (modelName == null ? 0 : modelChip + modelName) +
+        (clock ? clockWidth : 0) -
+        width;
+    if (over() > 0 && modelName != null) {
+      modelName = math.max(minName, modelName - over());
+    }
+    if (over() > 0 && branch != null) {
+      branchName = math.max(minName, branchName - over());
+    }
+    if (over() > 0) modelName = null;
+    if (over() > 0) clock = false;
+    if (over() > 0) branchName = math.max(0, branchName - over());
+    return (model: modelName, clock: clock, branch: branchName);
   }
 
   /// The model handling this thread's requests, marked solid once the
@@ -206,8 +307,9 @@ extension _SessionStatus on _AppSessionState {
   Widget _activeModelChip(
     AppLocalizations l10n,
     ColorScheme scheme,
-    ({String id, bool confirmed}) model,
-  ) => Tooltip(
+    ({String id, bool confirmed}) model, {
+    required double nameWidth,
+  }) => Tooltip(
     message: l10n.activeModelTooltip,
     child: InkWell(
       mouseCursor: clickable,
@@ -220,7 +322,7 @@ extension _SessionStatus on _AppSessionState {
           mainAxisSize: MainAxisSize.min,
           children: [
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
+              constraints: BoxConstraints(maxWidth: nameWidth),
               child: Text(
                 _modelDisplayLabel(model.id)!,
                 overflow: TextOverflow.ellipsis,
@@ -249,7 +351,12 @@ extension _SessionStatus on _AppSessionState {
 
   /// The [branch] with its working-tree change counts, tappable to open the
   /// diff.
-  Widget _branchChip(AppLocalizations l10n, ColorScheme scheme, String branch) {
+  Widget _branchChip(
+    AppLocalizations l10n,
+    ColorScheme scheme,
+    String branch, {
+    required double nameWidth,
+  }) {
     final d = _diff;
     final changed = d != null && !d.isEmpty;
     return Tooltip(
@@ -286,18 +393,21 @@ extension _SessionStatus on _AppSessionState {
                   size: 12,
                   color: scheme.onSurfaceVariant,
                 ),
-              const SizedBox(width: 4),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
-                child: Text(
-                  branch,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: scheme.onSurfaceVariant,
+              if (nameWidth > 0) ...[
+                const SizedBox(width: 4),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: nameWidth),
+                  child: Text(
+                    branch,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
+              ],
               if (changed) ...[
                 const SizedBox(width: 6),
                 ChangeCounts(added: d.added, removed: d.removed, gap: 3),

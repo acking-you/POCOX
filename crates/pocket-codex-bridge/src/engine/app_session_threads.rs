@@ -283,6 +283,13 @@ pub(super) fn parse_thread_meta(t: &Value) -> Option<ThreadMeta> {
             .and_then(Value::as_str)
             .unwrap_or("")
             .to_string(),
+        origin_url: t
+            .get("gitInfo")
+            .and_then(|g| g.get("originUrl"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string),
         updated_at: t.get("updatedAt").and_then(Value::as_i64).unwrap_or(0),
     })
 }

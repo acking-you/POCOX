@@ -400,12 +400,15 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
             guardian: s.isGuardian,
             onToggle: () =>
                 _toggle(s.threadId, open: !expanded.contains(s.threadId)),
-            child: _SessionRow(
+            leadingInset: _SessionRow.inset,
+            plateInset: _SessionRow.margin,
+            builder: (inset) => _SessionRow(
               session: s,
               now: now,
               onResume: _onResume,
               serviceKey: _source.serviceKey,
               provider: _source.provider,
+              titleInset: inset,
             ),
           );
         }),
@@ -529,7 +532,14 @@ class _SessionRow extends StatelessWidget {
     required this.onResume,
     this.serviceKey,
     this.provider = 'codex',
+    this.titleInset = inset,
   });
+
+  /// Space between the list's edge and the row's ink.
+  static const double margin = 8;
+
+  /// Space inside the ink before the title.
+  static const double inset = 14;
 
   final LocalSession session;
   final DateTime now;
@@ -539,6 +549,9 @@ class _SessionRow extends StatelessWidget {
   /// the transcript over the meta tunnel; null for the local source.
   final String? serviceKey;
   final String provider;
+
+  /// Space before the title inside the ink; wider for a fold control.
+  final double titleInset;
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +577,7 @@ class _SessionRow extends StatelessWidget {
     // rather than a ListTile, whose fixed leading/trailing metrics sit taller
     // than the rest of the app's lists.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: margin, vertical: 1),
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(kControlRadius),
@@ -613,46 +626,43 @@ class _SessionRow extends StatelessWidget {
             ];
             context.push('/sessions/view?${q.join('&')}');
           },
+          // No per-row glyph: every row is a session, and the one fact that
+          // differs (held open by another process) is the status at the end
+          // of the row.
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-            child: Row(
-              children: [
-                // No per-row glyph: every row is a session, and the one
-                // fact that differs (held open by another process) is the
-                // status at the end of the row.
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        preview.isEmpty ? session.threadId : preview,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (subtitleParts.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitleParts.join(' · '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: scheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ],
+            padding: EdgeInsetsDirectional.fromSTEB(titleInset, 9, 10, 9),
+            child: _layout(
+              context,
+              text: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    preview.isEmpty ? session.threadId : preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
+                  if (subtitleParts.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitleParts.join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              trailing: [
                 _safetyChip(context, l10n),
                 if (provider == 'codex' &&
                     session.allowsResume &&
-                    !session.isGuardian) ...[
-                  const SizedBox(width: 6),
+                    !session.isGuardian)
                   TextButton(
                     key: Key('resume-${session.threadId}'),
                     onPressed: () => onResume(session),
@@ -662,12 +672,56 @@ class _SessionRow extends StatelessWidget {
                           : l10n.resumeSession,
                     ),
                   ),
-                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  /// The narrowest row, at default text, that keeps the status and resume
+  /// action beside a readable title.
+  static const double _inlineWidth = 300;
+
+  /// [text] with [trailing] at the end of the row or, on a narrow phone or
+  /// with large text, under it, so the title keeps its width.
+  static Widget _layout(
+    BuildContext context, {
+    required Widget text,
+    required List<Widget> trailing,
+  }) {
+    final threshold = MediaQuery.textScalerOf(context).scale(_inlineWidth);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= threshold) {
+          return Row(
+            children: [
+              Expanded(child: text),
+              const SizedBox(width: 8),
+              for (final (i, w) in trailing.indexed) ...[
+                if (i > 0) const SizedBox(width: 6),
+                w,
+              ],
+            ],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            text,
+            const SizedBox(height: 4),
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
+              children: trailing,
+            ),
+          ],
+        );
+      },
     );
   }
 

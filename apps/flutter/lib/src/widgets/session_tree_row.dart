@@ -9,12 +9,12 @@ import 'package:pocket_codex/src/app_icons.dart';
 
 /// Parent/child affordances shared by live and on-disk session inventories.
 ///
-/// The fold control sits in the row's leading gutter: the inset [child]
-/// already keeps before its title ([leadingInset]), widened only where that
-/// is too narrow for the control. Parents and plain rows then share one title
-/// column. A child indents by half a gutter, which puts its edge under its
-/// parent's fold control, and a hairline rail there joins the family. Rows
-/// outside any hierarchy are returned unchanged.
+/// The fold control sits inside the row's own plate, in the inset the row
+/// keeps before its title ([leadingInset]), widened only where that is too
+/// narrow for the control; [builder] lays the row out with that inset, so a
+/// selected or hovered plate covers the control instead of stopping beside
+/// it. A child indents to its parent's fold control, and a hairline rail
+/// there joins the family. Rows outside any hierarchy are built unchanged.
 class SessionTreeRow extends StatelessWidget {
   /// Creates the hierarchy affordances around [child].
   const SessionTreeRow({
@@ -24,10 +24,11 @@ class SessionTreeRow extends StatelessWidget {
     required this.childCount,
     required this.expanded,
     required this.onToggle,
-    required this.child,
+    required this.builder,
     this.childSession = false,
     this.guardian = false,
     this.leadingInset = 0,
+    this.plateInset = 0,
   });
 
   /// The session id, used in the row and toggle keys.
@@ -45,8 +46,9 @@ class SessionTreeRow extends StatelessWidget {
   /// Shows or hides the children.
   final VoidCallback onToggle;
 
-  /// The session row itself.
-  final Widget child;
+  /// Builds the session row with the given inset before its title, measured
+  /// inside its plate.
+  final Widget Function(double titleInset) builder;
 
   /// Whether this session was spawned by another.
   final bool childSession;
@@ -54,22 +56,31 @@ class SessionTreeRow extends StatelessWidget {
   /// Whether this session is a model approval review.
   final bool guardian;
 
-  /// Space [child] already leaves before its title, which the fold control
-  /// may occupy.
+  /// Space the row normally leaves before its title, inside its plate.
   final double leadingInset;
+
+  /// Space between the row's edge and its plate.
+  final double plateInset;
 
   /// The fold control's box; touch keeps a finger-sized target.
   static double _box() => isDesktop ? 22 : 44;
 
   @override
   Widget build(BuildContext context) {
-    if (childCount == 0 && !childSession && !guardian) return child;
+    if (childCount == 0 && !childSession && !guardian) {
+      return builder(leadingInset);
+    }
     final box = _box();
-    final gutter = math.max(leadingInset, box + 4);
+    final inset = math.max(leadingInset, box + 4);
+    // One level puts a child's edge under its parent's fold control.
+    final step = plateInset + inset / 2;
     final rail = Theme.of(context).colorScheme.outlineVariant;
     final caption = guardian || childSession
         ? Padding(
-            padding: EdgeInsetsDirectional.only(start: gutter, top: 4),
+            padding: EdgeInsetsDirectional.only(
+              start: plateInset + inset,
+              top: 4,
+            ),
             child: Text(
               guardian
                   ? AppLocalizations.of(context).guardianSession
@@ -84,9 +95,7 @@ class SessionTreeRow extends StatelessWidget {
         : null;
     return Padding(
       key: ValueKey('session-tree-$id'),
-      padding: EdgeInsetsDirectional.only(
-        start: math.min(depth, 4) * gutter / 2,
-      ),
+      padding: EdgeInsetsDirectional.only(start: math.min(depth, 4) * step),
       child: Stack(
         fit: StackFit.passthrough,
         children: [
@@ -111,16 +120,12 @@ class SessionTreeRow extends StatelessWidget {
                     constraints: BoxConstraints(
                       minHeight: childCount > 0 ? box : 0,
                     ),
-                    child: Padding(
-                      padding: EdgeInsetsDirectional.only(
-                        start: gutter - leadingInset,
-                      ),
-                      child: child,
-                    ),
+                    child: builder(inset),
                   ),
+                  // Above the plate, inside its leading inset.
                   if (childCount > 0)
                     PositionedDirectional(
-                      start: (gutter - box) / 2,
+                      start: plateInset + (inset - box) / 2,
                       top: 0,
                       bottom: 0,
                       child: Center(child: _foldToggle(context, box)),

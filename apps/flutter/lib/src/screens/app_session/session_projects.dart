@@ -313,7 +313,7 @@ extension _SessionProjects on _AppSessionState {
   ) {
     final buckets = <String, List<ThreadMeta>>{};
     for (final t in threads) {
-      buckets.putIfAbsent(t.cwd, () => <ThreadMeta>[]).add(t);
+      buckets.putIfAbsent(_projects.of(t.cwd), () => <ThreadMeta>[]).add(t);
     }
     return [
       for (final entry in buckets.entries)

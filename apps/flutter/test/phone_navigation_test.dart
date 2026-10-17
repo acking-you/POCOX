@@ -112,12 +112,12 @@ void main() {
     // Hidden: offstage, not just covered.
     expect(find.byKey(const Key('new-conversation-btn')), findsNothing);
     final g = await _edgeDrag(t, 0.7);
-    expect(haptics, ['lightImpact']);
+    expect(haptics, isEmpty);
     expect(_nav(t).progress, greaterThan(0.6));
     await g.up();
     await t.pumpAndSettle();
     expect(_nav(t).isOpen, isTrue);
-    expect(haptics, ['lightImpact', 'mediumImpact']);
+    expect(haptics, ['lightImpact']);
     // Full screen: the sidebar spans the width.
     expect(
       t.getSize(find.byKey(const Key('phone-sidebar'))).width,

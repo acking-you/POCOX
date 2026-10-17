@@ -517,7 +517,7 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
   }
 
   Widget _notice(Key key, IconData icon, String text, TextStyle style) =>
-      Center(
+      ScrollableCenter(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -691,13 +691,19 @@ class _FolderTreePickerState extends ConsumerState<_FolderTreePicker> {
                     ),
                   ),
                 ),
-              Row(
+              // Too narrow for both (large text): the confirmation goes on
+              // top and Cancel under it.
+              OverflowBar(
+                alignment: MainAxisAlignment.spaceBetween,
+                spacing: 8,
+                overflowAlignment: OverflowBarAlignment.end,
+                overflowDirection: VerticalDirection.up,
+                overflowSpacing: 4,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: Text(l10n.cancel),
                   ),
-                  const Spacer(),
                   FilledButton.icon(
                     key: const Key('folder-use-btn'),
                     onPressed: target == null || _loading

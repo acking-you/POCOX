@@ -31,6 +31,7 @@ import 'package:pocket_codex/src/git_diff.dart';
 import 'package:pocket_codex/src/hosting/host_editor_page.dart';
 import 'package:pocket_codex/src/ide_context.dart';
 import 'package:pocket_codex/src/image_attachments.dart';
+import 'package:pocket_codex/src/project_index.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/log_manager.dart';
 import 'package:pocket_codex/src/voice/dictation.dart';
@@ -478,6 +479,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// Distinct project roots across every conversation on this service (not
   /// just the current project's), for the project switcher. See [_loadThreads].
   List<String> _allProjects = const [];
+  // Which project each listed folder belongs to (a Codex worktree joins the
+  // repository it came from). Rebuilt with every listing.
+  ProjectIndex _projects = ProjectIndex.empty;
   // Live filter text for the conversations pane search box.
   String _convQuery = '';
   // The search box, so ⌘K / Ctrl+K can reach it from anywhere.

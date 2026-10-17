@@ -18,6 +18,8 @@ pub struct ThreadMetaDto {
     pub parent_thread_id: Option<String>,
     /// Working directory (the project the thread controls).
     pub cwd: String,
+    /// The repository's remote, when the agent reports one.
+    pub origin_url: Option<String>,
     /// Unix seconds of last update.
     pub updated_at: i64,
 }
@@ -214,18 +216,7 @@ pub struct ThreadRuntimeConfigDto {
 /// List threads known to the app-server.
 pub fn app_thread_list(service_key: String) -> Result<Vec<ThreadMetaDto>> {
     let threads = engine(&service_key).thread_list(&service_key)?;
-    Ok(threads
-        .into_iter()
-        .map(|t| ThreadMetaDto {
-            id: t.id,
-            preview: t.preview,
-            name: t.name,
-            thread_source: t.thread_source,
-            parent_thread_id: t.parent_thread_id,
-            cwd: t.cwd,
-            updated_at: t.updated_at,
-        })
-        .collect())
+    Ok(threads.into_iter().map(thread_meta_dto).collect())
 }
 
 /// Inspect one thread without resuming it or taking ownership. Native Codex
@@ -233,16 +224,20 @@ pub fn app_thread_list(service_key: String) -> Result<Vec<ThreadMetaDto>> {
 /// before any network call.
 pub fn app_thread_metadata(service_key: String, thread_id: String) -> Result<ThreadMetaDto> {
     require_native(&service_key, "thread metadata")?;
-    let t = app_session::thread_metadata(&service_key, &thread_id)?;
-    Ok(ThreadMetaDto {
+    app_session::thread_metadata(&service_key, &thread_id).map(thread_meta_dto)
+}
+
+fn thread_meta_dto(t: app_session::ThreadMeta) -> ThreadMetaDto {
+    ThreadMetaDto {
         id: t.id,
         preview: t.preview,
         name: t.name,
         thread_source: t.thread_source,
         parent_thread_id: t.parent_thread_id,
         cwd: t.cwd,
+        origin_url: t.origin_url,
         updated_at: t.updated_at,
-    })
+    }
 }
 
 /// List the models the app-server offers.

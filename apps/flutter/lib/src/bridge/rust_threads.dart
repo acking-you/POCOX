@@ -498,5 +498,6 @@ ThreadMeta _threadMeta(frb.ThreadMetaDto t) => ThreadMeta(
   threadSource: t.threadSource,
   parentThreadId: t.parentThreadId,
   cwd: t.cwd,
+  originUrl: t.originUrl,
   updatedAt: t.updatedAt.toInt(),
 );

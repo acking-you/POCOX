@@ -966,9 +966,12 @@ this file's roadmap so the source of truth stays in sync.
     aside with the finger and rests wherever it is held. Release completes
     the direction the finger last clearly moved in, however short (a 16 px
     reversal flips it; no distance or velocity threshold); the open sidebar
-    closes the same way. One light haptic when a drag is first recognized
-    as an opening, one medium haptic when a gesture settles open; the menu
-    control and closing drags are silent. The sidebar stays
+    closes the same way. One light haptic when a gesture settles open
+    (2026-10-18: the earlier recognition tick and medium completion felt
+    busy); recognition, the menu control and closing drags are silent.
+    Opening parks focus on the sidebar scope itself
+    (`requestScopeFocus`), never on its search field, so a swipe never
+    raises the keyboard. The sidebar stays
     mounted offstage (scroll, folds, search kept; not rebuilt while hidden);
     the page keeps its state and leaves input, focus and semantics while
     moved. Back and Escape close it first; a system pointer cancel returns
@@ -1191,6 +1194,25 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     can show that no turn runs there and nothing already written can be
     lost. Until it ships, item 29's rules stand: write only from a fresh
     no-owner admission, no override.
+
+36. **Phone polish and worktree projects (2026-10-18).** A long-pressed
+    message darkens by the theme's neutral pressed layer in its own outline
+    (`kUserBubbleShape` for user bubbles), with no accent outline; its menu
+    uses muted icons. A sidebar row's fold control sits inside the row's
+    plate (`SessionTreeRow.builder` receives the title inset), so a selected
+    parent is one shape. Codex Desktop managed worktrees
+    (`<root>/worktrees/<4 hex>/<repository>[/<subfolder>]`) list under the
+    checkout they came from (`ProjectIndex`, matched by repository name,
+    subfolder and `gitInfo.originUrl`, now on `ThreadMeta.originUrl`);
+    without exactly one such checkout a repository's worktrees share one
+    project. A worktree row still opens in its own folder.
+    Phone overflows found by a sweep at 393/375/360/320 px and ×1.0–2.0 text
+    (en/zh) are fixed: the status bar measures its line (`_statusFit`: the
+    model name shortens, then the branch name, then the model chip and clock
+    give way; state and change counts always show), the narrow services
+    device list scrolls, local session rows stack status and action under a
+    narrow title, and picker footers use `OverflowBar`
+    (`test/chat_status_bar_test.dart`, `test/phone_pages_overflow_test.dart`).
 
 ### UI and history maintenance (2026-09-13)
 

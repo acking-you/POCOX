@@ -56,6 +56,7 @@ Future<List<bool>> _mount(
             sidebar: Material(
               child: Column(
                 children: [
+                  const TextField(key: Key('search')),
                   Builder(
                     builder: (c) => IconButton(
                       key: const Key('close'),
@@ -143,7 +144,8 @@ void main() {
     // The page moved aside by the same distance; the sidebar is onstage.
     expect(t.getTopLeft(find.byType(Scaffold)).dx, closeTo(0.15 * _width, 1));
     expect(find.text('row 0'), findsOneWidget);
-    expect(haptics, ['lightImpact']);
+    // Felt once, when it lands: nothing while the finger moves.
+    expect(haptics, isEmpty);
     // Held still, nothing settles.
     await t.pump(const Duration(seconds: 2));
     expect(_state(t).progress, closeTo(0.15, 0.01));
@@ -152,7 +154,7 @@ void main() {
     await t.pumpAndSettle();
     expect(_state(t).progress, 1);
     expect(_state(t).isOpen, isTrue);
-    expect(haptics, ['lightImpact', 'mediumImpact']);
+    expect(haptics, ['lightImpact']);
     expect(changes, [true]);
     // Full screen: the page has left entirely.
     expect(
@@ -182,7 +184,7 @@ void main() {
     await t.pumpAndSettle();
     expect(_state(t).progress, 0);
     expect(_state(t).isOpen, isFalse);
-    expect(haptics, ['lightImpact']);
+    expect(haptics, isEmpty);
     expect(changes, isEmpty);
   });
 
@@ -192,12 +194,11 @@ void main() {
     final changes = await _mount(t);
     // Recognized as an opening: an ordinary release here would open.
     final g = await _dragTo(t, 0.7);
-    expect(haptics, ['lightImpact']);
     await g.cancel();
     await t.pumpAndSettle();
     expect(_state(t).progress, 0);
     expect(_state(t).isOpen, isFalse);
-    expect(haptics, ['lightImpact']);
+    expect(haptics, isEmpty);
     expect(changes, isEmpty);
     expect(find.text('row 0'), findsNothing);
     // The page takes input again, and the next gesture behaves normally.
@@ -208,7 +209,7 @@ void main() {
     await again.up();
     await t.pumpAndSettle();
     expect(_state(t).isOpen, isTrue);
-    expect(haptics, ['lightImpact', 'lightImpact', 'mediumImpact']);
+    expect(haptics, ['lightImpact']);
     expect(changes, [true]);
   });
 
@@ -303,6 +304,40 @@ void main() {
     await t.pumpAndSettle();
     expect(_state(t).isOpen, isFalse);
     expect(changes, [true, false, true, false]);
+  });
+
+  testWidgets('opening never returns focus to a sidebar field', (t) async {
+    await _mount(t);
+    await t.tap(find.byKey(const Key('menu')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('search')));
+    await t.pumpAndSettle();
+    final search = t.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const Key('search')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(search.focusNode.hasFocus, isTrue);
+    await t.tap(find.byKey(const Key('close')));
+    await t.pumpAndSettle();
+    // Reopened by a swipe, focus rests on the sidebar, so no keyboard rises.
+    final g = await _dragTo(t, 0.6);
+    await g.up();
+    await t.pumpAndSettle();
+    expect(_state(t).isOpen, isTrue);
+    expect(search.focusNode.hasFocus, isFalse);
+    expect(
+      find.descendant(
+        of: _nav,
+        matching: find.byWidgetPredicate(
+          (w) =>
+              w is FocusScope &&
+              w.focusNode == FocusManager.instance.primaryFocus,
+        ),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('while open, the page is out of semantics, input and focus', (

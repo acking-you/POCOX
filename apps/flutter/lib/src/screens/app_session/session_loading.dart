@@ -15,17 +15,18 @@ extension _SessionLoading on _AppSessionState {
       // Every project this service has ever been used in, newest first. Taken
       // from the UNFILTERED list on purpose: the project switcher has to offer
       // the projects you're not in, which is exactly what `mine` drops below.
+      _projects = ProjectIndex(all);
       final projects = <String>[];
       final seenProjects = <String>{};
       for (final t in all) {
-        final p = t.cwd.trim();
+        final p = _projects.of(t.cwd);
         if (p.isNotEmpty && seenProjects.add(p)) projects.add(p);
       }
       _allProjects = projects;
       final cwd = _cwd?.trim();
       var mine = (widget.home || cwd == null || cwd.isEmpty)
           ? all
-          : all.where((t) => t.cwd.trim() == cwd).toList();
+          : all.where((t) => _projects.of(t.cwd) == _projects.of(cwd)).toList();
       // A session the host deleted stays out, even from a stale listing.
       if (_deletedThreads.isNotEmpty) {
         mine = [
@@ -70,6 +71,7 @@ extension _SessionLoading on _AppSessionState {
                   threadSource: t.threadSource,
                   parentThreadId: t.parentThreadId,
                   cwd: t.cwd,
+                  originUrl: t.originUrl,
                   updatedAt: t.updatedAt,
                 )
               : t,

@@ -29,7 +29,10 @@ extension _SessionConversations on _AppSessionState {
     final q = _convQuery.trim().toLowerCase();
     final known = {for (final thread in _threads) thread.id: thread};
     for (final thread in _discoveredThreads.values) {
-      if (widget.home || _cwd == null || _cwd!.isEmpty || thread.cwd == _cwd) {
+      if (widget.home ||
+          _cwd == null ||
+          _cwd!.isEmpty ||
+          _projects.of(thread.cwd) == _projects.of(_cwd!)) {
         known.putIfAbsent(thread.id, () => thread);
       }
     }
@@ -86,25 +89,30 @@ extension _SessionConversations on _AppSessionState {
 
     return Builder(
       builder: (ctx) {
-        Widget tile(ThreadMeta t, {required bool showProject}) =>
-            _conversationTile(
-              thread: t,
-              running: running.contains(t.id),
-              selected: t.id == _threadId,
-              now: now,
-              l10n: l10n,
-              // Only rows NOT already sitting under a project heading carry
-              // their own project name — under one it's just noise.
-              project: showProject ? _leafOf(t.cwd) : null,
-              onTap: () {
-                closeDrawerIfOpen(ctx);
-                if (t.id != _threadId) _openThread(t.id, t.cwd);
-              },
-            );
+        Widget tile(
+          ThreadMeta t, {
+          required bool showProject,
+          required double inset,
+        }) => _conversationTile(
+          thread: t,
+          titleInset: inset,
+          running: running.contains(t.id),
+          selected: t.id == _threadId,
+          now: now,
+          l10n: l10n,
+          // Only rows NOT already sitting under a project heading carry
+          // their own project name — under one it's just noise.
+          project: showProject ? _leafOf(t.cwd) : null,
+          onTap: () {
+            closeDrawerIfOpen(ctx);
+            if (t.id != _threadId) _openThread(t.id, t.cwd);
+          },
+        );
         // The activity view's taller row: name in bold over a one-line summary
         // of where the conversation got to.
-        Widget activityTile(ThreadMeta t) => _activityTile(
+        Widget activityTile(ThreadMeta t, double inset) => _activityTile(
           thread: t,
+          titleInset: inset,
           running: running.contains(t.id),
           selected: t.id == _threadId,
           now: now,
@@ -138,9 +146,9 @@ extension _SessionConversations on _AppSessionState {
                 _expandedSessionParents.add(t.id);
               }
             }),
-            child: _activityView
-                ? activityTile(t)
-                : tile(t, showProject: showProject),
+            builder: (inset) => _activityView
+                ? activityTile(t, inset)
+                : tile(t, showProject: showProject, inset: inset),
           );
         }
 
@@ -612,6 +620,7 @@ extension _SessionConversations on _AppSessionState {
     required DateTime now,
     required AppLocalizations l10n,
     required VoidCallback onTap,
+    required double titleInset,
     String? project,
   }) {
     final scheme = Theme.of(context).colorScheme;
@@ -681,7 +690,7 @@ extension _SessionConversations on _AppSessionState {
           );
     final content = Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
-        _conversationInset(showProject: project != null),
+        titleInset,
         dense ? 6 : 10,
         _rowInset,
         dense ? 6 : 10,
@@ -856,6 +865,7 @@ extension _SessionConversations on _AppSessionState {
     required DateTime now,
     required AppLocalizations l10n,
     required VoidCallback onTap,
+    required double titleInset,
   }) {
     final scheme = Theme.of(context).colorScheme;
     final fg = scheme.onSurface;
@@ -899,7 +909,12 @@ extension _SessionConversations on _AppSessionState {
           child: _activitySheen(
             running: running,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              padding: EdgeInsetsDirectional.fromSTEB(
+                titleInset,
+                8,
+                _rowInset,
+                8,
+              ),
               child: Row(
                 children: [
                   Expanded(
