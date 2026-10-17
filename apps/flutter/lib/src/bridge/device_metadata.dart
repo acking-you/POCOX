@@ -9,6 +9,8 @@ class DeviceMetadata {
     required this.hostname,
     required this.instanceId,
     this.environment,
+    this.hostId,
+    this.sourceName,
   });
 
   /// Publisher OS, independent of the controller's OS.
@@ -22,6 +24,12 @@ class DeviceMetadata {
 
   /// Display hostname; never an ownership check.
   final String hostname;
+
+  /// Stable hosting installation identity, independent of process restarts.
+  final String? hostId;
+
+  /// OS distribution or WSL distribution name reported by the publisher.
+  final String? sourceName;
 
   /// Opaque process identity, renewed on restart.
   final String instanceId;
@@ -37,6 +45,15 @@ class DeviceMetadata {
       _ => os,
     },
     if (environment == 'wsl') 'WSL',
+    ?sourceName,
     arch,
   ].where((part) => part.isNotEmpty).join(' · ');
+
+  /// Platform and a short stable instance label for selecting the right host.
+  String get instanceLabel {
+    final id = hostId?.replaceAll('-', '');
+    return id == null || id.isEmpty
+        ? platform
+        : '$platform · ${id.substring(0, id.length < 8 ? id.length : 8)}';
+  }
 }

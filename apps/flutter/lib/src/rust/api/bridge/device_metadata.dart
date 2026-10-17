@@ -34,6 +34,12 @@ class DeviceMetadataDto {
   /// Display hostname.
   final String hostname;
 
+  /// Stable installation identity, absent on older publishers.
+  final String? hostId;
+
+  /// OS or WSL distribution name.
+  final String? sourceName;
+
   /// Opaque publisher process identity, renewed on restart.
   final String instanceId;
 
@@ -42,6 +48,8 @@ class DeviceMetadataDto {
     required this.arch,
     this.environment,
     required this.hostname,
+    this.hostId,
+    this.sourceName,
     required this.instanceId,
   });
 
@@ -51,6 +59,8 @@ class DeviceMetadataDto {
       arch.hashCode ^
       environment.hashCode ^
       hostname.hashCode ^
+      hostId.hashCode ^
+      sourceName.hashCode ^
       instanceId.hashCode;
 
   @override
@@ -62,5 +72,7 @@ class DeviceMetadataDto {
           arch == other.arch &&
           environment == other.environment &&
           hostname == other.hostname &&
+          hostId == other.hostId &&
+          sourceName == other.sourceName &&
           instanceId == other.instanceId;
 }

@@ -26,6 +26,7 @@ static REGISTRY: OnceCell<Mutex<HashMap<String, SubEntry>>> = OnceCell::new();
 pub(super) struct HostContext {
     pub device: String,
     pub profiles: PathBuf,
+    pub identity_dir: PathBuf,
     pub transport: Option<Transport>,
 }
 
@@ -42,6 +43,9 @@ pub fn device_id() -> String {
     HOST_CONTEXT
         .get()
         .map(|context| context.device.clone())
+        .or_else(|| {
+            pocket_codex_core::device::host_identity().map(|identity| identity.device().to_string())
+        })
         .unwrap_or_else(pocket_codex_core::service::default_device_id)
 }
 
@@ -79,7 +83,14 @@ pub fn init(support_dir: PathBuf) -> Result<()> {
                 .map_err(|e| anyhow!("building tokio runtime: {e}"))?,
         )
         .ok();
-    SUPPORT_DIR.set(support_dir).ok();
+    let support_dir = SUPPORT_DIR.get_or_init(|| support_dir);
+    if !cfg!(any(target_os = "ios", target_os = "android")) {
+        let identity_dir = HOST_CONTEXT
+            .get()
+            .map(|context| context.identity_dir.clone())
+            .unwrap_or_else(|| support_dir.join("identity"));
+        pocket_codex_core::device::initialize(&identity_dir)?;
+    }
     REGISTRY.set(Mutex::new(HashMap::new())).ok();
     Ok(())
 }

@@ -48,15 +48,16 @@ in the foreground and allow enough stop time for its owned agents to exit.
 Every new host publishes `GET /host/device` on its registered `meta` listener
 (Codex, OpenCode and ACP), on the management listener, and on the standalone
 Responses API proxy. The shared version-1 metadata contains `os`, `arch`,
-`environment` (`wsl` where the Linux kernel identifies WSL), `hostname` and
-an opaque `instanceId` renewed for each publisher process. `/manage/v1/device`
+`environment` (`wsl` where the Linux kernel identifies WSL), `hostname`, optional
+`sourceName` (the WSL distribution name or Linux distribution), optional stable
+`hostId`, and an opaque `instanceId` renewed for each publisher process. `/manage/v1/device`
 also includes this metadata, so managing a computer needs no extra request.
 The OS comes from the publisher executable; WSL is Linux, independently of
 the Windows controller. Metadata contains no credentials or filesystem paths.
 
 This uses existing service registrations rather than extending
 pb-mapper's key-only discovery protocol: no relay upgrade, additional public
-listener, or renamed service key is needed. A selected unmanaged device reads
+listener, or change to discovery's wire format is needed. A selected unmanaged device reads
 one metadata endpoint through its existing tunnel; the UI never probes every
 device for metadata. Missing platform information stays unknown; an older
 management view can still supply its existing `os` field. Connection errors
@@ -68,9 +69,38 @@ current app's native host registry belong there. A matching hostname, OS,
 relay device label or shared Windows/WSL filesystem does not make a service
 local. Local controls never appear under a remote device. The local editor
 names its target environment, and remote runtime choices still come from the
-target host's runtime inventory. Existing explicit `--device`, relay keys and
-saved service selections remain unchanged; metadata does not resolve an actual
-registration-key conflict between independent publishers.
+target host's runtime inventory.
+
+### Several instances on one computer
+
+Hostname is a display name. Windows, WSL distributions, native Linux and
+separate hosting installations can share it without being the same host.
+Each installation persists a random `hostId` and its default relay device name
+before publishing. OS and native/WSL environments use separate identity records,
+even if they share an identity directory. Independently running hosts still
+require separate hosting/profile state directories. CLI publishers share `<state-dir>/identity`;
+the desktop app uses `<app-support-dir>/identity`. Different data directories
+are independent installations. Neither identity contains a hardware fingerprint.
+
+The generated device segment is `<source>.<hostname>.<host-id-without-hyphens>`;
+source includes OS/environment and the distribution when available. All services
+from that installation share it. The saved device segment and `hostId` survive
+process restarts, hostname changes and distribution upgrades; only `instanceId`
+changes on restart. The UI retains the full routing key and displays short stable
+IDs beside platform/distribution information. It never merges Windows and WSL by
+hostname. Old metadata without `hostId` remains supported.
+
+**Default-name migration:** the first upgraded start without `--device` publishes
+the new installation-scoped default instead of the former hostname-only key.
+Rediscover and select that host in controllers; saved targets and caches for the
+old key are not rewritten. Existing key formats remain discoverable/connectable.
+An explicit `--device` (or ordinary serve's exact `--key`) keeps its existing
+routing value; independent publishers must use different overrides. Metadata
+cannot fix a deliberate duplicate key. Back up identity files with hosting state;
+corrupt/unreadable identities fail rather than silently replacing published keys.
+Copying the complete identity directory clones an installation's identity. Use
+separate fresh state directories for independently running clones; this does not
+try to detect physical machines or split a deliberately shared installation.
 
 ### Discovery and permissions
 
@@ -170,5 +200,5 @@ conversation or its draft.
   accepted the current functionality on the installed desktop and iOS apps;
   that is user acceptance, not an instrumented check.
 - Not claimed: physical-phone haptics, other platforms.
-- The remote editor's support matrix uses this device's `hostConfigSupported`
-  answer.
+- The local editor uses this device's `hostConfigSupported` answer. Remote
+  runtime choices use the selected host's inventory and capabilities.

@@ -270,8 +270,7 @@ mod tests {
                 .route(
                     "/future",
                     get(|| async {
-                        let mut value =
-                            pocket_codex_core::device::DeviceMetadata::current().clone();
+                        let mut value = pocket_codex_core::device::DeviceMetadata::current();
                         value.protocol = 2;
                         axum::Json(value)
                     }),

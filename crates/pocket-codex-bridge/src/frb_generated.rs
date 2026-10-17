@@ -6687,12 +6687,16 @@ impl SseDecode for crate::api::bridge::device_metadata::DeviceMetadataDto {
         let mut var_arch = <String>::sse_decode(deserializer);
         let mut var_environment = <Option<String>>::sse_decode(deserializer);
         let mut var_hostname = <String>::sse_decode(deserializer);
+        let mut var_hostId = <Option<String>>::sse_decode(deserializer);
+        let mut var_sourceName = <Option<String>>::sse_decode(deserializer);
         let mut var_instanceId = <String>::sse_decode(deserializer);
         return crate::api::bridge::device_metadata::DeviceMetadataDto {
             os: var_os,
             arch: var_arch,
             environment: var_environment,
             hostname: var_hostname,
+            host_id: var_hostId,
+            source_name: var_sourceName,
             instance_id: var_instanceId,
         };
     }
@@ -9757,6 +9761,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::device_metadata::Devi
             self.arch.into_into_dart().into_dart(),
             self.environment.into_into_dart().into_dart(),
             self.hostname.into_into_dart().into_dart(),
+            self.host_id.into_into_dart().into_dart(),
+            self.source_name.into_into_dart().into_dart(),
             self.instance_id.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -11361,6 +11367,8 @@ impl SseEncode for crate::api::bridge::device_metadata::DeviceMetadataDto {
         <String>::sse_encode(self.arch, serializer);
         <Option<String>>::sse_encode(self.environment, serializer);
         <String>::sse_encode(self.hostname, serializer);
+        <Option<String>>::sse_encode(self.host_id, serializer);
+        <Option<String>>::sse_encode(self.source_name, serializer);
         <String>::sse_encode(self.instance_id, serializer);
     }
 }

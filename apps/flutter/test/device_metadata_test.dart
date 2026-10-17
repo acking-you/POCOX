@@ -84,7 +84,10 @@ void main() {
     expect(find.text('Windows · x86_64'), findsWidgets);
 
     await _tap(t, 'device-studio');
-    expect(find.text('Linux · WSL · x86_64'), findsOneWidget);
+    expect(
+      t.widget<Text>(find.byKey(const Key('device-platform'))).data,
+      'Linux · WSL · x86_64',
+    );
     expect(find.byKey(const Key('managed-device-studio')), findsOneWidget);
     expect(find.byKey(const Key('add-local-host-card')), findsNothing);
     expect(find.byKey(const Key('device-management-switch')), findsNothing);
@@ -120,7 +123,10 @@ void main() {
     await _tap(t, 'device-studio');
     expect(find.byKey(const Key('add-local-host-card')), findsNothing);
     expect(find.byKey(const Key('device-management-switch')), findsNothing);
-    expect(find.text('Linux · WSL · x86_64'), findsOneWidget);
+    expect(
+      t.widget<Text>(find.byKey(const Key('device-platform'))).data,
+      'Linux · WSL · x86_64',
+    );
     await _tap(t, 'device-back');
     await _tap(t, 'device-@local');
     expect(find.byKey(const Key('add-local-host-card')), findsOneWidget);
@@ -170,7 +176,10 @@ void main() {
     expect(api.metadataReads, [first, second]);
     gate.complete();
     await t.pumpAndSettle();
-    expect(find.text('macOS · aarch64'), findsOneWidget);
+    expect(
+      t.widget<Text>(find.byKey(const Key('device-platform'))).data,
+      'macOS · aarch64',
+    );
     expect(find.text('Linux · WSL · x86_64'), findsNothing);
     expect(find.byKey(const Key('add-local-host-card')), findsNothing);
   }, variant: windows);
@@ -193,7 +202,10 @@ void main() {
     api.metadataError = null;
     api.serviceMetadata[key] = _wsl;
     await _tap(t, 'refresh-btn');
-    expect(find.text('Linux · WSL · x86_64'), findsOneWidget);
+    expect(
+      t.widget<Text>(find.byKey(const Key('device-platform'))).data,
+      'Linux · WSL · x86_64',
+    );
     expect(t.takeException(), isNull);
   }, variant: windows);
 }

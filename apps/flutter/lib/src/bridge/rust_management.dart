@@ -205,6 +205,8 @@ DeviceMetadata _deviceMetadata(frb.DeviceMetadataDto d) => DeviceMetadata(
   arch: d.arch,
   environment: d.environment,
   hostname: d.hostname,
+  hostId: d.hostId,
+  sourceName: d.sourceName,
   instanceId: d.instanceId,
 );
 

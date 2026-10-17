@@ -206,7 +206,7 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
         .route(
             "/host/device",
             get(|State(s): State<Admission>| {
-                run(s, |_| Ok(pocket_codex_core::device::DeviceMetadata::current().clone()))
+                run(s, |_| Ok(pocket_codex_core::device::DeviceMetadata::current()))
             }),
         )
         .route(

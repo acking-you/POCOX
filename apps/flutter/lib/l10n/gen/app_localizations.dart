@@ -2522,6 +2522,12 @@ abstract class AppLocalizations {
   /// **'Publisher instance'**
   String get servicesPublisherInstance;
 
+  /// No description provided for @servicesHostInstance.
+  ///
+  /// In en, this message translates to:
+  /// **'Hosting instance'**
+  String get servicesHostInstance;
+
   /// No description provided for @servicesCapabilities.
   ///
   /// In en, this message translates to:

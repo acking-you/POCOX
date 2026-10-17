@@ -13,6 +13,7 @@ mod api;
 mod api_proxy;
 mod codex;
 mod connect;
+mod host_identity;
 mod init;
 mod managed_api;
 mod managed_host;

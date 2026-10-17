@@ -259,7 +259,7 @@ class _ManagedDevicePanelState extends ConsumerState<ManagedDevicePanel> {
       hint: device == null
           ? null
           : l10n.managedComputerSummary(
-              device.metadata?.platform ?? device.os,
+              device.metadata?.instanceLabel ?? device.os,
               device.appVersion,
             ),
       trailing: IconButton(
@@ -292,6 +292,9 @@ class _ManagedDevicePanelState extends ConsumerState<ManagedDevicePanel> {
           DiagnosticLine(label: l10n.managedKey, value: widget.serviceKey),
           if (device != null)
             DiagnosticLine(label: l10n.managedDevice, value: device.device),
+          if (device?.metadata case final metadata?)
+            if (metadata.hostId case final id?)
+              DiagnosticLine(label: l10n.servicesHostInstance, value: id),
           if (device?.metadata case final metadata?)
             DiagnosticLine(
               label: l10n.servicesPublisherInstance,

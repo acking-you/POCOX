@@ -137,7 +137,7 @@ async fn projects_round_trip_and_confined_listing() {
         .json::<pocket_codex_core::device::DeviceMetadata>()
         .await
         .expect("metadata JSON");
-    assert_eq!(&metadata, pocket_codex_core::device::DeviceMetadata::current());
+    assert_eq!(metadata, pocket_codex_core::device::DeviceMetadata::current());
 
     // Fresh host: no roots yet.
     let cfg: HostConfig = client

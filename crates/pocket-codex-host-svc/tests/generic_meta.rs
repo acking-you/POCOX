@@ -66,7 +66,7 @@ async fn session_links_require_a_known_session_and_stay_within_its_directory() {
         .json::<pocket_codex_core::device::DeviceMetadata>()
         .await
         .expect("metadata JSON");
-    assert_eq!(&metadata, pocket_codex_core::device::DeviceMetadata::current());
+    assert_eq!(metadata, pocket_codex_core::device::DeviceMetadata::current());
 
     let inside = thread_file(&base, "ses_known", "notes/a.txt:3").await;
     assert_eq!(inside.status(), Status::OK);

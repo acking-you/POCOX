@@ -1367,6 +1367,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get servicesPublisherInstance => 'Publisher instance';
 
   @override
+  String get servicesHostInstance => 'Hosting instance';
+
+  @override
   String get servicesCapabilities => 'Available capabilities';
 
   @override

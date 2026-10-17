@@ -40,7 +40,7 @@ use pocket_codex_codex::{spawn_ready, ListenSpec, SpawnOptions, SpawnReadyError,
 use pocket_codex_core::{
     config::Config,
     process::{find_codex_app_server, force_kill, send_sigterm, wait_for_port_closed},
-    service::{default_device_id, ServiceId, ServiceKind},
+    service::{ServiceId, ServiceKind},
     state::PbRole,
 };
 
@@ -86,7 +86,7 @@ pub async fn run(args: ServeArgs) -> Result<()> {
     let transport =
         transport::resolve_transport(args.relay.relay.as_deref(), None, &config).await?;
 
-    let device = args.device.clone().unwrap_or_else(default_device_id);
+    let device = super::host_identity::device(args.device.clone())?;
     let name = args.name.clone();
     let codec = args.codec;
     let explicit_key = args.key.clone();

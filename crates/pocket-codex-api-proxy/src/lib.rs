@@ -721,7 +721,7 @@ mod tests {
             .json::<pocket_codex_core::device::DeviceMetadata>()
             .await
             .expect("metadata JSON");
-        assert_eq!(&metadata, pocket_codex_core::device::DeviceMetadata::current());
+        assert_eq!(metadata, pocket_codex_core::device::DeviceMetadata::current());
         task.abort();
     }
 

@@ -129,7 +129,8 @@ pub struct ServeArgs {
     #[arg(long)]
     pub key: Option<String>,
 
-    /// Device id used in generated Pocket-Codex service keys.
+    /// Override the device in generated service keys. Defaults to a persisted
+    /// OS/hostname/installation ID; use distinct overrides for separate hosts.
     #[arg(long)]
     pub device: Option<String>,
 
@@ -213,7 +214,8 @@ pub struct ApiServeArgs {
     #[arg(long)]
     pub key: Option<String>,
 
-    /// Device id used in generated Pocket-Codex service keys.
+    /// Override the device in generated service keys. Defaults to a persisted
+    /// OS/hostname/installation ID; use distinct overrides for separate hosts.
     #[arg(long)]
     pub device: Option<String>,
 

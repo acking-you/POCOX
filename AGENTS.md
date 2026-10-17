@@ -1045,7 +1045,14 @@ Never infer locality from hostname, OS, device label or shared filesystem.
 The services UI keeps an independent local target before hosting starts and
 assigns only this process's exact owned service keys to it; remote metadata
 reads are lazy, context-scoped and never replace missing metadata with the
-controller's platform. Existing relay keys and explicit device names stay stable.
+controller's platform. Explicit device names stay stable; existing key formats
+remain supported. Stable `hostId` and persisted default relay
+keys distinguish OS environments and independent installation directories;
+`instanceId` identifies only the publisher process. Keep identity persistence
+and naming in core, shared by desktop and CLI publishers; explicit `--device`
+remains an override. Show source/distribution and short stable IDs without
+merging by hostname. Document the one-time hostname-default migration and
+shared/cloned-state limits in `docs/remote-device-management.md`.
 
 32. **Visual refresh (2026-10-16).** Calm graphite neutrals with ink-black
     primary actions and the logo's blue as the one, sparse signal colour: no

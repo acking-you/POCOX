@@ -19,6 +19,8 @@ pub struct Options {
     pub config_dir: PathBuf,
     /// Private daemon state, independent of desktop restore preferences.
     pub state_dir: PathBuf,
+    /// Stable CLI installation identity, shared with its standalone workers.
+    pub identity_dir: PathBuf,
     /// Device identity used by every service and the management entry.
     pub device: String,
     /// Initial Codex instance, used only without a saved lifecycle choice.
@@ -97,6 +99,7 @@ impl Manager {
         runtime::configure_host(runtime::HostContext {
             device: pocket_codex_core::service::sanitize_component(&options.device),
             profiles: options.state_dir.join("hosting"),
+            identity_dir: options.identity_dir,
             transport: options.relay.map(|session| Transport {
                 session,
                 namespace: None,

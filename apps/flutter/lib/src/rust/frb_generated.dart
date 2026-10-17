@@ -6774,14 +6774,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   DeviceMetadataDto dco_decode_device_metadata_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return DeviceMetadataDto(
       os: dco_decode_String(arr[0]),
       arch: dco_decode_String(arr[1]),
       environment: dco_decode_opt_String(arr[2]),
       hostname: dco_decode_String(arr[3]),
-      instanceId: dco_decode_String(arr[4]),
+      hostId: dco_decode_opt_String(arr[4]),
+      sourceName: dco_decode_opt_String(arr[5]),
+      instanceId: dco_decode_String(arr[6]),
     );
   }
 
@@ -8644,12 +8646,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_arch = sse_decode_String(deserializer);
     var var_environment = sse_decode_opt_String(deserializer);
     var var_hostname = sse_decode_String(deserializer);
+    var var_hostId = sse_decode_opt_String(deserializer);
+    var var_sourceName = sse_decode_opt_String(deserializer);
     var var_instanceId = sse_decode_String(deserializer);
     return DeviceMetadataDto(
       os: var_os,
       arch: var_arch,
       environment: var_environment,
       hostname: var_hostname,
+      hostId: var_hostId,
+      sourceName: var_sourceName,
       instanceId: var_instanceId,
     );
   }
@@ -10814,6 +10820,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.arch, serializer);
     sse_encode_opt_String(self.environment, serializer);
     sse_encode_String(self.hostname, serializer);
+    sse_encode_opt_String(self.hostId, serializer);
+    sse_encode_opt_String(self.sourceName, serializer);
     sse_encode_String(self.instanceId, serializer);
   }
 

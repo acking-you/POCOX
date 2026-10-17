@@ -51,18 +51,17 @@ impl Fixture {
     }
 
     fn start(&mut self) -> u32 {
-        let child = self
-            .command()
-            .args([
-                "serve",
-                "--allow-remote-management",
-                "--device",
-                "managed-test-device",
-                "--relay",
-                &self.relay,
-                "--codex-binary",
-                "/missing-codex-must-not-start",
-            ])
+        self.start_with_device(Some("managed-test-device"))
+    }
+
+    fn start_with_device(&mut self, device: Option<&str>) -> u32 {
+        let mut command = self.command();
+        command.args(["serve", "--allow-remote-management"]);
+        if let Some(device) = device {
+            command.args(["--device", device]);
+        }
+        let child = command
+            .args(["--relay", &self.relay, "--codex-binary", "/missing-codex-must-not-start"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -155,6 +154,40 @@ fn stopped_services_survive_restart_and_duplicate_owners_are_refused() {
     .unwrap();
     assert_eq!(ledger["entries"]["default"]["revision"], 1);
     assert!(ledger["entries"]["default"]["runtime"].is_null());
+}
+
+#[test]
+fn independent_installations_persist_distinct_defaults_across_restart() {
+    fn identity(fixture: &Fixture) -> serde_json::Value {
+        let file = std::fs::read_dir(fixture.root.join("state/pocket-codex/identity"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.extension()
+                    .is_some_and(|extension| extension == "json")
+            })
+            .unwrap();
+        serde_json::from_slice(&std::fs::read(file).unwrap()).unwrap()
+    }
+    let mut first = Fixture::new();
+    let mut second = Fixture::new();
+    let first_pid = first.start_with_device(None);
+    let second_pid = second.start_with_device(None);
+    let before = identity(&first);
+    let other = identity(&second);
+    assert_ne!(before["id"], other["id"]);
+    assert_ne!(before["device"], other["device"]);
+    let id = before["id"].as_str().unwrap().replace('-', "");
+    assert!(before["device"]
+        .as_str()
+        .unwrap()
+        .ends_with(&format!(".{id}")));
+    first.stop(first_pid);
+    let restarted = first.start_with_device(None);
+    assert_eq!(identity(&first), before);
+    assert_eq!(identity(&second), other);
+    first.stop(restarted);
+    second.stop(second_pid);
 }
 
 #[test]

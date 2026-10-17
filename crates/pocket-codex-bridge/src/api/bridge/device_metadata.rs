@@ -14,6 +14,10 @@ pub struct DeviceMetadataDto {
     pub environment: Option<String>,
     /// Display hostname.
     pub hostname: String,
+    /// Stable installation identity, absent on older publishers.
+    pub host_id: Option<String>,
+    /// OS or WSL distribution name.
+    pub source_name: Option<String>,
     /// Opaque publisher process identity, renewed on restart.
     pub instance_id: String,
 }
@@ -25,6 +29,8 @@ impl From<DeviceMetadata> for DeviceMetadataDto {
             arch: value.arch,
             environment: value.environment,
             hostname: value.hostname,
+            host_id: value.host_id,
+            source_name: value.source_name,
             instance_id: value.instance_id,
         }
     }
@@ -33,7 +39,7 @@ impl From<DeviceMetadata> for DeviceMetadataDto {
 /// Identity of this app process, available before it starts hosting.
 #[frb(sync)]
 pub fn local_device_metadata() -> DeviceMetadataDto {
-    DeviceMetadata::current().clone().into()
+    DeviceMetadata::current().into()
 }
 
 /// Read a registered service's metadata over its existing meta/host tunnel.

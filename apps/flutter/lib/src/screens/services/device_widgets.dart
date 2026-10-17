@@ -9,6 +9,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.activeDevice,
     required this.localDevices,
     required this.localMetadata,
+    required this.selectedMetadata,
     required this.capabilityCount,
     required this.onSelect,
     required this.filled,
@@ -22,6 +23,7 @@ class _DeviceColumn extends StatelessWidget {
   final String? activeDevice;
   final Set<String> localDevices;
   final DeviceMetadata? localMetadata;
+  final DeviceMetadata? selectedMetadata;
   final int Function(String device) capabilityCount;
   final ValueChanged<String> onSelect;
 
@@ -43,11 +45,15 @@ class _DeviceColumn extends StatelessWidget {
           key: Key('device-$device'),
           device: device == _thisDevice
               ? (localMetadata?.hostname ?? l10n.servicesLocalDevice)
-              : device,
+              : deviceLabel(device),
           subtitle: [
             if (localDevices.contains(device)) l10n.servicesLocalDevice,
             if (localDevices.contains(device) && localMetadata != null)
-              localMetadata!.platform,
+              localMetadata!.instanceLabel,
+            if (!localDevices.contains(device) &&
+                device == activeDevice &&
+                selectedMetadata != null)
+              selectedMetadata!.instanceLabel,
             l10n.servicesDeviceCapabilityCount(capabilityCount(device)),
           ].join(' · '),
           selected: device == activeDevice,

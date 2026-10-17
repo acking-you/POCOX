@@ -1327,6 +1327,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get servicesPublisherInstance => '服务进程实例';
 
   @override
+  String get servicesHostInstance => '托管实例';
+
+  @override
   String get servicesCapabilities => '可用能力';
 
   @override

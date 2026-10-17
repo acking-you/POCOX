@@ -4,7 +4,7 @@ use std::{sync::mpsc, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use pocket_codex_bridge::headless::{Manager, Options};
-use pocket_codex_core::{config::Config, paths, service::default_device_id};
+use pocket_codex_core::{config::Config, paths};
 
 use super::{api_proxy, relay, ui};
 use crate::cli::ServeArgs;
@@ -30,7 +30,8 @@ pub(super) async fn run(args: ServeArgs) -> Result<()> {
     let options = Options {
         config_dir: paths::config_dir()?,
         state_dir: state_dir()?,
-        device: args.device.unwrap_or_else(default_device_id),
+        device: super::host_identity::device(args.device)?,
+        identity_dir: super::host_identity::directory()?,
         name: args.name,
         binary: args
             .codex_binary

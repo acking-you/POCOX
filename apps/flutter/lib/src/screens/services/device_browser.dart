@@ -540,22 +540,6 @@ class _DeviceFirstServices extends ConsumerWidget {
       return entries.length + (account ? appCount : 0);
     }
 
-    final deviceColumn = _DeviceColumn(
-      relay: relay ?? l10n.relayNotConfigured,
-      accountLogin: accountLogin,
-      accountId: accountId,
-      devices: devices,
-      activeDevice: activeDevice,
-      localDevices: localDevices,
-      localMetadata: localMetadata,
-      capabilityCount: countFor,
-      onSelect: onSelectDevice,
-      relayDown: relayDown,
-      // Beside a detail pane the column owns the full height and scrolls its
-      // own list; stacked it is the page's only content and scrolls with it.
-      filled: split,
-    );
-
     final managementKey = activeDevice == null || activeDevice == _thisDevice
         ? null
         : managementKeys[activeDevice];
@@ -576,15 +560,40 @@ class _DeviceFirstServices extends ConsumerWidget {
           .asData
           ?.value;
     }
+    final deviceColumn = _DeviceColumn(
+      relay: relay ?? l10n.relayNotConfigured,
+      accountLogin: accountLogin,
+      accountId: accountId,
+      devices: devices,
+      activeDevice: activeDevice,
+      localDevices: localDevices,
+      localMetadata: localMetadata,
+      selectedMetadata: metadata,
+      capabilityCount: countFor,
+      onSelect: onSelectDevice,
+      relayDown: relayDown,
+      // Beside a detail pane the column owns the full height and scrolls its
+      // own list; stacked it is the page's only content and scrolls with it.
+      filled: split,
+    );
+
     final detail = <Widget>[
       _DeviceDetailHeader(
-        device: hostingShown ? localMetadata?.hostname : activeDevice,
+        device: hostingShown
+            ? localMetadata?.hostname
+            : activeDevice == null
+            ? null
+            : deviceLabel(
+                activeDevice,
+                hostname: metadata?.hostname,
+                hostId: metadata?.hostId,
+              ),
         local: activeDevice != null && localDevices.contains(activeDevice),
         isDefault: activeDevice != null && activeDevice == preferredDevice,
         onClean: unreachableEntries.isEmpty
             ? null
             : () => _batchRemove(context, ref, unreachableEntries),
-        platform: metadata?.platform ?? remoteDevice?.os,
+        platform: metadata?.instanceLabel ?? remoteDevice?.os,
       ),
       // Another computer that can be managed: its services, running or
       // not, come first. This computer is managed by its own hosting card.
