@@ -23,10 +23,11 @@ static RUNTIME: OnceCell<Runtime> = OnceCell::new();
 static SUPPORT_DIR: OnceCell<PathBuf> = OnceCell::new();
 static REGISTRY: OnceCell<Mutex<HashMap<String, SubEntry>>> = OnceCell::new();
 
+/// A headless supervisor's overrides of the desktop app's hosting defaults.
+/// Its caller has already initialized the installation identity.
 pub(super) struct HostContext {
     pub device: String,
     pub profiles: PathBuf,
-    pub identity_dir: PathBuf,
     pub transport: Option<Transport>,
 }
 
@@ -38,16 +39,22 @@ pub(super) fn configure_host(context: HostContext) -> Result<()> {
         .map_err(|_| anyhow!("the managed host is already initialized"))
 }
 
-/// This process's host identity, with the desktop default when not overridden.
-pub fn device_id() -> String {
-    HOST_CONTEXT
-        .get()
-        .map(|context| context.device.clone())
-        .or_else(|| {
-            pocket_codex_core::device::host_identity().map(|identity| identity.device().to_string())
-        })
-        .unwrap_or_else(pocket_codex_core::service::default_device_id)
+/// The device segment of every service this process publishes: the headless
+/// override, else the persisted installation identity. An unreadable identity
+/// fails hosting instead of publishing under a different key.
+pub fn device_id() -> Result<String> {
+    if let Some(context) = HOST_CONTEXT.get() {
+        return Ok(context.device.clone());
+    }
+    if MOBILE {
+        return Ok(pocket_codex_core::service::default_device_id());
+    }
+    let identity = pocket_codex_core::device::initialize(&support_dir()?.join("identity"))?;
+    Ok(identity.device().to_string())
 }
+
+/// Phones never host, so they keep no installation identity.
+const MOBILE: bool = cfg!(any(target_os = "ios", target_os = "android"));
 
 pub(super) fn host_profiles_dir() -> Option<PathBuf> {
     HOST_CONTEXT.get().map(|context| context.profiles.clone())
@@ -83,13 +90,11 @@ pub fn init(support_dir: PathBuf) -> Result<()> {
                 .map_err(|e| anyhow!("building tokio runtime: {e}"))?,
         )
         .ok();
-    let support_dir = SUPPORT_DIR.get_or_init(|| support_dir);
-    if !cfg!(any(target_os = "ios", target_os = "android")) {
-        let identity_dir = HOST_CONTEXT
-            .get()
-            .map(|context| context.identity_dir.clone())
-            .unwrap_or_else(|| support_dir.join("identity"));
-        pocket_codex_core::device::initialize(&identity_dir)?;
+    SUPPORT_DIR.set(support_dir).ok();
+    // Loaded early so local metadata names the installation before its first
+    // host starts. A damaged identity only blocks hosting, never the app.
+    if let Err(error) = device_id() {
+        tracing::warn!(%error, "host identity unavailable; hosting is blocked until it is restored");
     }
     REGISTRY.set(Mutex::new(HashMap::new())).ok();
     Ok(())

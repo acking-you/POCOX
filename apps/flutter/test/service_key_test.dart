@@ -5,21 +5,28 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/service_key.dart';
 
 void main() {
-  test('installation labels shorten display only and match metadata by ID', () {
-    const id = '12345678-1234-4123-8123-123456789abc';
-    const device = 'wsl-ubuntu.studio.12345678123441238123123456789abc';
-    expect(deviceLabel(device), '12345678 · wsl-ubuntu.studio');
-    expect(deviceLabel(device, hostname: 'studio', hostId: id), 'studio');
-    expect(
-      deviceLabel(device, hostname: 'wrong', hostId: 'other'),
-      '12345678 · wsl-ubuntu.studio',
-    );
-    expect(deviceLabel('my.explicit.device'), 'my.explicit.device');
+  test('installation devices read as hostname and source; others as is', () {
+    const id = '12345678123441238123123456789abc';
+    const device = 'wsl-ubuntu-24-04.studio.$id';
+    expect(installationOf(device), (
+      source: 'wsl-ubuntu-24-04',
+      hostname: 'studio',
+      id: id,
+    ));
+    expect(deviceLabel(device), 'studio (WSL ubuntu-24-04)');
+    expect(deviceLabel('windows.studio.$id'), 'studio (Windows)');
+    expect(deviceLabel('macos.mbp.$id'), 'mbp (macOS)');
+    // Explicit overrides and hostname-only devices are never reinterpreted.
+    for (final other in ['my.explicit.device', 'lb7666', '.studio.$id']) {
+      expect(installationOf(other), isNull, reason: other);
+      expect(deviceLabel(other), other);
+    }
     expect(serviceKeyDevice('pcxu:user:$device:host:pocket'), device);
     expect(
-      serviceKeyLabel('pcxu:user:$device:host:pocket'),
-      '12345678 · wsl-ubuntu.studio · pocket',
+      serviceKeyLabel('pcxu:user:$device:app:default'),
+      'studio (WSL ubuntu-24-04) · default',
     );
+    expect(shortId('12345678-1234-4123-8123-123456789abc'), '12345678');
   });
   test('parses a self-hosted key', () {
     final parsed = parseServiceKey('pcx:lb7666:app:default');

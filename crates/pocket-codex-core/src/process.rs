@@ -721,6 +721,7 @@ mod tests {
         std::thread::sleep(Duration::from_secs(60));
     }
 
+    #[cfg(unix)]
     fn free_port() -> u16 {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
         listener.local_addr().expect("addr").port()
@@ -750,6 +751,7 @@ mod tests {
             .expect("spawn the fixture")
     }
 
+    #[cfg(unix)]
     fn started(pid: u32) -> u64 {
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
         loop {
@@ -761,6 +763,7 @@ mod tests {
         }
     }
 
+    #[cfg(unix)]
     fn until_listening(port: u16) {
         let deadline = std::time::Instant::now() + Duration::from_secs(20);
         while !tcp_port_open("127.0.0.1", port) {

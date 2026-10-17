@@ -353,7 +353,7 @@ pub fn device() -> Result<DeviceView> {
         app_version: env!("CARGO_PKG_VERSION").into(),
         os: std::env::consts::OS.into(),
         metadata: Some(pocket_codex_core::device::DeviceMetadata::current()),
-        device: runtime::device_id(),
+        device: runtime::device_id()?,
         hosts: names.iter().map(|name| host(name)).collect::<Result<_>>()?,
         restore_problem: host_lifecycle::problem(None)?,
     })

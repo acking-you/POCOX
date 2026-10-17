@@ -48,44 +48,13 @@ impl HostIdentity {
         let lock = private_file(&root.join(format!("{scope}.lock")), false)?;
         lock.lock().context("locking host identity")?;
         let path = root.join(format!("{scope}.json"));
-        let record = match File::open(&path) {
-            Ok(file) => {
-                let mut bytes = Vec::new();
-                file.take(4097).read_to_end(&mut bytes)?;
-                if bytes.len() > 4096 {
-                    bail!("host identity is too large");
-                }
-                let record: Record = serde_json::from_slice(&bytes)
-                    .context("reading host identity; restore its saved file before hosting")?;
-                let id = Uuid::parse_str(&record.id).context("invalid host identity ID")?;
-                if record.version != 1
-                    || id.is_nil()
-                    || record.device != sanitize_component(&record.device)
-                    || record.device.is_empty()
-                    || !record.device.ends_with(&format!(".{}", id.simple()))
-                {
-                    bail!("unsupported or invalid host identity");
-                }
-                record
-            },
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                let id = Uuid::new_v4();
-                let source = [
-                    metadata.environment.as_deref().unwrap_or(&metadata.os),
-                    metadata.source_name.as_deref().unwrap_or(""),
-                ]
-                .join("-");
-                let source = component(&source, 24);
-                let hostname = component(&metadata.hostname, 32);
-                let record = Record {
-                    version: 1,
-                    id: id.to_string(),
-                    device: format!("{source}.{hostname}.{}", id.simple()),
-                };
+        let record = match read(&path)? {
+            Some(record) => record,
+            None => {
+                let record = Record::generate(metadata);
                 persist(root, &path, &record)?;
                 record
             },
-            Err(error) => return Err(error).context("reading host identity"),
         };
         Ok(Self {
             root: root.to_path_buf(),
@@ -105,13 +74,58 @@ impl HostIdentity {
     }
 }
 
-fn component(raw: &str, limit: usize) -> String {
-    sanitize_component(
-        &sanitize_component(raw)
-            .chars()
-            .take(limit)
-            .collect::<String>(),
-    )
+impl Record {
+    /// `<source>.<hostname>.<id>`: neither label contains a dot, so a
+    /// controller can split a generated segment without asking its host.
+    fn generate(metadata: &DeviceMetadata) -> Self {
+        let id = Uuid::new_v4();
+        let source = label(
+            &format!(
+                "{}-{}",
+                metadata.environment.as_deref().unwrap_or(&metadata.os),
+                metadata.source_name.as_deref().unwrap_or("")
+            ),
+            24,
+        );
+        let hostname = label(&metadata.hostname, 32);
+        Self {
+            version: 1,
+            id: id.to_string(),
+            device: format!("{source}.{hostname}.{}", id.simple()),
+        }
+    }
+}
+
+/// The saved record, `None` when there is none yet. Anything unreadable is an
+/// error so a damaged file never silently changes the published keys.
+fn read(path: &Path) -> Result<Option<Record>> {
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error).context("reading host identity"),
+    };
+    let mut bytes = Vec::new();
+    file.take(4097).read_to_end(&mut bytes)?;
+    if bytes.len() > 4096 {
+        bail!("host identity is too large");
+    }
+    let record: Record = serde_json::from_slice(&bytes)
+        .context("reading host identity; restore its saved file before hosting")?;
+    let id = Uuid::parse_str(&record.id).context("invalid host identity ID")?;
+    if record.version != 1
+        || id.is_nil()
+        || record.device.is_empty()
+        || record.device != sanitize_component(&record.device)
+        || !record.device.ends_with(&format!(".{}", id.simple()))
+    {
+        bail!("unsupported or invalid host identity");
+    }
+    Ok(Some(record))
+}
+
+fn label(raw: &str, limit: usize) -> String {
+    let dotless = sanitize_component(raw).replace('.', "-");
+    sanitize_component(&dotless.chars().take(limit).collect::<String>())
 }
 
 fn private_file(path: &Path, exclusive: bool) -> Result<File> {

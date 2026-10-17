@@ -7,20 +7,21 @@ use serde::{Deserialize, Serialize};
 mod identity;
 pub use identity::HostIdentity;
 
+/// HTTP route serving [`DeviceMetadata`] on every publisher listener.
+pub const ROUTE: &str = "/host/device";
+
 static HOST: OnceLock<HostIdentity> = OnceLock::new();
 
 /// Initialize a hosting installation before publishing any of its services.
 /// All services of this process must use the same private identity directory.
 pub fn initialize(root: &std::path::Path) -> anyhow::Result<&'static HostIdentity> {
-    if let Some(value) = HOST.get() {
-        anyhow::ensure!(value.root == root, "host identity is already initialized elsewhere");
-        return Ok(value);
-    }
-    let value = HostIdentity::load_or_create(root, &DeviceMetadata::current())?;
-    let _ = HOST.set(value);
-    let value = HOST
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("host identity initialization failed"))?;
+    let value = match HOST.get() {
+        Some(value) => value,
+        None => {
+            let loaded = HostIdentity::load_or_create(root, &DeviceMetadata::current())?;
+            HOST.get_or_init(|| loaded)
+        },
+    };
     anyhow::ensure!(value.root == root, "host identity is already initialized elsewhere");
     Ok(value)
 }
@@ -58,21 +59,28 @@ pub struct DeviceMetadata {
 }
 
 impl DeviceMetadata {
+    /// The only schema version this build reads or writes.
+    pub const PROTOCOL: u32 = 1;
+
     /// Metadata shared by every service owned by this process.
     pub fn current() -> Self {
         static VALUE: OnceLock<DeviceMetadata> = OnceLock::new();
         let mut value = VALUE
             .get_or_init(|| {
                 let os = std::env::consts::OS;
-                let environment = environment(
-                    os,
-                    &std::fs::read_to_string("/proc/sys/kernel/osrelease").unwrap_or_default(),
-                );
-                let release = std::fs::read_to_string("/etc/os-release").unwrap_or_default();
+                let read = |path: &str| {
+                    if os == "linux" {
+                        std::fs::read_to_string(path).unwrap_or_default()
+                    } else {
+                        String::new()
+                    }
+                };
+                let environment = environment(os, &read("/proc/sys/kernel/osrelease"));
+                let release = read("/etc/os-release");
                 let distro = std::env::var("WSL_DISTRO_NAME").ok();
                 Self {
-                    protocol: 1,
-                    os: std::env::consts::OS.into(),
+                    protocol: Self::PROTOCOL,
+                    os: os.into(),
                     arch: std::env::consts::ARCH.into(),
                     source_name: source_name(
                         os,

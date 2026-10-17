@@ -121,7 +121,9 @@ pub fn managed_device(service_key: String) -> Result<ManagedDeviceDto> {
         os: value.os,
         metadata: value
             .metadata
-            .filter(|metadata| metadata.protocol == 1)
+            .filter(|metadata| {
+                metadata.protocol == pocket_codex_core::device::DeviceMetadata::PROTOCOL
+            })
             .map(Into::into),
         app_version: value.app_version,
         hosts: value.hosts.into_iter().map(Into::into).collect(),

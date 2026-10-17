@@ -133,30 +133,32 @@ class _DeviceFirstServices extends ConsumerWidget {
       for (final service in visible)
         if (service.kind == 'host') service.device: service.key,
     };
+    // This computer is a target of its own, never matched by relay device
+    // label: Windows and WSL can publish under the same name. Only the exact
+    // keys its native host registry owns are listed under it.
     final ownManagement = _hostingSupported
         ? ref.watch(deviceManagementProvider).valueOrNull
         : null;
-    final localMetadata = _hostingSupported
-        ? ref.watch(bridgeApiProvider).localDeviceMetadata()
+    // A disabled switch keeps reporting its last key, which no longer names a
+    // live entry.
+    final ownManagementKey = ownManagement?.enabled == true
+        ? ownManagement?.serviceKey
         : null;
     final ownedKeys = {
       for (final host in localHosts) ...[
         host.appServiceKey,
         host.apiServiceKey,
-        host.metaServiceKey,
       ],
-      if (ownManagement?.enabled == true && ownManagement?.serviceKey != null)
-        ownManagement!.serviceKey!,
+      ?ownManagementKey,
     }..remove('');
-    final localDevices = {if (_hostingSupported) _thisDevice};
     bool belongs(ServiceEntry service, String? target) => target == _thisDevice
         ? ownedKeys.contains(service.key)
         : !ownedKeys.contains(service.key) && service.device == target;
     final devices = <String>{
       for (final service in visible)
         if (!ownedKeys.contains(service.key)) service.device,
-      ...localDevices,
-    }.toList()..sort();
+      if (_hostingSupported) _thisDevice,
+    }.toList();
     final preferredKey = ref.watch(
       uiPrefsProvider.select(
         (prefs) => prefs.valueOrNull?.preferredAppServiceKey,
@@ -173,8 +175,10 @@ class _DeviceFirstServices extends ConsumerWidget {
     devices.sort((a, b) {
       int rank(String device) {
         if (device == preferredDevice) return 0;
-        if (localDevices.contains(device)) {
-          return localHosts.isEmpty && ownManagement?.enabled != true ? 3 : 1;
+        // An idle local target waits behind the remote devices, so a wide
+        // layout opens on one that has something to show.
+        if (device == _thisDevice) {
+          return localHosts.isEmpty && ownManagementKey == null ? 3 : 1;
         }
         return 2;
       }
@@ -540,35 +544,23 @@ class _DeviceFirstServices extends ConsumerWidget {
       return entries.length + (account ? appCount : 0);
     }
 
-    final managementKey = activeDevice == null || activeDevice == _thisDevice
+    final managementKey = activeDevice == _thisDevice
         ? null
         : managementKeys[activeDevice];
-    // A selected host reports its own environment. Do not fan out metadata
-    // requests across every discovered device or substitute this app's OS.
-    final remoteDevice = managementKey == null
-        ? null
-        : ref.watch(managedDeviceProvider(managementKey)).asData?.value;
-    final metadataKey = deviceEntries.firstOrNull?.key;
-    DeviceMetadata? metadata;
-    if (hostingShown) {
-      metadata = localMetadata;
-    } else if (managementKey != null) {
-      metadata = remoteDevice?.metadata;
-    } else if (metadataKey != null) {
-      metadata = ref
-          .watch(serviceDeviceMetadataProvider(metadataKey))
-          .asData
-          ?.value;
-    }
+    final localMetadata = _hostingSupported
+        ? ref.watch(localDeviceMetadataProvider)
+        : null;
+    final localName = switch (localMetadata?.hostname) {
+      final hostname? when hostname.isNotEmpty => hostname,
+      _ => l10n.servicesLocalDevice,
+    };
     final deviceColumn = _DeviceColumn(
       relay: relay ?? l10n.relayNotConfigured,
       accountLogin: accountLogin,
       accountId: accountId,
       devices: devices,
       activeDevice: activeDevice,
-      localDevices: localDevices,
-      localMetadata: localMetadata,
-      selectedMetadata: metadata,
+      localName: localName,
       capabilityCount: countFor,
       onSelect: onSelectDevice,
       relayDown: relayDown,
@@ -579,21 +571,33 @@ class _DeviceFirstServices extends ConsumerWidget {
 
     final detail = <Widget>[
       _DeviceDetailHeader(
-        device: hostingShown
-            ? localMetadata?.hostname
-            : activeDevice == null
-            ? null
-            : deviceLabel(
-                activeDevice,
-                hostname: metadata?.hostname,
-                hostId: metadata?.hostId,
-              ),
-        local: activeDevice != null && localDevices.contains(activeDevice),
+        device: switch (activeDevice) {
+          null => null,
+          _thisDevice => localName,
+          final device => deviceLabel(device),
+        },
+        platform: switch (activeDevice) {
+          null => null,
+          _thisDevice => localMetadata?.instanceLabel,
+          _ => _remotePlatform(
+            ref,
+            l10n,
+            managementKey: managementKey,
+            // A live service answers for its publisher; a stale
+            // registration only times out.
+            probeKey:
+                (deviceEntries
+                            .where((s) => !unreachableKeys.contains(s.key))
+                            .firstOrNull ??
+                        deviceEntries.firstOrNull)
+                    ?.key,
+          ),
+        },
+        local: activeDevice == _thisDevice,
         isDefault: activeDevice != null && activeDevice == preferredDevice,
         onClean: unreachableEntries.isEmpty
             ? null
             : () => _batchRemove(context, ref, unreachableEntries),
-        platform: metadata?.instanceLabel ?? remoteDevice?.os,
       ),
       // Another computer that can be managed: its services, running or
       // not, come first. This computer is managed by its own hosting card.
@@ -677,9 +681,9 @@ class _DeviceFirstServices extends ConsumerWidget {
     // header rather than a second column squeezed alongside.
     if (!split) {
       return _NarrowServices(
-        // With no devices at all there is no list worth showing — and the empty
-        // state and the "host this machine" card both live in the detail, so
-        // going straight there is the only way to reach them.
+        // With no devices at all (a phone that discovered nothing; a desktop
+        // always lists itself) there is no list worth showing, and the empty
+        // state lives in the detail.
         showDetail: activeDevice != null || devices.isEmpty,
         canGoBack: devices.isNotEmpty,
         onBack: onClearDevice,
@@ -705,6 +709,45 @@ class _DeviceFirstServices extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// The selected remote device's platform line: what its publisher reports,
+  /// else the OS an older management entry names, else unknown once nothing
+  /// more is coming. Null while the answer is loading. Reads one publisher,
+  /// never every discovered device, and never substitutes this app's OS.
+  String? _remotePlatform(
+    WidgetRef ref,
+    AppLocalizations l10n, {
+    required String? managementKey,
+    required String? probeKey,
+  }) {
+    final ({DeviceMetadata? metadata, String? os, bool loading}) found;
+    if (managementKey != null) {
+      found = ref.watch(
+        managedDeviceProvider(managementKey).select(
+          (device) => (
+            metadata: device.valueOrNull?.metadata,
+            os: device.valueOrNull?.os,
+            loading: device.isLoading && !device.hasValue,
+          ),
+        ),
+      );
+    } else if (probeKey != null) {
+      found = ref.watch(
+        serviceDeviceMetadataProvider(probeKey).select(
+          (metadata) => (
+            metadata: metadata.valueOrNull,
+            os: null,
+            loading: metadata.isLoading && !metadata.hasValue,
+          ),
+        ),
+      );
+    } else {
+      return l10n.servicesPlatformUnknown;
+    }
+    if (found.metadata case final metadata?) return metadata.instanceLabel;
+    if (found.os case final os?) return osLabel(os);
+    return found.loading ? null : l10n.servicesPlatformUnknown;
   }
 }
 

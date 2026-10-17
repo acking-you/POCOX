@@ -22,7 +22,7 @@ class DeviceMetadata {
   /// Runtime environment, currently `wsl`.
   final String? environment;
 
-  /// Display hostname; never an ownership check.
+  /// Display hostname; never an ownership check. May be empty.
   final String hostname;
 
   /// Stable hosting installation identity, independent of process restarts.
@@ -36,24 +36,37 @@ class DeviceMetadata {
 
   /// Human-readable platform, including WSL where the host reports it.
   String get platform => [
-    switch (os) {
-      'windows' => 'Windows',
-      'macos' => 'macOS',
-      'linux' => 'Linux',
-      'android' => 'Android',
-      'ios' => 'iOS',
-      _ => os,
-    },
-    if (environment == 'wsl') 'WSL',
+    osLabel(os),
+    if (environment case final environment?) osLabel(environment),
     ?sourceName,
     arch,
   ].where((part) => part.isNotEmpty).join(' · ');
 
-  /// Platform and a short stable instance label for selecting the right host.
-  String get instanceLabel {
-    final id = hostId?.replaceAll('-', '');
-    return id == null || id.isEmpty
-        ? platform
-        : '$platform · ${id.substring(0, id.length < 8 ? id.length : 8)}';
-  }
+  /// [platform] plus a short stable ID, to tell same-name installations apart.
+  String get instanceLabel => switch (hostId) {
+    final id? when id.isNotEmpty => '$platform · ${shortId(id)}',
+    _ => platform,
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is DeviceMetadata &&
+      other.os == os &&
+      other.arch == arch &&
+      other.environment == environment &&
+      other.hostname == hostname &&
+      other.hostId == hostId &&
+      other.sourceName == sourceName &&
+      other.instanceId == instanceId;
+
+  @override
+  int get hashCode => Object.hash(
+    os,
+    arch,
+    environment,
+    hostname,
+    hostId,
+    sourceName,
+    instanceId,
+  );
 }

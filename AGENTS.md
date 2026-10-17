@@ -1053,8 +1053,12 @@ remain supported. Stable `hostId` and persisted default relay
 keys distinguish OS environments and independent installation directories;
 `instanceId` identifies only the publisher process. Keep identity persistence
 and naming in core, shared by desktop and CLI publishers; explicit `--device`
-remains an override. Show source/distribution and short stable IDs without
-merging by hostname. Document the one-time hostname-default migration and
+remains an override. An unreadable identity blocks only publishing under the
+default name, never app startup. Show `hostname (source)` from the generated
+segment everywhere a device is named (`deviceLabel`), adding a short stable ID
+only where two installations would read the same; never merge by hostname. A
+managed supervisor survives a service that cannot be restored and a status
+report it cannot save. Document the one-time hostname-default migration and
 shared/cloned-state limits in `docs/remote-device-management.md`.
 
 32. **Visual refresh (2026-10-16).** Calm graphite neutrals with ink-black

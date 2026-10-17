@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/hosting/model_service_section.dart';
 import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/managed/management_failure.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
@@ -679,8 +680,8 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
         child: UtilityPage(
           route: '/manage',
           title: host == null
-              ? l10n.managedAddTitle(widget.device)
-              : l10n.managedEditTitle(host.name, widget.device),
+              ? l10n.managedAddTitle(deviceLabel(widget.device))
+              : l10n.managedEditTitle(host.name, deviceLabel(widget.device)),
           parent: UtilityParent(title: l10n.manageServices, route: '/manage'),
           // With little room (keyboard up, large text) the actions scroll
           // with the form instead of covering it.

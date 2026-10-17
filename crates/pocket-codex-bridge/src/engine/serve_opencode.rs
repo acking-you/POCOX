@@ -264,6 +264,7 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     ensure!(!hosts().closing, "the app is quitting");
     // Fallible local/transport setup precedes the owned process.
     let owned = transport::resolve_owned_blocking()?;
+    let device = runtime::device_id()?;
     let config = host_services::config_store()?;
     let store = host_services::host_store()?;
     let uploads = pocket_codex_core::paths::state_dir()?.join("opencode-uploads");
@@ -299,7 +300,6 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
             }
         }));
     let name = prepared.name.clone();
-    let device = runtime::device_id();
     let serving = Serving {
         key: ServiceId::new(&device, ServiceKind::OpenCode, &name).key(),
         meta_key: ServiceId::new(&device, ServiceKind::Meta, &name).key(),

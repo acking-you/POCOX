@@ -1364,12 +1364,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get servicesPlatformUnknown => 'Platform unknown';
 
   @override
-  String get servicesPublisherInstance => 'Publisher instance';
-
-  @override
-  String get servicesHostInstance => 'Hosting instance';
-
-  @override
   String get servicesCapabilities => 'Available capabilities';
 
   @override
@@ -3705,6 +3699,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get managedDevice => 'Device';
+
+  @override
+  String get managedInstallationId => 'Installation ID';
+
+  @override
+  String get managedProcessInstance => 'Process instance';
 
   @override
   String get managedSwitchTitle => 'Allow management from my other devices';

@@ -2,14 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
 
-/// Metadata of the selected publisher only. The provider owns the in-flight
-/// read and is discarded on account/relay changes or leaving the device.
-final serviceDeviceMetadataProvider = FutureProvider.autoDispose
-    .family<DeviceMetadata?, String>((ref, key) {
-      ref.watch(configProvider);
-      return ref.watch(bridgeApiProvider).serviceDeviceMetadata(key);
-    });
-
 /// A remote computer's management view, by its `host:` service key. Reads
 /// only: invalidating it never starts or stops anything.
 final managedDeviceProvider = FutureProvider.autoDispose

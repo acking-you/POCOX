@@ -4,6 +4,8 @@ library;
 
 import 'dart:typed_data';
 
+import 'package:pocket_codex/src/service_key.dart';
+
 part 'bridge/capability_types.dart';
 part 'bridge/connection_types.dart';
 part 'bridge/host_session_types.dart';

@@ -47,7 +47,8 @@ enum HostSwitchPhase {
 }
 
 /// `device · name` for [entry].
-String hostLabel(ServiceEntry entry) => '${entry.device} · ${entry.name}';
+String hostLabel(ServiceEntry entry) =>
+    '${deviceLabel(entry.device)} · ${entry.name}';
 
 /// The sidebar's host row: the host this chat runs on, and the way to change
 /// it.
@@ -464,7 +465,7 @@ class _HostList extends StatelessWidget {
                   // Two lines on touch: a long device or instance name (or the
                   // failure) stays recognisable in a phone's sheet.
                   Text(
-                    s.device,
+                    deviceLabel(s.device),
                     maxLines: touch ? 2 : 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

@@ -466,10 +466,11 @@ fn a_sign_in_server_on_the_official_route_is_admitted() {
             .env(ISOLATED, "1")
             .output()
             .expect("isolated ownership fixture");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        // A renamed test would match nothing and still exit successfully.
         assert!(
-            output.status.success(),
-            "{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
+            output.status.success() && stdout.contains("1 passed"),
+            "{stdout}\n{}",
             String::from_utf8_lossy(&output.stderr)
         );
         return;

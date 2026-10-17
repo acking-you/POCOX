@@ -7,9 +7,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.accountId,
     required this.devices,
     required this.activeDevice,
-    required this.localDevices,
-    required this.localMetadata,
-    required this.selectedMetadata,
+    required this.localName,
     required this.capabilityCount,
     required this.onSelect,
     required this.filled,
@@ -21,9 +19,9 @@ class _DeviceColumn extends StatelessWidget {
   final String? accountId;
   final List<String> devices;
   final String? activeDevice;
-  final Set<String> localDevices;
-  final DeviceMetadata? localMetadata;
-  final DeviceMetadata? selectedMetadata;
+
+  /// This computer's name, for its own (independent) target.
+  final String localName;
   final int Function(String device) capabilityCount;
   final ValueChanged<String> onSelect;
 
@@ -39,21 +37,24 @@ class _DeviceColumn extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final online = successColor(scheme);
+    final labels = {
+      for (final device in devices)
+        device: device == _thisDevice ? localName : deviceLabel(device),
+    };
+    // Installations that share a name (two copies of one WSL distribution,
+    // say) are told apart by their stable ID. The platform is in the header.
+    bool shared(String label) =>
+        labels.values.where((other) => other == label).length > 1;
     final tiles = <Widget>[
       for (final device in devices)
         _DeviceTile(
           key: Key('device-$device'),
-          device: device == _thisDevice
-              ? (localMetadata?.hostname ?? l10n.servicesLocalDevice)
-              : deviceLabel(device),
+          device: labels[device]!,
           subtitle: [
-            if (localDevices.contains(device)) l10n.servicesLocalDevice,
-            if (localDevices.contains(device) && localMetadata != null)
-              localMetadata!.instanceLabel,
-            if (!localDevices.contains(device) &&
-                device == activeDevice &&
-                selectedMetadata != null)
-              selectedMetadata!.instanceLabel,
+            if (device == _thisDevice) l10n.servicesLocalDevice,
+            if (installationOf(device) case final installation?
+                when shared(labels[device]!))
+              shortId(installation.id),
             l10n.servicesDeviceCapabilityCount(capabilityCount(device)),
           ].join(' · '),
           selected: device == activeDevice,
@@ -285,17 +286,19 @@ class _DeviceTile extends StatelessWidget {
 class _DeviceDetailHeader extends StatelessWidget {
   const _DeviceDetailHeader({
     required this.device,
+    required this.platform,
     required this.local,
     required this.isDefault,
     required this.onClean,
-    this.platform,
   });
 
   final String? device;
+
+  /// What the device's publisher reports it runs on; null while loading.
+  final String? platform;
   final bool local;
   final bool isDefault;
   final VoidCallback? onClean;
-  final String? platform;
 
   @override
   Widget build(BuildContext context) {
@@ -316,10 +319,10 @@ class _DeviceDetailHeader extends StatelessWidget {
                 context,
               ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
-            if (device != null)
+            if (platform case final platform?)
               Text(
-                platform ?? l10n.servicesPlatformUnknown,
-                key: const Key('device-platform'),
+                platform,
+                key: const Key('device-detail-platform'),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),

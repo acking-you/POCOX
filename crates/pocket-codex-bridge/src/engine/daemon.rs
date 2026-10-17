@@ -1,17 +1,20 @@
 //! Native foreground hosting shared by CLI and desktop management.
 
 use std::{
-    fs::File,
+    fs::{File, TryLockError},
     path::{Path, PathBuf},
 };
 
-use anyhow::{bail, Context, Result};
-use host_profiles::files::{write_private, Committed};
-use pocket_codex_core::process::process_identity;
+use anyhow::{Context, Result};
+use host_profiles::files::write_private;
 use pocket_codex_pb::{RelaySession, Transport};
 use serde::{Deserialize, Serialize};
 
 use super::{host_lifecycle, host_profiles, management, runtime, serve};
+
+/// Held for the supervisor's lifetime; its holder is the live supervisor.
+const OWNER_LOCK: &str = "owner.lock";
+const STATUS: &str = "status.json";
 
 /// Startup configuration for one native managed-host supervisor.
 pub struct Options {
@@ -19,9 +22,8 @@ pub struct Options {
     pub config_dir: PathBuf,
     /// Private daemon state, independent of desktop restore preferences.
     pub state_dir: PathBuf,
-    /// Stable CLI installation identity, shared with its standalone workers.
-    pub identity_dir: PathBuf,
-    /// Device identity used by every service and the management entry.
+    /// Device segment of every service and the management entry. The caller
+    /// initializes the installation identity before starting.
     pub device: String,
     /// Initial Codex instance, used only without a saved lifecycle choice.
     pub name: String,
@@ -50,13 +52,11 @@ pub struct ServiceStatus {
     pub key: String,
 }
 
-/// Private, identity-checked daemon status; contains no launch secrets.
+/// What the supervisor last reported; contains no launch secrets.
 #[derive(Serialize, Deserialize)]
 pub struct Status {
     /// Supervisor PID.
     pub pid: u32,
-    /// Supervisor process start time, for rejecting reused PIDs.
-    pub started: u64,
     /// Management permission and relay reachability.
     pub management: management::LocalStatus,
     /// Services owned by this supervisor.
@@ -66,8 +66,10 @@ pub struct Status {
 /// One foreground owner of all services created through its management entry.
 pub struct Manager {
     state_dir: PathBuf,
-    started: u64,
     stopped: bool,
+    /// The status file's current contents, so an unchanged state is not
+    /// rewritten every tick.
+    written: Vec<u8>,
     _lock: File,
 }
 
@@ -81,7 +83,7 @@ fn lock(state: &Path) -> Result<File> {
         std::fs::set_permissions(state, std::fs::Permissions::from_mode(0o700))?;
         options.mode(0o600);
     }
-    let file = options.open(state.join("owner.lock"))?;
+    let file = options.open(state.join(OWNER_LOCK))?;
     file.try_lock()
         .context("another managed-host supervisor owns this state directory")?;
     Ok(file)
@@ -94,12 +96,9 @@ impl Manager {
     pub fn start(options: Options) -> Result<Self> {
         let name = super::host_names::canonical(&options.name)?;
         let lock = lock(&options.state_dir)?;
-        let identity =
-            process_identity(std::process::id()).context("reading supervisor identity")?;
         runtime::configure_host(runtime::HostContext {
             device: pocket_codex_core::service::sanitize_component(&options.device),
             profiles: options.state_dir.join("hosting"),
-            identity_dir: options.identity_dir,
             transport: options.relay.map(|session| Transport {
                 session,
                 namespace: None,
@@ -109,34 +108,16 @@ impl Manager {
         runtime::init(options.config_dir)?;
         let mut manager = Self {
             state_dir: options.state_dir,
-            started: identity.started,
             stopped: false,
+            written: Vec::new(),
             _lock: lock,
         };
-        let restored = (|| -> Result<()> {
-            let entries = host_lifecycle::entries()?;
-            for (name, entry) in &entries {
-                if entry.runtime.is_some() {
-                    host_lifecycle::restore(name, Some(entry.revision), None)
-                        .with_context(|| format!("restoring managed service `{name}`"))?;
-                }
-            }
-            if !entries.contains_key(&name) {
-                host_lifecycle::restore(
-                    &name,
-                    None,
-                    Some(host_profiles::Runtime::Codex {
-                        binary: options.binary,
-                        port: options.port,
-                        proxy: options.proxy,
-                    }),
-                )?;
-            }
-            management::set_enabled(true)?;
-            manager.write_status()?;
-            Ok(())
-        })();
-        if let Err(error) = restored {
+        let initial = host_profiles::Runtime::Codex {
+            binary: options.binary,
+            port: options.port,
+            proxy: options.proxy,
+        };
+        if let Err(error) = manager.restore(&name, initial) {
             if let Err(stop) = manager.stop() {
                 tracing::error!(%stop, "managed-host startup cleanup failed");
             }
@@ -145,11 +126,34 @@ impl Manager {
         Ok(manager)
     }
 
-    /// Refresh the private status file without exporting credentials or argv.
-    pub fn write_status(&self) -> Result<Status> {
+    /// Restore every saved service, then publish management. A service that
+    /// cannot start is reported and left for repair from another device; only
+    /// an unreadable restore ledger, whose choices would be guesses, stops
+    /// startup.
+    fn restore(&mut self, initial_name: &str, initial: host_profiles::Runtime) -> Result<()> {
+        let entries = host_lifecycle::entries()?;
+        let saved = entries
+            .iter()
+            .filter(|(_, entry)| entry.runtime.is_some())
+            .map(|(name, entry)| (name.as_str(), Some(entry.revision), None));
+        let first_start =
+            (!entries.contains_key(initial_name)).then_some((initial_name, None, Some(initial)));
+        for (name, revision, runtime) in saved.chain(first_start) {
+            if let Err(error) = host_lifecycle::restore(name, revision, runtime) {
+                tracing::warn!(service = name, "not restored: {error:#}");
+            }
+        }
+        management::set_enabled(true)?;
+        self.refresh_status()?;
+        Ok(())
+    }
+
+    /// Report the current state to `pocket-codex status`, rewriting the file
+    /// only when it changed. The file is a view: failing to save it is logged,
+    /// never fatal to the services.
+    pub fn refresh_status(&mut self) -> Result<Status> {
         let status = Status {
             pid: std::process::id(),
-            started: self.started,
             management: management::local_status()?,
             services: serve::serve_status()
                 .into_iter()
@@ -162,10 +166,12 @@ impl Manager {
                 })
                 .collect(),
         };
-        if write_private(&self.state_dir.join("status.json"), &serde_json::to_vec(&status)?)?
-            != Committed::Durable
-        {
-            bail!("managed-host status could not be durably saved");
+        let bytes = serde_json::to_vec(&status)?;
+        if bytes != self.written {
+            match write_private(&self.state_dir.join(STATUS), &bytes) {
+                Ok(_) => self.written = bytes,
+                Err(error) => tracing::warn!("managed-host status not saved: {error:#}"),
+            }
         }
         Ok(status)
     }
@@ -176,7 +182,7 @@ impl Manager {
         if !self.stopped {
             serve::serve_stop_all()?;
             self.stopped = true;
-            match std::fs::remove_file(self.state_dir.join("status.json")) {
+            match std::fs::remove_file(self.state_dir.join(STATUS)) {
                 Ok(()) => {},
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
                 Err(error) => return Err(error).context("removing managed-host status"),
@@ -194,24 +200,26 @@ impl Drop for Manager {
     }
 }
 
-/// Read fresh status only when the original supervisor still owns its PID.
+/// The running supervisor's last report, or `None` when no supervisor holds
+/// this state directory (or it has not reported yet).
 pub fn read_status(state_dir: &Path) -> Result<Option<Status>> {
-    let path = state_dir.join("status.json");
-    let bytes = match std::fs::read(&path) {
-        Ok(bytes) => bytes,
+    let owner = match File::open(state_dir.join(OWNER_LOCK)) {
+        Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error).context("reading managed-host status"),
+        Err(error) => return Err(error).context("opening the managed-host lock"),
     };
-    if std::fs::metadata(&path)?
-        .modified()?
-        .elapsed()
-        .map_or(true, |age| age > std::time::Duration::from_secs(15))
-    {
-        return Ok(None);
+    match owner.try_lock_shared() {
+        // Nobody holds it; dropping the file releases this probe.
+        Ok(()) => return Ok(None),
+        Err(TryLockError::WouldBlock) => {},
+        Err(TryLockError::Error(error)) => {
+            return Err(error).context("probing the managed-host lock");
+        },
     }
-    let status: Status = serde_json::from_slice(&bytes).context("reading managed-host status")?;
-    let current = std::env::current_exe()?.canonicalize()?;
-    Ok(process_identity(status.pid)
-        .filter(|owner| owner.started == status.started && owner.executable == current)
-        .map(|_| status))
+    match std::fs::read(state_dir.join(STATUS)) {
+        // A report from a different version shows as not reported yet.
+        Ok(bytes) => Ok(serde_json::from_slice(&bytes).ok()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error).context("reading managed-host status"),
+    }
 }

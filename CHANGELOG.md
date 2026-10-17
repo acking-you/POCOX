@@ -9,6 +9,19 @@ breaking change goes.
 
 ## Unreleased
 
+- `pocket-codex serve --allow-remote-management` lets other devices manage a
+  CLI host (for example a systemd unit in WSL or on a server) exactly like a
+  desktop: add, edit, apply and stop its Codex, OpenCode and Claude services.
+  Saved choices survive restarts, a service that cannot start is reported
+  instead of taking management down, and `pocket-codex status` lists it. See
+  [CLI host](docs/remote-device-management.md#cli-host).
+- Windows, each WSL distribution and every separate installation on one
+  computer now publish under their own stable name, so they can be hosted side
+  by side. The services page keeps this computer's controls on its own entry,
+  names devices as `studio (WSL ubuntu)` and shows the platform each host
+  reports. **Breaking:** a host started without `--device` publishes under its
+  new installation name once; pick it again in the host switcher. Hosts with an
+  explicit `--device` keep their name.
 - Conversations Codex Desktop ran in its managed worktrees are listed under
   the project they came from, instead of as more projects of the same name.
 - Phones: a long-pressed message darkens in its own outline instead of

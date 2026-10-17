@@ -87,6 +87,20 @@ final servicesProvider = FutureProvider<List<ServiceEntry>>((ref) async {
   return ref.watch(bridgeApiProvider).discoverServices();
 });
 
+/// This app's own publisher identity, known before its first host starts.
+final localDeviceMetadataProvider = Provider<DeviceMetadata>(
+  (ref) => ref.watch(bridgeApiProvider).localDeviceMetadata(),
+);
+
+/// What the publisher of service [key] reports about itself; null for an older
+/// host without the route. Read for the selected device only, and discarded on
+/// account/relay changes or leaving the device.
+final serviceDeviceMetadataProvider = FutureProvider.autoDispose
+    .family<DeviceMetadata?, String>((ref, key) {
+      ref.watch(configProvider);
+      return ref.watch(bridgeApiProvider).serviceDeviceMetadata(key);
+    });
+
 /// Active local subscriptions.
 final subscriptionsProvider = FutureProvider<List<SubInfo>>((ref) async {
   return ref.watch(bridgeApiProvider).subscriptions();

@@ -182,7 +182,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     // Reading another device's sessions is reached from that device, so name it:
     // otherwise a remote list is indistinguishable from this machine's own.
     final key = widget.source.serviceKey;
-    final device = key == null ? '' : serviceKeyDevice(key);
+    final device = key == null ? '' : deviceLabel(serviceKeyDevice(key));
     final remoteDevice = device.isEmpty ? null : device;
     return UtilityPage(
       route: '/sessions',

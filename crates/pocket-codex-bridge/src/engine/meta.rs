@@ -283,7 +283,7 @@ pub(super) fn device_endpoint(service_key: &str) -> Result<Url> {
     let mut url = base_url_for(service_key, id.kind == ServiceKind::Api)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("host URL cannot be a base"))?
-        .extend(["host", "device"]);
+        .extend(pocket_codex_core::device::ROUTE.split('/').skip(1));
     Ok(url)
 }
 

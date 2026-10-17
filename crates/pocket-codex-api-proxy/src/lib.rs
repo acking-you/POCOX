@@ -150,7 +150,7 @@ pub async fn serve(listener: TcpListener, proxy: Option<String>) -> Result<()> {
 fn proxy_router(state: ProxyState) -> Router {
     Router::new()
         .route(
-            "/host/device",
+            pocket_codex_core::device::ROUTE,
             axum::routing::get(|| async {
                 axum::Json(pocket_codex_core::device::DeviceMetadata::current())
             }),

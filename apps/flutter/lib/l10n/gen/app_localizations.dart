@@ -2516,18 +2516,6 @@ abstract class AppLocalizations {
   /// **'Platform unknown'**
   String get servicesPlatformUnknown;
 
-  /// No description provided for @servicesPublisherInstance.
-  ///
-  /// In en, this message translates to:
-  /// **'Publisher instance'**
-  String get servicesPublisherInstance;
-
-  /// No description provided for @servicesHostInstance.
-  ///
-  /// In en, this message translates to:
-  /// **'Hosting instance'**
-  String get servicesHostInstance;
-
   /// No description provided for @servicesCapabilities.
   ///
   /// In en, this message translates to:
@@ -6433,6 +6421,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device'**
   String get managedDevice;
+
+  /// No description provided for @managedInstallationId.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation ID'**
+  String get managedInstallationId;
+
+  /// No description provided for @managedProcessInstance.
+  ///
+  /// In en, this message translates to:
+  /// **'Process instance'**
+  String get managedProcessInstance;
 
   /// No description provided for @managedSwitchTitle.
   ///

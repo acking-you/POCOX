@@ -1324,12 +1324,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get servicesPlatformUnknown => '平台未知';
 
   @override
-  String get servicesPublisherInstance => '服务进程实例';
-
-  @override
-  String get servicesHostInstance => '托管实例';
-
-  @override
   String get servicesCapabilities => '可用能力';
 
   @override
@@ -3492,6 +3486,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get managedDevice => '设备';
+
+  @override
+  String get managedInstallationId => '安装 ID';
+
+  @override
+  String get managedProcessInstance => '进程实例';
 
   @override
   String get managedSwitchTitle => '允许我的其他设备管理这台电脑';

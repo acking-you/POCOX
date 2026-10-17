@@ -110,7 +110,7 @@ class _ApiServicePanelState extends ConsumerState<ApiServicePanel> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final name = serviceKeyName(widget.serviceKey);
-    final device = serviceKeyDevice(widget.serviceKey);
+    final device = deviceLabel(serviceKeyDevice(widget.serviceKey));
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
       child: Column(

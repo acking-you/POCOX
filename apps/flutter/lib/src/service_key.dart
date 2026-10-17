@@ -89,19 +89,54 @@ SessionProtocol sessionProtocolOf(String key) =>
 /// The device that publishes [key], or empty when [key] isn't a service key.
 String serviceKeyDevice(String key) => parseServiceKey(key).device;
 
-/// Short display of a generated installation-scoped device ID. Routing always
-/// keeps the full key. Host-provided names apply only to that exact stable ID.
-String deviceLabel(String device, {String? hostname, String? hostId}) {
-  final at = device.lastIndexOf('.');
-  if (at < 1) return device;
-  final id = device.substring(at + 1);
-  if (!RegExp(r'^[0-9a-f]{32}$').hasMatch(id)) return device;
-  if (id == hostId?.replaceAll('-', '') &&
-      hostname != null &&
-      hostname.isNotEmpty) {
-    return hostname;
-  }
-  return '${id.substring(0, 8)} · ${device.substring(0, at)}';
+final _installationId = RegExp(r'^[0-9a-f]{32}$');
+
+/// The parts of a device segment generated from a hosting installation's
+/// identity, `<source>.<hostname>.<id>`; null for an explicit `--device`
+/// override or an older hostname-only device. Routing always keeps the full
+/// segment: this is for display only.
+({String source, String hostname, String id})? installationOf(String device) {
+  final first = device.indexOf('.');
+  final last = device.lastIndexOf('.');
+  if (first < 1 || last <= first + 1) return null;
+  final id = device.substring(last + 1);
+  if (!_installationId.hasMatch(id)) return null;
+  return (
+    source: device.substring(0, first),
+    hostname: device.substring(first + 1, last),
+    id: id,
+  );
+}
+
+/// The OS (or `wsl`) a publisher reports, as people write it.
+String osLabel(String os) => switch (os) {
+  'windows' => 'Windows',
+  'macos' => 'macOS',
+  'linux' => 'Linux',
+  'wsl' => 'WSL',
+  'android' => 'Android',
+  'ios' => 'iOS',
+  _ => os,
+};
+
+/// The first eight hex digits of a stable ID: enough to tell installations of
+/// the same name apart without showing the whole UUID.
+String shortId(String id) {
+  final hex = id.replaceAll('-', '');
+  return hex.length <= 8 ? hex : hex.substring(0, 8);
+}
+
+/// How [device] is named to people: `studio (WSL ubuntu)` for a generated
+/// installation segment, otherwise the segment itself.
+String deviceLabel(String device) {
+  final installation = installationOf(device);
+  if (installation == null) return device;
+  final source = installation.source;
+  final dash = source.indexOf('-');
+  final from = dash < 0
+      ? osLabel(source)
+      : '${osLabel(source.substring(0, dash))} ${source.substring(dash + 1)}';
+  return '${installation.hostname} ($from)';
 }
 
 /// The instance name in [key], falling back to the whole key so a label is never

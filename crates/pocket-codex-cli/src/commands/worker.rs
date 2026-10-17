@@ -61,7 +61,7 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
             outcome?;
         },
         WorkerCmd::ApiProxy(args) => {
-            super::host_identity::device(None)?;
+            super::host_identity::initialize_for_metadata();
             api_proxy::run(args.listen, args.proxy).await?;
         },
     }
@@ -177,13 +177,31 @@ async fn monitor(
     }
 }
 
-async fn shutdown_signal() -> Result<()> {
+/// Ctrl-C, or the platform's other polite stops: SIGTERM (how systemd stops a
+/// unit), or on Windows Ctrl-Break and closing the console, logging off or
+/// shutting down, so owned processes are stopped instead of orphaned.
+pub(super) async fn shutdown_signal() -> Result<()> {
     #[cfg(unix)]
     {
         let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())?;
         tokio::select! { result = tokio::signal::ctrl_c() => result?, _ = term.recv() => {} }
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
+    {
+        use tokio::signal::windows;
+        let mut brk = windows::ctrl_break()?;
+        let mut close = windows::ctrl_close()?;
+        let mut logoff = windows::ctrl_logoff()?;
+        let mut shutdown = windows::ctrl_shutdown()?;
+        tokio::select! {
+            result = tokio::signal::ctrl_c() => result?,
+            _ = brk.recv() => {},
+            _ = close.recv() => {},
+            _ = logoff.recv() => {},
+            _ = shutdown.recv() => {},
+        }
+    }
+    #[cfg(not(any(unix, windows)))]
     tokio::signal::ctrl_c().await?;
     Ok(())
 }

@@ -215,7 +215,7 @@ async fn launch(generation: u64) -> Result<Serving> {
         bail!("management context changed");
     }
     let (listener, addr) = host_services::bind_loopback("device management")?;
-    let key = ServiceId::new(runtime::device_id(), ServiceKind::Host, "pocket").key();
+    let key = ServiceId::new(runtime::device_id()?, ServiceKind::Host, "pocket").key();
     let app = super::router(owned.epoch, generation);
     let task = runtime::runtime().spawn(host_services::supervise(
         "device management",

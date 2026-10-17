@@ -70,6 +70,23 @@ fn same_machine_environments_and_installations_register_independently() {
 }
 
 #[test]
+fn generated_segments_split_into_source_hostname_and_id() {
+    let root = Root::new();
+    let mut current = metadata("linux", Some("wsl"), Some("Ubuntu-24.04"));
+    current.hostname = "Studio.local".into();
+    let identity = HostIdentity::load_or_create(&root.0, &current).expect("identity");
+    let id = Uuid::parse_str(identity.id())
+        .expect("id")
+        .simple()
+        .to_string();
+    assert_eq!(identity.device().split('.').collect::<Vec<_>>(), [
+        "wsl-ubuntu-24-04",
+        "studio-local",
+        id.as_str()
+    ]);
+}
+
+#[test]
 fn identity_and_registration_survive_restart_rename_and_os_upgrade() {
     let root = Root::new();
     let first = HostIdentity::load_or_create(
