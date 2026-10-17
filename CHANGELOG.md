@@ -22,6 +22,8 @@ breaking change goes.
   reports. **Breaking:** a host started without `--device` publishes under its
   new installation name once; pick it again in the host switcher. Hosts with an
   explicit `--device` keep their name.
+- A turn that completes while the running-sessions list refreshes no longer
+  shows as running again until the next refresh (most visible on Windows).
 - Conversations Codex Desktop ran in its managed worktrees are listed under
   the project they came from, instead of as more projects of the same name.
 - Phones: a long-pressed message darkens in its own outline instead of
