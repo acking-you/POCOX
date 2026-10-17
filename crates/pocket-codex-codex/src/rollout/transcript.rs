@@ -72,7 +72,7 @@ impl TranscriptItem {
 /// the whole read, so a partially-written rollout (one a live writer is
 /// appending to) still renders what is parseable.
 pub fn read_transcript(path: &Path) -> Result<Vec<TranscriptItem>> {
-    let reader = std::io::BufReader::new(std::fs::File::open(path)?);
+    let reader = super::open_rollout(path)?;
     let mut transcript = Transcript::default();
     for (idx, line) in reader.lines().enumerate() {
         let line = line?;

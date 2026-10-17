@@ -3,12 +3,15 @@
 //! Read-only over `CODEX_HOME` via the `pocket-codex-codex` rollout / liveness
 //! / takeover primitives — the same two-signal model the bridge's
 //! `engine/sessions.rs` uses, but exposed through serde wire DTOs so the
-//! inventory can be served over HTTP and consumed by a remote client.
+//! inventory can be served over HTTP and consumed by a remote client. The
+//! host routes ask the colocated app-server first (`crate::codex_inventory`);
+//! these file-only functions cover what it cannot see and stand in when it
+//! does not answer.
 //!
 //! Every function here is **blocking** (it scans the filesystem and process
 //! table); HTTP handlers run them on a blocking task.
 
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use anyhow::{anyhow, Result};
 use pocket_codex_codex::{
@@ -45,6 +48,14 @@ pub struct LocalSession {
     pub cwd: Option<String>,
     /// Best-effort first-user-message preview.
     pub preview: String,
+    /// User-set title from `thread/list`; `None` when never renamed or when
+    /// the rollouts were scanned directly.
+    #[serde(default)]
+    pub name: Option<String>,
+    /// The colocated app-server's `Thread.status` type (`notLoaded` / `idle`
+    /// / `active` / `systemError`); `None` when no app-server answered.
+    #[serde(default)]
+    pub status: Option<String>,
     /// Originating client (`cli` / `vscode` / …), when recorded.
     pub source: Option<String>,
     /// Parent thread, when this session is a spawned child.
@@ -156,6 +167,8 @@ pub fn list() -> Result<Vec<LocalSession>> {
             thread_id: info.thread_id,
             cwd: info.cwd,
             preview: info.preview,
+            name: None,
+            status: None,
             source: info.source,
             parent_thread_id: info.parent_thread_id,
             thread_source: info.thread_source,
@@ -173,25 +186,40 @@ pub fn list() -> Result<Vec<LocalSession>> {
 /// Discover running sessions without replaying inactive transcript files.
 /// Ownership is checked in one batch; only held files need lifecycle scans.
 pub fn running() -> Result<Vec<LocalSession>> {
-    let paths = rollout::session_paths()?;
-    Ok(running_at(&paths))
+    running_except(&HashSet::new())
 }
 
-fn running_at(paths: &[PathBuf]) -> Vec<LocalSession> {
-    let held = held_open_paths(paths);
+/// [`running`], leaving out `skip` (threads whose state the colocated
+/// app-server reports itself).
+pub fn running_except(skip: &HashSet<String>) -> Result<Vec<LocalSession>> {
+    let paths = rollout::session_paths()?;
+    Ok(running_at(&paths, skip))
+}
+
+fn running_at(paths: &[PathBuf], skip: &HashSet<String>) -> Vec<LocalSession> {
+    // Codex decompresses a rollout before writing to it: a compressed one has
+    // no writer to find.
+    let plain: Vec<PathBuf> = paths
+        .iter()
+        .filter(|path| !rollout::is_compressed(path))
+        .cloned()
+        .collect();
+    let held = held_open_paths(&plain);
     let mut out = Vec::new();
     for path in held {
         if !matches!(rollout::classify_turn_state(&path), Ok(rollout::TurnState::Incomplete)) {
             continue;
         }
         let Ok(info) = rollout::read_session_info(&path) else { continue };
-        if info.turn_state != rollout::TurnState::Incomplete {
+        if info.turn_state != rollout::TurnState::Incomplete || skip.contains(&info.thread_id) {
             continue;
         }
         out.push(LocalSession {
             thread_id: info.thread_id,
             cwd: info.cwd,
             preview: info.preview,
+            name: None,
+            status: None,
             source: info.source,
             parent_thread_id: info.parent_thread_id,
             thread_source: info.thread_source,
@@ -246,15 +274,6 @@ pub(crate) fn rollout_path(thread_id: &str) -> Result<PathBuf> {
         .ok_or_else(|| anyhow!("no rollout found for thread {thread_id}"))
 }
 
-/// Read the liveness and transcript used to seed a session follow stream.
-pub fn follow_update(thread_id: &str, protected: &[u32]) -> Result<SessionFollowUpdate> {
-    Ok(SessionFollowUpdate {
-        liveness: liveness(thread_id, protected)?,
-        items: transcript(thread_id)?,
-        history_revision: None,
-    })
-}
-
 #[cfg(test)]
 mod running_tests {
     use std::io::Write;
@@ -276,18 +295,26 @@ mod running_tests {
         )
         .expect("metadata");
         let paths = [path, orphan];
-        assert!(running_at(&paths).is_empty(), "ownership alone is not running");
+        assert!(running_at(&paths, &HashSet::new()).is_empty(), "ownership alone is not running");
         writer.write_all(started.as_bytes()).expect("start");
-        let active = running_at(&paths);
+        let active = running_at(&paths, &HashSet::new());
         assert_eq!(active.len(), 1, "unowned incomplete sessions are not active");
         assert_eq!(active[0].thread_id, "running");
         assert_eq!(active[0].safety, "ownedRunning");
         assert!(!active[0].allows_resume);
         writer.write_all(completed.as_bytes()).expect("complete");
-        assert!(running_at(&paths).is_empty(), "completion is visible with the file still open");
+        assert!(
+            running_at(&paths, &HashSet::new()).is_empty(),
+            "completion is visible with the file still open"
+        );
         writer.write_all(started.as_bytes()).expect("restart");
-        assert_eq!(running_at(&paths).len(), 1);
+        assert_eq!(running_at(&paths, &HashSet::new()).len(), 1);
+        let reported = HashSet::from(["running".to_owned()]);
+        assert!(running_at(&paths, &reported).is_empty(), "the app-server reports its own threads");
         drop(writer);
-        assert!(running_at(&paths).is_empty(), "exiting a writer clears the badge");
+        assert!(
+            running_at(&paths, &HashSet::new()).is_empty(),
+            "exiting a writer clears the badge"
+        );
     }
 }

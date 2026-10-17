@@ -7095,21 +7095,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   LocalSessionDto dco_decode_local_session_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return LocalSessionDto(
       threadId: dco_decode_String(arr[0]),
       cwd: dco_decode_opt_String(arr[1]),
       preview: dco_decode_String(arr[2]),
-      source: dco_decode_opt_String(arr[3]),
-      parentThreadId: dco_decode_opt_String(arr[4]),
-      threadSource: dco_decode_opt_String(arr[5]),
-      updatedAt: dco_decode_i_64(arr[6]),
-      turnState: dco_decode_String(arr[7]),
-      heldOpen: dco_decode_bool(arr[8]),
-      safety: dco_decode_String(arr[9]),
-      allowsResume: dco_decode_bool(arr[10]),
-      requiresTakeover: dco_decode_bool(arr[11]),
+      name: dco_decode_opt_String(arr[3]),
+      status: dco_decode_opt_String(arr[4]),
+      source: dco_decode_opt_String(arr[5]),
+      parentThreadId: dco_decode_opt_String(arr[6]),
+      threadSource: dco_decode_opt_String(arr[7]),
+      updatedAt: dco_decode_i_64(arr[8]),
+      turnState: dco_decode_String(arr[9]),
+      heldOpen: dco_decode_bool(arr[10]),
+      safety: dco_decode_String(arr[11]),
+      allowsResume: dco_decode_bool(arr[12]),
+      requiresTakeover: dco_decode_bool(arr[13]),
     );
   }
 
@@ -9128,6 +9130,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_threadId = sse_decode_String(deserializer);
     var var_cwd = sse_decode_opt_String(deserializer);
     var var_preview = sse_decode_String(deserializer);
+    var var_name = sse_decode_opt_String(deserializer);
+    var var_status = sse_decode_opt_String(deserializer);
     var var_source = sse_decode_opt_String(deserializer);
     var var_parentThreadId = sse_decode_opt_String(deserializer);
     var var_threadSource = sse_decode_opt_String(deserializer);
@@ -9141,6 +9145,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       threadId: var_threadId,
       cwd: var_cwd,
       preview: var_preview,
+      name: var_name,
+      status: var_status,
       source: var_source,
       parentThreadId: var_parentThreadId,
       threadSource: var_threadSource,
@@ -11150,6 +11156,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.threadId, serializer);
     sse_encode_opt_String(self.cwd, serializer);
     sse_encode_String(self.preview, serializer);
+    sse_encode_opt_String(self.name, serializer);
+    sse_encode_opt_String(self.status, serializer);
     sse_encode_opt_String(self.source, serializer);
     sse_encode_opt_String(self.parentThreadId, serializer);
     sse_encode_opt_String(self.threadSource, serializer);

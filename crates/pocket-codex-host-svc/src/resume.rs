@@ -3,7 +3,8 @@
 //! Mirrors the bridge's `engine/sessions::force_resume`, but resumes over
 //! **loopback** into the app-server hosted alongside this meta service (rather
 //! than via a relay-resolved service key): evict every live process holding the
-//! rollout open (except the protected pids), then `thread/resume`.
+//! rollout open (except the protected pids), then `thread/resume`. A thread
+//! that app-server already has loaded is joined instead; nothing is evicted.
 
 use std::net::SocketAddr;
 
@@ -12,7 +13,7 @@ use pocket_codex_codex::{client::AppClient, rollout, takeover};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::sessions::Holder;
+use crate::{app_server::CodexReader, codex_inventory, sessions::Holder};
 
 /// Outcome of a [`force_resume`], reporting exactly what the eviction + resume
 /// did.
@@ -46,14 +47,33 @@ pub fn protected_pids(app_ws_addr: SocketAddr) -> Vec<u32> {
 }
 
 /// Evict every live holder of `thread_id`'s rollout (except the protected
-/// pids), then `thread/resume` it into the app-server at `app_ws_addr` over
-/// loopback.
+/// pids), then `thread/resume` it into the colocated app-server over loopback.
 ///
 /// Re-checks liveness against the freshest state right before acting and
-/// refuses to resume a rollout whose turn is running right now (that would make
-/// two writers append to one file). The caller is responsible for gating on
-/// user confirmation.
-pub async fn force_resume(app_ws_addr: SocketAddr, thread_id: &str) -> Result<ForceResumeOutcome> {
+/// refuses to resume a rollout whose turn is running right now in another
+/// process (that would make two writers append to one file). A thread the
+/// colocated app-server has loaded is joined, running or not, as any of its
+/// clients would. The caller is responsible for gating on user confirmation.
+pub async fn force_resume(reader: &CodexReader, thread_id: &str) -> Result<ForceResumeOutcome> {
+    let app_ws_addr = reader.address();
+    if let Some(thread) = codex_inventory::loaded_thread(reader, thread_id).await {
+        if rollout::thread_source(&thread).as_deref() == Some("guardian_review") {
+            return Err(anyhow!(
+                "Guardian approval sessions are read-only; open their parent session"
+            ));
+        }
+        let (resumed, resume_error) = match resume_into(app_ws_addr, thread_id).await {
+            Ok(()) => (true, None),
+            Err(e) => (false, Some(format!("{e:#}"))),
+        };
+        return Ok(ForceResumeOutcome {
+            killed: Vec::new(),
+            survived: Vec::new(),
+            still_held: false,
+            resumed,
+            resume_error,
+        });
+    }
     let tid = thread_id.to_string();
     // Inspect + evict touch the filesystem and process table (force_release
     // sends kills), so run them off the async runtime.

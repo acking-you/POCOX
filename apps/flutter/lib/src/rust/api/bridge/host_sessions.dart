@@ -478,6 +478,13 @@ class LocalSessionDto {
   /// Best-effort first-user-message preview.
   final String preview;
 
+  /// User-set title, when the host's app-server listed one.
+  final String? name;
+
+  /// The host app-server's `Thread.status` type (`notLoaded` / `idle` /
+  /// `active` / `systemError`); `None` when no app-server answered.
+  final String? status;
+
   /// Originating client (`cli` / `vscode` / …), when recorded.
   final String? source;
 
@@ -490,7 +497,8 @@ class LocalSessionDto {
   /// Last-modified time of the rollout, unix seconds.
   final PlatformInt64 updatedAt;
 
-  /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`).
+  /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`/
+  /// `unknown`).
   final String turnState;
 
   /// Whether the rollout is currently held open by a live process.
@@ -500,8 +508,8 @@ class LocalSessionDto {
   /// `ownedIdle`).
   final String safety;
 
-  /// Whether the UI may offer a resume action (false only while a turn is
-  /// actively running).
+  /// Whether the UI may offer a resume action: false while another process
+  /// runs a turn; a thread the host's app-server runs is joined.
   final bool allowsResume;
 
   /// Whether resuming requires a force takeover (a live owner must be
@@ -512,6 +520,8 @@ class LocalSessionDto {
     required this.threadId,
     this.cwd,
     required this.preview,
+    this.name,
+    this.status,
     this.source,
     this.parentThreadId,
     this.threadSource,
@@ -528,6 +538,8 @@ class LocalSessionDto {
       threadId.hashCode ^
       cwd.hashCode ^
       preview.hashCode ^
+      name.hashCode ^
+      status.hashCode ^
       source.hashCode ^
       parentThreadId.hashCode ^
       threadSource.hashCode ^
@@ -546,6 +558,8 @@ class LocalSessionDto {
           threadId == other.threadId &&
           cwd == other.cwd &&
           preview == other.preview &&
+          name == other.name &&
+          status == other.status &&
           source == other.source &&
           parentThreadId == other.parentThreadId &&
           threadSource == other.threadSource &&

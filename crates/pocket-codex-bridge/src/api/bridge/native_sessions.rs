@@ -67,6 +67,8 @@ pub fn app_native_sessions(
                 thread_id: id.into(),
                 cwd: entry["cwd"].as_str().map(str::to_owned),
                 preview: entry["title"].as_str().unwrap_or_default().into(),
+                name: None,
+                status: None,
                 source: Some(provider.clone()),
                 parent_thread_id: entry["parentSessionId"].as_str().map(str::to_owned),
                 thread_source: None,

@@ -7207,6 +7207,8 @@ impl SseDecode for crate::api::bridge::host_sessions::LocalSessionDto {
         let mut var_threadId = <String>::sse_decode(deserializer);
         let mut var_cwd = <Option<String>>::sse_decode(deserializer);
         let mut var_preview = <String>::sse_decode(deserializer);
+        let mut var_name = <Option<String>>::sse_decode(deserializer);
+        let mut var_status = <Option<String>>::sse_decode(deserializer);
         let mut var_source = <Option<String>>::sse_decode(deserializer);
         let mut var_parentThreadId = <Option<String>>::sse_decode(deserializer);
         let mut var_threadSource = <Option<String>>::sse_decode(deserializer);
@@ -7220,6 +7222,8 @@ impl SseDecode for crate::api::bridge::host_sessions::LocalSessionDto {
             thread_id: var_threadId,
             cwd: var_cwd,
             preview: var_preview,
+            name: var_name,
+            status: var_status,
             source: var_source,
             parent_thread_id: var_parentThreadId,
             thread_source: var_threadSource,
@@ -9980,6 +9984,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::host_sessions::LocalS
             self.thread_id.into_into_dart().into_dart(),
             self.cwd.into_into_dart().into_dart(),
             self.preview.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.status.into_into_dart().into_dart(),
             self.source.into_into_dart().into_dart(),
             self.parent_thread_id.into_into_dart().into_dart(),
             self.thread_source.into_into_dart().into_dart(),
@@ -11660,6 +11666,8 @@ impl SseEncode for crate::api::bridge::host_sessions::LocalSessionDto {
         <String>::sse_encode(self.thread_id, serializer);
         <Option<String>>::sse_encode(self.cwd, serializer);
         <String>::sse_encode(self.preview, serializer);
+        <Option<String>>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.status, serializer);
         <Option<String>>::sse_encode(self.source, serializer);
         <Option<String>>::sse_encode(self.parent_thread_id, serializer);
         <Option<String>>::sse_encode(self.thread_source, serializer);

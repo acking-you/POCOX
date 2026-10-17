@@ -10,12 +10,12 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use pocket_codex_codex::client::AppClient;
 use pocket_codex_core::history_sync::{
     self as wire, HistoryWindow, SyncRequest, SyncResponse, WindowQuery,
 };
 use serde_json::{json, Value};
-use tokio::sync::Mutex;
+
+use crate::app_server::CodexReader;
 
 /// A bounded read-only history source. Adapters own collection projection,
 /// stable document ids, source generations and opaque cursors. They must never
@@ -69,17 +69,20 @@ async fn sync_window(
 /// runtime. This connection never attaches through thread/resume or takes
 /// ownership.
 pub struct CodexHistorySource {
-    address: SocketAddr,
-    client: Mutex<Option<Arc<AppClient>>>,
+    reader: Arc<CodexReader>,
     directories: Option<(PathBuf, PathBuf)>,
 }
 
 impl CodexHistorySource {
     /// Create a lazy adapter; construction does not connect to the runtime.
     pub fn new(address: SocketAddr) -> Self {
+        Self::shared(Arc::new(CodexReader::new(address)))
+    }
+
+    /// Read through a connection shared with other host routes.
+    pub fn shared(reader: Arc<CodexReader>) -> Self {
         Self {
-            address,
-            client: Mutex::new(None),
+            reader,
             directories: None,
         }
     }
@@ -92,8 +95,7 @@ impl CodexHistorySource {
         index_directory: PathBuf,
     ) -> Self {
         Self {
-            address,
-            client: Mutex::new(None),
+            reader: Arc::new(CodexReader::new(address)),
             directories: Some((codex_home, index_directory)),
         }
     }
@@ -159,21 +161,7 @@ impl CodexHistorySource {
     }
 
     async fn request(&self, method: &str, params: Value) -> Result<Value> {
-        let mut connection = self.client.lock().await;
-        if !connection.as_ref().is_some_and(|client| client.is_alive()) {
-            let (client, receiver) = AppClient::connect(&format!("ws://{}", self.address)).await?;
-            // Read-only RPCs do not subscribe to session events. Dropping the
-            // receiver also prevents unrelated notifications from accumulating.
-            drop(receiver);
-            client.initialize("pocket-codex-history", true).await?;
-            *connection = Some(Arc::new(client));
-        }
-        let client = connection
-            .as_ref()
-            .context("history connection unavailable")?
-            .clone();
-        drop(connection);
-        client.request(method, params).await
+        self.reader.request(method, params).await
     }
 }
 

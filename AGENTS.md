@@ -1189,6 +1189,37 @@ this file's roadmap so the source of truth stays in sync.
     narrow title, and picker footers use `OverflowBar`
     (`test/chat_status_bar_test.dart`, `test/phone_pages_overflow_test.dart`).
 
+37. **Standard session state and protocol sync (2026-10-18).** `deps/codex`
+    points at `35eabb7013`, a clean merge of upstream main `8d9f6466f` (356
+    commits after `b38942ce7`). The host's Codex session routes ask the
+    colocated app-server first (`host-svc/src/codex_inventory.rs`, one shared
+    read-only `app_server::CodexReader`): `/sessions` lists through
+    `thread/list` (every provider, the conversation list's source kinds),
+    `/sessions?running_only=true` reads `thread/loaded/list` + `thread/read`,
+    and liveness and force-resume consult `Thread.status`. A thread that
+    app-server has loaded is its own: joined by a plain `thread/resume`, never
+    evicted, even while a turn runs. Only threads it reports `notLoaded` fall
+    back to rollout + `lsof` probes (another process, such as Codex Desktop or
+    the TUI, writes them); an unfinished turn nobody holds is reported
+    interrupted, as the app-server reads it, never as running. When the
+    app-server does not answer, the file-only inventory stands in; this
+    device's own Local sessions (no app-server) stay file-only. Controllers
+    follow the broadcast `thread/status/changed` for running state and re-list
+    on `thread/started` / `thread/archived` / `thread/unarchived`;
+    `LocalSession` gains `name` and `status` (defaulted, so older hosts parse
+    unchanged). Codex compresses rollouts idle for a week to `.jsonl.zst`
+    (most sessions on the development Mac): every rollout reader accepts
+    both, a compressed rollout's last turn is `unknown` (never decoded for
+    listing), and history review offsets address decoded bytes. File-backed
+    `imageGeneration` items (`fileId` instead of `result`) keep their saved
+    path or the unavailable state; experimental read-state and item lookup
+    methods are not used. Verified: Rust 847 passed / 25 ignored, Flutter
+    suite, and the opt-in `codex_inventory_live` test against installed Codex
+    0.161.0 (a compressed rollout listed and read, a loaded thread `idle`,
+    joined with nothing evicted). Not verified live: an `active` thread
+    (needs a model turn) or a controller app build. See
+    `docs/app-server-protocol-sync.md`.
+
 ### UI and history maintenance (2026-09-13)
 
 - Keep shared colors, typography, and control shapes in `theme.dart` /
@@ -1272,7 +1303,10 @@ this file's roadmap so the source of truth stays in sync.
   Cache lifecycle scan positions for append-only rollouts so polling does not
   repeatedly scan hundreds of MiB; invalidate on replacement or truncation.
 - Discover running sessions in the background via `/sessions?running_only=true`.
-  Probe ownership in a batch and read lifecycle data only for held files.
+  The host reports its app-server's active threads from `Thread.status`, and
+  probes ownership in a batch only for threads that app-server has not loaded,
+  reading lifecycle data only for held files. Controllers apply the broadcast
+  `thread/status/changed` between polls.
   Polls must not overlap; preserve status across transient failures and give
   newer app-server events precedence over an older snapshot. Unopened sessions
   must enter and leave the Active section automatically on desktop and mobile.

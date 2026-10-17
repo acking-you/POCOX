@@ -780,6 +780,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
             ThreadMeta(
               id: session.threadId,
               preview: session.preview,
+              name: session.name,
               threadSource: session.threadSource,
               parentThreadId: session.parentThreadId,
               cwd: session.cwd ?? '',
@@ -790,6 +791,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       bool known(ThreadMeta meta) => switch (_discoveredThreads[meta.id]) {
         final had? =>
           had.preview == meta.preview &&
+              had.name == meta.name &&
               had.threadSource == meta.threadSource &&
               had.parentThreadId == meta.parentThreadId &&
               had.cwd == meta.cwd &&

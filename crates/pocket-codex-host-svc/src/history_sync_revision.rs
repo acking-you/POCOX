@@ -1,13 +1,18 @@
 //! Persist small append-scan checkpoints, never a second transcript copy.
+//!
+//! Offsets address a rollout's decoded bytes. A compressed rollout is
+//! immutable (Codex decompresses it to a new plain file before appending), so
+//! it is decoded from its start whenever a range is needed.
 
 use std::{
     collections::{BTreeMap, HashSet},
     fs::{self, File, Metadata, OpenOptions},
-    io::{BufRead, BufReader, Read, Seek, SeekFrom, Write},
+    io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write},
     path::Path,
 };
 
 use anyhow::{ensure, Result};
+use pocket_codex_codex::rollout;
 use pocket_codex_core::history_sync::digest_bytes;
 use serde::{Deserialize, Serialize};
 
@@ -76,9 +81,7 @@ pub(super) fn attach_reviews(
                 continue;
             }
             ensure!(review.length <= 8 * 1024 * 1024, "approval review exceeds history size limit");
-            file.seek(SeekFrom::Start(review.offset))?;
-            let value: serde_json::Value =
-                serde_json::from_reader(Read::by_ref(&mut file).take(review.length))?;
+            let value = record_at(path, &mut file, review.offset, review.length)?;
             if let Some(review) = pocket_codex_codex::rollout::guardian_review(&value["payload"]) {
                 reviews.push(review);
             }
@@ -140,15 +143,17 @@ fn scan_snapshot_index(path: &Path, directory: &Path, file: File, stat: Metadata
             ..Index::default()
         };
     }
-    reader.seek(SeekFrom::Start(index.offset))?;
     // Deserialize only the discriminator fields. Ignored JSON values are
     // streamed past, so even a multi-megabyte compaction record is recognized
     // without retaining its replacement transcript in memory.
     let start = index.offset;
-    let mut records = serde_json::Deserializer::from_reader(
-        reader.by_ref().take(stat.len().saturating_sub(start)),
-    )
-    .into_iter::<RevisionMarker>();
+    let source: Box<dyn Read + '_> = if rollout::is_compressed(path) {
+        Box::new(decoded_from(path, start)?)
+    } else {
+        reader.seek(SeekFrom::Start(start))?;
+        Box::new(reader.by_ref().take(stat.len().saturating_sub(start)))
+    };
+    let mut records = serde_json::Deserializer::from_reader(source).into_iter::<RevisionMarker>();
     while let Some(record) = records.next() {
         let marker = match record {
             Ok(marker) => marker,
@@ -208,6 +213,22 @@ fn scan_snapshot_index(path: &Path, directory: &Path, file: File, stat: Metadata
         }
     }
     Ok(index)
+}
+
+/// A rollout's decoded bytes from `offset` on.
+fn decoded_from(path: &Path, offset: u64) -> Result<impl Read> {
+    let mut decoded = rollout::open_rollout(path)?;
+    io::copy(&mut decoded.by_ref().take(offset), &mut io::sink())?;
+    Ok(decoded)
+}
+
+/// The record stored at decoded bytes `offset..offset + length`.
+fn record_at(path: &Path, plain: &mut File, offset: u64, length: u64) -> Result<serde_json::Value> {
+    if rollout::is_compressed(path) {
+        return Ok(serde_json::from_reader(decoded_from(path, offset)?.take(length))?);
+    }
+    plain.seek(SeekFrom::Start(offset))?;
+    Ok(serde_json::from_reader(Read::by_ref(plain).take(length))?)
 }
 
 fn source_identity(reader: &mut BufReader<File>, stat: &Metadata) -> Result<String> {
@@ -340,6 +361,29 @@ mod tests {
         assert!(replaced
             .iter()
             .all(|entry| entry["item"].get("autoApprovalReviews").is_none()));
+        Ok(())
+    }
+
+    #[test]
+    fn compressed_history_indexes_reviews_from_decoded_offsets() -> Result<()> {
+        use serde_json::json;
+        let temp = tempfile::tempdir()?;
+        let path = temp.path().join("rollout.jsonl.zst");
+        let directory = temp.path().join("index");
+        let text = format!(
+            "{}\n{}\n",
+            json!({"type":"session_meta","payload":{"id":"cold"}}),
+            json!({"type":"event_msg", "payload":{"type":"guardian_assessment", "id":"review",
+                "turn_id":"turn", "target_item_id":"cmd", "status":"approved",
+                "rationale":"Authorized", "action":{"type":"command", "command":"true"}}})
+        );
+        fs::write(&path, zstd::encode_all(text.as_bytes(), 0)?)?;
+        let generation = scan(&path, &directory)?;
+        let mut page =
+            vec![json!({"turnId":"turn", "item":{"type":"commandExecution", "id":"cmd"}})];
+        attach_reviews(&path, &directory, &mut page)?;
+        assert_eq!(page[0]["item"]["autoApprovalReviews"][0]["reviewId"], "review");
+        assert_eq!(scan(&path, &directory)?, generation, "an unchanged file keeps its generation");
         Ok(())
     }
 

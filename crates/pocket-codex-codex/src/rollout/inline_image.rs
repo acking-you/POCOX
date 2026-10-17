@@ -23,7 +23,7 @@ pub fn inline_user_image(rollout: &Path, path: &str) -> Result<Option<String>> {
     // escaped), for the prefilter.
     let escaped = serde_json::to_string(path)?;
     let needle = escaped.trim_matches('"');
-    let reader = std::io::BufReader::new(std::fs::File::open(rollout)?);
+    let reader = super::open_rollout(rollout)?;
     for line in reader.lines() {
         // A line that is not UTF-8 (its bytes are consumed) ends nothing: the
         // image may still be on another line. Any other read error would

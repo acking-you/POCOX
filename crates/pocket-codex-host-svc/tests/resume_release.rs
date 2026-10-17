@@ -13,10 +13,10 @@ fn held_rollout_blocks_resume_before_connecting() -> Result<()> {
     if let Some(home) = std::env::var_os(CHILD_HOME) {
         ensure!(std::env::var_os("CODEX_HOME").as_ref() == Some(&home));
         let runtime = tokio::runtime::Runtime::new()?;
-        let outcome = runtime.block_on(pocket_codex_host_svc::resume::force_resume(
-            "127.0.0.1:0".parse()?,
-            SESSION,
-        ))?;
+        // Nothing listens here: the app-server reports no loaded thread.
+        let reader = pocket_codex_host_svc::app_server::CodexReader::new("127.0.0.1:0".parse()?);
+        let outcome =
+            runtime.block_on(pocket_codex_host_svc::resume::force_resume(&reader, SESSION))?;
         ensure!(outcome.still_held, "the parent still holds the fixture rollout");
         ensure!(outcome.killed.is_empty() && outcome.survived.is_empty());
         ensure!(!outcome.resumed);
@@ -25,7 +25,7 @@ fn held_rollout_blocks_resume_before_connecting() -> Result<()> {
                 .resume_error
                 .as_deref()
                 .is_some_and(|error| error.contains("previous session owner was not released")),
-            "must reject release failure before attempting any app-server connection: {:?}",
+            "must reject release failure before resuming: {:?}",
             outcome.resume_error
         );
         return Ok(());

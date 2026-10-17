@@ -286,7 +286,9 @@ mod tests {
             .await
             .expect("project root");
             let state = Arc::new(AppState {
-                app_ws_addr: "127.0.0.1:1".parse().expect("unused address"),
+                codex: Arc::new(crate::app_server::CodexReader::new(
+                    "127.0.0.1:1".parse().expect("unused address"),
+                )),
                 store: Arc::new(
                     ConfigStore::open(dir.path().join("threads.json"))
                         .await

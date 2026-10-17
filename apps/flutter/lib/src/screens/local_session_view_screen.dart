@@ -390,8 +390,19 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     final scheme = Theme.of(context).colorScheme;
     final running =
         live.safety == 'ownedRunning' || live.safety == 'nativeOwnedRunning';
-    final color = running ? scheme.error : cautionColor(scheme);
-    final text = running
+    // Held by the host's own app-server: resuming joins it, so the only news
+    // is a running turn.
+    final joined =
+        !_source.isNative && live.allowsResume && !live.requiresTakeover;
+    if (joined && !running) return const SizedBox.shrink();
+    final color = joined
+        ? scheme.primary
+        : running
+        ? scheme.error
+        : cautionColor(scheme);
+    final text = joined
+        ? l10n.running
+        : running
         ? '${l10n.sessionRunningElsewhere} · ${l10n.sessionReadOnly}'
         : l10n.sessionInUseElsewhere;
     return Container(
@@ -401,7 +412,11 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       child: Row(
         children: [
           Icon(
-            running ? AppIcons.lock_clock : AppIcons.lock_outline,
+            joined
+                ? AppIcons.sync_rounded
+                : running
+                ? AppIcons.lock_clock
+                : AppIcons.lock_outline,
             size: 16,
             color: color,
           ),

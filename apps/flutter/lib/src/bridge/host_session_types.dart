@@ -21,6 +21,8 @@ class LocalSession {
     required this.threadId,
     this.cwd,
     required this.preview,
+    this.name,
+    this.status,
     this.source,
     this.parentThreadId,
     this.threadSource,
@@ -41,6 +43,16 @@ class LocalSession {
   /// Best-effort first-user-message preview.
   final String preview;
 
+  /// User-set title, when the host's app-server listed one.
+  final String? name;
+
+  /// The host app-server's thread status (`notLoaded` / `idle` / `active` /
+  /// `systemError`); null when no app-server answered.
+  final String? status;
+
+  /// A turn runs in the host's own app-server: resuming joins it.
+  bool get runningOnHost => status == 'active';
+
   /// Originating client (`cli` / `vscode` / …), when recorded.
   final String? source;
 
@@ -52,7 +64,8 @@ class LocalSession {
   /// Last-modified time of the rollout, unix seconds.
   final int updatedAt;
 
-  /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`).
+  /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`/
+  /// `unknown`).
   final String turnState;
 
   /// Whether the rollout is currently held open by a live process.
@@ -62,8 +75,8 @@ class LocalSession {
   /// `ownedIdle`).
   final String safety;
 
-  /// Whether the UI may offer a resume action (false only while a turn is
-  /// actively running).
+  /// Whether the UI may offer a resume action: false while another process
+  /// runs a turn (one the host's app-server runs is joined).
   final bool allowsResume;
 
   /// Whether resuming requires a force takeover (a live owner must be evicted

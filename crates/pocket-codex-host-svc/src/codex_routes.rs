@@ -1,6 +1,7 @@
 //! Routes over the host's Codex rollouts and app-server: session inventory,
 //! liveness, transcripts, follow, force-resume, and image previews authorised
-//! by the thread's own transcript.
+//! by the thread's own transcript. Inventory and liveness ask the colocated
+//! app-server first (`codex_inventory`).
 
 use super::*;
 
@@ -17,17 +18,14 @@ pub(super) struct SessionListQuery {
 }
 
 pub(super) async fn list_sessions(
+    State(state): State<Arc<AppState>>,
     Query(query): Query<SessionListQuery>,
 ) -> Result<Json<SessionsResponse>, ApiError> {
-    let sessions = tokio::task::spawn_blocking(move || {
-        if query.running_only {
-            sessions::running()
-        } else {
-            sessions::list()
-        }
-    })
-    .await
-    .context("session-scan task panicked")??;
+    let sessions = if query.running_only {
+        codex_inventory::running(&state.codex).await?
+    } else {
+        codex_inventory::list(&state.codex).await?
+    };
     Ok(Json(SessionsResponse {
         sessions,
     }))
@@ -37,15 +35,7 @@ pub(super) async fn session_liveness(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<sessions::SessionLiveness>, ApiError> {
-    let addr = state.app_ws_addr;
-    // protected_pids + the liveness inspect both hit the process table.
-    let view = tokio::task::spawn_blocking(move || {
-        let protected = resume::protected_pids(addr);
-        sessions::liveness(&id, &protected)
-    })
-    .await
-    .context("liveness task panicked")??;
-    Ok(Json(view))
+    Ok(Json(codex_inventory::liveness(&state.codex, &id).await?))
 }
 
 /// `{ "items": [...] }` — a read-only transcript.
@@ -81,23 +71,21 @@ pub(super) async fn session_follow(
     Path(id): Path<String>,
     Query(query): Query<FollowQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let protected = resume::protected_pids(state.app_ws_addr);
-    let initial_id = id.clone();
-    let initial_protected = protected.clone();
+    let codex = Arc::clone(&state.codex);
     let metadata_only = query.metadata_only;
-    let mut initial = tokio::task::spawn_blocking(move || {
-        if metadata_only {
-            Ok(sessions::SessionFollowUpdate {
-                liveness: sessions::liveness(&initial_id, &initial_protected)?,
-                items: Vec::new(),
-                history_revision: None,
-            })
-        } else {
-            sessions::follow_update(&initial_id, &initial_protected)
-        }
+    let initial_id = id.clone();
+    let items = tokio::task::spawn_blocking(move || {
+        (!metadata_only)
+            .then(|| sessions::transcript(&initial_id))
+            .transpose()
     })
     .await
     .context("session-follow seed task panicked")??;
+    let mut initial = sessions::SessionFollowUpdate {
+        liveness: codex_inventory::liveness(&codex, &id).await?,
+        items: items.unwrap_or_default(),
+        history_revision: None,
+    };
     let rollout_path = sessions::rollout_path(&id)?;
     let initial_metadata = tokio::fs::metadata(&rollout_path).await?;
     let mut revision = (initial_metadata.len(), initial_metadata.modified().ok());
@@ -145,24 +133,25 @@ pub(super) async fn session_follow(
                 continue;
             }
             let next_id = id.clone();
-            let next_protected = protected.clone();
-            let next = match tokio::task::spawn_blocking(move || -> anyhow::Result<_> {
-                let items = (transcript_changed && !metadata_only)
+            let items = tokio::task::spawn_blocking(move || {
+                (transcript_changed && !metadata_only)
                     .then(|| sessions::transcript(&next_id))
-                    .transpose()?;
-                let liveness = check_liveness
-                    .then(|| sessions::liveness(&next_id, &next_protected))
-                    .transpose()?;
-                Ok((items, liveness))
-            })
-            .await
-            {
-                Ok(Ok(update)) => update,
-                Ok(Err(error)) => {
+                    .transpose()
+            });
+            let liveness = async {
+                if check_liveness {
+                    codex_inventory::liveness(&codex, &id).await.map(Some)
+                } else {
+                    Ok(None)
+                }
+            };
+            let next = match tokio::join!(items, liveness) {
+                (Ok(Ok(items)), Ok(liveness)) => (items, liveness),
+                (Ok(Err(error)), _) | (_, Err(error)) => {
                     tracing::debug!(%error, thread_id = %id, "session follow stopped");
                     break;
                 },
-                Err(error) => {
+                (Err(error), _) => {
                     tracing::warn!(%error, thread_id = %id, "session follow task panicked");
                     break;
                 },
@@ -216,7 +205,7 @@ pub(super) async fn session_resume(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<resume::ForceResumeOutcome>, ApiError> {
-    let outcome = resume::force_resume(state.app_ws_addr, &id).await?;
+    let outcome = resume::force_resume(&state.codex, &id).await?;
     Ok(Json(outcome))
 }
 

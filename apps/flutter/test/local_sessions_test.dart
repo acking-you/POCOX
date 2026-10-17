@@ -188,6 +188,32 @@ void main() {
     expect(find.byKey(const Key('resume-thr-running')), findsNothing);
   });
 
+  desktopTest('a turn the host app-server runs is joined, not waited out', (
+    t,
+  ) async {
+    final api = FakeBridgeApi()
+      ..localSessions = const [
+        LocalSession(
+          threadId: 'thr-host',
+          cwd: '/proj',
+          preview: 'first message',
+          name: 'Renamed on the phone',
+          status: 'active',
+          updatedAt: 0,
+          turnState: 'incomplete',
+          heldOpen: true,
+          safety: 'ownedRunning',
+          allowsResume: true,
+          requiresTakeover: false,
+        ),
+      ];
+    await t.pumpWidget(_host(const LocalSessionsScreen(), api));
+    await _settle(t);
+    expect(find.text('Renamed on the phone'), findsOneWidget);
+    expect(find.text('其他进程运行中'), findsNothing);
+    expect(find.byKey(const Key('resume-thr-host')), findsOneWidget);
+  });
+
   desktopTest('force-takeover opens a confirm dialog listing the holders', (
     t,
   ) async {

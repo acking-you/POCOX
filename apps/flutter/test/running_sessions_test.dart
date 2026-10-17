@@ -126,6 +126,48 @@ void main() {
     },
   );
 
+  testWidgets(
+    'app-server status broadcasts move threads this controller never opened',
+    (t) async {
+      final api = ProbeApi();
+      await t.pumpWidget(
+        ProviderScope(
+          overrides: [bridgeApiProvider.overrideWithValue(api)],
+          child: Consumer(
+            builder: (context, ref, _) {
+              ref.watch(runningThreadsProvider(service));
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+      final container = ProviderScope.containerOf(
+        t.element(find.byType(Consumer)),
+      );
+      Set<String> running() =>
+          container.read(runningThreadsProvider(service)).valueOrNull ?? {};
+      await frames(t);
+      api.probes.first.complete([]);
+      await frames(t);
+      void status(String type) => api.pushEvent(
+        service,
+        AppEvent(
+          kind: 'thread/status/changed',
+          threadId: 'phone',
+          raw:
+              '{"threadId":"phone","status":{"type":"$type","activeFlags":[]}}',
+        ),
+      );
+      status('active');
+      await frames(t);
+      expect(running(), {'phone'});
+      status('idle');
+      await frames(t);
+      expect(running(), isEmpty);
+      await t.pumpWidget(const SizedBox.shrink());
+    },
+  );
+
   for (final width in [1280.0, 430.0]) {
     testWidgets(
       'unopened external session moves into and out of Active at width $width',

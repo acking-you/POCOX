@@ -563,8 +563,11 @@ class _SessionRow extends StatelessWidget {
       session.preview.trim(),
       l10n.fileOnlyMessage,
     );
+    // The host's app-server lists renamed titles; a rollout scan has none.
+    final title = session.name ?? preview;
     // Running sessions read "运行中"; everything else gets a relative-time tag.
-    final time = session.safety == 'ownedRunning'
+    // A turn the host itself runs says so on its status chip instead.
+    final time = session.safety == 'ownedRunning' && !session.runningOnHost
         ? l10n.running
         : relativeTime(session.updatedAt, now, l10n);
     final subtitleParts = <String>[
@@ -621,7 +624,7 @@ class _SessionRow extends StatelessWidget {
                 'parent=${Uri.encodeComponent(session.parentThreadId!)}',
               if (session.cwd != null && session.cwd!.trim().isNotEmpty)
                 'cwd=${Uri.encodeComponent(session.cwd!.trim())}',
-              if (preview.isNotEmpty) 'preview=${Uri.encodeComponent(preview)}',
+              if (title.isNotEmpty) 'preview=${Uri.encodeComponent(title)}',
               if (serviceKey != null) 'svc=${Uri.encodeComponent(serviceKey!)}',
             ];
             context.push('/sessions/view?${q.join('&')}');
@@ -637,7 +640,7 @@ class _SessionRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    preview.isEmpty ? session.threadId : preview,
+                    title.isEmpty ? session.threadId : title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -729,19 +732,32 @@ class _SessionRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     // Both "in use elsewhere" states are degraded-but-not-failed, so they share
     // the caution amber; only a session actively running elsewhere is an error.
-    final (Color color, String label) = switch (session.safety) {
-      'resumable' => (successColor(scheme), l10n.sessionResumable),
-      'resumableUnfinished' => (cautionColor(scheme), l10n.sessionUnfinished),
-      'ownedRunning' => (scheme.error, l10n.sessionRunningElsewhere),
-      'ownedIdle' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
-      'nativeOwnedRunning' => (scheme.error, l10n.sessionRunningElsewhere),
-      'nativeOwnedIdle' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
-      'nativeUnowned' => (successColor(scheme), l10n.nativeSessionFree),
-      _ => (
-        scheme.outline,
-        provider == 'codex' ? session.safety : l10n.nativeSessionUnknown,
-      ),
-    };
+    // A turn the host's own app-server runs is joined by resuming, not
+    // waited out: it is plainly running, not running elsewhere.
+    final (Color color, String label) = session.runningOnHost
+        ? (scheme.primary, l10n.running)
+        : switch (session.safety) {
+            'resumable' => (successColor(scheme), l10n.sessionResumable),
+            'resumableUnfinished' => (
+              cautionColor(scheme),
+              l10n.sessionUnfinished,
+            ),
+            'ownedRunning' => (scheme.error, l10n.sessionRunningElsewhere),
+            'ownedIdle' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
+            'nativeOwnedRunning' => (
+              scheme.error,
+              l10n.sessionRunningElsewhere,
+            ),
+            'nativeOwnedIdle' => (
+              cautionColor(scheme),
+              l10n.sessionInUseElsewhere,
+            ),
+            'nativeUnowned' => (successColor(scheme), l10n.nativeSessionFree),
+            _ => (
+              scheme.outline,
+              provider == 'codex' ? session.safety : l10n.nativeSessionUnknown,
+            ),
+          };
     return StatusChip(
       color: color,
       label: label,
@@ -805,8 +821,9 @@ Future<String?> ensureResumeTarget(WidgetRef ref) async {
 /// Shared by the sessions list and the read-only viewer. For a takeover it first
 /// shows the holder-listing confirm dialog; on cancel it returns silently. On
 /// success it opens the live conversation; failures surface as a snackbar. The
-/// caller must ensure the session is not actively running (resume is disabled
-/// for `ownedRunning`).
+/// caller must ensure no other process is running a turn in the session (its
+/// `allowsResume` is false then); a turn the host's own app-server runs is
+/// joined.
 Future<void> resumeLocalSession(
   BuildContext context,
   WidgetRef ref, {

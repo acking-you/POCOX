@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:pocket_codex/src/voice/dictation.dart';
 import 'package:pocket_codex/src/voice/voice_transport.dart';
@@ -311,8 +312,9 @@ LocalSession _runningStub(String threadId) => LocalSession(
   requiresTakeover: false,
 );
 
-/// Discovers external writers without opening their threads. Probes never
-/// overlap, and the host reads lifecycle records only for held rollout files.
+/// Discovers running sessions without opening their threads: the host reports
+/// its app-server's active threads and probes rollouts only for writers that
+/// app-server cannot see. Probes never overlap.
 final runningSessionInventoryProvider = StreamProvider.autoDispose
     .family<RunningSessionSnapshot, String>((ref, serviceKey) {
       final api = ref.watch(bridgeApiProvider);
@@ -396,8 +398,11 @@ final runningSessionInventoryProvider = StreamProvider.autoDispose
       return out.stream;
     });
 
-/// Combines host ownership snapshots with immediate app-server turn events.
-/// A late snapshot cannot resurrect a turn completed while its probe ran.
+/// Combines host ownership snapshots with immediate app-server events: the
+/// broadcast `thread/status/changed` covers every thread the app-server has
+/// loaded, opened here or not; turn events cover subscribed threads on servers
+/// without it. A late snapshot cannot resurrect a turn completed while its
+/// probe ran.
 final runningThreadsProvider = StreamProvider.autoDispose
     .family<Set<String>, String>((ref, serviceKey) {
       final api = ref.watch(bridgeApiProvider);
@@ -450,6 +455,7 @@ final runningThreadsProvider = StreamProvider.autoDispose
                 final running = switch (event.kind) {
                   'turn/started' => true,
                   'turn/completed' || 'turn/failed' => false,
+                  'thread/status/changed' => _threadStatusActive(event.raw),
                   _ => null,
                 };
                 if (running == null) return;
@@ -492,6 +498,21 @@ final runningThreadsProvider = StreamProvider.autoDispose
       connect();
       return out.stream;
     });
+
+/// Whether a `thread/status/changed` payload reports a running turn; null when
+/// it carries no status.
+bool? _threadStatusActive(String raw) {
+  try {
+    final status = switch (jsonDecode(raw)) {
+      {'status': final Map<String, dynamic> status} => status,
+      _ => null,
+    };
+    final type = status?['type'];
+    return type is String ? type == 'active' : null;
+  } catch (_) {
+    return null;
+  }
+}
 
 /// Active UI locale (`null` = follow system). Seeded at boot from the
 /// persisted config via a ProviderScope override, then changed by the

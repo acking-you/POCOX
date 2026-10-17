@@ -78,6 +78,39 @@ fn session_headers_name_the_session_and_its_origin() {
 }
 
 #[test]
+fn compressed_rollouts_are_found_read_and_superseded_by_a_plain_copy() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let day = dir.path().join("2025/11/17");
+    std::fs::create_dir_all(&day).expect("day");
+    let id = "019a9209-e42f-78f2-a98c-e1ba9e0e79a1";
+    let name = format!("rollout-2025-11-17T21-38-33-{id}.jsonl");
+    let header = json!({"type":"session_meta","payload":{"id":id,"cwd":"/repo"}}).to_string();
+    let started = event(json!({"type": "task_started", "turn_id": "t"}));
+    let text = format!("{header}\n{}\n{started}\n", user_line("hello from last week"));
+    let compressed = day.join(format!("{name}.zst"));
+    std::fs::write(&compressed, zstd::encode_all(text.as_bytes(), 0).expect("encode"))
+        .expect("write");
+
+    assert_eq!(thread_id_from_path(&compressed).as_deref(), Some(id));
+    assert_eq!(rollout_path_in(dir.path(), id).expect("lookup"), Some(compressed.clone()));
+    let info = read_session_info(&compressed).expect("info");
+    assert_eq!(
+        (info.cwd.as_deref(), info.preview.as_str()),
+        (Some("/repo"), "hello from last week")
+    );
+    // Lifecycle markers of a compressed file are not decoded.
+    assert_eq!(info.turn_state, TurnState::Unknown);
+    assert_eq!(read_transcript(&compressed).expect("transcript")[0].text, "hello from last week");
+
+    // Decompressed before an append, the plain copy is the session.
+    let plain = day.join(&name);
+    std::fs::write(&plain, &text).expect("plain");
+    assert_eq!(rollout_paths_in(dir.path()).expect("paths"), vec![plain.clone()]);
+    assert_eq!(rollout_path_in(dir.path(), id).expect("lookup"), Some(plain.clone()));
+    assert_eq!(read_session_info(&plain).expect("info").turn_state, TurnState::Incomplete);
+}
+
+#[test]
 fn guardian_sessions_keep_their_parent_and_classification() {
     let header = json!({"type":"session_meta","payload":{
         "id":"child", "parent_thread_id":"parent", "thread_source":"guardian_review",

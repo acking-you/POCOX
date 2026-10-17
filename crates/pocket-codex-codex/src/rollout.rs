@@ -22,6 +22,12 @@
 //! line is always `"type":"session_meta"`. Turn lifecycle is carried by
 //! `"type":"event_msg"` lines whose `payload.type` is one of
 //! `task_started`, `task_complete`, or `turn_aborted`.
+//!
+//! Codex compresses rollouts that have been idle for a week into a single
+//! zstd frame beside the original name (`….jsonl.zst`), and decompresses one
+//! back to plain `.jsonl` before appending to it. Every reader here accepts
+//! both representations ([`open_rollout`]); when both exist the plain file is
+//! the current one.
 
 use std::{
     path::{Path, PathBuf},
@@ -50,13 +56,16 @@ pub use turn_state::{classify_turn_state, TurnState};
 /// How many leading lines to scan for a human-readable preview.
 const PREVIEW_HEAD_LINES: usize = 64;
 
+/// Suffix Codex appends to a rollout name when it compresses the file.
+const COMPRESSED_SUFFIX: &str = ".zst";
+
 /// A session discovered on disk, with its rollout path, header metadata
 /// and classified most-recent-turn state.
 #[derive(Debug, Clone)]
 pub struct SessionInfo {
     /// Thread / conversation id.
     pub thread_id: String,
-    /// Absolute path to the rollout JSONL file.
+    /// Absolute path to the rollout: plain `.jsonl` or compressed `.jsonl.zst`.
     pub rollout_path: PathBuf,
     /// Working directory the session controls, when recorded.
     pub cwd: Option<String>,
@@ -118,9 +127,38 @@ pub fn scan_sessions() -> Result<Vec<SessionInfo>> {
 
 /// Enumerate rollout paths without reading any transcript contents.
 pub fn session_paths() -> Result<Vec<PathBuf>> {
+    rollout_paths_in(&sessions_dir()?)
+}
+
+/// Every rollout beneath `dir`, one path per session: a compressed copy is
+/// skipped when its plain sibling exists (the plain file is the live one).
+fn rollout_paths_in(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut files = Vec::new();
-    collect_jsonl(&sessions_dir()?, &mut files)?;
+    collect_rollouts(dir, &mut files)?;
+    let plain: std::collections::HashSet<PathBuf> = files
+        .iter()
+        .filter(|path| !is_compressed(path))
+        .cloned()
+        .collect();
+    files.retain(|path| !is_compressed(path) || !plain.contains(&path.with_extension("")));
     Ok(files)
+}
+
+/// Whether `path` names a compressed (`.jsonl.zst`) rollout.
+pub fn is_compressed(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.ends_with(COMPRESSED_SUFFIX))
+}
+
+/// Open a rollout for line reading, decoding a compressed one on the fly.
+pub fn open_rollout(path: &Path) -> Result<Box<dyn std::io::BufRead + Send>> {
+    let file = std::fs::File::open(path)?;
+    Ok(if is_compressed(path) {
+        Box::new(std::io::BufReader::new(zstd::stream::read::Decoder::new(file)?))
+    } else {
+        Box::new(std::io::BufReader::new(file))
+    })
 }
 
 /// Locate the rollout file for a given `thread_id`.
@@ -128,8 +166,9 @@ pub fn session_paths() -> Result<Vec<PathBuf>> {
 /// The thread id is embedded verbatim at the end of the rollout filename
 /// (`rollout-<timestamp>-<thread_id>.jsonl`), so this anchors the match to that
 /// exact suffix — a bare `contains` would let one id match another whose id (or
-/// timestamp) merely contains it, resolving the wrong session. Returns `None`
-/// when no rollout exists for the id.
+/// timestamp) merely contains it, resolving the wrong session. A compressed
+/// rollout counts when no plain one exists. Returns `None` when no rollout
+/// exists for the id.
 pub fn rollout_path_for_thread(thread_id: &str) -> Result<Option<PathBuf>> {
     rollout_path_in(&sessions_dir()?, thread_id)
 }
@@ -140,13 +179,12 @@ pub fn rollout_path_in(dir: &Path, thread_id: &str) -> Result<Option<PathBuf>> {
     if thread_id.is_empty() {
         return Ok(None);
     }
-    let suffix = format!("-{thread_id}.jsonl");
-    let mut files = Vec::new();
-    collect_jsonl(dir, &mut files)?;
-    Ok(files.into_iter().find(|p| {
+    let plain = format!("-{thread_id}.jsonl");
+    let compressed = format!("{plain}{COMPRESSED_SUFFIX}");
+    Ok(rollout_paths_in(dir)?.into_iter().find(|p| {
         p.file_name()
             .and_then(|n| n.to_str())
-            .is_some_and(|n| n.ends_with(&suffix))
+            .is_some_and(|n| n.ends_with(&plain) || n.ends_with(&compressed))
     }))
 }
 
@@ -184,11 +222,15 @@ fn non_empty(value: Option<&Value>) -> Option<String> {
 }
 
 /// Derive the thread id from a rollout filename
-/// (`rollout-<ts>-<thread_id>.jsonl`): the id is the trailing five
+/// (`rollout-<ts>-<thread_id>.jsonl[.zst]`): the id is the trailing five
 /// dash-separated groups of the stem. Returns `None` when the stem is
 /// too short to contain one.
 fn thread_id_from_path(path: &Path) -> Option<String> {
-    let stem = path.file_stem().and_then(|s| s.to_str())?;
+    let name = path.file_name().and_then(|s| s.to_str())?;
+    let stem = name
+        .strip_suffix(COMPRESSED_SUFFIX)
+        .unwrap_or(name)
+        .strip_suffix(".jsonl")?;
     let parts: Vec<&str> = stem.split('-').collect();
     if parts.len() < 5 {
         return None;
@@ -212,9 +254,7 @@ fn mtime_unix_secs(path: &Path) -> i64 {
 /// errors on the first invalid-UTF-8 byte): rollouts are written by external
 /// processes, and one malformed byte must not hide the whole session.
 fn read_head(path: &Path, max_lines: usize) -> Result<String> {
-    use std::io::BufRead;
-    let file = std::fs::File::open(path)?;
-    let mut reader = std::io::BufReader::new(file);
+    let mut reader = open_rollout(path)?;
     let mut out = String::new();
     let mut line = Vec::new();
     for _ in 0..max_lines {
@@ -227,10 +267,10 @@ fn read_head(path: &Path, max_lines: usize) -> Result<String> {
     Ok(out)
 }
 
-/// Recursively collect `*.jsonl` files beneath `dir` into `out`.
+/// Recursively collect `*.jsonl` and `*.jsonl.zst` files beneath `dir`.
 ///
 /// A missing `dir` is not an error (it just contributes nothing).
-fn collect_jsonl(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
+fn collect_rollouts(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -241,8 +281,12 @@ fn collect_jsonl(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
         let path = entry.path();
         let file_type = entry.file_type()?;
         if file_type.is_dir() {
-            collect_jsonl(&path, out)?;
-        } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+            collect_rollouts(&path, out)?;
+        } else if path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with(".jsonl") || n.ends_with(".jsonl.zst"))
+        {
             out.push(path);
         }
     }

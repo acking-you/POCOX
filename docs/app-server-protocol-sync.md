@@ -1,4 +1,4 @@
-# App-server protocol sync: 2026-10-04
+# App-server protocol sync: 2026-10-04 (updated 2026-10-18)
 
 The reference is upstream `openai/codex` main, pulled on 2026-10-04 with
 `git -C ~/rust_pro/codex pull --ff-only origin main`:
@@ -79,6 +79,55 @@ No app-server method or notification was added, removed or renamed, and
 fields are ignored by local parsing. `subAgentActivity` gained `model` and
 `reasoningEffort`, which the step card shows live and from rollouts. The
 resolved workspace graph still contains no Codex runtime crate.
+
+## Follow-up sync: 2026-10-18
+
+`deps/codex` now points at `35eabb7013`, a clean merge of upstream
+`openai/codex` main `8d9f6466f` (356 commits after `b38942ce7`) into the
+`pocket-codex` branch. The resolved workspace graph is unchanged: no Codex
+runtime or protocol crate is linked.
+
+| Upstream change since `b38942ce7` | Pocket-Codex behavior |
+| --- | --- |
+| `imageGeneration` items carry either `result` or a file-backed `fileId` (attachment store), plus optional `inputImages` | The saved path still renders; a `fileId` with no saved path shows the existing unavailable state. Pocket never reads the attachment store. |
+| Experimental `thread/readState/update`, `thread/readState/changed`, `readState(s)` on `thread/read` / `thread/list`, and `thread/items/read` | Not called; unknown response fields are ignored. |
+| Rollouts left idle for a week are compressed to `….jsonl.zst` (since `a8a6071279`); `thread/list` keeps naming the plain path | Every rollout reader accepts both forms (the plain file wins when both exist). A compressed rollout's last turn is `unknown`: it is never decoded for listing, and Codex decompresses it before writing again. History review offsets address decoded bytes. |
+| Optional request fields (`responsesapiClientMetadataPatch`, `experimentalPredictionMode`, `voiceSessionId`, `websocketRequestId`) and response fields (`McpServerStatus.toolListMeta`, `TurnToolOutput.retain`) | Not sent; ignored by local parsing. |
+
+### Standard session state
+
+The host's Codex routes now ask the colocated app-server before reading files
+(`crates/pocket-codex-host-svc/src/codex_inventory.rs`, over one shared
+read-only connection):
+
+```mermaid
+flowchart LR
+    R["/sessions, /liveness, /resume"] --> A["thread/list · thread/loaded/list · thread/read"]
+    A -->|"status: idle / active / systemError"| L["loaded here: joined by thread/resume, nothing evicted"]
+    A -->|"status: notLoaded"| F["rollout + lsof: another process (Codex Desktop, TUI)"]
+    A -.->|"no answer"| S["file-only inventory"]
+    C["Controllers"] -->|"thread/status/changed (broadcast)"| X["Active section"]
+```
+
+- `/sessions` lists through `thread/list` with every model provider and the
+  conversation list's source kinds, so renamed titles (`name`) and
+  compressed sessions appear. Each row carries the app-server's
+  `Thread.status` type (`status`); older hosts omit both fields.
+- `/sessions?running_only=true` reports the app-server's active threads
+  (`thread/loaded/list`, then `thread/read` for each) plus rollouts another
+  process holds with an unfinished turn.
+- A thread the app-server has loaded is joined by `thread/resume`, running or
+  idle: liveness lists no holders and force-resume evicts nothing.
+- An unfinished last turn that nobody holds is reported `aborted` (the
+  app-server reads it as interrupted), so no view shows it as running; its
+  safety tag keeps the "last turn interrupted" label.
+- The API cannot see another process's writer: those threads report
+  `notLoaded`, and only for them do the rollout and `lsof` probes decide.
+- Controllers follow `thread/status/changed`, which the app-server broadcasts
+  to every connection for every loaded thread, and re-list on
+  `thread/started`, `thread/archived` and `thread/unarchived`.
+- This device's own Local sessions view has no app-server and stays
+  file-only.
 
 ## Verification
 

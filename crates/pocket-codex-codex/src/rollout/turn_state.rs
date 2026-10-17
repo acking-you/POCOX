@@ -37,6 +37,11 @@ pub enum TurnState {
     /// `turn_aborted` after it — it is either running right now or was
     /// left dangling by a crashed writer.
     Incomplete,
+    /// The rollout is stored compressed. Codex compresses only rollouts left
+    /// idle for a week and decompresses one before writing to it again, so
+    /// no turn runs in it; its lifecycle markers are not decoded, since that
+    /// would inflate the whole file.
+    Unknown,
 }
 
 impl TurnState {
@@ -49,13 +54,14 @@ impl TurnState {
     }
 
     /// Stable lowercase tag for FFI / UI (`empty` / `completed` /
-    /// `aborted` / `incomplete`).
+    /// `aborted` / `incomplete` / `unknown`).
     pub fn tag(&self) -> &'static str {
         match self {
             TurnState::Empty => "empty",
             TurnState::Completed => "completed",
             TurnState::Aborted(_) => "aborted",
             TurnState::Incomplete => "incomplete",
+            TurnState::Unknown => "unknown",
         }
     }
 }
@@ -68,7 +74,11 @@ impl TurnState {
 /// scan so a long-running turn is never misread as [`TurnState::Empty`].
 /// A bounded cache reuses unchanged results and scans only appended bytes
 /// after a complete line boundary; replacement and truncation restart it.
+/// A compressed rollout is [`TurnState::Unknown`].
 pub fn classify_turn_state(path: &Path) -> Result<TurnState> {
+    if super::is_compressed(path) {
+        return Ok(TurnState::Unknown);
+    }
     super::state_cache::classify(path)
 }
 

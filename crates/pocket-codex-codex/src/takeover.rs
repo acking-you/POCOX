@@ -78,13 +78,17 @@ impl ResumeSafety {
 }
 
 /// Derive the [`ResumeSafety`] from a transcript turn state and whether
-/// the rollout is currently held open by a live process.
+/// the rollout is currently held open by a live process. A holder of a
+/// rollout whose last turn is [`TurnState::Unknown`] counts as running: an
+/// unknown turn never authorizes an eviction.
 pub fn classify(turn_state: &TurnState, held_open: bool) -> ResumeSafety {
-    match (held_open, turn_state.is_finished()) {
-        (true, false) => ResumeSafety::OwnedRunning,
-        (true, true) => ResumeSafety::OwnedIdle,
-        (false, true) => ResumeSafety::Resumable,
-        (false, false) => ResumeSafety::ResumableUnfinished,
+    match (held_open, turn_state) {
+        (true, TurnState::Unknown) => ResumeSafety::OwnedRunning,
+        (false, TurnState::Unknown) => ResumeSafety::Resumable,
+        (true, state) if state.is_finished() => ResumeSafety::OwnedIdle,
+        (true, _) => ResumeSafety::OwnedRunning,
+        (false, state) if state.is_finished() => ResumeSafety::Resumable,
+        (false, _) => ResumeSafety::ResumableUnfinished,
     }
 }
 
@@ -230,6 +234,9 @@ mod tests {
         assert_eq!(classify(&TurnState::Empty, false), ResumeSafety::Resumable);
         // Free + unfinished ⇒ resumable but the last turn was left dangling.
         assert_eq!(classify(&TurnState::Incomplete, false), ResumeSafety::ResumableUnfinished);
+        // A compressed rollout is resumable, and a holder of one is never evicted.
+        assert_eq!(classify(&TurnState::Unknown, false), ResumeSafety::Resumable);
+        assert_eq!(classify(&TurnState::Unknown, true), ResumeSafety::OwnedRunning);
     }
 
     #[test]

@@ -2483,6 +2483,7 @@ dependencies = [
  "tracing",
  "tungstenite 0.27.0",
  "which",
+ "zstd",
 ]
 
 [[package]]
@@ -2531,6 +2532,7 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "zstd",
 ]
 
 [[package]]

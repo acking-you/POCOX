@@ -15,6 +15,7 @@
 #![forbid(unsafe_code)]
 
 pub mod acp;
+pub mod app_server;
 pub mod file_links;
 pub mod fs;
 pub mod history_sync;
@@ -27,6 +28,7 @@ pub mod resume;
 pub mod sessions;
 pub mod store;
 
+mod codex_inventory;
 mod codex_routes;
 mod file_routes;
 
@@ -59,7 +61,8 @@ use crate::{
 
 /// Shared handler state.
 struct AppState {
-    app_ws_addr: SocketAddr,
+    /// The colocated app-server (inventory reads and resume target).
+    codex: Arc<app_server::CodexReader>,
     store: Arc<ConfigStore>,
     host: Arc<HostStore>,
     /// Upload destination; `None` keeps the Codex default under `CODEX_HOME`.
@@ -108,8 +111,9 @@ pub async fn serve(
     store: Arc<ConfigStore>,
     host: Arc<HostStore>,
 ) -> Result<()> {
+    let codex = Arc::new(app_server::CodexReader::new(app_ws_addr));
     let state = Arc::new(AppState {
-        app_ws_addr,
+        codex: Arc::clone(&codex),
         store,
         host,
         uploads_dir: None,
@@ -129,7 +133,7 @@ pub async fn serve(
         .layer(tower_http::compression::CompressionLayer::new())
         .with_state(state)
         .merge(history_sync::router(Arc::new(
-            history_sync::CodexHistorySource::new(app_ws_addr),
+            history_sync::CodexHistorySource::shared(codex),
         )));
     axum::serve(listener, app)
         .await
@@ -176,8 +180,8 @@ pub async fn serve_generic(
     session_dirs: Arc<dyn file_links::SessionDirResolver>,
 ) -> Result<()> {
     let state = Arc::new(AppState {
-        // Never read by the generic routes.
-        app_ws_addr: SocketAddr::from(([127, 0, 0, 1], 0)),
+        // Never contacted by the generic routes.
+        codex: Arc::new(app_server::CodexReader::new(SocketAddr::from(([127, 0, 0, 1], 0)))),
         store,
         host,
         uploads_dir: Some(uploads_dir),

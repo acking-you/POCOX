@@ -83,6 +83,14 @@ extension _SessionEvents on _AppSessionState {
       _applyRemoteName(e);
       return;
     }
+    // Another client of this app-server started, archived or restored a
+    // session (broadcast to every connection): the host's `thread/list`
+    // decides what the sidebar shows, so list again.
+    if (e.kind == 'thread/started' ||
+        e.kind == 'thread/archived' ||
+        e.kind == 'thread/unarchived') {
+      _scheduleThreadsRefresh();
+    }
     // A pending request answered elsewhere (another device, the provider's own
     // UI) or withdrawn: drop its card. Carries the id in `raw` only.
     if (e.kind == 'serverRequest/resolved') {

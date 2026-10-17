@@ -378,6 +378,8 @@ LocalSession _localSession(frb.LocalSessionDto s) => LocalSession(
   threadId: s.threadId,
   cwd: s.cwd,
   preview: s.preview,
+  name: s.name,
+  status: s.status,
   source: s.source,
   parentThreadId: s.parentThreadId,
   threadSource: s.threadSource,

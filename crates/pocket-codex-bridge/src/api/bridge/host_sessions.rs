@@ -30,6 +30,11 @@ pub struct LocalSessionDto {
     pub cwd: Option<String>,
     /// Best-effort first-user-message preview.
     pub preview: String,
+    /// User-set title, when the host's app-server listed one.
+    pub name: Option<String>,
+    /// The host app-server's `Thread.status` type (`notLoaded` / `idle` /
+    /// `active` / `systemError`); `None` when no app-server answered.
+    pub status: Option<String>,
     /// Originating client (`cli` / `vscode` / …), when recorded.
     pub source: Option<String>,
     /// Parent thread for a spawned child.
@@ -38,15 +43,16 @@ pub struct LocalSessionDto {
     pub thread_source: Option<String>,
     /// Last-modified time of the rollout, unix seconds.
     pub updated_at: i64,
-    /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`).
+    /// Most-recent-turn state (`empty`/`completed`/`aborted`/`incomplete`/
+    /// `unknown`).
     pub turn_state: String,
     /// Whether the rollout is currently held open by a live process.
     pub held_open: bool,
     /// Resume-safety tag (`resumable`/`resumableUnfinished`/`ownedRunning`/
     /// `ownedIdle`).
     pub safety: String,
-    /// Whether the UI may offer a resume action (false only while a turn is
-    /// actively running).
+    /// Whether the UI may offer a resume action: false while another process
+    /// runs a turn; a thread the host's app-server runs is joined.
     pub allows_resume: bool,
     /// Whether resuming requires a force takeover (a live owner must be
     /// evicted first).
@@ -111,6 +117,8 @@ fn local_session_dto(s: sessions::LocalSession) -> LocalSessionDto {
         thread_id: s.thread_id,
         cwd: s.cwd,
         preview: s.preview,
+        name: s.name,
+        status: s.status,
         source: s.source,
         parent_thread_id: s.parent_thread_id,
         thread_source: s.thread_source,

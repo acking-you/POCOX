@@ -110,6 +110,8 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 url = "2.5"
 percent-encoding = "2.3"
 directories = "5"
+# Codex compresses cold rollouts to `.jsonl.zst`; already resolved through reqwest/tower-http.
+zstd = "0.13"
 which = "6"
 nix = { version = "0.29", features = ["signal", "process"] }
 sysinfo = "0.32"
