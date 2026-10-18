@@ -288,7 +288,14 @@ fn local_routes(secret: Arc<str>) -> Router {
                     local_port: body.local_port,
                 };
                 match connections::connect(&caller, request).await {
-                    Ok(view) => Json(view).into_response(),
+                    Ok(Ok(view)) => Json(view).into_response(),
+                    Ok(Err(pending)) => (
+                        StatusCode::ACCEPTED,
+                        Json(serde_json::json!({
+                            "status": pending.status(), "message": pending.message(),
+                        })),
+                    )
+                        .into_response(),
                     Err(error) => failure(error),
                 }
             }),

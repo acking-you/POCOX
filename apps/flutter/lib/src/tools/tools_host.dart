@@ -294,6 +294,11 @@ class _ConsentCard extends StatelessWidget {
         ? l10n.toolsThisDevice
         : deviceLabel(device);
     final known = consent.owner.conversation != null;
+    final owner = ownerLabel(l10n, consent.owner);
+    final connect = switch (consent.service) {
+      final service? => parseServiceKey(service),
+      null => null,
+    };
     return _Arrive(
       child: Glass(
         depth: GlassDepth.overlay,
@@ -310,7 +315,9 @@ class _ConsentCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    l10n.toolsRequestTitle(ownerLabel(l10n, consent.owner)),
+                    connect == null
+                        ? l10n.toolsRequestTitle(owner)
+                        : l10n.toolsConnectRequestTitle(owner),
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -320,11 +327,17 @@ class _ConsentCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              l10n.toolsRequestDetail(
-                consent.title,
-                consent.ports.join(', '),
-                where,
-              ),
+              connect == null
+                  ? l10n.toolsRequestDetail(
+                      consent.title,
+                      consent.ports.join(', '),
+                      where,
+                    )
+                  : l10n.toolsConnectRequestDetail(
+                      connect.name,
+                      deviceLabel(connect.device),
+                      where,
+                    ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),

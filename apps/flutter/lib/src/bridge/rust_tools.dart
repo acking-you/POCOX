@@ -194,6 +194,7 @@ ToolsOverview _toolsOverview(frb.ToolsOverviewDto o) => ToolsOverview(
               owner: _toolsOwner(c.owner),
               title: c.title,
               ports: List.of(c.ports),
+              service: c.service,
               createdMs: c.createdMs.toInt(),
               expiresMs: c.expiresMs.toInt(),
             ),

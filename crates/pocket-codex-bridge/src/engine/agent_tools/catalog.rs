@@ -139,6 +139,7 @@ pub fn sanitize(mut catalog: Catalog) -> Catalog {
         consent.title = bounded(&consent.title);
         consent.owner.label = bounded(&consent.owner.label);
         consent.ports.truncate(8);
+        consent.service = consent.service.as_deref().map(bounded);
     }
     catalog.services.truncate(64);
     for service in &mut catalog.services {

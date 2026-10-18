@@ -97,15 +97,19 @@ ToolsOverview _studio({
   ],
 );
 
-ToolsConsent _consent(String id, {String title = 'Landing page'}) =>
-    ToolsConsent(
-      id: id,
-      owner: _owner,
-      title: title,
-      ports: const [5173],
-      createdMs: 0,
-      expiresMs: DateTime.now().millisecondsSinceEpoch + 600000,
-    );
+ToolsConsent _consent(
+  String id, {
+  String title = 'Landing page',
+  String? service,
+}) => ToolsConsent(
+  id: id,
+  owner: _owner,
+  title: title,
+  ports: service == null ? const [5173] : const [],
+  service: service,
+  createdMs: 0,
+  expiresMs: DateTime.now().millisecondsSinceEpoch + 600000,
+);
 
 Widget _host(FakeBridgeApi api, Widget child) => ProviderScope(
   overrides: [bridgeApiProvider.overrideWithValue(api)],
@@ -270,7 +274,7 @@ void main() {
     await t.pump();
     await t.pump(const Duration(milliseconds: 300));
     expect(find.byKey(const Key('consent-c1')), findsOneWidget);
-    // One of this device's own agents asks too.
+    // One of this device's own agents asks to connect another device's API.
     final both = ToolsOverview(
       thisDevice: 'phone',
       devices: [
@@ -278,7 +282,9 @@ void main() {
           name: 'phone',
           online: true,
           catalog: true,
-          consents: [_consent('c2', title: 'Docs')],
+          consents: [
+            _consent('c2', title: 'main', service: 'pcx:studio:api:main'),
+          ],
         ),
         ToolsDevice(
           name: 'studio',

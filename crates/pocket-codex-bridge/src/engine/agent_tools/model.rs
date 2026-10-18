@@ -174,7 +174,8 @@ pub enum PortStatus {
     Refused,
 }
 
-/// A share waiting for the user's answer.
+/// A share, or a connection to another device's Responses API, waiting for
+/// the user's answer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ConsentView {
@@ -182,10 +183,14 @@ pub struct ConsentView {
     pub id: String,
     /// Who asks.
     pub owner: OwnerView,
-    /// What would be shared.
+    /// What would be shared, or the name of the service to connect.
     pub title: String,
-    /// Which ports.
+    /// Which ports (none for a connection).
     pub ports: Vec<u16>,
+    /// The key of the service to connect; none for a share. Older apps,
+    /// which do not know it, show the request by its title.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
     /// Unix milliseconds.
     pub created_ms: i64,
     /// Unanswered requests lapse.

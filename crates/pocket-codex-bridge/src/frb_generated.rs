@@ -8995,6 +8995,7 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsConsentDto {
             <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_decode(deserializer);
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_ports = <Vec<u16>>::sse_decode(deserializer);
+        let mut var_service = <Option<String>>::sse_decode(deserializer);
         let mut var_createdMs = <i64>::sse_decode(deserializer);
         let mut var_expiresMs = <i64>::sse_decode(deserializer);
         return crate::api::bridge::agent_tools::ToolsConsentDto {
@@ -9002,6 +9003,7 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsConsentDto {
             owner: var_owner,
             title: var_title,
             ports: var_ports,
+            service: var_service,
             created_ms: var_createdMs,
             expires_ms: var_expiresMs,
         };
@@ -12093,6 +12095,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsCon
             self.owner.into_into_dart().into_dart(),
             self.title.into_into_dart().into_dart(),
             self.ports.into_into_dart().into_dart(),
+            self.service.into_into_dart().into_dart(),
             self.created_ms.into_into_dart().into_dart(),
             self.expires_ms.into_into_dart().into_dart(),
         ]
@@ -14024,6 +14027,7 @@ impl SseEncode for crate::api::bridge::agent_tools::ToolsConsentDto {
         <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_encode(self.owner, serializer);
         <String>::sse_encode(self.title, serializer);
         <Vec<u16>>::sse_encode(self.ports, serializer);
+        <Option<String>>::sse_encode(self.service, serializer);
         <i64>::sse_encode(self.created_ms, serializer);
         <i64>::sse_encode(self.expires_ms, serializer);
     }

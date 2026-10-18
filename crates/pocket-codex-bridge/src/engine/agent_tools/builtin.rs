@@ -28,6 +28,11 @@ pub struct BuiltinTool {
 /// The capability that sharing a port needs the user's consent for.
 pub const SHARE: &str = "share";
 
+/// The capability that connecting another device's Responses API needs the
+/// user's consent for: it spends that device's model account. Connecting a
+/// shared port needs none (it was shared with the user's devices).
+pub const CONNECT: &str = "connect";
+
 /// What this POCOX offers, in the order the composer lists it.
 pub fn catalog() -> Vec<BuiltinTool> {
     let tool = |id: &str, title: &str, summary: &str, gated: bool| BuiltinTool {
@@ -51,11 +56,12 @@ pub fn catalog() -> Vec<BuiltinTool> {
             true,
         ),
         tool(
-            "connect",
+            CONNECT,
             "Connect a service",
             "Make a service on another of the user's devices reachable here (pocox `connect`, \
-             action `connect`).",
-            false,
+             action `connect`), a Responses API included; the user has allowed it for this \
+             conversation.",
+            true,
         ),
     ]
 }

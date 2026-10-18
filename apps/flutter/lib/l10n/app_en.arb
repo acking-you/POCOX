@@ -1477,6 +1477,10 @@
   "@toolsRequestTitle": {"placeholders": {"owner": {"type": "String"}}},
   "toolsRequestDetail": "{title} · port {ports} on {device}",
   "@toolsRequestDetail": {"placeholders": {"title": {"type": "String"}, "ports": {"type": "String"}, "device": {"type": "String"}}},
+  "toolsConnectRequestTitle": "{owner} wants to connect",
+  "@toolsConnectRequestTitle": {"placeholders": {"owner": {"type": "String"}}},
+  "toolsConnectRequestDetail": "{name} · Responses API on {serviceDevice}, for {device}",
+  "@toolsConnectRequestDetail": {"placeholders": {"name": {"type": "String"}, "serviceDevice": {"type": "String"}, "device": {"type": "String"}}},
   "toolsAllowOnce": "Allow once",
   "toolsAllowConversation": "Allow in this conversation",
   "toolsDeny": "Deny",
@@ -1516,7 +1520,7 @@
   "toolsThisDevice": "This device",
   "toolsSwitch": "Let agents use POCOX",
   "toolsSwitchInfo": "Codex, Claude, OpenCode and other agents can see your devices and services, share a port of this computer with your other devices, and connect to services elsewhere.",
-  "toolsAsk": "Ask before an agent shares",
+  "toolsAsk": "Ask before agents share or connect an API",
   "toolsEndpoint": "MCP endpoint",
   "toolsNotServing": "Not serving",
   "toolsAddToHarness": "Add to another agent",
@@ -1566,7 +1570,7 @@
   "builtinToolShare": "Share a port",
   "builtinToolShareSummary": "The agent can share a port of its computer with your devices without asking first in this conversation.",
   "builtinToolConnect": "Connect a service",
-  "builtinToolConnectSummary": "The agent can reach a service on another of your devices.",
+  "builtinToolConnectSummary": "The agent can reach a service on another of your devices, a Responses API included, without asking first in this conversation.",
   "builtinToolRemove": "Remove {tool}",
   "@builtinToolRemove": {"placeholders": {"tool": {"type": "String"}}}
 }

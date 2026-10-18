@@ -8558,15 +8558,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsConsentDto dco_decode_tools_consent_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
     return ToolsConsentDto(
       id: dco_decode_String(arr[0]),
       owner: dco_decode_tools_owner_dto(arr[1]),
       title: dco_decode_String(arr[2]),
       ports: dco_decode_list_prim_u_16_strict(arr[3]),
-      createdMs: dco_decode_i_64(arr[4]),
-      expiresMs: dco_decode_i_64(arr[5]),
+      service: dco_decode_opt_String(arr[4]),
+      createdMs: dco_decode_i_64(arr[5]),
+      expiresMs: dco_decode_i_64(arr[6]),
     );
   }
 
@@ -11256,6 +11257,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_owner = sse_decode_tools_owner_dto(deserializer);
     var var_title = sse_decode_String(deserializer);
     var var_ports = sse_decode_list_prim_u_16_strict(deserializer);
+    var var_service = sse_decode_opt_String(deserializer);
     var var_createdMs = sse_decode_i_64(deserializer);
     var var_expiresMs = sse_decode_i_64(deserializer);
     return ToolsConsentDto(
@@ -11263,6 +11265,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       owner: var_owner,
       title: var_title,
       ports: var_ports,
+      service: var_service,
       createdMs: var_createdMs,
       expiresMs: var_expiresMs,
     );
@@ -13496,6 +13499,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_tools_owner_dto(self.owner, serializer);
     sse_encode_String(self.title, serializer);
     sse_encode_list_prim_u_16_strict(self.ports, serializer);
+    sse_encode_opt_String(self.service, serializer);
     sse_encode_i_64(self.createdMs, serializer);
     sse_encode_i_64(self.expiresMs, serializer);
   }

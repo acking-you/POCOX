@@ -128,16 +128,19 @@ fn share(s: model::ShareView) -> ToolsShareDto {
     }
 }
 
-/// A share waiting for the user's answer.
+/// A share, or a connection to another device's Responses API, waiting for
+/// the user's answer.
 pub struct ToolsConsentDto {
     /// Answer with this id.
     pub id: String,
     /// Who asks.
     pub owner: ToolsOwnerDto,
-    /// What would be shared.
+    /// What would be shared, or the name of the service to connect.
     pub title: String,
-    /// Which ports.
+    /// Which ports (none for a connection).
     pub ports: Vec<u16>,
+    /// The key of the service to connect; none for a share.
+    pub service: Option<String>,
     /// Unix milliseconds.
     pub created_ms: i64,
     /// When it lapses.
@@ -270,6 +273,7 @@ fn overview(o: model::Overview) -> ToolsOverviewDto {
                         owner: owner(c.owner),
                         title: c.title,
                         ports: c.ports,
+                        service: c.service,
                         created_ms: c.created_ms,
                         expires_ms: c.expires_ms,
                     })
@@ -462,10 +466,11 @@ pub fn tools_connect(service: String, local_port: Option<u16>) -> Result<ToolsCo
         local_port,
     };
     let caller = shares::Caller::user("This device");
-    runtime::runtime()
-        .block_on(connections::connect(&caller, request))
-        .map(connection)
-        .map_err(|error| anyhow!(error.message()))
+    match runtime::runtime().block_on(connections::connect(&caller, request)) {
+        Ok(Ok(view)) => Ok(connection(view)),
+        Ok(Err(pending)) => Err(anyhow!(pending.message())),
+        Err(error) => Err(anyhow!(error.message())),
+    }
 }
 
 /// End this device's connection to `service`.

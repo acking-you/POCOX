@@ -1241,6 +1241,8 @@
   "toolsSharedWithYou": "与你共享",
   "toolsRequestTitle": "{owner} 想要共享",
   "toolsRequestDetail": "{title} · {device} 的端口 {ports}",
+  "toolsConnectRequestTitle": "{owner} 想要连接",
+  "toolsConnectRequestDetail": "{name} · {serviceDevice} 的 Responses API，供{device}使用",
   "toolsAllowOnce": "允许一次",
   "toolsAllowConversation": "本次对话内允许",
   "toolsDeny": "拒绝",
@@ -1271,7 +1273,7 @@
   "toolsThisDevice": "本机",
   "toolsSwitch": "允许智能体使用 POCOX",
   "toolsSwitchInfo": "Codex、Claude、OpenCode 等智能体可以看到你的设备和服务，把这台电脑的端口共享给你的其他设备，并连接其他设备上的服务。",
-  "toolsAsk": "智能体共享前先问我",
+  "toolsAsk": "智能体共享或连接 API 前先问我",
   "toolsEndpoint": "MCP 端点",
   "toolsNotServing": "未运行",
   "toolsAddToHarness": "添加到其他智能体",
@@ -1315,6 +1317,6 @@
   "builtinToolShare": "共享端口",
   "builtinToolShareSummary": "在这个对话中，智能体可以把所在电脑的端口共享给你的设备，无需再次确认。",
   "builtinToolConnect": "连接服务",
-  "builtinToolConnectSummary": "智能体可以连接你其他设备上的服务。",
+  "builtinToolConnectSummary": "在这个对话中，智能体可以连接你其他设备上的服务（包括 Responses API），无需再次确认。",
   "builtinToolRemove": "移除{tool}"
 }

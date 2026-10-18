@@ -398,14 +398,14 @@ pub fn grant(
     if gated.is_empty() {
         return Ok(());
     }
-    for tool in gated {
+    for tool in &gated {
         state.granted.insert(state::Granted {
             host: host.clone(),
             conversation: conversation.clone(),
-            tool,
+            tool: tool.clone(),
         });
     }
-    let woken = consent::settle_granted(&mut state, &host, conversation.as_deref());
+    let woken = consent::settle_granted(&mut state, &host, conversation.as_deref(), &gated);
     state::changed(&mut state);
     drop(state);
     for answered in woken {

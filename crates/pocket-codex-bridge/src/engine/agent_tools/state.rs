@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Notify};
 
 use super::{
+    builtin::{CONNECT, SHARE},
     error::ToolError,
     model::{
         ConnectionView, ConsentView, Decision, HostedView, OwnerKind, OwnerView, PortStatus,
@@ -199,7 +200,7 @@ pub struct SavedShare {
     pub ports: Vec<u16>,
 }
 
-/// A share waiting for the user.
+/// A share or connection waiting for the user.
 pub struct Consent {
     /// What controllers show.
     pub view: ConsentView,
@@ -209,6 +210,17 @@ pub struct Consent {
     pub decision: Option<Decision>,
     /// Wakes the calls waiting for the answer.
     pub answered: Arc<Notify>,
+}
+
+impl Consent {
+    /// The capability it asks for ([`SHARE`] or [`CONNECT`]).
+    pub fn tool(&self) -> &'static str {
+        if self.view.service.is_some() {
+            CONNECT
+        } else {
+            SHARE
+        }
+    }
 }
 
 /// A service of another device reachable here.
@@ -284,12 +296,14 @@ pub struct State {
     pub shares: Vec<Share>,
     /// Requests waiting for the user.
     pub consents: Vec<Consent>,
-    /// Owners the user let share without asking again.
-    pub allowed: HashSet<OwnerKey>,
+    /// Owners the user let use a capability ([`SHARE`] or [`CONNECT`])
+    /// without asking again.
+    pub allowed: HashSet<(OwnerKey, &'static str)>,
     /// Gated built-in tools the user handed conversations from the composer.
     pub granted: HashSet<Granted>,
-    /// Recently declined owners (they are not asked again for a while).
-    pub declined: Vec<(OwnerKey, i64)>,
+    /// Owners recently declined a capability, and until when they are not
+    /// asked again for it.
+    pub declined: Vec<(OwnerKey, &'static str, i64)>,
     /// Connections of this device.
     pub connections: Vec<Connection>,
     /// Agent hosts and APIs this process serves, as last read.

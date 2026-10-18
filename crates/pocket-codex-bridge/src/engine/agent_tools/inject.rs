@@ -265,14 +265,14 @@ fn rekey(state: &mut State, older: &[String], id: &str) {
     for consent in &mut state.consents {
         moved(&mut consent.key);
     }
-    for (key, _) in &mut state.declined {
+    for (key, _, _) in &mut state.declined {
         moved(key);
     }
     state.allowed = std::mem::take(&mut state.allowed)
         .into_iter()
-        .map(|mut key| {
+        .map(|(mut key, tool)| {
             moved(&mut key);
-            key
+            (key, tool)
         })
         .collect();
     state::changed(state);

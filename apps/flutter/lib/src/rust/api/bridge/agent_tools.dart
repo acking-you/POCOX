@@ -278,7 +278,8 @@ class ToolsConnectionDto {
           expiresMs == other.expiresMs;
 }
 
-/// A share waiting for the user's answer.
+/// A share, or a connection to another device's Responses API, waiting for
+/// the user's answer.
 class ToolsConsentDto {
   /// Answer with this id.
   final String id;
@@ -286,11 +287,14 @@ class ToolsConsentDto {
   /// Who asks.
   final ToolsOwnerDto owner;
 
-  /// What would be shared.
+  /// What would be shared, or the name of the service to connect.
   final String title;
 
-  /// Which ports.
+  /// Which ports (none for a connection).
   final Uint16List ports;
+
+  /// The key of the service to connect; none for a share.
+  final String? service;
 
   /// Unix milliseconds.
   final PlatformInt64 createdMs;
@@ -303,6 +307,7 @@ class ToolsConsentDto {
     required this.owner,
     required this.title,
     required this.ports,
+    this.service,
     required this.createdMs,
     required this.expiresMs,
   });
@@ -313,6 +318,7 @@ class ToolsConsentDto {
       owner.hashCode ^
       title.hashCode ^
       ports.hashCode ^
+      service.hashCode ^
       createdMs.hashCode ^
       expiresMs.hashCode;
 
@@ -325,6 +331,7 @@ class ToolsConsentDto {
           owner == other.owner &&
           title == other.title &&
           ports == other.ports &&
+          service == other.service &&
           createdMs == other.createdMs &&
           expiresMs == other.expiresMs;
 }

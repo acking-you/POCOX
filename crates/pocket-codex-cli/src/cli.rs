@@ -365,14 +365,16 @@ pub enum ToolsCmd {
     Enable(ToolsTargetArgs),
     /// Stop agents from using the tools; what agents shared ends.
     Disable(ToolsTargetArgs),
-    /// Whether an agent's first share asks you first (on by default).
+    /// Whether an agent's first share, or its connection to another
+    /// device's Responses API, asks you first (on by default).
     Ask(ToolsAskArgs),
-    /// List agents' share requests waiting for you, on every device.
+    /// List agents' share and connect requests waiting for you, on every
+    /// device.
     Requests,
-    /// Let an agent share what it asked for (`--always`: and share again
-    /// in that conversation without asking).
+    /// Let an agent do what it asked for (`--always`: and share, or
+    /// connect, again in that conversation without asking).
     Allow(ToolsAnswerArgs),
-    /// Refuse an agent's share request.
+    /// Refuse an agent's request.
     Deny(ToolsAnswerArgs),
     /// Print a ready-to-paste entry for a harness POCOX does not launch
     /// (Claude Code or Codex run in a terminal, OpenCode, any MCP client),

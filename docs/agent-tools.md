@@ -141,7 +141,7 @@ One `action` with its fields:
 | --- | --- | --- |
 | `share` | `ports` (1–4, the page's first), `title`, `path`, `scheme` (`https` for a TLS page), `wait_ready_seconds` (≤ 20) | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
 | `stop_sharing` | `service` (share id, port or key) | `stopped`; only what the caller's conversation shared |
-| `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port` | `connected` with the local address; shared ports and APIs only |
+| `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port` | `connected` with the local address; shared ports and APIs only; or `waiting_for_user` for another device's Responses API, to repeat |
 | `disconnect` | `service` | `disconnected`; only what the caller's conversation connected |
 
 - A share is published only after its first port answers on 127.0.0.1 or
@@ -161,21 +161,27 @@ One `action` with its fields:
 
 ## Consent
 
-The first share of each owner (a conversation, or a token when the harness
-names none) needs the user's answer. It is asked on every POCOX device of the
-user, the agent's own included, above whatever page is open, or with
-`pocox tools requests|allow|deny` in a terminal. A request names its ports,
-and an answer covers what the user was shown:
+An agent needs the user's answer before its first share, and before it
+connects another device's Responses API (which spends that device's model
+account), per owner: a conversation, or a token when the harness names none.
+Connecting a shared port needs none, since it was shared with the user's
+devices; nor do listing, stopping its own shares and disconnecting. It is
+asked on every POCOX device of the user, the agent's own included, above
+whatever page is open, or with `pocox tools requests|allow|deny` in a
+terminal. A request names its ports or the API, and an answer covers what
+the user was shown:
 
-- **Allow once** admits the ports of that request, once; a call for other
-  ports is a request of its own.
-- **Allow in this conversation** lets the owner share without asking again.
-- **Deny** refuses the owner for ten minutes.
+- **Allow once** admits that request, once; a call for other ports, or for
+  some of them, is a request of its own.
+- **Allow in this conversation** lets the owner share, or connect APIs,
+  without asking again; sharing does not cover connecting, nor the reverse.
+- **Deny** refuses the owner's sharing, or connecting, for ten minutes.
 
-The last two settle the owner's other waiting requests too. The tool call
-waits for the answer (110 s for hosted harnesses, whose tool timeout POCOX
-sets to 180 s, 18 s for others) and otherwise returns `waiting_for_user`; an
-answer given later applies to the next call with the same ports. A waiting
+The last two settle the owner's other waiting requests of the same kind too.
+The tool call waits for the answer (110 s for hosted harnesses, whose tool
+timeout POCOX sets to 180 s, 18 s for others) and otherwise returns
+`waiting_for_user`; an answer given later applies to the next call asking
+the same. A waiting
 call fails as soon as the switch goes off or its token ends, and nothing is
 published after that. At most 16 requests wait at once, 4 per token.
 
@@ -183,8 +189,8 @@ Harness prompts (MCP elicitation, multi round-trip requests) are deliberately
 not used: a harness may answer them itself — Codex accepts a plain
 confirmation by itself under full access and declines under its `never`
 policy — so they cannot carry the user's consent. POCOX enforces it for every
-harness and approval policy. **Ask before an agent shares** can be switched
-off.
+harness and approval policy. **Ask before agents share or connect an API**
+can be switched off.
 
 ### Built-in tools in the composer
 
@@ -198,16 +204,17 @@ attachments:
 - the message ends with a block naming them for the agent
   (`<pocox_tools ids="share,services">…</pocox_tools>`); transcripts and list
   previews show chips instead;
-- before the turn starts, a tool that needs consent (Share a port) is granted
-  to that conversation, as if the user had answered **Allow in this
-  conversation** in advance, on the host itself or through its management
+- before the turn starts, a tool that needs consent (Share a port, and
+  Connect a service for a Responses API) is granted to that conversation, as
+  if the user had answered **Allow in this conversation** in advance, on the host itself or through its management
   entry (`POST /services/v1/grants`, bound to the account or relay like every
   answer). A request already waiting there goes ahead.
 
 A grant names the hosted instance and the conversation its harness reports
 (native OpenCode names none, so there it covers the instance, as its consent
 does). It ends with the instance or the session, when the switch or **Ask
-before an agent shares** goes off, and when the account or relay changes. A
+before agents share or connect an API** goes off, and when the account or
+relay changes. A
 host that cannot be reached keeps its consent prompt.
 
 ## Ownership and lifetimes
@@ -263,8 +270,10 @@ token never reaches a command line.
 Hosted harnesses run every POCOX tool without their own prompt. Codex would
 otherwise ask before any tool that is not read-only (`connect` reaches other
 devices), by its own prompt or its auto-reviewer, which can refuse a share
-before POCOX asks the user; POCOX's consent is the one gate. The tools are
-listed once (`builtin.rs`), so a new tool is approved the same way.
+before POCOX asks the user; POCOX's consent is the one gate, for what reaches
+beyond what the user already exposed: shares, and connections to another
+device's Responses API (see Consent). The tools are listed once
+(`builtin.rs`), so a new tool is approved the same way.
 
 ## The CLI
 
@@ -353,6 +362,9 @@ own token is protected by the proof above.
   ⌘3, Runtime logs ⌘4.
 - A catalog's `builtin` list and `/services/v1/grants` are additions: an
   older host lists no built-in tools, so its conversations offer none.
+- A consent request for an agent's connection to a Responses API carries the
+  API's key (`service`); an older app shows it by its name as if it were a
+  share, and its answer still settles it.
 
 ## Verification
 
@@ -428,8 +440,13 @@ own token is protected by the proof above.
   the phone, returned `waiting_for_user` after 110 s, and after a Deny from
   the terminal its repeat was refused at once. The turn itself failed (the
   isolated host had no sign-in), so no model read the block.
+- Consent for an agent's connection to a Responses API (2026-10-19), by
+  unit and widget tests only: an answer covers sharing or connecting, not
+  both; Allow once covers only the exact request; a composer pick settles
+  only what was picked; the card for it shows and answers on a phone.
 - Not verified: a share card at a real model's tool call in the transcript,
-  a model reading the picked tools' block, Claude and OpenCode hosts
+  a model reading the picked tools' block, an agent's Responses API
+  connection waiting for a live answer, Claude and OpenCode hosts
   calling the tools (their pre-approval by unit tests only), a physical
   phone, Android
   (including its loopback cleartext allowance), Windows and Linux, account

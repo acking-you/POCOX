@@ -137,7 +137,8 @@ class ToolsShare {
   String get status => ports.isEmpty ? 'starting' : ports.first.status;
 }
 
-/// An agent's share waiting for the user's answer.
+/// An agent's share, or its connection to another device's Responses API,
+/// waiting for the user's answer.
 class ToolsConsent {
   /// Creates a request.
   const ToolsConsent({
@@ -145,6 +146,7 @@ class ToolsConsent {
     required this.owner,
     required this.title,
     required this.ports,
+    this.service,
     required this.createdMs,
     required this.expiresMs,
   });
@@ -155,11 +157,14 @@ class ToolsConsent {
   /// Who asks.
   final ToolsOwner owner;
 
-  /// What would be shared.
+  /// What would be shared, or the name of the service to connect.
   final String title;
 
-  /// Which ports.
+  /// Which ports (none for a connection).
   final List<int> ports;
+
+  /// The key of the service to connect; null for a share.
+  final String? service;
 
   /// Unix milliseconds.
   final int createdMs;

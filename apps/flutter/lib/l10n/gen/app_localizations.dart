@@ -6734,6 +6734,22 @@ abstract class AppLocalizations {
   /// **'{title} · port {ports} on {device}'**
   String toolsRequestDetail(String title, String ports, String device);
 
+  /// No description provided for @toolsConnectRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{owner} wants to connect'**
+  String toolsConnectRequestTitle(String owner);
+
+  /// No description provided for @toolsConnectRequestDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} · Responses API on {serviceDevice}, for {device}'**
+  String toolsConnectRequestDetail(
+    String name,
+    String serviceDevice,
+    String device,
+  );
+
   /// No description provided for @toolsAllowOnce.
   ///
   /// In en, this message translates to:
@@ -6917,7 +6933,7 @@ abstract class AppLocalizations {
   /// No description provided for @toolsAsk.
   ///
   /// In en, this message translates to:
-  /// **'Ask before an agent shares'**
+  /// **'Ask before agents share or connect an API'**
   String get toolsAsk;
 
   /// No description provided for @toolsEndpoint.
@@ -7181,7 +7197,7 @@ abstract class AppLocalizations {
   /// No description provided for @builtinToolConnectSummary.
   ///
   /// In en, this message translates to:
-  /// **'The agent can reach a service on another of your devices.'**
+  /// **'The agent can reach a service on another of your devices, a Responses API included, without asking first in this conversation.'**
   String get builtinToolConnectSummary;
 
   /// No description provided for @builtinToolRemove.

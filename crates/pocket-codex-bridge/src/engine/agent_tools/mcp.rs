@@ -91,8 +91,9 @@ fn connect_tool() -> Tool {
          server the user wants to preview on their phone), stop sharing it, or connect to a \
          service on another of the user's devices so it is reachable on this machine. \
          action=share needs `ports`; stop_sharing needs `service` (a key or port); connect and \
-         disconnect need `service` (a key, `device:kind:name` or `device/port`). A share may \
-         wait for the user's consent in POCOX; repeating the same call continues it.",
+         disconnect need `service` (a key, `device:kind:name` or `device/port`). A share, or a \
+         connection to another device's Responses API, may wait for the user's consent in \
+         POCOX; repeating the same call continues it.",
         schema(json!({
             "type": "object",
             "properties": {
@@ -265,13 +266,14 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                     local_port: port(args.get("local_port")),
                 };
                 match connections::connect(caller, request).await {
-                    Ok(mut view) => {
+                    Ok(Ok(mut view)) => {
                         for_agent(caller, &mut view.owner);
                         let message = render::connected(&view);
                         let mut value = serde_json::to_value(&view).unwrap_or_default();
                         value["status"] = json!("connected");
                         done(value, message)
                     },
+                    Ok(Err(waiting)) => pending(&waiting),
                     Err(error) => failed(&error),
                 }
             },

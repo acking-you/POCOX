@@ -56,9 +56,7 @@ impl ToolError {
                                  `pocox serve --allow-remote-management`."
                 .into(),
             Self::Invalid(why) => why.clone(),
-            Self::Declined => {
-                "The user declined sharing this. Do not retry unless the user asks.".into()
-            },
+            Self::Declined => "The user declined this. Do not retry unless the user asks.".into(),
             Self::Conflict(why) => why.clone(),
             Self::NotFound(what) => {
                 format!("{what} was not found. Call `services` to see what exists.")
@@ -88,7 +86,8 @@ impl std::fmt::Display for ToolError {
 
 impl std::error::Error for ToolError {}
 
-/// A share that could not finish yet; repeating the same call continues it.
+/// A share or connection that could not finish yet; repeating the same call
+/// continues it.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pending {
     /// The user has not answered yet.
@@ -109,7 +108,7 @@ impl Pending {
     /// What to tell the model.
     pub fn message(&self) -> String {
         match self {
-            Self::WaitingForUser => "The user is being asked in POCOX whether to share this. Tell \
+            Self::WaitingForUser => "The user is being asked in POCOX whether to allow this. Tell \
                                      the user to answer there, then call `connect` again with the \
                                      same arguments."
                 .into(),

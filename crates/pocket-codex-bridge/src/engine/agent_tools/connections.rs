@@ -7,7 +7,8 @@ use pocket_codex_account_proto::key::NamespacedServiceId;
 use pocket_codex_core::service::{sanitize_component, ServiceId, ServiceKind};
 
 use super::{
-    error::ToolError,
+    consent,
+    error::{Pending, ToolError},
     model::{bounded, ConnectionView, AGENT_LEASE_MS},
     shares::Caller,
     state::{self, now_ms, Connection, OwnerKey},
@@ -81,11 +82,15 @@ fn alive(registry_key: &str) -> bool {
         .any(|s| s.key == registry_key && s.alive)
 }
 
-/// Make `request.service` reachable on this device for `caller`.
+/// Make `request.service` reachable on this device for `caller`. An agent
+/// connects another device's Responses API, which spends that device's
+/// model account, only with the user's consent: a pending result while the
+/// user has not answered. Shared ports were shared with the user's devices
+/// and need none.
 pub async fn connect(
     caller: &Caller,
     request: ConnectRequest,
-) -> Result<ConnectionView, ToolError> {
+) -> Result<Result<ConnectionView, Pending>, ToolError> {
     if !caller.is_user() && !state::lock().settings.enabled {
         return Err(ToolError::Off);
     }
@@ -116,8 +121,13 @@ pub async fn connect(
             "`{key}` runs on this device; use it at its own local address."
         )));
     }
+    if !caller.is_user() && id.kind == ServiceKind::Api {
+        if let Err(waiting) = consent::admit_connect(caller, &caller.key(), &key, &id.name).await? {
+            return Ok(Err(waiting));
+        }
+    }
     if let Some(existing) = reuse(caller, &key, owned.epoch)? {
-        return Ok(existing);
+        return Ok(Ok(existing));
     }
     let own_port = (id.kind == ServiceKind::Port)
         .then(|| id.name.parse::<u16>().ok())
@@ -210,7 +220,7 @@ pub async fn connect(
     };
     state::changed(&mut state);
     tracing::info!(service = %view.service, local = %view.local, "connected");
-    Ok(view)
+    Ok(Ok(view))
 }
 
 /// A live connection to `key`, shared with `caller`: an agent joins those

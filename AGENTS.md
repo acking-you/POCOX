@@ -1296,14 +1296,17 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     after its first port answers on 127.0.0.1 or ::1. Each device's management
     entry gains `/services/v1` (catalog, event stream, the user's answers and
     shares); the app follows every device's stream. Consent for an agent's
-    first share per conversation (or token) is asked on all the user's
-    devices, the agent's own included, while the call waits (110 s hosted,
-    18 s otherwise); harness elicitation and multi round-trip prompts are
-    never used for it, because a harness may answer them itself. An answer
-    covers what was shown: Allow once admits that request's ports only;
-    Allow in this conversation and Deny apply to the owner and settle its
-    other requests. Agents never see consent requests or conversation ids,
-    and every share and connection re-checks the switch and the caller's
+    first share, and for its connections to another device's Responses API
+    (which spend that device's model account), per conversation (or token)
+    is asked on all the user's devices, the agent's own included, while the
+    call waits (110 s hosted, 18 s otherwise); connecting a shared port needs
+    none. Harness elicitation and multi round-trip prompts are never used
+    for it, because a harness may answer them itself. An answer covers what
+    was shown: Allow once admits that exact request only; Allow in this
+    conversation and Deny apply to the owner's sharing, or connecting, and
+    settle its other requests of that kind. Agents never see consent
+    requests or conversation ids, and every share and connection re-checks
+    the switch and the caller's
     token right before it publishes or connects. Every call carries a bearer
     token (per hosted Codex or OpenCode instance, committed only once the
     host is recorded; per ACP session for agents advertising

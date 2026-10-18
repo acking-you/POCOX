@@ -3884,6 +3884,20 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String toolsConnectRequestTitle(String owner) {
+    return '$owner wants to connect';
+  }
+
+  @override
+  String toolsConnectRequestDetail(
+    String name,
+    String serviceDevice,
+    String device,
+  ) {
+    return '$name · Responses API on $serviceDevice, for $device';
+  }
+
+  @override
   String get toolsAllowOnce => 'Allow once';
 
   @override
@@ -3994,7 +4008,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Codex, Claude, OpenCode and other agents can see your devices and services, share a port of this computer with your other devices, and connect to services elsewhere.';
 
   @override
-  String get toolsAsk => 'Ask before an agent shares';
+  String get toolsAsk => 'Ask before agents share or connect an API';
 
   @override
   String get toolsEndpoint => 'MCP endpoint';
@@ -4149,7 +4163,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get builtinToolConnectSummary =>
-      'The agent can reach a service on another of your devices.';
+      'The agent can reach a service on another of your devices, a Responses API included, without asking first in this conversation.';
 
   @override
   String builtinToolRemove(String tool) {

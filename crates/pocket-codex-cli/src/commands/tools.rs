@@ -26,8 +26,11 @@ pub async fn run(cmd: ToolsCmd) -> Result<()> {
         ToolsCmd::Deny(args) => answer(&args.id, "deny").await,
         ToolsCmd::Ask(args) => {
             let ask = args.value == OnOff::On;
-            let label =
-                if ask { "asking before agents share" } else { "agents share without asking" };
+            let label = if ask {
+                "asking before agents share or connect an API"
+            } else {
+                "agents share and connect without asking"
+            };
             change(&args.target, |s| s.ask_before_sharing = ask, label)
         },
     }
@@ -103,18 +106,24 @@ async fn requests() -> Result<()> {
         for consent in &device.consents {
             any = true;
             let ports: Vec<String> = consent.ports.iter().map(u16::to_string).collect();
-            println!(
-                "{}  {} asks to share \"{}\" (port {}) on {}",
-                consent.id,
-                consent.owner.label,
-                consent.title,
-                ports.join(", "),
-                device.name
-            );
+            match &consent.service {
+                Some(service) => println!(
+                    "{}  {} asks to connect {} on {}",
+                    consent.id, consent.owner.label, service, device.name
+                ),
+                None => println!(
+                    "{}  {} asks to share \"{}\" (port {}) on {}",
+                    consent.id,
+                    consent.owner.label,
+                    consent.title,
+                    ports.join(", "),
+                    device.name
+                ),
+            }
         }
     }
     if !any {
-        ui::muted("no share requests are waiting");
+        ui::muted("no requests are waiting");
     }
     Ok(())
 }
