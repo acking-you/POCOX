@@ -343,6 +343,8 @@ mod tests {
 
     #[test]
     fn a_shared_tunnel_lasts_until_its_last_holder_lets_go() {
+        // Ending a tunnel unsubscribes it in the runtime's registry.
+        runtime::init(std::env::temp_dir()).expect("test runtime");
         let service = "pcx:holders-test:port:7001";
         let a = OwnerKey {
             token: "holders-a".into(),

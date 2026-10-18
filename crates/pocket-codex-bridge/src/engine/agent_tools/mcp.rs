@@ -23,7 +23,7 @@ use super::{
     catalog,
     connections::{self, ConnectRequest},
     error::{Pending, ToolError},
-    model::{bounded, Overview},
+    model::{bounded, Overview, OwnerView},
     render,
     shares::{self, Caller, ShareRequest},
     tokens::Principal,
@@ -171,6 +171,14 @@ fn pending(pending: &Pending) -> CallToolResult {
     done(value, pending.message())
 }
 
+/// An agent sees no conversation id in what it gets back, as in `services`:
+/// a tunnel or share it joined may be held for another conversation.
+fn for_agent(caller: &Caller, owner: &mut OwnerView) {
+    if !caller.is_user() {
+        owner.conversation = None;
+    }
+}
+
 async fn services(caller: &Caller, args: &JsonObject) -> CallToolResult {
     let overview: Result<Overview, ToolError> =
         tokio::task::spawn_blocking(catalog::overview_blocking)
@@ -218,7 +226,8 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                 epoch: None,
             };
             match shares::share(caller, request).await {
-                Ok(Ok(shared)) => {
+                Ok(Ok(mut shared)) => {
+                    for_agent(caller, &mut shared.share.owner);
                     let message = render::shared(&shared);
                     let mut value = serde_json::to_value(&shared).unwrap_or_default();
                     value["status"] = json!("shared");
@@ -231,10 +240,13 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
         },
         "stop_sharing" => match service.as_deref() {
             Some(service) => match shares::stop(Some(caller), service) {
-                Ok(share) => done(
-                    json!({"status": "stopped", "share": share}),
-                    format!("Stopped sharing {}.", share.title),
-                ),
+                Ok(mut share) => {
+                    for_agent(caller, &mut share.owner);
+                    done(
+                        json!({"status": "stopped", "share": share}),
+                        format!("Stopped sharing {}.", share.title),
+                    )
+                },
                 Err(error) => failed(&error),
             },
             None => failed(&ToolError::Invalid("stop_sharing needs `service`.".into())),
@@ -246,7 +258,8 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                     local_port: port(args.get("local_port")),
                 };
                 match connections::connect(caller, request).await {
-                    Ok(view) => {
+                    Ok(mut view) => {
+                        for_agent(caller, &mut view.owner);
                         let message = render::connected(&view);
                         let mut value = serde_json::to_value(&view).unwrap_or_default();
                         value["status"] = json!("connected");

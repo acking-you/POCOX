@@ -18,7 +18,15 @@ import 'package:pocket_codex/src/widgets/status_dots.dart';
 /// Every share and service in [scene], as a list.
 class GalaxyList extends ConsumerWidget {
   /// Lists [scene]; [onPick] opens a body's details.
-  const GalaxyList({super.key, required this.scene, required this.onPick});
+  const GalaxyList({
+    super.key,
+    required this.top,
+    required this.scene,
+    required this.onPick,
+  });
+
+  /// Room above the first row, where the search bar floats over the list.
+  final double top;
 
   /// What to list.
   final GalaxyScene scene;
@@ -47,7 +55,7 @@ class GalaxyList extends ConsumerWidget {
     );
     return ListView(
       key: const Key('galaxy-list'),
-      padding: const EdgeInsets.fromLTRB(16, 72, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, top, 16, 24),
       children: [
         heading(l10n.toolsSharedWithYou),
         if (shares.isEmpty)

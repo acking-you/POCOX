@@ -1,7 +1,7 @@
 # Agent tools: devices and services
 
-Status: implemented (2026-10-18). Verified on one Mac; see
-[Verification](#verification) for what was and was not exercised.
+Status: implemented (2026-10-18). Verified on one Mac and an iOS simulator;
+see [Verification](#verification) for what was and was not exercised.
 
 POCOX lets a person reach every device's agents and services. Agent tools
 give the same reach to the agents themselves, through one MCP server, `pocox`,
@@ -339,14 +339,52 @@ own token is protected by the proof above.
   Flutter widget tests for the share card, the consent prompt, Settings and
   the galaxy, with offscreen renders of the galaxy in both themes and on a
   phone.
-- The review round of PR #119 (Codex review and three independent reviews)
-  added tests for what it fixed: answers covering only the ports shown, owner
-  answers settling waiting requests, calls ending with their token, unreadable
-  settings staying off, POCOX's own ports refused, the user taking over an
-  agent's share, browser requests refused by the management entry, and
-  consent prompts raised on the agent's own device. Those fixes were not
-  re-run against a live relay.
-- Not verified: a phone or the iOS/Android in-app browser against a real
-  share (including Android's loopback cleartext allowance), Claude and
-  OpenCode hosts calling the tools, Windows and Linux, account mode across
-  machines, and the nebula on device (the headless renderer has no shader).
+- The review rounds of PR #119 added tests for what they fixed: answers
+  covering only the ports shown, owner answers settling waiting requests,
+  calls ending with their token, unreadable settings staying off, POCOX's own
+  ports refused, the user taking over an agent's share, browser requests
+  refused by the management entry, consent prompts raised on the agent's own
+  device, durable stops and revocations, and shared tunnels.
+- Live run (2026-10-19): the macOS app and an iPhone 15 simulator (iOS 27),
+  debug builds of the PR, a local pb-mapper 0.6.0 relay in self-host mode and
+  an isolated CLI host as a second computer. Agents were driven over MCP with
+  each hosted Codex instance's own token; no model turn was run.
+  - Consent: a share asked for by the desktop's hosted Codex raised the card on
+    the desktop itself and on the phone at once, and an answer on either
+    cleared both. Of two requests waiting in one conversation, Allow once
+    released only its own call; the other returned `waiting_for_user` after
+    110 s, and the answer given later let the repeated call share at once.
+    Deny ended the waiting call and refused the owner's next one; Allow in this
+    conversation let it share another port without asking; `pocox tools
+    requests|allow|deny` answered from a terminal.
+  - Phone: a share showed a notice above any page (also over the in-app
+    browser), was connected at once (on another port: the simulator shares the
+    Mac's loopback), and was listed under Shared with you on its device's page
+    and in the galaxy; the connection ended with the share. The in-app browser
+    loaded shared pages through the tunnel, over http and, for a share made with
+    `scheme: https`, at an `https://localhost` address (copied links carry
+    `scheme=https`); it kept same-origin links inside and handed an off-origin
+    link to Safari. Send to agent put the page and its console error into the
+    owning conversation's draft without sending and opened that conversation;
+    for the user's own share it copied the note.
+  - Desktop: another computer's share showed a notice without connecting; Open
+    connected it, or took over the tunnel an agent here held (the agent's
+    disconnect then left it up), and opened the system browser; stopping the
+    share released the local port within two seconds. Two conversations
+    connecting to one service shared one tunnel.
+  - Settings › Agent tools followed `pocox tools disable` and `enable` within
+    seconds. Off refused MCP calls (403 `tools_off`), ended the agent's share
+    and cleared earlier answers. A token issued by `pocox tools config` was
+    listed in Settings, revoked there, refused afterwards (401) and gone from
+    the saved file.
+  - Galaxy, on macOS and the phone in light and dark: real devices and shares,
+    the nebula shader, list mode, and the phone's home star with an arc to its
+    connection. With the platform's disable-animations flag (delivered through
+    the engine's accessibility entry point: the iOS 27 simulator ignored a
+    written Reduce Motion preference) the scene stood still and drew no frames,
+    in list mode too; clearing the flag resumed it.
+- Not verified: a share card at a real model's tool call in the transcript,
+  Claude and OpenCode hosts calling the tools, a physical phone, Android
+  (including its loopback cleartext allowance), Windows and Linux, account
+  mode across machines, connecting at the shared port's own number on a phone,
+  and the operating systems' Reduce Motion settings themselves.
