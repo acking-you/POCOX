@@ -116,7 +116,7 @@ pub async fn connect(
             "`{key}` runs on this device; use it at its own local address."
         )));
     }
-    if let Some(existing) = reuse(caller, &key)? {
+    if let Some(existing) = reuse(caller, &key, owned.epoch)? {
         return Ok(existing);
     }
     let own_port = (id.kind == ServiceKind::Port)
@@ -165,9 +165,14 @@ pub async fn connect(
         user,
     };
     let mut state = state::lock();
-    // The call may have waited for the relay: the switch or the token may
-    // have ended meanwhile.
-    if let Err(error) = state.admits(caller) {
+    // The call may have waited for the relay: the switch, the token, or the
+    // account or relay the tunnel belongs to may have ended meanwhile.
+    let admitted = state.admits(caller).and_then(|()| {
+        transport::is_current(epoch)
+            .then_some(())
+            .ok_or(ToolError::ContextChanged)
+    });
+    if let Err(error) = admitted {
         // The tunnel may be another admitted owner's too (a concurrent
         // connect to the same service): only an unowned one is ended.
         let owned = state
@@ -211,9 +216,13 @@ pub async fn connect(
 /// A live connection to `key`, shared with `caller`: an agent joins those
 /// keeping it alive (with its own lease), and the user's own connect takes
 /// it over.
-fn reuse(caller: &Caller, key: &str) -> Result<Option<ConnectionView>, ToolError> {
+fn reuse(caller: &Caller, key: &str, epoch: u64) -> Result<Option<ConnectionView>, ToolError> {
     let mut state = state::lock();
     state.admits(caller)?;
+    // A tunnel of an account or relay that changed is gone.
+    if !transport::is_current(epoch) {
+        return Err(ToolError::ContextChanged);
+    }
     let Some(index) = state.connections.iter().position(|c| c.service == key) else {
         return Ok(None);
     };

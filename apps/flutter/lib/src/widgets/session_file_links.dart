@@ -123,7 +123,14 @@ class _HostWebLinkState extends State<_HostWebLink> {
         path: path,
         secure: uri.scheme == 'https',
       );
-      final key = shared.share.firstKey;
+      // The clicked port, path and scheme: an earlier share of the port may
+      // hold it beside another page, at another path.
+      final key =
+          [
+            for (final held in shared.share.ports)
+              if (held.port == port) held.key,
+          ].firstOrNull ??
+          shared.share.firstKey;
       final container = _container;
       if (!mounted || key == null || container == null) return;
       await openShareWith(
@@ -131,9 +138,9 @@ class _HostWebLinkState extends State<_HostWebLink> {
         container.read,
         ShareRef(
           service: key,
-          path: shared.share.path,
+          path: path,
           title: shared.share.title,
-          secure: shared.share.secure,
+          secure: uri.scheme == 'https',
         ),
       );
       if (mounted) Navigator.of(context).pop();
