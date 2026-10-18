@@ -686,6 +686,7 @@ class ClaudeEnvironment extends StatelessWidget {
     }
 
     final adapter = switch (status.adapter) {
+      'unavailable' => null,
       'installed' => line(
         'claude-adapter',
         l10n.claudeAdapterInstalled(status.adapterPath ?? ''),
@@ -762,7 +763,7 @@ class ClaudeEnvironment extends StatelessWidget {
             ),
           ],
         ),
-        adapter,
+        ?adapter,
         ?runtime,
         cli,
         if (!status.ready && !status.canPrepare && problem != null)

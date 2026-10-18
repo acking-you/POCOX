@@ -132,7 +132,16 @@ pub fn local_status() -> Result<LocalStatus> {
 }
 
 fn status_from(preference: Result<Preference>, previous: Option<LocalStatus>) -> LocalStatus {
-    let enabled = supported() && preference.as_ref().is_ok_and(|p| p.enabled == Some(true));
+    let resource_limited = preference
+        .as_ref()
+        .err()
+        .is_some_and(|error| pocket_codex_core::error::is_file_limit(error.as_ref()));
+    let enabled = supported()
+        && if resource_limited {
+            previous.as_ref().is_some_and(|status| status.enabled)
+        } else {
+            preference.as_ref().is_ok_and(|p| p.enabled == Some(true))
+        };
     let mut status = previous.unwrap_or(LocalStatus {
         supported: supported(),
         enabled,
@@ -146,7 +155,9 @@ fn status_from(preference: Result<Preference>, previous: Option<LocalStatus>) ->
         status.registered = false;
         status.listen_addr = None;
     }
-    if preference.is_err() {
+    if resource_limited {
+        status.problem = Some(pocket_codex_core::error::FILE_LIMIT_MESSAGE.into());
+    } else if preference.is_err() {
         status.problem = Some(
             "Device management settings could not be read. Choose whether to enable management \
              again on this computer."
@@ -154,6 +165,30 @@ fn status_from(preference: Result<Preference>, previous: Option<LocalStatus>) ->
         );
     }
     status
+}
+
+#[cfg(all(test, unix))]
+#[test]
+fn allocation_failure_preserves_grant_but_unreadable_settings_revoke_it() {
+    let previous = LocalStatus {
+        supported: true,
+        enabled: true,
+        registered: true,
+        service_key: Some("pcx:host:host:default".into()),
+        listen_addr: Some("127.0.0.1:12345".into()),
+        problem: None,
+    };
+    let exhausted = std::io::Error::from_raw_os_error(24);
+    let status = status_from(
+        Err(anyhow::Error::new(exhausted).context("read config")),
+        Some(previous.clone()),
+    );
+    assert!(status.enabled && status.registered);
+    assert_eq!(status.listen_addr, previous.listen_addr);
+    let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+    let status = status_from(Err(denied.into()), Some(previous));
+    assert!(!status.enabled && !status.registered);
+    assert!(status.listen_addr.is_none());
 }
 
 #[cfg(test)]
@@ -269,11 +304,29 @@ async fn supervise() {
             return;
         }
         let mut generation = generation();
-        let enabled = tokio::task::spawn_blocking(preference)
+        let observed = tokio::task::spawn_blocking(preference)
             .await
-            .ok()
-            .and_then(Result::ok)
-            .is_some_and(|pref| pref.enabled == Some(true));
+            .map_err(anyhow::Error::from)
+            .and_then(|result| result);
+        if observed
+            .as_ref()
+            .err()
+            .is_some_and(|error| pocket_codex_core::error::is_file_limit(error.as_ref()))
+        {
+            // Allocation failure is not a revocation of the saved grant.
+            // Account changes must still withdraw the old publication.
+            if serving
+                .as_ref()
+                .is_some_and(|s| !transport::is_current(s.epoch))
+            {
+                serving.take();
+                *STATUS.lock().unwrap_or_else(|p| p.into_inner()) = None;
+            }
+            tracing::warn!("management preference check deferred: local file handles exhausted");
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            continue;
+        }
+        let enabled = observed.is_ok_and(|pref| pref.enabled == Some(true));
         {
             let _authority = AUTHORITY.lock().unwrap_or_else(|p| p.into_inner());
             if generation != self::generation() || is_stopping() {

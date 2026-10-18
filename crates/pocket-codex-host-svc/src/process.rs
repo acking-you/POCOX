@@ -24,7 +24,7 @@ use tokio::process::{Child, ChildStdin, ChildStdout};
 use tokio::{io::AsyncReadExt, process::Command};
 
 mod output;
-pub use output::read_output;
+pub use output::{inspect_output, read_output, OutputError};
 
 /// Why the agent could not be started.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -35,6 +35,28 @@ pub enum SpawnError {
     /// The operating system refused to start the program.
     #[error("the agent executable could not be started")]
     Start,
+    /// The program is missing, including an unavailable script interpreter.
+    #[error("the agent executable or its interpreter was not found; check its configured path")]
+    NotFound,
+    /// The operating system denied execution.
+    #[error("permission to start the agent executable was denied; check its execute permissions")]
+    PermissionDenied,
+    /// Local descriptor exhaustion prevented process creation.
+    #[error("{}", pocket_codex_core::error::FILE_LIMIT_MESSAGE)]
+    FileLimit,
+}
+
+impl From<std::io::Error> for SpawnError {
+    fn from(error: std::io::Error) -> Self {
+        if pocket_codex_core::error::is_file_limit(&error) {
+            return Self::FileLimit;
+        }
+        match error.kind() {
+            std::io::ErrorKind::NotFound => Self::NotFound,
+            std::io::ErrorKind::PermissionDenied => Self::PermissionDenied,
+            _ => Self::Start,
+        }
+    }
 }
 
 /// A running agent and its pipes.
@@ -102,7 +124,7 @@ fn spawn_command(
         command.env("PATH", path);
     }
     command.envs(env.iter().map(|(key, value)| (key, value)));
-    let mut child = command.spawn().map_err(|_| SpawnError::Start)?;
+    let mut child = command.spawn().map_err(SpawnError::from)?;
     let group = child.id().and_then(|pid| i32::try_from(pid).ok());
     let (Some(stdin), Some(stdout)) = (child.stdin.take(), child.stdout.take()) else {
         let mut process = AgentProcess {
@@ -366,7 +388,7 @@ mod tests {
     async fn a_missing_program_fails_to_start() {
         assert_eq!(
             spawn(Path::new("/definitely/not/here"), &[], None, &[]).err(),
-            Some(SpawnError::Start)
+            Some(SpawnError::NotFound)
         );
     }
 }

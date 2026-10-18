@@ -109,7 +109,7 @@ impl OpenCodeStatus {
                 out.models = u32::try_from(catalog.models.len()).unwrap_or(u32::MAX);
                 out.agents = catalog.agents.into_iter().map(|agent| agent.name).collect();
             },
-            Err(error) => out.problem = Some(error.to_string()),
+            Err(error) => out.problem = Some(format!("{error:#}")),
         }
         out
     }

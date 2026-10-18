@@ -35,6 +35,12 @@ pub enum ClientError {
     /// The host could not be reached or the connection broke.
     #[error("the agent host could not be reached")]
     Transport,
+    /// The local process cannot allocate another file or socket.
+    #[error("{}", pocket_codex_core::error::FILE_LIMIT_MESSAGE)]
+    FileLimit,
+    /// The request exceeded its connection or response budget.
+    #[error("the agent request timed out; check the host connection and retry")]
+    Timeout,
     /// The host answered with an error.
     #[error("{message}")]
     Host {
@@ -56,6 +62,18 @@ pub enum ClientError {
 /// Gateway events, as JSON bodies; ends after the first error.
 pub type EventStream = Pin<Box<dyn Stream<Item = Result<Value, ClientError>> + Send>>;
 
+impl From<reqwest::Error> for ClientError {
+    fn from(error: reqwest::Error) -> Self {
+        if pocket_codex_core::error::is_file_limit(&error) {
+            Self::FileLimit
+        } else if error.is_timeout() {
+            Self::Timeout
+        } else {
+            Self::Transport
+        }
+    }
+}
+
 /// A client fixed to one gateway origin.
 #[derive(Clone)]
 pub struct GatewayClient {
@@ -72,7 +90,7 @@ impl std::fmt::Debug for GatewayClient {
 
 async fn read_body(mut response: reqwest::Response, limit: usize) -> Result<Vec<u8>, ClientError> {
     let mut body = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|_| ClientError::Transport)? {
+    while let Some(chunk) = response.chunk().await.map_err(ClientError::from)? {
         if body.len() + chunk.len() > limit {
             return Err(ClientError::Limit);
         }
@@ -96,7 +114,7 @@ impl GatewayClient {
             if let Some(timeout) = timeout {
                 builder = builder.timeout(timeout);
             }
-            builder.build().map_err(|_| ClientError::Transport)
+            builder.build().map_err(ClientError::from)
         };
         Ok(Self {
             http: build(Some(REQUEST_TIMEOUT))?,
@@ -110,7 +128,7 @@ impl GatewayClient {
     }
 
     async fn send(&self, request: RequestBuilder) -> Result<Value, ClientError> {
-        let response = request.send().await.map_err(|_| ClientError::Transport)?;
+        let response = request.send().await.map_err(ClientError::from)?;
         let status = response.status();
         let body = read_body(response, MAX_RESPONSE_BYTES).await?;
         if status.is_success() {
@@ -467,7 +485,7 @@ impl GatewayClient {
             .query(query)
             .send()
             .await
-            .map_err(|_| ClientError::Transport)?;
+            .map_err(ClientError::from)?;
         if !response.status().is_success() {
             return Err(ClientError::Host {
                 status: response.status().as_u16(),
