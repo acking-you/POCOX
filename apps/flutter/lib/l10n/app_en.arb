@@ -1559,5 +1559,14 @@
   "@browserNoteNoErrors": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
   "browserNoteConsole": "Preview of \"{title}\" ({url}, shared from {device}), recent console messages:",
   "@browserNoteConsole": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
-  "browserNotLocal": "Only pages shared from your devices open here."
+  "browserNotLocal": "Only pages shared from your devices open here.",
+  "builtinTools": "Built-in tools",
+  "builtinToolServices": "Devices and services",
+  "builtinToolServicesSummary": "The agent can see your devices and the services on them.",
+  "builtinToolShare": "Share a port",
+  "builtinToolShareSummary": "The agent can share a port of its computer with your devices without asking first in this conversation.",
+  "builtinToolConnect": "Connect a service",
+  "builtinToolConnectSummary": "The agent can reach a service on another of your devices.",
+  "builtinToolRemove": "Remove {tool}",
+  "@builtinToolRemove": {"placeholders": {"tool": {"type": "String"}}}
 }

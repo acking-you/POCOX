@@ -30,6 +30,7 @@ import 'package:pocket_codex/src/screens/app_session/model_feedback.dart';
 import 'package:pocket_codex/src/screens/app_session/message_actions.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/tools/builtin_tools.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/loading.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';

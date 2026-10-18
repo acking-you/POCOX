@@ -223,6 +223,7 @@ class ToolsDevice {
     this.services = const [],
     this.shares = const [],
     this.consents = const [],
+    this.builtinTools = const [],
   });
 
   /// Device id.
@@ -248,6 +249,33 @@ class ToolsDevice {
 
   /// Its shares waiting for the user.
   final List<ToolsConsent> consents;
+
+  /// The built-in tools a conversation on it can be handed from the
+  /// composer (none from an older POCOX).
+  final List<ToolsBuiltinTool> builtinTools;
+}
+
+/// A built-in tool of POCOX that the composer can hand a conversation.
+class ToolsBuiltinTool {
+  /// Creates a tool.
+  const ToolsBuiltinTool({
+    required this.id,
+    required this.title,
+    required this.summary,
+    this.gated = false,
+  });
+
+  /// Stable id (`services`, `share`, `connect`).
+  final String id;
+
+  /// English name, for an id this app does not know.
+  final String title;
+
+  /// What it lets the agent do, for an id this app does not know.
+  final String summary;
+
+  /// Picking it gives the user's consent for the conversation.
+  final bool gated;
 }
 
 /// Another device's service reachable on this device.

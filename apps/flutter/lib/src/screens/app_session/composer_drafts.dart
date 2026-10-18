@@ -50,6 +50,9 @@ class _ComposerDraft {
   final List<_Attachment> attachments = [];
   final List<_Queued> queue = [];
 
+  /// Built-in tools picked for the next message (`tools/builtin_tools.dart`).
+  final List<String> tools = [];
+
   bool get hasDraft => value.text.isNotEmpty || attachments.isNotEmpty;
 
   /// Moves when text joins this draft from outside its view (see

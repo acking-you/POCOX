@@ -94,6 +94,7 @@ import 'package:pocket_codex/src/widgets/turn_outline.dart';
 import 'package:pocket_codex/src/screens/app_session/approval_review.dart';
 import 'package:pocket_codex/src/widgets/window_title_bar.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/tools/builtin_tools.dart';
 import 'package:pocket_codex/src/widgets/app_dialog.dart';
 import 'package:pocket_codex/src/widgets/change_counts.dart';
 
@@ -101,6 +102,7 @@ part 'app_session/composer_drafts.dart';
 part 'app_session/session_access.dart';
 part 'app_session/session_agent_prepare.dart';
 part 'app_session/session_attachments.dart';
+part 'app_session/session_builtin_tools.dart';
 part 'app_session/session_capabilities.dart';
 part 'app_session/session_composer.dart';
 part 'app_session/session_composer_toolbar.dart';
@@ -690,7 +692,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // interrupts. Reset on each turn/started; set on the first agent-side item.
   bool _outputStarted = false;
   // Snapshot the whole draft so undo can restore attachments as well as text.
-  ({String text, List<_Attachment> attachments})? _undoableDraft;
+  ({String text, List<_Attachment> attachments, List<String> tools})?
+  _undoableDraft;
   // Set when an interrupt is really an Esc "undo": the turn's end must NOT add a
   // "stopped" marker (the send is being taken back, not shown as stopped).
   bool _suppressStopMarker = false;

@@ -186,6 +186,30 @@ policy — so they cannot carry the user's consent. POCOX enforces it for every
 harness and approval policy. **Ask before an agent shares** can be switched
 off.
 
+### Built-in tools in the composer
+
+The user can hand an agent POCOX's built-in tools with a message: **+ ›
+Built-in tools** in the composer offers what the conversation's host lists in
+its catalog (`builtin`: Devices and services, Share a port, Connect a service
+today; a newer host's tools appear by its own title), several at once. The
+picked tools show as chips above the field and go with the next message, like
+attachments:
+
+- the message ends with a block naming them for the agent
+  (`<pocox_tools ids="share,services">…</pocox_tools>`); transcripts and list
+  previews show chips instead;
+- before the turn starts, a tool that needs consent (Share a port) is granted
+  to that conversation, as if the user had answered **Allow in this
+  conversation** in advance, on the host itself or through its management
+  entry (`POST /services/v1/grants`, bound to the account or relay like every
+  answer). A request already waiting there goes ahead.
+
+A grant names the hosted instance and the conversation its harness reports
+(native OpenCode names none, so there it covers the instance, as its consent
+does). It ends with the instance or the session, when the switch or **Ask
+before an agent shares** goes off, and when the account or relay changes. A
+host that cannot be reached keeps its consent prompt.
+
 ## Ownership and lifetimes
 
 Every call carries a bearer token, so it is attributed without trusting the
@@ -225,16 +249,22 @@ that cannot be read keeps the tools off until the switch is saved again.
 
 ## Getting the tools into each harness
 
-| Harness | How | Read tool without asking |
+| Harness | How | Tools without the harness asking |
 | --- | --- | --- |
-| Codex app-server | launch overrides `mcp_servers.pocox.{url, bearer_token_env_var}`, token in the child's environment, `tool_timeout_sec = 180` | `tools.services.approval_mode = "approve"` |
-| Claude (ACP adapter) | an HTTP entry in `mcpServers` of every `session/new`/`session/load`, with a token for that session | `_meta.claudeCode.options.allowedTools` |
+| Codex app-server | launch overrides `mcp_servers.pocox.{url, bearer_token_env_var}`, token in the child's environment, `tool_timeout_sec = 180` | `tools.<name>.approval_mode = "approve"` for every tool |
+| Claude (ACP adapter) | an HTTP entry in `mcpServers` of every `session/new`/`session/load`, with a token for that session | every `mcp__pocox__<name>` in `_meta.claudeCode.options.allowedTools` |
 | Other ACP agents | the same entry when they advertise `mcpCapabilities.http` | the agent's own prompt |
 | Native OpenCode | a `mcp.pocox` remote entry (headers, `oauth: false`, `timeout`) merged into its inline configuration at launch | OpenCode does not prompt for MCP tools |
 | Anything else | Settings › Agent tools › Add to another agent, or `pocox tools config --harness codex|claude|opencode|generic`: a ready entry with a new token for the harness's configuration file (`~/.codex/config.toml`, an `mcpServers` entry for `~/.claude.json`, `opencode.json`) | the harness's own |
 
 Nothing writes another program's files, and no entry is a shell command: the
 token never reaches a command line.
+
+Hosted harnesses run every POCOX tool without their own prompt. Codex would
+otherwise ask before any tool that is not read-only (`connect` reaches other
+devices), by its own prompt or its auto-reviewer, which can refuse a share
+before POCOX asks the user; POCOX's consent is the one gate. The tools are
+listed once (`builtin.rs`), so a new tool is approved the same way.
 
 ## The CLI
 
@@ -321,6 +351,8 @@ own token is protected by the proof above.
   only. Existing `pb register|subscribe`, keys and `config.toml` are unchanged.
 - The page shortcuts after Services moved one key: Galaxy ⌘2, Local sessions
   ⌘3, Runtime logs ⌘4.
+- A catalog's `builtin` list and `/services/v1/grants` are additions: an
+  older host lists no built-in tools, so its conversations offer none.
 
 ## Verification
 

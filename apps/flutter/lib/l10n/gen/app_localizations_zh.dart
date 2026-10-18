@@ -3895,4 +3895,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserNotLocal => '这里只能打开你的设备共享的页面。';
+
+  @override
+  String get builtinTools => '内置工具';
+
+  @override
+  String get builtinToolServices => '设备与服务';
+
+  @override
+  String get builtinToolServicesSummary => '智能体可以查看你的设备和设备上的服务。';
+
+  @override
+  String get builtinToolShare => '共享端口';
+
+  @override
+  String get builtinToolShareSummary => '在这个对话中，智能体可以把所在电脑的端口共享给你的设备，无需再次确认。';
+
+  @override
+  String get builtinToolConnect => '连接服务';
+
+  @override
+  String get builtinToolConnectSummary => '智能体可以连接你其他设备上的服务。';
+
+  @override
+  String builtinToolRemove(String tool) {
+    return '移除$tool';
+  }
 }

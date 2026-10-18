@@ -68,7 +68,8 @@ class _TranscriptRow extends StatelessWidget {
         // ahead of the request; show both as chips/thumbnails and only the
         // typed text (display-only — the rollout on disk is untouched).
         final ide = splitIdeContext(item.text);
-        final refs = splitFileRefs(ide.text);
+        final picked = splitBuiltinTools(ide.text);
+        final refs = splitFileRefs(picked.text);
         final text = ideDisplayText(refs.text, ide.annotations);
         final shown = [
           ...images,
@@ -87,7 +88,7 @@ class _TranscriptRow extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              if (shown.isNotEmpty || paths.isNotEmpty)
+              if (shown.isNotEmpty || paths.isNotEmpty || picked.ids.isNotEmpty)
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 640),
                   child: Column(
@@ -103,10 +104,18 @@ class _TranscriptRow extends StatelessWidget {
                       if (shown.isNotEmpty && paths.isNotEmpty)
                         const SizedBox(height: 6),
                       if (paths.isNotEmpty) FileRefChips(paths: paths),
+                      if (picked.ids.isNotEmpty) ...[
+                        if (shown.isNotEmpty || paths.isNotEmpty)
+                          const SizedBox(height: 6),
+                        BuiltinToolChips(ids: picked.ids),
+                      ],
                     ],
                   ),
                 ),
-              if ((shown.isNotEmpty || paths.isNotEmpty) && text.isNotEmpty)
+              if ((shown.isNotEmpty ||
+                      paths.isNotEmpty ||
+                      picked.ids.isNotEmpty) &&
+                  text.isNotEmpty)
                 const SizedBox(height: 6),
               if (text.isNotEmpty)
                 MessageActions(

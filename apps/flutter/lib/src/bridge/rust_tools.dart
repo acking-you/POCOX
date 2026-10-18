@@ -29,6 +29,17 @@ mixin _RustTools implements BridgeApi {
       frb.toolsAnswer(device: device, consentId: consentId, decision: decision);
 
   @override
+  Future<void> toolsGrant(
+    String service,
+    String conversation,
+    List<String> tools,
+  ) => frb.toolsGrant(
+    service: service,
+    conversation: conversation,
+    tools: tools,
+  );
+
+  @override
   Future<void> toolsStopShare(String device, String shareId) =>
       frb.toolsStopShare(device: device, shareId: shareId);
 
@@ -185,6 +196,15 @@ ToolsOverview _toolsOverview(frb.ToolsOverviewDto o) => ToolsOverview(
               ports: List.of(c.ports),
               createdMs: c.createdMs.toInt(),
               expiresMs: c.expiresMs.toInt(),
+            ),
+        ],
+        builtinTools: [
+          for (final t in d.builtinTools)
+            ToolsBuiltinTool(
+              id: t.id,
+              title: t.title,
+              summary: t.summary,
+              gated: t.gated,
             ),
         ],
       ),

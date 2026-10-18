@@ -4126,4 +4126,33 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browserNotLocal =>
       'Only pages shared from your devices open here.';
+
+  @override
+  String get builtinTools => 'Built-in tools';
+
+  @override
+  String get builtinToolServices => 'Devices and services';
+
+  @override
+  String get builtinToolServicesSummary =>
+      'The agent can see your devices and the services on them.';
+
+  @override
+  String get builtinToolShare => 'Share a port';
+
+  @override
+  String get builtinToolShareSummary =>
+      'The agent can share a port of its computer with your devices without asking first in this conversation.';
+
+  @override
+  String get builtinToolConnect => 'Connect a service';
+
+  @override
+  String get builtinToolConnectSummary =>
+      'The agent can reach a service on another of your devices.';
+
+  @override
+  String builtinToolRemove(String tool) {
+    return 'Remove $tool';
+  }
 }

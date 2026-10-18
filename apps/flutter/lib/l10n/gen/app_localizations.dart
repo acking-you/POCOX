@@ -7141,6 +7141,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Only pages shared from your devices open here.'**
   String get browserNotLocal;
+
+  /// No description provided for @builtinTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Built-in tools'**
+  String get builtinTools;
+
+  /// No description provided for @builtinToolServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices and services'**
+  String get builtinToolServices;
+
+  /// No description provided for @builtinToolServicesSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent can see your devices and the services on them.'**
+  String get builtinToolServicesSummary;
+
+  /// No description provided for @builtinToolShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share a port'**
+  String get builtinToolShare;
+
+  /// No description provided for @builtinToolShareSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent can share a port of its computer with your devices without asking first in this conversation.'**
+  String get builtinToolShareSummary;
+
+  /// No description provided for @builtinToolConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect a service'**
+  String get builtinToolConnect;
+
+  /// No description provided for @builtinToolConnectSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'The agent can reach a service on another of your devices.'**
+  String get builtinToolConnectSummary;
+
+  /// No description provided for @builtinToolRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {tool}'**
+  String builtinToolRemove(String tool);
 }
 
 class _AppLocalizationsDelegate

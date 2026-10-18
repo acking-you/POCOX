@@ -23,6 +23,7 @@ library;
 import 'package:pocket_codex/src/automation_prompt.dart';
 import 'package:pocket_codex/src/ide_context.dart';
 import 'package:pocket_codex/src/realtime_delegation.dart';
+import 'package:pocket_codex/src/tools/builtin_tags.dart';
 
 /// Header line introducing the attached-files block (English on purpose — it
 /// is model-facing wire text, like codex's own `<image>` markers).
@@ -123,7 +124,7 @@ String previewWithoutFileRefs(String preview, String placeholder) {
   // An automation's run reads as the task it set.
   final automation = AutomationPrompt.parse(preview);
   if (automation != null) return automation.instructions;
-  final text = splitIdeContext(preview).text;
+  final text = splitBuiltinTools(splitIdeContext(preview).text).text;
   final split = splitFileRefs(text);
   return split.paths.isEmpty ? text : split.text;
 }

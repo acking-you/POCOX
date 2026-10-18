@@ -62,8 +62,18 @@ extension _SessionSend on _AppSessionState {
               if (a.isFile) ?a.hostPath,
           ]
         : const <String>[];
-    final text = appendFileRefs(typed, filePaths);
-    final again = _Resend(text: text, images: images);
+    // Built-in tools ride an ordinary send too, named for the agent at the
+    // end of the text; a retry grants again the ones its text already names.
+    final sendTools = ordinary
+        ? List<String>.of(queued?.tools ?? _tools)
+        : retry
+        ? (resend?.tools ?? const <String>[])
+        : const <String>[];
+    final text = appendBuiltinTools(
+      appendFileRefs(typed, filePaths),
+      ordinary ? sendTools : const [],
+    );
+    final again = _Resend(text: text, images: images, tools: sendTools);
     // Block sends while reconnecting — a reconnect reloads history and would
     // wipe an optimistic message added mid-flight.
     if (_externalWriterMode ||
@@ -207,12 +217,17 @@ extension _SessionSend on _AppSessionState {
         // programmatic prompt (e.g. "implement the plan") has no user draft to
         // hand back.
         _undoableDraft = ordinary
-            ? (text: typed, attachments: List<_Attachment>.of(sendAttachments))
+            ? (
+                text: typed,
+                attachments: List<_Attachment>.of(sendAttachments),
+                tools: sendTools,
+              )
             : null;
         // Don't clear the composer for a programmatic send (e.g. "implement
         // the plan") — the user may have text in progress there.
         if (ordinary && queued == null) {
           _attachments.clear();
+          _tools.clear();
           _input.clear();
         }
         _saveDraft();
@@ -264,7 +279,12 @@ extension _SessionSend on _AppSessionState {
     // user's behalf — and its optimistic copy is withdrawn (the reconnect's
     // reload shows what the host holds).
     void returnToDraft(String message) {
-      _restoreDraft(typed, sendAttachments, into: sendingDraft);
+      _restoreDraft(
+        typed,
+        sendAttachments,
+        tools: sendTools,
+        into: sendingDraft,
+      );
       if (!mounted || !identical(_draft, sendingDraft)) return;
       _updateState(() {
         final index = bubble == null ? -1 : _itemIndex[bubble] ?? -1;
@@ -344,7 +364,12 @@ extension _SessionSend on _AppSessionState {
             _retry = () => _send(retry: true, resend: again);
           });
         } else if (ordinary) {
-          _restoreDraft(typed, sendAttachments, into: sendingDraft);
+          _restoreDraft(
+            typed,
+            sendAttachments,
+            tools: sendTools,
+            into: sendingDraft,
+          );
         }
         return;
       }
@@ -442,6 +467,9 @@ extension _SessionSend on _AppSessionState {
       // turn/start overrides apply to this and subsequent turns, so switching
       // works mid-conversation.
       final turnRevision = _turnStateRevision;
+      // Built-in tools picked for this message: a gated one is allowed for
+      // this conversation before its agent could ask.
+      await _grantBuiltinTools(service, targetThread, sendTools);
       // The model list or thread start above may have outlived the
       // connection: nothing goes to whichever host answers now.
       if (!sameLink()) throw const _LinkMoved();
@@ -529,7 +557,12 @@ extension _SessionSend on _AppSessionState {
         // withdrawn, and the session shows the options it really has.
         // Sending again is the user's ordinary send, from the composer.
         final sendAgain = e is _DraftOptionsRefused ? null : _submit;
-        _restoreDraft(typed, sendAttachments, into: sendingDraft);
+        _restoreDraft(
+          typed,
+          sendAttachments,
+          tools: sendTools,
+          into: sendingDraft,
+        );
         if (mounted && identical(_draft, sendingDraft)) {
           _updateState(() {
             final index = bubble == null ? -1 : _itemIndex[bubble] ?? -1;
@@ -556,7 +589,12 @@ extension _SessionSend on _AppSessionState {
         } else if (ordinary) {
           // This view moved on: the input goes back to its own draft (it is
           // never sent from there by itself).
-          _restoreDraft(typed, sendAttachments, into: sendingDraft);
+          _restoreDraft(
+            typed,
+            sendAttachments,
+            tools: sendTools,
+            into: sendingDraft,
+          );
         }
         if (shown() && !moved && _looksDisconnected(msg)) dropped = true;
       }

@@ -369,6 +369,10 @@ extension _SessionComposer on _AppSessionState {
                   _attachmentStrip(l10n),
                   const SizedBox(height: 8),
                 ],
+                if (_tools.isNotEmpty) ...[
+                  _builtinToolsStrip(),
+                  const SizedBox(height: 8),
+                ],
                 // A take's strip: the field stays editable below it, and the
                 // words appear in the field itself as they are spoken.
                 Motion.resize(
@@ -683,7 +687,17 @@ extension _SessionComposer on _AppSessionState {
   /// The `+` attachment menu. One button instead of three icons: on a phone the
   /// three used to crowd the row, and two of them are rare enough to live a tap
   /// away.
-  Widget _attachMenu(AppLocalizations l10n) => PopupMenuButton<void>(
+  // The host's tools are followed while the composer shows, so the menu
+  // offers what the host offers now.
+  Widget _attachMenu(AppLocalizations l10n) => KeyedSubtree(
+    key: _attachAnchor,
+    child: _attachMenuButton(l10n, tools: _hostTools(watch: true).isNotEmpty),
+  );
+
+  Widget _attachMenuButton(
+    AppLocalizations l10n, {
+    required bool tools,
+  }) => PopupMenuButton<void>(
     key: const Key('attach-menu-btn'),
     tooltip: l10n.addAttachment,
     enabled: !_sending,
@@ -737,6 +751,13 @@ extension _SessionComposer on _AppSessionState {
           enabled: !_voice.busy && !_dictation.taking && !_externalWriterMode,
           onTap: _startDictation,
           child: _menuRow(AppIcons.mic_none_rounded, l10n.dictate),
+        ),
+      // POCOX's own tools for the next message, where its host offers them.
+      if (tools)
+        PopupMenuItem<void>(
+          key: const Key('builtin-tools-btn'),
+          onTap: _pickBuiltinTools,
+          child: _menuRow(AppIcons.extension, l10n.builtinTools),
         ),
     ],
   );

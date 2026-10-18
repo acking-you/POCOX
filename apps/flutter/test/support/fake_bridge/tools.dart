@@ -84,6 +84,16 @@ mixin _FakeTools on _FakeBridgeState {
     String decision,
   ) async => toolsAnswers.add((device, consentId, decision));
 
+  /// What [toolsGrant] received, in order.
+  final List<(String, String, List<String>)> toolsGrants = [];
+
+  @override
+  Future<void> toolsGrant(
+    String service,
+    String conversation,
+    List<String> tools,
+  ) async => toolsGrants.add((service, conversation, List.of(tools)));
+
   @override
   Future<void> toolsStopShare(String device, String shareId) async =>
       toolsStopped.add((device, shareId));

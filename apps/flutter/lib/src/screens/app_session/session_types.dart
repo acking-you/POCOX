@@ -34,10 +34,18 @@ class _Attachment {
 /// The composer draft is snapshotted whole (text + its ready attachments) so the
 /// entry can be sent verbatim later, or handed back to the composer on Esc.
 class _Queued {
-  _Queued({required this.id, required this.text, required this.attachments});
+  _Queued({
+    required this.id,
+    required this.text,
+    required this.attachments,
+    this.tools = const [],
+  });
   final int id;
   final String text; // the raw composer text, as typed
   final List<_Attachment> attachments;
+
+  /// Built-in tools picked for it.
+  final List<String> tools;
 
   /// Being sent: it stays first in the queue until the host admits it, so a
   /// refusal keeps its place; meanwhile it cannot be dequeued or discarded.
@@ -98,9 +106,17 @@ class _ModelWithdrawn extends _DraftOptionsRefused {
 /// The exact wire content of one send (text with file references, image
 /// data URLs), kept by its retry.
 class _Resend {
-  const _Resend({required this.text, required this.images});
+  const _Resend({
+    required this.text,
+    required this.images,
+    this.tools = const [],
+  });
   final String text;
   final List<String> images;
+
+  /// Built-in tools its first attempt picked: granted again on a retry (the
+  /// text already names them).
+  final List<String> tools;
 }
 
 /// One entry in an option-picker bottom sheet (model / permission / effort).

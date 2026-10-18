@@ -738,6 +738,15 @@ abstract interface class BridgeApi {
   /// `allow_conversation` or `deny`.
   Future<void> toolsAnswer(String device, String consentId, String decision);
 
+  /// Hand the built-in [tools] the user picked in the composer to
+  /// [conversation] of agent service [service], on the device that hosts
+  /// it: the gated ones need no consent prompt in that conversation.
+  Future<void> toolsGrant(
+    String service,
+    String conversation,
+    List<String> tools,
+  );
+
   /// Stop share [shareId] of [device], as the user.
   Future<void> toolsStopShare(String device, String shareId);
 

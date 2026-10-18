@@ -163,9 +163,11 @@ extension _SessionQueue on _AppSessionState {
           id: _drafts.nextQueueId++,
           text: _input.text,
           attachments: atts,
+          tools: List.of(_tools),
         ),
       );
       _attachments.clear();
+      _tools.clear();
       _input.clear();
       _saveDraft();
     });
@@ -229,12 +231,13 @@ extension _SessionQueue on _AppSessionState {
     // One being sent belongs to its send now.
     if (q.inFlight) return;
     _updateState(() => _queue.removeWhere((e) => e.id == q.id));
-    _restoreDraft(q.text, q.attachments);
+    _restoreDraft(q.text, q.attachments, tools: q.tools);
   }
 
   void _restoreDraft(
     String text,
     List<_Attachment> attachments, {
+    List<String> tools = const [],
     _ComposerDraft? into,
   }) {
     final draft = into ?? _draft;
@@ -253,6 +256,7 @@ extension _SessionQueue on _AppSessionState {
       0,
       attachments.where((a) => ids.add(a.id)).toList(),
     );
+    draft.tools.addAll(tools.where((id) => !draft.tools.contains(id)));
     _drafts.save(draft, changed: true);
     if (mounted && identical(_draft, draft)) {
       _input.value = draft.value;
@@ -281,7 +285,9 @@ extension _SessionQueue on _AppSessionState {
       _suppressStopMarker = true;
     });
     unawaited(_interrupt());
-    if (restore != null) _restoreDraft(restore.text, restore.attachments);
+    if (restore != null) {
+      _restoreDraft(restore.text, restore.attachments, tools: restore.tools);
+    }
     _inputFocus.requestFocus();
   }
 
