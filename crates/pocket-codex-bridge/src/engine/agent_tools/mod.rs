@@ -12,6 +12,7 @@
 //! or the CLI host) serves it. Phones only read other devices' catalogs and
 //! connect to their shares.
 
+pub mod builtin;
 pub mod catalog;
 pub mod connections;
 mod consent;

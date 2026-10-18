@@ -40,6 +40,13 @@ fn schema(value: Value) -> Arc<JsonObject> {
     }
 }
 
+/// Every tool, as harnesses list them. Hosted harnesses run all of them
+/// without asking ([`super::inject`]): POCOX asks the user itself where it
+/// matters, whatever the harness's approval policy.
+pub fn tools() -> Vec<Tool> {
+    vec![services_tool(), connect_tool()]
+}
+
 fn services_tool() -> Tool {
     Tool::new(
         "services",
@@ -301,15 +308,11 @@ impl ServerHandler for Tools {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        Ok(ListToolsResult::with_all_items(vec![services_tool(), connect_tool()]))
+        Ok(ListToolsResult::with_all_items(tools()))
     }
 
     fn get_tool(&self, name: &str) -> Option<Tool> {
-        match name {
-            "services" => Some(services_tool()),
-            "connect" => Some(connect_tool()),
-            _ => None,
-        }
+        tools().into_iter().find(|tool| tool.name == name)
     }
 
     async fn call_tool(
@@ -350,5 +353,16 @@ impl ServerHandler for Tools {
             },
         };
         Ok(CallToolResponse::Complete(result))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_served_tools_are_the_ones_harnesses_are_told_about() {
+        let served: Vec<String> = tools().iter().map(|tool| tool.name.to_string()).collect();
+        assert_eq!(served, super::super::builtin::MCP_TOOLS);
     }
 }

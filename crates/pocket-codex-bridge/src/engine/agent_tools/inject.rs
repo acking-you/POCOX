@@ -15,6 +15,7 @@ use pocket_codex_host_svc::acp::{McpGrant, SessionMcp};
 use serde_json::{json, Map, Value};
 
 use super::{
+    builtin::MCP_TOOLS,
     state::{self, OwnerKey, State},
     tokens::{Kind, Principal},
 };
@@ -126,8 +127,25 @@ pub fn codex(grant: &Grant) -> (Vec<String>, (String, Secret)) {
     set("startup_timeout_sec", "10".into());
     // Longer than the time a share waits for the user's answer.
     set("tool_timeout_sec", "180".into());
-    set("tools.services.approval_mode", quoted("approve"));
+    // Codex would ask before every call of a tool that is not read-only
+    // (its own prompt, or its auto-reviewer, which may refuse); POCOX asks
+    // the user itself before an agent shares.
+    for tool in MCP_TOOLS {
+        set(&format!("tools.{tool}.approval_mode"), quoted("approve"));
+    }
     (args, (TOKEN_VAR.to_string(), grant.token.clone()))
+}
+
+/// The Claude adapter's options for Claude Code: every POCOX tool runs
+/// without Claude Code's own permission prompt, as in [`codex`].
+fn claude_meta() -> Map<String, Value> {
+    let allowed: Vec<String> = MCP_TOOLS
+        .iter()
+        .map(|tool| format!("mcp__pocox__{tool}"))
+        .collect();
+    let mut meta = Map::new();
+    meta.insert("claudeCode".into(), json!({"options": {"allowedTools": allowed}}));
+    meta
 }
 
 /// Merge the tools into native OpenCode's inline configuration in `env`
@@ -288,16 +306,7 @@ impl SessionMcp for AcpTools {
             "url": mcp_url(&base),
             "headers": [{"name": "Authorization", "value": format!("Bearer {secret}")}],
         })];
-        // The Claude adapter passes these options to Claude Code: the read
-        // tool runs without a prompt.
-        let meta = self.claude.then(|| {
-            let mut meta = Map::new();
-            meta.insert(
-                "claudeCode".into(),
-                json!({"options": {"allowedTools": ["mcp__pocox__services"]}}),
-            );
-            meta
-        });
+        let meta = self.claude.then(claude_meta);
         Some(McpGrant {
             servers,
             meta,
@@ -344,6 +353,25 @@ mod tests {
         assert!(args.contains(&"mcp_servers.pocox.url=\"http://127.0.0.1:17863/mcp\"".to_string()));
         assert!(args.iter().all(|arg| !arg.contains("pcxt_")), "no token in argv");
         assert_eq!((var.as_str(), token.expose()), (TOKEN_VAR, "pcxt_secret"));
+    }
+
+    #[test]
+    fn hosted_harnesses_run_every_tool_without_their_own_prompt() {
+        let (args, _) = codex(&grant());
+        let meta = claude_meta();
+        let allowed = &meta["claudeCode"]["options"]["allowedTools"];
+        for name in MCP_TOOLS {
+            assert!(
+                args.contains(&format!("mcp_servers.pocox.tools.{name}.approval_mode=\"approve\"")),
+                "Codex asks before `{name}`"
+            );
+            assert!(
+                allowed
+                    .as_array()
+                    .is_some_and(|tools| tools.contains(&json!(format!("mcp__pocox__{name}")))),
+                "Claude asks before `{name}`"
+            );
+        }
     }
 
     #[test]
