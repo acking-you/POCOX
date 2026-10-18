@@ -253,10 +253,12 @@ impl Tokens {
         self.records.values().any(|record| record.id == id)
     }
 
-    /// Bind a session token to the session it was minted for.
+    /// Bind a session token to the session it was minted for. The id is kept
+    /// exactly (the host admits at most 1024 characters): two sessions never
+    /// pass for one.
     pub fn bind_session(&mut self, id: &str, session: &str) {
         if let Some(record) = self.records.values_mut().find(|r| r.id == id) {
-            record.session = Some(bounded(session));
+            record.session = Some(session.to_string());
         }
     }
 

@@ -92,6 +92,11 @@ async fn follow(
     while let Some(chunk) = body.next().await {
         buffer.extend_from_slice(&chunk?);
         while let Some(end) = find_blank_line(&buffer) {
+            // Judged before it is copied or parsed: a whole frame can arrive
+            // in one chunk.
+            if end > MAX_EVENT {
+                bail!("the device sent an oversized event");
+            }
             let frame: Vec<u8> = buffer.drain(..end).collect();
             if let Some(event) = parse(&frame) {
                 record(&device, event, &seen);

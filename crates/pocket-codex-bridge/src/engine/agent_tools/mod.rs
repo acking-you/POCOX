@@ -245,6 +245,10 @@ fn apply(saved: settings::Settings) {
     }
     state::changed(&mut state);
     drop(state);
+    if was.ask_before_sharing && !saved.ask_before_sharing {
+        // Nothing waits for an answer any more: those calls go ahead now.
+        consent::withdraw(|_| true);
+    }
     if was.enabled && !saved.enabled {
         tracing::info!("agent tools switched off; ending what agents shared");
         end_agents();

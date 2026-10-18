@@ -15,7 +15,6 @@ use pocket_codex_host_svc::acp::{McpGrant, SessionMcp};
 use serde_json::{json, Map, Value};
 
 use super::{
-    model::bounded,
     state::{self, OwnerKey, State},
     tokens::{Kind, Principal},
 };
@@ -195,15 +194,14 @@ impl SessionToken {
     /// token's, so the session still owns (and can stop) its shares.
     fn adopt(mut self, session: &str) {
         self.adopted = true;
-        let session = bounded(session);
         let mut state = state::lock();
-        state.tokens.bind_session(&self.id, &session);
+        state.tokens.bind_session(&self.id, session);
         let older: Vec<String> = state
             .tokens
             .forget_where(|p| {
                 p.kind == Kind::Session
                     && p.host.as_deref() == Some(self.host.as_str())
-                    && p.session.as_deref() == Some(session.as_str())
+                    && p.session.as_deref() == Some(session)
                     && p.id != self.id
             })
             .into_iter()
@@ -308,11 +306,10 @@ impl SessionMcp for AcpTools {
     }
 
     fn closed(&self, session: &str) {
-        let session = bounded(session);
         retract(|p| {
             p.kind == Kind::Session
                 && p.host.as_deref() == Some(self.host.as_str())
-                && p.session.as_deref() == Some(session.as_str())
+                && p.session.as_deref() == Some(session)
         });
     }
 }

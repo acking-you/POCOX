@@ -240,25 +240,16 @@ fn parse_link(target: &str) -> Link {
     link
 }
 
-/// The other ports of the share that holds `service`, as the running POCOX
-/// sees them (none when it cannot say).
-async fn companions(service: &str) -> Vec<String> {
-    let Ok(local) = local_tools::require().await else { return Vec::new() };
-    let Ok(overview) = local.get::<Overview>("overview").await else { return Vec::new() };
+/// The share that holds `service`, as the running POCOX sees it (none when
+/// it cannot say).
+async fn share_of(service: &str) -> Option<ShareView> {
+    let local = local_tools::require().await.ok()?;
+    let overview = local.get::<Overview>("overview").await.ok()?;
     overview
         .devices
-        .iter()
-        .flat_map(|device| &device.shares)
+        .into_iter()
+        .flat_map(|device| device.shares)
         .find(|share| share.ports.iter().any(|port| port.key == service))
-        .map(|share| {
-            share
-                .ports
-                .iter()
-                .filter(|port| port.key != service)
-                .map(|port| port.key.clone())
-                .collect()
-        })
-        .unwrap_or_default()
 }
 
 /// `pocox open`: connect a shared service here and open it.
@@ -268,17 +259,30 @@ pub async fn open(args: OpenArgs) -> Result<()> {
         bail!("the link names no service");
     }
     let view = connect_to(&link.service, None).await?;
+    let share = share_of(&view.service).await;
     // The page's other ports (its API) come along before it opens: its first
     // request may already need them.
-    for other in companions(&view.service).await {
-        if let Err(error) = connect_to(&other, None).await {
-            ui::warn(&format!("{other} could not be connected here: {error:#}"));
+    for other in share.iter().flat_map(|share| &share.ports) {
+        if other.key == view.service {
+            continue;
+        }
+        if let Err(error) = connect_to(&other.key, None).await {
+            ui::warn(&format!("{} could not be connected here: {error:#}", other.key));
         }
     }
-    let path = args.path.or(link.path).unwrap_or_else(|| "/".into());
+    // A bare service names no path or scheme: the page's own share does.
+    let page = share
+        .as_ref()
+        .filter(|share| share.first_key() == Some(view.service.as_str()));
+    let path = args
+        .path
+        .or(link.path)
+        .or_else(|| page.map(|share| share.path.clone()))
+        .unwrap_or_else(|| "/".into());
     let port = view.local.rsplit(':').next().unwrap_or_default();
     let path = if path.starts_with('/') { path } else { format!("/{path}") };
-    let scheme = if link.secure { "https" } else { "http" };
+    let secure = link.secure || page.is_some_and(|share| share.secure);
+    let scheme = if secure { "https" } else { "http" };
     let url = format!("{scheme}://localhost:{port}{path}");
     if args.no_browser {
         println!("{url}");

@@ -97,6 +97,17 @@ pub async fn connect(
             .await
             .map_err(|_| ToolError::Relay("listing services timed out".into()))?
             .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+    // A full account key names its account: one of another account or relay
+    // (a stale or foreign link) is not this one's same-named service.
+    let wanted = request.service.trim();
+    if let Some(named) = NamespacedServiceId::parse_key(wanted) {
+        if owned.transport.key(&named.service) != wanted {
+            return Err(ToolError::Invalid(format!(
+                "`{}` belongs to another account or relay; call `services` for this one's.",
+                bounded(wanted)
+            )));
+        }
+    }
     let id = resolve(&request.service, &services)?;
     let key = id.key();
     let this_device = runtime::device_id().ok();

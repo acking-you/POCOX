@@ -83,9 +83,6 @@ impl AgentHost {
             .filter(|id| !id.is_empty() && id.len() <= MAX_ID)
             .ok_or_else(|| HostError::Agent("the agent returned no session id".into()))?
             .to_string();
-        if let Some(adopt) = adopt {
-            adopt(&id);
-        }
         self.claim_native_session(&id, generation)
             .inspect_err(|_| {
                 self.close_session(Some(id.clone()), &peer, &caps);
@@ -117,6 +114,11 @@ impl AgentHost {
                 .submit(|pending| pending.record(&id, &cwd, None));
             evicted
         };
+        // Granted only once admitted here: dropped uncalled on any failure
+        // above, the grant withdraws what it handed the agent.
+        if let Some(adopt) = adopt {
+            adopt(&id);
+        }
         self.close_session(evicted, &peer, &caps);
         Ok(self.opened(&id, "new"))
     }

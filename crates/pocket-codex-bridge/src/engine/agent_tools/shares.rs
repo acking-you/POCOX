@@ -769,11 +769,21 @@ pub fn maintain(probe: bool) {
     }
     let mut released = Vec::new();
     let mut todo: Vec<(String, u16, String, SocketAddr)> = Vec::new();
+    // A restored share's port can since have been taken by POCOX itself (a
+    // host, the management entry, a tunnel): never published while it is.
+    let own = if state::lock().shares.is_empty() { BTreeSet::new() } else { own_ports() };
     {
         let mut state = state::lock();
         let mut changed = false;
         for share in &mut state.shares {
             for port in &mut share.ports {
+                if own.contains(&port.port) {
+                    if let Some(registration) = port.published.take() {
+                        released.push(registration);
+                        changed = true;
+                    }
+                    continue;
+                }
                 let moved = port.published.is_some() && !transport::is_current(port.epoch);
                 let refusal = port.published.as_ref().and_then(Published::failure);
                 if let Some(why) = &refusal {
