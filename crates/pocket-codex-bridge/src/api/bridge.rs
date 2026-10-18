@@ -39,11 +39,12 @@ pub mod threads;
 
 pub use self::{
     agent_tools::{
-        tools_answer, tools_connect, tools_disconnect, tools_keep_share, tools_overview,
-        tools_revoke, tools_set_ask_before_sharing, tools_set_enabled, tools_share, tools_status,
-        tools_stop_share, tools_tokens, tools_watch, AgentToolsStatusDto, ToolsConnectionDto,
-        ToolsConsentDto, ToolsDeviceDto, ToolsOverviewDto, ToolsOwnerDto, ToolsPortDto,
-        ToolsRefDto, ToolsServiceDto, ToolsShareDto, ToolsSharedDto, ToolsTokenDto, ToolsUpdateDto,
+        tools_answer, tools_connect, tools_disconnect, tools_harness_config, tools_keep_share,
+        tools_overview, tools_revoke, tools_set_ask_before_sharing, tools_set_enabled, tools_share,
+        tools_share_on, tools_status, tools_stop_share, tools_tokens, tools_watch,
+        AgentToolsStatusDto, ToolsConnectionDto, ToolsConsentDto, ToolsDeviceDto, ToolsOverviewDto,
+        ToolsOwnerDto, ToolsPortDto, ToolsRefDto, ToolsServiceDto, ToolsShareDto, ToolsSharedDto,
+        ToolsTokenDto, ToolsUpdateDto,
     },
     codex_setup::{
         codex_auth_status, codex_login_cancel, codex_login_chatgpt_start, codex_logout,

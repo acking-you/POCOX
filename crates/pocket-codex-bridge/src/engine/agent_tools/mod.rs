@@ -296,6 +296,38 @@ pub fn answer_on(device: &str, id: &str, decision: model::Decision) -> Result<()
     )
 }
 
+/// Share `ports` of `device` as the user (this device directly, another one
+/// through its management entry).
+pub fn share_on(
+    device: &str,
+    ports: Vec<u16>,
+    title: Option<String>,
+    path: Option<String>,
+) -> Result<model::Shared> {
+    if is_local(device) {
+        let request = shares::ShareRequest {
+            ports,
+            title,
+            path,
+            wait_ready_seconds: Some(5),
+        };
+        let shared =
+            runtime::runtime().block_on(shares::share(&shares::Caller::user("You"), request));
+        return match shared {
+            Ok(Ok(shared)) => Ok(shared),
+            Ok(Err(pending)) => Err(anyhow::anyhow!(pending.message())),
+            Err(error) => Err(anyhow::anyhow!(error.message())),
+        };
+    }
+    let body = serde_json::json!({ "ports": ports, "title": title, "path": path });
+    crate::engine::management_client::request(
+        &host_key(device),
+        reqwest::Method::POST,
+        &["services", "v1", "shares"],
+        Some(&body),
+    )
+}
+
 /// Stop share `id` of `device`, as the user.
 pub fn stop_on(device: &str, id: &str) -> Result<()> {
     if is_local(device) {

@@ -3,6 +3,11 @@ part of '../services_screen.dart';
 // A UI target, never a relay device label. Windows and WSL may share labels.
 const _thisDevice = '@local';
 
+/// Services listed as a device's capabilities: not its management entry, and
+/// not its shared ports, which have their own section.
+bool _capability(ServiceEntry service) =>
+    service.kind != 'host' && service.kind != 'port';
+
 /// The service inventory, organized around devices rather than protocol tabs.
 /// App/API remain the real discovered services; session sharing is presented
 /// as a capability derived from an account-mode app host, because meta is
@@ -116,7 +121,7 @@ class _DeviceFirstServices extends ConsumerWidget {
       final recovered = <String>[
         for (final service in services)
           if (dismissed.contains(service.key) &&
-              service.kind != 'host' &&
+              _capability(service) &&
               ref.watch(_reachability(service)).valueOrNull == true)
             service.key,
       ];
@@ -207,7 +212,7 @@ class _DeviceFirstServices extends ConsumerWidget {
         visible
             .where(
               (service) =>
-                  belongs(service, activeDevice) && service.kind != 'host',
+                  belongs(service, activeDevice) && _capability(service),
             )
             .toList()
           ..sort((a, b) {
@@ -536,9 +541,7 @@ class _DeviceFirstServices extends ConsumerWidget {
 
     int countFor(String device) {
       final entries = visible
-          .where(
-            (service) => belongs(service, device) && service.kind != 'host',
-          )
+          .where((service) => belongs(service, device) && _capability(service))
           .toList();
       final appCount = entries.where((service) => service.kind == 'app').length;
       return entries.length + (account ? appCount : 0);
@@ -635,6 +638,28 @@ class _DeviceFirstServices extends ConsumerWidget {
               ),
           ],
         ),
+      // What this device shares: dev servers and pages, agents' or the user's.
+      if (_sharesOf(ref, activeDevice) case final shares
+          when shares.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        GroupCard(
+          title: l10n.toolsSharedWithYou,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: Column(
+                children: [
+                  for (final share in shares)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: ShareCard(share: shareRefOf(share), dense: true),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
       // Local hosting always belongs to the independent local target, even
       // before its first service starts or while management is disabled.
       if (hostingShown) ...[
@@ -709,6 +734,16 @@ class _DeviceFirstServices extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// The shares of [device] (this computer for the local target).
+  List<ToolsShare> _sharesOf(WidgetRef ref, String? device) {
+    final overview = ref.watch(toolsOverviewProvider);
+    final name = device == _thisDevice ? overview.thisDevice : device;
+    return [
+      for (final entry in overview.devices)
+        if (entry.name == name) ...entry.shares,
+    ];
   }
 
   /// The selected remote device's platform line: what its publisher reports,

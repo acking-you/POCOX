@@ -75,6 +75,20 @@ Future<ToolsSharedDto> toolsShare({
   path: path,
 );
 
+/// Share `ports` of `device` as the user: this computer, or another of the
+/// user's devices (Share and open on a `localhost` link).
+Future<ToolsSharedDto> toolsShareOn({
+  required String device,
+  required List<int> ports,
+  String? title,
+  String? path,
+}) => RustLib.instance.api.crateApiBridgeAgentToolsToolsShareOn(
+  device: device,
+  ports: ports,
+  title: title,
+  path: path,
+);
+
 /// Make another device's shared port or API reachable on this device, at
 /// the same port number when it is free.
 Future<ToolsConnectionDto> toolsConnect({
@@ -96,6 +110,13 @@ List<ToolsTokenDto> toolsTokens() =>
 /// Revoke a token; what its holder shared or connected ends.
 Future<void> toolsRevoke({required String tokenId}) =>
     RustLib.instance.api.crateApiBridgeAgentToolsToolsRevoke(tokenId: tokenId);
+
+/// A ready-to-paste entry for a harness POCOX does not launch (`codex`,
+/// `claude`, `opencode` or `generic`), with a token issued to it, shown once.
+Future<String> toolsHarnessConfig({required String harness}) => RustLib
+    .instance
+    .api
+    .crateApiBridgeAgentToolsToolsHarnessConfig(harness: harness);
 
 /// The tools on this installation.
 class AgentToolsStatusDto {

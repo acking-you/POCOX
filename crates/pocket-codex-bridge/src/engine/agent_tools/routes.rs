@@ -67,6 +67,21 @@ struct Answer {
     decision: Decision,
 }
 
+/// A share the user asks for from another of their devices (Share and open
+/// on a `localhost` link in a conversation).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareBody {
+    /// Ports of the device that serves this route.
+    pub ports: Vec<u16>,
+    /// What it is.
+    #[serde(default)]
+    pub title: Option<String>,
+    /// Path to open.
+    #[serde(default)]
+    pub path: Option<String>,
+}
+
 fn events(admitted: Admitted) -> impl futures::Stream<Item = Result<Event, Infallible>> {
     let changes = state::changes();
     futures::stream::unfold(
@@ -106,8 +121,14 @@ fn events(admitted: Admitted) -> impl futures::Stream<Item = Result<Event, Infal
 /// The routes, guarded by `admitted`.
 pub fn router(admitted: Admitted) -> Router {
     let guard = |admitted: &Admitted| -> Option<Response> { (!admitted()).then(refused) };
-    let (a1, a2, a3, a4, a5) =
-        (admitted.clone(), admitted.clone(), admitted.clone(), admitted.clone(), admitted);
+    let (a1, a2, a3, a4, a5, a6) = (
+        admitted.clone(),
+        admitted.clone(),
+        admitted.clone(),
+        admitted.clone(),
+        admitted.clone(),
+        admitted,
+    );
     Router::new()
         .route(
             "/services/v1",
@@ -139,6 +160,28 @@ pub fn router(admitted: Admitted) -> Router {
                     return refusal;
                 }
                 reply(consent::answer(&id, answer.decision).map(|()| serde_json::json!({})))
+            }),
+        )
+        .route(
+            "/services/v1/shares",
+            post(move |Json(body): Json<ShareBody>| async move {
+                if let Some(refusal) = guard(&a6) {
+                    return refusal;
+                }
+                // The user asked, from one of their own devices: no consent
+                // prompt, and the share lasts until they stop it.
+                let caller = shares::Caller::user("You");
+                let request = shares::ShareRequest {
+                    ports: body.ports,
+                    title: body.title,
+                    path: body.path,
+                    wait_ready_seconds: Some(5),
+                };
+                match shares::share(&caller, request).await {
+                    Ok(Ok(shared)) => Json(shared).into_response(),
+                    Ok(Err(pending)) => failure(ToolError::Invalid(pending.message())),
+                    Err(error) => failure(error),
+                }
             }),
         )
         .route(

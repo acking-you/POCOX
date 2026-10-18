@@ -11,6 +11,8 @@ import 'package:pocket_codex/src/screens/onboarding_screen.dart';
 import 'package:pocket_codex/src/screens/services_screen.dart';
 import 'package:pocket_codex/src/screens/settings_screen.dart';
 import 'package:pocket_codex/src/screens/welcome_guide_screen.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_screen.dart';
+import 'package:pocket_codex/src/tools/preview_browser.dart';
 
 /// The live router instance, captured by [buildRouter] so code outside the
 /// widget tree — namely the desktop tray's "Settings" item — can navigate. Null
@@ -59,6 +61,10 @@ void openSettingsFromTray() {
   }
 }
 
+/// Push [location] from outside a page's own context (the agent tools'
+/// app-wide prompts open shares this way). A no-op before the router exists.
+void pushRoute(String location) => _appRouter?.push(location);
+
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
 GoRouter buildRouter({
@@ -83,6 +89,17 @@ GoRouter buildRouter({
     // First-run welcome guide, shown once per device after the first sign-in.
     GoRoute(path: '/welcome', builder: (c, s) => const WelcomeGuideScreen()),
     GoRoute(path: '/manage', builder: (c, s) => const ServicesScreen()),
+    // Every device and service as a living galaxy.
+    GoRoute(path: '/galaxy', builder: (c, s) => const GalaxyScreen()),
+    // A page another device shared, in the in-app browser (phones).
+    GoRoute(
+      path: '/preview',
+      builder: (c, s) => PreviewBrowserScreen(
+        url: s.uri.queryParameters['url'] ?? 'about:blank',
+        title: s.uri.queryParameters['title'],
+        serviceKey: s.uri.queryParameters['svc'],
+      ),
+    ),
     GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
     // External Codex setup: detect CODEX_HOME, configure login/provider and prompt.
     GoRoute(path: '/setup/codex', builder: (c, s) => const CodexSetupScreen()),

@@ -17,6 +17,8 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/tools/share_card.dart';
+import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/api_service_panel.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';

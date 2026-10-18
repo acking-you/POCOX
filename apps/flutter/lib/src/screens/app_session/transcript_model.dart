@@ -9,6 +9,7 @@
 /// must agree on. NOT here: anything that builds a widget.
 library;
 
+import 'package:pocket_codex/src/tools/share_ref.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
 
 /// Width at which the transcript switches from mobile chat bubbles to the
@@ -95,6 +96,22 @@ class TranscriptItem {
   /// app watched run.
   int? turnDurationMs;
 
+  /// The share a finished agent tool call announced (a Codex `pocox` call, or
+  /// any tool output with a `pocox://open` link), read again only when the
+  /// row's text changes.
+  ShareRef? get share {
+    if (!identical(_shareText, text)) {
+      _shareText = text;
+      _share = isMessage || streaming
+          ? null
+          : shareOfToolCall(type: type, title: title, text: text);
+    }
+    return _share;
+  }
+
+  String? _shareText;
+  ShareRef? _share;
+
   /// Whether this row is the user's own message.
   bool get isUser => type == 'userMessage';
 
@@ -122,6 +139,7 @@ class TranscriptItem {
   ///
   /// * `modelError` — the turn failed; the card says why, in place of an answer.
   /// * `reasoningOutput` — the turn's only output, returned as reasoning.
+  /// * a share — what the agent shared, to open on this device.
   ///
   /// `contextCompaction` is deliberately NOT here: compaction happens *during* a
   /// turn, so leaving it out split one turn's work into several folds that each
@@ -135,7 +153,8 @@ class TranscriptItem {
       type == 'interrupted' ||
       type == 'imageGeneration' ||
       type == 'modelError' ||
-      type == 'reasoningOutput';
+      type == 'reasoningOutput' ||
+      share != null;
 }
 
 /// Stopwatch-format an elapsed-second count: `m:ss`, or `h:mm:ss` past an hour

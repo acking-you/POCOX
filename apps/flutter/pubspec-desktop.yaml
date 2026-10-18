@@ -107,6 +107,10 @@ dependencies:
   # The app's one icon family (Lucide, ISC): a consistent stroke set mapped
   # in lib/src/app_icons.dart. Pinned exactly so a glyph redraw is a choice.
   lucide_icons_flutter: 3.1.25
+  # Opens a page another device shared in an in-app browser on phones: the
+  # app stays in the foreground, which keeps the relay tunnel to it alive.
+  # The Flutter team's package; desktops use the system browser instead.
+  webview_flutter: ^4.14.1
 
 dev_dependencies:
   flutter_test:
@@ -127,6 +131,9 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  # The galaxy's backdrop (rendered once per size and theme).
+  shaders:
+    - shaders/nebula.frag
   # Only the theme-matched brand marks ship in the bundle. logo.png stays in
   # the repo as marketing material — bundling it would add dead weight.
   #

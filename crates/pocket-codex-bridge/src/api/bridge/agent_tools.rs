@@ -394,6 +394,23 @@ pub fn tools_share(
     }
 }
 
+/// Share `ports` of `device` as the user: this computer, or another of the
+/// user's devices (Share and open on a `localhost` link).
+pub fn tools_share_on(
+    device: String,
+    ports: Vec<u16>,
+    title: Option<String>,
+    path: Option<String>,
+) -> Result<ToolsSharedDto> {
+    let shared = tools::share_on(&device, ports, title, path)?;
+    Ok(ToolsSharedDto {
+        share: share(shared.share),
+        on_this_machine: shared.on_this_machine,
+        open: shared.open,
+        ends: shared.ends,
+    })
+}
+
 /// Make another device's shared port or API reachable on this device, at
 /// the same port number when it is free.
 pub fn tools_connect(service: String, local_port: Option<u16>) -> Result<ToolsConnectionDto> {
@@ -439,4 +456,11 @@ pub fn tools_tokens() -> Vec<ToolsTokenDto> {
 /// Revoke a token; what its holder shared or connected ends.
 pub fn tools_revoke(token_id: String) {
     tools::revoke(&token_id);
+}
+
+/// A ready-to-paste entry for a harness POCOX does not launch (`codex`,
+/// `claude`, `opencode` or `generic`), with a token issued to it, shown once.
+pub fn tools_harness_config(harness: String) -> Result<String> {
+    let issued = tools::issue(&harness, None)?;
+    Ok(tools::harness::snippet(&harness, &issued))
 }

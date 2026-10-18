@@ -656,8 +656,9 @@ class _BreadcrumbLink extends StatelessWidget {
 const _pageKeys = <String, LogicalKeyboardKey>{
   '/': LogicalKeyboardKey.digit0,
   '/manage': LogicalKeyboardKey.digit1,
-  '/sessions': LogicalKeyboardKey.digit2,
-  '/logs': LogicalKeyboardKey.digit3,
+  '/galaxy': LogicalKeyboardKey.digit2,
+  '/sessions': LogicalKeyboardKey.digit3,
+  '/logs': LogicalKeyboardKey.digit4,
   '/settings': LogicalKeyboardKey.comma,
 };
 
