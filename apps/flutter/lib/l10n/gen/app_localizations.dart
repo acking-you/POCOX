@@ -6881,7 +6881,7 @@ abstract class AppLocalizations {
   /// No description provided for @toolsPortsNotConnected.
   ///
   /// In en, this message translates to:
-  /// **'Port {ports} of this share could not be connected here, so parts of the page may not work.'**
+  /// **'Port {ports} of this share is not reachable at its own number here, so parts of the page may not work.'**
   String toolsPortsNotConnected(String ports);
 
   /// No description provided for @toolsNothingShared.

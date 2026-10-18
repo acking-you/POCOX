@@ -247,26 +247,17 @@ pub async fn share(
     }
     let ports = validate(&request, &own_ports())?;
     let key = caller.key();
-    if caller.is_user() {
-        take_over(&mut state::lock(), &ports, caller)?;
-    }
-    if let Some(done) = existing(&ports) {
-        return Ok(Ok(shared(done)));
-    }
-    // An agent's other ports cannot join a page someone else shares, and a
-    // page split from its API would open without it.
-    if !caller.is_user() {
-        let state = state::lock();
-        if let Some(page) = state
-            .share_with_port(ports[0])
-            .filter(|share| share.key.as_ref() != Some(&key))
-        {
-            return Err(ToolError::Invalid(format!(
-                "Port {} is already shared by {}; share the other ports in a call of their own.",
-                ports[0], page.owner.label
-            )));
+    if existing(&ports).is_some() {
+        // Shared already: the same answer, and the user's ask makes those
+        // shares theirs.
+        if caller.is_user() {
+            take_over(&mut state::lock(), &ports, caller)?;
         }
+        return existing(&ports)
+            .map(|done| Ok(shared(done)))
+            .ok_or_else(|| ToolError::NotFound("The share".into()));
     }
+    refuse_split(&state::lock(), caller, &key, &ports)?;
     let new: Vec<u16> = {
         let state = state::lock();
         ports
@@ -315,6 +306,11 @@ pub async fn share(
             "Port {port} now belongs to POCOX itself; it cannot be shared."
         )));
     }
+    if caller.is_user() {
+        // Only now that every port answers: a call still waiting for a port
+        // changes nothing.
+        take_over(&mut state::lock(), &ports, caller)?;
+    }
     let page = Page {
         port: ports[0],
         title,
@@ -339,6 +335,37 @@ pub async fn share(
         .ok_or_else(|| ToolError::NotFound("The share".into()))?;
     tracing::info!(share = %id, owner = %view.owner.label, ports = ?ports, "shared ports");
     Ok(Ok(shared(view)))
+}
+
+/// A page and its other ports stay one share, the one opening the page
+/// connects: a requested port another share holds apart from the page, or
+/// (for an agent) a page someone else shares, cannot take new ports.
+fn refuse_split(
+    state: &State,
+    caller: &Caller,
+    key: &OwnerKey,
+    ports: &[u16],
+) -> Result<(), ToolError> {
+    let page = state.share_with_port(ports[0]);
+    if let Some(page) = page.filter(|share| !caller.is_user() && share.key.as_ref() != Some(key)) {
+        return Err(ToolError::Invalid(format!(
+            "Port {} is already shared by {}; share the other ports in a call of their own.",
+            ports[0], page.owner.label
+        )));
+    }
+    let page = page.map(|share| share.id.as_str());
+    if let Some(port) = ports[1..].iter().find(|port| {
+        state
+            .share_with_port(**port)
+            .is_some_and(|holder| Some(holder.id.as_str()) != page)
+    }) {
+        return Err(ToolError::Invalid(format!(
+            "Port {port} is already shared apart from port {}; stop that share, or share these \
+             ports in calls of their own.",
+            ports[0]
+        )));
+    }
+    Ok(())
 }
 
 /// The user sharing ports an agent shares makes those shares the user's: no
@@ -560,20 +587,29 @@ async fn publish(
         codec: true,
     };
     match publish_pending(&owned.transport.session, options).await {
-        // The wait can be long: a handle of an account or relay that changed
-        // meanwhile is the old one's. A bound request fails; any other is
-        // published again under the new one.
-        Ok((published, _)) if !transport::is_current(owned.epoch) => {
+        Ok((published, _)) => {
+            // The wait can be long: the account or relay may have changed
+            // (the handle is the old one's: a bound request fails, any other
+            // is published again), or POCOX itself may now listen on the port.
+            let moved = !transport::is_current(owned.epoch);
+            let own = own_ports().contains(&addr.port());
+            if !moved && !own {
+                return Ok(Some((published, owned.epoch)));
+            }
             runtime::runtime().spawn(async move {
                 let _ = published.stop().await;
             });
-            if epoch.is_some() {
+            if own {
+                Err(ToolError::Invalid(format!(
+                    "Port {} now belongs to POCOX itself; it cannot be shared.",
+                    addr.port()
+                )))
+            } else if epoch.is_some() {
                 Err(ToolError::ContextChanged)
             } else {
                 Ok(None)
             }
         },
-        Ok((published, _)) => Ok(Some((published, owned.epoch))),
         Err(PublishError::Conflict {
             ..
         }) => Err(ToolError::Conflict(
@@ -940,6 +976,44 @@ mod tests {
         take_over(&mut state, &[5173], &Caller::user("You")).expect("taken");
         let share = &state.shares[0];
         assert!(share.key.is_none() && share.expires_ms.is_none() && share.durable());
+    }
+
+    #[test]
+    fn a_page_and_its_other_ports_stay_one_share() {
+        let addr = |port| SocketAddr::from(([127, 0, 0, 1], port));
+        let agent = Caller {
+            principal: Principal {
+                id: "t1".into(),
+                kind: Kind::Hosted,
+                label: "Codex".into(),
+                harness: Some("codex".into()),
+                host: Some("default".into()),
+                session: None,
+            },
+            conversation: Some("c1".into()),
+        };
+        let share = |id: &str, key: Option<OwnerKey>, port: u16| Share {
+            id: id.into(),
+            title: "Page".into(),
+            path: "/".into(),
+            secure: false,
+            owner: agent.owner(),
+            key,
+            created_ms: 0,
+            expires_ms: None,
+            ports: vec![SharedPort::new(port, format!("pcx:studio:port:{port}"), addr(port), true)],
+        };
+        let mut state = State::default();
+        state.shares.push(share("mine", Some(agent.key()), 5173));
+        state.shares.push(share("theirs", None, 8000));
+        let user = Caller::user("You");
+        // Its own page takes more free ports; a port held apart does not join.
+        assert!(refuse_split(&state, &agent, &agent.key(), &[5173, 9000]).is_ok());
+        assert!(refuse_split(&state, &agent, &agent.key(), &[5173, 8000]).is_err());
+        assert!(refuse_split(&state, &agent, &agent.key(), &[3000, 8000]).is_err());
+        // Someone else's page takes no ports from an agent; the user's ask may.
+        assert!(refuse_split(&state, &agent, &agent.key(), &[8000, 9000]).is_err());
+        assert!(refuse_split(&state, &user, &user.key(), &[8000, 9000]).is_ok());
     }
 
     #[test]

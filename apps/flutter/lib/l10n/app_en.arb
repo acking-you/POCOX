@@ -1509,7 +1509,7 @@
   "@toolsOpenFailed": {"placeholders": {"error": {"type": "String"}}},
   "toolsPortMoved": "Port {port} is taken here, so it opened on {local}. Links that name localhost:{port} may not work.",
   "@toolsPortMoved": {"placeholders": {"port": {"type": "String"}, "local": {"type": "String"}}},
-  "toolsPortsNotConnected": "Port {ports} of this share could not be connected here, so parts of the page may not work.",
+  "toolsPortsNotConnected": "Port {ports} of this share is not reachable at its own number here, so parts of the page may not work.",
   "@toolsPortsNotConnected": {"placeholders": {"ports": {"type": "String"}}},
   "toolsNothingShared": "Nothing shared yet",
   "toolsShareHint": "When an agent shares a dev server or a page, it appears here, ready to open.",

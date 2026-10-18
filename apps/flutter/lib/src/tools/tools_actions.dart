@@ -95,8 +95,10 @@ Future<void> openShareWith(
       final failed = <String>[];
       Future<void> companion(ToolsPort other) async {
         try {
-          await api.toolsConnect(other.key);
+          final made = await api.toolsConnect(other.key);
           connected[other.key] = share.device;
+          // At another number here, the page's absolute requests miss it.
+          if (!made.samePort) failed.add(other.port.toString());
         } catch (_) {
           failed.add(other.port.toString());
         }

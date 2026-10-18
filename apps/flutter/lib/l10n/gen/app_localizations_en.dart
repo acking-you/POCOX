@@ -3973,7 +3973,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String toolsPortsNotConnected(String ports) {
-    return 'Port $ports of this share could not be connected here, so parts of the page may not work.';
+    return 'Port $ports of this share is not reachable at its own number here, so parts of the page may not work.';
   }
 
   @override
