@@ -52,6 +52,9 @@ pub struct SharedPort {
     pub reachable: bool,
     /// A publication is in flight (only one at a time).
     pub publishing: bool,
+    /// Its share call finished: a user's port is saved only once published,
+    /// so a failed share never reaches the file.
+    pub confirmed: bool,
     /// The relay refused the last registration.
     pub refused: bool,
     /// No new publication before this (Unix milliseconds).
@@ -69,6 +72,7 @@ impl SharedPort {
             epoch: 0,
             reachable,
             publishing: false,
+            confirmed: true,
             refused: false,
             retry_at_ms: 0,
         }
@@ -106,9 +110,6 @@ pub struct Share {
     pub expires_ms: Option<i64>,
     /// Its ports.
     pub ports: Vec<SharedPort>,
-    /// Its call finished: the user's share is saved only once it is
-    /// published, so a failed share never reaches the file.
-    pub confirmed: bool,
 }
 
 impl Share {
@@ -137,7 +138,8 @@ impl Share {
     /// Whether it survives a restart: kept shares and the user's own. An
     /// agent's share ends with the process that served its tools.
     pub fn durable(&self) -> bool {
-        self.confirmed && (self.key.is_none() || self.owner.kind == OwnerKind::User)
+        (self.key.is_none() || self.owner.kind == OwnerKind::User)
+            && self.ports.iter().any(|port| port.confirmed)
     }
 
     /// The saved form.
@@ -150,7 +152,12 @@ impl Share {
             owner: self.owner.clone(),
             created_ms: self.created_ms,
             expires_ms: self.expires_ms,
-            ports: self.ports.iter().map(|port| port.port).collect(),
+            ports: self
+                .ports
+                .iter()
+                .filter(|port| port.confirmed)
+                .map(|port| port.port)
+                .collect(),
         }
     }
 }
@@ -271,8 +278,6 @@ pub struct State {
     pub connections: Vec<Connection>,
     /// Agent hosts and APIs this process serves, as last read.
     pub services: Vec<HostedView>,
-    /// Loopback ports those hosts listen on, as last read.
-    pub own_ports: Vec<u16>,
     /// Moves with every change.
     pub revision: u64,
 }

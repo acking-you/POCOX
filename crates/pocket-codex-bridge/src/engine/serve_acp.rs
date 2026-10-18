@@ -380,6 +380,14 @@ pub(super) fn relaunch(name: &str) -> Option<AcpRelaunch> {
 }
 
 /// Status rows for every ACP host, in the shared [`ServeStatus`] shape.
+/// Loopback ports this process's ACP hosts listen on (gateway and meta).
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts()
+        .values()
+        .flat_map(|host| [host.gateway_local.port(), host.meta_local.port()])
+        .collect()
+}
+
 pub(super) fn status() -> Vec<ServeStatus> {
     hosts()
         .values()

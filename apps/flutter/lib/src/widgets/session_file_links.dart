@@ -111,7 +111,9 @@ class _HostWebLinkState extends State<_HostWebLink> {
     final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
     final path =
         (uri.path.isEmpty ? '/' : uri.path) +
-        (uri.hasQuery ? '?${uri.query}' : '');
+        (uri.hasQuery ? '?${uri.query}' : '') +
+        // A hash-routed app's route lives in the fragment.
+        (uri.hasFragment ? '#${uri.fragment}' : '');
     setState(() => _sharing = true);
     final messenger = ToastMessenger.of(context);
     try {

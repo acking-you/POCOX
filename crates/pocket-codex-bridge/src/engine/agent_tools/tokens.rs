@@ -154,7 +154,21 @@ impl Tokens {
     /// creating it on first use).
     pub fn open(dir: &Path) -> Result<Self> {
         let file: File = match std::fs::read(dir.join(FILE)) {
-            Ok(bytes) => serde_json::from_slice(&bytes).unwrap_or_default(),
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(file) => file,
+                // Set aside before anything is written over it: the tokens of
+                // installed harnesses may still be recovered from it.
+                Err(error) => {
+                    let aside = dir.join(format!("{FILE}.unreadable-{}", now_ms()));
+                    std::fs::rename(dir.join(FILE), &aside)
+                        .context("setting aside unreadable agent tool tokens")?;
+                    tracing::warn!(
+                        "agent tool tokens unreadable, kept at {}: {error}",
+                        aside.display()
+                    );
+                    File::default()
+                },
+            },
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => File::default(),
             Err(error) => return Err(error).context("reading agent tool tokens"),
         };
@@ -390,6 +404,24 @@ mod tests {
         }
         let reopened = Tokens::open(dir.path()).expect("reopen");
         assert!(reopened.authenticate(&secret).is_none(), "a restart keeps it revoked");
+    }
+
+    #[test]
+    fn an_unreadable_token_file_is_kept_aside_not_overwritten() {
+        let dir = tempfile::tempdir().expect("dir");
+        std::fs::write(dir.path().join(FILE), b"{\"tokens\": [").expect("write");
+        Tokens::open(dir.path()).expect("open");
+        let aside: Vec<_> = std::fs::read_dir(dir.path())
+            .expect("list")
+            .filter_map(Result::ok)
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .starts_with("tokens.json.unreadable-")
+            })
+            .collect();
+        assert_eq!(aside.len(), 1);
+        assert_eq!(std::fs::read(aside[0].path()).expect("kept"), b"{\"tokens\": [");
     }
 
     #[test]

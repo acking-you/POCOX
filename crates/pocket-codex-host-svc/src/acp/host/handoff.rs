@@ -136,6 +136,12 @@ impl AgentHost {
         state.sessions.remove(session);
         state.session_event(session);
         self.forget_native_claim(session, generation);
+        drop(state);
+        // What the released session was granted ends with it.
+        let mcp = lock(&self.inner.session_mcp).clone();
+        if let Some(mcp) = mcp {
+            mcp.closed(session);
+        }
         Ok(
             json!({"sessionId":session,"released":true,"hostId":self.host_id(),"generation":generation}),
         )

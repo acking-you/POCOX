@@ -20,13 +20,7 @@ use crate::engine::{discovery, meta, runtime, serve, transport};
 
 /// The agent hosts and APIs this process serves, read again.
 pub fn refresh_services() {
-    let statuses = serve::serve_status();
-    let own_ports: Vec<u16> = statuses
-        .iter()
-        .flat_map(|s| [&s.app_listen_addr, &s.api_listen_addr, &s.meta_listen_addr])
-        .filter_map(|addr| addr.rsplit(':').next()?.parse().ok())
-        .collect();
-    let services: Vec<HostedView> = statuses
+    let services: Vec<HostedView> = serve::serve_status()
         .into_iter()
         .flat_map(|status| {
             let agent = match status.protocol.as_str() {
@@ -59,7 +53,6 @@ pub fn refresh_services() {
         })
         .collect();
     let mut state = state::lock();
-    state.own_ports = own_ports;
     if state.services != services {
         state.services = services;
         state::changed(&mut state);

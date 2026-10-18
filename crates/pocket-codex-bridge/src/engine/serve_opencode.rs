@@ -468,6 +468,15 @@ pub fn refresh_catalog(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Loopback ports this process's OpenCode hosts listen on (gateway and meta).
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts()
+        .hosts
+        .values()
+        .flat_map(|host| [host.local.port(), host.meta.port()])
+        .collect()
+}
+
 pub(super) fn status() -> Vec<ServeStatus> {
     registration::recover();
     hosts()

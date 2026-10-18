@@ -169,7 +169,12 @@ fn own_ports() -> BTreeSet<u16> {
     ports.extend([APP_PORT, CLI_PORT]);
     ports.extend(state.settings.port);
     ports.extend(state.endpoint.as_deref().and_then(port_of));
-    ports.extend(state.own_ports.iter().copied());
+    drop(state);
+    // Read live, not from the supervisor's last pass: a host may have bound
+    // its listeners just now.
+    ports.extend(crate::engine::serve::listen_ports());
+    ports.extend(crate::engine::serve_acp::listen_ports());
+    ports.extend(crate::engine::serve_opencode::listen_ports());
     ports
 }
 
@@ -297,6 +302,7 @@ pub async fn share(
         )));
     }
     let page = Page {
+        port: ports[0],
         title,
         path: clean_path(request.path.as_deref()),
         secure: request.secure,
@@ -376,6 +382,8 @@ fn existing(ports: &[u16]) -> Option<ShareView> {
 
 /// What a new share shows.
 struct Page {
+    /// The requested page port (the first).
+    port: u16,
     title: String,
     path: String,
     secure: bool,
@@ -421,25 +429,35 @@ fn reserve(
         )));
     }
     let reserved: Vec<u16> = addrs.iter().map(|(port, _)| *port).collect();
+    let user = caller.is_user();
     let ports = addrs.iter().map(|(port, addr)| {
         let key = ServiceId::new(&device, ServiceKind::Port, port.to_string()).key();
-        // Published by this call, not by the supervisor.
+        // Published by this call, not by the supervisor; the user's is saved
+        // once published ([`confirm`]).
         SharedPort {
             publishing: true,
+            confirmed: !user,
             ..SharedPort::new(*port, key, *addr, true)
         }
     });
-    // The same owner sharing more ports extends its share.
-    let id = if let Some(share) = state
-        .shares
-        .iter_mut()
-        .find(|share| share.key.as_ref() == Some(key))
-    {
+    // More ports join the page's share: the user's share that holds the
+    // page, or the agent's own share.
+    let joined = if user {
+        state.shares.iter().position(|share| {
+            share.key.is_none() && share.ports.iter().any(|p| p.port == page.port)
+        })
+    } else {
+        state
+            .shares
+            .iter()
+            .position(|share| share.key.as_ref() == Some(key))
+    };
+    let id = if let Some(index) = joined {
+        let share = &mut state.shares[index];
         share.ports.extend(ports);
         share.id.clone()
     } else {
         let owner = caller.owner();
-        let user = caller.is_user();
         let id = uuid::Uuid::new_v4().simple().to_string()[..10].to_string();
         state.shares.push(Share {
             id: id.clone(),
@@ -451,8 +469,6 @@ fn reserve(
             created_ms: now_ms(),
             expires_ms: (!user).then(|| now_ms() + AGENT_LEASE_MS),
             ports: ports.collect(),
-            // The user's is saved once published ([`confirm`]).
-            confirmed: !user,
         });
         id
     };
@@ -470,7 +486,13 @@ fn confirm(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
         // Stopped meanwhile.
         return Ok(());
     };
-    share.confirmed = true;
+    for port in share
+        .ports
+        .iter_mut()
+        .filter(|p| reserved.contains(&p.port))
+    {
+        port.confirmed = true;
+    }
     if state.save_shares().is_ok() {
         state::changed(&mut state);
         return Ok(());
@@ -719,7 +741,6 @@ pub fn restore(saved: Vec<state::SavedShare>) {
             created_ms: share.created_ms,
             expires_ms: share.expires_ms,
             ports,
-            confirmed: true,
         });
     }
     state::changed(&mut state);
@@ -876,12 +897,37 @@ mod tests {
             created_ms: 0,
             expires_ms: Some(1),
             ports: vec![SharedPort::new(5173, "pcx:studio:port:5173".into(), addr, true)],
-            confirmed: true,
         });
         take_over(&mut state, &[8000], &Caller::user("You")).expect("nothing to take");
         assert!(state.shares[0].key.is_some(), "other ports are left alone");
         take_over(&mut state, &[5173], &Caller::user("You")).expect("taken");
         let share = &state.shares[0];
         assert!(share.key.is_none() && share.expires_ms.is_none() && share.durable());
+    }
+
+    #[test]
+    fn only_published_ports_of_the_users_shares_are_saved() {
+        let addr = |port| SocketAddr::from(([127, 0, 0, 1], port));
+        let pending = |port| SharedPort {
+            confirmed: false,
+            ..SharedPort::new(port, format!("pcx:studio:port:{port}"), addr(port), true)
+        };
+        let mut share = Share {
+            id: "s1".into(),
+            title: "Landing".into(),
+            path: "/".into(),
+            secure: false,
+            owner: Caller::user("You").owner(),
+            key: None,
+            created_ms: 0,
+            expires_ms: None,
+            ports: vec![pending(5173)],
+        };
+        assert!(!share.durable(), "a share still publishing is not saved");
+        share
+            .ports
+            .insert(0, SharedPort::new(5173, "pcx:studio:port:5173".into(), addr(5173), true));
+        share.ports[1] = pending(8000);
+        assert_eq!(share.saved().ports, [5173], "its companion joins once published");
     }
 }

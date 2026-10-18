@@ -309,6 +309,15 @@ fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
 /// release `panic = "unwind"` that just errors the call, but recovering keeps
 /// hosting fully operational. Prefer this over `.lock().expect(...)`
 /// everywhere.
+/// Loopback ports this process's Codex hosts listen on (the app-server, API
+/// proxy and meta service), read from their records without probing.
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts_locked()
+        .values()
+        .flat_map(|ls| [ls.app_local.port(), ls.api_local.port(), ls.meta_local.port()])
+        .collect()
+}
+
 fn hosts_locked() -> std::sync::MutexGuard<'static, HashMap<String, LocalServe>> {
     hosts().lock().unwrap_or_else(|poison| poison.into_inner())
 }

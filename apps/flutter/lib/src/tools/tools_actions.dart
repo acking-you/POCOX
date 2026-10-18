@@ -105,7 +105,7 @@ Future<void> openShareWith(
       await Future.wait([
         for (final other in shared?.share.ports ?? const <ToolsPort>[])
           if (other.key != share.service &&
-              overview.connectionTo(other.key) == null)
+              overview.connectionTo(other.key)?.owner.isAgent != false)
             companion(other),
       ]);
       if (failed.isNotEmpty) {
