@@ -346,6 +346,7 @@ pub fn share_on(
     ports: Vec<u16>,
     title: Option<String>,
     path: Option<String>,
+    secure: bool,
 ) -> Result<model::Shared> {
     if is_local(device) {
         let request = shares::ShareRequest {
@@ -353,6 +354,7 @@ pub fn share_on(
             title,
             path,
             wait_ready_seconds: Some(5),
+            secure,
         };
         let shared =
             runtime::runtime().block_on(shares::share(&shares::Caller::user("You"), request));
@@ -362,7 +364,8 @@ pub fn share_on(
             Err(error) => Err(anyhow::anyhow!(error.message())),
         };
     }
-    let body = serde_json::json!({ "ports": ports, "title": title, "path": path });
+    let body =
+        serde_json::json!({ "ports": ports, "title": title, "path": path, "secure": secure });
     crate::engine::management_client::request(
         &host_key(device),
         reqwest::Method::POST,

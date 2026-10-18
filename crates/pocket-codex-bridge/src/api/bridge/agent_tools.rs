@@ -85,6 +85,8 @@ pub struct ToolsShareDto {
     pub title: String,
     /// Path to open.
     pub path: String,
+    /// The page is served over TLS (opened with `https`).
+    pub secure: bool,
     /// Ports.
     pub ports: Vec<ToolsPortDto>,
     /// Who made it.
@@ -110,6 +112,7 @@ fn share(s: model::ShareView) -> ToolsShareDto {
         id: s.id,
         title: s.title,
         path: s.path,
+        secure: s.secure,
         ports: s
             .ports
             .into_iter()
@@ -379,6 +382,7 @@ pub fn tools_share(
         title,
         path,
         wait_ready_seconds: Some(5),
+        secure: false,
     };
     let caller = shares::Caller::user("You");
     match runtime::runtime().block_on(shares::share(&caller, request)) {
@@ -394,14 +398,16 @@ pub fn tools_share(
 }
 
 /// Share `ports` of `device` as the user: this computer, or another of the
-/// user's devices (Share and open on a `localhost` link).
+/// user's devices (Share and open on a `localhost` link; `secure` for an
+/// `https://localhost` one).
 pub fn tools_share_on(
     device: String,
     ports: Vec<u16>,
     title: Option<String>,
     path: Option<String>,
+    secure: bool,
 ) -> Result<ToolsSharedDto> {
-    let shared = tools::share_on(&device, ports, title, path)?;
+    let shared = tools::share_on(&device, ports, title, path, secure)?;
     Ok(ToolsSharedDto {
         share: share(shared.share),
         on_this_machine: shared.on_this_machine,

@@ -856,6 +856,7 @@ abstract class RustLibApi extends BaseApi {
     required List<int> ports,
     String? title,
     String? path,
+    required bool secure,
   });
 
   AgentToolsStatusDto crateApiBridgeAgentToolsToolsStatus();
@@ -6584,6 +6585,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     required List<int> ports,
     String? title,
     String? path,
+    required bool secure,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -6593,6 +6595,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_list_prim_u_16_loose(ports, serializer);
           sse_encode_opt_String(title, serializer);
           sse_encode_opt_String(path, serializer);
+          sse_encode_bool(secure, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -6605,7 +6608,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiBridgeAgentToolsToolsShareOnConstMeta,
-        argValues: [device, ports, title, path],
+        argValues: [device, ports, title, path, secure],
         apiImpl: this,
       ),
     );
@@ -6614,7 +6617,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgeAgentToolsToolsShareOnConstMeta =>
       const TaskConstMeta(
         debugName: "tools_share_on",
-        argNames: ["device", "ports", "title", "path"],
+        argNames: ["device", "ports", "title", "path", "secure"],
       );
 
   @override
@@ -8594,16 +8597,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsShareDto dco_decode_tools_share_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return ToolsShareDto(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
       path: dco_decode_String(arr[2]),
-      ports: dco_decode_list_tools_port_dto(arr[3]),
-      owner: dco_decode_tools_owner_dto(arr[4]),
-      createdMs: dco_decode_i_64(arr[5]),
-      expiresMs: dco_decode_opt_box_autoadd_i_64(arr[6]),
+      secure: dco_decode_bool(arr[3]),
+      ports: dco_decode_list_tools_port_dto(arr[4]),
+      owner: dco_decode_tools_owner_dto(arr[5]),
+      createdMs: dco_decode_i_64(arr[6]),
+      expiresMs: dco_decode_opt_box_autoadd_i_64(arr[7]),
     );
   }
 
@@ -11266,6 +11270,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_id = sse_decode_String(deserializer);
     var var_title = sse_decode_String(deserializer);
     var var_path = sse_decode_String(deserializer);
+    var var_secure = sse_decode_bool(deserializer);
     var var_ports = sse_decode_list_tools_port_dto(deserializer);
     var var_owner = sse_decode_tools_owner_dto(deserializer);
     var var_createdMs = sse_decode_i_64(deserializer);
@@ -11274,6 +11279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       id: var_id,
       title: var_title,
       path: var_path,
+      secure: var_secure,
       ports: var_ports,
       owner: var_owner,
       createdMs: var_createdMs,
@@ -13450,6 +13456,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.id, serializer);
     sse_encode_String(self.title, serializer);
     sse_encode_String(self.path, serializer);
+    sse_encode_bool(self.secure, serializer);
     sse_encode_list_tools_port_dto(self.ports, serializer);
     sse_encode_tools_owner_dto(self.owner, serializer);
     sse_encode_i_64(self.createdMs, serializer);

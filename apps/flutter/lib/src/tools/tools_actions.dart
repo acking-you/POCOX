@@ -78,7 +78,9 @@ Future<void> openShareWith(
     } else {
       final connected = read(shareConnectionsProvider);
       var connection = overview.connectionTo(share.service);
-      if (connection == null) {
+      // An agent's connection ends with the agent: the user's own open takes
+      // it over, so the page's tunnel lasts while it is open.
+      if (connection == null || connection.owner.isAgent) {
         connection = await api.toolsConnect(share.service);
         connected[share.service] = share.device;
       }

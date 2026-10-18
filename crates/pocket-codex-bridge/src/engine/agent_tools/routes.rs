@@ -91,6 +91,9 @@ pub struct ShareBody {
     /// Path to open.
     #[serde(default)]
     pub path: Option<String>,
+    /// The page is served over TLS.
+    #[serde(default)]
+    pub secure: bool,
 }
 
 /// The catalog's events; `permit` is held for the stream's lifetime.
@@ -194,6 +197,7 @@ pub fn router(admitted: Admitted) -> Router {
                     title: body.title,
                     path: body.path,
                     wait_ready_seconds: Some(5),
+                    secure: body.secure,
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),

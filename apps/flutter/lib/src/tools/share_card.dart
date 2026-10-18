@@ -21,6 +21,7 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
   path: share.path,
   title: share.title,
   ports: [for (final port in share.ports) port.port],
+  secure: share.secure,
 );
 
 /// What a share is right now, as far as this device can tell.

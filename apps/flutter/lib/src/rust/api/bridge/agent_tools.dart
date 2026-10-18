@@ -76,17 +76,20 @@ Future<ToolsSharedDto> toolsShare({
 );
 
 /// Share `ports` of `device` as the user: this computer, or another of the
-/// user's devices (Share and open on a `localhost` link).
+/// user's devices (Share and open on a `localhost` link; `secure` for an
+/// `https://localhost` one).
 Future<ToolsSharedDto> toolsShareOn({
   required String device,
   required List<int> ports,
   String? title,
   String? path,
+  required bool secure,
 }) => RustLib.instance.api.crateApiBridgeAgentToolsToolsShareOn(
   device: device,
   ports: ports,
   title: title,
   path: path,
+  secure: secure,
 );
 
 /// Make another device's shared port or API reachable on this device, at
@@ -548,6 +551,9 @@ class ToolsShareDto {
   /// Path to open.
   final String path;
 
+  /// The page is served over TLS (opened with `https`).
+  final bool secure;
+
   /// Ports.
   final List<ToolsPortDto> ports;
 
@@ -564,6 +570,7 @@ class ToolsShareDto {
     required this.id,
     required this.title,
     required this.path,
+    required this.secure,
     required this.ports,
     required this.owner,
     required this.createdMs,
@@ -575,6 +582,7 @@ class ToolsShareDto {
       id.hashCode ^
       title.hashCode ^
       path.hashCode ^
+      secure.hashCode ^
       ports.hashCode ^
       owner.hashCode ^
       createdMs.hashCode ^
@@ -588,6 +596,7 @@ class ToolsShareDto {
           id == other.id &&
           title == other.title &&
           path == other.path &&
+          secure == other.secure &&
           ports == other.ports &&
           owner == other.owner &&
           createdMs == other.createdMs &&

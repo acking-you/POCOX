@@ -758,6 +758,7 @@ abstract interface class BridgeApi {
     List<int> ports, {
     String? title,
     String? path,
+    bool secure = false,
   });
 
   /// Make [service] of another device reachable here, at its own port number

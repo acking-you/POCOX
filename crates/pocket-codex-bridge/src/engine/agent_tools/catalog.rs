@@ -268,12 +268,21 @@ pub fn assemble(
     for device in catalogs.keys() {
         by_device.entry(device.clone()).or_default();
     }
+    // This device is always there, even when it only connects (a phone):
+    // the galaxy's home star and its connections hang on it.
+    if !this_device.is_empty() {
+        by_device.entry(this_device.clone()).or_default();
+    }
     let mut devices: Vec<DeviceView> = by_device
         .iter()
         .map(|(device, ids)| {
             let mut view = device_view(device, ids, catalogs.get(device));
-            // This device is online whenever it answers for itself.
-            view.online |= *device == this_device && view.catalog;
+            if *device == this_device {
+                // It answers for itself.
+                view.online = true;
+                view.platform
+                    .get_or_insert_with(|| std::env::consts::OS.into());
+            }
             view
         })
         .collect();
@@ -339,6 +348,7 @@ mod tests {
             id: "s1".into(),
             title: "Landing".into(),
             path: "/".into(),
+            secure: false,
             ports: vec![
                 PortView {
                     port: 5173,
@@ -390,5 +400,8 @@ mod tests {
         let bare =
             device_view("devbox", &[ServiceId::new("devbox", ServiceKind::Port, "3000")], None);
         assert_eq!((bare.catalog, bare.services[0].port), (false, Some(3000)));
+        // A phone lists nothing of its own, yet is its overview's home.
+        let phone = assemble("phone".into(), &listed, &BTreeMap::new());
+        assert_eq!((phone.devices[0].name.as_str(), phone.devices[0].online), ("phone", true));
     }
 }

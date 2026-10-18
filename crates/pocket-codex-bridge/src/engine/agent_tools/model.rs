@@ -121,6 +121,9 @@ pub struct ShareView {
     pub title: String,
     /// Path to open on the first port.
     pub path: String,
+    /// The page is served over TLS (opened with `https`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub secure: bool,
     /// Each port and its relay service.
     pub ports: Vec<PortView>,
     /// Who made it.
@@ -344,9 +347,20 @@ pub struct Shared {
     pub ends: String,
 }
 
-/// The `pocox://open` link for a service and path.
-pub fn open_link(service: &str, path: &str) -> String {
-    format!("pocox://open?service={}&path={}", encode(service), encode(path))
+/// The `pocox://open` link for a service and path (`scheme=https` when the
+/// page is served over TLS).
+pub fn open_link(service: &str, path: &str, secure: bool) -> String {
+    let scheme = if secure { "&scheme=https" } else { "" };
+    format!("pocox://open?service={}&path={}{scheme}", encode(service), encode(path))
+}
+
+/// `http` or `https`.
+pub fn scheme(secure: bool) -> &'static str {
+    if secure {
+        "https"
+    } else {
+        "http"
+    }
 }
 
 fn encode(text: &str) -> String {
@@ -386,9 +400,10 @@ mod tests {
         assert_eq!(clean_path(Some("//evil.example")), "/");
         assert_eq!(clean_path(Some("docs?q=1")), "/docs?q=1");
         assert_eq!(
-            open_link("pcx:studio:port:5173", "/a b"),
+            open_link("pcx:studio:port:5173", "/a b", false),
             "pocox://open?service=pcx:studio:port:5173&path=/a%20b"
         );
+        assert!(open_link("pcx:studio:port:8443", "/", true).ends_with("&scheme=https"));
         assert_eq!(bounded(&format!(" {}\u{7} ", "x".repeat(200))).len(), MAX_LABEL);
     }
 }
