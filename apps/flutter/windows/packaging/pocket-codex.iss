@@ -23,7 +23,7 @@
 #define MyAppName "POCOX"
 #define MyAppExe "pocket_codex.exe"
 #define MyAppPublisher "POCOX Contributors"
-#define MyAppURL "https://github.com/acking-you/pocket-codex"
+#define MyAppURL "https://github.com/acking-you/POCOX"
 
 [Setup]
 ; A stable, unique AppId so upgrades replace the previous install in place.

@@ -8,7 +8,7 @@
   that dir to your user PATH.
 
   One-liner:
-    irm https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.ps1 | iex
+    irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 | iex
 
   Environment overrides:
     POCKET_CODEX_VERSION        pin a release tag (e.g. v0.1.3); default: latest
@@ -21,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 # (No-op / already default on PowerShell 7+.)
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
-$Repo = 'acking-you/pocket-codex'
+$Repo = 'acking-you/POCOX'
 $Bin = 'pocket-codex'
 
 function Info($m) { Write-Host "==> $m" -ForegroundColor Cyan }

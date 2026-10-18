@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <em>Carry your Codex in your pocket. Drive it natively from any device.</em>
+  <em>Every device, in your pocket.</em>
 </p>
 
 <p align="center">
@@ -32,10 +32,35 @@
 
 ## What is this?
 
-POCOX (**PO**cket **CO**de**X**) is an experiment in turning the upstream
+POCOX (**PO**cket **CO**de**X**) puts every device you own in your pocket.
+Each computer keeps doing what it already does, running coding agents such as
+Codex, Claude Code and OpenCode and holding your logins and subscriptions, and
+POCOX makes all of it reachable from your phone, a tablet or any other machine.
+
+What works today:
+
+- **Agents on any desktop.** macOS, Windows and Linux host Codex through its
+  [`app-server`](https://github.com/openai/codex) protocol, OpenCode natively,
+  and Claude Code or any other agent through ACP, several side by side.
+- **Reach from anywhere.** Native apps for iOS, Android and desktop, and a CLI,
+  follow and steer every turn, answer approvals, browse history and review
+  changes on every host of every device you own.
+- **Share a subscription, not only a session.** A computer's Codex login can be
+  published as an OpenAI-compatible Responses API (HTTP and WebSocket), so
+  devices and tools without Codex use the same model.
+- **Manage your other computers.** Add, configure, restart and stop another
+  desktop's services from your phone or the CLI.
+
+Where it is going: a built-in tool that lets an agent on one device work with
+your other devices, so a single conversation reaches everything in your pocket.
+It is planned, not available yet.
+
+### How it works
+
+POCOX turns the upstream
 [`codex app-server`](https://github.com/openai/codex) protocol into a
-portable, multi-device experience, and additionally exposing the host's
-Codex login as a relay-reachable Responses API endpoint for any device:
+portable, multi-device experience, and exposes a host's Codex login as a
+relay-reachable Responses API endpoint for any device:
 
 - A pure-Rust CLI manages a local `codex app-server` process on the
   machine where Codex is installed.
@@ -64,9 +89,9 @@ Codex login as a relay-reachable Responses API endpoint for any device:
 The name is new; the command, crates, packages and app identifiers keep their
 `pocket-codex` names, so existing installs, scripts and settings carry over.
 
-In short: **one machine stays logged in to Codex; every other device —
-the Flutter UI, a remote `codex` CLI, or any OpenAI-compatible tool —
-reaches it through the relay**, either with a shared relay key (self-host)
+In short: **each computer keeps its agents and logins; every other device —
+the POCOX apps, a remote `codex` CLI, or any OpenAI-compatible tool —
+reaches them through the relay**, either with a shared relay key (self-host)
 or a per-account GitHub login (hosted).
 
 ## Status
@@ -170,12 +195,12 @@ on macOS/Windows) and drops it on your `PATH`.
 
 ```bash
 # Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.sh | sh
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 | iex
 ```
 
 Overrides (env vars): `POCKET_CODEX_VERSION` pins a tag (e.g. `v0.1.3`),
@@ -186,8 +211,8 @@ skips the PATH step. Prefer a package or a from-source build? See below.
 
 ```bash
 # Clone with submodules (deps/codex).
-git clone --recurse-submodules git@github.com:acking-you/pocket-codex.git
-cd pocket-codex
+git clone --recurse-submodules git@github.com:acking-you/POCOX.git
+cd POCOX
 
 # If you cloned without --recurse-submodules:
 git submodule update --init --recursive

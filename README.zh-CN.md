@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <em>把你的 Codex 装进口袋，在任意设备上原生驱动它。</em>
+  <em>把你的每一台设备，都装进口袋。</em>
 </p>
 
 <p align="center">
@@ -30,10 +30,30 @@
 
 ## 这是什么？
 
-POCOX（取自 **PO**cket **CO**de**X**）是一个实验：把上游
-[`codex app-server`](https://github.com/openai/codex) 协议变成一种可移植、
-多设备的体验；同时把宿主机的 Codex 登录态，暴露成一个经由中转（relay）可达、
-任意设备都能访问的 Responses API 端点：
+POCOX（取自 **PO**cket **CO**de**X**）把你拥有的每一台设备都装进口袋。
+每台电脑照常做它本来就在做的事：运行 Codex、Claude Code、OpenCode 这样的编程
+智能体，保存你的登录与订阅；POCOX 让这一切都能从手机、平板或任何另一台机器上
+触及。
+
+现在已经能做到：
+
+- **任意桌面都能托管智能体。** macOS、Windows 与 Linux 可以托管 Codex（通过它的
+  [`app-server`](https://github.com/openai/codex) 协议）、原生 OpenCode，以及经
+  ACP 接入的 Claude Code 或其它智能体，多个可以同时运行。
+- **随处触及。** iOS、Android 与桌面的原生 App 以及 CLI，可以跟进并引导每一轮对话、
+  处理审批、浏览历史、查看改动，覆盖你所有设备上的每一个托管。
+- **共享的是订阅，不只是会话。** 一台电脑的 Codex 登录可以发布成 OpenAI 兼容的
+  Responses API（HTTP 与 WebSocket），没有安装 Codex 的设备和工具也能用同一个模型。
+- **管理你的其它电脑。** 在手机或 CLI 上为另一台桌面添加、配置、重启和停止服务。
+
+接下来的方向：一个内建工具，让一台设备上的智能体能够操作你的其它设备，一次对话
+就能触及口袋里的一切。目前仍在规划中，尚未提供。
+
+### 工作原理
+
+POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变成一种
+可移植、多设备的体验；同时把宿主机的 Codex 登录态，暴露成一个经由中转（relay）
+可达、任意设备都能访问的 Responses API 端点：
 
 - 一个纯 Rust 的 CLI，在装有 Codex 的机器上管理本地的
   `codex app-server` 进程。
@@ -55,8 +75,8 @@ POCOX（取自 **PO**cket **CO**de**X**）是一个实验：把上游
 
 改名只换了名字：命令、crate、包名与应用标识仍是 `pocket-codex`，已有安装、脚本和设置照常沿用。
 
-一句话：**一台机器保持登录 Codex；其它每台设备——Flutter 界面、远端的 `codex`
-CLI，或任意 OpenAI 兼容工具——都通过中转访问它**，要么用共享的中转密钥
+一句话：**每台电脑保留自己的智能体与登录；其它每台设备——POCOX App、远端的
+`codex` CLI，或任意 OpenAI 兼容工具——都通过中转访问它们**，要么用共享的中转密钥
 （自建），要么用按账号的 GitHub 登录（托管）。
 
 ## 状态
@@ -138,12 +158,12 @@ pocket-codex/
 
 ```bash
 # Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.sh | sh
 ```
 
 ```powershell
 # Windows（PowerShell）
-irm https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 | iex
 ```
 
 可用环境变量覆盖：`POCKET_CODEX_VERSION` 固定某个 tag（如 `v0.1.3`）、
@@ -154,8 +174,8 @@ PATH 处理。想用包管理器或从源码构建？见下文。
 
 ```bash
 # 连同所有子模块一起 clone（deps/codex、pb-mapper、kanal、uni-stream）。
-git clone --recurse-submodules git@github.com:acking-you/pocket-codex.git
-cd pocket-codex
+git clone --recurse-submodules git@github.com:acking-you/POCOX.git
+cd POCOX
 
 # 如果你没带 --recurse-submodules：
 git submodule update --init --recursive

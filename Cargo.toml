@@ -34,8 +34,8 @@ edition = "2021"
 rust-version = "1.95"
 authors = ["POCOX Contributors"]
 license = "Apache-2.0"
-repository = "https://github.com/acking-you/pocket-codex"
-homepage = "https://github.com/acking-you/pocket-codex"
+repository = "https://github.com/acking-you/POCOX"
+homepage = "https://github.com/acking-you/POCOX"
 readme = "README.md"
 
 # Workspace-wide dependency version pins. Individual crates should pull

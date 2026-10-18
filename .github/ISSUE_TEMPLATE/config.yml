@@ -1,10 +1,10 @@
 blank_issues_enabled: false
 contact_links:
   - name: Contributor & agent guide (AGENTS.md)
-    url: https://github.com/acking-you/pocket-codex/blob/main/AGENTS.md
+    url: https://github.com/acking-you/POCOX/blob/main/AGENTS.md
     about: Engineering principles, crate boundaries, verification commands and roadmap. Read this before opening a non-trivial issue or PR.
   - name: Contribution guide (CONTRIBUTING.md)
-    url: https://github.com/acking-you/pocket-codex/blob/main/CONTRIBUTING.md
+    url: https://github.com/acking-you/POCOX/blob/main/CONTRIBUTING.md
     about: Toolchain setup, branching / commit conventions and the verification commands CI runs.
   - name: Upstream codex
     url: https://github.com/openai/codex

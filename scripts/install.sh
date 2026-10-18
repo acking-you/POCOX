@@ -2,7 +2,7 @@
 # POCOX CLI installer for Linux and macOS.
 #
 # One-liner:
-#   curl -fsSL https://raw.githubusercontent.com/acking-you/pocket-codex/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.sh | sh
 #
 # Downloads the `pocket-codex` binary from the latest GitHub release, matching
 # your OS + CPU, installs it to a bin dir, and makes sure that dir is on your
@@ -18,7 +18,7 @@
 # POSIX sh; no bashisms. Depends only on: curl or wget, tar, uname, mkdir, mv.
 set -eu
 
-REPO="acking-you/pocket-codex"
+REPO="acking-you/POCOX"
 BIN="pocket-codex"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1"; }

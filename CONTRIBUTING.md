@@ -39,8 +39,8 @@ project (intent, crate boundaries, engineering principles) lives in
 
 ```bash
 # Clone with submodules (deps/codex, deps/pb-mapper, deps/kanal, deps/uni-stream).
-git clone --recurse-submodules git@github.com:acking-you/pocket-codex.git
-cd pocket-codex
+git clone --recurse-submodules git@github.com:acking-you/POCOX.git
+cd POCOX
 
 # If you cloned without --recurse-submodules:
 git submodule update --init --recursive

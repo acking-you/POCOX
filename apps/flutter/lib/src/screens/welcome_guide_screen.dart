@@ -225,7 +225,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
             key: const Key('welcome-download-btn'),
             onPressed: () => openUrl(
               context,
-              'https://github.com/acking-you/pocket-codex/releases/latest',
+              'https://github.com/acking-you/POCOX/releases/latest',
             ),
             icon: const Icon(AppIcons.download_outlined, size: 18),
             label: Text(l10n.welcomeDownloadDesktop),

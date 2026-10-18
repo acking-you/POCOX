@@ -6,7 +6,9 @@
 
 ## 1. Project intent
 
-POCOX (from **PO**cket **CO**de**X**) turns the upstream
+POCOX (from **PO**cket **CO**de**X**) aims to put every device a user owns
+in their pocket: the agents, services and subscriptions on each computer,
+reachable from any other device. Concretely, it turns the upstream
 [`codex app-server`](https://github.com/openai/codex) protocol into a
 portable, multi-device experience, and additionally exposes the host's
 Codex login as a relay-reachable Responses API endpoint for any device:
@@ -1258,12 +1260,19 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     bundle and application IDs, `PRODUCT_NAME`, the Windows `ProductName` (it
     names the `%APPDATA%` folder), config and state directories,
     `POCKET_CODEX_*` variables, the `~/PocketCodex` default project folder,
-    `pcx:` keys, release artifact names, the repository URL and the provider
-    names written into Codex configuration (effective-route checks compare
-    them; the API snippet users paste keeps its name too). The Windows
-    installer keeps its AppId and removes shortcuts made under the old
-    name. The README poster is regenerated from the app's own
+    `pcx:` keys, release artifact names and the provider names written into
+    Codex configuration (effective-route checks compare them; the API snippet
+    users paste keeps its name too). The repository is `acking-you/POCOX`
+    (renamed from `pocket-codex`, whose URLs GitHub redirects); links in the
+    tree use the new name. The Windows installer keeps its AppId and removes
+    shortcuts made under the old name. The README leads with the aim, every
+    device in your pocket, and its poster is regenerated from the app's own
     screens (`test/gen_poster_test.dart`).
+
+39. **Cross-device agent tool (planned, not started).** A built-in tool that
+    lets an agent on one device work with the user's other devices and their
+    services, so one conversation reaches everything in the pocket. Until it
+    ships, describe it only as planned.
 
 ### UI and history maintenance (2026-09-13)
 

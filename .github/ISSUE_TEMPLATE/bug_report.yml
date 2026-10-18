@@ -23,9 +23,9 @@ body:
     attributes:
       label: Pre-flight checks
       options:
-        - label: I searched [open and closed issues](https://github.com/acking-you/pocket-codex/issues?q=is%3Aissue) and didn't find a duplicate.
+        - label: I searched [open and closed issues](https://github.com/acking-you/POCOX/issues?q=is%3Aissue) and didn't find a duplicate.
           required: true
-        - label: I read the relevant section of [`AGENTS.md`](https://github.com/acking-you/pocket-codex/blob/main/AGENTS.md) / [`README.md`](https://github.com/acking-you/pocket-codex/blob/main/README.md) and the bug isn't documented as known / expected.
+        - label: I read the relevant section of [`AGENTS.md`](https://github.com/acking-you/POCOX/blob/main/AGENTS.md) / [`README.md`](https://github.com/acking-you/POCOX/blob/main/README.md) and the bug isn't documented as known / expected.
           required: true
 
   - type: textarea

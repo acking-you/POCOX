@@ -1,6 +1,6 @@
 [Unit]
 Description=POCOX hosted backend (account API + relay credential vending)
-Documentation=https://github.com/acking-you/pocket-codex
+Documentation=https://github.com/acking-you/POCOX
 # The backend mints credentials against the relay, so start after it when the
 # relay is on this host.
 After=network-online.target pb-mapper-server.service

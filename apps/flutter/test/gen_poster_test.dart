@@ -1,7 +1,8 @@
-// Derives the README poster from the app itself: the chat screen rendered on
-// a desktop and on a phone with the bundled fonts, the light theme and fixture
-// data (no real session), set beside the mark and the POCOX wordmark, whose
-// letters are spelled out of "POcket COdeX".
+// Derives the README poster from the app itself: a desktop on Codex with the
+// switcher over every device's agents open, and a phone on Claude answering a
+// permission request, rendered with the bundled fonts, the light theme and
+// fixture data (no real session), beside the mark, the POCOX wordmark (spelled
+// out of "POcket COdeX") and the services within reach.
 //
 // Opt-in like gen_icon_test (PNG output differs across platforms):
 //   REGEN_ICONS=1 fvm flutter test test/gen_poster_test.dart
@@ -16,19 +17,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as img;
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/screens/app_session/agent_permission_card.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
 import 'package:pocket_codex/src/theme.dart';
-import 'package:image/image.dart' as img;
+import 'package:pocket_codex/src/widgets/agent_icon.dart';
 
 import 'fake_bridge_api.dart';
 import 'gen_icon_test.dart' show renderMark;
+import 'support/acp_capabilities.dart';
 import 'support/ui_preview.dart';
 
 const _codex = 'pcx:studio:app:default';
-const _cwd = '/Users/me/work/pocox';
+const _claude = 'pcx:studio:acp:claude';
+const _openCode = 'pcx:devbox:opencode:opencode';
+const _windows = 'pcx:gaming-pc:app:default';
+const _cwd = '/Users/me/work/atlas';
 
 /// The poster's size, in pixels.
 const _poster = Size(1536, 1024);
@@ -58,21 +65,9 @@ ThreadMeta _thread(String id, String name, Duration ago, {String? cwd}) =>
       updatedAt: _ago(ago),
     );
 
-LocalSession _running(String id, String name) => LocalSession(
-  threadId: id,
-  cwd: _cwd,
-  preview: name,
-  name: name,
-  status: 'active',
-  updatedAt: _ago(Duration.zero),
-  turnState: 'incomplete',
-  heldOpen: true,
-  safety: 'ownedRunning',
-  allowsResume: true,
-  requiresTakeover: false,
-);
-
-Future<FakeBridgeApi> _api(ThreadHistory history) async {
+/// One account's devices: a Mac hosting Codex and Claude, a Linux box hosting
+/// OpenCode and a Windows PC hosting Codex.
+Future<FakeBridgeApi> _api(String connect, ThreadHistory history) async {
   final api =
       FakeBridgeApi(
           config: const ConfigInfo(
@@ -86,61 +81,145 @@ Future<FakeBridgeApi> _api(ThreadHistory history) async {
               name: 'default',
               key: _codex,
             ),
+            ServiceEntry(
+              device: 'studio',
+              kind: 'acp',
+              name: 'claude',
+              key: _claude,
+            ),
+            ServiceEntry(
+              device: 'devbox',
+              kind: 'opencode',
+              name: 'opencode',
+              key: _openCode,
+            ),
+            ServiceEntry(
+              device: 'gaming-pc',
+              kind: 'app',
+              name: 'default',
+              key: _windows,
+            ),
+          ],
+        )
+        ..acpCapabilities[_claude] = negotiatedAcpCapabilities(
+          providerName: 'Claude',
+          profileId: 'claude',
+          steer: true,
+        )
+        ..acpCapabilities[_openCode] = negotiatedOpenCodeCapabilities()
+        // Signed in to Codex on this Mac.
+        ..codexStatus = const CodexSetupStatus(
+          codexHome: '/Users/me/.codex',
+          hasConfig: true,
+          hasAuth: true,
+          hasCustomProvider: false,
+          authMode: 'chatgpt',
+          needsSetup: false,
+          promptVariant: 'default',
+        )
+        // This Mac's own hosts, so the switcher knows their agents.
+        ..serveHosts.addAll(const [
+          AppServeStatus(
+            name: 'default',
+            device: 'studio',
+            alive: true,
+            appServiceKey: _codex,
+            appRegistered: true,
+          ),
+          AppServeStatus(
+            name: 'claude',
+            device: 'studio',
+            alive: true,
+            appServiceKey: _claude,
+            appRegistered: true,
+            provider: 'acp',
+            providerName: 'Claude',
+            profileId: 'claude',
+          ),
+        ])
+        ..modelLists[_codex] = const [
+          ModelInfo(
+            id: 'gpt-6-astra',
+            displayName: 'GPT-6-Astra',
+            description: '',
+            supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
+            defaultReasoningEffort: 'medium',
+          ),
+        ]
+        ..sessionSettings['$_claude|ses-1'] = const SessionSettings(
+          configOptions: [
+            SessionConfigOption(
+              id: 'model',
+              name: 'Model',
+              category: 'model',
+              currentValue: 'opus',
+              values: [
+                SessionConfigValue(value: 'opus', name: 'Opus 5.5'),
+                SessionConfigValue(value: 'sonnet', name: 'Sonnet 5.5'),
+              ],
+            ),
           ],
         )
         ..appThreads.addAll([
           _thread(
             't1',
-            'Follow the app-server for session state',
-            const Duration(minutes: 3),
+            'Speed up the Windows build',
+            const Duration(minutes: 4),
           ),
           _thread(
             't2',
-            'Fix the flaky port test in core',
+            'Profile the import pipeline',
             const Duration(minutes: 1),
           ),
           _thread(
             't3',
-            'Sweep phone layouts at 320 px',
-            const Duration(hours: 2),
+            'Tidy the settings page on phones',
+            const Duration(hours: 3),
           ),
           _thread(
             't4',
-            'Draft the 0.3.1 release notes',
-            const Duration(hours: 5),
-            cwd: '/Users/me/work/pocox-site',
+            'Draft the release notes',
+            const Duration(hours: 6),
+            cwd: '/Users/me/work/atlas-site',
           ),
           _thread(
-            't5',
-            'Review relay recovery logs',
-            const Duration(days: 1),
-            cwd: '/Users/me/work/relay',
-          ),
-          _thread(
-            't6',
-            'Explain the pb-mapper handshake',
-            const Duration(days: 2),
-            cwd: '/Users/me/work/relay',
+            'ses-1',
+            'Why is the nightly build red?',
+            const Duration(seconds: 30),
           ),
         ])
-        ..localSessions = [_running('t2', 'Fix the flaky port test in core')]
+        ..localSessions = [
+          LocalSession(
+            threadId: 't2',
+            cwd: _cwd,
+            preview: 'Profile the import pipeline',
+            name: 'Profile the import pipeline',
+            status: 'active',
+            updatedAt: _ago(Duration.zero),
+            turnState: 'incomplete',
+            heldOpen: true,
+            safety: 'ownedRunning',
+            allowsResume: true,
+            requiresTakeover: false,
+          ),
+        ]
         ..readResult = history;
-  await api.appConnect(_codex, 1);
+  await api.appConnect(connect, 1);
   return api;
 }
 
 const _desktopHistory = ThreadHistory(
   running: false,
-  branch: 'codex-sync',
+  branch: 'ci-cache',
   cwd: _cwd,
-  model: 'gpt-5.5',
+  model: 'gpt-6-astra',
   reasoningEffort: 'high',
   items: [
     ThreadItem(
       id: 'u0',
       itemType: 'userMessage',
       title: '',
-      text: 'Why does Local sessions miss my older conversations?',
+      text: 'Why is the Windows build so much slower than macOS?',
       turnId: 'turn0',
     ),
     ThreadItem(
@@ -148,50 +227,37 @@ const _desktopHistory = ThreadHistory(
       itemType: 'agentMessage',
       title: '',
       text:
-          'Codex compresses rollouts idle for a week to `.jsonl.zst`, and '
-          'the scanner only read `.jsonl`: here that hid 770 of 1059 '
-          'sessions. Every reader now accepts both.',
+          'Its runner rebuilds `zstd-sys` and `ring` from scratch on every '
+          'push; macOS restores them from cache.',
       turnId: 'turn0',
-      turnDurationMs: 48000,
+      turnDurationMs: 41000,
     ),
     ThreadItem(
       id: 'u1',
       itemType: 'userMessage',
       title: '',
-      text:
-          'Take running state from the app-server itself, and keep the '
-          'rollout probes only for writers it cannot see.',
+      text: 'Cache them per toolchain and check the timings.',
       turnId: 'turn1',
     ),
     ThreadItem(
       id: 'c1',
       itemType: 'commandExecution',
-      title: 'rg -n "running_only" crates',
-      text: 'crates/pocket-codex-host-svc/src/codex_routes.rs:22',
+      title: 'gh run list --workflow ci.yml --limit 5',
+      text: 'completed  success  windows  5m02s',
       turnId: 'turn1',
-      turnDurationMs: 134000,
-    ),
-    ThreadItem(
-      id: 'c2',
-      itemType: 'commandExecution',
-      title: 'cargo test --workspace --locked',
-      text: 'test result: ok. 847 passed; 0 failed',
-      turnId: 'turn1',
-      turnDurationMs: 134000,
+      turnDurationMs: 128000,
     ),
     ThreadItem(
       id: 'a1',
       itemType: 'agentMessage',
       title: '',
       text:
-          'Done. Session state now comes from the app-server:\n\n'
-          '- `thread/list` names every session, compressed ones included\n'
-          '- `Thread.status` marks what this host runs, so opening one joins '
-          'it instead of taking it over\n'
-          '- `lsof` stays only for writers in other processes\n\n'
-          'All 847 Rust tests pass.',
+          'Done:\n\n'
+          '- `target/` is cached per toolchain and lockfile\n'
+          '- the Windows job takes **5 min** instead of 14\n'
+          '- cold runs still rebuild everything, as before',
       turnId: 'turn1',
-      turnDurationMs: 134000,
+      turnDurationMs: 128000,
     ),
   ],
 );
@@ -199,15 +265,13 @@ const _desktopHistory = ThreadHistory(
 const _phoneHistory = ThreadHistory(
   running: true,
   activeTurnId: 'turn2',
-  branch: 'main',
   cwd: _cwd,
-  model: 'gpt-5.5',
   items: [
     ThreadItem(
       id: 'u2',
       itemType: 'userMessage',
       title: '',
-      text: 'Run the core tests again and fix the flaky one.',
+      text: 'Find out why the nightly build is red, and fix it.',
       turnId: 'turn2',
     ),
     ThreadItem(
@@ -215,8 +279,8 @@ const _phoneHistory = ThreadHistory(
       itemType: 'agentMessage',
       title: '',
       text:
-          'The port test frees its port before checking it, so a parallel '
-          'test can take it. I will rerun it alone first.',
+          'The arm64 job links with the host `ar`. Pointing it at the cross '
+          "toolchain's archiver fixes the link; I'd like to edit the workflow.",
       turnId: 'turn2',
     ),
   ],
@@ -229,13 +293,13 @@ Future<void> _frames(WidgetTester t, [int count = 10]) async {
   }
 }
 
-/// [screen] rendered on [platform] at [size] (logical pixels).
+/// [child] rendered on [platform] at [size] (logical pixels).
 Future<ui.Image> _shot(
   WidgetTester t, {
   required TargetPlatform platform,
   required Size size,
-  required FakeBridgeApi api,
-  required Widget screen,
+  required Widget child,
+  FakeBridgeApi? api,
   EdgeInsets safeArea = EdgeInsets.zero,
   Future<void> Function()? then,
 }) async {
@@ -250,16 +314,18 @@ Future<ui.Image> _shot(
     await t.pumpWidget(const SizedBox());
     await t.pumpWidget(
       ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(api)],
+        overrides: [
+          bridgeApiProvider.overrideWithValue(api ?? FakeBridgeApi()),
+        ],
         child: MaterialApp(
           debugShowCheckedModeBanner: false,
           locale: const Locale('en'),
           theme: lightTheme(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          builder: (context, child) =>
-              RepaintBoundary(key: previewKey, child: child!),
-          home: screen,
+          builder: (context, navigator) =>
+              RepaintBoundary(key: previewKey, child: navigator!),
+          home: child,
         ),
       ),
     );
@@ -278,6 +344,54 @@ Future<ui.Image> _shot(
     debugDefaultTargetPlatformOverride = null;
     t.view.reset();
   }
+}
+
+/// The agents and services a pocket reaches, as chips with their real marks.
+Widget _services() {
+  Widget chip(Widget mark, String label) => Container(
+    height: 34,
+    padding: const EdgeInsets.symmetric(horizontal: 11),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(17),
+      border: Border.all(color: _hairline),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        mark,
+        const SizedBox(width: 7),
+        Text(
+          label,
+          style: const TextStyle(
+            fontFamily: 'GoogleSansFlex',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: _ink,
+          ),
+        ),
+      ],
+    ),
+  );
+  return Material(
+    type: MaterialType.transparency,
+    child: Align(
+      alignment: Alignment.topLeft,
+      child: Wrap(
+        spacing: 7,
+        runSpacing: 7,
+        children: [
+          chip(const AgentIcon(kind: AgentKind.codex, size: 15), 'Codex'),
+          chip(const AgentIcon(kind: AgentKind.claude, size: 15), 'Claude'),
+          chip(const AgentIcon(kind: AgentKind.opencode, size: 15), 'OpenCode'),
+          chip(
+            const Icon(Icons.api_rounded, size: 15, color: _signal),
+            'Responses API',
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 ui.Paragraph _text(
@@ -324,13 +438,13 @@ void _shadow(Canvas canvas, RRect shape, {double blur = 40, double y = 24}) {
   );
 }
 
-void _image(Canvas canvas, ui.Image image, RRect into) {
+void _image(Canvas canvas, ui.Image image, Rect into, [RRect? clip]) {
   canvas.save();
-  canvas.clipRRect(into);
+  if (clip != null) canvas.clipRRect(clip);
   canvas.drawImageRect(
     image,
     Offset.zero & Size(image.width.toDouble(), image.height.toDouble()),
-    into.outerRect,
+    into,
     Paint()..filterQuality = FilterQuality.high,
   );
   canvas.restore();
@@ -341,7 +455,7 @@ void _image(Canvas canvas, ui.Image image, RRect into) {
 void _window(Canvas canvas, ui.Image screen, Rect at) {
   final shape = RRect.fromRectAndRadius(at, const Radius.circular(14));
   _shadow(canvas, shape, blur: 48, y: 28);
-  _image(canvas, screen, shape);
+  _image(canvas, screen, at, shape);
   final scale = at.width / (screen.width / _captureScale);
   // Traffic lights sit centred in the 60 pt title strip.
   const colors = [Color(0xFFFF5F57), Color(0xFFFEBC2E), Color(0xFF28C840)];
@@ -372,7 +486,7 @@ void _phone(Canvas canvas, ui.Image screen, Rect at) {
     at.deflate(bezel),
     const Radius.circular(44 - bezel),
   );
-  _image(canvas, screen, inner);
+  _image(canvas, screen, inner.outerRect, inner);
   final island = Rect.fromCenter(
     center: Offset(at.center.dx, at.top + bezel + 17),
     width: at.width * 0.3,
@@ -405,7 +519,12 @@ void _phone(Canvas canvas, ui.Image screen, Rect at) {
   );
 }
 
-Future<ui.Image> _compose(ui.Image desktop, ui.Image phone, ui.Image mark) {
+Future<ui.Image> _compose({
+  required ui.Image desktop,
+  required ui.Image phone,
+  required ui.Image services,
+  required ui.Image mark,
+}) {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   final bounds = Offset.zero & _poster;
@@ -429,15 +548,10 @@ Future<ui.Image> _compose(ui.Image desktop, ui.Image phone, ui.Image mark) {
   );
 
   const left = 96.0;
-  canvas.drawImageRect(
-    mark,
-    Offset.zero & Size(mark.width.toDouble(), mark.height.toDouble()),
-    const Rect.fromLTWH(left - 4, 180, 100, 100),
-    Paint()..filterQuality = FilterQuality.high,
-  );
+  _image(canvas, mark, const Rect.fromLTWH(left - 4, 150, 100, 100));
   canvas.drawParagraph(
     _text([('POCOX', _ink)], size: 120, weight: FontWeight.w700, spacing: -2.5),
-    const Offset(left - 6, 292),
+    const Offset(left - 6, 262),
   );
   // The name, spelled out of the words it comes from.
   canvas.drawParagraph(
@@ -453,26 +567,26 @@ Future<ui.Image> _compose(ui.Image desktop, ui.Image phone, ui.Image mark) {
       weight: FontWeight.w600,
       spacing: 1,
     ),
-    const Offset(left, 440),
+    const Offset(left, 410),
   );
   canvas.drawParagraph(
     _text(
-      [('Your Codex,\nin your pocket.', _ink)],
+      [('Every device,\nin your pocket.', _ink)],
       size: 46,
       weight: FontWeight.w600,
       height: 1.14,
       spacing: -0.6,
       width: 460,
     ),
-    const Offset(left, 534),
+    const Offset(left, 504),
   );
   canvas.drawParagraph(
     _text(
       [
         (
-          'Host Codex on your computer. Follow and steer every turn, '
-              'answer approvals and read history from a phone, a tablet or '
-              'another desktop.',
+          'Your computers, and the agents, services and subscriptions on '
+              'them, within reach from a phone, a tablet or any other '
+              'machine.',
           _muted,
         ),
       ],
@@ -480,25 +594,22 @@ Future<ui.Image> _compose(ui.Image desktop, ui.Image phone, ui.Image mark) {
       height: 1.5,
       width: 420,
     ),
-    const Offset(left, 666),
+    const Offset(left, 636),
   );
-  var x = left;
-  for (final label in ['iOS · Android', 'macOS · Windows · Linux']) {
-    final text = _text([(label, _ink)], size: 16, weight: FontWeight.w500);
-    final pill = RRect.fromRectAndRadius(
-      Rect.fromLTWH(x, 828, text.maxIntrinsicWidth + 30, 38),
-      const Radius.circular(19),
-    );
-    canvas.drawRRect(pill, Paint()..color = Colors.white);
-    canvas.drawRRect(
-      pill,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..color = _hairline,
-    );
-    canvas.drawParagraph(text, Offset(x + 15, 828 + (38 - text.height) / 2));
-    x = pill.right + 10;
-  }
+  final chips = Size(
+    services.width / _captureScale,
+    services.height / _captureScale,
+  );
+  _image(canvas, services, const Offset(left, 772) & chips);
+  canvas.drawParagraph(
+    _text(
+      [('iOS · Android · macOS · Windows · Linux', _faint)],
+      size: 16,
+      weight: FontWeight.w500,
+      spacing: 0.2,
+    ),
+    Offset(left + 2, 772 + chips.height + 18),
+  );
 
   _window(canvas, desktop, const Rect.fromLTWH(696, 104, 776, 552));
   _phone(canvas, phone, const Rect.fromLTWH(584, 384, 266, 568));
@@ -516,50 +627,74 @@ void main() {
   setUp(AppSessionScreen.debugResetThreadMemory);
 
   testWidgets('derive the README poster from the app', (t) async {
+    final desktopApi = await _api(_codex, _desktopHistory);
     final desktop = await _shot(
       t,
       platform: TargetPlatform.macOS,
       size: const Size(1040, 740),
-      api: await _api(_desktopHistory),
-      screen: const AppSessionScreen(
+      api: desktopApi,
+      child: AppSessionScreen(
         serviceKey: _codex,
         threadId: 't1',
         home: true,
+        services: desktopApi.services,
       ),
+      then: () async {
+        await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+        await _frames(t);
+      },
     );
-    final phoneApi = await _api(_phoneHistory);
+    final phoneApi = await _api(_claude, _phoneHistory);
     final phone = await _shot(
       t,
       platform: TargetPlatform.iOS,
       size: const Size(393, 852),
       safeArea: const EdgeInsets.only(top: 54, bottom: 34),
       api: phoneApi,
-      screen: const AppSessionScreen(
-        serviceKey: _codex,
-        threadId: 't2',
+      child: AppSessionScreen(
+        serviceKey: _claude,
+        threadId: 'ses-1',
         home: true,
+        services: phoneApi.services,
       ),
       then: () async {
         phoneApi.pushEvent(
-          _codex,
+          _claude,
           const AppEvent(
-            kind: 'execCommandApproval',
-            threadId: 't2',
-            requestId: '7',
+            kind: agentPermissionKind,
+            threadId: 'ses-1',
+            requestId: 'p1',
+            title: 'Edit .github/workflows/nightly.yml',
             raw:
-                '{"command":"cargo test -p pocket-codex-core '
-                'tcp_port_open","cwd":"$_cwd"}',
+                '{"threadId":"ses-1","toolCall":{"title":"Edit '
+                '.github/workflows/nightly.yml","locations":[{"path":'
+                '"$_cwd/.github/workflows/nightly.yml"}]},"options":['
+                '{"optionId":"allow","name":"Allow once","kind":"allow_once"},'
+                '{"optionId":"always","name":"Always allow edits",'
+                '"kind":"allow_always"},'
+                '{"optionId":"reject","name":"Reject","kind":"reject_once"}]}',
           ),
         );
         await _frames(t);
       },
+    );
+    final services = await _shot(
+      t,
+      platform: TargetPlatform.macOS,
+      size: const Size(500, 34),
+      child: _services(),
     );
     final png = await t.runAsync(() async {
       final codec = await ui.instantiateImageCodec(
         img.encodePng(await renderMark(224)),
       );
       final mark = (await codec.getNextFrame()).image;
-      final poster = await _compose(desktop, phone, mark);
+      final poster = await _compose(
+        desktop: desktop,
+        phone: phone,
+        services: services,
+        mark: mark,
+      );
       final data = await poster.toByteData(format: ui.ImageByteFormat.png);
       return data!.buffer.asUint8List();
     });
