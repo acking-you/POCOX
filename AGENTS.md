@@ -1285,7 +1285,21 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
 39. **Cross-device agent tool (planned, not started).** A built-in tool that
     lets an agent on one device work with the user's other devices and their
     services, so one conversation reaches everything in the pocket. Until it
-    ships, describe it only as planned.
+    ships, describe it only as planned. Its services part is item 40; operating
+    other devices can reuse the same MCP server later.
+
+40. **Agent tools: devices and services (design proposed, not started).** One
+    `pocox` MCP server with a read tool (`services`) and an act tool
+    (`connect`: share, stop sharing, connect, disconnect), served by the POCOX
+    process itself over Streamable HTTP on loopback (bearer tokens per harness
+    or session; no extra executable). Harness-neutral at its core: consent,
+    delivery to the user's devices and ownership work with plain MCP, while
+    Codex's `threadId`, multi round-trip requests, elicitation and transcript
+    cards only remove steps where available. On by default for every hosted
+    harness (Codex, Claude, ACP agents that accept HTTP MCP, OpenCode); other
+    harnesses install it explicitly. One switch in the app and the CLI, on by
+    default. The galaxy is a page of its own: a turning pseudo-3D disk of
+    devices and orbiting services in both themes. See `docs/agent-tools.md`.
 
 ### UI and history maintenance (2026-09-13)
 
