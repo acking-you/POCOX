@@ -31,6 +31,23 @@ $OldBin = 'pocket-codex'
 function Info($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 function Warn($m) { Write-Host "warning: $m" -ForegroundColor Yellow }
 
+# A directory as one canonical string, so paths in it compare equal.
+function Normalize-Dir($dir) {
+  $trimmed = [IO.Path]::GetFullPath($dir).TrimEnd('\', '/')
+  if ($trimmed -match ':$') { "$trimmed\" } else { $trimmed }
+}
+
+# Move a file aside so a new one can take its name: a running exe cannot be
+# overwritten or deleted, but it can be renamed (and is deleted once free).
+function Retire($path) {
+  if (-not (Test-Path -LiteralPath $path)) { return }
+  $retired = "$path.old"
+  Remove-Item -LiteralPath $retired -Force -ErrorAction SilentlyContinue
+  if (Test-Path -LiteralPath $retired) { $retired = "$path.$([Guid]::NewGuid().ToString('N')).old" }
+  Rename-Item -LiteralPath $path -NewName (Split-Path -Leaf $retired)
+  Remove-Item -LiteralPath $retired -Force -ErrorAction SilentlyContinue
+}
+
 # --- detect CPU -> Rust target ---------------------------------------------
 # Only x86_64-pc-windows-msvc is published; on Windows-on-ARM it runs fine
 # under the built-in x64 emulation.
@@ -101,13 +118,15 @@ try {
   # --- install --------------------------------------------------------------
   # When updating an existing install (and no explicit dir), replace THAT copy
   # so the user keeps the same location; otherwise the default programs dir.
-  $binDir =
+  $binDir = Normalize-Dir $(
     if ($env:POCKET_CODEX_BIN_DIR) { $env:POCKET_CODEX_BIN_DIR }
     elseif ($existing) { Split-Path -Parent $existing.Source }
     elseif ($old) { Split-Path -Parent $old }
-    else { Join-Path $env:LOCALAPPDATA 'Programs\pocket-codex' }
+    else { Join-Path $env:LOCALAPPDATA 'Programs\pocket-codex' })
   New-Item -ItemType Directory -Path $binDir -Force | Out-Null
   $dest = Join-Path $binDir "$name.exe"
+  # The installed copy may be running (a worker it started).
+  Retire $dest
   Copy-Item -Path $exe.FullName -Destination $dest -Force
 
   $newVer = (& $dest --version 2>$null | Select-Object -First 1)
@@ -118,15 +137,11 @@ try {
     Info "this release predates the $Bin name, so it installs as $OldBin"
     if ($existing) { Warn "$($existing.Source) is a newer $Bin and was left as it is" }
   }
-  # Keep the former name working for scripts and services written for it. A
-  # running old exe cannot be deleted but can be renamed; `.exe` would win over
-  # the `.cmd` shim while it stays in place.
-  elseif ($old -and ((Split-Path -Parent $old) -eq $binDir)) {
-    $retired = "$old.old"
-    Remove-Item -Path $retired -Force -ErrorAction SilentlyContinue
-    Rename-Item -Path $old -NewName (Split-Path -Leaf $retired)
+  # Keep the former name working for scripts and services written for it; the
+  # old `.exe` would win over the `.cmd` shim while it stays in place.
+  elseif ($old -and ((Normalize-Dir (Split-Path -Parent $old)) -eq $binDir)) {
+    Retire $old
     Set-Content -Path (Join-Path $binDir "$OldBin.cmd") -Value "@`"%~dp0$Bin.exe`" %*" -Encoding ASCII
-    Remove-Item -Path $retired -Force -ErrorAction SilentlyContinue
     Info "$OldBin now runs $Bin"
   }
   elseif ($old) {

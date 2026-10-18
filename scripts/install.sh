@@ -86,6 +86,13 @@ else
 fi
 
 # --- install vs update: report the current version, if any ------------------
+# An explicit install dir without trailing slashes, so it compares equal to the
+# directory part of a path in it.
+override=""
+if [ -n "${POCKET_CODEX_BIN_DIR:-}" ]; then
+  override="$(printf '%s' "$POCKET_CODEX_BIN_DIR" | sed 's#//*$##')"
+  [ -n "$override" ] || override="/"
+fi
 existing="$(command -v "$BIN" 2>/dev/null || true)"
 # An install under the former name counts only as a regular file: the desktop
 # app's Linux package puts a `pocket-codex` symlink to the app on the PATH, and
@@ -93,8 +100,8 @@ existing="$(command -v "$BIN" 2>/dev/null || true)"
 # since it need not be on the PATH.
 legacy() { [ -n "$1" ] && [ -f "$1" ] && [ ! -L "$1" ]; }
 old=""
-if [ -n "${POCKET_CODEX_BIN_DIR:-}" ] && legacy "$POCKET_CODEX_BIN_DIR/$OLD_BIN"; then
-  old="$POCKET_CODEX_BIN_DIR/$OLD_BIN"
+if [ -n "$override" ] && legacy "${override%/}/$OLD_BIN"; then
+  old="${override%/}/$OLD_BIN"
 else
   old_path="$(command -v "$OLD_BIN" 2>/dev/null || true)"
   if legacy "$old_path"; then
@@ -132,8 +139,8 @@ name="$(basename "$src")"
 # --- install ----------------------------------------------------------------
 # When updating an install on the PATH, replace THAT copy so the user keeps
 # using the same location; otherwise use the default (or overridden) bin dir.
-if [ -n "${POCKET_CODEX_BIN_DIR:-}" ]; then
-  bindir="$POCKET_CODEX_BIN_DIR"
+if [ -n "$override" ]; then
+  bindir="$override"
 elif [ -n "$existing" ]; then
   bindir="$(dirname "$existing")"
 elif [ -n "$old" ]; then
