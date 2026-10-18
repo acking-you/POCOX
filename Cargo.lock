@@ -2195,7 +2195,7 @@ checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 [[package]]
 name = "pb-mapper"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#7a59d08096ca55596238328bf6843eda1091574a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "pb-mapper-client",
 ]
@@ -2203,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-auth"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#7a59d08096ca55596238328bf6843eda1091574a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "parking_lot",
  "pb-mapper-core",
@@ -2220,7 +2220,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-client"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#7a59d08096ca55596238328bf6843eda1091574a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "if-addrs",
  "if-watch",
@@ -2240,7 +2240,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-core"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#7a59d08096ca55596238328bf6843eda1091574a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -2258,7 +2258,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-protocol"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#7a59d08096ca55596238328bf6843eda1091574a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "bytes",
  "parking_lot",

@@ -75,3 +75,10 @@ cover close handshakes after successful and timed-out probes, error-chain
 classification, Claude inspection recovery, management authority, service policy,
 and stringified UI errors. Live desktop acceptance additionally exercises each
 harness and observes descriptor counts under the original soft limit.
+
+Live regression on the public relay: ten completed OpenCode info requests were
+left connected with their subscriber handle still held. The publisher closed all
+ten at 90.0 seconds and the app's numeric descriptors fell from 97 to 67, without
+changing the 256 soft limit. The validation build uses the current development
+branch's installation-specific device identity, so this controlled load—not an
+assumption that the old phone kept selecting the new identity—establishes recovery.
