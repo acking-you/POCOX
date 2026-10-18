@@ -7,7 +7,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.accountId,
     required this.devices,
     required this.activeDevice,
-    required this.localDevices,
+    required this.localName,
     required this.capabilityCount,
     required this.onSelect,
     required this.filled,
@@ -19,7 +19,9 @@ class _DeviceColumn extends StatelessWidget {
   final String? accountId;
   final List<String> devices;
   final String? activeDevice;
-  final Set<String> localDevices;
+
+  /// This computer's name, for its own (independent) target.
+  final String localName;
   final int Function(String device) capabilityCount;
   final ValueChanged<String> onSelect;
 
@@ -35,13 +37,17 @@ class _DeviceColumn extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final online = successColor(scheme);
+    // Installations that share a name (two copies of one WSL distribution,
+    // say) are told apart by their stable ID. The platform is in the header.
+    final sameNamed = sameNamedDevices(devices.where((d) => d != _thisDevice));
     final tiles = <Widget>[
       for (final device in devices)
         _DeviceTile(
           key: Key('device-$device'),
-          device: device,
+          device: device == _thisDevice ? localName : deviceLabel(device),
           subtitle: [
-            if (localDevices.contains(device)) l10n.servicesLocalDevice,
+            if (device == _thisDevice) l10n.servicesLocalDevice,
+            if (sameNamed.contains(device)) ?deviceShortId(device),
             l10n.servicesDeviceCapabilityCount(capabilityCount(device)),
           ].join(' · '),
           selected: device == activeDevice,
@@ -273,12 +279,16 @@ class _DeviceTile extends StatelessWidget {
 class _DeviceDetailHeader extends StatelessWidget {
   const _DeviceDetailHeader({
     required this.device,
+    required this.platform,
     required this.local,
     required this.isDefault,
     required this.onClean,
   });
 
   final String? device;
+
+  /// What the device's publisher reports it runs on; null while loading.
+  final String? platform;
   final bool local;
   final bool isDefault;
   final VoidCallback? onClean;
@@ -293,11 +303,24 @@ class _DeviceDetailHeader extends StatelessWidget {
         // The device list beside it already carries the device's glyph;
         // the heading is its name alone.
         leading: const [SizedBox(width: 4)],
-        body: Text(
-          device ?? l10n.servicesDevices,
-          style: Theme.of(
-            context,
-          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              device ?? l10n.servicesDevices,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            if (platform case final platform?)
+              Text(
+                platform,
+                key: const Key('device-detail-platform'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
         ),
         trailing: [
           if (local) _CountPill(label: l10n.servicesLocalDevice),

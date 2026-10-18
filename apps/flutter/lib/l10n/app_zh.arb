@@ -466,6 +466,7 @@
     "placeholders": { "count": { "type": "int" } }
   },
   "servicesLocalDevice": "本机",
+  "servicesPlatformUnknown": "平台未知",
   "servicesCapabilities": "可用能力",
   "servicesChatCapability": "对话服务",
   "servicesApiCapability": "Responses API",
@@ -1186,6 +1187,8 @@
   "managedDiagnostics": "诊断详情",
   "managedKey": "管理服务键",
   "managedDevice": "设备",
+  "managedInstallationId": "安装 ID",
+  "managedProcessInstance": "进程实例",
   "managedSwitchTitle": "允许我的其他设备管理这台电脑",
   "managedSwitchOn": "已开启",
   "managedSwitchOff": "已关闭",

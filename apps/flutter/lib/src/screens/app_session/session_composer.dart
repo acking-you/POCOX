@@ -672,11 +672,12 @@ extension _SessionComposer on _AppSessionState {
       (h) => h.appServiceKey == widget.serviceKey,
     );
     if (isLocal) return l10n.envLocal;
-    return widget.services
-            .where((s) => s.key == widget.serviceKey)
-            .firstOrNull
-            ?.device ??
-        serviceKeyLabel(widget.serviceKey);
+    return switch (widget.services
+        .where((s) => s.key == widget.serviceKey)
+        .firstOrNull) {
+      final service? => deviceLabel(service.device),
+      null => serviceKeyLabel(widget.serviceKey),
+    };
   }
 
   /// The `+` attachment menu. One button instead of three icons: on a phone the

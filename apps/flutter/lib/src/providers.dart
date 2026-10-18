@@ -88,6 +88,29 @@ final servicesProvider = FutureProvider<List<ServiceEntry>>((ref) async {
   return ref.watch(bridgeApiProvider).discoverServices();
 });
 
+/// This app's own publisher identity, known before its first host starts.
+final localDeviceMetadataProvider = Provider<DeviceMetadata>(
+  (ref) => ref.watch(bridgeApiProvider).localDeviceMetadata(),
+);
+
+/// What the publisher of service [key] reports about itself; null for an older
+/// host without the route. Read for the selected device only, and discarded on
+/// account/relay changes or leaving the device. An answer changes only when
+/// the host restarts, so it is kept until a manual refresh; a failed read is
+/// retried while the device stays selected.
+final serviceDeviceMetadataProvider = FutureProvider.autoDispose
+    .family<DeviceMetadata?, String>((ref, key) async {
+      ref.watch(configProvider);
+      final api = ref.watch(bridgeApiProvider);
+      try {
+        return await api.serviceDeviceMetadata(key);
+      } catch (_) {
+        final retry = Timer(const Duration(seconds: 15), ref.invalidateSelf);
+        ref.onDispose(retry.cancel);
+        rethrow;
+      }
+    });
+
 /// Active local subscriptions.
 final subscriptionsProvider = FutureProvider<List<SubInfo>>((ref) async {
   return ref.watch(bridgeApiProvider).subscriptions();
@@ -297,8 +320,16 @@ final metaRetryProvider = StreamProvider<RetryProgress?>((ref) {
 /// Events newer than this point must take precedence over the result.
 typedef RunningSessionSnapshot = ({
   List<LocalSession> sessions,
-  DateTime requestedAt,
+  int requestedAt,
 });
+
+var _activity = 0;
+
+/// The next point in the order of inventory probes and session events. Not
+/// wall-clock time: an event in the same clock tick as a probe (a coarse tick
+/// on Windows) would read as older than it, and the stale inventory would
+/// revive a turn that had just completed.
+int _nextActivity() => ++_activity;
 
 /// A running session known only by id (the ACP engine's inventory).
 LocalSession _runningStub(String threadId) => LocalSession(
@@ -330,7 +361,7 @@ final runningSessionInventoryProvider = StreamProvider.autoDispose
       Future<void> poll() async {
         if (disposed || paused || !foreground || inFlight) return;
         inFlight = true;
-        final requestedAt = DateTime.now();
+        final requestedAt = _nextActivity();
         try {
           // ACP agents report running sessions through the
           // engine; they have no meta rollout inventory, and their history is
@@ -408,7 +439,7 @@ final runningThreadsProvider = StreamProvider.autoDispose
       final api = ref.watch(bridgeApiProvider);
       final out = StreamController<Set<String>>();
       var host = <String>{};
-      final events = <String, ({bool running, DateTime at})>{};
+      final events = <String, ({bool running, int at})>{};
       Set<String>? previous;
       var disposed = false;
       Timer? retry;
@@ -437,9 +468,7 @@ final runningThreadsProvider = StreamProvider.autoDispose
           final snapshot = next.valueOrNull;
           if (snapshot == null) return;
           host = {for (final session in snapshot.sessions) session.threadId};
-          events.removeWhere(
-            (_, event) => !event.at.isAfter(snapshot.requestedAt),
-          );
+          events.removeWhere((_, event) => event.at < snapshot.requestedAt);
           emit();
         }, fireImmediately: true);
       }
@@ -459,7 +488,7 @@ final runningThreadsProvider = StreamProvider.autoDispose
                   _ => null,
                 };
                 if (running == null) return;
-                events[tid] = (running: running, at: DateTime.now());
+                events[tid] = (running: running, at: _nextActivity());
                 emit();
               },
               onError: (_) {

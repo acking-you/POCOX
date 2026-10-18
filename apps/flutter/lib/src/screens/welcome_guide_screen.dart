@@ -162,7 +162,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '${host.device} · ${host.name}',
+                      '${deviceLabel(host.device)} · ${host.name}',
                       style: Theme.of(context).textTheme.bodySmall,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -268,9 +268,7 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
               )
             : StatusChip(
                 color: successColor(scheme),
-                label: l10n.welcomeHostFound(
-                  '${found.first.device} · ${found.first.name}',
-                ),
+                label: l10n.welcomeHostFound(serviceKeyLabel(found.first.key)),
                 filled: true,
                 wrap: true,
               ),

@@ -22,7 +22,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use pocket_codex_core::{process::pid_running, service::default_device_id};
+use pocket_codex_core::process::pid_running;
 use pocket_codex_host_svc::acp::{AgentSpec, GatewayClient};
 use serde_json::{json, Value};
 
@@ -462,7 +462,7 @@ fn hosting_live_coexistence() {
         let started = serve_acp::start(Some(name.clone()), fx.spec.clone());
         assert!(!fx.ok("start an ACP host", started).reused);
     }
-    let device = default_device_id();
+    let device = runtime::device_id().expect("host identity");
     let rows = [codex_a.as_str(), codex_b.as_str(), acp_a.as_str(), acp_b.as_str()].map(registered);
     for status in &rows {
         assert_eq!(status.device, device);

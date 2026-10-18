@@ -219,6 +219,9 @@ static RESOLVE_PAUSE: Mutex<
 /// One resolution attempt from the configuration in `support`.
 async fn resolve_once(support: &Path) -> Result<Result<Owned, Stale>> {
     let revision = epoch();
+    if let Some(transport) = runtime::host_transport() {
+        return self_host(transport, revision);
+    }
     let config = load_config(support)?;
     #[cfg(test)]
     {
@@ -259,10 +262,17 @@ async fn resolve_once(support: &Path) -> Result<Result<Owned, Stale>> {
     if key.len() != 32 {
         return Err(anyhow!("stored MSG_HEADER_KEY is not 32 bytes; re-run setup"));
     }
-    let transport = Transport {
-        session: RelaySession::new(relay, key),
-        namespace: None,
-    };
+    self_host(
+        Transport {
+            session: RelaySession::new(relay, key),
+            namespace: None,
+        },
+        revision,
+    )
+}
+
+/// Adopt a self-host transport, which has no account credential to renew.
+fn self_host(transport: Transport, revision: u64) -> Result<Result<Owned, Stale>> {
     let observed = observe(&transport, revision, || {
         account::stop_credential_refresh();
         Ok(())

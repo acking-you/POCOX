@@ -9,7 +9,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
-use pocket_codex_core::service::{default_device_id, ServiceId, ServiceKind};
+use pocket_codex_core::service::{ServiceId, ServiceKind};
 use pocket_codex_pb::{publish_pending, Published, RegisterOptions};
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
@@ -215,7 +215,7 @@ async fn launch(generation: u64) -> Result<Serving> {
         bail!("management context changed");
     }
     let (listener, addr) = host_services::bind_loopback("device management")?;
-    let key = ServiceId::new(default_device_id(), ServiceKind::Host, "pocket").key();
+    let key = ServiceId::new(runtime::device_id()?, ServiceKind::Host, "pocket").key();
     let app = super::router(owned.epoch, generation);
     let task = runtime::runtime().spawn(host_services::supervise(
         "device management",
@@ -295,18 +295,22 @@ async fn supervise() {
         if enabled && serving.is_none() {
             match launch(generation).await {
                 Ok(ready) => serving = Some(ready),
-                Err(_) => {
+                Err(error) => {
+                    tracing::warn!("device management unavailable: {error:#}");
+                    let problem = if runtime::device_id().is_err() {
+                        "This computer's hosting identity cannot be read. Restore its saved \
+                         identity file to publish management."
+                    } else {
+                        "Device management is unavailable. Check the relay and whether another app \
+                         uses this device name."
+                    };
                     *STATUS.lock().unwrap_or_else(|p| p.into_inner()) = Some(LocalStatus {
                         supported: true,
                         enabled: true,
                         registered: false,
                         service_key: None,
                         listen_addr: None,
-                        problem: Some(
-                            "Device management is unavailable. Check the relay and whether \
-                             another app uses this device name."
-                                .into(),
-                        ),
+                        problem: Some(problem.into()),
                     });
                     tokio::time::sleep(Duration::from_secs(30)).await;
                     continue;

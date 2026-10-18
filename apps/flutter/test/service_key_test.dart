@@ -5,6 +5,44 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/service_key.dart';
 
 void main() {
+  test('installation devices read as hostname and source; others as is', () {
+    const id = '12345678123441238123123456789abc';
+    const device = 'wsl-ubuntu-24-04.studio.$id';
+    expect(installationOf(device), (
+      source: 'wsl-ubuntu-24-04',
+      hostname: 'studio',
+      id: id,
+    ));
+    // A WSL distribution keeps its whole name: two of them must differ.
+    expect(deviceLabel(device), 'studio (WSL Ubuntu-24.04)');
+    expect(deviceLabel('wsl-ubuntu.studio.$id'), 'studio (WSL Ubuntu)');
+    expect(deviceLabel('windows.studio.$id'), 'studio (Windows)');
+    expect(deviceLabel('macos.mbp.$id'), 'mbp (macOS)');
+    expect(
+      deviceLabel('linux-debian-gnu-linux-12.build.$id'),
+      'build (Linux Debian)',
+    );
+    // Explicit overrides and hostname-only devices are never reinterpreted.
+    for (final other in ['my.explicit.device', 'lb7666', '.studio.$id']) {
+      expect(installationOf(other), isNull, reason: other);
+      expect(deviceLabel(other), other);
+    }
+    expect(serviceKeyDevice('pcxu:user:$device:host:pocket'), device);
+    expect(
+      serviceKeyLabel('pcxu:user:$device:app:default'),
+      'studio (WSL Ubuntu-24.04) · default',
+    );
+    expect(shortId('12345678-1234-4123-8123-123456789abc'), '12345678');
+  });
+
+  test('only installations that read the same need their short ID', () {
+    const a = 'windows.studio.11111111123441238123123456789abc';
+    const b = 'windows.studio.22222222123441238123123456789abc';
+    const c = 'wsl-ubuntu.studio.33333333123441238123123456789abc';
+    expect(sameNamedDevices([a, b, c, a, 'lb7666']), {a, b});
+    expect(deviceShortId(b), '22222222');
+    expect(deviceShortId('lb7666'), isNull);
+  });
   test('parses a self-hosted key', () {
     final parsed = parseServiceKey('pcx:lb7666:app:default');
     expect(parsed.device, 'lb7666');
