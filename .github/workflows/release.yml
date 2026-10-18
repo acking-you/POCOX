@@ -171,11 +171,17 @@ jobs:
           tag="${GITHUB_REF_NAME//\//-}"
           name="pocket-codex-cli-${tag}-${{ matrix.target }}"
           mkdir -p "dist/$name"
+          # The former command name ships beside it, so an archive extracted
+          # over an older install keeps scripts written for `pocket-codex`
+          # working. Windows gets a copy of the binary rather than a shim: an
+          # older `pocket-codex.exe` left in place would win over a `.cmd`.
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/"
+            cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/pocket-codex.exe"
             (cd dist && 7z a "$name.zip" "$name" >/dev/null)
           else
             cp "target/${{ matrix.target }}/release/pocox" "dist/$name/"
+            ln -s pocox "dist/$name/pocket-codex"
             tar -czf "dist/$name.tar.gz" -C dist "$name"
           fi
           rm -rf "dist/$name"

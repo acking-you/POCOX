@@ -86,14 +86,27 @@ else
 fi
 
 # --- install vs update: report the current version, if any ------------------
+# An explicit install dir without trailing slashes, so it compares equal to the
+# directory part of a path in it.
+override=""
+if [ -n "${POCKET_CODEX_BIN_DIR:-}" ]; then
+  override="$(printf '%s' "$POCKET_CODEX_BIN_DIR" | sed 's#//*$##')"
+  [ -n "$override" ] || override="/"
+fi
 existing="$(command -v "$BIN" 2>/dev/null || true)"
 # An install under the former name counts only as a regular file: the desktop
 # app's Linux package puts a `pocket-codex` symlink to the app on the PATH, and
-# that one is never run or replaced.
+# that one is never run or replaced. An explicit install dir is looked at too,
+# since it need not be on the PATH.
+legacy() { [ -n "$1" ] && [ -f "$1" ] && [ ! -L "$1" ]; }
 old=""
-old_path="$(command -v "$OLD_BIN" 2>/dev/null || true)"
-if [ -n "$old_path" ] && [ -f "$old_path" ] && [ ! -L "$old_path" ]; then
-  old="$old_path"
+if [ -n "$override" ] && legacy "${override%/}/$OLD_BIN"; then
+  old="${override%/}/$OLD_BIN"
+else
+  old_path="$(command -v "$OLD_BIN" 2>/dev/null || true)"
+  if legacy "$old_path"; then
+    old="$old_path"
+  fi
 fi
 if [ -n "$existing" ]; then
   cur="$("$existing" --version 2>/dev/null | awk 'NR==1{print $NF}')"
@@ -114,17 +127,20 @@ info "downloading $url"
 download "$url" "$tmp/cli.tar.gz" || err "download failed."
 tar -xzf "$tmp/cli.tar.gz" -C "$tmp" || err "unpack failed."
 
-# The archive holds one dir `pocket-codex-cli-.../` containing the binary;
-# releases before the rename name it `pocket-codex`.
-src="$(find "$tmp" -type f \( -name "$BIN" -o -name "$OLD_BIN" \) | head -n 1)"
+# The archive holds one dir `pocket-codex-cli-.../` containing the binary.
+# Releases before the rename ship it as `pocket-codex`, and that program
+# recognizes its own workers only under that name, so it keeps it.
+src="$(find "$tmp" -type f -name "$BIN" | head -n 1)"
+[ -n "$src" ] || src="$(find "$tmp" -type f -name "$OLD_BIN" | head -n 1)"
 [ -n "$src" ] || err "the archive did not contain a '$BIN' binary."
 chmod +x "$src"
+name="$(basename "$src")"
 
 # --- install ----------------------------------------------------------------
 # When updating an install on the PATH, replace THAT copy so the user keeps
 # using the same location; otherwise use the default (or overridden) bin dir.
-if [ -n "${POCKET_CODEX_BIN_DIR:-}" ]; then
-  bindir="$POCKET_CODEX_BIN_DIR"
+if [ -n "$override" ]; then
+  bindir="$override"
 elif [ -n "$existing" ]; then
   bindir="$(dirname "$existing")"
 elif [ -n "$old" ]; then
@@ -133,13 +149,23 @@ else
   bindir="$HOME/.local/bin"
 fi
 mkdir -p "$bindir" || err "could not create install dir: $bindir"
-mv -f "$src" "$bindir/$BIN" || err "could not write to $bindir (try POCKET_CODEX_BIN_DIR=/some/writable/dir)."
+# A `pocket-codex` link there (the desktop app's, or the alias of a newer
+# `pocox`) is never replaced by an older CLI.
+if [ "$name" = "$OLD_BIN" ] && [ -L "$bindir/$OLD_BIN" ]; then
+  err "$bindir/$OLD_BIN is a link this release would replace; choose another POCKET_CODEX_BIN_DIR."
+fi
+mv -f "$src" "$bindir/$name" || err "could not write to $bindir (try POCKET_CODEX_BIN_DIR=/some/writable/dir)."
 
-newver="$("$bindir/$BIN" --version 2>/dev/null | awk 'NR==1{print $NF}')"
-info "installed $BIN ${newver:-$tag} → $bindir/$BIN"
+newver="$("$bindir/$name" --version 2>/dev/null | awk 'NR==1{print $NF}')"
+info "installed $name ${newver:-$tag} → $bindir/$name"
 
+if [ "$name" = "$OLD_BIN" ]; then
+  info "this release predates the $BIN name, so it installs as $OLD_BIN"
+  if [ -n "$existing" ]; then
+    warn "$existing is a newer $BIN and was left as it is"
+  fi
 # Keep the former name working for scripts and services written for it.
-if [ -n "$old" ] && [ "$(dirname "$old")" = "$bindir" ]; then
+elif [ -n "$old" ] && [ "$(dirname "$old")" = "$bindir" ]; then
   ln -sf "$BIN" "$bindir/$OLD_BIN" && info "$OLD_BIN now runs $BIN"
 elif [ -n "$old" ]; then
   warn "an older $OLD_BIN remains at $old; remove it, or point scripts at $bindir/$BIN"
@@ -184,4 +210,4 @@ add_to_path() {
 }
 add_to_path "$bindir"
 
-info "done. Run '$BIN --help' to get started."
+info "done. Run '$name --help' to get started."
