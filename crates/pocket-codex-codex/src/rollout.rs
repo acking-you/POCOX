@@ -152,13 +152,51 @@ pub fn is_compressed(path: &Path) -> bool {
 }
 
 /// Open a rollout for line reading, decoding a compressed one on the fly.
+/// A rollout replaced by its other representation since `path` was listed is
+/// opened in that one.
 pub fn open_rollout(path: &Path) -> Result<Box<dyn std::io::BufRead + Send>> {
+    Ok(match open_representation(path) {
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            open_representation(&sibling(path))?
+        },
+        opened => opened?,
+    })
+}
+
+fn open_representation(path: &Path) -> std::io::Result<Box<dyn std::io::BufRead + Send>> {
     let file = std::fs::File::open(path)?;
     Ok(if is_compressed(path) {
         Box::new(std::io::BufReader::new(zstd::stream::read::Decoder::new(file)?))
     } else {
         Box::new(std::io::BufReader::new(file))
     })
+}
+
+/// The representation of `path`'s rollout that exists now. Codex replaces a
+/// plain rollout with its compressed copy when it goes cold, and the other way
+/// round before appending, so a path listed a moment ago may name the other.
+/// Each replacement writes the new file before removing the old one.
+pub fn current_rollout(path: &Path) -> PathBuf {
+    if path.exists() {
+        return path.to_path_buf();
+    }
+    let other = sibling(path);
+    if other.exists() {
+        other
+    } else {
+        path.to_path_buf()
+    }
+}
+
+/// The same rollout's other representation.
+fn sibling(path: &Path) -> PathBuf {
+    if is_compressed(path) {
+        path.with_extension("")
+    } else {
+        let mut compressed = path.as_os_str().to_owned();
+        compressed.push(COMPRESSED_SUFFIX);
+        PathBuf::from(compressed)
+    }
 }
 
 /// Locate the rollout file for a given `thread_id`.
@@ -190,6 +228,7 @@ pub fn rollout_path_in(dir: &Path, thread_id: &str) -> Result<Option<PathBuf>> {
 
 /// Read header metadata, preview, mtime and turn state for one rollout.
 pub fn read_session_info(path: &Path) -> Result<SessionInfo> {
+    let path = &current_rollout(path);
     let head = read_head(path, PREVIEW_HEAD_LINES)?;
     let meta = head.lines().next().and_then(parse_session_meta);
     let thread_id = meta

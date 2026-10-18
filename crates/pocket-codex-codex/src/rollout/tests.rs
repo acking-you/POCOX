@@ -102,8 +102,17 @@ fn compressed_rollouts_are_found_read_and_superseded_by_a_plain_copy() {
     assert_eq!(info.turn_state, TurnState::Unknown);
     assert_eq!(read_transcript(&compressed).expect("transcript")[0].text, "hello from last week");
 
-    // Decompressed before an append, the plain copy is the session.
+    // A path listed before a representation change still reads the session.
     let plain = day.join(&name);
+    assert_eq!(
+        read_session_info(&plain)
+            .expect("listed plain")
+            .rollout_path,
+        compressed
+    );
+    assert_eq!(read_transcript(&plain).expect("listed plain").len(), 1);
+
+    // Decompressed before an append, the plain copy is the session.
     std::fs::write(&plain, &text).expect("plain");
     assert_eq!(rollout_paths_in(dir.path()).expect("paths"), vec![plain.clone()]);
     assert_eq!(rollout_path_in(dir.path(), id).expect("lookup"), Some(plain.clone()));

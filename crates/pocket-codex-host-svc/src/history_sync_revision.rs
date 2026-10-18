@@ -45,6 +45,7 @@ pub(super) fn attach_reviews(
     directory: &Path,
     entries: &mut [serde_json::Value],
 ) -> Result<()> {
+    let path = &rollout::current_rollout(path);
     fs::create_dir_all(directory)?;
     let lock = private_file(&directory.join("index.lock"), false)?;
     lock.lock()?;
@@ -100,6 +101,7 @@ pub(super) fn generation(session: &str) -> Result<String> {
 }
 
 pub(super) fn scan(path: &Path, directory: &Path) -> Result<String> {
+    let path = &rollout::current_rollout(path);
     fs::create_dir_all(directory)?;
     let lock = private_file(&directory.join("index.lock"), false)?;
     lock.lock()?;
