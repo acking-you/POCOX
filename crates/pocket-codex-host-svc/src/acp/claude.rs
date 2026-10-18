@@ -554,7 +554,16 @@ async fn inspect_with(
     mut probe: impl AsyncFnMut(&Path) -> Result<Option<Version>, process::OutputError>,
 ) -> Environment {
     let adapter = find_adapter(lookup);
-    let found = find_node(lookup, adapter.as_ref(), &mut probe).await;
+    let found = if adapter
+        .as_ref()
+        .is_some_and(|adapter| adapter.entry.is_none())
+    {
+        // Wrappers own their runtime selection; probing unrelated Node installs
+        // can only add latency or report a failure that cannot block this launch.
+        Runtimes::default()
+    } else {
+        find_node(lookup, adapter.as_ref(), &mut probe).await
+    };
     Environment {
         inspection_error: if found.node.is_some() { None } else { found.failure },
         adapter,
@@ -572,7 +581,11 @@ fn version_text(version: Version) -> String {
 impl Environment {
     /// The launch for a spec with `args`, or why it cannot start.
     pub fn launch(&self, args: &[String]) -> Result<Launch, Missing> {
-        if let Some(error) = &self.inspection_error {
+        let needs_node = self
+            .adapter
+            .as_ref()
+            .is_none_or(|adapter| adapter.entry.is_some());
+        if let Some(error) = self.inspection_error.as_ref().filter(|_| needs_node) {
             return Err(Missing::Inspection(error.clone()));
         }
         let adapter = self.adapter.as_ref().ok_or(Missing::Adapter)?;
