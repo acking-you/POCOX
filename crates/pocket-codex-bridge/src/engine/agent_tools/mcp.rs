@@ -104,6 +104,10 @@ fn connect_tool() -> Tool {
                 },
                 "title": {"type": "string", "description": "share: what it is, e.g. \"Landing page\"."},
                 "path": {"type": "string", "description": "share: path to open, default \"/\"."},
+                "scheme": {
+                    "type": "string", "enum": ["http", "https"],
+                    "description": "share: how the page is served, default http."
+                },
                 "wait_ready_seconds": {
                     "type": "integer", "minimum": 0, "maximum": 20,
                     "description": "share: how long to wait for the first port to answer."
@@ -210,6 +214,7 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                 title: text(args.get("title")),
                 path: text(args.get("path")),
                 wait_ready_seconds: args.get("wait_ready_seconds").and_then(number),
+                secure: text(args.get("scheme")).as_deref() == Some("https"),
             };
             match shares::share(caller, request).await {
                 Ok(Ok(shared)) => {

@@ -115,7 +115,12 @@ class _HostWebLinkState extends State<_HostWebLink> {
     setState(() => _sharing = true);
     final messenger = ToastMessenger.of(context);
     try {
-      final shared = await widget.api.toolsShareOn(device, [port], path: path);
+      final shared = await widget.api.toolsShareOn(
+        device,
+        [port],
+        path: path,
+        secure: uri.scheme == 'https',
+      );
       final key = shared.share.firstKey;
       final container = _container;
       if (!mounted || key == null || container == null) return;
@@ -126,7 +131,7 @@ class _HostWebLinkState extends State<_HostWebLink> {
           service: key,
           path: shared.share.path,
           title: shared.share.title,
-          secure: uri.scheme == 'https',
+          secure: shared.share.secure,
         ),
       );
       if (mounted) Navigator.of(context).pop();

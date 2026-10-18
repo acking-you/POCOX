@@ -94,6 +94,8 @@ pub struct Share {
     pub title: String,
     /// Path to open.
     pub path: String,
+    /// The page is served over TLS.
+    pub secure: bool,
     /// Recorded owner.
     pub owner: OwnerView,
     /// Who keeps it alive; `None` once the user kept it.
@@ -113,6 +115,7 @@ impl Share {
             id: self.id.clone(),
             title: self.title.clone(),
             path: self.path.clone(),
+            secure: self.secure,
             ports: self
                 .ports
                 .iter()
@@ -140,6 +143,7 @@ impl Share {
             id: self.id.clone(),
             title: self.title.clone(),
             path: self.path.clone(),
+            secure: self.secure,
             owner: self.owner.clone(),
             created_ms: self.created_ms,
             expires_ms: self.expires_ms,
@@ -158,6 +162,9 @@ pub struct SavedShare {
     pub title: String,
     /// Path to open.
     pub path: String,
+    /// The page is served over TLS.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub secure: bool,
     /// Recorded owner.
     pub owner: OwnerView,
     /// Unix milliseconds.

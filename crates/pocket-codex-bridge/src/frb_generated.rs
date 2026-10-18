@@ -6456,12 +6456,13 @@ fn wire__crate__api__bridge__agent_tools__tools_share_on_impl(
             let api_ports = <Vec<u16>>::sse_decode(&mut deserializer);
             let api_title = <Option<String>>::sse_decode(&mut deserializer);
             let api_path = <Option<String>>::sse_decode(&mut deserializer);
+            let api_secure = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || {
                         let output_ok = crate::api::bridge::agent_tools::tools_share_on(
-                            api_device, api_ports, api_title, api_path,
+                            api_device, api_ports, api_title, api_path, api_secure,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -9055,6 +9056,7 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsShareDto {
         let mut var_id = <String>::sse_decode(deserializer);
         let mut var_title = <String>::sse_decode(deserializer);
         let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_secure = <bool>::sse_decode(deserializer);
         let mut var_ports =
             <Vec<crate::api::bridge::agent_tools::ToolsPortDto>>::sse_decode(deserializer);
         let mut var_owner =
@@ -9065,6 +9067,7 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsShareDto {
             id: var_id,
             title: var_title,
             path: var_path,
+            secure: var_secure,
             ports: var_ports,
             owner: var_owner,
             created_ms: var_createdMs,
@@ -12151,6 +12154,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsSha
             self.id.into_into_dart().into_dart(),
             self.title.into_into_dart().into_dart(),
             self.path.into_into_dart().into_dart(),
+            self.secure.into_into_dart().into_dart(),
             self.ports.into_into_dart().into_dart(),
             self.owner.into_into_dart().into_dart(),
             self.created_ms.into_into_dart().into_dart(),
@@ -13985,6 +13989,7 @@ impl SseEncode for crate::api::bridge::agent_tools::ToolsShareDto {
         <String>::sse_encode(self.id, serializer);
         <String>::sse_encode(self.title, serializer);
         <String>::sse_encode(self.path, serializer);
+        <bool>::sse_encode(self.secure, serializer);
         <Vec<crate::api::bridge::agent_tools::ToolsPortDto>>::sse_encode(self.ports, serializer);
         <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_encode(self.owner, serializer);
         <i64>::sse_encode(self.created_ms, serializer);

@@ -5,6 +5,31 @@ use thiserror::Error;
 /// Convenience alias for `Result<T, Error>` used by this crate.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Whether an error chain reports exhausted local file/socket descriptors.
+/// A failed local probe in this state says nothing about the remote service.
+pub fn is_file_limit(error: &(dyn std::error::Error + 'static)) -> bool {
+    let mut current = Some(error);
+    while let Some(error) = current {
+        if let Some(io) = error.downcast_ref::<std::io::Error>() {
+            #[cfg(unix)]
+            if matches!(io.raw_os_error(), Some(code) if code == nix::libc::EMFILE || code == nix::libc::ENFILE)
+            {
+                return true;
+            }
+            #[cfg(windows)]
+            if matches!(io.raw_os_error(), Some(4 | 10024)) {
+                return true;
+            }
+        }
+        current = error.source();
+    }
+    false
+}
+
+/// Credential-free description shared by network and process diagnostics.
+pub const FILE_LIMIT_MESSAGE: &str = "This POCOX process has exhausted its file/socket handles; \
+                                      close unused connections or restart POCOX, then retry.";
+
 /// All errors surfaced by `pocket-codex-core`.
 ///
 /// New variants should be added here rather than re-using
@@ -35,4 +60,19 @@ pub enum Error {
     /// We could not determine a project path (e.g. no `$HOME`).
     #[error("path error: {0}")]
     Path(String),
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_limit_survives_context_without_matching_unrelated_errors() {
+        let error = anyhow::Error::new(std::io::Error::from_raw_os_error(nix::libc::EMFILE))
+            .context("opening a connection");
+        assert!(is_file_limit(error.as_ref()));
+        let refused = std::io::Error::from(std::io::ErrorKind::ConnectionRefused);
+        assert!(!is_file_limit(&refused));
+        assert!(!is_file_limit(anyhow::anyhow!("os error 24 in user content").as_ref()));
+    }
 }

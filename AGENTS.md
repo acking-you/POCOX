@@ -1443,6 +1443,15 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
 - Reference: T3 Code's [virtualized timeline and scroll anchoring](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/apps/web/src/components/chat/MessagesTimeline.tsx)
   and [pagination state tests](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/packages/client-runtime/src/state/threads-pagination.test.ts).
 
+41. **Harness connection lifecycle (2026-10-18).** Temporary probes own and
+    await their SDK connections; Codex probes close their WebSocket handshake.
+    Publishers reclaim idle app/OpenCode streams after 90s and ACP/meta/host
+    streams after 180s, with activity in either direction renewing the deadline.
+    Keep generic port and Responses API timeouts unchanged. Local descriptor
+    exhaustion is not proof of a dead harness or revoked management grant;
+    preserve healthy services and report inspection failures accurately.
+    See `docs/harness-connection-lifecycle.md`.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.

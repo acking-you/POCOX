@@ -165,6 +165,8 @@ struct ShareBody {
     title: Option<String>,
     path: Option<String>,
     wait_ready_seconds: Option<u64>,
+    #[serde(default)]
+    secure: bool,
 }
 
 #[derive(Deserialize)]
@@ -251,6 +253,7 @@ fn local_routes(secret: Arc<str>) -> Router {
                     title: body.title,
                     path: body.path,
                     wait_ready_seconds: body.wait_ready_seconds,
+                    secure: body.secure,
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),

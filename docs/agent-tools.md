@@ -60,7 +60,8 @@ sequenceDiagram
   the phone's loopback (where shares are connected) and stays on the page's
   origin; other web links open in the system browser. **Send to agent** adds
   the page's address and its recent console errors to the conversation's
-  draft; nothing is sent by itself.
+  draft and opens that conversation; nothing is sent by itself. Opening a
+  share makes its tunnel the user's, so it lasts while the page is open.
 
 ### Use a service on another device
 
@@ -138,7 +139,7 @@ One `action` with its fields:
 
 | Action | Fields | Result |
 | --- | --- | --- |
-| `share` | `ports` (1–4, the page's first), `title`, `path`, `wait_ready_seconds` (≤ 20) | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
+| `share` | `ports` (1–4, the page's first), `title`, `path`, `scheme` (`https` for a TLS page), `wait_ready_seconds` (≤ 20) | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
 | `stop_sharing` | `service` (share id, port or key) | `stopped`; only what the caller's conversation shared |
 | `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port` | `connected` with the local address; shared ports and APIs only |
 | `disconnect` | `service` | `disconnected`; only what the caller's conversation connected |
@@ -206,7 +207,9 @@ A token is committed only when its harness has started: a launch that fails
 revokes it. A reopened ACP session gets a new token; once the agent accepts
 it, the session's earlier tokens end and what they made is the new one's, so
 the session can still stop its shares. A revocation from Settings is saved
-before it takes effect, so a restart cannot bring the token back.
+before it takes effect, so a restart cannot bring the token back. A share
+the user makes, keeps or stops, which outlives restarts, is reported only
+once it is saved; otherwise nothing changes and the call fails.
 
 ## The switch
 

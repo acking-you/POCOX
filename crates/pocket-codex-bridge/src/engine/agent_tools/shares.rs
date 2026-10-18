@@ -26,8 +26,8 @@ use super::{
     consent,
     error::{Pending, ToolError},
     model::{
-        bounded, clean_path, open_link, OwnerKind, OwnerView, ShareView, Shared, AGENT_LEASE_MS,
-        APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
+        bounded, clean_path, open_link, scheme, OwnerKind, OwnerView, ShareView, Shared,
+        AGENT_LEASE_MS, APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
     },
     state::{self, now_ms, OwnerKey, Share, SharedPort, State},
     tokens::{Kind, Principal},
@@ -111,6 +111,8 @@ pub struct ShareRequest {
     pub path: Option<String>,
     /// How long to wait for the first port to answer (at most 20 s).
     pub wait_ready_seconds: Option<u64>,
+    /// The page is served over TLS (opened with `https`).
+    pub secure: bool,
 }
 
 /// The loopback address answering on `port`, IPv4 first.
@@ -215,8 +217,8 @@ pub fn shared(share: ShareView) -> Shared {
         .unwrap_or_default();
     let key = share.first_key().unwrap_or_default().to_string();
     Shared {
-        on_this_machine: format!("http://localhost:{first}{}", share.path),
-        open: open_link(&key, &share.path),
+        on_this_machine: format!("{}://localhost:{first}{}", scheme(share.secure), share.path),
+        open: open_link(&key, &share.path, share.secure),
         ends: ends(share.expires_ms, &share.owner),
         share,
     }
@@ -238,9 +240,9 @@ pub async fn share(
     let ports = validate(&request, &own_ports())?;
     let key = caller.key();
     if caller.is_user() {
-        take_over(&mut state::lock(), &ports, caller);
+        take_over(&mut state::lock(), &ports, caller)?;
     }
-    if let Some(done) = existing(&ports, &key) {
+    if let Some(done) = existing(&ports) {
         return Ok(Ok(shared(done)));
     }
     let new: Vec<u16> = {
@@ -253,7 +255,7 @@ pub async fn share(
     };
     if new.is_empty() {
         // Shared by a concurrent call between the two looks.
-        return existing(&ports, &key)
+        return existing(&ports)
             .map(|view| Ok(shared(view)))
             .ok_or_else(|| ToolError::NotFound("The share".into()));
     }
@@ -284,7 +286,19 @@ pub async fn share(
             return Ok(Err(pending));
         }
     }
-    let (id, reserved) = reserve(caller, &key, title, clean_path(request.path.as_deref()), &addrs)?;
+    // The waits above can be long: a POCOX listener may have taken a port.
+    let own = own_ports();
+    if let Some(port) = new.iter().find(|port| own.contains(port)) {
+        return Err(ToolError::Invalid(format!(
+            "Port {port} now belongs to POCOX itself; it cannot be shared."
+        )));
+    }
+    let page = Page {
+        title,
+        path: clean_path(request.path.as_deref()),
+        secure: request.secure,
+    };
+    let (id, reserved) = reserve(caller, &key, page, &addrs)?;
     publish_reserved(&id, &reserved).await?;
     let view = state::lock()
         .shares
@@ -297,38 +311,63 @@ pub async fn share(
 }
 
 /// The user sharing ports an agent shares makes those shares the user's: no
-/// owner lifetime, no expiry, kept across restarts.
-fn take_over(state: &mut State, ports: &[u16], user: &Caller) {
-    let mut taken = false;
-    for share in state
+/// owner lifetime, no expiry, kept across restarts. Nothing changes unless
+/// that is saved.
+fn take_over(state: &mut State, ports: &[u16], user: &Caller) -> Result<(), ToolError> {
+    let taken: Vec<usize> = state
         .shares
-        .iter_mut()
-        .filter(|share| share.key.is_some() && share.ports.iter().any(|p| ports.contains(&p.port)))
-    {
-        share.key = None;
-        share.expires_ms = None;
-        share.owner = user.owner();
-        taken = true;
+        .iter()
+        .enumerate()
+        .filter(|(_, share)| {
+            share.key.is_some() && share.ports.iter().any(|p| ports.contains(&p.port))
+        })
+        .map(|(index, _)| index)
+        .collect();
+    if taken.is_empty() {
+        return Ok(());
     }
-    if taken {
-        let _ = state.save_shares();
-        state::changed(state);
+    let unsaved = state.shares_unsaved;
+    let before: Vec<_> = taken
+        .iter()
+        .map(|&index| {
+            let share = &mut state.shares[index];
+            let before = (share.key.take(), share.expires_ms.take(), share.owner.clone());
+            share.owner = user.owner();
+            before
+        })
+        .collect();
+    if state.save_shares().is_err() {
+        for (&index, (key, expires_ms, owner)) in taken.iter().zip(before) {
+            let share = &mut state.shares[index];
+            (share.key, share.expires_ms, share.owner) = (key, expires_ms, owner);
+        }
+        state.shares_unsaved = unsaved;
+        return Err(ToolError::NotSaved);
     }
+    state::changed(state);
+    Ok(())
 }
 
-/// A share that already covers every requested port (shared again: same
-/// answer).
-fn existing(ports: &[u16], key: &OwnerKey) -> Option<ShareView> {
+/// The share that holds the requested page (the first port) when every
+/// requested port is shared already: shared again, same answer.
+fn existing(ports: &[u16]) -> Option<ShareView> {
     let state = state::lock();
-    let holders: Vec<&Share> = ports
+    if !ports
         .iter()
-        .map(|port| state.share_with_port(*port))
-        .collect::<Option<Vec<_>>>()?;
-    holders
-        .iter()
-        .find(|share| share.key.as_ref() == Some(key))
-        .or_else(|| holders.first())
+        .all(|port| state.share_with_port(*port).is_some())
+    {
+        return None;
+    }
+    state
+        .share_with_port(*ports.first()?)
         .map(|share| share.view())
+}
+
+/// What a new share shows.
+struct Page {
+    title: String,
+    path: String,
+    secure: bool,
 }
 
 /// Reserve the free ports of `addrs` for `caller`, checking once more that
@@ -337,8 +376,7 @@ fn existing(ports: &[u16], key: &OwnerKey) -> Option<ShareView> {
 fn reserve(
     caller: &Caller,
     key: &OwnerKey,
-    title: String,
-    path: String,
+    page: Page,
     addrs: &[(u16, SocketAddr)],
 ) -> Result<(String, Vec<u16>), ToolError> {
     let device = runtime::device_id().map_err(|e| ToolError::Relay(format!("{e:#}")))?;
@@ -376,6 +414,7 @@ fn reserve(
             ..SharedPort::new(*port, key, *addr, true)
         }
     });
+    let unsaved = state.shares_unsaved;
     // The same owner sharing more ports extends its share.
     let id = if let Some(share) = state
         .shares
@@ -390,8 +429,9 @@ fn reserve(
         let id = uuid::Uuid::new_v4().simple().to_string()[..10].to_string();
         state.shares.push(Share {
             id: id.clone(),
-            title,
-            path,
+            title: page.title,
+            path: page.path,
+            secure: page.secure,
             owner,
             key: (!user).then(|| key.clone()),
             created_ms: now_ms(),
@@ -400,7 +440,15 @@ fn reserve(
         });
         id
     };
-    let _ = state.save_shares();
+    // The user's shares outlive restarts: reported only once saved.
+    if state.save_shares().is_err() && caller.is_user() {
+        for share in state.shares.iter_mut().filter(|share| share.id == id) {
+            share.ports.retain(|p| !reserved.contains(&p.port));
+        }
+        state.shares.retain(|share| !share.ports.is_empty());
+        state.shares_unsaved = unsaved;
+        return Err(ToolError::NotSaved);
+    }
     state::changed(&mut state);
     Ok((id, reserved))
 }
@@ -561,18 +609,25 @@ pub fn stop(caller: Option<&Caller>, target: &str) -> Result<ShareView, ToolErro
     Ok(view)
 }
 
-/// Keep a share until the user stops it (no owner lifetime, no expiry).
+/// Keep a share until the user stops it (no owner lifetime, no expiry), once
+/// that is saved.
 pub fn keep(id: &str) -> Result<ShareView, ToolError> {
     let mut state = state::lock();
-    let share = state
+    let index = state
         .shares
-        .iter_mut()
-        .find(|share| share.id == id)
+        .iter()
+        .position(|share| share.id == id)
         .ok_or_else(|| ToolError::NotFound(format!("The share `{}`", bounded(id))))?;
-    share.key = None;
-    share.expires_ms = None;
-    let view = share.view();
-    let _ = state.save_shares();
+    let unsaved = state.shares_unsaved;
+    let share = &mut state.shares[index];
+    let before = (share.key.take(), share.expires_ms.take());
+    if state.save_shares().is_err() {
+        let share = &mut state.shares[index];
+        (share.key, share.expires_ms) = before;
+        state.shares_unsaved = unsaved;
+        return Err(ToolError::NotSaved);
+    }
+    let view = state.shares[index].view();
     state::changed(&mut state);
     Ok(view)
 }
@@ -621,6 +676,7 @@ pub fn restore(saved: Vec<state::SavedShare>) {
             id: share.id,
             title: bounded(&share.title),
             path: clean_path(Some(&share.path)),
+            secure: share.secure,
             owner: share.owner,
             key: None,
             created_ms: share.created_ms,
@@ -773,6 +829,7 @@ mod tests {
             id: "s1".into(),
             title: "Landing".into(),
             path: "/".into(),
+            secure: false,
             owner: Caller::user("agent").owner(),
             key: Some(OwnerKey {
                 token: "t1".into(),
@@ -782,9 +839,9 @@ mod tests {
             expires_ms: Some(1),
             ports: vec![SharedPort::new(5173, "pcx:studio:port:5173".into(), addr, true)],
         });
-        take_over(&mut state, &[8000], &Caller::user("You"));
+        take_over(&mut state, &[8000], &Caller::user("You")).expect("nothing to take");
         assert!(state.shares[0].key.is_some(), "other ports are left alone");
-        take_over(&mut state, &[5173], &Caller::user("You"));
+        take_over(&mut state, &[5173], &Caller::user("You")).expect("taken");
         let share = &state.shares[0];
         assert!(share.key.is_none() && share.expires_ms.is_none() && share.durable());
     }

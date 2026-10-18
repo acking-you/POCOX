@@ -9,9 +9,9 @@
 //! shared.
 use std::{collections::HashMap, path::PathBuf, sync::Mutex};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use once_cell::sync::OnceCell;
-use pocket_codex_pb::{subscribe, RelaySession, SubscribeOptions};
+use pocket_codex_pb::{subscribe, Connection, RelaySession, SubscribeOptions};
 use tokio::{
     runtime::{Builder, Runtime},
     task::JoinHandle,
@@ -264,69 +264,42 @@ fn spawn_subscribe(
     key: String,
     local_port: u16,
 ) -> Result<(String, JoinHandle<()>)> {
-    let requested = format!("127.0.0.1:{local_port}");
-    let local_addr = std::net::TcpListener::bind(&requested)
-        .map_err(|e| anyhow!("cannot bind {requested}: {e}"))?
-        .local_addr()
-        .map(|a| a.to_string())
-        .map_err(|e| anyhow!("reading bound addr for {requested}: {e}"))?;
-
-    // The probe is released above; a tiny TOCTOU window remains before the SDK
-    // rebinds, which the readiness wait below turns from a silent failure into a
-    // reported one.
-    let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
-    let handle = runtime().spawn({
-        let local_addr = local_addr.clone();
-        async move {
-            let opts = SubscribeOptions {
-                key: key.clone(),
-                local_addr,
-            };
-            match subscribe(&session, opts).await {
-                Ok(connection) => {
-                    // A send failure means the caller gave up waiting; the tunnel
-                    // is up either way, and the caller's own timeout already
-                    // reported that. Hold it regardless, so an abort is what tears
-                    // it down.
-                    let _ = ready_tx.send(Ok(()));
-                    std::future::pending::<()>().await;
-                    drop(connection);
-                },
-                Err(err) => {
-                    let message = format!("{err:#}");
-                    tracing::warn!(key = %key, error = %message, "subscribe failed");
-                    let _ = ready_tx.send(Err(message));
-                },
-            }
-        }
+    let (local_addr, connection) = open_subscription(session, key, local_port)?;
+    let handle = runtime().spawn(async move {
+        std::future::pending::<()>().await;
+        drop(connection);
     });
+    Ok((local_addr, handle))
+}
 
-    // Awaited ON the runtime, not with a blocking channel recv: this is called
-    // from synchronous FRB entrypoints, and parking a runtime worker thread on a
-    // std channel could deadlock against the very task we are waiting for.
-    //
-    // Bounded so a wedged relay cannot hang the Flutter isolate forever. The
-    // budget is the SDK's own readiness timeout plus a margin, so it only fires
-    // when the SDK itself has already given up.
-    let outcome = runtime()
-        .block_on(async { tokio::time::timeout(subscribe_ready_timeout(), ready_rx).await });
-    match outcome {
-        Ok(Ok(Ok(()))) => Ok((local_addr, handle)),
-        Ok(Ok(Err(message))) => {
-            handle.abort();
-            Err(anyhow!("subscribing to the relay failed: {message}"))
-        },
-        // Sender dropped without reporting (the task was aborted or panicked),
-        // or the readiness budget elapsed. Neither leaves a dialable endpoint, so
-        // both have to fail rather than hand back an address that refuses.
-        Ok(Err(_)) | Err(_) => {
-            handle.abort();
-            Err(anyhow!(
+fn open_subscription(
+    session: RelaySession,
+    key: String,
+    local_port: u16,
+) -> Result<(String, Connection)> {
+    let requested = format!("127.0.0.1:{local_port}");
+    let reservation = std::net::TcpListener::bind(&requested)
+        .with_context(|| format!("cannot bind {requested}"))?;
+    let local_addr = reservation.local_addr()?.to_string();
+    drop(reservation);
+    let connection = runtime()
+        .block_on(async {
+            tokio::time::timeout(
+                subscribe_ready_timeout(),
+                subscribe(&session, SubscribeOptions {
+                    key,
+                    local_addr: local_addr.clone(),
+                }),
+            )
+            .await
+        })
+        .map_err(|_| {
+            anyhow!(
                 "the relay did not accept a subscription on `{requested}` within {}s",
                 subscribe_ready_timeout().as_secs()
-            ))
-        },
-    }
+            )
+        })??;
+    Ok((local_addr, connection))
 }
 
 /// How long a subscribe waits for the tunnel to come up before giving up.
@@ -377,21 +350,33 @@ pub fn unsubscribe_prefix(prefix: &str) {
     }
 }
 
-/// Open a one-off pb-mapper subscriber for `key` that is NOT recorded in the
-/// shared registry, returning the bound local address and the task handle (the
-/// caller MUST `abort()` it when done).
-///
-/// Unlike [`subscribe_service`], this never reuses or registers a persistent
-/// entry. A transient reachability probe needs that isolation: keyed on the
-/// shared registry, a probe could reuse a live connection's tunnel and then —
-/// on its own teardown — abort the real connection. With its own handle it
-/// tears down only its own tunnel.
+/// An isolated probe's tunnel. Dropping it cancels the SDK connection even
+/// when a probe returns early; explicit closure also waits for its streams.
+pub struct TransientSubscription {
+    connection: Connection,
+}
+
+impl TransientSubscription {
+    /// Stop the probe's listener and streams before reporting completion.
+    pub fn close(self) {
+        if let Err(error) = runtime().block_on(self.connection.stop()) {
+            tracing::warn!(%error, "closing transient relay subscription failed");
+        }
+    }
+}
+
+/// Open a one-off subscriber owned by the returned guard, independently of
+/// every persistent connection. Call `close` after the probe to await teardown.
 pub fn subscribe_transient(
     key: String,
     local_port: u16,
     transport: &Transport,
-) -> Result<(String, JoinHandle<()>)> {
-    spawn_subscribe(transport.session.clone(), transport.relay_key(&key), local_port)
+) -> Result<(String, TransientSubscription)> {
+    let (address, connection) =
+        open_subscription(transport.session.clone(), transport.relay_key(&key), local_port)?;
+    Ok((address, TransientSubscription {
+        connection,
+    }))
 }
 
 /// Snapshot of all tracked subscriptions.

@@ -230,7 +230,6 @@ pub(super) fn restart_guard(name: &str, incarnation: &str, wait: Duration) -> Op
 pub(super) async fn health_watchdog(watched: Watched) {
     let watched = Arc::new(watched);
     let local_addr = watched.local_addr.clone();
-    let url = format!("http://{local_addr}/readyz");
     let Some(client) = probe_client() else {
         return;
     };
@@ -238,7 +237,24 @@ pub(super) async fn health_watchdog(watched: Watched) {
     let mut restart_failures: u32 = 0;
     loop {
         tokio::time::sleep(HEALTH_INTERVAL).await;
-        if probe_ready(&client, &url).await && probe_thread_rpc(&local_addr).await {
+        let health = async {
+            client
+                .get(format!("http://{local_addr}/readyz"))
+                .send()
+                .await?
+                .error_for_status()?;
+            pocket_codex_codex::readiness::probe_rpc(&format!("ws://{local_addr}"), READY_TIMEOUT)
+                .await
+        }
+        .await;
+        if let Err(error) = &health {
+            tracing::warn!(%local_addr, error = %format!("{error:#}"), "app-server health check failed");
+            if pocket_codex_core::error::is_file_limit(error.as_ref()) {
+                consecutive = 0;
+                continue;
+            }
+        }
+        if health.is_ok() {
             consecutive = 0;
             restart_failures = 0;
             continue;
@@ -286,21 +302,6 @@ fn probe_client() -> Option<reqwest::Client> {
         .no_proxy()
         .build()
         .ok()
-}
-
-/// One `/readyz` probe over `client`: `true` on any 2xx.
-async fn probe_ready(client: &reqwest::Client, url: &str) -> bool {
-    matches!(client.get(url).send().await, Ok(resp) if resp.status().is_success())
-}
-
-async fn probe_thread_rpc(local_addr: &str) -> bool {
-    let result =
-        pocket_codex_codex::readiness::probe_rpc(&format!("ws://{local_addr}"), READY_TIMEOUT)
-            .await;
-    if let Err(error) = &result {
-        tracing::warn!(%local_addr, error = %format!("{error:#}"), "app-server functional health probe failed");
-    }
-    result.is_ok()
 }
 
 /// Stop the wedged codex and spawn a fresh one on the same port (escalating to

@@ -3,6 +3,8 @@
 /// conversation's draft. Nothing is sent by itself.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -48,7 +50,8 @@ String previewNote(
 }
 
 /// Add the preview of share [serviceKey] to its agent's conversation draft
-/// and go back there; without a known conversation the note is copied.
+/// and open that conversation (unless it is the page under the preview);
+/// without a known conversation the note is copied.
 Future<void> sendPreviewToAgent(
   BuildContext context,
   WidgetRef ref, {
@@ -81,5 +84,11 @@ Future<void> sendPreviewToAgent(
   addToConversationDraft(ref, service, thread, note);
   if (!context.mounted) return;
   showToastOk(context, l10n.browserSentToDraft);
+  final router = GoRouter.of(context);
+  final target = Uri.parse(conversationRoute(service, thread));
   context.pop();
+  final below = router.state.uri;
+  if (below.path != target.path || below.queryParameters['tid'] != thread) {
+    unawaited(router.push(target.toString()));
+  }
 }

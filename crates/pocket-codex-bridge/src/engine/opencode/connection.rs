@@ -143,10 +143,10 @@ pub fn probe_reason(service: &str, owned: &Owned) -> Option<String> {
             .await
         });
         if let Some(task) = task {
-            task.abort();
+            task.close();
         }
         result??;
         Ok(())
     };
-    attempt().err().map(|error| error.to_string())
+    attempt().err().map(|error| format!("{error:#}"))
 }

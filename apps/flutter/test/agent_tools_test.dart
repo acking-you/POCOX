@@ -184,6 +184,35 @@ void main() {
     expect(api.toolsConnected, ['pcx:studio:port:5173']);
   });
 
+  testWidgets('opening a share an agent here connected takes its tunnel over', (
+    t,
+  ) async {
+    final api = FakeBridgeApi()
+      ..toolsOverviewValue = ToolsOverview(
+        thisDevice: 'phone',
+        devices: remoteShare().devices,
+        connections: const [
+          ToolsConnection(
+            service: 'pcx:studio:port:5173',
+            local: '127.0.0.1:5173',
+            samePort: true,
+            owner: _owner,
+          ),
+        ],
+      );
+    await t.pumpWidget(
+      _host(
+        api,
+        const ShareCard(share: ShareRef(service: 'pcx:studio:port:5173')),
+      ),
+    );
+    await t.pump();
+    await t.tap(find.byKey(const Key('share-open-pcx:studio:port:5173')));
+    await t.pump();
+    // The agent's would end with the agent while the page is open.
+    expect(api.toolsConnected, ['pcx:studio:port:5173']);
+  });
+
   testWidgets('every pending request is asked about, on any device, until '
       'answered here', (t) async {
     // Pending before the app opened, on another device.

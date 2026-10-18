@@ -61,12 +61,14 @@ mixin _RustTools implements BridgeApi {
     List<int> ports, {
     String? title,
     String? path,
+    bool secure = false,
   }) async {
     final s = await frb.toolsShareOn(
       device: device,
       ports: Uint16List.fromList(ports),
       title: title,
       path: path,
+      secure: secure,
     );
     return ToolsShared(
       share: _toolsShare(s.share),
@@ -131,6 +133,7 @@ ToolsShare _toolsShare(frb.ToolsShareDto s) => ToolsShare(
   id: s.id,
   title: s.title,
   path: s.path,
+  secure: s.secure,
   ports: [
     for (final p in s.ports)
       ToolsPort(port: p.port, key: p.key, status: p.status),

@@ -157,8 +157,16 @@ pub async fn connect(
     // The call may have waited for the relay: the switch or the token may
     // have ended meanwhile.
     if let Err(error) = state.admits(caller) {
+        // The tunnel may be another admitted owner's too (a concurrent
+        // connect to the same service): only an unowned one is ended.
+        let owned = state
+            .connections
+            .iter()
+            .any(|c| c.registry_key == connection.registry_key);
         drop(state);
-        runtime::unsubscribe_service(&connection.registry_key);
+        if !owned {
+            runtime::unsubscribe_service(&connection.registry_key);
+        }
         return Err(error);
     }
     let view = match state

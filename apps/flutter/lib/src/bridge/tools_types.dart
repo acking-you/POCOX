@@ -100,6 +100,7 @@ class ToolsShare {
     required this.owner,
     required this.createdMs,
     this.expiresMs,
+    this.secure = false,
   });
 
   /// Id on its device.
@@ -110,6 +111,9 @@ class ToolsShare {
 
   /// Path to open on the first port.
   final String path;
+
+  /// Whether the page is served over TLS (opened with `https`).
+  final bool secure;
 
   /// Its ports, the page's first.
   final List<ToolsPort> ports;

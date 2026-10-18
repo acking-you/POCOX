@@ -223,7 +223,7 @@ pub fn probe_reason(service_key: String, local_port: u16, transport: &Transport)
         };
     let reason = probe_endpoint_error(&local_addr);
     // Tear down ONLY this probe's own transient tunnel.
-    handle.abort();
+    handle.close();
     reason
 }
 
@@ -264,7 +264,7 @@ pub fn probe_api(service_key: String, transport: &Transport) -> bool {
         return false;
     };
     let ok = probe_http_endpoint(&local_addr);
-    handle.abort();
+    handle.close();
     ok
 }
 

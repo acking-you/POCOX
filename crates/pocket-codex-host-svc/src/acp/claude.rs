@@ -145,6 +145,9 @@ pub enum Cli {
 /// What this computer has for the Claude preset.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Environment {
+    /// An installed runtime could not be inspected; this is not a missing
+    /// install.
+    pub inspection_error: Option<process::OutputError>,
     /// The adapter, if any.
     pub adapter: Option<Adapter>,
     /// A Node.js >= [`MIN_NODE_MAJOR`], if any.
@@ -185,6 +188,9 @@ pub struct Launch {
 /// Why the preset cannot start yet.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Missing {
+    /// An installed executable could not be inspected.
+    #[error("Claude runtime inspection failed: {0}")]
+    Inspection(process::OutputError),
     /// No adapter is installed or prepared.
     #[error(
         "Claude's ACP adapter ({}) is not installed; start the Claude host from the hosting \
@@ -383,10 +389,12 @@ fn find_adapter(lookup: &Lookup<'_>) -> Option<Adapter> {
 /// process group ([`process::spawn`]), which is cleaned up in every case, so
 /// a descendant holding its output open neither stalls this nor survives it.
 pub async fn node_version(path: &Path) -> Option<Version> {
-    // Preloads requested for the user's own programs are not needed to print
-    // a version; an empty value requests none.
+    inspect_node(path).await.ok().flatten()
+}
+
+async fn inspect_node(path: &Path) -> Result<Option<Version>, process::OutputError> {
     let env = [(OsString::from("NODE_OPTIONS"), OsString::new())];
-    let output = process::read_output(
+    let output = process::inspect_output(
         path,
         &["--version".into()],
         None,
@@ -395,12 +403,17 @@ pub async fn node_version(path: &Path) -> Option<Version> {
         PROBE_OUTPUT_LIMIT,
     )
     .await?;
-    parse_version(std::str::from_utf8(&output).ok()?)
+    let version = std::str::from_utf8(&output)
+        .ok()
+        .and_then(parse_version)
+        .ok_or(process::OutputError::Output)?;
+    Ok(Some(version))
 }
 
 /// What the Node.js search found.
 #[derive(Default)]
 struct Runtimes {
+    failure: Option<process::OutputError>,
     /// The first Node.js new enough: it runs an adapter script.
     node: Option<Node>,
     /// The first Node.js new enough with npm beside it, searched only when
@@ -416,7 +429,7 @@ struct Runtimes {
 async fn find_node(
     lookup: &Lookup<'_>,
     adapter: Option<&Adapter>,
-    probe: &mut impl AsyncFnMut(&Path) -> Option<Version>,
+    probe: &mut impl AsyncFnMut(&Path) -> Result<Option<Version>, process::OutputError>,
 ) -> Runtimes {
     let mut candidates: Vec<(Option<Version>, PathBuf)> = Vec::new();
     if let Some(dir) = adapter.and_then(|a| a.bin.parent()) {
@@ -469,7 +482,7 @@ async fn find_node(
         }
         probes += 1;
         match probe(&path).await {
-            Some(version) if version.0 >= MIN_NODE_MAJOR => {
+            Ok(Some(version)) if version.0 >= MIN_NODE_MAJOR => {
                 if wants_npm && found.npm.is_none() {
                     found.npm = npm.map(|cli| Npm {
                         node: path.clone(),
@@ -481,8 +494,16 @@ async fn find_node(
                     version,
                 });
             },
-            Some(version) => found.too_old = found.too_old.max(Some(version)),
-            None => {},
+            Ok(Some(version)) => found.too_old = found.too_old.max(Some(version)),
+            Ok(None) => {},
+            Err(error) => {
+                let exhausted =
+                    error == process::OutputError::Spawn(process::SpawnError::FileLimit);
+                found.failure.get_or_insert(error);
+                if exhausted {
+                    break;
+                }
+            },
         }
     }
     found
@@ -517,7 +538,7 @@ fn find_cli(lookup: &Lookup<'_>) -> Cli {
 /// Look at what this computer has (runs bounded `node --version` probes on
 /// candidates; must run inside a Tokio runtime).
 pub async fn detect(lookup: &Lookup<'_>) -> Environment {
-    detect_with(lookup, node_version).await
+    inspect_with(lookup, inspect_node).await
 }
 
 /// [`detect`] with the Node.js probe supplied.
@@ -525,9 +546,26 @@ pub async fn detect_with(
     lookup: &Lookup<'_>,
     mut probe: impl AsyncFnMut(&Path) -> Option<Version>,
 ) -> Environment {
+    inspect_with(lookup, async |path: &Path| Ok(probe(path).await)).await
+}
+
+async fn inspect_with(
+    lookup: &Lookup<'_>,
+    mut probe: impl AsyncFnMut(&Path) -> Result<Option<Version>, process::OutputError>,
+) -> Environment {
     let adapter = find_adapter(lookup);
-    let found = find_node(lookup, adapter.as_ref(), &mut probe).await;
+    let found = if adapter
+        .as_ref()
+        .is_some_and(|adapter| adapter.entry.is_none())
+    {
+        // Wrappers own their runtime selection; probing unrelated Node installs
+        // can only add latency or report a failure that cannot block this launch.
+        Runtimes::default()
+    } else {
+        find_node(lookup, adapter.as_ref(), &mut probe).await
+    };
     Environment {
+        inspection_error: if found.node.is_some() { None } else { found.failure },
         adapter,
         node: found.node,
         too_old: found.too_old,
@@ -543,6 +581,13 @@ fn version_text(version: Version) -> String {
 impl Environment {
     /// The launch for a spec with `args`, or why it cannot start.
     pub fn launch(&self, args: &[String]) -> Result<Launch, Missing> {
+        let needs_node = self
+            .adapter
+            .as_ref()
+            .is_none_or(|adapter| adapter.entry.is_some());
+        if let Some(error) = self.inspection_error.as_ref().filter(|_| needs_node) {
+            return Err(Missing::Inspection(error.clone()));
+        }
         let adapter = self.adapter.as_ref().ok_or(Missing::Adapter)?;
         let env = match &self.cli {
             Cli::Found(path) => vec![(OsString::from(CLI_ENV), path.clone().into_os_string())],
@@ -581,7 +626,7 @@ impl Environment {
 
     /// Whether preparing the pinned adapter could help and can run.
     pub fn can_prepare(&self) -> bool {
-        self.adapter.is_none() && self.npm.is_some()
+        self.inspection_error.is_none() && self.adapter.is_none() && self.npm.is_some()
     }
 
     /// A display summary (paths and versions only).
@@ -593,12 +638,14 @@ impl Environment {
             adapter: match self.adapter.as_ref().map(|a| a.source) {
                 Some(AdapterSource::Installed) => "installed",
                 Some(AdapterSource::Prepared) => "prepared",
+                None if self.inspection_error.is_some() => "unavailable",
                 None => "missing",
             },
             adapter_path: self.adapter.as_ref().map(|a| a.bin.display().to_string()),
             runtime: match (&self.node, self.too_old) {
                 (Some(_), _) => "found",
                 (None, _) if !needs_node => "notNeeded",
+                (None, _) if self.inspection_error.is_some() => "unavailable",
                 (None, Some(_)) => "tooOld",
                 (None, None) => "missing",
             },
@@ -629,11 +676,12 @@ impl Environment {
 pub struct Status {
     /// The preset can start now.
     pub ready: bool,
-    /// `installed` / `prepared` / `missing`.
+    /// `installed` / `prepared` / `missing` / `unavailable`.
     pub adapter: &'static str,
     /// The adapter executable.
     pub adapter_path: Option<String>,
-    /// `found` / `tooOld` / `missing` / `notNeeded` (a wrapper adapter).
+    /// `found` / `tooOld` / `missing` / `unavailable` / `notNeeded` (a wrapper
+    /// adapter).
     pub runtime: &'static str,
     /// The runtime's version (or the newest too-old one).
     pub runtime_version: Option<String>,

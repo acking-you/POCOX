@@ -126,6 +126,7 @@ mixin _FakeTools on _FakeBridgeState {
     List<int> ports, {
     String? title,
     String? path,
+    bool secure = false,
   }) async {
     toolsSharedOn.add((device, ports));
     final shared = await toolsShare(ports, title: title, path: path);
@@ -135,6 +136,7 @@ mixin _FakeTools on _FakeBridgeState {
         id: shared.share.id,
         title: shared.share.title,
         path: shared.share.path,
+        secure: secure,
         ports: [ToolsPort(port: ports.first, key: key, status: 'online')],
         owner: shared.share.owner,
         createdMs: 0,
