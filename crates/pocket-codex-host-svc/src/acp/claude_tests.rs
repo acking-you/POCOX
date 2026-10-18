@@ -426,3 +426,23 @@ async fn malformed_or_oversized_output_is_not_a_version() {
     let binary = script(dir.path(), "binary", "printf 'v22.4.1\\377\\376'");
     assert_eq!(node_version(&binary).await, None, "not UTF-8");
 }
+
+#[tokio::test]
+async fn exhausted_inspection_is_retryable_and_does_not_claim_node_is_missing() {
+    let dir = tempfile::tempdir().expect("temp");
+    let root = dir.path();
+    node(&root.join("bin/node"), "v22.23.2");
+    npm_beside(root);
+    let path = root.join("bin").into_os_string();
+    let env = inspect_with(&lookup(&path, root, root), async |_: &Path| {
+        Err(process::OutputError::Spawn(process::SpawnError::FileLimit))
+    })
+    .await;
+    assert!(matches!(env.launch(&[]), Err(Missing::Inspection(_))));
+    assert!(!env.can_prepare());
+    assert_eq!(env.status().runtime, "unavailable");
+    assert_eq!(env.status().adapter, "unavailable");
+    let recovered = detect_with(&lookup(&path, root, root), probe).await;
+    assert_eq!(recovered.status().runtime, "found");
+    assert!(recovered.can_prepare());
+}

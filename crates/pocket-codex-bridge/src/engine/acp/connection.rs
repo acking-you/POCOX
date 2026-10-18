@@ -13,7 +13,7 @@ struct Origin {
     /// The loopback gateway, when hosted here.
     pub(super) local: Option<String>,
     /// A transient tunnel to abort when done (probes).
-    pub(super) transient: Option<JoinHandle<()>>,
+    pub(super) transient: Option<runtime::TransientSubscription>,
 }
 
 impl Origin {
@@ -282,7 +282,7 @@ pub fn probe_reason(service_key: &str, owned: &Owned) -> Option<String> {
         })
         .unwrap_or_else(|error| Some(format!("{error:#}")));
     if let Some(handle) = origin.transient {
-        handle.abort();
+        handle.close();
     }
     reason
 }

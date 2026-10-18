@@ -322,7 +322,6 @@ fn websocket_listen_addr(listen: &str) -> Option<String> {
 /// and WebSocket pongs remain healthy. It does not run a model turn, so a
 /// single hung generation on an otherwise responsive server is not restarted.
 async fn codex_health_watchdog(local_addr: String, spawn_opts: SpawnOptions) {
-    let url = format!("http://{local_addr}/readyz");
     let client = match reqwest::Client::builder()
         .timeout(HEALTH_TIMEOUT)
         .no_proxy()
@@ -337,24 +336,24 @@ async fn codex_health_watchdog(local_addr: String, spawn_opts: SpawnOptions) {
     let mut restart_failures: u32 = 0;
     loop {
         tokio::time::sleep(HEALTH_INTERVAL).await;
-        let http_ready = matches!(
-            client.get(&url).send().await,
-            Ok(resp) if resp.status().is_success()
-        );
-        let rpc_ready = if http_ready {
-            let result = pocket_codex_codex::readiness::probe_rpc(
-                &format!("ws://{local_addr}"),
-                READY_TIMEOUT,
-            )
-            .await;
-            if let Err(error) = &result {
-                tracing::warn!(%local_addr, error = %format!("{error:#}"), "app-server functional health probe failed");
+        let health = async {
+            client
+                .get(format!("http://{local_addr}/readyz"))
+                .send()
+                .await?
+                .error_for_status()?;
+            pocket_codex_codex::readiness::probe_rpc(&format!("ws://{local_addr}"), READY_TIMEOUT)
+                .await
+        }
+        .await;
+        if let Err(error) = &health {
+            tracing::warn!(%local_addr, error = %format!("{error:#}"), "app-server health check failed");
+            if pocket_codex_core::error::is_file_limit(error.as_ref()) {
+                consecutive = 0;
+                continue;
             }
-            result.is_ok()
-        } else {
-            false
-        };
-        if rpc_ready {
+        }
+        if health.is_ok() {
             consecutive = 0;
             restart_failures = 0;
             continue;
