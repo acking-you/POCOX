@@ -26,7 +26,8 @@ use pocket_codex_pb::Published;
 use tokio::task::JoinHandle;
 
 use super::{
-    host_lease, host_profiles, host_services, hosting, runtime, serve::ServeStatus, transport,
+    agent_tools, host_lease, host_profiles, host_services, hosting, runtime, serve::ServeStatus,
+    transport,
 };
 
 #[path = "serve_opencode_registration.rs"]
@@ -108,7 +109,7 @@ impl OpenCodeStatus {
                 out.models = u32::try_from(catalog.models.len()).unwrap_or(u32::MAX);
                 out.agents = catalog.agents.into_iter().map(|agent| agent.name).collect();
             },
-            Err(error) => out.problem = Some(error.to_string()),
+            Err(error) => out.problem = Some(format!("{error:#}")),
         }
         out
     }
@@ -271,8 +272,25 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let (gateway, local) = host_services::bind_loopback("OpenCode gateway")?;
     let (meta_listener, meta) = host_services::bind_loopback("OpenCode meta")?;
     let rt = runtime::runtime();
+    // The tools are added at launch, not when the launch is prepared: an
+    // apply prepares before it stops the previous host, which ends that
+    // host's tokens.
+    let mut launch = prepared.launch.clone();
+    let name = &prepared.name;
+    // Revoked when dropped uncommitted: any failure below.
+    let tools = agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}"))
+        .and_then(|grant| {
+            let inherited = std::env::var_os("OPENCODE_CONFIG_CONTENT");
+            match agent_tools::inject::opencode(&grant, &mut launch.env, inherited.as_deref()) {
+                Ok(()) => Some(grant),
+                Err(error) => {
+                    tracing::warn!("agent tools not given to OpenCode `{name}`: {error:#}");
+                    None
+                },
+            }
+        });
     let (host, pid) = rt.block_on(async {
-        let server = Server::start(&prepared.launch).await?;
+        let server = Server::start(&launch).await?;
         let pid = server.pid;
         Ok::<_, anyhow::Error>((Host::new(server).await?, pid))
     })?;
@@ -342,6 +360,9 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
             .context("OpenCode startup cleanup did not confirm exit; stop this host again")?;
         return Err(error);
     }
+    if let Some(grant) = tools {
+        agent_tools::inject::hosted_started(&name, grant, false);
+    }
     Ok(out)
 }
 
@@ -375,6 +396,7 @@ pub(super) fn retire(name: &str) -> Result<Option<Prepared>> {
     }
     let removed = hosts().hosts.remove(name);
     let Some(host) = removed else { return Ok(None) };
+    agent_tools::inject::hosted_stopped(name);
     runtime::runtime().block_on(async {
         for task in host.tasks {
             task.abort();
@@ -444,6 +466,15 @@ pub fn refresh_catalog(name: &str) -> Result<()> {
         .take()
         .or_else(|| current.prepared.discovery_problem.clone());
     Ok(())
+}
+
+/// Loopback ports this process's OpenCode hosts listen on (gateway and meta).
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts()
+        .hosts
+        .values()
+        .flat_map(|host| [host.local.port(), host.meta.port()])
+        .collect()
 }
 
 pub(super) fn status() -> Vec<ServeStatus> {

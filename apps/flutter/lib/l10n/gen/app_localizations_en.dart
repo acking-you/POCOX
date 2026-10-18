@@ -3870,4 +3870,264 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conversationsLoading => 'Loading conversations…';
+
+  @override
+  String get toolsTitle => 'Agent tools';
+
+  @override
+  String get toolsSharedWithYou => 'Shared with you';
+
+  @override
+  String toolsRequestTitle(String owner) {
+    return '$owner wants to share';
+  }
+
+  @override
+  String toolsRequestDetail(String title, String ports, String device) {
+    return '$title · port $ports on $device';
+  }
+
+  @override
+  String get toolsAllowOnce => 'Allow once';
+
+  @override
+  String get toolsAllowConversation => 'Allow in this conversation';
+
+  @override
+  String get toolsDeny => 'Deny';
+
+  @override
+  String toolsAnswerFailed(String error) {
+    return 'Could not answer: $error';
+  }
+
+  @override
+  String toolsNewShare(String device, String title) {
+    return '$device shared $title';
+  }
+
+  @override
+  String get toolsOpen => 'Open';
+
+  @override
+  String get toolsCopyLink => 'Copy link';
+
+  @override
+  String get toolsLinkCopied => 'Link copied';
+
+  @override
+  String get toolsStopSharing => 'Stop sharing';
+
+  @override
+  String get toolsKeepSharing => 'Keep sharing';
+
+  @override
+  String get toolsKeptToast => 'Kept until you stop it';
+
+  @override
+  String toolsStoppedToast(String title) {
+    return 'Stopped sharing $title';
+  }
+
+  @override
+  String toolsBy(String owner) {
+    return 'by $owner';
+  }
+
+  @override
+  String get toolsYou => 'you';
+
+  @override
+  String toolsPort(String ports) {
+    return 'port $ports';
+  }
+
+  @override
+  String get toolsStatusOnline => 'Online';
+
+  @override
+  String get toolsStatusStarting => 'Connecting';
+
+  @override
+  String get toolsStatusUnreachable => 'Not answering';
+
+  @override
+  String get toolsStatusOffline => 'Offline';
+
+  @override
+  String get toolsEnded => 'Ended';
+
+  @override
+  String toolsEndsIn(String time) {
+    return 'Ends in $time';
+  }
+
+  @override
+  String get toolsKept => 'Kept';
+
+  @override
+  String toolsOpenFailed(String error) {
+    return 'Could not open it: $error';
+  }
+
+  @override
+  String toolsPortMoved(String port, String local) {
+    return 'Port $port is taken here, so it opened on $local. Links that name localhost:$port may not work.';
+  }
+
+  @override
+  String toolsPortsNotConnected(String ports) {
+    return 'Port $ports of this share is not reachable at its own number here, so parts of the page may not work.';
+  }
+
+  @override
+  String get toolsNothingShared => 'Nothing shared yet';
+
+  @override
+  String get toolsShareHint =>
+      'When an agent shares a dev server or a page, it appears here, ready to open.';
+
+  @override
+  String get toolsThisDevice => 'This device';
+
+  @override
+  String get toolsSwitch => 'Let agents use POCOX';
+
+  @override
+  String get toolsSwitchInfo =>
+      'Codex, Claude, OpenCode and other agents can see your devices and services, share a port of this computer with your other devices, and connect to services elsewhere.';
+
+  @override
+  String get toolsAsk => 'Ask before an agent shares';
+
+  @override
+  String get toolsEndpoint => 'MCP endpoint';
+
+  @override
+  String get toolsNotServing => 'Not serving';
+
+  @override
+  String get toolsAddToHarness => 'Add to another agent';
+
+  @override
+  String get toolsAddToHarnessInfo =>
+      'For agents POCOX does not start, such as Claude Code or Codex run in a terminal: paste this into its configuration. Each copy carries a new token.';
+
+  @override
+  String get toolsHarnessGeneric => 'Other MCP client';
+
+  @override
+  String get toolsConfigCopied => 'Copied. Its token is shown only once.';
+
+  @override
+  String get toolsTokens => 'Tokens';
+
+  @override
+  String get toolsRevoke => 'Revoke';
+
+  @override
+  String get toolsRevoked => 'Revoked';
+
+  @override
+  String get toolsOffHere => 'Agent tools are off on this computer';
+
+  @override
+  String get galaxyTitle => 'Galaxy';
+
+  @override
+  String get galaxySearch => 'Search devices and services';
+
+  @override
+  String get galaxyList => 'List';
+
+  @override
+  String get galaxyEmpty => 'No devices yet';
+
+  @override
+  String get galaxyKindAgent => 'Agent';
+
+  @override
+  String get galaxyKindApi => 'Responses API';
+
+  @override
+  String get galaxyKindPort => 'Shared port';
+
+  @override
+  String galaxyConnected(String local) {
+    return 'Connected here at $local';
+  }
+
+  @override
+  String get galaxyConnect => 'Connect';
+
+  @override
+  String get galaxyDisconnect => 'Disconnect';
+
+  @override
+  String get galaxyOpenConversations => 'Open conversations';
+
+  @override
+  String get galaxyManageDevice => 'Manage device';
+
+  @override
+  String get galaxyOlderPocox => 'Older POCOX: no titles or owners';
+
+  @override
+  String get galaxyAll => 'All';
+
+  @override
+  String get browserReload => 'Reload';
+
+  @override
+  String get browserOpenExternal => 'Open in browser';
+
+  @override
+  String get browserSendToAgent => 'Send to agent';
+
+  @override
+  String get browserSentToDraft => 'Added to the conversation\'s draft';
+
+  @override
+  String galaxyServices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count services',
+      one: '1 service',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get toolsShareAndOpen => 'Share and open';
+
+  @override
+  String get toolsSharing => 'Sharing…';
+
+  @override
+  String get toolsStatusRefused => 'Refused by the relay';
+
+  @override
+  String toolsHours(int count) {
+    return '$count h';
+  }
+
+  @override
+  String toolsMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String browserNoteNoErrors(String title, String url, String device) {
+    return 'Preview of \"$title\" ($url, shared from $device): no console errors.';
+  }
+
+  @override
+  String browserNoteConsole(String title, String url, String device) {
+    return 'Preview of \"$title\" ($url, shared from $device), recent console messages:';
+  }
+
+  @override
+  String get browserNotLocal =>
+      'Only pages shared from your devices open here.';
 }

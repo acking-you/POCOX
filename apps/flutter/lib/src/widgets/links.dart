@@ -15,9 +15,17 @@ class SessionLinkScope extends InheritedWidget {
   bool updateShouldNotify(SessionLinkScope oldWidget) => open != oldWidget.open;
 }
 
+/// Opens `pocox://open` links (a share on one of the user's devices); set by
+/// the agent tools' app-wide host, unset until it is mounted.
+Future<bool> Function(BuildContext context, String url)? pocoxLinkHandler;
+
 /// Route session links before falling back to the system browser.
 Future<void> openUrl(BuildContext context, String? url) async {
   if (url == null) return;
+  if (url.startsWith('pocox://')) {
+    await pocoxLinkHandler?.call(context, url);
+    return;
+  }
   final scope = context.getInheritedWidgetOfExactType<SessionLinkScope>();
   if (scope != null && await scope.open(context, url)) return;
   if (context.mounted) await openWebUrl(context, url);

@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::{DefaultBodyLimit, Path, Query, State},
-    http::StatusCode,
+    extract::{DefaultBodyLimit, Path, Query, Request, State},
+    http::{header, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Json, Router,
@@ -320,6 +321,42 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
             },
             limit: Arc::new(tokio::sync::Semaphore::new(8)),
         })
+        .merge(crate::engine::agent_tools::routes::router(
+            Arc::new(move || {
+                AdmissionToken {
+                    epoch,
+                    generation,
+                }
+                .check()
+                .is_ok()
+            }),
+            epoch,
+        ))
+        .layer(middleware::from_fn(loopback_only))
+}
+
+/// Controllers reach this entry through a loopback tunnel and send neither an
+/// `Origin` nor a foreign `Host`; a request with either came from a browser
+/// page (cross-site, or DNS rebinding) and is refused.
+async fn loopback_only(request: Request, next: Next) -> Response {
+    let headers = request.headers();
+    let host = headers
+        .get(header::HOST)
+        .and_then(|value| value.to_str().ok());
+    if headers.contains_key(header::ORIGIN) || !host.is_some_and(loopback_host) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    next.run(request).await
+}
+
+fn loopback_host(host: &str) -> bool {
+    let name = match host.rsplit_once(':') {
+        Some((name, port)) if port.bytes().all(|b| b.is_ascii_digit()) => name,
+        _ => host,
+    };
+    ["127.0.0.1", "localhost", "[::1]"]
+        .iter()
+        .any(|allowed| name.eq_ignore_ascii_case(allowed))
 }
 
 #[cfg(test)]
@@ -338,16 +375,28 @@ mod tests {
             .no_proxy()
             .build()
             .expect("client");
-        for path in ["/projects/default/ensure", "/manage/v1/claude/prepare"] {
-            let response = client
-                .post(format!("{url}{path}"))
+        // What a browser page can send: a cross-site simple request, or one
+        // through a rebinding name.
+        for request in [
+            client
+                .post(format!("{url}/projects/default/ensure"))
                 .header("origin", "https://untrusted.example")
-                .body("{}")
-                .send()
-                .await
-                .expect("simple request");
-            assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+                .body("{}"),
+            client
+                .post(format!("{url}/services/v1/consents/x"))
+                .header("host", "rebound.example")
+                .json(&serde_json::json!({"decision": "allow_once"})),
+        ] {
+            let response = request.send().await.expect("browser request");
+            assert_eq!(response.status(), StatusCode::FORBIDDEN);
         }
+        let response = client
+            .post(format!("{url}/manage/v1/claude/prepare"))
+            .body("{}")
+            .send()
+            .await
+            .expect("simple request");
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
         for request in [
             client.get(format!("{url}/host/device")),
             client.get(format!("{url}/manage/v1/device")),

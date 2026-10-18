@@ -15,6 +15,7 @@ mod codex;
 mod connect;
 mod host_identity;
 mod init;
+mod local_tools;
 mod managed_api;
 mod managed_host;
 mod managed_pb;
@@ -26,6 +27,7 @@ mod service_target;
 mod services;
 mod status;
 mod stop;
+mod tools;
 mod transport;
 mod ui;
 mod version;
@@ -43,6 +45,8 @@ pub async fn dispatch(cli: Cli) -> Result<()> {
         Command::Connect(args) => connect::run(args).await,
         Command::Api(cmd) => api::run(cmd).await,
         Command::Services(cmd) => services::run(cmd).await,
+        Command::Tools(cmd) => tools::run(cmd).await,
+        Command::Open(args) => services::open(args).await,
         Command::Status => status::run(),
         Command::Stop(args) => stop::run(args),
         Command::Version => version::run(),

@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1863780294;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1857566098;
 
 
 // Section: executor
@@ -6088,6 +6088,556 @@ fn wire__crate__api__bridge__services__subscriptions_impl(
         },
     )
 }
+fn wire__crate__api__bridge__agent_tools__tools_answer_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_answer",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_device = <String>::sse_decode(&mut deserializer);
+            let api_consent_id = <String>::sse_decode(&mut deserializer);
+            let api_decision = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_answer(
+                            api_device,
+                            api_consent_id,
+                            api_decision,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_connect_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_connect",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service = <String>::sse_decode(&mut deserializer);
+            let api_local_port = <Option<u16>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_connect(
+                            api_service,
+                            api_local_port,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_disconnect",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_disconnect(api_service)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_harness_config",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_harness = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_harness_config(api_harness)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_keep_share",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_device = <String>::sse_decode(&mut deserializer);
+            let api_share_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_keep_share(
+                            api_device,
+                            api_share_id,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_overview_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_overview",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_overview()?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_revoke_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_revoke",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_token_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_revoke(api_token_id)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_set_ask_before_sharing",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_ask = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_set_ask_before_sharing(api_ask)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_set_enabled",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_enabled = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_set_enabled(api_enabled)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_share_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_share",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_ports = <Vec<u16>>::sse_decode(&mut deserializer);
+            let api_title = <Option<String>>::sse_decode(&mut deserializer);
+            let api_path = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_share(
+                            api_ports, api_title, api_path,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_share_on_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_share_on",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_device = <String>::sse_decode(&mut deserializer);
+            let api_ports = <Vec<u16>>::sse_decode(&mut deserializer);
+            let api_title = <Option<String>>::sse_decode(&mut deserializer);
+            let api_path = <Option<String>>::sse_decode(&mut deserializer);
+            let api_secure = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_share_on(
+                            api_device, api_ports, api_title, api_path, api_secure,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_status_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_status",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Result::<_, ()>::Ok(crate::api::bridge::agent_tools::tools_status())?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_stop_share",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_device = <String>::sse_decode(&mut deserializer);
+            let api_share_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_stop_share(
+                            api_device,
+                            api_share_id,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_tokens_impl(
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) -> flutter_rust_bridge::for_generated::WireSyncRust2DartSse {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_sync::<flutter_rust_bridge::for_generated::SseCodec, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_tokens",
+            port: None,
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Sync,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            transform_result_sse::<_, ()>((move || {
+                let output_ok =
+                    Result::<_, ()>::Ok(crate::api::bridge::agent_tools::tools_tokens())?;
+                Ok(output_ok)
+            })())
+        },
+    )
+}
+fn wire__crate__api__bridge__agent_tools__tools_watch_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_watch",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_sink = <StreamSink<
+                crate::api::bridge::agent_tools::ToolsUpdateDto,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_watch(api_sink)?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 
 // Section: dart2rust
 
@@ -6142,6 +6692,19 @@ impl SseDecode
 impl SseDecode
     for StreamSink<
         crate::api::bridge::host_sessions::SessionFollowUpdateDto,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
+impl SseDecode
+    for StreamSink<
+        crate::api::bridge::agent_tools::ToolsUpdateDto,
         flutter_rust_bridge::for_generated::SseCodec,
     >
 {
@@ -6340,6 +6903,30 @@ impl SseDecode for crate::api::bridge::session_access::AgentCommandDto {
             description: var_description,
             source: var_source,
             hints: var_hints,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::AgentToolsStatusDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_supported = <bool>::sse_decode(deserializer);
+        let mut var_hosting = <bool>::sse_decode(deserializer);
+        let mut var_enabled = <bool>::sse_decode(deserializer);
+        let mut var_askBeforeSharing = <bool>::sse_decode(deserializer);
+        let mut var_endpoint = <Option<String>>::sse_decode(deserializer);
+        let mut var_problem = <Option<String>>::sse_decode(deserializer);
+        let mut var_sharedPorts = <u32>::sse_decode(deserializer);
+        let mut var_connections = <u32>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::AgentToolsStatusDto {
+            supported: var_supported,
+            hosting: var_hosting,
+            enabled: var_enabled,
+            ask_before_sharing: var_askBeforeSharing,
+            endpoint: var_endpoint,
+            problem: var_problem,
+            shared_ports: var_sharedPorts,
+            connections: var_connections,
         };
     }
 }
@@ -7196,6 +7783,18 @@ impl SseDecode for Vec<crate::api::bridge::threads::ModelInfoDto> {
     }
 }
 
+impl SseDecode for Vec<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<u16>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -7293,6 +7892,104 @@ impl SseDecode for Vec<crate::api::bridge::threads::ThreadMetaDto> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::api::bridge::threads::ThreadMetaDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsConnectionDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsConnectionDto>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsConsentDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsConsentDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsDeviceDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsDeviceDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsPortDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsPortDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsRefDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsRefDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsServiceDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsServiceDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsShareDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsShareDto>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsTokenDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsTokenDto>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -7795,6 +8492,17 @@ impl SseDecode for Option<crate::api::bridge::threads::ThreadRuntimeConfigDto> {
     }
 }
 
+impl SseDecode for Option<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u16>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<u32> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -8215,6 +8923,234 @@ impl SseDecode for crate::api::bridge::threads::ThreadRuntimeConfigDto {
             sandbox_mode: var_sandboxMode,
             collaboration_mode: var_collaborationMode,
             confirmed_by_update: var_confirmedByUpdate,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsConnectionDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_service = <String>::sse_decode(deserializer);
+        let mut var_local = <String>::sse_decode(deserializer);
+        let mut var_samePort = <bool>::sse_decode(deserializer);
+        let mut var_owner =
+            <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_decode(deserializer);
+        let mut var_expiresMs = <Option<i64>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsConnectionDto {
+            service: var_service,
+            local: var_local,
+            same_port: var_samePort,
+            owner: var_owner,
+            expires_ms: var_expiresMs,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsConsentDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_owner =
+            <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_ports = <Vec<u16>>::sse_decode(deserializer);
+        let mut var_createdMs = <i64>::sse_decode(deserializer);
+        let mut var_expiresMs = <i64>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsConsentDto {
+            id: var_id,
+            owner: var_owner,
+            title: var_title,
+            ports: var_ports,
+            created_ms: var_createdMs,
+            expires_ms: var_expiresMs,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsDeviceDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_platform = <Option<String>>::sse_decode(deserializer);
+        let mut var_online = <bool>::sse_decode(deserializer);
+        let mut var_catalog = <bool>::sse_decode(deserializer);
+        let mut var_toolsEnabled = <Option<bool>>::sse_decode(deserializer);
+        let mut var_services =
+            <Vec<crate::api::bridge::agent_tools::ToolsServiceDto>>::sse_decode(deserializer);
+        let mut var_shares =
+            <Vec<crate::api::bridge::agent_tools::ToolsShareDto>>::sse_decode(deserializer);
+        let mut var_consents =
+            <Vec<crate::api::bridge::agent_tools::ToolsConsentDto>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsDeviceDto {
+            name: var_name,
+            platform: var_platform,
+            online: var_online,
+            catalog: var_catalog,
+            tools_enabled: var_toolsEnabled,
+            services: var_services,
+            shares: var_shares,
+            consents: var_consents,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsOverviewDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_thisDevice = <String>::sse_decode(deserializer);
+        let mut var_devices =
+            <Vec<crate::api::bridge::agent_tools::ToolsDeviceDto>>::sse_decode(deserializer);
+        let mut var_connections =
+            <Vec<crate::api::bridge::agent_tools::ToolsConnectionDto>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsOverviewDto {
+            this_device: var_thisDevice,
+            devices: var_devices,
+            connections: var_connections,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsOwnerDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_kind = <String>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_harness = <Option<String>>::sse_decode(deserializer);
+        let mut var_host = <Option<String>>::sse_decode(deserializer);
+        let mut var_conversation = <Option<String>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsOwnerDto {
+            kind: var_kind,
+            label: var_label,
+            harness: var_harness,
+            host: var_host,
+            conversation: var_conversation,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsPortDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_port = <u16>::sse_decode(deserializer);
+        let mut var_key = <String>::sse_decode(deserializer);
+        let mut var_status = <String>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsPortDto {
+            port: var_port,
+            key: var_key,
+            status: var_status,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsRefDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_device = <String>::sse_decode(deserializer);
+        let mut var_id = <String>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsRefDto {
+            device: var_device,
+            id: var_id,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsServiceDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_key = <String>::sse_decode(deserializer);
+        let mut var_kind = <String>::sse_decode(deserializer);
+        let mut var_name = <String>::sse_decode(deserializer);
+        let mut var_agent = <Option<String>>::sse_decode(deserializer);
+        let mut var_title = <Option<String>>::sse_decode(deserializer);
+        let mut var_port = <Option<u16>>::sse_decode(deserializer);
+        let mut var_status = <String>::sse_decode(deserializer);
+        let mut var_owner = <Option<String>>::sse_decode(deserializer);
+        let mut var_share = <Option<String>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsServiceDto {
+            key: var_key,
+            kind: var_kind,
+            name: var_name,
+            agent: var_agent,
+            title: var_title,
+            port: var_port,
+            status: var_status,
+            owner: var_owner,
+            share: var_share,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsShareDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_secure = <bool>::sse_decode(deserializer);
+        let mut var_ports =
+            <Vec<crate::api::bridge::agent_tools::ToolsPortDto>>::sse_decode(deserializer);
+        let mut var_owner =
+            <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_decode(deserializer);
+        let mut var_createdMs = <i64>::sse_decode(deserializer);
+        let mut var_expiresMs = <Option<i64>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsShareDto {
+            id: var_id,
+            title: var_title,
+            path: var_path,
+            secure: var_secure,
+            ports: var_ports,
+            owner: var_owner,
+            created_ms: var_createdMs,
+            expires_ms: var_expiresMs,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsSharedDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_share =
+            <crate::api::bridge::agent_tools::ToolsShareDto>::sse_decode(deserializer);
+        let mut var_onThisMachine = <String>::sse_decode(deserializer);
+        let mut var_open = <String>::sse_decode(deserializer);
+        let mut var_ends = <String>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsSharedDto {
+            share: var_share,
+            on_this_machine: var_onThisMachine,
+            open: var_open,
+            ends: var_ends,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsTokenDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_kind = <String>::sse_decode(deserializer);
+        let mut var_label = <String>::sse_decode(deserializer);
+        let mut var_harness = <Option<String>>::sse_decode(deserializer);
+        let mut var_createdMs = <i64>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsTokenDto {
+            id: var_id,
+            kind: var_kind,
+            label: var_label,
+            harness: var_harness,
+            created_ms: var_createdMs,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::agent_tools::ToolsUpdateDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_overview =
+            <crate::api::bridge::agent_tools::ToolsOverviewDto>::sse_decode(deserializer);
+        let mut var_added =
+            <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsUpdateDto {
+            overview: var_overview,
+            added: var_added,
         };
     }
 }
@@ -9109,6 +10045,84 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
+        160 => wire__crate__api__bridge__agent_tools__tools_answer_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        161 => wire__crate__api__bridge__agent_tools__tools_connect_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        162 => wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        163 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        164 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        165 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        166 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        167 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        168 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        169 => wire__crate__api__bridge__agent_tools__tools_share_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        170 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        172 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        174 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
         _ => unreachable!(),
     }
 }
@@ -9180,6 +10194,12 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
+        171 => {
+            wire__crate__api__bridge__agent_tools__tools_status_impl(ptr, rust_vec_len, data_len)
+        },
+        173 => {
+            wire__crate__api__bridge__agent_tools__tools_tokens_impl(ptr, rust_vec_len, data_len)
+        },
         _ => unreachable!(),
     }
 }
@@ -9423,6 +10443,33 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::session_access::Agent
     for crate::api::bridge::session_access::AgentCommandDto
 {
     fn into_into_dart(self) -> crate::api::bridge::session_access::AgentCommandDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::AgentToolsStatusDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.supported.into_into_dart().into_dart(),
+            self.hosting.into_into_dart().into_dart(),
+            self.enabled.into_into_dart().into_dart(),
+            self.ask_before_sharing.into_into_dart().into_dart(),
+            self.endpoint.into_into_dart().into_dart(),
+            self.problem.into_into_dart().into_dart(),
+            self.shared_ports.into_into_dart().into_dart(),
+            self.connections.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::AgentToolsStatusDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::AgentToolsStatusDto>
+    for crate::api::bridge::agent_tools::AgentToolsStatusDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::AgentToolsStatusDto {
         self
     }
 }
@@ -10947,6 +11994,287 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::threads::ThreadRuntim
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsConnectionDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.service.into_into_dart().into_dart(),
+            self.local.into_into_dart().into_dart(),
+            self.same_port.into_into_dart().into_dart(),
+            self.owner.into_into_dart().into_dart(),
+            self.expires_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsConnectionDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsConnectionDto>
+    for crate::api::bridge::agent_tools::ToolsConnectionDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsConnectionDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsConsentDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.owner.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.ports.into_into_dart().into_dart(),
+            self.created_ms.into_into_dart().into_dart(),
+            self.expires_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsConsentDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsConsentDto>
+    for crate::api::bridge::agent_tools::ToolsConsentDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsConsentDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsDeviceDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.name.into_into_dart().into_dart(),
+            self.platform.into_into_dart().into_dart(),
+            self.online.into_into_dart().into_dart(),
+            self.catalog.into_into_dart().into_dart(),
+            self.tools_enabled.into_into_dart().into_dart(),
+            self.services.into_into_dart().into_dart(),
+            self.shares.into_into_dart().into_dart(),
+            self.consents.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsDeviceDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsDeviceDto>
+    for crate::api::bridge::agent_tools::ToolsDeviceDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsDeviceDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsOverviewDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.this_device.into_into_dart().into_dart(),
+            self.devices.into_into_dart().into_dart(),
+            self.connections.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsOverviewDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsOverviewDto>
+    for crate::api::bridge::agent_tools::ToolsOverviewDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsOverviewDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsOwnerDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.kind.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.harness.into_into_dart().into_dart(),
+            self.host.into_into_dart().into_dart(),
+            self.conversation.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsOwnerDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsOwnerDto>
+    for crate::api::bridge::agent_tools::ToolsOwnerDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsOwnerDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsPortDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.port.into_into_dart().into_dart(),
+            self.key.into_into_dart().into_dart(),
+            self.status.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsPortDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsPortDto>
+    for crate::api::bridge::agent_tools::ToolsPortDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsPortDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsRefDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.device.into_into_dart().into_dart(), self.id.into_into_dart().into_dart()].into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsRefDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsRefDto>
+    for crate::api::bridge::agent_tools::ToolsRefDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsRefDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsServiceDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.key.into_into_dart().into_dart(),
+            self.kind.into_into_dart().into_dart(),
+            self.name.into_into_dart().into_dart(),
+            self.agent.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.port.into_into_dart().into_dart(),
+            self.status.into_into_dart().into_dart(),
+            self.owner.into_into_dart().into_dart(),
+            self.share.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsServiceDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsServiceDto>
+    for crate::api::bridge::agent_tools::ToolsServiceDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsServiceDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsShareDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.secure.into_into_dart().into_dart(),
+            self.ports.into_into_dart().into_dart(),
+            self.owner.into_into_dart().into_dart(),
+            self.created_ms.into_into_dart().into_dart(),
+            self.expires_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsShareDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsShareDto>
+    for crate::api::bridge::agent_tools::ToolsShareDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsShareDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsSharedDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.share.into_into_dart().into_dart(),
+            self.on_this_machine.into_into_dart().into_dart(),
+            self.open.into_into_dart().into_dart(),
+            self.ends.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsSharedDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsSharedDto>
+    for crate::api::bridge::agent_tools::ToolsSharedDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsSharedDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsTokenDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.kind.into_into_dart().into_dart(),
+            self.label.into_into_dart().into_dart(),
+            self.harness.into_into_dart().into_dart(),
+            self.created_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsTokenDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsTokenDto>
+    for crate::api::bridge::agent_tools::ToolsTokenDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsTokenDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsUpdateDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.overview.into_into_dart().into_dart(), self.added.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsUpdateDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsUpdateDto>
+    for crate::api::bridge::agent_tools::ToolsUpdateDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsUpdateDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::threads::TurnItemsPageDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -11061,6 +12389,18 @@ impl SseEncode
 impl SseEncode
     for StreamSink<
         crate::api::bridge::host_sessions::SessionFollowUpdateDto,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
+impl SseEncode
+    for StreamSink<
+        crate::api::bridge::agent_tools::ToolsUpdateDto,
         flutter_rust_bridge::for_generated::SseCodec,
     >
 {
@@ -11186,6 +12526,20 @@ impl SseEncode for crate::api::bridge::session_access::AgentCommandDto {
         <Option<String>>::sse_encode(self.description, serializer);
         <String>::sse_encode(self.source, serializer);
         <Vec<String>>::sse_encode(self.hints, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::AgentToolsStatusDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.supported, serializer);
+        <bool>::sse_encode(self.hosting, serializer);
+        <bool>::sse_encode(self.enabled, serializer);
+        <bool>::sse_encode(self.ask_before_sharing, serializer);
+        <Option<String>>::sse_encode(self.endpoint, serializer);
+        <Option<String>>::sse_encode(self.problem, serializer);
+        <u32>::sse_encode(self.shared_ports, serializer);
+        <u32>::sse_encode(self.connections, serializer);
     }
 }
 
@@ -11751,6 +13105,16 @@ impl SseEncode for Vec<crate::api::bridge::threads::ModelInfoDto> {
     }
 }
 
+impl SseEncode for Vec<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <u16>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<u8> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -11831,6 +13195,86 @@ impl SseEncode for Vec<crate::api::bridge::threads::ThreadMetaDto> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::api::bridge::threads::ThreadMetaDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsConnectionDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsConnectionDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsConsentDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsConsentDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsDeviceDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsDeviceDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsPortDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsPortDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsRefDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsRefDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsServiceDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsServiceDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsShareDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsShareDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsTokenDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsTokenDto>::sse_encode(item, serializer);
         }
     }
 }
@@ -12189,6 +13633,16 @@ impl SseEncode for Option<crate::api::bridge::threads::ThreadRuntimeConfigDto> {
     }
 }
 
+impl SseEncode for Option<u16> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u16>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<u32> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -12460,6 +13914,150 @@ impl SseEncode for crate::api::bridge::threads::ThreadRuntimeConfigDto {
         <Option<String>>::sse_encode(self.sandbox_mode, serializer);
         <Option<String>>::sse_encode(self.collaboration_mode, serializer);
         <bool>::sse_encode(self.confirmed_by_update, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsConnectionDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.service, serializer);
+        <String>::sse_encode(self.local, serializer);
+        <bool>::sse_encode(self.same_port, serializer);
+        <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_encode(self.owner, serializer);
+        <Option<i64>>::sse_encode(self.expires_ms, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsConsentDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_encode(self.owner, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <Vec<u16>>::sse_encode(self.ports, serializer);
+        <i64>::sse_encode(self.created_ms, serializer);
+        <i64>::sse_encode(self.expires_ms, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsDeviceDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.platform, serializer);
+        <bool>::sse_encode(self.online, serializer);
+        <bool>::sse_encode(self.catalog, serializer);
+        <Option<bool>>::sse_encode(self.tools_enabled, serializer);
+        <Vec<crate::api::bridge::agent_tools::ToolsServiceDto>>::sse_encode(
+            self.services,
+            serializer,
+        );
+        <Vec<crate::api::bridge::agent_tools::ToolsShareDto>>::sse_encode(self.shares, serializer);
+        <Vec<crate::api::bridge::agent_tools::ToolsConsentDto>>::sse_encode(
+            self.consents,
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsOverviewDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.this_device, serializer);
+        <Vec<crate::api::bridge::agent_tools::ToolsDeviceDto>>::sse_encode(
+            self.devices,
+            serializer,
+        );
+        <Vec<crate::api::bridge::agent_tools::ToolsConnectionDto>>::sse_encode(
+            self.connections,
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsOwnerDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <Option<String>>::sse_encode(self.harness, serializer);
+        <Option<String>>::sse_encode(self.host, serializer);
+        <Option<String>>::sse_encode(self.conversation, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsPortDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <u16>::sse_encode(self.port, serializer);
+        <String>::sse_encode(self.key, serializer);
+        <String>::sse_encode(self.status, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsRefDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.device, serializer);
+        <String>::sse_encode(self.id, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsServiceDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.key, serializer);
+        <String>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.name, serializer);
+        <Option<String>>::sse_encode(self.agent, serializer);
+        <Option<String>>::sse_encode(self.title, serializer);
+        <Option<u16>>::sse_encode(self.port, serializer);
+        <String>::sse_encode(self.status, serializer);
+        <Option<String>>::sse_encode(self.owner, serializer);
+        <Option<String>>::sse_encode(self.share, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsShareDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <String>::sse_encode(self.path, serializer);
+        <bool>::sse_encode(self.secure, serializer);
+        <Vec<crate::api::bridge::agent_tools::ToolsPortDto>>::sse_encode(self.ports, serializer);
+        <crate::api::bridge::agent_tools::ToolsOwnerDto>::sse_encode(self.owner, serializer);
+        <i64>::sse_encode(self.created_ms, serializer);
+        <Option<i64>>::sse_encode(self.expires_ms, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsSharedDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::bridge::agent_tools::ToolsShareDto>::sse_encode(self.share, serializer);
+        <String>::sse_encode(self.on_this_machine, serializer);
+        <String>::sse_encode(self.open, serializer);
+        <String>::sse_encode(self.ends, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsTokenDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.kind, serializer);
+        <String>::sse_encode(self.label, serializer);
+        <Option<String>>::sse_encode(self.harness, serializer);
+        <i64>::sse_encode(self.created_ms, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::agent_tools::ToolsUpdateDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::bridge::agent_tools::ToolsOverviewDto>::sse_encode(self.overview, serializer);
+        <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_encode(self.added, serializer);
     }
 }
 

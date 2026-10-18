@@ -7,7 +7,7 @@ mod engine;
 #[cfg(feature = "flutter")]
 mod frb_generated;
 
-pub use engine::daemon as headless;
+pub use engine::{agent_tools, daemon as headless};
 
 // Manual (#[ignore]d) end-to-end harness — see its module docs for usage.
 #[cfg(all(test, feature = "flutter"))]

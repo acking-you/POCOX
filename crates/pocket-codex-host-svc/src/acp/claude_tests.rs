@@ -161,8 +161,14 @@ async fn a_wrapper_adapter_runs_directly_and_needs_no_node() {
     let dir = tempfile::tempdir().expect("tempdir");
     let root = dir.path();
     executable(&root.join("bin").join(ADAPTER_BIN));
+    executable(&root.join("bin/node"));
     let path = std::env::join_paths([root.join("bin")]).expect("path");
-    let env = detect_with(&lookup(&path, root, root), async |_: &Path| None).await;
+    let mut env = inspect_with(&lookup(&path, root, root), async |_: &Path| {
+        panic!("a wrapper must not probe unrelated Node installations")
+    })
+    .await;
+    // Even a previously captured inspection failure cannot block a wrapper.
+    env.inspection_error = Some(process::OutputError::Timeout);
     let launch = env.launch(&["a b".into()]).expect("launch");
     assert_eq!(launch.program, root.join("bin").join(ADAPTER_BIN));
     assert_eq!(launch.args, vec!["a b".to_string()]);
@@ -425,4 +431,24 @@ async fn malformed_or_oversized_output_is_not_a_version() {
     assert_eq!(node_version(&huge).await, None);
     let binary = script(dir.path(), "binary", "printf 'v22.4.1\\377\\376'");
     assert_eq!(node_version(&binary).await, None, "not UTF-8");
+}
+
+#[tokio::test]
+async fn exhausted_inspection_is_retryable_and_does_not_claim_node_is_missing() {
+    let dir = tempfile::tempdir().expect("temp");
+    let root = dir.path();
+    node(&root.join("bin/node"), "v22.23.2");
+    npm_beside(root);
+    let path = root.join("bin").into_os_string();
+    let env = inspect_with(&lookup(&path, root, root), async |_: &Path| {
+        Err(process::OutputError::Spawn(process::SpawnError::FileLimit))
+    })
+    .await;
+    assert!(matches!(env.launch(&[]), Err(Missing::Inspection(_))));
+    assert!(!env.can_prepare());
+    assert_eq!(env.status().runtime, "unavailable");
+    assert_eq!(env.status().adapter, "unavailable");
+    let recovered = detect_with(&lookup(&path, root, root), probe).await;
+    assert_eq!(recovered.status().runtime, "found");
+    assert!(recovered.can_prepare());
 }

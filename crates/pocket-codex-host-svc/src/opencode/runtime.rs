@@ -69,7 +69,7 @@ impl Launch {
 
     async fn text(&self, args: &[&str], limit: usize) -> Result<String> {
         let args = args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
-        let bytes = process::read_output(
+        let bytes = process::inspect_output(
             &self.program,
             &args,
             self.path.as_ref(),
@@ -78,7 +78,7 @@ impl Launch {
             limit,
         )
         .await
-        .context("OpenCode executable inspection failed or timed out")?;
+        .context("OpenCode executable inspection failed")?;
         let text = std::str::from_utf8(&bytes)
             .context("OpenCode inspection returned invalid text")?
             .trim();

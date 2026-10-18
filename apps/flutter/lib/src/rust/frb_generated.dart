@@ -4,6 +4,7 @@
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
 import 'api/bridge.dart';
+import 'api/bridge/agent_tools.dart';
 import 'api/bridge/codex_setup.dart';
 import 'api/bridge/connection.dart';
 import 'api/bridge/device_management.dart';
@@ -81,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1863780294;
+  int get rustContentHash => -1857566098;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -809,6 +810,67 @@ abstract class RustLibApi extends BaseApi {
   Future<void> crateApiBridgeSetRelay({required String relay});
 
   Future<List<SubStatusDto>> crateApiBridgeServicesSubscriptions();
+
+  Future<void> crateApiBridgeAgentToolsToolsAnswer({
+    required String device,
+    required String consentId,
+    required String decision,
+  });
+
+  Future<ToolsConnectionDto> crateApiBridgeAgentToolsToolsConnect({
+    required String service,
+    int? localPort,
+  });
+
+  Future<void> crateApiBridgeAgentToolsToolsDisconnect({
+    required String service,
+  });
+
+  Future<String> crateApiBridgeAgentToolsToolsHarnessConfig({
+    required String harness,
+  });
+
+  Future<void> crateApiBridgeAgentToolsToolsKeepShare({
+    required String device,
+    required String shareId,
+  });
+
+  Future<ToolsOverviewDto> crateApiBridgeAgentToolsToolsOverview();
+
+  Future<void> crateApiBridgeAgentToolsToolsRevoke({required String tokenId});
+
+  Future<AgentToolsStatusDto> crateApiBridgeAgentToolsToolsSetAskBeforeSharing({
+    required bool ask,
+  });
+
+  Future<AgentToolsStatusDto> crateApiBridgeAgentToolsToolsSetEnabled({
+    required bool enabled,
+  });
+
+  Future<ToolsSharedDto> crateApiBridgeAgentToolsToolsShare({
+    required List<int> ports,
+    String? title,
+    String? path,
+  });
+
+  Future<ToolsSharedDto> crateApiBridgeAgentToolsToolsShareOn({
+    required String device,
+    required List<int> ports,
+    String? title,
+    String? path,
+    required bool secure,
+  });
+
+  AgentToolsStatusDto crateApiBridgeAgentToolsToolsStatus();
+
+  Future<void> crateApiBridgeAgentToolsToolsStopShare({
+    required String device,
+    required String shareId,
+  });
+
+  List<ToolsTokenDto> crateApiBridgeAgentToolsToolsTokens();
+
+  Stream<ToolsUpdateDto> crateApiBridgeAgentToolsToolsWatch();
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -6216,6 +6278,495 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgeServicesSubscriptionsConstMeta =>
       const TaskConstMeta(debugName: "subscriptions", argNames: []);
 
+  @override
+  Future<void> crateApiBridgeAgentToolsToolsAnswer({
+    required String device,
+    required String consentId,
+    required String decision,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(device, serializer);
+          sse_encode_String(consentId, serializer);
+          sse_encode_String(decision, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 160,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsAnswerConstMeta,
+        argValues: [device, consentId, decision],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsAnswerConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_answer",
+        argNames: ["device", "consentId", "decision"],
+      );
+
+  @override
+  Future<ToolsConnectionDto> crateApiBridgeAgentToolsToolsConnect({
+    required String service,
+    int? localPort,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(service, serializer);
+          sse_encode_opt_box_autoadd_u_16(localPort, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 161,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_tools_connection_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsConnectConstMeta,
+        argValues: [service, localPort],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsConnectConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_connect",
+        argNames: ["service", "localPort"],
+      );
+
+  @override
+  Future<void> crateApiBridgeAgentToolsToolsDisconnect({
+    required String service,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(service, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 162,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsDisconnectConstMeta,
+        argValues: [service],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsDisconnectConstMeta =>
+      const TaskConstMeta(debugName: "tools_disconnect", argNames: ["service"]);
+
+  @override
+  Future<String> crateApiBridgeAgentToolsToolsHarnessConfig({
+    required String harness,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(harness, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 163,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_String,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsHarnessConfigConstMeta,
+        argValues: [harness],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsHarnessConfigConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_harness_config",
+        argNames: ["harness"],
+      );
+
+  @override
+  Future<void> crateApiBridgeAgentToolsToolsKeepShare({
+    required String device,
+    required String shareId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(device, serializer);
+          sse_encode_String(shareId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 164,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsKeepShareConstMeta,
+        argValues: [device, shareId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsKeepShareConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_keep_share",
+        argNames: ["device", "shareId"],
+      );
+
+  @override
+  Future<ToolsOverviewDto> crateApiBridgeAgentToolsToolsOverview() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 165,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_tools_overview_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsOverviewConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsOverviewConstMeta =>
+      const TaskConstMeta(debugName: "tools_overview", argNames: []);
+
+  @override
+  Future<void> crateApiBridgeAgentToolsToolsRevoke({required String tokenId}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(tokenId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 166,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsRevokeConstMeta,
+        argValues: [tokenId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsRevokeConstMeta =>
+      const TaskConstMeta(debugName: "tools_revoke", argNames: ["tokenId"]);
+
+  @override
+  Future<AgentToolsStatusDto> crateApiBridgeAgentToolsToolsSetAskBeforeSharing({
+    required bool ask,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(ask, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 167,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_agent_tools_status_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsSetAskBeforeSharingConstMeta,
+        argValues: [ask],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta
+  get kCrateApiBridgeAgentToolsToolsSetAskBeforeSharingConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_set_ask_before_sharing",
+        argNames: ["ask"],
+      );
+
+  @override
+  Future<AgentToolsStatusDto> crateApiBridgeAgentToolsToolsSetEnabled({
+    required bool enabled,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(enabled, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 168,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_agent_tools_status_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsSetEnabledConstMeta,
+        argValues: [enabled],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsSetEnabledConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_set_enabled",
+        argNames: ["enabled"],
+      );
+
+  @override
+  Future<ToolsSharedDto> crateApiBridgeAgentToolsToolsShare({
+    required List<int> ports,
+    String? title,
+    String? path,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_list_prim_u_16_loose(ports, serializer);
+          sse_encode_opt_String(title, serializer);
+          sse_encode_opt_String(path, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 169,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_tools_shared_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsShareConstMeta,
+        argValues: [ports, title, path],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsShareConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_share",
+        argNames: ["ports", "title", "path"],
+      );
+
+  @override
+  Future<ToolsSharedDto> crateApiBridgeAgentToolsToolsShareOn({
+    required String device,
+    required List<int> ports,
+    String? title,
+    String? path,
+    required bool secure,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(device, serializer);
+          sse_encode_list_prim_u_16_loose(ports, serializer);
+          sse_encode_opt_String(title, serializer);
+          sse_encode_opt_String(path, serializer);
+          sse_encode_bool(secure, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 170,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_tools_shared_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsShareOnConstMeta,
+        argValues: [device, ports, title, path, secure],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsShareOnConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_share_on",
+        argNames: ["device", "ports", "title", "path", "secure"],
+      );
+
+  @override
+  AgentToolsStatusDto crateApiBridgeAgentToolsToolsStatus() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 171,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_agent_tools_status_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsStatusConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsStatusConstMeta =>
+      const TaskConstMeta(debugName: "tools_status", argNames: []);
+
+  @override
+  Future<void> crateApiBridgeAgentToolsToolsStopShare({
+    required String device,
+    required String shareId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(device, serializer);
+          sse_encode_String(shareId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 172,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsStopShareConstMeta,
+        argValues: [device, shareId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsStopShareConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_stop_share",
+        argNames: ["device", "shareId"],
+      );
+
+  @override
+  List<ToolsTokenDto> crateApiBridgeAgentToolsToolsTokens() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 173,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_tools_token_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsTokensConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsTokensConstMeta =>
+      const TaskConstMeta(debugName: "tools_tokens", argNames: []);
+
+  @override
+  Stream<ToolsUpdateDto> crateApiBridgeAgentToolsToolsWatch() {
+    final sink = RustStreamSink<ToolsUpdateDto>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_tools_update_dto_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 174,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiBridgeAgentToolsToolsWatchConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsWatchConstMeta =>
+      const TaskConstMeta(debugName: "tools_watch", argNames: ["sink"]);
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -6249,6 +6800,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   RustStreamSink<SessionFollowUpdateDto>
   dco_decode_StreamSink_session_follow_update_dto_Sse(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<ToolsUpdateDto> dco_decode_StreamSink_tools_update_dto_Sse(
+    dynamic raw,
+  ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     throw UnimplementedError();
   }
@@ -6408,6 +6967,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       description: dco_decode_opt_String(arr[1]),
       source: dco_decode_String(arr[2]),
       hints: dco_decode_list_String(arr[3]),
+    );
+  }
+
+  @protected
+  AgentToolsStatusDto dco_decode_agent_tools_status_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return AgentToolsStatusDto(
+      supported: dco_decode_bool(arr[0]),
+      hosting: dco_decode_bool(arr[1]),
+      enabled: dco_decode_bool(arr[2]),
+      askBeforeSharing: dco_decode_bool(arr[3]),
+      endpoint: dco_decode_opt_String(arr[4]),
+      problem: dco_decode_opt_String(arr[5]),
+      sharedPorts: dco_decode_u_32(arr[6]),
+      connections: dco_decode_u_32(arr[7]),
     );
   }
 
@@ -6661,6 +7238,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_thread_runtime_config_dto(raw);
+  }
+
+  @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -7136,6 +7719,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<int> dco_decode_list_prim_u_16_loose(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as List<int>;
+  }
+
+  @protected
+  Uint16List dco_decode_list_prim_u_16_strict(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as Uint16List;
+  }
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as List<int>;
@@ -7195,6 +7790,54 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<ThreadMetaDto> dco_decode_list_thread_meta_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_thread_meta_dto).toList();
+  }
+
+  @protected
+  List<ToolsConnectionDto> dco_decode_list_tools_connection_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_connection_dto).toList();
+  }
+
+  @protected
+  List<ToolsConsentDto> dco_decode_list_tools_consent_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_consent_dto).toList();
+  }
+
+  @protected
+  List<ToolsDeviceDto> dco_decode_list_tools_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_device_dto).toList();
+  }
+
+  @protected
+  List<ToolsPortDto> dco_decode_list_tools_port_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_port_dto).toList();
+  }
+
+  @protected
+  List<ToolsRefDto> dco_decode_list_tools_ref_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_ref_dto).toList();
+  }
+
+  @protected
+  List<ToolsServiceDto> dco_decode_list_tools_service_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_service_dto).toList();
+  }
+
+  @protected
+  List<ToolsShareDto> dco_decode_list_tools_share_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_share_dto).toList();
+  }
+
+  @protected
+  List<ToolsTokenDto> dco_decode_list_tools_token_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_tools_token_dto).toList();
   }
 
   @protected
@@ -7543,6 +8186,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_16(raw);
+  }
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_32(raw);
@@ -7852,6 +8501,186 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ToolsConnectionDto dco_decode_tools_connection_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ToolsConnectionDto(
+      service: dco_decode_String(arr[0]),
+      local: dco_decode_String(arr[1]),
+      samePort: dco_decode_bool(arr[2]),
+      owner: dco_decode_tools_owner_dto(arr[3]),
+      expiresMs: dco_decode_opt_box_autoadd_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  ToolsConsentDto dco_decode_tools_consent_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return ToolsConsentDto(
+      id: dco_decode_String(arr[0]),
+      owner: dco_decode_tools_owner_dto(arr[1]),
+      title: dco_decode_String(arr[2]),
+      ports: dco_decode_list_prim_u_16_strict(arr[3]),
+      createdMs: dco_decode_i_64(arr[4]),
+      expiresMs: dco_decode_i_64(arr[5]),
+    );
+  }
+
+  @protected
+  ToolsDeviceDto dco_decode_tools_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return ToolsDeviceDto(
+      name: dco_decode_String(arr[0]),
+      platform: dco_decode_opt_String(arr[1]),
+      online: dco_decode_bool(arr[2]),
+      catalog: dco_decode_bool(arr[3]),
+      toolsEnabled: dco_decode_opt_box_autoadd_bool(arr[4]),
+      services: dco_decode_list_tools_service_dto(arr[5]),
+      shares: dco_decode_list_tools_share_dto(arr[6]),
+      consents: dco_decode_list_tools_consent_dto(arr[7]),
+    );
+  }
+
+  @protected
+  ToolsOverviewDto dco_decode_tools_overview_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ToolsOverviewDto(
+      thisDevice: dco_decode_String(arr[0]),
+      devices: dco_decode_list_tools_device_dto(arr[1]),
+      connections: dco_decode_list_tools_connection_dto(arr[2]),
+    );
+  }
+
+  @protected
+  ToolsOwnerDto dco_decode_tools_owner_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ToolsOwnerDto(
+      kind: dco_decode_String(arr[0]),
+      label: dco_decode_String(arr[1]),
+      harness: dco_decode_opt_String(arr[2]),
+      host: dco_decode_opt_String(arr[3]),
+      conversation: dco_decode_opt_String(arr[4]),
+    );
+  }
+
+  @protected
+  ToolsPortDto dco_decode_tools_port_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ToolsPortDto(
+      port: dco_decode_u_16(arr[0]),
+      key: dco_decode_String(arr[1]),
+      status: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  ToolsRefDto dco_decode_tools_ref_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ToolsRefDto(
+      device: dco_decode_String(arr[0]),
+      id: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
+  ToolsServiceDto dco_decode_tools_service_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return ToolsServiceDto(
+      key: dco_decode_String(arr[0]),
+      kind: dco_decode_String(arr[1]),
+      name: dco_decode_String(arr[2]),
+      agent: dco_decode_opt_String(arr[3]),
+      title: dco_decode_opt_String(arr[4]),
+      port: dco_decode_opt_box_autoadd_u_16(arr[5]),
+      status: dco_decode_String(arr[6]),
+      owner: dco_decode_opt_String(arr[7]),
+      share: dco_decode_opt_String(arr[8]),
+    );
+  }
+
+  @protected
+  ToolsShareDto dco_decode_tools_share_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return ToolsShareDto(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      path: dco_decode_String(arr[2]),
+      secure: dco_decode_bool(arr[3]),
+      ports: dco_decode_list_tools_port_dto(arr[4]),
+      owner: dco_decode_tools_owner_dto(arr[5]),
+      createdMs: dco_decode_i_64(arr[6]),
+      expiresMs: dco_decode_opt_box_autoadd_i_64(arr[7]),
+    );
+  }
+
+  @protected
+  ToolsSharedDto dco_decode_tools_shared_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ToolsSharedDto(
+      share: dco_decode_tools_share_dto(arr[0]),
+      onThisMachine: dco_decode_String(arr[1]),
+      open: dco_decode_String(arr[2]),
+      ends: dco_decode_String(arr[3]),
+    );
+  }
+
+  @protected
+  ToolsTokenDto dco_decode_tools_token_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return ToolsTokenDto(
+      id: dco_decode_String(arr[0]),
+      kind: dco_decode_String(arr[1]),
+      label: dco_decode_String(arr[2]),
+      harness: dco_decode_opt_String(arr[3]),
+      createdMs: dco_decode_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  ToolsUpdateDto dco_decode_tools_update_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return ToolsUpdateDto(
+      overview: dco_decode_tools_overview_dto(arr[0]),
+      added: dco_decode_list_tools_ref_dto(arr[1]),
+    );
+  }
+
+  @protected
   TurnItemsPageDto dco_decode_turn_items_page_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -7956,6 +8785,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   RustStreamSink<SessionFollowUpdateDto>
   sse_decode_StreamSink_session_follow_update_dto_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<ToolsUpdateDto> sse_decode_StreamSink_tools_update_dto_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -8145,6 +8982,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       description: var_description,
       source: var_source,
       hints: var_hints,
+    );
+  }
+
+  @protected
+  AgentToolsStatusDto sse_decode_agent_tools_status_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_supported = sse_decode_bool(deserializer);
+    var var_hosting = sse_decode_bool(deserializer);
+    var var_enabled = sse_decode_bool(deserializer);
+    var var_askBeforeSharing = sse_decode_bool(deserializer);
+    var var_endpoint = sse_decode_opt_String(deserializer);
+    var var_problem = sse_decode_opt_String(deserializer);
+    var var_sharedPorts = sse_decode_u_32(deserializer);
+    var var_connections = sse_decode_u_32(deserializer);
+    return AgentToolsStatusDto(
+      supported: var_supported,
+      hosting: var_hosting,
+      enabled: var_enabled,
+      askBeforeSharing: var_askBeforeSharing,
+      endpoint: var_endpoint,
+      problem: var_problem,
+      sharedPorts: var_sharedPorts,
+      connections: var_connections,
     );
   }
 
@@ -8500,6 +9362,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_thread_runtime_config_dto(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_16(deserializer));
   }
 
   @protected
@@ -9143,6 +10011,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<int> sse_decode_list_prim_u_16_loose(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint16List(len_);
+  }
+
+  @protected
+  Uint16List sse_decode_list_prim_u_16_strict(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var len_ = sse_decode_i_32(deserializer);
+    return deserializer.buffer.getUint16List(len_);
+  }
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var len_ = sse_decode_i_32(deserializer);
@@ -9250,6 +10132,118 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ThreadMetaDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_thread_meta_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsConnectionDto> sse_decode_list_tools_connection_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsConnectionDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_connection_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsConsentDto> sse_decode_list_tools_consent_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsConsentDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_consent_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsDeviceDto> sse_decode_list_tools_device_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsDeviceDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_device_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsPortDto> sse_decode_list_tools_port_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsPortDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_port_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsRefDto> sse_decode_list_tools_ref_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsRefDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_ref_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsServiceDto> sse_decode_list_tools_service_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsServiceDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_service_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsShareDto> sse_decode_list_tools_share_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsShareDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_share_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<ToolsTokenDto> sse_decode_list_tools_token_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsTokenDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_token_dto(deserializer));
     }
     return ans_;
   }
@@ -9751,6 +10745,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_16(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -10155,6 +11160,202 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ToolsConnectionDto sse_decode_tools_connection_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_service = sse_decode_String(deserializer);
+    var var_local = sse_decode_String(deserializer);
+    var var_samePort = sse_decode_bool(deserializer);
+    var var_owner = sse_decode_tools_owner_dto(deserializer);
+    var var_expiresMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ToolsConnectionDto(
+      service: var_service,
+      local: var_local,
+      samePort: var_samePort,
+      owner: var_owner,
+      expiresMs: var_expiresMs,
+    );
+  }
+
+  @protected
+  ToolsConsentDto sse_decode_tools_consent_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_owner = sse_decode_tools_owner_dto(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_ports = sse_decode_list_prim_u_16_strict(deserializer);
+    var var_createdMs = sse_decode_i_64(deserializer);
+    var var_expiresMs = sse_decode_i_64(deserializer);
+    return ToolsConsentDto(
+      id: var_id,
+      owner: var_owner,
+      title: var_title,
+      ports: var_ports,
+      createdMs: var_createdMs,
+      expiresMs: var_expiresMs,
+    );
+  }
+
+  @protected
+  ToolsDeviceDto sse_decode_tools_device_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_name = sse_decode_String(deserializer);
+    var var_platform = sse_decode_opt_String(deserializer);
+    var var_online = sse_decode_bool(deserializer);
+    var var_catalog = sse_decode_bool(deserializer);
+    var var_toolsEnabled = sse_decode_opt_box_autoadd_bool(deserializer);
+    var var_services = sse_decode_list_tools_service_dto(deserializer);
+    var var_shares = sse_decode_list_tools_share_dto(deserializer);
+    var var_consents = sse_decode_list_tools_consent_dto(deserializer);
+    return ToolsDeviceDto(
+      name: var_name,
+      platform: var_platform,
+      online: var_online,
+      catalog: var_catalog,
+      toolsEnabled: var_toolsEnabled,
+      services: var_services,
+      shares: var_shares,
+      consents: var_consents,
+    );
+  }
+
+  @protected
+  ToolsOverviewDto sse_decode_tools_overview_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_thisDevice = sse_decode_String(deserializer);
+    var var_devices = sse_decode_list_tools_device_dto(deserializer);
+    var var_connections = sse_decode_list_tools_connection_dto(deserializer);
+    return ToolsOverviewDto(
+      thisDevice: var_thisDevice,
+      devices: var_devices,
+      connections: var_connections,
+    );
+  }
+
+  @protected
+  ToolsOwnerDto sse_decode_tools_owner_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_kind = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_harness = sse_decode_opt_String(deserializer);
+    var var_host = sse_decode_opt_String(deserializer);
+    var var_conversation = sse_decode_opt_String(deserializer);
+    return ToolsOwnerDto(
+      kind: var_kind,
+      label: var_label,
+      harness: var_harness,
+      host: var_host,
+      conversation: var_conversation,
+    );
+  }
+
+  @protected
+  ToolsPortDto sse_decode_tools_port_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_port = sse_decode_u_16(deserializer);
+    var var_key = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    return ToolsPortDto(port: var_port, key: var_key, status: var_status);
+  }
+
+  @protected
+  ToolsRefDto sse_decode_tools_ref_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_device = sse_decode_String(deserializer);
+    var var_id = sse_decode_String(deserializer);
+    return ToolsRefDto(device: var_device, id: var_id);
+  }
+
+  @protected
+  ToolsServiceDto sse_decode_tools_service_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_key = sse_decode_String(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_agent = sse_decode_opt_String(deserializer);
+    var var_title = sse_decode_opt_String(deserializer);
+    var var_port = sse_decode_opt_box_autoadd_u_16(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_owner = sse_decode_opt_String(deserializer);
+    var var_share = sse_decode_opt_String(deserializer);
+    return ToolsServiceDto(
+      key: var_key,
+      kind: var_kind,
+      name: var_name,
+      agent: var_agent,
+      title: var_title,
+      port: var_port,
+      status: var_status,
+      owner: var_owner,
+      share: var_share,
+    );
+  }
+
+  @protected
+  ToolsShareDto sse_decode_tools_share_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_path = sse_decode_String(deserializer);
+    var var_secure = sse_decode_bool(deserializer);
+    var var_ports = sse_decode_list_tools_port_dto(deserializer);
+    var var_owner = sse_decode_tools_owner_dto(deserializer);
+    var var_createdMs = sse_decode_i_64(deserializer);
+    var var_expiresMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return ToolsShareDto(
+      id: var_id,
+      title: var_title,
+      path: var_path,
+      secure: var_secure,
+      ports: var_ports,
+      owner: var_owner,
+      createdMs: var_createdMs,
+      expiresMs: var_expiresMs,
+    );
+  }
+
+  @protected
+  ToolsSharedDto sse_decode_tools_shared_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_share = sse_decode_tools_share_dto(deserializer);
+    var var_onThisMachine = sse_decode_String(deserializer);
+    var var_open = sse_decode_String(deserializer);
+    var var_ends = sse_decode_String(deserializer);
+    return ToolsSharedDto(
+      share: var_share,
+      onThisMachine: var_onThisMachine,
+      open: var_open,
+      ends: var_ends,
+    );
+  }
+
+  @protected
+  ToolsTokenDto sse_decode_tools_token_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_harness = sse_decode_opt_String(deserializer);
+    var var_createdMs = sse_decode_i_64(deserializer);
+    return ToolsTokenDto(
+      id: var_id,
+      kind: var_kind,
+      label: var_label,
+      harness: var_harness,
+      createdMs: var_createdMs,
+    );
+  }
+
+  @protected
+  ToolsUpdateDto sse_decode_tools_update_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_overview = sse_decode_tools_overview_dto(deserializer);
+    var var_added = sse_decode_list_tools_ref_dto(deserializer);
+    return ToolsUpdateDto(overview: var_overview, added: var_added);
+  }
+
+  @protected
   TurnItemsPageDto sse_decode_turn_items_page_dto(
     SseDeserializer deserializer,
   ) {
@@ -10314,6 +11515,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_StreamSink_tools_update_dto_Sse(
+    RustStreamSink<ToolsUpdateDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_tools_update_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
@@ -10443,6 +11661,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.description, serializer);
     sse_encode_String(self.source, serializer);
     sse_encode_list_String(self.hints, serializer);
+  }
+
+  @protected
+  void sse_encode_agent_tools_status_dto(
+    AgentToolsStatusDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.supported, serializer);
+    sse_encode_bool(self.hosting, serializer);
+    sse_encode_bool(self.enabled, serializer);
+    sse_encode_bool(self.askBeforeSharing, serializer);
+    sse_encode_opt_String(self.endpoint, serializer);
+    sse_encode_opt_String(self.problem, serializer);
+    sse_encode_u_32(self.sharedPorts, serializer);
+    sse_encode_u_32(self.connections, serializer);
   }
 
   @protected
@@ -10729,6 +11963,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_thread_runtime_config_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_16(self, serializer);
   }
 
   @protected
@@ -11217,6 +12457,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_prim_u_16_loose(
+    List<int> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint16List(
+      self is Uint16List ? self : Uint16List.fromList(self),
+    );
+  }
+
+  @protected
+  void sse_encode_list_prim_u_16_strict(
+    Uint16List self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    serializer.buffer.putUint16List(self);
+  }
+
+  @protected
   void sse_encode_list_prim_u_8_loose(
     List<int> self,
     SseSerializer serializer,
@@ -11319,6 +12581,102 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_thread_meta_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_connection_dto(
+    List<ToolsConnectionDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_connection_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_consent_dto(
+    List<ToolsConsentDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_consent_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_device_dto(
+    List<ToolsDeviceDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_device_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_port_dto(
+    List<ToolsPortDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_port_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_ref_dto(
+    List<ToolsRefDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_ref_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_service_dto(
+    List<ToolsServiceDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_service_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_share_dto(
+    List<ToolsShareDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_share_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_tools_token_dto(
+    List<ToolsTokenDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_token_dto(item, serializer);
     }
   }
 
@@ -11720,6 +13078,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_16(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -12006,6 +13374,156 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.sandboxMode, serializer);
     sse_encode_opt_String(self.collaborationMode, serializer);
     sse_encode_bool(self.confirmedByUpdate, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_connection_dto(
+    ToolsConnectionDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.service, serializer);
+    sse_encode_String(self.local, serializer);
+    sse_encode_bool(self.samePort, serializer);
+    sse_encode_tools_owner_dto(self.owner, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.expiresMs, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_consent_dto(
+    ToolsConsentDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_tools_owner_dto(self.owner, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_list_prim_u_16_strict(self.ports, serializer);
+    sse_encode_i_64(self.createdMs, serializer);
+    sse_encode_i_64(self.expiresMs, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_device_dto(
+    ToolsDeviceDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.platform, serializer);
+    sse_encode_bool(self.online, serializer);
+    sse_encode_bool(self.catalog, serializer);
+    sse_encode_opt_box_autoadd_bool(self.toolsEnabled, serializer);
+    sse_encode_list_tools_service_dto(self.services, serializer);
+    sse_encode_list_tools_share_dto(self.shares, serializer);
+    sse_encode_list_tools_consent_dto(self.consents, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_overview_dto(
+    ToolsOverviewDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.thisDevice, serializer);
+    sse_encode_list_tools_device_dto(self.devices, serializer);
+    sse_encode_list_tools_connection_dto(self.connections, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_owner_dto(
+    ToolsOwnerDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_opt_String(self.harness, serializer);
+    sse_encode_opt_String(self.host, serializer);
+    sse_encode_opt_String(self.conversation, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_port_dto(ToolsPortDto self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_16(self.port, serializer);
+    sse_encode_String(self.key, serializer);
+    sse_encode_String(self.status, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_ref_dto(ToolsRefDto self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.device, serializer);
+    sse_encode_String(self.id, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_service_dto(
+    ToolsServiceDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.key, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.agent, serializer);
+    sse_encode_opt_String(self.title, serializer);
+    sse_encode_opt_box_autoadd_u_16(self.port, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_opt_String(self.owner, serializer);
+    sse_encode_opt_String(self.share, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_share_dto(
+    ToolsShareDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.path, serializer);
+    sse_encode_bool(self.secure, serializer);
+    sse_encode_list_tools_port_dto(self.ports, serializer);
+    sse_encode_tools_owner_dto(self.owner, serializer);
+    sse_encode_i_64(self.createdMs, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.expiresMs, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_shared_dto(
+    ToolsSharedDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_tools_share_dto(self.share, serializer);
+    sse_encode_String(self.onThisMachine, serializer);
+    sse_encode_String(self.open, serializer);
+    sse_encode_String(self.ends, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_token_dto(
+    ToolsTokenDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_opt_String(self.harness, serializer);
+    sse_encode_i_64(self.createdMs, serializer);
+  }
+
+  @protected
+  void sse_encode_tools_update_dto(
+    ToolsUpdateDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_tools_overview_dto(self.overview, serializer);
+    sse_encode_list_tools_ref_dto(self.added, serializer);
   }
 
   @protected

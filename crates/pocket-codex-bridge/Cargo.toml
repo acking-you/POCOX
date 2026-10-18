@@ -60,6 +60,12 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 
+# The agent tools' MCP endpoint runs only where POCOX hosts (desktops and the
+# CLI host). Phones never serve it, so they do not link the SDK.
+[target.'cfg(not(any(target_os = "ios", target_os = "android")))'.dependencies]
+rmcp = { version = "3.5.1", default-features = false, features = ["server", "base64", "transport-streamable-http-server"] }
+tokio-util = { workspace = true }
+
 [dev-dependencies]
 tempfile = "3"
 tokio-tungstenite = { workspace = true }

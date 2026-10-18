@@ -4,9 +4,26 @@ use std::{ffi::OsString, path::Path, time::Duration};
 
 use tokio::{io::AsyncReadExt, process::ChildStdout};
 
-use super::{leader_exited, spawn, Spawned};
+use super::{leader_exited, spawn, SpawnError, Spawned};
 
 const EXIT_POLL: Duration = Duration::from_millis(20);
+
+/// Why inspecting an installed executable failed. Never contains child output.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum OutputError {
+    /// The helper could not start.
+    #[error(transparent)]
+    Spawn(#[from] SpawnError),
+    /// The helper exceeded its entire inspection budget.
+    #[error("the executable inspection timed out; retry after checking the executable")]
+    Timeout,
+    /// The helper exited unsuccessfully or could not be reaped.
+    #[error("the executable inspection did not exit successfully")]
+    Exit,
+    /// Output could not be read within the expected bound.
+    #[error("the executable inspection returned unreadable or oversized output")]
+    Output,
+}
 
 /// Read a successful helper's bounded stdout, with no shell and no echoed
 /// stderr. The helper inherits the environment plus explicit child overrides.
@@ -20,18 +37,41 @@ pub async fn read_output(
     timeout: Duration,
     limit: usize,
 ) -> Option<Vec<u8>> {
+    inspect_output(program, args, path, env, timeout, limit)
+        .await
+        .ok()
+}
+
+/// Inspect an executable while retaining the failure category. Every outcome
+/// cleans up the owned process group; no stderr or command arguments are
+/// echoed.
+pub async fn inspect_output(
+    program: &Path,
+    args: &[String],
+    path: Option<&OsString>,
+    env: &[(OsString, OsString)],
+    timeout: Duration,
+    limit: usize,
+) -> Result<Vec<u8>, OutputError> {
     let Spawned {
         process,
         stdin,
         stdout,
-    } = spawn(program, args, path, env).ok()?;
+    } = spawn(program, args, path, env)?;
     drop(stdin);
     let result = tokio::time::timeout(timeout, collect(stdout, process.id(), limit)).await;
     match result {
-        Ok(Some(output)) => process.finish().await?.success().then_some(output),
-        Ok(None) | Err(_) => {
+        Ok(Some(output)) => {
+            let status = process.finish().await.ok_or(OutputError::Exit)?;
+            if status.success() {
+                Ok(output)
+            } else {
+                Err(OutputError::Exit)
+            }
+        },
+        result => {
             process.terminate(Duration::from_millis(100)).await;
-            None
+            Err(if result.is_err() { OutputError::Timeout } else { OutputError::Output })
         },
     }
 }

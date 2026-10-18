@@ -43,14 +43,15 @@ library;
 /// The service kinds the relay namespaces by. `meta` never appears in a
 /// discovered key (it is derived from an app host), but it is a real kind and a
 /// key carrying it must still parse. `host` is a computer's management entry,
-/// never a conversation or model service.
+/// never a conversation or model service; `port` is a port a device shares.
 bool _isKind(String part) =>
     part == 'app' ||
     part == 'api' ||
     part == 'meta' ||
     part == 'acp' ||
     part == 'opencode' ||
-    part == 'host';
+    part == 'host' ||
+    part == 'port';
 
 /// Whether [key] names a computer's device-management service.
 bool isManagementKey(String key) => parseServiceKey(key).kind == 'host';

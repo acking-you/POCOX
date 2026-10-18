@@ -9,6 +9,24 @@ breaking change goes.
 
 ## Unreleased
 
+- Agent tools: one `pocox` MCP server lets any agent see your devices and
+  services, share a dev server or other local port with your phone and other
+  devices, and connect to a service elsewhere. Hosted Codex, Claude and
+  OpenCode have it by default; other agents (Claude Code or Codex in a
+  terminal, OpenCode, any MCP client) get a copied entry from Settings or
+  `pocox tools config`. An agent's first share asks you on your devices. On by
+  default; switch it off in Settings or with `pocox tools disable`. See
+  [Agent tools](docs/agent-tools.md).
+- Shares appear above any page, as cards in the conversation and under Shared
+  with you; phones open them in an in-app browser that can send the page and
+  its console errors to the agent's draft. A `localhost` link in a remote
+  conversation can be shared and opened.
+- The galaxy (⌘2): every device as a star system and its services as
+  planets, with connections as arcs of light, in both themes. The page
+  shortcuts after it moved: Local sessions ⌘3, Runtime logs ⌘4.
+- `pocox services share|unshare|connect|disconnect`, `services list --json`
+  and `pocox open` share and reach ports from a terminal.
+
 - The CLI is now `pocox`. The installers update an existing `pocket-codex` CLI
   in place (also in an explicit `POCKET_CODEX_BIN_DIR`) and keep that name as an
   alias, so scripts and systemd units written for it keep working, and workers

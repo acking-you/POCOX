@@ -242,6 +242,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   final _expandedInputFocus = FocusNode();
   late final _ComposerDrafts _drafts;
   late _ComposerDraft _draft;
+
+  /// The [_ComposerDraft.outside] revision this view last showed.
+  int _outsideSeen = 0;
   bool _editorOpen = false;
   final _scroll = CenteredScrollController();
   // The transcript's two lists around its centre row (transcript_list.dart).

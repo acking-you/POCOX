@@ -112,6 +112,7 @@ impl AgentHost {
                 program: options.program,
                 launch_args,
                 session_meta,
+                session_mcp: Mutex::new(None),
                 path: options.path,
                 env: options.env,
                 store,

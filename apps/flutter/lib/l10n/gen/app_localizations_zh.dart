@@ -3647,4 +3647,256 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get conversationsLoading => '正在加载会话…';
+
+  @override
+  String get toolsTitle => '智能体工具';
+
+  @override
+  String get toolsSharedWithYou => '与你共享';
+
+  @override
+  String toolsRequestTitle(String owner) {
+    return '$owner 想要共享';
+  }
+
+  @override
+  String toolsRequestDetail(String title, String ports, String device) {
+    return '$title · $device 的端口 $ports';
+  }
+
+  @override
+  String get toolsAllowOnce => '允许一次';
+
+  @override
+  String get toolsAllowConversation => '本次对话内允许';
+
+  @override
+  String get toolsDeny => '拒绝';
+
+  @override
+  String toolsAnswerFailed(String error) {
+    return '回复失败：$error';
+  }
+
+  @override
+  String toolsNewShare(String device, String title) {
+    return '$device 共享了 $title';
+  }
+
+  @override
+  String get toolsOpen => '打开';
+
+  @override
+  String get toolsCopyLink => '复制链接';
+
+  @override
+  String get toolsLinkCopied => '链接已复制';
+
+  @override
+  String get toolsStopSharing => '停止共享';
+
+  @override
+  String get toolsKeepSharing => '保持共享';
+
+  @override
+  String get toolsKeptToast => '将保持到你停止';
+
+  @override
+  String toolsStoppedToast(String title) {
+    return '已停止共享 $title';
+  }
+
+  @override
+  String toolsBy(String owner) {
+    return '来自 $owner';
+  }
+
+  @override
+  String get toolsYou => '你';
+
+  @override
+  String toolsPort(String ports) {
+    return '端口 $ports';
+  }
+
+  @override
+  String get toolsStatusOnline => '在线';
+
+  @override
+  String get toolsStatusStarting => '连接中';
+
+  @override
+  String get toolsStatusUnreachable => '无响应';
+
+  @override
+  String get toolsStatusOffline => '离线';
+
+  @override
+  String get toolsEnded => '已结束';
+
+  @override
+  String toolsEndsIn(String time) {
+    return '$time后结束';
+  }
+
+  @override
+  String get toolsKept => '已保持';
+
+  @override
+  String toolsOpenFailed(String error) {
+    return '无法打开：$error';
+  }
+
+  @override
+  String toolsPortMoved(String port, String local) {
+    return '本机端口 $port 已被占用，已改用 $local；指向 localhost:$port 的链接可能无效。';
+  }
+
+  @override
+  String toolsPortsNotConnected(String ports) {
+    return '这个共享的端口 $ports 在本机无法以原端口号连接，页面的部分功能可能无法使用。';
+  }
+
+  @override
+  String get toolsNothingShared => '还没有共享';
+
+  @override
+  String get toolsShareHint => '智能体共享开发服务器或页面后，会出现在这里，点开即可查看。';
+
+  @override
+  String get toolsThisDevice => '本机';
+
+  @override
+  String get toolsSwitch => '允许智能体使用 POCOX';
+
+  @override
+  String get toolsSwitchInfo =>
+      'Codex、Claude、OpenCode 等智能体可以看到你的设备和服务，把这台电脑的端口共享给你的其他设备，并连接其他设备上的服务。';
+
+  @override
+  String get toolsAsk => '智能体共享前先问我';
+
+  @override
+  String get toolsEndpoint => 'MCP 端点';
+
+  @override
+  String get toolsNotServing => '未运行';
+
+  @override
+  String get toolsAddToHarness => '添加到其他智能体';
+
+  @override
+  String get toolsAddToHarnessInfo =>
+      '用于 POCOX 未启动的智能体，例如在终端运行的 Claude Code 或 Codex：把它粘贴到其配置中。每次复制都会带一个新令牌。';
+
+  @override
+  String get toolsHarnessGeneric => '其他 MCP 客户端';
+
+  @override
+  String get toolsConfigCopied => '已复制，其中的令牌只显示这一次。';
+
+  @override
+  String get toolsTokens => '令牌';
+
+  @override
+  String get toolsRevoke => '吊销';
+
+  @override
+  String get toolsRevoked => '已吊销';
+
+  @override
+  String get toolsOffHere => '这台电脑已关闭智能体工具';
+
+  @override
+  String get galaxyTitle => '星系';
+
+  @override
+  String get galaxySearch => '搜索设备和服务';
+
+  @override
+  String get galaxyList => '列表';
+
+  @override
+  String get galaxyEmpty => '还没有设备';
+
+  @override
+  String get galaxyKindAgent => '智能体';
+
+  @override
+  String get galaxyKindApi => 'Responses API';
+
+  @override
+  String get galaxyKindPort => '共享端口';
+
+  @override
+  String galaxyConnected(String local) {
+    return '已在本机 $local 连接';
+  }
+
+  @override
+  String get galaxyConnect => '连接';
+
+  @override
+  String get galaxyDisconnect => '断开';
+
+  @override
+  String get galaxyOpenConversations => '打开对话';
+
+  @override
+  String get galaxyManageDevice => '管理设备';
+
+  @override
+  String get galaxyOlderPocox => '较旧的 POCOX：没有标题和来源';
+
+  @override
+  String get galaxyAll => '全部';
+
+  @override
+  String get browserReload => '重新加载';
+
+  @override
+  String get browserOpenExternal => '在浏览器中打开';
+
+  @override
+  String get browserSendToAgent => '发送给智能体';
+
+  @override
+  String get browserSentToDraft => '已添加到对话草稿';
+
+  @override
+  String galaxyServices(int count) {
+    return '$count 个服务';
+  }
+
+  @override
+  String get toolsShareAndOpen => '共享并打开';
+
+  @override
+  String get toolsSharing => '正在共享…';
+
+  @override
+  String get toolsStatusRefused => '中继拒绝了它';
+
+  @override
+  String toolsHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String toolsMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String browserNoteNoErrors(String title, String url, String device) {
+    return '预览“$title”（$url，由 $device 共享）：控制台没有错误。';
+  }
+
+  @override
+  String browserNoteConsole(String title, String url, String device) {
+    return '预览“$title”（$url，由 $device 共享），最近的控制台消息：';
+  }
+
+  @override
+  String get browserNotLocal => '这里只能打开你的设备共享的页面。';
 }

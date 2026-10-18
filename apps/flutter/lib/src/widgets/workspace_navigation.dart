@@ -28,6 +28,7 @@ List<WorkspaceDestination> workspaceDestinations(AppLocalizations l10n) => [
     label: l10n.utilityChat,
   ),
   (route: '/manage', icon: AppIcons.dns_outlined, label: l10n.manageServices),
+  (route: '/galaxy', icon: AppIcons.orbit, label: l10n.galaxyTitle),
   (
     route: '/sessions',
     icon: AppIcons.history_rounded,
@@ -42,7 +43,7 @@ List<WorkspaceDestination> workspaceDestinations(AppLocalizations l10n) => [
 ];
 
 /// The destinations' routes, in [workspaceDestinations] order.
-const _routes = ['/', '/manage', '/sessions', '/logs', '/settings'];
+const _routes = ['/', '/manage', '/galaxy', '/sessions', '/logs', '/settings'];
 
 /// The workspace's persistent destinations: a rail on the backdrop of a wide
 /// window, its selection a pane of glass gliding between rows, or a bottom

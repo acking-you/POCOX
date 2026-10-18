@@ -1282,10 +1282,61 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     worker). Release asset names, the `__worker` subcommand and state files
     are unchanged.
 
-39. **Cross-device agent tool (planned, not started).** A built-in tool that
-    lets an agent on one device work with the user's other devices and their
-    services, so one conversation reaches everything in the pocket. Until it
-    ships, describe it only as planned.
+39. **Operating other devices (planned, not started).** Agents working with the
+    user's other devices themselves (their shells, their files), so one
+    conversation reaches everything in the pocket. Until it ships, describe it
+    only as planned. It can reuse item 40's MCP server.
+
+40. **Agent tools and the galaxy (2026-10-18).** One `pocox` MCP server,
+    `services` (read) and `connect` (share, stop sharing, connect, disconnect),
+    served by the process that owns the machine's relay registrations (the app
+    or the CLI host) over stateless Streamable HTTP on 127.0.0.1 (17863 app,
+    17864 CLI host, saved), built on `rmcp` (desktop targets only). Shared
+    ports are the `port` kind keyed by port number; a share publishes only
+    after its first port answers on 127.0.0.1 or ::1. Each device's management
+    entry gains `/services/v1` (catalog, event stream, the user's answers and
+    shares); the app follows every device's stream. Consent for an agent's
+    first share per conversation (or token) is asked on all the user's
+    devices, the agent's own included, while the call waits (110 s hosted,
+    18 s otherwise); harness elicitation and multi round-trip prompts are
+    never used for it, because a harness may answer them itself. An answer
+    covers what was shown: Allow once admits that request's ports only;
+    Allow in this conversation and Deny apply to the owner and settle its
+    other requests. Agents never see consent requests or conversation ids,
+    and every share and connection re-checks the switch and the caller's
+    token right before it publishes or connects. Every call carries a bearer
+    token (per hosted Codex or OpenCode instance, committed only once the
+    host is recorded; per ACP session for agents advertising
+    `mcpCapabilities.http`, carried over on a reopen the agent accepted; per
+    copied entry; one for the CLI, sent only after the endpoint's
+    `/local/v1/hello` proof); tokens are kept as digests, revocations are
+    saved before they apply, and no token reaches a command line (copied
+    entries are configuration, never shell commands). Requests with an
+    Origin or a foreign Host are refused, by the endpoint and the management
+    entry alike. POCOX's own ports cannot be shared. Agents' shares and
+    connections end with their harness or token, after 24 h, when the switch
+    goes off or the account or relay changes; Keep sharing, the user sharing
+    the same port, and the user's own shares last until stopped. Ownership
+    is the token and conversation, not the token alone. The switch (on by
+    default; off while its file is unreadable) lives in `agent-tools.json`,
+    not `config.toml`; off refuses MCP calls but keeps the user's surface.
+    Consent holds for agents that reach POCOX only through the tools; a
+    same-user program with loopback access can act as the user, and the
+    harness's sandbox is that boundary (never claim otherwise). Hosted Codex,
+    Claude (with its read tool pre-allowed) and native OpenCode get the
+    server at launch; others get a copied entry (`pocox tools config`). CLI:
+    `pocox services share|unshare|connect|disconnect|list --json`, `pocox
+    open`, `pocox tools …`. App: app-wide consent prompts and share notices
+    (phones connect announced shares right away; desktops when opened, and a
+    share's connection ends with it), share cards at the agent's tool call,
+    Shared with you, the phone's in-app browser (loopback pages only; Flutter
+    deep linking is off on iOS and Android, sign-in callbacks keep their own
+    handler) with Send to agent (draft only), Share and open for localhost
+    links, Settings
+    › Agent tools, and the galaxy (`/galaxy`, ⌘2): a turning perspective
+    disk of device star systems and orbiting services, light and dark, with
+    list mode, keyboard focus and reduced motion. See `docs/agent-tools.md`
+    (Trust boundary; Verification lists what was exercised).
 
 40. **One desktop app per hosting state (2026-10-19).** The desktop app claims
     `<state-dir>/hosting/owner.lock` at bridge start (`engine/host_owner.rs`):
@@ -1407,6 +1458,15 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
   times and RSS, and switches repeatedly without sending turns or taking over.
 - Reference: T3 Code's [virtualized timeline and scroll anchoring](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/apps/web/src/components/chat/MessagesTimeline.tsx)
   and [pagination state tests](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/packages/client-runtime/src/state/threads-pagination.test.ts).
+
+41. **Harness connection lifecycle (2026-10-18).** Temporary probes own and
+    await their SDK connections; Codex probes close their WebSocket handshake.
+    Publishers reclaim idle app/OpenCode streams after 90s and ACP/meta/host
+    streams after 180s, with activity in either direction renewing the deadline.
+    Keep generic port and Responses API timeouts unchanged. Local descriptor
+    exhaustion is not proof of a dead harness or revoked management grant;
+    preserve healthy services and report inspection failures accurately.
+    See `docs/harness-connection-lifecycle.md`.
 
 ## 10. Communication conventions
 

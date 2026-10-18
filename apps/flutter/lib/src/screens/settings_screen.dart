@@ -11,6 +11,8 @@ import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/hosting/host_picker.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/tools/tools_providers.dart';
+import 'package:pocket_codex/src/tools/tools_settings.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
@@ -336,6 +338,12 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
+                  if (ref.watch(
+                    toolsStatusProvider.select((status) => status.supported),
+                  )) ...[
+                    const SizedBox(height: 10),
+                    const AgentToolsSettings(),
+                  ],
                   const SizedBox(height: 10),
                   GroupCard(
                     title: 'Codex',

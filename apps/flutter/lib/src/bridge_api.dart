@@ -16,6 +16,7 @@ part 'bridge/thread_types.dart';
 part 'bridge/session_access_types.dart';
 part 'bridge/management_types.dart';
 part 'bridge/device_metadata.dart';
+part 'bridge/tools_types.dart';
 
 abstract interface class BridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
@@ -720,6 +721,67 @@ abstract interface class BridgeApi {
 
   /// Enable or disable remote management of this computer only.
   Future<DeviceManagement> deviceManagementSetEnabled(bool enabled);
+
+  // --- agent tools: devices, services and shares for every harness ---
+
+  /// This installation's agent tools.
+  AgentToolsStatus toolsStatus();
+
+  /// Switch the agent tools on or off on this installation.
+  Future<AgentToolsStatus> toolsSetEnabled(bool enabled);
+
+  /// Ask (or not) before an agent's first share.
+  Future<AgentToolsStatus> toolsSetAskBeforeSharing(bool ask);
+
+  /// Every device and service visible now, read once.
+  Future<ToolsOverview> toolsOverview();
+
+  /// Follow every device's services and shares; cancel to stop.
+  Stream<ToolsUpdate> toolsWatch();
+
+  /// Answer consent request [consentId] of [device]: `allow_once`,
+  /// `allow_conversation` or `deny`.
+  Future<void> toolsAnswer(String device, String consentId, String decision);
+
+  /// Stop share [shareId] of [device], as the user.
+  Future<void> toolsStopShare(String device, String shareId);
+
+  /// Keep share [shareId] of [device] until the user stops it.
+  Future<void> toolsKeepShare(String device, String shareId);
+
+  /// Share [ports] of this computer with the user's other devices.
+  Future<ToolsShared> toolsShare(
+    List<int> ports, {
+    String? title,
+    String? path,
+  });
+
+  /// Share [ports] of [device] as the user: this computer, or another of the
+  /// user's devices (Share and open on a `localhost` link).
+  Future<ToolsShared> toolsShareOn(
+    String device,
+    List<int> ports, {
+    String? title,
+    String? path,
+    bool secure = false,
+  });
+
+  /// Make [service] of another device reachable here, at its own port number
+  /// when free (else [localPort], else any).
+  Future<ToolsConnection> toolsConnect(String service, {int? localPort});
+
+  /// End this device's connection to [service].
+  Future<void> toolsDisconnect(String service);
+
+  /// Tokens issued on this installation.
+  List<ToolsToken> toolsTokens();
+
+  /// Revoke a token; what its holder shared or connected ends.
+  Future<void> toolsRevoke(String tokenId);
+
+  /// A ready-to-paste entry for a harness POCOX does not launch, with a token
+  /// issued to it (shown once).
+  Future<String> toolsHarnessConfig(String harness);
 
   /// Authoritative boot-restore choices; a failure must block restore.
   Future<List<HostRestoreOverride>> hostRestoreOverrides();

@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/file_exports.dart';
@@ -12,6 +13,10 @@ import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/file_preview.dart';
 import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocket_codex/src/tools/tools_actions.dart';
+import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/widgets/app_dialog.dart';
 
 const _previewLimit = 8 * 1024 * 1024;
@@ -79,6 +84,72 @@ class _HostWebLink extends StatefulWidget {
 
 class _HostWebLinkState extends State<_HostWebLink> {
   bool _checking = true;
+  bool _sharing = false;
+
+  /// The app's providers, where the agent tools are (absent in previews).
+  ProviderContainer? get _container => context
+      .getInheritedWidgetOfExactType<UncontrolledProviderScope>()
+      ?.container;
+
+  /// The host's device, when it can share a port on request (a newer POCOX
+  /// reporting its catalog).
+  String? get _sharingDevice {
+    final key = widget.serviceKey;
+    final container = _container;
+    if (key == null || container == null) return null;
+    final device = parseServiceKey(key).device;
+    final known = container
+        .read(toolsOverviewProvider)
+        .devices
+        .any((d) => d.name == device && d.catalog);
+    return known ? device : null;
+  }
+
+  /// Ask the host to share the link's port, then open it here.
+  Future<void> _shareAndOpen(String device) async {
+    final uri = Uri.parse(widget.url.trim());
+    final port = uri.hasPort ? uri.port : (uri.scheme == 'https' ? 443 : 80);
+    final path =
+        (uri.path.isEmpty ? '/' : uri.path) +
+        (uri.hasQuery ? '?${uri.query}' : '') +
+        // A hash-routed app's route lives in the fragment.
+        (uri.hasFragment ? '#${uri.fragment}' : '');
+    setState(() => _sharing = true);
+    final messenger = ToastMessenger.of(context);
+    try {
+      final shared = await widget.api.toolsShareOn(
+        device,
+        [port],
+        path: path,
+        secure: uri.scheme == 'https',
+      );
+      // The clicked port, path and scheme: an earlier share of the port may
+      // hold it beside another page, at another path.
+      final key =
+          [
+            for (final held in shared.share.ports)
+              if (held.port == port) held.key,
+          ].firstOrNull ??
+          shared.share.firstKey;
+      final container = _container;
+      if (!mounted || key == null || container == null) return;
+      await openShareWith(
+        context,
+        container.read,
+        ShareRef(
+          service: key,
+          path: path,
+          title: shared.share.title,
+          secure: uri.scheme == 'https',
+        ),
+      );
+      if (mounted) Navigator.of(context).pop();
+    } catch (error) {
+      messenger.error(friendlyError(error));
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -132,6 +203,12 @@ class _HostWebLinkState extends State<_HostWebLink> {
           onPressed: () => Navigator.of(context).pop(),
           child: Text(l10n.fileLinkClose),
         ),
+        if (_sharingDevice case final device? when !_checking)
+          FilledButton(
+            key: const Key('host-link-share-open'),
+            onPressed: _sharing ? null : () => _shareAndOpen(device),
+            child: Text(_sharing ? l10n.toolsSharing : l10n.toolsShareAndOpen),
+          ),
       ],
     );
   }

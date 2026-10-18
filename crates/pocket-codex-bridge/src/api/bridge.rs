@@ -21,6 +21,7 @@ use crate::{
     frb_generated::StreamSink,
 };
 
+pub mod agent_tools;
 pub mod codex_setup;
 pub mod connection;
 pub mod device_management;
@@ -37,6 +38,14 @@ pub mod session_config;
 pub mod threads;
 
 pub use self::{
+    agent_tools::{
+        tools_answer, tools_connect, tools_disconnect, tools_harness_config, tools_keep_share,
+        tools_overview, tools_revoke, tools_set_ask_before_sharing, tools_set_enabled, tools_share,
+        tools_share_on, tools_status, tools_stop_share, tools_tokens, tools_watch,
+        AgentToolsStatusDto, ToolsConnectionDto, ToolsConsentDto, ToolsDeviceDto, ToolsOverviewDto,
+        ToolsOwnerDto, ToolsPortDto, ToolsRefDto, ToolsServiceDto, ToolsShareDto, ToolsSharedDto,
+        ToolsTokenDto, ToolsUpdateDto,
+    },
     codex_setup::{
         codex_auth_status, codex_login_cancel, codex_login_chatgpt_start, codex_logout,
         codex_prompt_variant, codex_set_prompt_variant, codex_setup_provider, codex_setup_status,
@@ -153,6 +162,7 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // state starts, restores and publishes nothing while the first runs.
     crate::engine::host_owner::claim_desktop();
     crate::engine::management::initialize();
+    crate::engine::agent_tools::initialize();
     Ok(())
 }
 

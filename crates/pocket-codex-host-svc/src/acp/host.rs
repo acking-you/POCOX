@@ -307,6 +307,8 @@ struct Inner {
     /// `_meta` merged into every session creation and reopen request (see
     /// [`AgentHost::create_configured`]). May hold a secret: never logged.
     session_meta: Option<serde_json::Map<String, Value>>,
+    /// MCP servers for each session, for an agent that accepts HTTP ones.
+    session_mcp: Mutex<Option<Arc<dyn crate::acp::SessionMcp>>>,
     path: Option<OsString>,
     env: Vec<(OsString, OsString)>,
     store: Arc<SessionStore>,

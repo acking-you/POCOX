@@ -6715,6 +6715,438 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Loading conversations…'**
   String get conversationsLoading;
+
+  /// No description provided for @toolsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent tools'**
+  String get toolsTitle;
+
+  /// No description provided for @toolsSharedWithYou.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared with you'**
+  String get toolsSharedWithYou;
+
+  /// No description provided for @toolsRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{owner} wants to share'**
+  String toolsRequestTitle(String owner);
+
+  /// No description provided for @toolsRequestDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} · port {ports} on {device}'**
+  String toolsRequestDetail(String title, String ports, String device);
+
+  /// No description provided for @toolsAllowOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow once'**
+  String get toolsAllowOnce;
+
+  /// No description provided for @toolsAllowConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow in this conversation'**
+  String get toolsAllowConversation;
+
+  /// No description provided for @toolsDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get toolsDeny;
+
+  /// No description provided for @toolsAnswerFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not answer: {error}'**
+  String toolsAnswerFailed(String error);
+
+  /// No description provided for @toolsNewShare.
+  ///
+  /// In en, this message translates to:
+  /// **'{device} shared {title}'**
+  String toolsNewShare(String device, String title);
+
+  /// No description provided for @toolsOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get toolsOpen;
+
+  /// No description provided for @toolsCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get toolsCopyLink;
+
+  /// No description provided for @toolsLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get toolsLinkCopied;
+
+  /// No description provided for @toolsStopSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop sharing'**
+  String get toolsStopSharing;
+
+  /// No description provided for @toolsKeepSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep sharing'**
+  String get toolsKeepSharing;
+
+  /// No description provided for @toolsKeptToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept until you stop it'**
+  String get toolsKeptToast;
+
+  /// No description provided for @toolsStoppedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped sharing {title}'**
+  String toolsStoppedToast(String title);
+
+  /// No description provided for @toolsBy.
+  ///
+  /// In en, this message translates to:
+  /// **'by {owner}'**
+  String toolsBy(String owner);
+
+  /// No description provided for @toolsYou.
+  ///
+  /// In en, this message translates to:
+  /// **'you'**
+  String get toolsYou;
+
+  /// No description provided for @toolsPort.
+  ///
+  /// In en, this message translates to:
+  /// **'port {ports}'**
+  String toolsPort(String ports);
+
+  /// No description provided for @toolsStatusOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get toolsStatusOnline;
+
+  /// No description provided for @toolsStatusStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting'**
+  String get toolsStatusStarting;
+
+  /// No description provided for @toolsStatusUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Not answering'**
+  String get toolsStatusUnreachable;
+
+  /// No description provided for @toolsStatusOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get toolsStatusOffline;
+
+  /// No description provided for @toolsEnded.
+  ///
+  /// In en, this message translates to:
+  /// **'Ended'**
+  String get toolsEnded;
+
+  /// No description provided for @toolsEndsIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Ends in {time}'**
+  String toolsEndsIn(String time);
+
+  /// No description provided for @toolsKept.
+  ///
+  /// In en, this message translates to:
+  /// **'Kept'**
+  String get toolsKept;
+
+  /// No description provided for @toolsOpenFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open it: {error}'**
+  String toolsOpenFailed(String error);
+
+  /// No description provided for @toolsPortMoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Port {port} is taken here, so it opened on {local}. Links that name localhost:{port} may not work.'**
+  String toolsPortMoved(String port, String local);
+
+  /// No description provided for @toolsPortsNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Port {ports} of this share is not reachable at its own number here, so parts of the page may not work.'**
+  String toolsPortsNotConnected(String ports);
+
+  /// No description provided for @toolsNothingShared.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing shared yet'**
+  String get toolsNothingShared;
+
+  /// No description provided for @toolsShareHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When an agent shares a dev server or a page, it appears here, ready to open.'**
+  String get toolsShareHint;
+
+  /// No description provided for @toolsThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get toolsThisDevice;
+
+  /// No description provided for @toolsSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Let agents use POCOX'**
+  String get toolsSwitch;
+
+  /// No description provided for @toolsSwitchInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Codex, Claude, OpenCode and other agents can see your devices and services, share a port of this computer with your other devices, and connect to services elsewhere.'**
+  String get toolsSwitchInfo;
+
+  /// No description provided for @toolsAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask before an agent shares'**
+  String get toolsAsk;
+
+  /// No description provided for @toolsEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'MCP endpoint'**
+  String get toolsEndpoint;
+
+  /// No description provided for @toolsNotServing.
+  ///
+  /// In en, this message translates to:
+  /// **'Not serving'**
+  String get toolsNotServing;
+
+  /// No description provided for @toolsAddToHarness.
+  ///
+  /// In en, this message translates to:
+  /// **'Add to another agent'**
+  String get toolsAddToHarness;
+
+  /// No description provided for @toolsAddToHarnessInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'For agents POCOX does not start, such as Claude Code or Codex run in a terminal: paste this into its configuration. Each copy carries a new token.'**
+  String get toolsAddToHarnessInfo;
+
+  /// No description provided for @toolsHarnessGeneric.
+  ///
+  /// In en, this message translates to:
+  /// **'Other MCP client'**
+  String get toolsHarnessGeneric;
+
+  /// No description provided for @toolsConfigCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied. Its token is shown only once.'**
+  String get toolsConfigCopied;
+
+  /// No description provided for @toolsTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Tokens'**
+  String get toolsTokens;
+
+  /// No description provided for @toolsRevoke.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke'**
+  String get toolsRevoke;
+
+  /// No description provided for @toolsRevoked.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoked'**
+  String get toolsRevoked;
+
+  /// No description provided for @toolsOffHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent tools are off on this computer'**
+  String get toolsOffHere;
+
+  /// No description provided for @galaxyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Galaxy'**
+  String get galaxyTitle;
+
+  /// No description provided for @galaxySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search devices and services'**
+  String get galaxySearch;
+
+  /// No description provided for @galaxyList.
+  ///
+  /// In en, this message translates to:
+  /// **'List'**
+  String get galaxyList;
+
+  /// No description provided for @galaxyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices yet'**
+  String get galaxyEmpty;
+
+  /// No description provided for @galaxyKindAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent'**
+  String get galaxyKindAgent;
+
+  /// No description provided for @galaxyKindApi.
+  ///
+  /// In en, this message translates to:
+  /// **'Responses API'**
+  String get galaxyKindApi;
+
+  /// No description provided for @galaxyKindPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Shared port'**
+  String get galaxyKindPort;
+
+  /// No description provided for @galaxyConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected here at {local}'**
+  String galaxyConnected(String local);
+
+  /// No description provided for @galaxyConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect'**
+  String get galaxyConnect;
+
+  /// No description provided for @galaxyDisconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get galaxyDisconnect;
+
+  /// No description provided for @galaxyOpenConversations.
+  ///
+  /// In en, this message translates to:
+  /// **'Open conversations'**
+  String get galaxyOpenConversations;
+
+  /// No description provided for @galaxyManageDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage device'**
+  String get galaxyManageDevice;
+
+  /// No description provided for @galaxyOlderPocox.
+  ///
+  /// In en, this message translates to:
+  /// **'Older POCOX: no titles or owners'**
+  String get galaxyOlderPocox;
+
+  /// No description provided for @galaxyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get galaxyAll;
+
+  /// No description provided for @browserReload.
+  ///
+  /// In en, this message translates to:
+  /// **'Reload'**
+  String get browserReload;
+
+  /// No description provided for @browserOpenExternal.
+  ///
+  /// In en, this message translates to:
+  /// **'Open in browser'**
+  String get browserOpenExternal;
+
+  /// No description provided for @browserSendToAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Send to agent'**
+  String get browserSendToAgent;
+
+  /// No description provided for @browserSentToDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to the conversation\'s draft'**
+  String get browserSentToDraft;
+
+  /// No description provided for @galaxyServices.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 service} other{{count} services}}'**
+  String galaxyServices(int count);
+
+  /// No description provided for @toolsShareAndOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Share and open'**
+  String get toolsShareAndOpen;
+
+  /// No description provided for @toolsSharing.
+  ///
+  /// In en, this message translates to:
+  /// **'Sharing…'**
+  String get toolsSharing;
+
+  /// No description provided for @toolsStatusRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused by the relay'**
+  String get toolsStatusRefused;
+
+  /// No description provided for @toolsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String toolsHours(int count);
+
+  /// No description provided for @toolsMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String toolsMinutes(int count);
+
+  /// No description provided for @browserNoteNoErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of \"{title}\" ({url}, shared from {device}): no console errors.'**
+  String browserNoteNoErrors(String title, String url, String device);
+
+  /// No description provided for @browserNoteConsole.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of \"{title}\" ({url}, shared from {device}), recent console messages:'**
+  String browserNoteConsole(String title, String url, String device);
+
+  /// No description provided for @browserNotLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Only pages shared from your devices open here.'**
+  String get browserNotLocal;
 }
 
 class _AppLocalizationsDelegate

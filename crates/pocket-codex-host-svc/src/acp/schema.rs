@@ -54,6 +54,9 @@ pub struct AgentCapabilities {
     /// sibling of `agentCapabilities`.
     #[serde(default)]
     pub steering: bool,
+    /// HTTP MCP servers in `mcpServers` — `mcpCapabilities.http`.
+    #[serde(default)]
+    pub mcp_http: bool,
 }
 
 /// The `_session/steering` extension request.
@@ -181,6 +184,7 @@ pub fn negotiate(result: &Value) -> Result<Negotiated, NegotiationError> {
         audio: prompt["audio"] == true,
         embedded_context: prompt["embeddedContext"] == true,
         steering: result["_meta"]["steering"]["supported"] == true,
+        mcp_http: agent["mcpCapabilities"]["http"] == true,
     };
     let info = &result["agentInfo"];
     let auth_methods = result["authMethods"]
