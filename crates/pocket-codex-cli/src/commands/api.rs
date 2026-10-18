@@ -154,12 +154,14 @@ pub(crate) fn client_setup_command(subcommand: &str, key: &str, transport: &Tran
     }
 }
 
+/// The provider entry users paste into Codex configuration. Its name keeps
+/// the former product name, like every value written into that file.
 pub(crate) fn codex_provider_config(local_addr: &str) -> String {
     format!(
         r#"model_provider = "pocket-codex-api"
 
 [model_providers.pocket-codex-api]
-name = "POCOX API"
+name = "Pocket-Codex API"
 base_url = "http://{local_addr}/v1"
 wire_api = "responses"
 requires_openai_auth = false

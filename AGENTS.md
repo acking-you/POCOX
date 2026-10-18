@@ -1231,7 +1231,7 @@ this file's roadmap so the source of truth stays in sync.
     `POCKET_CODEX_*` variables, the `~/PocketCodex` default project folder,
     `pcx:` keys, release artifact names, the repository URL and the provider
     names written into Codex configuration (effective-route checks compare
-    them). The Windows installer keeps its AppId and removes shortcuts made
+    them; the API snippet users paste keeps its name too). The Windows installer keeps its AppId and removes shortcuts made
     under the old name. The README poster is regenerated from the app's own
     screens (`test/gen_poster_test.dart`).
 

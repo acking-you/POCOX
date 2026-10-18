@@ -296,7 +296,7 @@ $PCX api connect --relay lb7666.top:7666
 model_provider = "pocket-codex-api"
 
 [model_providers.pocket-codex-api]
-name = "POCOX API"
+name = "Pocket-Codex API"
 base_url = "http://127.0.0.1:28180/v1"
 wire_api = "responses"
 requires_openai_auth = false
