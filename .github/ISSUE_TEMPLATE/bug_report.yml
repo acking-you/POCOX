@@ -11,7 +11,7 @@ body:
         - **POCOX is pre-1.0.** APIs, on-disk layout and the protocol
           mapping are all expected to change. Please include the exact
           commit / version you saw the bug on.
-        - **Logs help.** `pocket-codex` uses `tracing`; running with
+        - **Logs help.** `pocox` uses `tracing`; running with
           `RUST_LOG=pocket_codex=debug` (or `trace`) usually surfaces what
           went wrong.
         - **Don't paste secrets.** Scrub `CODEX_ACCESS_TOKEN`, ChatGPT
@@ -33,7 +33,7 @@ body:
     attributes:
       label: Summary
       description: One-sentence description of the bug.
-      placeholder: "`pocket-codex serve --relay …` exits 0 but pb-mapper never sees the registration."
+      placeholder: "`pocox serve --relay …` exits 0 but pb-mapper never sees the registration."
     validations:
       required: true
 
@@ -44,9 +44,9 @@ body:
       description: The exact commands you ran, in order. A minimal repro is gold.
       placeholder: |
         1. `git clone --recurse-submodules … && cargo build --workspace`
-        2. `pocket-codex codex start`
-        3. `pocket-codex serve --relay relay.example.com:7666`
-        4. On another machine: `pocket-codex services list --relay relay.example.com:7666`
+        2. `pocox codex start`
+        3. `pocox serve --relay relay.example.com:7666`
+        4. On another machine: `pocox services list --relay relay.example.com:7666`
       render: markdown
     validations:
       required: true
@@ -74,11 +74,11 @@ body:
       description: Which part of the system did the bug show up in?
       multiple: true
       options:
-        - "`pocket-codex` CLI (serve / connect / status / stop)"
-        - "`pocket-codex codex …` (app-server supervision)"
-        - "`pocket-codex api …` (Responses API proxy)"
-        - "`pocket-codex pb …` (pb-mapper register / subscribe)"
-        - "`pocket-codex services …` (discovery / default device)"
+        - "`pocox` CLI (serve / connect / status / stop)"
+        - "`pocox codex …` (app-server supervision)"
+        - "`pocox api …` (Responses API proxy)"
+        - "`pocox pb …` (pb-mapper register / subscribe)"
+        - "`pocox services …` (discovery / default device)"
         - "Flutter UI (`apps/flutter`)"
         - "`flutter_rust_bridge` codegen / cdylib"
         - "Build / CI / docs"
@@ -90,8 +90,8 @@ body:
     id: pcx-version
     attributes:
       label: POCOX version
-      description: Output of `pocket-codex version` (or the commit SHA you built from).
-      placeholder: "pocket-codex 0.1.0 (commit abcdef0)"
+      description: Output of `pocox version` (or the commit SHA you built from).
+      placeholder: "pocox 0.1.0 (commit abcdef0)"
     validations:
       required: true
 

@@ -1,4 +1,4 @@
-//! `pocket-codex services …` subcommand handlers.
+//! `pocox services …` subcommand handlers.
 
 use anyhow::{anyhow, Result};
 use comfy_table::Cell;

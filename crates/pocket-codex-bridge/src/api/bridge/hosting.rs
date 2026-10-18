@@ -1,5 +1,5 @@
 //! Local hosting (desktop): run and manage local Codex app-server and ACP agent
-//! hosts, the in-app equivalent of `pocket-codex serve`.
+//! hosts, the in-app equivalent of `pocox serve`.
 
 use super::*;
 

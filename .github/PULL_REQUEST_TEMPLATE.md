@@ -32,7 +32,7 @@ is documented it is part of the contract. If you're changing one of
 these, call it out explicitly and write a migration note.
 -->
 
-- [ ] Changes a `pocket-codex` CLI flag, subcommand or output format
+- [ ] Changes a `pocox` CLI flag, subcommand or output format
 - [ ] Changes the on-disk layout (`state.toml`, paths under
       `pocket-codex-core::paths`)
 - [ ] Changes a wire-protocol field (codex app-server JSON-RPC,

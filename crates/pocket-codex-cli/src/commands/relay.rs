@@ -1,4 +1,4 @@
-//! Relay address + credential resolution for `pocket-codex` commands.
+//! Relay address + credential resolution for `pocox` commands.
 //!
 //! Precedence is `flag > config > $PB_MAPPER_SERVER`. The credential is bound
 //! to the *configured* relay: [`resolve_relay`] pairs the resolved address with
@@ -35,9 +35,7 @@ fn resolve_relay_from(
         .map(str::trim)
         .find(|s| !s.is_empty())
         .map(ToString::to_string)
-        .ok_or_else(|| {
-            anyhow!("no relay configured; run `pocket-codex init` or pass --relay <host:port>")
-        })
+        .ok_or_else(|| anyhow!("no relay configured; run `pocox init` or pass --relay <host:port>"))
 }
 
 /// Resolve the effective relay address (`flag > config > $PB_MAPPER_SERVER`).
@@ -64,10 +62,7 @@ pub(crate) fn resolve_session(flag: Option<&str>, config: &Config) -> Result<Rel
         .map(|c| c.trim().to_string())
         .filter(|c| !c.is_empty())
         .ok_or_else(|| {
-            anyhow!(
-                "no relay credential for {relay}; run `pocket-codex init` or export \
-                 {CREDENTIAL_ENV}"
-            )
+            anyhow!("no relay credential for {relay}; run `pocox init` or export {CREDENTIAL_ENV}")
         })?;
     Ok(RelaySession::new(relay, credential))
 }

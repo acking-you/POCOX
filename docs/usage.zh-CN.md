@@ -34,14 +34,14 @@ Codex，其它所有设备登录**同一个**账号后即可驱动它。无需�
 ### CLI
 
 ```bash
-pocket-codex login
+pocox login
 ```
 
 它会打印一个验证网址和一次性验证码。打开网址、输入验证码、完成授权。用以下命令
 确认：
 
 ```bash
-pocket-codex account     # → 已登录为 @you，模式 = account
+pocox account     # → 已登录为 @you，模式 = account
 ```
 
 ---
@@ -51,7 +51,7 @@ pocket-codex account     # → 已登录为 @you，模式 = account
 在已安装并登录 `codex` 的机器上：
 
 ```bash
-pocket-codex serve
+pocox serve
 ```
 
 它会启动（或复用）本地的 `codex app-server`，并以你的账号注册它。让它保持运行
@@ -83,8 +83,8 @@ pocket-codex serve
 ### CLI
 
 ```bash
-pocket-codex services list      # 查看你注册的服务
-pocket-codex connect            # 订阅；打印出对应的 codex 命令
+pocox services list      # 查看你注册的服务
+pocox connect            # 订阅；打印出对应的 codex 命令
 codex --remote ws://127.0.0.1:28080
 ```
 
@@ -101,13 +101,13 @@ codex --remote ws://127.0.0.1:28080
 在宿主机上：
 
 ```bash
-pocket-codex api serve
+pocox api serve
 ```
 
 在任意设备上：
 
 ```bash
-pocket-codex api connect        # 打印一段本地 model_providers 配置片段
+pocox api connect        # 打印一段本地 model_providers 配置片段
 ```
 
 把任意 OpenAI 兼容工具指向打印出的本地地址即可（它提供 `/v1/responses`）。
@@ -118,10 +118,10 @@ pocket-codex api connect        # 打印一段本地 model_providers 配置片�
 ## 5. 状态与登出
 
 ```bash
-pocket-codex account            # 你是谁 + 传输模式
-pocket-codex status             # 本地 serve / api / codex 的状态
-pocket-codex stop               # 停止本地的 serve / api
-pocket-codex logout             # 吊销会话并清除本地令牌
+pocox account            # 你是谁 + 传输模式
+pocox status             # 本地 serve / api / codex 的状态
+pocox stop               # 停止本地的 serve / api
+pocox logout             # 吊销会话并清除本地令牌
 ```
 
 在 App 中：**设置 → 账号 → 退出登录**。
@@ -130,10 +130,10 @@ pocket-codex logout             # 吊销会话并清除本地令牌
 
 ## 常见问题
 
-- **App 里显示「app-server 不可达」**——宿主机上的 `pocket-codex serve` 没在
+- **App 里显示「app-server 不可达」**——宿主机上的 `pocox serve` 没在
   运行，或连接已断开。在宿主机上（重新）启动它。App 会周期性重新探测；用刷新
   控件可立即检查。
-- **登录过期**——再次运行 `pocket-codex login`。会话有效期内会自动刷新，所以
+- **登录过期**——再次运行 `pocox login`。会话有效期内会自动刷新，所以
   每台设备通常只需登录一次。
 - **多个宿主或服务**——分别给每个起一个 `--name`，然后在 CLI 用 `--name` /
   `--device` 选择，或在 App 中点击对应的服务。

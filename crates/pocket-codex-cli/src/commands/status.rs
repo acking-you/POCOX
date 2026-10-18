@@ -1,4 +1,4 @@
-//! `pocket-codex status` unified runtime status output.
+//! `pocox status` unified runtime status output.
 
 use anyhow::Result;
 use comfy_table::Cell;

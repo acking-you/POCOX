@@ -59,11 +59,11 @@ body:
       description: Which area(s) of the project would this touch?
       multiple: true
       options:
-        - "`pocket-codex` CLI surface"
-        - "`pocket-codex codex …` (app-server supervision)"
-        - "`pocket-codex api …` (Responses API proxy)"
-        - "`pocket-codex pb …` (pb-mapper integration)"
-        - "`pocket-codex services …` (discovery / default device)"
+        - "`pocox` CLI surface"
+        - "`pocox codex …` (app-server supervision)"
+        - "`pocox api …` (Responses API proxy)"
+        - "`pocox pb …` (pb-mapper integration)"
+        - "`pocox services …` (discovery / default device)"
         - "On-disk layout (`state.toml`, paths)"
         - "Flutter UI (`apps/flutter`)"
         - "`flutter_rust_bridge` API surface"

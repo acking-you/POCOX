@@ -1,4 +1,4 @@
-//! `pocket-codex init`: interactively persist the default relay + key.
+//! `pocox init`: interactively persist the default relay + key.
 //!
 //! Stores `host:port` and the shared `MSG_HEADER_KEY` in `config.toml`
 //! (0600) so later commands need neither `--relay` nor an exported
@@ -60,7 +60,7 @@ fn prompt(label: &str, default_hint: Option<&str>) -> Result<Option<String>> {
     Ok((!trimmed.is_empty()).then(|| trimmed.to_string()))
 }
 
-/// Run `pocket-codex init`.
+/// Run `pocox init`.
 pub async fn run(args: InitArgs) -> Result<()> {
     let mut config = Config::load()?;
 

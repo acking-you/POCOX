@@ -95,7 +95,7 @@ jobs:
             echo "| Android | \`…-android-arm64-v8a.apk\` (most phones) · armeabi-v7a · x86_64 |"
             echo "| iOS | \`…-ios-unsigned.ipa\` (sideload / development) |"
             echo
-            echo "**CLI** — \`pocket-codex-cli-*\`: statically linked **musl** Linux binaries (x86_64 / aarch64 / armv7 — run on any distro, no glibc dependency), plus macOS (x64 / arm64) and Windows x64."
+            echo "**CLI** — \`pocket-codex-cli-*\`, the \`pocox\` command: statically linked **musl** Linux binaries (x86_64 / aarch64 / armv7 — run on any distro, no glibc dependency), plus macOS (x64 / arm64) and Windows x64."
             echo
             echo "> Android APKs use a persistent release signature from v0.2.4 onward. Older debug-signed builds cannot be upgraded in place; save your settings before uninstalling an old build. iOS remains unsigned for sideloading/development."
             if [ -n "${changelog}" ]; then
@@ -111,7 +111,7 @@ jobs:
           name: release-notes
           path: release_notes.md
 
-  # --- CLI (`pocket-codex`) — static musl Linux + native macOS/Windows --------
+  # --- CLI (`pocox`) — static musl Linux + native macOS/Windows ---------------
   cli:
     if: inputs.macos_release_tag == ''
     name: CLI (${{ matrix.target }})
@@ -150,7 +150,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cross
-      - name: Build pocket-codex CLI
+      - name: Build the pocox CLI
         shell: bash
         run: |
           set -euo pipefail
@@ -160,9 +160,9 @@ jobs:
             export CARGO_PROFILE_RELEASE_LTO=false
           fi
           if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release --locked -p pocket-codex-cli --bin pocket-codex --target ${{ matrix.target }}
+            cross build --release --locked -p pocket-codex-cli --bin pocox --target ${{ matrix.target }}
           else
-            cargo build --release --locked -p pocket-codex-cli --bin pocket-codex --target ${{ matrix.target }}
+            cargo build --release --locked -p pocket-codex-cli --bin pocox --target ${{ matrix.target }}
           fi
       - name: Package
         shell: bash
@@ -172,10 +172,10 @@ jobs:
           name="pocket-codex-cli-${tag}-${{ matrix.target }}"
           mkdir -p "dist/$name"
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "target/${{ matrix.target }}/release/pocket-codex.exe" "dist/$name/"
+            cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/"
             (cd dist && 7z a "$name.zip" "$name" >/dev/null)
           else
-            cp "target/${{ matrix.target }}/release/pocket-codex" "dist/$name/"
+            cp "target/${{ matrix.target }}/release/pocox" "dist/$name/"
             tar -czf "dist/$name.tar.gz" -C dist "$name"
           fi
           rm -rf "dist/$name"

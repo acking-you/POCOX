@@ -14,7 +14,7 @@ unavailable physical link or resume a data socket that has already reset.
 Inspect one recorded worker:
 
 ```sh
-pocket-codex pb diagnostics --role register --key pcx:device:api:default
+pocox pb diagnostics --role register --key pcx:device:api:default
 ```
 
 Output includes PID liveness and, for a recent matching worker, its actual SDK
@@ -23,16 +23,17 @@ files contain no credentials or application payload. PID/start-time validation a
 a 30-second freshness bound prevent a stale snapshot from impersonating a running
 worker. `runtime: null` / `unknown` means this worker cannot report fresh diagnostics;
 the installed binary's version is never substituted for the running worker's SDK.
-`pocket-codex status` also displays the running SDK version.
+`pocox status` also displays the running SDK version.
 
 After installing an updated CLI, replace exactly one network worker:
 
 ```sh
-pocket-codex pb restart --role register --key pcx:device:api:default
+pocox pb restart --role register --key pcx:device:api:default
 ```
 
-Both selectors are required. The command checks executable, worker subcommand,
-key, endpoint and relay before sending a signal; it refuses a host supervisor or
+Both selectors are required. The command checks the executable (`pocox`, or
+`pocket-codex` for a worker started before the rename), worker subcommand, key,
+endpoint and relay before sending a signal; it refuses a host supervisor or
 another process at a reused PID. It resolves credentials before stopping the
 worker and refuses a relay/account change. A restart replaces this mapping's
 connections, while its local Codex/API process and other worker records remain

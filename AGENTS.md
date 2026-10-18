@@ -16,7 +16,7 @@ services. Concretely, it turns the upstream
 portable, multi-device experience, and additionally exposes the host's
 Codex login as a relay-reachable Responses API endpoint for any device:
 
-- A **pure-Rust CLI** (`pocket-codex`) supervises a local
+- A **pure-Rust CLI** (`pocox`) supervises a local
   `codex app-server` process on the machine that already has Codex
   installed.
 - The same CLI ships an in-process **Responses API proxy** that reuses
@@ -90,7 +90,7 @@ Shared / host side:
 | `pocket-codex-pb`           | async wrappers around the Git-pinned `pb-mapper` client SDK: `RelaySession` (address + credential), register / subscribe / status, `publish` (and the one name-conflict failure a caller must not retry), admin credential issuance, and credential keep-alive |
 | `pocket-codex-api-proxy`    | local Responses API proxy: forwards `/v1/responses` (HTTP + WS) to ChatGPT's Codex backend, reusing the host's `codex login`; shared by the CLI worker and the in-app host |
 | `pocket-codex-host-svc`     | host-side meta service — remote-viewable codex sessions, per-thread config, attachment upload — published on the relay as a third `meta:<name>` service |
-| `pocket-codex-cli`          | user-facing `pocket-codex` binary; account (`login` / `logout` / `account`), setup (`init`), high-level `serve` / `connect` / `api {serve,connect}` / `services {list,default set}` / `status` / `stop`, low-level `codex {start,stop,status}`, `pb {register,subscribe,status}`, `remote-hint`, `version` |
+| `pocket-codex-cli`          | user-facing `pocox` binary; account (`login` / `logout` / `account`), setup (`init`), high-level `serve` / `connect` / `api {serve,connect}` / `services {list,default set}` / `status` / `stop`, low-level `codex {start,stop,status}`, `pb {register,subscribe,status}`, `remote-hint`, `version` |
 | `pocket_codex_bridge`       | `cdylib + staticlib` consumed by Flutter via `flutter_rust_bridge`; auto-generated bindings live in `lib/src/rust` of the Flutter app |
 
 Hosted-account mode (all optional — self-host never touches these):
@@ -321,20 +321,20 @@ After a protocol bump:
 
 The order below is our current best guess; it is not a contract.
 
-1. **CLI bootstrap (done).** `pocket-codex version`, configuration
+1. **CLI bootstrap (done).** `pocox version`, configuration
    loading, basic logging, command-line schema + dispatcher.
-2. **Codex process manager (done).** `pocket-codex codex
+2. **Codex process manager (done).** `pocox codex
    start|stop|status` spawning the user's local `codex app-server`,
    persisting PID / listen URL metadata to `state.toml`, surfacing
    logs.
-3. **pb-mapper register / subscribe (done).** `pocket-codex pb
-   register` and `pocket-codex pb subscribe` re-using the upstream
+3. **pb-mapper register / subscribe (done).** `pocox pb
+   register` and `pocox pb subscribe` re-using the upstream
    `local::server::run_server_side_cli` /
    `local::client::run_client_side_cli` helpers.
-4. **Combined `serve` / `connect` flow (done).** `pocket-codex serve`
+4. **Combined `serve` / `connect` flow (done).** `pocox serve`
    starts or reuses the local app-server, registers it with a relay and
    tracks the daemonised pb-mapper worker in `state.toml`;
-   `pocket-codex connect` subscribes on the client side and prints the
+   `pocox connect` subscribes on the client side and prints the
    matching `codex --remote ...` command.
 5. **Multi-device service selection + direct API proxy (done).**
    POCOX service keys use `pcx:<device>:<service>:<name>`;
@@ -1259,7 +1259,7 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     `CFBundleDisplayName`, Android label, window and tray titles, Linux
     desktop entries, the Windows installer name), CLI and backend messages.
     Identifiers keep their names so installs, scripts and settings carry
-    over: the `pocket-codex` CLI and crates, the `pocket_codex` Dart package,
+    over: the crates, the `pocket_codex` Dart package,
     bundle and application IDs, `PRODUCT_NAME`, the Windows `ProductName` (it
     names the `%APPDATA%` folder), config and state directories,
     `POCKET_CODEX_*` variables, the `~/PocketCodex` default project folder,
@@ -1273,6 +1273,14 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     harnesses. Its poster is regenerated at 2x from the app's own screens
     (`test/gen_poster_test.dart`): Local sessions on a Mac and a phone ready
     to take over a session Codex's app holds.
+    The CLI executable is `pocox`, short to type. The installers update an
+    existing `pocket-codex` CLI in place and leave that name as an alias (a
+    symlink on Unix, a `.cmd` shim on Windows); the Linux package's
+    `pocket-codex` link to the desktop app is never run or replaced. Worker
+    identity checks accept both executable names, so workers started before
+    an upgrade stay manageable (an older binary cannot recognize a `pocox`
+    worker). Release asset names, the `__worker` subcommand and state files
+    are unchanged.
 
 39. **Cross-device agent tool (planned, not started).** A built-in tool that
     lets an agent on one device work with the user's other devices and their

@@ -30,7 +30,7 @@
 //!    access token, account id, and FedRAMP claim from the embedded id_token.
 //!
 //! Two entry points share the same router: [`run`] binds a fresh listener
-//! (used by the `pocket-codex api serve` worker subprocess) and [`serve`]
+//! (used by the `pocox api serve` worker subprocess) and [`serve`]
 //! adopts a pre-bound [`TcpListener`] (used by the in-app host, which binds
 //! `127.0.0.1:0` first so it can learn the port it must register).
 
@@ -80,7 +80,7 @@ struct ProxyState {
 }
 
 /// Bind `listen` and run the Responses API proxy until the process is
-/// signalled. Used by the `pocket-codex api serve` worker.
+/// signalled. Used by the `pocox api serve` worker.
 pub async fn run(listen: String, proxy: Option<String>) -> Result<()> {
     let listen: SocketAddr = listen
         .parse()

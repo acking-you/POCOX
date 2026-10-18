@@ -1,7 +1,7 @@
 //! Subcommand dispatcher.
 //!
 //! Each module in this directory implements one verb of the
-//! `pocket-codex` CLI and is responsible for its own I/O. Keeping
+//! `pocox` CLI and is responsible for its own I/O. Keeping
 //! them small and side-effect-local makes them easy to unit test.
 
 use anyhow::Result;

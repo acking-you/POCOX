@@ -1,4 +1,4 @@
-//! `pocket-codex codex …` subcommand handlers.
+//! `pocox codex …` subcommand handlers.
 
 use anyhow::Result;
 use pocket_codex_codex::{
@@ -61,7 +61,7 @@ fn start(args: CodexStartArgs) -> Result<()> {
         .strip_prefix("ws://")
         .unwrap_or(&report.info.listen);
     ui::code(&format!(
-        "pocket-codex pb register --key codex --local-addr {local_addr} --relay <relay-host:7666>"
+        "pocox pb register --key codex --local-addr {local_addr} --relay <relay-host:7666>"
     ));
     Ok(())
 }
@@ -94,7 +94,7 @@ pub(crate) fn startup_failure_error(failure: StartupFailure) -> anyhow::Error {
 fn stop_cmd() -> Result<()> {
     match stop()? {
         StopOutcome::NoRecord => {
-            ui::muted("no codex app-server is currently supervised by pocket-codex");
+            ui::muted("no codex app-server is currently supervised by pocox");
         },
         StopOutcome::StaleRecord {
             pid,
@@ -128,7 +128,7 @@ fn status_cmd() -> Result<()> {
             ui::field("listen", &info.listen);
             ui::field("started", &info.started_at);
         },
-        None => ui::muted("no codex app-server is currently supervised by pocket-codex"),
+        None => ui::muted("no codex app-server is currently supervised by pocox"),
     }
     Ok(())
 }

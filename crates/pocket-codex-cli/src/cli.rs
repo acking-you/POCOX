@@ -1,4 +1,4 @@
-//! Command-line argument schema for `pocket-codex`.
+//! Command-line argument schema for `pocox`.
 //!
 //! All subcommands are declared here so that argument parsing,
 //! `--help` text and shell completion stay in one file. The actual
@@ -10,10 +10,10 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use pocket_codex_core::{service::ServiceKind, state::PbRole};
 
-/// `pocket-codex` orchestrates codex app-server + pb-mapper.
+/// `pocox` orchestrates codex app-server + pb-mapper.
 #[derive(Debug, Parser)]
 #[command(
-    name = "pocket-codex",
+    name = "pocox",
     version,
     about,
     long_about = None,
@@ -81,7 +81,7 @@ pub enum Command {
     Worker(WorkerCmd),
 }
 
-/// Args for `pocket-codex login`.
+/// Args for `pocox login`.
 #[derive(Debug, Args)]
 pub struct LoginArgs {
     /// Backend base URL. Defaults to the configured backend, then
@@ -98,7 +98,7 @@ pub struct LoginArgs {
     pub web: bool,
 }
 
-/// Args for `pocket-codex init`.
+/// Args for `pocox init`.
 #[derive(Debug, Args)]
 pub struct InitArgs {
     /// Relay `host:port` (or `tcp://host:port`). Prompted when omitted
@@ -115,7 +115,7 @@ pub struct InitArgs {
     pub no_verify: bool,
 }
 
-/// Args for `pocket-codex serve`.
+/// Args for `pocox serve`.
 #[derive(Debug, Args)]
 pub struct ServeArgs {
     /// Stay in the foreground and let authorized devices manage this computer's
@@ -172,7 +172,7 @@ pub struct ServeArgs {
     pub extra: Vec<String>,
 }
 
-/// Args for `pocket-codex connect`.
+/// Args for `pocox connect`.
 #[derive(Debug, Args)]
 pub struct ConnectArgs {
     /// Exact pb-mapper key to attach to. When omitted, POCOX resolves
@@ -197,7 +197,7 @@ pub struct ConnectArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Subcommands under `pocket-codex api …`.
+/// Subcommands under `pocox api …`.
 #[derive(Debug, Subcommand)]
 pub enum ApiCmd {
     /// Start the local Responses API proxy and register it with a relay.
@@ -206,7 +206,7 @@ pub enum ApiCmd {
     Connect(ApiConnectArgs),
 }
 
-/// Args for `pocket-codex api serve`.
+/// Args for `pocox api serve`.
 #[derive(Debug, Args)]
 pub struct ApiServeArgs {
     /// Exact pb-mapper key to register. When omitted, POCOX builds
@@ -246,7 +246,7 @@ pub struct ApiServeArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Args for `pocket-codex api connect`.
+/// Args for `pocox api connect`.
 #[derive(Debug, Args)]
 pub struct ApiConnectArgs {
     /// Exact pb-mapper key to attach to. When omitted, POCOX resolves
@@ -271,7 +271,7 @@ pub struct ApiConnectArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Subcommands under `pocket-codex services …`.
+/// Subcommands under `pocox services …`.
 #[derive(Debug, Subcommand)]
 pub enum ServicesCmd {
     /// List relay-exposed POCOX service keys.
@@ -281,7 +281,7 @@ pub enum ServicesCmd {
     Default(ServicesDefaultCmd),
 }
 
-/// Args for `pocket-codex services list`.
+/// Args for `pocox services list`.
 #[derive(Debug, Args)]
 pub struct ServicesListArgs {
     /// Limit output to one service kind.
@@ -292,14 +292,14 @@ pub struct ServicesListArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Subcommands under `pocket-codex services default …`.
+/// Subcommands under `pocox services default …`.
 #[derive(Debug, Subcommand)]
 pub enum ServicesDefaultCmd {
     /// Set the local default target for a service kind.
     Set(ServicesDefaultSetArgs),
 }
 
-/// Args for `pocket-codex services default set`.
+/// Args for `pocox services default set`.
 #[derive(Debug, Args)]
 pub struct ServicesDefaultSetArgs {
     /// Service kind to configure.
@@ -333,11 +333,11 @@ impl From<ServiceKindArg> for ServiceKind {
     }
 }
 
-/// Args for `pocket-codex stop`.
+/// Args for `pocox stop`.
 #[derive(Debug, Args)]
 pub struct StopArgs {
     /// Limit pb-mapper stopping to one service key. When set, codex is
-    /// left running; use `pocket-codex codex stop` for codex-only stops.
+    /// left running; use `pocox codex stop` for codex-only stops.
     #[arg(long)]
     pub key: Option<String>,
 
@@ -388,7 +388,7 @@ pub struct ApiProxyArgs {
     pub proxy: Option<String>,
 }
 
-/// Subcommands under `pocket-codex codex …`.
+/// Subcommands under `pocox codex …`.
 #[derive(Debug, Subcommand)]
 pub enum CodexCmd {
     /// Start the local `codex app-server` as a detached child.
@@ -399,7 +399,7 @@ pub enum CodexCmd {
     Status,
 }
 
-/// Args for `pocket-codex codex start`.
+/// Args for `pocox codex start`.
 #[derive(Debug, Args)]
 pub struct CodexStartArgs {
     /// Optional explicit path to the `codex` binary.
@@ -429,7 +429,7 @@ pub struct CodexStartArgs {
     pub extra: Vec<String>,
 }
 
-/// Subcommands under `pocket-codex pb …`.
+/// Subcommands under `pocox pb …`.
 #[derive(Debug, Subcommand)]
 pub enum PbCmd {
     /// Register a local TCP service with the relay (publisher side).
@@ -460,13 +460,13 @@ pub struct PbWorkerArgs {
 #[derive(Debug, Args, Clone)]
 pub struct PbRelayArgs {
     /// `host:port` of the upstream pb-mapper relay. When omitted, falls
-    /// back to the configured relay (`pocket-codex init`) and then
+    /// back to the configured relay (`pocox init`) and then
     /// `$PB_MAPPER_SERVER`.
     #[arg(long)]
     pub relay: Option<String>,
 }
 
-/// Args for `pocket-codex pb register`.
+/// Args for `pocox pb register`.
 #[derive(Debug, Args)]
 pub struct PbRegisterArgs {
     /// Service key the relay will index this registration under.
@@ -485,7 +485,7 @@ pub struct PbRegisterArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Args for `pocket-codex pb subscribe`.
+/// Args for `pocox pb subscribe`.
 #[derive(Debug, Args)]
 pub struct PbSubscribeArgs {
     /// Service key to attach to.
@@ -500,7 +500,7 @@ pub struct PbSubscribeArgs {
     pub relay: PbRelayArgs,
 }
 
-/// Args for `pocket-codex pb status`.
+/// Args for `pocox pb status`.
 #[derive(Debug, Args)]
 pub struct PbStatusArgs {
     /// What to query: `keys` (registered services) or `remote-id`
@@ -521,7 +521,7 @@ pub enum PbStatusKind {
     RemoteId,
 }
 
-/// Args for `pocket-codex remote-hint`.
+/// Args for `pocox remote-hint`.
 #[derive(Debug, Args)]
 pub struct RemoteHintArgs {
     /// Service key the relay knows the app-server by.
@@ -545,7 +545,7 @@ mod tests {
 
     #[test]
     fn serve_parses_high_level_host_flow_defaults() {
-        let cli = Cli::parse_from(["pocket-codex", "serve", "--relay", "relay.example:7666"]);
+        let cli = Cli::parse_from(["pocox", "serve", "--relay", "relay.example:7666"]);
 
         let Command::Serve(args) = cli.command else {
             panic!("expected serve command");
@@ -564,7 +564,7 @@ mod tests {
 
     #[test]
     fn connect_parses_high_level_client_flow_defaults() {
-        let cli = Cli::parse_from(["pocket-codex", "connect", "--relay", "relay.example:7666"]);
+        let cli = Cli::parse_from(["pocox", "connect", "--relay", "relay.example:7666"]);
 
         let Command::Connect(args) = cli.command else {
             panic!("expected connect command");
@@ -579,8 +579,7 @@ mod tests {
 
     #[test]
     fn api_serve_parses_device_service_defaults() {
-        let cli =
-            Cli::parse_from(["pocket-codex", "api", "serve", "--relay", "relay.example:7666"]);
+        let cli = Cli::parse_from(["pocox", "api", "serve", "--relay", "relay.example:7666"]);
 
         let Command::Api(ApiCmd::Serve(args)) = cli.command else {
             panic!("expected api serve command");
@@ -597,15 +596,7 @@ mod tests {
     #[test]
     fn services_default_set_parses_target() {
         let cli = Cli::parse_from([
-            "pocket-codex",
-            "services",
-            "default",
-            "set",
-            "--kind",
-            "app",
-            "--device",
-            "studio",
-            "--name",
+            "pocox", "services", "default", "set", "--kind", "app", "--device", "studio", "--name",
             "work",
         ]);
 
@@ -622,7 +613,7 @@ mod tests {
     #[test]
     fn hidden_worker_parses_pb_register_args() {
         let cli = Cli::parse_from([
-            "pocket-codex",
+            "pocox",
             "__worker",
             "pb-register",
             "--key",
@@ -646,8 +637,7 @@ mod tests {
 
     #[test]
     fn stop_filter_role_maps_to_runtime_role() {
-        let cli =
-            Cli::parse_from(["pocket-codex", "stop", "--role", "subscribe", "--key", "codex"]);
+        let cli = Cli::parse_from(["pocox", "stop", "--role", "subscribe", "--key", "codex"]);
 
         let Command::Stop(args) = cli.command else {
             panic!("expected stop command");
@@ -660,14 +650,14 @@ mod tests {
     #[test]
     fn login_defaults_to_device_and_parses_web_flag() {
         // Default: device flow (web = false).
-        let cli = Cli::parse_from(["pocket-codex", "login"]);
+        let cli = Cli::parse_from(["pocox", "login"]);
         let Command::Login(args) = cli.command else {
             panic!("expected login command");
         };
         assert!(!args.web);
         assert!(args.backend.is_none());
         // `--web` opts into the browser-redirect flow.
-        let cli = Cli::parse_from(["pocket-codex", "login", "--web", "--backend", "https://b"]);
+        let cli = Cli::parse_from(["pocox", "login", "--web", "--backend", "https://b"]);
         let Command::Login(args) = cli.command else {
             panic!("expected login command");
         };
@@ -678,7 +668,7 @@ mod tests {
     #[test]
     fn init_parses_relay_key_and_no_verify() {
         let cli = Cli::parse_from([
-            "pocket-codex",
+            "pocox",
             "init",
             "--relay",
             "lb7666.top:7666",

@@ -39,7 +39,7 @@ pub(crate) async fn resolve_transport(
     match config.account_mode() {
         Mode::Account => {
             if config.account_token().is_none() {
-                return Err(anyhow!("account mode but not signed in; run `pocket-codex login`"));
+                return Err(anyhow!("account mode but not signed in; run `pocox login`"));
             }
             let backend = account::backend_base(backend_flag, config);
             let mut config = config.clone();
@@ -102,7 +102,7 @@ mod tests {
             .expect_err("an unconfigured install cannot resolve a transport");
         let err = err.to_string();
         assert!(
-            err.contains("pocket-codex init") || err.contains("--relay"),
+            err.contains("pocox init") || err.contains("--relay"),
             "the error must name the fix: {err}"
         );
     }

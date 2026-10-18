@@ -124,12 +124,28 @@ fn matches_pb_worker(exe: &str, cmd: &[String], session: &crate::state::PbSessio
             .map(|pair| &pair[1]);
         values.next().is_some_and(|actual| actual == value) && values.next().is_none()
     };
-    matches!(exe, "pocket-codex" | "pocket-codex.exe")
+    is_cli_executable(exe)
         && cmd.get(1).is_some_and(|arg| arg == "__worker")
         && cmd.get(2).is_some_and(|arg| arg == role)
         && flag("--key", &session.key)
         && flag("--relay", &session.relay_addr)
         && flag("--local-addr", &session.local_addr)
+}
+
+/// The CLI's executable name, current or former: workers started by the
+/// former `pocket-codex` binary stay manageable after an upgrade.
+fn is_cli_executable(exe: &str) -> bool {
+    let name = exe
+        .strip_suffix(".exe")
+        .or_else(|| exe.strip_suffix(".EXE"))
+        .unwrap_or(exe);
+    ["pocox", "pocket-codex"].iter().any(|known| {
+        if cfg!(windows) {
+            name.eq_ignore_ascii_case(known)
+        } else {
+            name == *known
+        }
+    })
 }
 
 /// Host to dial when probing a listener that was bound to `host`: unspecified
@@ -489,7 +505,7 @@ mod tests {
             started_at: String::new(),
         };
         let args = [
-            "pocket-codex",
+            "pocox",
             "__worker",
             "pb-register",
             "--key",
@@ -501,20 +517,23 @@ mod tests {
             "--codec",
         ];
         let cmd: Vec<String> = args.iter().map(|s| s.to_string()).collect();
-        assert!(matches_pb_worker("pocket-codex", &cmd, &record));
+        // Workers of the current binary and of the former `pocket-codex` one.
+        for exe in ["pocox", "pocox.exe", "pocket-codex", "pocket-codex.exe"] {
+            assert!(matches_pb_worker(exe, &cmd, &record), "{exe}");
+        }
         assert!(!matches_pb_worker("codex", &cmd, &record));
         let mut host = cmd.clone();
         host[1] = "serve".into();
-        assert!(!matches_pb_worker("pocket-codex", &host, &record));
+        assert!(!matches_pb_worker("pocox", &host, &record));
         let mut wrong = cmd.clone();
         wrong[4] = "another-key".into();
-        assert!(!matches_pb_worker("pocket-codex", &wrong, &record));
+        assert!(!matches_pb_worker("pocox", &wrong, &record));
         let mut wrong = cmd.clone();
         wrong[8] = "different-relay:7666".into();
-        assert!(!matches_pb_worker("pocket-codex", &wrong, &record));
+        assert!(!matches_pb_worker("pocox", &wrong, &record));
         let mut wrong = cmd;
         wrong.extend(["--key".into(), record.key.clone()]);
-        assert!(!matches_pb_worker("pocket-codex", &wrong, &record));
+        assert!(!matches_pb_worker("pocox", &wrong, &record));
     }
 
     #[test]

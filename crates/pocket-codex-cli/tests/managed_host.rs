@@ -49,7 +49,7 @@ impl Fixture {
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_pocket-codex"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_pocox"));
         command
             .env("XDG_CONFIG_HOME", self.root.join("config"))
             .env("XDG_STATE_HOME", self.root.join("state"))

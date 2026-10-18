@@ -9,10 +9,10 @@ license.workspace = true
 repository.workspace = true
 readme.workspace = true
 
-# The binary is intentionally short so it reads nicely in shell
-# completions, command palettes and Flutter UI labels.
+# The binary is short so it reads nicely in shells and scripts. Installs
+# upgraded from the former `pocket-codex` keep that name as an alias.
 [[bin]]
-name = "pocket-codex"
+name = "pocox"
 path = "src/main.rs"
 
 [lints]

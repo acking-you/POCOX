@@ -86,7 +86,7 @@ fn lock(state: &Path) -> Result<File> {
         options.mode(0o600);
     }
     let file = options.open(state.join(OWNER_LOCK))?;
-    // A `pocket-codex status` probe holds the lock for an instant; only a
+    // A `pocox status` probe holds the lock for an instant; only a
     // holder that outlasts it is another supervisor.
     for attempt in 0.. {
         match file.try_lock() {
@@ -170,7 +170,7 @@ impl Manager {
         Ok(())
     }
 
-    /// Report the current state to `pocket-codex status`, rewriting the file
+    /// Report the current state to `pocox status`, rewriting the file
     /// only when it changed. The file is a view: failing to save it is logged,
     /// never fatal to the services.
     pub fn refresh_status(&mut self) -> Result<Status> {

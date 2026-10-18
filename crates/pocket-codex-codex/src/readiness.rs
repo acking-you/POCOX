@@ -3,7 +3,7 @@
 //! [`crate::spawn`] deliberately never fails just because the child did not
 //! come up — it records honest state and lets `status` report the truth
 //! later. That is right for the supervisor, but wrong for an interactive
-//! launch: `pocket-codex serve` / `pocket-codex codex start` used to print a
+//! launch: `pocox serve` / `pocox codex start` used to print a
 //! green "✓ codex app-server" the moment the child was forked, even when it
 //! died on the very next tick (classically a bind failure because the listen
 //! port is already taken — `os error 10048` on Windows, `EADDRINUSE` on

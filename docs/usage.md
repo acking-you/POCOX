@@ -36,14 +36,14 @@ screen, which shows the account you signed in as.
 ### CLI
 
 ```bash
-pocket-codex login
+pocox login
 ```
 
 This prints a verification URL and a one-time code. Open the URL, enter the code,
 authorize. Confirm with:
 
 ```bash
-pocket-codex account     # → signed in as @you, mode = account
+pocox account     # → signed in as @you, mode = account
 ```
 
 ---
@@ -53,7 +53,7 @@ pocket-codex account     # → signed in as @you, mode = account
 On the machine that has `codex` installed and logged in:
 
 ```bash
-pocket-codex serve
+pocox serve
 ```
 
 This starts (or reuses) the local `codex app-server` and registers it under your
@@ -88,8 +88,8 @@ The home screen lists your app-server with a live health dot. Tap it, then:
 ### CLI
 
 ```bash
-pocket-codex services list      # see your registered services
-pocket-codex connect            # subscribe; prints the exact codex command
+pocox services list      # see your registered services
+pocox connect            # subscribe; prints the exact codex command
 codex --remote ws://127.0.0.1:28080
 ```
 
@@ -106,13 +106,13 @@ Reach your Codex login as a standard Responses API from any device.
 On the host:
 
 ```bash
-pocket-codex api serve
+pocox api serve
 ```
 
 On any device:
 
 ```bash
-pocket-codex api connect        # prints a local model_providers config snippet
+pocox api connect        # prints a local model_providers config snippet
 ```
 
 Point any OpenAI-compatible tool at the printed local endpoint (it serves
@@ -124,10 +124,10 @@ own health indicator.
 ## 5. Status & sign out
 
 ```bash
-pocket-codex account            # who you are + transport mode
-pocket-codex status             # local serve / api / codex state
-pocket-codex stop               # stop the local serve / api
-pocket-codex logout             # revoke the session + clear the local token
+pocox account            # who you are + transport mode
+pocox status             # local serve / api / codex state
+pocox stop               # stop the local serve / api
+pocox logout             # revoke the session + clear the local token
 ```
 
 In the app: **Settings → Account → Sign out**.
@@ -136,10 +136,10 @@ In the app: **Settings → Account → Sign out**.
 
 ## Troubleshooting
 
-- **"app-server unreachable" in the app** — the host's `pocket-codex serve` isn't
+- **"app-server unreachable" in the app** — the host's `pocox serve` isn't
   running or lost its connection. (Re)start it on the host. The app re-probes
   periodically; the refresh control forces an immediate check.
-- **Login expired** — run `pocket-codex login` again. While a session is valid it
+- **Login expired** — run `pocox login` again. While a session is valid it
   refreshes automatically, so you normally only log in once per device.
 - **Multiple hosts or services** — give each a `--name`, then select it with
   `--name` / `--device` on the CLI, or by tapping the right service in the app.

@@ -1,7 +1,7 @@
-//! `pocket-codex connect` high-level client-side orchestration.
+//! `pocox connect` high-level client-side orchestration.
 //!
 //! ```text
-//!                       pocket-codex connect …
+//!                       pocox connect …
 //!                                  │
 //!                                  ▼
 //!                       resolve_transport → { session, namespace? }
@@ -79,7 +79,7 @@ pub async fn run(args: ConnectArgs) -> Result<()> {
 
 /// Subscribe to a remote service of `kind` and expose it on `local_addr`.
 ///
-/// Shared with `pocket-codex api connect`, which differs only in the kind it
+/// Shared with `pocox api connect`, which differs only in the kind it
 /// asks for and the summary that gets printed.
 pub(crate) async fn connect(
     request: TargetRequest,

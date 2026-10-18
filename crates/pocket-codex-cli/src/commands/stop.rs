@@ -1,4 +1,4 @@
-//! `pocket-codex stop` unified runtime stop command.
+//! `pocox stop` unified runtime stop command.
 
 use anyhow::Result;
 use pocket_codex_codex::{stop as stop_codex, StopOutcome as CodexStopOutcome};

@@ -130,13 +130,13 @@ curl -fsS https://lb7666.top:8443/healthz        # -> ok
 journalctl -u pocket-codex-backend -f            # watch logs
 ```
 
-Then from a client: `pocket-codex login` → `pocket-codex serve`, and on another
+Then from a client: `pocox login` → `pocox serve`, and on another
 device sign in with the **same** GitHub account and open the registered service.
 
 To check the credential handoff specifically:
 
 ```bash
-# With $TOKEN from a `pocket-codex login` session (config.toml):
+# With $TOKEN from a `pocox login` session (config.toml):
 curl -fsS -H "Authorization: Bearer $TOKEN" https://lb7666.top:8443/v1/relay
 # -> {"relay_addr":"lb7666.top:7666","credential":"pbmt1_…","expires_at":…,"namespace":"…"}
 ```

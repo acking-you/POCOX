@@ -1,7 +1,7 @@
-//! `pocket-codex api …` subcommand handlers.
+//! `pocox api …` subcommand handlers.
 //!
 //! ```text
-//!                       pocket-codex api …
+//!                       pocox api …
 //!                     ┌─────────┴─────────┐
 //!                   serve               connect
 //!                     │                   │
@@ -100,7 +100,7 @@ async fn connect(args: ApiConnectArgs) -> Result<()> {
     let config = Config::load()?;
     let transport =
         transport::resolve_transport(args.relay.relay.as_deref(), None, &config).await?;
-    // Same flow as `pocket-codex connect`, only the kind differs — an API proxy
+    // Same flow as `pocox connect`, only the kind differs — an API proxy
     // and an app-server are both just a TCP service on the relay.
     connect::connect(
         TargetRequest {
@@ -123,7 +123,7 @@ fn print_proxy_status(effective: Option<&str>) {
             "no upstream proxy configured. The API proxy reaches chatgpt.com directly and will \
              fail on networks that block it. Pass `--proxy http://host:port` (or \
              `socks5://host:port`), or export HTTPS_PROXY / ALL_PROXY / HTTP_PROXY before running \
-             `pocket-codex api serve`.",
+             `pocox api serve`.",
         ),
     }
 }
@@ -148,9 +148,9 @@ fn print_serve_summary(
 /// to name.
 pub(crate) fn client_setup_command(subcommand: &str, key: &str, transport: &Transport) -> String {
     if transport.is_account() {
-        format!("pocket-codex {subcommand}")
+        format!("pocox {subcommand}")
     } else {
-        format!("pocket-codex {subcommand} --key {key} --relay {}", transport.session.relay_addr)
+        format!("pocox {subcommand} --key {key} --relay {}", transport.session.relay_addr)
     }
 }
 

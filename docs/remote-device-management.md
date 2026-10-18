@@ -11,7 +11,7 @@ client; the wire contract lives in the Rust host and bridge.
 Run the same native hosting and management engine without Flutter:
 
 ```sh
-pocket-codex serve --allow-remote-management --device my-computer \
+pocox serve --allow-remote-management --device my-computer \
   --name default --codex-binary /path/to/codex
 ```
 
@@ -41,12 +41,14 @@ Windows Ctrl-Break, closing the console window or system shutdown) stops
 owned services without changing their restore choices. A process lock prevents
 two CLI supervisors from owning the same state directory.
 
-`pocket-codex status` includes the supervisor and its managed services while a
+`pocox status` includes the supervisor and its managed services while a
 supervisor holds that lock, from the private report it rewrites whenever its
 state changes. Failing to save that report is logged and never stops a service.
 An enabled but offline management registration is `pending`. For systemd,
 append `--allow-remote-management` to `ExecStart`; keep the service in the
-foreground and allow enough stop time for its owned agents to exit.
+foreground and allow enough stop time for its owned agents to exit. A unit
+written for the former `pocket-codex` name keeps working through the alias the
+installer leaves; new units can name `pocox`.
 
 ## Management entry
 

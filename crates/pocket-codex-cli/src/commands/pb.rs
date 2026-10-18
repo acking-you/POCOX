@@ -1,4 +1,4 @@
-//! `pocket-codex pb …` subcommand handlers.
+//! `pocox pb …` subcommand handlers.
 //!
 //! `register` and `subscribe` are blocking foreground commands by design:
 //! daemonising a relay session is not portable, so they hold the tunnel open

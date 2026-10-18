@@ -74,11 +74,11 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 - **两种连接方式。** *自建中转*——让每台设备指向你自己的 `pb-mapper` 中转，
   并共享一把 32 字节密钥（最初的方式）。*托管账号*——在你的服务器上运行一次
   可选的 `pocket-codex-backend`，之后每台设备只需用 **GitHub** 登录
-  （`pocket-codex login`，或在 App 里点「Sign in with GitHub」）；后端会以
+  （`pocox login`，或在 App 里点「Sign in with GitHub」）；后端会以
   按用户隔离的 `pcxu:<user>:…` 键，替每个账号经中转代理其服务，因此中转的主
   密钥永远不会下发给客户端，账号之间也彼此不可见。
 
-改名只换了名字：命令、crate、包名与应用标识仍是 `pocket-codex`，已有安装、脚本和设置照常沿用。
+命令是 `pocox`；从旧名 `pocket-codex` 升级的安装会保留旧名作为别名。crate、包名与应用标识仍是 `pocket-codex`，已有安装、脚本和设置照常沿用。
 
 一句话：**每台电脑保留自己的智能体与登录；其它每台设备——POCOX App、远端的
 `codex` CLI，或任意 OpenAI 兼容工具——都通过中转访问它们**，要么用共享的中转密钥
@@ -89,7 +89,7 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 | 模块                           | 状态                                    |
 | ------------------------------ | -------------------------------------- |
 | 工作区 / lints / CI            | 已搭好                                  |
-| `pocket-codex` CLI             | `login`、`logout`、`account`、`init`、`serve`、`connect`、`api {serve,connect}`、`services {list,default set}`、顶层 `status`/`stop`、`codex {start,stop,status}`、`pb {register,subscribe,status}`、`remote-hint`、`version` |
+| `pocox` CLI                    | `login`、`logout`、`account`、`init`、`serve`、`connect`、`api {serve,connect}`、`services {list,default set}`、顶层 `status`/`stop`、`codex {start,stop,status}`、`pb {register,subscribe,status}`、`remote-hint`、`version` |
 | `pb-mapper` 注册/订阅          | Git SDK 来自 `pocket-codex` 分支，由 `Cargo.lock` 固定版本 |
 | `codex app-server` 进程管理    | 通过 PID + state.toml 启动/停止/查状态 |
 | 外置 Codex 托管                | 所有桌面端均启动已安装的外置 `codex`，只直接依赖上游协议 crate；「内置引擎」暂未实现，按钮置灰。旧内嵌托管配置恢复为外置模式，需安装 Codex 或指定其路径。 |
@@ -105,33 +105,33 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 
 两种模式下，多设备 CLI 流程均已可用：
 
-- `pocket-codex login` / `logout` / `account` 驱动**托管账号**模式：一次 GitHub
+- `pocox login` / `logout` / `account` 驱动**托管账号**模式：一次 GitHub
   设备流会话（令牌以 0600 存于 `config.toml`）即可让 `serve` / `connect` / `api`
   / `services` **无需中转地址或密钥**工作——后端以按用户隔离的 `pcxu:<user>:…`
   键替你代理。下文的 `--relay` 示例则是**自建**模式，显式传入 `--relay` 总会
   选择它（兜底逃生通道）。
-- `pocket-codex init [--relay <host:port>] [--key <32B>]` 把默认中转地址和共享的
+- `pocox init [--relay <host:port>] [--key <32B>]` 把默认中转地址和共享的
   `MSG_HEADER_KEY` 持久化到 `~/.config/pocket-codex/config.toml`（Unix 下 0600）。
   之后所有命令默认读取该配置（优先级：`--relay` 参数 > 配置 > `$PB_MAPPER_SERVER`）；
   `--relay` 仍可在单次调用中覆盖。
-- `pocket-codex serve --relay <host:port>` 启动或复用本地 `codex app-server`，
+- `pocox serve --relay <host:port>` 启动或复用本地 `codex app-server`，
   以 `pcx:<device>:app:<name>` 注册它，并打印对应的客户端命令。
-- `pocket-codex connect --relay <host:port>` 订阅由 `--device` / 本地默认 /
+- `pocox connect --relay <host:port>` 订阅由 `--device` / 本地默认 /
   中转发现选出的远端 app-server，将其暴露到本地，并打印用于连接它的、确切的
   `codex --remote ...` 命令。
-- `pocket-codex api serve --relay <host:port>` 把宿主机的 Codex 登录暴露成一个
+- `pocox api serve --relay <host:port>` 把宿主机的 Codex 登录暴露成一个
   本地回环的 Responses API 代理，并注册 `pcx:<device>:api:<name>`。
-- `pocket-codex api connect --relay <host:port>` 订阅该 API 代理，并打印一段
+- `pocox api connect --relay <host:port>` 订阅该 API 代理，并打印一段
   本地 `model_providers` 配置片段供 Codex 使用。
-- `pocket-codex services list --relay <host:port>` 发现可用的 `pcx:*` 服务；
-  `pocket-codex services default set ...` 在命令未指定时记录本地默认设备。
+- `pocox services list --relay <host:port>` 发现可用的 `pcx:*` 服务；
+  `pocox services default set ...` 在命令未指定时记录本地默认设备。
 
 详细路线图与贡献约定见 [`AGENTS.md`](AGENTS.md)。
 
 ## 仓库结构
 
 ```
-pocket-codex/
+POCOX/
 ├── apps/
 │   └── flutter/                 # Flutter 界面（FRB 驱动，FVM 锁定）
 ├── assets/
@@ -140,7 +140,7 @@ pocket-codex/
 │   ├── pocket-codex-core        # 共享类型、配置、状态、路径
 │   ├── pocket-codex-codex       # codex app-server 进程管理器
 │   ├── pocket-codex-pb          # pb-mapper 注册/订阅胶水层
-│   ├── pocket-codex-cli         # `pocket-codex` 二进制
+│   ├── pocket-codex-cli         # `pocox` 二进制
 │   └── pocket-codex-bridge      # 供 flutter_rust_bridge 消费的 cdylib
 ├── deps/
 │   ├── codex/                   # 上游 codex（git 子模块）
@@ -157,7 +157,7 @@ pocket-codex/
 
 ### 一键安装 CLI
 
-从最新 release 下载 `pocket-codex` 二进制，无需任何工具链。安装脚本会按你的
+从最新 release 下载 `pocox` 二进制，无需任何工具链。安装脚本会按你的
 系统 + CPU 选择对应构建（Linux 用静态 musl、macOS/Windows 用原生），并放到
 `PATH` 上。
 
@@ -195,20 +195,20 @@ cargo run -p pocket-codex-cli -- --help
 `$PATH` 中需有可用的 `codex` 程序；POCOX **不**自带模型运行时。CLI 提供：
 
 ```text
-pocket-codex login                          # 托管账号（GitHub）
-pocket-codex logout
-pocket-codex account
-pocket-codex init                           # 自建（中转 + 密钥）
-pocket-codex serve
-pocket-codex connect
-pocket-codex api      serve | connect
-pocket-codex services list | default set
-pocket-codex status
-pocket-codex stop
-pocket-codex codex   start | stop | status
-pocket-codex pb      register | subscribe | status
-pocket-codex remote-hint
-pocket-codex version
+pocox login                          # 托管账号（GitHub）
+pocox logout
+pocox account
+pocox init                           # 自建（中转 + 密钥）
+pocox serve
+pocox connect
+pocox api      serve | connect
+pocox services list | default set
+pocox status
+pocox stop
+pocox codex   start | stop | status
+pocox pb      register | subscribe | status
+pocox remote-hint
+pocox version
 ```
 
 #### 托管账号（推荐）
@@ -220,22 +220,22 @@ pocket-codex version
 > （English: [`docs/usage.md`](docs/usage.md)）。
 
 ```bash
-pocket-codex login                 # GitHub 设备流：打开网址、输入验证码
-pocket-codex account               # 当前登录身份 + 传输模式
+pocox login                 # GitHub 设备流：打开网址、输入验证码
+pocox account               # 当前登录身份 + 传输模式
 
 # 宿主机：以你的账号暴露本机的 codex app-server。
-pocket-codex serve
+pocox serve
 
 # 另一台设备：登录同一个 GitHub 账号，然后列出并驱动服务。
-pocket-codex services list
-pocket-codex connect               # 选中你的默认 / 唯一 app-server
+pocox services list
+pocox connect               # 选中你的默认 / 唯一 app-server
 codex --remote ws://127.0.0.1:28080
 
 # 或把你的 Codex 登录当作 OpenAI 兼容的 Responses API 来访问。
-pocket-codex api serve
-pocket-codex api connect
+pocox api serve
+pocox api connect
 
-pocket-codex logout                # 吊销并清除本地会话
+pocox logout                # 吊销并清除本地会话
 ```
 
 在 **App** 中，这一切只是首次启动时的「Sign in with GitHub」；随后同一账号的
@@ -248,12 +248,12 @@ app-server 就会出现在主界面，随时可驱动。
 即便你已登录——它是逃生通道。
 
 ```bash
-pocket-codex init    --relay relay.example.com:7666   # 持久化中转 + 32B 密钥
-pocket-codex serve   --relay relay.example.com:7666   # 宿主端
-pocket-codex connect --relay relay.example.com:7666   # 客户端
+pocox init    --relay relay.example.com:7666   # 持久化中转 + 32B 密钥
+pocox serve   --relay relay.example.com:7666   # 宿主端
+pocox connect --relay relay.example.com:7666   # 客户端
 codex --remote ws://127.0.0.1:28080
-pocket-codex api serve   --relay relay.example.com:7666
-pocket-codex api connect --device my-host --relay relay.example.com:7666
+pocox api serve   --relay relay.example.com:7666
+pocox api connect --device my-host --relay relay.example.com:7666
 ```
 
 ### Flutter 前端

@@ -1,6 +1,6 @@
 //! Host a local codex app-server **and** a local Responses API proxy from the
 //! app, each published directly on the relay — the in-app equivalent of running
-//! `pocket-codex serve` + `pocket-codex api serve` under one name. Desktop
+//! `pocox serve` + `pocox api serve` under one name. Desktop
 //! only: it spawns the user's `codex` binary as a child process and reuses its
 //! login (`~/.codex/auth.json`) for the API proxy.
 //!

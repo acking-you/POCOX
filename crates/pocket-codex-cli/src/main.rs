@@ -1,4 +1,4 @@
-//! `pocket-codex` command-line entrypoint.
+//! `pocox` command-line entrypoint.
 //!
 //! POCOX orchestrates a local `codex app-server` process and a
 //! `pb-mapper` register/subscribe session so users can drive Codex

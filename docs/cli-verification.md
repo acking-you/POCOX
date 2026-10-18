@@ -2,7 +2,7 @@
 
 > 适用环境：relay 已部署在 `lb7666.top:7666`（pb-mapper **0.2.14**，systemd 托管，
 > 已在线）。本指南让你在**一台机器上**用 loopback-through-relay 的方式跑通
-> `pocket-codex` 的全部命令面，无需第二台设备。所有步骤已在 `lb7666` 主机上实测通过。
+> `pocox` 的全部命令面，无需第二台设备。所有步骤已在 `lb7666` 主机上实测通过。
 
 ## 0. 环境现状（已由部署方备妥，你无需再动）
 
@@ -22,7 +22,7 @@
 ## 1. 前置条件
 
 - 本机已安装 `codex` 且已 `codex login`（ChatGPT 账号，`~/.codex/auth.json` 存在）。
-  `pocket-codex` 不自带模型运行时，宿主的 codex 登录态是唯一真相来源。
+  `pocox` 不自带模型运行时，宿主的 codex 登录态是唯一真相来源。
 - 已 clone 本仓库并初始化 submodule：
 
   ```bash
@@ -33,19 +33,19 @@
 
 ```bash
 cargo build --release -p pocket-codex-cli
-# 产物：target/release/pocket-codex
+# 产物：target/release/pocox
 ```
 
 下文统一用：
 
 ```bash
-export PCX=./target/release/pocket-codex
+export PCX=./target/release/pocox
 ```
 
 ## 3. 【最关键】导出共享密钥 MSG_HEADER_KEY
 
 relay 用 `--use-machine-msg-header-key` 启动，对**每一条控制消息**做 32 字节密钥校验。
-客户端（含 `pocket-codex` 派生出来的 pb worker，它们继承父进程环境变量）**必须用同一个
+客户端（含 `pocox` 派生出来的 pb worker，它们继承父进程环境变量）**必须用同一个
 key**，否则 relay 静默拒绝：CLI 会照常打印 "started"，但注册/订阅永远连不上 relay。
 
 每开一个新终端，先执行（直接从 relay 拉取，免 sudo，保证一致）：
@@ -111,7 +111,7 @@ MSG_HEADER_KEY`。
 > 代理会被拒绝。未配置任何代理时启动会打 warning。
 >
 > app-server 已在运行时再传 `--proxy` **不会自动重启**（只打 warning）：换代理需
-> 先 `pocket-codex stop`（或 `pocket-codex codex stop`）再 `serve --proxy …`。
+> 先 `pocox stop`（或 `pocox codex stop`）再 `serve --proxy …`。
 
 ```bash
 # 方式一：显式指定（推荐，最不易错）
@@ -136,7 +136,7 @@ $PCX serve --relay lb7666.top:7666
     relay     lb7666.top:7666
     log       ...
 → client setup
-    pocket-codex connect --key pcx:lb7666:app:default --relay lb7666.top:7666
+    pocox connect --key pcx:lb7666:app:default --relay lb7666.top:7666
 ```
 
 `codex app-server` 块里的 `proxy` 字段确认代理已注入子进程；若没传 `--proxy` 也没有
@@ -219,8 +219,8 @@ codex --remote ws://127.0.0.1:28080
 这会把 codex TUI 接到「穿 relay 的远端 app-server」。WebSocket 升级握手已实测
 （直连与隧道都返回 `101 Switching Protocols`），TUI 应能正常进入会话。
 
-> 真实多设备场景：第二台设备只需装 `pocket-codex` + `codex`（无需 codex 登录态），
-> 设好同一个 `MSG_HEADER_KEY`，跑 `pocket-codex connect --relay lb7666.top:7666` 再
+> 真实多设备场景：第二台设备只需装 `pocox` + `codex`（无需 codex 登录态），
+> 设好同一个 `MSG_HEADER_KEY`，跑 `pocox connect --relay lb7666.top:7666` 再
 > `codex --remote ws://127.0.0.1:28080` 即可驱动你这台主机上的 Codex。
 
 ## 5. Responses API 代理流程（api serve → api connect）
@@ -267,7 +267,7 @@ $PCX api serve --relay lb7666.top:7666
     relay     lb7666.top:7666
     log       ...
 → client setup
-    pocket-codex api connect --key pcx:lb7666:api:default --relay lb7666.top:7666
+    pocox api connect --key pcx:lb7666:api:default --relay lb7666.top:7666
 ```
 
 `api proxy` 块里的 `proxy` 字段确认代理已生效；若没传 `--proxy` 也没有 env 代理，

@@ -2,7 +2,7 @@
 
 A **host-side meta service**: a small axum HTTP server, run on the machine that
 hosts a `codex` app-server (via the app's in-app hosting or the CLI
-`pocket-codex serve`). It is published on the relay as a **third service** —
+`pocox serve`). It is published on the relay as a **third service** —
 `meta:<name>` — alongside the existing `app:<name>` (codex remote control) and
 `api:<name>` (Responses API proxy) services that one host already exposes.
 

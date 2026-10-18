@@ -1,7 +1,7 @@
-//! `pocket-codex serve` high-level host-side orchestration.
+//! `pocox serve` high-level host-side orchestration.
 //!
 //! ```text
-//!                       pocket-codex serve …
+//!                       pocox serve …
 //!                                │
 //!                                ▼
 //!                ServiceId::new(device, App, name).key()
@@ -23,7 +23,7 @@
 //!              })
 //!                                │
 //!                                ▼
-//!              print_serve_summary + "client setup: pocket-codex
+//!              print_serve_summary + "client setup: pocox
 //!              connect --key <key> --relay <relay>"
 //! ```
 //!

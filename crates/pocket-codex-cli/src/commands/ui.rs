@@ -1,4 +1,4 @@
-//! Terminal output styling for the `pocket-codex` CLI.
+//! Terminal output styling for the `pocox` CLI.
 //!
 //! This module is the single source of truth for how user-facing
 //! command output looks: colored status glyphs, aligned key/value

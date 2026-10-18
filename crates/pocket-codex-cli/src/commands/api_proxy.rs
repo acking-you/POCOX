@@ -25,9 +25,9 @@ fn proxy_is_socks(raw: &str) -> bool {
 /// no-proxy / reuse warnings with the right command names.
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum SpawnCommand {
-    /// `pocket-codex serve`.
+    /// `pocox serve`.
     Serve,
-    /// `pocket-codex codex start`.
+    /// `pocox codex start`.
     CodexStart,
 }
 
@@ -35,8 +35,8 @@ impl SpawnCommand {
     /// Invocation a user would rerun with `--proxy`.
     fn invocation(self) -> &'static str {
         match self {
-            Self::Serve => "pocket-codex serve",
-            Self::CodexStart => "pocket-codex codex start",
+            Self::Serve => "pocox serve",
+            Self::CodexStart => "pocox codex start",
         }
     }
 
@@ -44,8 +44,8 @@ impl SpawnCommand {
     /// proxy change can take effect on the next spawn.
     fn stop_hint(self) -> &'static str {
         match self {
-            Self::Serve => "`pocket-codex stop` (or `pocket-codex codex stop`)",
-            Self::CodexStart => "`pocket-codex codex stop`",
+            Self::Serve => "`pocox stop` (or `pocox codex stop`)",
+            Self::CodexStart => "`pocox codex stop`",
         }
     }
 }

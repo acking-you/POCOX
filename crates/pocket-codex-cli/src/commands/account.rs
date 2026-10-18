@@ -70,7 +70,7 @@ pub(crate) fn backend_base(flag: Option<&str>, config: &Config) -> String {
         .unwrap_or_else(default_backend)
 }
 
-/// `pocket-codex login`: sign in against the backend and persist the session.
+/// `pocox login`: sign in against the backend and persist the session.
 /// Defaults to the GitHub device flow; `--web` (`web = true`) runs the
 /// browser-redirect authorization-code flow instead.
 pub(crate) async fn login(backend_flag: Option<&str>, web: bool) -> Result<()> {
@@ -112,11 +112,11 @@ async fn login_device(backend_flag: Option<&str>) -> Result<()> {
     loop {
         let now = Instant::now();
         if now >= deadline {
-            bail!("device code expired; run `pocket-codex login` again");
+            bail!("device code expired; run `pocox login` again");
         }
         tokio::time::sleep(interval.min(deadline.saturating_duration_since(now))).await;
         if Instant::now() >= deadline {
-            bail!("device code expired; run `pocket-codex login` again");
+            bail!("device code expired; run `pocox login` again");
         }
         let poll: DevicePollResponse = client
             .post(format!("{base}/auth/device/poll"))
@@ -156,7 +156,7 @@ async fn login_device(backend_flag: Option<&str>) -> Result<()> {
                 return Ok(());
             },
             DevicePollStatus::Expired => {
-                bail!("device code expired; run `pocket-codex login` again")
+                bail!("device code expired; run `pocox login` again")
             },
             DevicePollStatus::Denied => bail!("access denied on GitHub"),
         }
@@ -380,7 +380,7 @@ async fn read_request_target(stream: &mut tokio::net::TcpStream) -> Result<Optio
     }
 }
 
-/// `pocket-codex logout`: revoke the refresh token (best effort) and clear the
+/// `pocox logout`: revoke the refresh token (best effort) and clear the
 /// local session.
 pub(crate) async fn logout() -> Result<()> {
     let mut config = Config::load()?;
@@ -402,7 +402,7 @@ pub(crate) async fn logout() -> Result<()> {
     Ok(())
 }
 
-/// `pocket-codex account status`: show the signed-in identity (verified against
+/// `pocox account status`: show the signed-in identity (verified against
 /// the backend) or the current self-host/unconfigured state.
 pub(crate) async fn status() -> Result<()> {
     let mut config = Config::load()?;
@@ -436,7 +436,7 @@ pub(crate) async fn status() -> Result<()> {
         },
         Mode::Unconfigured => {
             ui::headline(ui::Tone::Muted, "not configured");
-            ui::code("pocket-codex login");
+            ui::code("pocox login");
         },
     }
     Ok(())
@@ -484,7 +484,7 @@ fn refresh_lock() -> &'static tokio::sync::Mutex<()> {
 async fn refresh_session(config: &mut Config, base: &str) -> Result<String> {
     let refresh_token = config
         .account_refresh_token()
-        .ok_or_else(|| anyhow!("not signed in; run `pocket-codex login`"))?
+        .ok_or_else(|| anyhow!("not signed in; run `pocox login`"))?
         .to_string();
     let resp = http_client()?
         .post(format!("{base}/auth/refresh"))
@@ -495,7 +495,7 @@ async fn refresh_session(config: &mut Config, base: &str) -> Result<String> {
         .await
         .context("calling /auth/refresh")?;
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        bail!("session expired; run `pocket-codex login` again");
+        bail!("session expired; run `pocox login` again");
     }
     let body: RefreshResponse = resp
         .error_for_status()
