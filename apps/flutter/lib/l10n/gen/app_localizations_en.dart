@@ -3731,6 +3731,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get managedSwitchUnavailable => 'Management status could not be read.';
 
   @override
+  String get hostingElsewhere =>
+      'POCOX is already running on this computer and hosts its services. This window cannot host, restore or allow remote management; quit it and use the POCOX already running (it may be in the menu bar or system tray).';
+
+  @override
   String hostRestoreBlocked(String problem) {
     return 'Automatic restore was skipped because its saved choices cannot be read: $problem';
   }

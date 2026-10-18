@@ -6470,6 +6470,12 @@ abstract class AppLocalizations {
   /// **'Management status could not be read.'**
   String get managedSwitchUnavailable;
 
+  /// No description provided for @hostingElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX is already running on this computer and hosts its services. This window cannot host, restore or allow remote management; quit it and use the POCOX already running (it may be in the menu bar or system tray).'**
+  String get hostingElsewhere;
+
   /// No description provided for @hostRestoreBlocked.
   ///
   /// In en, this message translates to:

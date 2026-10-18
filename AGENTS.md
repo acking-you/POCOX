@@ -1287,6 +1287,22 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     services, so one conversation reaches everything in the pocket. Until it
     ships, describe it only as planned.
 
+40. **One desktop app per hosting state (2026-10-19).** The desktop app claims
+    `<state-dir>/hosting/owner.lock` at bridge start (`engine/host_owner.rs`):
+    an exclusive OS lock held until the process exits, never a pid file (the
+    pid inside only names the holder). A second app on the same state still
+    starts and connects, but every non-stop lifecycle lease, an explicit
+    stop's restore record and the management entry (publication and setting)
+    call `host_owner::require()`, so it restores, starts, restarts, applies and
+    publishes nothing, never adopts, stops or re-registers the first app's
+    services and never changes what that app restores. The first such call
+    after the first app has gone takes ownership. Flutter skips restore and explains
+    on the home hero, the services page and every hosting-editor entry
+    (`hostingOwnedElsewhere`). Any new hosting service, the agent tools
+    endpoint included, calls `require()` before it binds or publishes. The CLI
+    supervisor shares the lock code but keeps its own directory
+    (`managed-host/owner.lock`). See `docs/remote-device-management.md`.
+
 ### UI and history maintenance (2026-09-13)
 
 - Keep shared colors, typography, and control shapes in `theme.dart` /

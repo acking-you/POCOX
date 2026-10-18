@@ -1421,6 +1421,7 @@
   "managedSwitchInfo": "When on, your other signed-in devices can add, configure, start and stop services here while this computer is online. When off, only this computer can change them.",
   "managedSwitchConnecting": "On, not reachable yet.",
   "managedSwitchUnavailable": "Management status could not be read.",
+  "hostingElsewhere": "POCOX is already running on this computer and hosts its services. This window cannot host, restore or allow remote management; quit it and use the POCOX already running (it may be in the menu bar or system tray).",
   "hostRestoreBlocked": "Automatic restore was skipped because its saved choices cannot be read: {problem}",
   "@hostRestoreBlocked": {"placeholders": {"problem": {"type": "String"}}},
   "managedRuntimeReady": "Ready",

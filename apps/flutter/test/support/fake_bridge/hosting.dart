@@ -227,6 +227,9 @@ mixin _FakeHosting on _FakeBridgeState {
   }
 
   @override
+  bool hostingOwnedElsewhere() => hostingElsewhere;
+
+  @override
   Future<String?> acpLocate(String program, {String? profileId}) async {
     acpLocateCalls.add(program);
     final gate = acpLocateGates[program];

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
 use crate::engine::{
+    host_owner::{self, HeldElsewhere},
     host_profiles::{
         self,
         files::{write_private, Committed, FileLock},
@@ -69,6 +70,8 @@ fn update(enabled: bool, only_unset: bool) -> Result<()> {
     if !supported() {
         bail!("this device cannot host services");
     }
+    // The setting belongs to the app that hosts from this state.
+    host_owner::require()?;
     let root = host_profiles::root()?;
     let _lock = FileLock::acquire(&root)?;
     if only_unset && preference()?.enabled.is_some() {
@@ -210,6 +213,8 @@ impl Drop for Serving {
 }
 
 async fn launch(generation: u64) -> Result<Serving> {
+    // Only the app that hosts from this state publishes the computer's entry.
+    tokio::task::spawn_blocking(host_owner::require).await??;
     let owned = tokio::task::spawn_blocking(transport::resolve_owned_blocking).await??;
     if !transport::is_current(owned.epoch) || !accepts(generation) {
         bail!("management context changed");
@@ -296,8 +301,16 @@ async fn supervise() {
             match launch(generation).await {
                 Ok(ready) => serving = Some(ready),
                 Err(error) => {
-                    tracing::warn!("device management unavailable: {error:#}");
-                    let problem = if runtime::device_id().is_err() {
+                    // The owner shares this log, and the refusal was logged
+                    // when this app started.
+                    if error.is::<HeldElsewhere>() {
+                        tracing::debug!("device management unavailable: {error:#}");
+                    } else {
+                        tracing::warn!("device management unavailable: {error:#}");
+                    }
+                    let problem = if error.is::<HeldElsewhere>() {
+                        "Another POCOX app on this computer hosts its services; manage them there."
+                    } else if runtime::device_id().is_err() {
                         "This computer's hosting identity cannot be read. Restore its saved \
                          identity file to publish management."
                     } else {

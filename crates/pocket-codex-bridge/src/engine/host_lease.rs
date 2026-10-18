@@ -12,6 +12,10 @@
 //! the quit waits for those in progress ([`drain`]) and then stops each host
 //! under its own lease ([`acquire_for_quit`]), never around a holder.
 //!
+//! Only the process that owns the hosting state ([`super::host_owner`]) is
+//! granted a lease for anything but a stop, so a second app on the same
+//! state starts, restarts and applies nothing.
+//!
 //! This sits above [`super::hosting`], whose claims still keep two
 //! *providers* off one name; the lease orders operations on one instance.
 
@@ -91,6 +95,9 @@ impl Table {
 
     fn acquire(&'static self, name: &str, op: Op, wait: Duration, quit: bool) -> Result<Lease> {
         let name = host_names::canonical(name)?;
+        if op != Op::Stop {
+            super::host_owner::require()?;
+        }
         let deadline = Instant::now() + wait;
         let mut state = self.state();
         loop {

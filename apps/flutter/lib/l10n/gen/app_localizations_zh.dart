@@ -3513,6 +3513,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get managedSwitchUnavailable => '无法读取管理状态。';
 
   @override
+  String get hostingElsewhere =>
+      'POCOX 已在这台电脑上运行并托管服务。这里不能托管、恢复或开启远程管理；请退出这个窗口，改用已在运行的 POCOX（可能在菜单栏或系统托盘中）。';
+
+  @override
   String hostRestoreBlocked(String problem) {
     return '已跳过自动恢复，因为无法读取已保存的恢复选择：$problem';
   }

@@ -42,7 +42,7 @@ pub(super) fn valid_key_ref(name: &str, file: &str) -> bool {
 }
 
 /// Create `dir` (and parents), `0700` on Unix.
-fn private_dir(dir: &Path) -> Result<()> {
+pub(in crate::engine) fn private_dir(dir: &Path) -> Result<()> {
     std::fs::create_dir_all(dir).context("creating the host configuration directory")?;
     #[cfg(unix)]
     {
@@ -53,7 +53,7 @@ fn private_dir(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn private_options() -> OpenOptions {
+pub(in crate::engine) fn private_options() -> OpenOptions {
     let mut options = OpenOptions::new();
     #[cfg(unix)]
     {

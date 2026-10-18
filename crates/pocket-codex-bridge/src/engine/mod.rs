@@ -12,6 +12,7 @@ pub mod host_apply;
 mod host_lease;
 pub mod host_lifecycle;
 mod host_names;
+pub mod host_owner;
 pub mod host_profiles;
 mod host_services;
 pub mod host_start;

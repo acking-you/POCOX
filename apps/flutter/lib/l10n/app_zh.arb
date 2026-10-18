@@ -1195,6 +1195,7 @@
   "managedSwitchInfo": "开启后，你已登录的其他设备可在这台电脑在线时添加、配置、启动和停止它的服务；关闭后只有这台电脑能修改。",
   "managedSwitchConnecting": "已开启，暂未连通。",
   "managedSwitchUnavailable": "无法读取管理状态。",
+  "hostingElsewhere": "POCOX 已在这台电脑上运行并托管服务。这里不能托管、恢复或开启远程管理；请退出这个窗口，改用已在运行的 POCOX（可能在菜单栏或系统托盘中）。",
   "hostRestoreBlocked": "已跳过自动恢复，因为无法读取已保存的恢复选择：{problem}",
   "managedRuntimeReady": "可用",
   "managedRuntimeNeedsSetup": "需要准备",

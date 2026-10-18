@@ -18,6 +18,7 @@ import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/busy_label.dart';
 import 'package:pocket_codex/src/widgets/glass.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
@@ -25,17 +26,29 @@ import 'package:pocket_codex/src/widgets/utility_page.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
 /// Open the hosting editor: a new host, or the running [existing] one.
-/// [initialChoice] preselects a new host's agent ([AgentChoice]).
+/// [initialChoice] preselects a new host's agent ([AgentChoice]). While
+/// another POCOX app hosts from this computer's state, nothing opens and a
+/// toast says why.
 Future<void> showHostingEditor(
   BuildContext context, {
   AppServeStatus? existing,
   AgentChoice? initialChoice,
-}) => Navigator.of(context).push(
-  MaterialPageRoute<void>(
-    builder: (_) =>
-        HostingEditor(existing: existing, initialChoice: initialChoice),
-  ),
-);
+}) async {
+  final api = ProviderScope.containerOf(
+    context,
+    listen: false,
+  ).read(bridgeApiProvider);
+  if (api.hostingOwnedElsewhere()) {
+    showToastError(context, AppLocalizations.of(context).hostingElsewhere);
+    return;
+  }
+  await Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) =>
+          HostingEditor(existing: existing, initialChoice: initialChoice),
+    ),
+  );
+}
 
 /// The hosting editor, one page for creating and editing a local host.
 ///
