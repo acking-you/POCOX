@@ -1559,5 +1559,13 @@
   "@browserNoteNoErrors": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
   "browserNoteConsole": "Preview of \"{title}\" ({url}, shared from {device}), recent console messages:",
   "@browserNoteConsole": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
-  "browserNotLocal": "Only pages shared from your devices open here."
+  "browserNotLocal": "Only pages shared from your devices open here.",
+  "browserFailed": "Couldn't open the page",
+  "browserFailedCertificate": "This device doesn't trust the page's certificate.",
+  "browserFailedNoAnswer": "The page's server didn't answer. The share may have ended, or the server isn't running.",
+  "browserFailedStopped": "The page stopped unexpectedly.",
+  "browserFailedOther": "The page didn't load.",
+  "browserRetrying": "Retrying…",
+  "browserNoteFailed": "Preview of \"{title}\" ({url}, shared from {device}) did not load: {reason}",
+  "@browserNoteFailed": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}, "reason": {"type": "String"}}}
 }

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/relay_diagnosis.dart';
 import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocket_codex/src/widgets/error_details.dart';
 
 /// The relay could not be reached: what is wrong in words, a retry, and the
 /// raw error folded away, whole and copyable.
@@ -99,7 +97,10 @@ class _RelayProblemState extends State<RelayProblem> {
       style: theme.textTheme.bodyMedium?.copyWith(color: muted),
       textAlign: widget.compact ? TextAlign.start : TextAlign.center,
     );
-    final details = _Details(detail: widget.detail);
+    final details = ErrorDetails(
+      detail: widget.detail,
+      tileKey: const Key('relay-problem-details'),
+    );
     if (widget.compact) {
       return DecoratedBox(
         decoration: BoxDecoration(
@@ -177,62 +178,6 @@ class _RelayProblemState extends State<RelayProblem> {
               details,
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The raw error, folded: whole, selectable and copyable once opened.
-class _Details extends StatelessWidget {
-  const _Details({required this.detail});
-
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    return Material(
-      // An own ink layer: a coloured ancestor would hide the tile's.
-      type: MaterialType.transparency,
-      child: Theme(
-        data: theme.copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          key: const Key('relay-problem-details'),
-          tilePadding: EdgeInsets.zero,
-          dense: true,
-          childrenPadding: const EdgeInsets.only(bottom: 10),
-          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
-          title: Text(
-            l10n.errorDetails,
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          children: [
-            SelectableText(
-              detail,
-              style: TextStyle(
-                fontFamily: monoFontFamily,
-                fontFamilyFallback: monoCjkFallback,
-                fontSize: 12,
-                height: 1.45,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: detail));
-                  if (context.mounted) showToast(context, l10n.copied);
-                },
-                icon: const Icon(AppIcons.copy, size: 16),
-                label: Text(l10n.copy),
-              ),
-            ),
-          ],
         ),
       ),
     );

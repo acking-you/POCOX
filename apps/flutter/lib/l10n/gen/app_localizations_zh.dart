@@ -3895,4 +3895,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get browserNotLocal => '这里只能打开你的设备共享的页面。';
+
+  @override
+  String get browserFailed => '无法打开页面';
+
+  @override
+  String get browserFailedCertificate => '此设备不信任该页面的证书。';
+
+  @override
+  String get browserFailedNoAnswer => '页面的服务器没有响应。共享可能已结束，或者服务器没有在运行。';
+
+  @override
+  String get browserFailedStopped => '页面意外停止了。';
+
+  @override
+  String get browserFailedOther => '页面没有加载出来。';
+
+  @override
+  String get browserRetrying => '正在重试…';
+
+  @override
+  String browserNoteFailed(
+    String title,
+    String url,
+    String device,
+    String reason,
+  ) {
+    return '预览“$title”（$url，由 $device 共享）没有加载出来：$reason';
+  }
 }
