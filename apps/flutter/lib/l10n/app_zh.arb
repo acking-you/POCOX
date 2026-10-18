@@ -1308,5 +1308,12 @@
   "toolsMinutes": "{count} 分钟",
   "browserNoteNoErrors": "预览“{title}”（{url}，由 {device} 共享）：控制台没有错误。",
   "browserNoteConsole": "预览“{title}”（{url}，由 {device} 共享），最近的控制台消息：",
-  "browserNotLocal": "这里只能打开你的设备共享的页面。"
+  "browserNotLocal": "这里只能打开你的设备共享的页面。",
+  "browserFailed": "无法打开页面",
+  "browserFailedCertificate": "此设备不信任该页面的证书。",
+  "browserFailedNoAnswer": "页面的服务器没有响应。共享可能已结束，或者服务器没有在运行。",
+  "browserFailedStopped": "页面意外停止了。",
+  "browserFailedOther": "页面没有加载出来。",
+  "browserRetrying": "正在重试…",
+  "browserNoteFailed": "预览“{title}”（{url}，由 {device} 共享）没有加载出来：{reason}"
 }

@@ -43,26 +43,29 @@ String sharedPageUrl(String url, String? serviceKey) {
   return uri.replace(port: port).toString();
 }
 
-/// The note added to the draft, in the user's language.
+/// The note added to the draft, in the user's language; [failure] is why
+/// the page did not load, when it did not.
 String previewNote(
   AppLocalizations l10n, {
   required String title,
   required String url,
   required String device,
   required List<String> console,
+  String? failure,
 }) {
-  if (console.isEmpty) return l10n.browserNoteNoErrors(title, url, device);
-  return [
-    l10n.browserNoteConsole(title, url, device),
-    '```',
-    ...console,
-    '```',
-  ].join('\n');
+  final head = failure != null
+      ? l10n.browserNoteFailed(title, url, device, failure)
+      : console.isEmpty
+      ? l10n.browserNoteNoErrors(title, url, device)
+      : l10n.browserNoteConsole(title, url, device);
+  if (console.isEmpty) return head;
+  return [head, '```', ...console, '```'].join('\n');
 }
 
 /// Add the preview of share [serviceKey] to its agent's conversation draft
 /// and open that conversation (unless it is the page under the preview);
-/// without a known conversation the note is copied.
+/// without a known conversation the note is copied. [failure] says why the
+/// page did not load, when it did not.
 Future<void> sendPreviewToAgent(
   BuildContext context,
   WidgetRef ref, {
@@ -70,6 +73,7 @@ Future<void> sendPreviewToAgent(
   required String title,
   required String url,
   required List<String> console,
+  String? failure,
 }) async {
   final l10n = AppLocalizations.of(context);
   final overview = ref.read(toolsOverviewProvider);
@@ -81,6 +85,7 @@ Future<void> sendPreviewToAgent(
     url: sharedPageUrl(url, serviceKey),
     device: deviceLabel(device),
     console: console,
+    failure: failure,
   );
   final owner = live?.share.owner;
   final service = serviceKey == null

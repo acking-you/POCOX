@@ -4126,4 +4126,34 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get browserNotLocal =>
       'Only pages shared from your devices open here.';
+
+  @override
+  String get browserFailed => 'Couldn\'t open the page';
+
+  @override
+  String get browserFailedCertificate =>
+      'This device doesn\'t trust the page\'s certificate.';
+
+  @override
+  String get browserFailedNoAnswer =>
+      'The page\'s server didn\'t answer. The share may have ended, or the server isn\'t running.';
+
+  @override
+  String get browserFailedStopped => 'The page stopped unexpectedly.';
+
+  @override
+  String get browserFailedOther => 'The page didn\'t load.';
+
+  @override
+  String get browserRetrying => 'Retrying…';
+
+  @override
+  String browserNoteFailed(
+    String title,
+    String url,
+    String device,
+    String reason,
+  ) {
+    return 'Preview of \"$title\" ($url, shared from $device) did not load: $reason';
+  }
 }
