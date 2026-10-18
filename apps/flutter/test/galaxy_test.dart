@@ -202,6 +202,12 @@ void main() {
         await t.tap(find.byKey(const Key('galaxy-list-toggle')));
         await t.pump();
         expect(find.text('Landing page'), findsWidgets);
+        // The search narrows what is shared too, not just the systems.
+        await t.enterText(find.byKey(const Key('galaxy-search')), 'zzz');
+        await t.pump();
+        expect(find.text('Landing page'), findsNothing);
+        await t.enterText(find.byKey(const Key('galaxy-search')), '');
+        await t.pump();
         await t.tap(
           find.byKey(const Key('galaxy-list-pcx:studio:app:default')),
         );

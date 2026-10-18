@@ -176,10 +176,12 @@ pub async fn connect(
     {
         // A concurrent connect made the same tunnel first: join it.
         Some(existing) => {
-            existing.user |= connection.user;
-            if existing.user {
+            if connection.user {
+                // The user's own connect takes it over, as in `reuse`.
+                existing.user = true;
                 existing.holders.clear();
-            } else {
+                existing.owner = connection.owner;
+            } else if !existing.user {
                 existing.holders.extend(connection.holders);
             }
             existing.view()

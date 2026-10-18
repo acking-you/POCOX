@@ -40,6 +40,15 @@ class GalaxyList extends ConsumerWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final shares = ref.watch(toolsSharesProvider);
+    // The search and kind filter the scene; shares follow what it shows.
+    final shown = {
+      for (final system in scene.systems)
+        for (final planet in system.planets) planet.service.key,
+    };
+    final listed = [
+      for (final entry in shares)
+        if (entry.share.ports.any((port) => shown.contains(port.key))) entry,
+    ];
     Widget heading(String text) => Padding(
       padding: const EdgeInsets.fromLTRB(4, 18, 4, 8),
       child: Semantics(
@@ -57,8 +66,8 @@ class GalaxyList extends ConsumerWidget {
       key: const Key('galaxy-list'),
       padding: EdgeInsets.fromLTRB(16, top, 16, 24),
       children: [
-        heading(l10n.toolsSharedWithYou),
-        if (shares.isEmpty)
+        if (shares.isEmpty) ...[
+          heading(l10n.toolsSharedWithYou),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
             child: Text(
@@ -67,13 +76,15 @@ class GalaxyList extends ConsumerWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
-          )
-        else
-          for (final entry in shares)
+          ),
+        ] else if (listed.isNotEmpty) ...[
+          heading(l10n.toolsSharedWithYou),
+          for (final entry in listed)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: ShareCard(share: shareRefOf(entry.share), dense: true),
             ),
+        ],
         for (final system in scene.systems) ...[
           heading(
             system.home
