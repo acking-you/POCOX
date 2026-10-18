@@ -415,8 +415,23 @@ own token is protected by the proof above.
     the engine's accessibility entry point: the iOS 27 simulator ignored a
     written Reduce Motion preference) the scene stood still and drew no frames,
     in list mode too; clearing the flag resumed it.
+- Built-in tools in the composer, live (2026-10-19): the same relay, an
+  isolated CLI host with a hosted Codex 0.161.0 and the iPhone simulator.
+  The Codex host read back `tools.services` and `tools.connect` with
+  `approval_mode = "approve"` (`config/read`) and served both tools with
+  its token. On the phone, **+ › Built-in tools** listed the host's three
+  tools; the two picked showed as chips above the field and on the sent
+  message, never as the block, and the composer emptied. The grant reached
+  the host through its management entry before the turn: an MCP share from
+  that conversation was shared at once, with no consent request, under the
+  agent's name; the same call from another conversation raised the card on
+  the phone, returned `waiting_for_user` after 110 s, and after a Deny from
+  the terminal its repeat was refused at once. The turn itself failed (the
+  isolated host had no sign-in), so no model read the block.
 - Not verified: a share card at a real model's tool call in the transcript,
-  Claude and OpenCode hosts calling the tools, a physical phone, Android
+  a model reading the picked tools' block, Claude and OpenCode hosts
+  calling the tools (their pre-approval by unit tests only), a physical
+  phone, Android
   (including its loopback cleartext allowance), Windows and Linux, account
   mode across machines, connecting at the shared port's own number on a phone,
   and the operating systems' Reduce Motion settings themselves.

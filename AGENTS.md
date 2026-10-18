@@ -1323,8 +1323,16 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     Consent holds for agents that reach POCOX only through the tools; a
     same-user program with loopback access can act as the user, and the
     harness's sandbox is that boundary (never claim otherwise). Hosted Codex,
-    Claude (with its read tool pre-allowed) and native OpenCode get the
-    server at launch; others get a copied entry (`pocox tools config`). CLI:
+    Claude and native OpenCode get the server at launch and run every tool
+    without their own prompt (Codex `tools.<name>.approval_mode = "approve"`,
+    Claude `allowedTools`; OpenCode never asks), so POCOX's consent is the one
+    gate; others get a copied entry (`pocox tools config`). The composer's
+    **+ › Built-in tools** offers the host catalog's `builtin` list (one
+    source, `agent_tools/builtin.rs`, where new tools are added); picked tools
+    go with the next message as a `<pocox_tools>` block shown as chips, and a
+    gated one (Share a port) is granted to that conversation before its turn
+    (`/services/v1/grants`), as Allow in this conversation, and ends like
+    that answer. CLI:
     `pocox services share|unshare|connect|disconnect|list --json`, `pocox
     open`, `pocox tools …`. App: app-wide consent prompts and share notices
     (phones connect announced shares right away; desktops when opened, and a
