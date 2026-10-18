@@ -9,14 +9,13 @@
 //! the owner spawned and outlived never keeps the lock.
 //!
 //! The CLI supervisor ([`super::daemon`]) takes its directory's lock and does
-//! not start without it. The desktop app claims its hosting state when it
-//! starts ([`claim_desktop`]). A second app on the same state still starts
-//! and can connect to services, but every start, restart and apply (through
-//! [`super::host_lease`]), an explicit stop's restore record and the
-//! management entry (through [`super::management`]) call [`require`]: refused
-//! while the first app lives, so the second never starts, adopts, stops or
-//! re-registers the first one's services, nor changes what it restores. The
-//! first call after the first app has gone takes ownership.
+//! not start without it. The desktop app claims its hosting state once, when
+//! it starts ([`claim_desktop`]). A copy started while another one runs still
+//! opens and can connect to services, but for the rest of its life every
+//! start, restart and apply (through [`super::host_lease`]), an explicit
+//! stop's restore record, the management entry and the agent tools refuse
+//! ([`require`]). So it never starts, adopts, stops or re-registers the first
+//! app's services, nor changes what that app restores or serves.
 
 use std::{
     fs::{File, TryLockError},
@@ -25,7 +24,7 @@ use std::{
     sync::Mutex,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 use super::host_profiles::{self, files};
 
@@ -36,7 +35,7 @@ pub(super) const LOCK_FILE: &str = "owner.lock";
 pub(super) struct OwnerLock(File);
 
 /// Another live process owns the directory.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(super) struct HeldElsewhere {
     /// The owner's process id, when its lock file could be read.
     pub pid: Option<u32>,
@@ -104,54 +103,72 @@ fn read_pid(path: &Path) -> Option<u32> {
     std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
-/// This process's claim on the desktop app's hosting state.
+/// The desktop app's claim on its hosting state, made when it starts.
 enum Claim {
     /// Held until the process exits.
     Owned { _lock: OwnerLock },
-    /// Another app owned it, or it could not be locked, when last asked.
-    Pending,
+    /// Another live app owned it.
+    Elsewhere(HeldElsewhere),
+    /// It could not be locked.
+    Failed(String),
+}
+
+fn claim(dir: Result<PathBuf>) -> Claim {
+    match dir.and_then(|dir| OwnerLock::try_acquire(&dir)) {
+        Ok(lock) => Claim::Owned {
+            _lock: lock,
+        },
+        Err(error) => match error.downcast::<HeldElsewhere>() {
+            Ok(held) => Claim::Elsewhere(held),
+            Err(error) => Claim::Failed(format!("{error:#}")),
+        },
+    }
+}
+
+fn refusal(claim: &Claim) -> Result<()> {
+    match claim {
+        Claim::Owned {
+            ..
+        } => Ok(()),
+        Claim::Elsewhere(held) => Err(held.clone().into()),
+        Claim::Failed(reason) => Err(anyhow!("the hosting state could not be locked: {reason}")),
+    }
 }
 
 /// `None` until [`claim_desktop`]: tests, phones and the CLI supervisor
 /// never claim the desktop state.
 static DESKTOP: Mutex<Option<Claim>> = Mutex::new(None);
 
+fn desktop() -> std::sync::MutexGuard<'static, Option<Claim>> {
+    DESKTOP.lock().unwrap_or_else(|p| p.into_inner())
+}
+
 /// Own this computer's hosting state for the rest of the desktop app's life,
-/// or note that another app does. Never fails the app's start.
+/// or note that another app does. Never fails the app's start; a second call
+/// changes nothing.
 pub fn claim_desktop() {
     if cfg!(any(target_os = "ios", target_os = "android")) {
         return;
     }
-    let mut claim = DESKTOP.lock().unwrap_or_else(|p| p.into_inner());
-    if claim.is_some() {
-        return;
-    }
-    *claim = Some(Claim::Pending);
-    if let Err(error) = take(&mut claim, host_profiles::root) {
-        tracing::warn!("hosting is unavailable in this app: {error:#}");
+    let mut desktop = desktop();
+    if desktop.is_none() {
+        let claim = claim(host_profiles::root());
+        if let Err(error) = refusal(&claim) {
+            tracing::warn!("this app hosts nothing: {error:#}");
+        }
+        *desktop = Some(claim);
     }
 }
 
 /// Ok when this process may host: it owns the hosting state, or never
-/// claimed it. A pending claim is tried again, so the first call after the
-/// owning app has gone takes over.
+/// claimed it.
 pub(super) fn require() -> Result<()> {
-    take(&mut DESKTOP.lock().unwrap_or_else(|p| p.into_inner()), host_profiles::root)
+    desktop().as_ref().map_or(Ok(()), refusal)
 }
 
-/// Whether another live app owns this app's hosting state (asking takes
-/// ownership once it has gone).
+/// Whether another app owned this app's hosting state when it started.
 pub fn owned_elsewhere() -> bool {
-    require().is_err_and(|error| error.is::<HeldElsewhere>())
-}
-
-fn take(claim: &mut Option<Claim>, dir: impl FnOnce() -> Result<PathBuf>) -> Result<()> {
-    if matches!(claim, Some(Claim::Pending)) {
-        *claim = Some(Claim::Owned {
-            _lock: OwnerLock::try_acquire(&dir()?)?,
-        });
-    }
-    Ok(())
+    matches!(*desktop(), Some(Claim::Elsewhere(_)))
 }
 
 #[cfg(test)]
@@ -159,29 +176,22 @@ mod tests {
     use super::*;
 
     /// Two apps on one hosting state, each with its own handle on the lock
-    /// file: the second is refused while the first lives, the owner stays
-    /// unaffected, and once the first has gone (its lock released, as at
-    /// exit) the second takes over with nothing to clean up.
+    /// file: the first owns it, the second is refused and names the owner,
+    /// and once the first has gone (its lock released, as at exit) the next
+    /// app to start owns the state with nothing to clean up.
     #[test]
-    fn a_second_app_cannot_host_until_the_first_has_gone() {
+    fn a_second_app_never_hosts_while_the_first_lives() {
         let state = tempfile::tempdir().expect("state");
         let dir = || Ok(state.path().join("hosting"));
-        let (mut first, mut second) = (Some(Claim::Pending), Some(Claim::Pending));
-        take(&mut first, dir).expect("the first app owns the hosting state");
-        for _ in 0..2 {
-            let refused = take(&mut second, dir).expect_err("the first app still runs");
-            let held = refused
-                .downcast_ref::<HeldElsewhere>()
-                .expect("held elsewhere");
-            if cfg!(unix) {
-                assert_eq!(held.pid, Some(std::process::id()), "the owner is named");
-            }
-            assert!(matches!(second, Some(Claim::Pending)));
-            take(&mut first, dir).expect("the owner keeps hosting");
+        let first = claim(dir());
+        refusal(&first).expect("the first app owns the hosting state");
+        let second = claim(dir());
+        let Claim::Elsewhere(held) = &second else { panic!("the first app still runs") };
+        if cfg!(unix) {
+            assert_eq!(held.pid, Some(std::process::id()), "the owner is named");
         }
+        assert!(refusal(&second).is_err_and(|error| error.is::<HeldElsewhere>()));
         drop(first);
-        take(&mut second, dir).expect("the second app takes over");
-        assert!(matches!(second, Some(Claim::Owned { .. })));
-        assert!(take(&mut None, dir).is_ok(), "a process that never claimed is never refused");
+        refusal(&claim(dir())).expect("the next app owns it");
     }
 }

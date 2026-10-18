@@ -1339,20 +1339,21 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     (Trust boundary; Verification lists what was exercised).
 
 40. **One desktop app per hosting state (2026-10-19).** The desktop app claims
-    `<state-dir>/hosting/owner.lock` at bridge start (`engine/host_owner.rs`):
-    an exclusive OS lock held until the process exits, never a pid file (the
-    pid inside only names the holder). A second app on the same state still
-    starts and connects, but every non-stop lifecycle lease, an explicit
-    stop's restore record and the management entry (publication and setting)
-    call `host_owner::require()`, so it restores, starts, restarts, applies and
-    publishes nothing, never adopts, stops or re-registers the first app's
-    services and never changes what that app restores. The first such call
-    after the first app has gone takes ownership. Flutter skips restore and explains
-    on the home hero, the services page and every hosting-editor entry
-    (`hostingOwnedElsewhere`). Any new hosting service, the agent tools
-    endpoint included, calls `require()` before it binds or publishes. The CLI
-    supervisor shares the lock code but keeps its own directory
-    (`managed-host/owner.lock`). See `docs/remote-device-management.md`.
+    `<state-dir>/hosting/owner.lock` once, at bridge start
+    (`engine/host_owner.rs`): an exclusive OS lock held until the process
+    exits, never a pid file (the pid inside only names the holder). A copy
+    started while another runs stays a controller for its whole run (no
+    takeover when the first quits): `host_owner::require()` refuses every
+    non-stop lifecycle lease, an explicit stop's restore record, management
+    (no supervisor, no setting write) and the agent tools (not served; switch
+    and tokens refused). So it never adopts, stops or re-registers the first
+    app's services, nor changes what that app restores or serves. Flutter
+    skips restore, explains on the home hero, the services page and every
+    hosting-editor entry, and disables the agent tools switches
+    (`hostingOwnedElsewhere`). Any new hosting service calls `require()`
+    before it binds, publishes or writes hosting state. The CLI supervisor
+    shares the lock code in its own directory (`managed-host/owner.lock`).
+    See `docs/remote-device-management.md`.
 
 ### UI and history maintenance (2026-09-13)
 

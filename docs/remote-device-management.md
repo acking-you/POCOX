@@ -126,19 +126,21 @@ try to detect physical machines or split a deliberately shared installation.
 
 ### One desktop app per hosting state
 
-One desktop app at a time hosts from a hosting state directory. The first app
-to start holds an exclusive lock on `<state-dir>/hosting/owner.lock` for as
-long as it runs. The operating system releases the lock when that app exits or
-crashes, so nothing stale ever blocks the next start; the process ID written in
-the file only names the holder in logs. Another copy started on the same state
-(a second launch, or another build of the app) still opens and connects to
-services, but it restores nothing, starts, restarts and applies no host, and
-neither publishes nor changes the management entry. Its home screen and
-services page say why, and its hosting buttons explain instead of opening the
-editor. So it never adopts, stops or re-registers the first app's services,
-and the first app is unaffected. The first such action after the first app has
-quit takes ownership. The CLI supervisor keeps its own lock under
-`managed-host/` (see [CLI host](#cli-host)).
+One desktop app at a time hosts from a hosting state directory. An app claims
+`<state-dir>/hosting/owner.lock` when it starts and holds that exclusive lock
+for as long as it runs. The operating system releases the lock when the app
+exits or crashes, so nothing stale ever blocks the next start; the process ID
+written in the file only names the holder in logs. A copy started while
+another one runs (a second launch, or another build of the app) still opens
+and connects to services, but for its whole run it restores nothing, starts,
+restarts and applies no host, publishes no management entry and serves no
+agent tools, and it changes neither their settings nor what the first app
+restores. Its home screen and services page say why, its hosting buttons
+explain instead of opening the editor, and its agent tools switches are
+disabled. So it never adopts, stops or re-registers the first app's services,
+and the first app is unaffected. It does not take over when the first app
+quits: quit it and open POCOX again. The CLI supervisor keeps its own lock
+under `managed-host/` (see [CLI host](#cli-host)).
 
 ### Discovery and permissions
 

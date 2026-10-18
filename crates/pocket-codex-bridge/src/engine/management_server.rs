@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
 use crate::engine::{
-    host_owner::{self, HeldElsewhere},
+    host_owner,
     host_profiles::{
         self,
         files::{write_private, Committed, FileLock},
@@ -88,9 +88,10 @@ fn update(enabled: bool, only_unset: bool) -> Result<()> {
     Ok(())
 }
 
-/// Start the supervisor once. Mobile never opens a management listener.
+/// Start the supervisor once. Mobile never opens a management listener,
+/// and a second app on the hosting state leaves the entry to the first.
 pub fn initialize() {
-    if !supported() || is_stopping() {
+    if !supported() || is_stopping() || host_owner::require().is_err() {
         return;
     }
     let mut task = LOOP.lock().unwrap_or_else(|p| p.into_inner());
@@ -248,8 +249,6 @@ impl Drop for Serving {
 }
 
 async fn launch(generation: u64) -> Result<Serving> {
-    // Only the app that hosts from this state publishes the computer's entry.
-    tokio::task::spawn_blocking(host_owner::require).await??;
     let owned = tokio::task::spawn_blocking(transport::resolve_owned_blocking).await??;
     if !transport::is_current(owned.epoch) || !accepts(generation) {
         bail!("management context changed");
@@ -354,16 +353,8 @@ async fn supervise() {
             match launch(generation).await {
                 Ok(ready) => serving = Some(ready),
                 Err(error) => {
-                    // The owner shares this log, and the refusal was logged
-                    // when this app started.
-                    if error.is::<HeldElsewhere>() {
-                        tracing::debug!("device management unavailable: {error:#}");
-                    } else {
-                        tracing::warn!("device management unavailable: {error:#}");
-                    }
-                    let problem = if error.is::<HeldElsewhere>() {
-                        "Another POCOX app on this computer hosts its services; manage them there."
-                    } else if runtime::device_id().is_err() {
+                    tracing::warn!("device management unavailable: {error:#}");
+                    let problem = if runtime::device_id().is_err() {
                         "This computer's hosting identity cannot be read. Restore its saved \
                          identity file to publish management."
                     } else {

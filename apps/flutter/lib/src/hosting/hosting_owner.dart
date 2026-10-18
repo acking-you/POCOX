@@ -5,11 +5,10 @@ import 'package:pocket_codex/src/hosting/editor_block.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 
-/// Whether another POCOX app on this computer owns its hosting state
-/// ([BridgeApi.hostingOwnedElsewhere]): this window then hosts, restores and
-/// publishes nothing. Read again by each new listener, so it clears once that
-/// app has quit.
-final hostingElsewhereProvider = Provider.autoDispose<bool>(
+/// Whether another POCOX app on this computer owned its hosting state when
+/// this one started ([BridgeApi.hostingOwnedElsewhere]): this window then
+/// hosts, restores and publishes nothing for its whole run.
+final hostingElsewhereProvider = Provider<bool>(
   (ref) => ref.watch(bridgeApiProvider).hostingOwnedElsewhere(),
 );
 

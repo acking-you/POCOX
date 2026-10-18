@@ -26,9 +26,9 @@ List<AcpPresetDto> acpPresets() =>
 bool acpHostingSupported() =>
     RustLib.instance.api.crateApiBridgeHostingAcpHostingSupported();
 
-/// Whether another POCOX app on this computer owns its hosting state, so this
-/// one starts, restores and publishes nothing. Asking again once that app has
-/// quit takes ownership.
+/// Whether another POCOX app on this computer owned its hosting state when
+/// this one started: this one then starts, restores and publishes nothing for
+/// its whole run.
 bool hostingOwnedElsewhere() =>
     RustLib.instance.api.crateApiBridgeHostingHostingOwnedElsewhere();
 

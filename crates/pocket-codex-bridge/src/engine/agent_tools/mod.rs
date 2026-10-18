@@ -46,7 +46,7 @@ use tokio::task::JoinHandle;
 
 pub use self::tokens::TokenView;
 use self::{state::OwnerKey, tokens::Principal};
-use crate::engine::{host_profiles, runtime};
+use crate::engine::{host_owner, host_profiles, runtime};
 
 /// Whether this platform can serve the tools (desktops and the CLI host).
 pub fn supported() -> bool {
@@ -127,9 +127,13 @@ fn end_agents() {
 }
 
 /// Start serving the tools in this process. Idempotent; phones return at
-/// once.
+/// once, and a second app on the hosting state leaves them to the first.
 pub fn initialize() {
     if !supported() || STOPPING.load(Ordering::SeqCst) || STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    if host_owner::require().is_err() {
+        state::lock().problem = Some(ELSEWHERE.into());
         return;
     }
     if let Err(error) = open() {
@@ -186,6 +190,9 @@ fn open() -> Result<()> {
 
 const UNREADABLE: &str = "The agent tools setting could not be read, so the tools stay off. \
                           Switch them on again to save it anew.";
+
+const ELSEWHERE: &str =
+    "Another POCOX app on this computer serves the agent tools; use them there.";
 
 async fn supervise() {
     let mut tick: u64 = 0;
@@ -257,6 +264,7 @@ fn apply(saved: settings::Settings) {
 
 /// Switch the tools on or off on this installation.
 pub fn set_enabled(enabled: bool) -> Result<Status> {
+    host_owner::require()?;
     let saved = settings::update(|s| s.enabled = enabled)?;
     apply(saved);
     WAKE.notify_one();
@@ -265,6 +273,7 @@ pub fn set_enabled(enabled: bool) -> Result<Status> {
 
 /// Ask (or not) before an agent's first share.
 pub fn set_ask_before_sharing(ask: bool) -> Result<Status> {
+    host_owner::require()?;
     let saved = settings::update(|s| s.ask_before_sharing = ask)?;
     apply(saved);
     Ok(status())
@@ -300,6 +309,7 @@ fn harness_label(harness: &str) -> &str {
 /// Issue a token for `harness` (`codex`, `claude`, `opencode` or another
 /// MCP client).
 pub fn issue(harness: &str, label: Option<&str>) -> Result<Issued> {
+    host_owner::require()?;
     let url = status()
         .endpoint
         .ok_or_else(|| anyhow::anyhow!("the agent tools are switched off on this device"))?;
@@ -318,6 +328,7 @@ pub fn issue(harness: &str, label: Option<&str>) -> Result<Issued> {
 /// Revoke a token; what its holder shared or connected ends. Fails, changing
 /// nothing, when the revocation cannot be saved.
 pub fn revoke(id: &str) -> Result<()> {
+    host_owner::require()?;
     let revoked = state::lock().tokens.revoke_where(|p| p.id == id)?;
     ended(&revoked);
     Ok(())

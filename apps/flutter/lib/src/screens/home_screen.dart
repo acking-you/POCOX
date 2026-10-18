@@ -168,7 +168,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// Rediscover and re-resolve without flipping the fallback UI.
   void _recheck() {
     ref.invalidate(servicesProvider);
-    ref.invalidate(hostingElsewhereProvider);
     _resolve(background: true);
   }
 
@@ -641,7 +640,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _retry() {
     ref.invalidate(servicesProvider);
     ref.invalidate(appReachableProvider);
-    ref.invalidate(hostingElsewhereProvider);
     _resolve();
   }
 

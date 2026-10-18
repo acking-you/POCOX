@@ -113,7 +113,6 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     ref.invalidate(appReachableLocalProvider);
     ref.invalidate(apiReachableLocalProvider);
     ref.invalidate(localServeListProvider);
-    ref.invalidate(hostingElsewhereProvider);
     // Reads only: a stopped service is never restarted by a refresh.
     ref.invalidate(managedDeviceProvider);
     ref.invalidate(deviceManagementProvider);

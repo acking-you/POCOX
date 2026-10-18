@@ -158,8 +158,8 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // after the fact instead of only in a viewer that was open at the time.
     logging::init_file(&support_dir);
     runtime::init(support_dir)?;
-    // Before anything can host or publish: a second app on the same hosting
-    // state starts, restores and publishes nothing while the first runs.
+    // Before anything can host or publish: an app started while another one
+    // runs on the same hosting state hosts nothing for its whole run.
     crate::engine::host_owner::claim_desktop();
     crate::engine::management::initialize();
     crate::engine::agent_tools::initialize();
