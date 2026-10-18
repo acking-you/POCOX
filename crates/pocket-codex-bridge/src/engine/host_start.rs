@@ -63,7 +63,9 @@ fn start_in(
     start_checked_in(support, profiles, name, runtime, change, None, &|| Ok(()))
 }
 
-fn start_checked_in(
+/// [`start_configured_checked`] with the support directory and saved
+/// configuration at `support` and `profiles`.
+pub(super) fn start_checked_in(
     support: &std::path::Path,
     profiles: &std::path::Path,
     name: Option<&str>,
@@ -94,7 +96,8 @@ fn start_checked_in(
         ..change
     };
     // No host runs under the name, so whatever was saved for it before is
-    // replaced; it comes back if the start fails.
+    // replaced; it comes back if the start fails. Starting exactly what is
+    // saved (a restore) commits nothing.
     let (_, staged) = host_profiles::stage_checked_in(
         profiles,
         &requested,
@@ -108,9 +111,11 @@ fn start_checked_in(
     // Exactly what this stage committed: a save made meanwhile (saves do
     // not take the lifecycle lease) never changes what this start runs.
     let started = staged.resolved().cloned().and_then(|provider| {
-        #[cfg(test)]
-        tests::launching(&provider);
         check()?;
+        #[cfg(test)]
+        if let Some(pretended) = tests::launching(&provider) {
+            return pretended;
+        }
         launch(&lease, support, profiles, &requested, runtime.clone(), provider)
     });
     match started {
@@ -167,7 +172,7 @@ fn launch(
 
 #[cfg(test)]
 mod tests {
-    use std::cell::RefCell;
+    use std::cell::{Cell, RefCell};
     #[test]
     fn revoked_start_does_not_save_a_profile_or_launch() {
         let root = tempfile::tempdir().expect("temp");
@@ -202,13 +207,17 @@ mod tests {
     use pocket_codex_core::provider::{ApiProtocol, Secret};
 
     use super::*;
-    use crate::engine::host_profiles::{Engine, KeyChange, ProfileInput, Resolved, Source, Staged};
+    use crate::engine::{
+        host_lifecycle,
+        host_profiles::{Engine, KeyChange, ProfileInput, Resolved, Source, Staged},
+    };
 
     type Hook = Box<dyn FnOnce()>;
 
     thread_local! {
         static AFTER_STAGE: RefCell<Option<Hook>> = RefCell::new(None);
         static LAUNCHED: RefCell<Option<Resolved>> = const { RefCell::new(None) };
+        static PRETEND: Cell<bool> = const { Cell::new(false) };
     }
 
     /// Runs this thread's pending hook between the commit and the launch.
@@ -218,9 +227,84 @@ mod tests {
         }
     }
 
-    /// Records the configuration handed to the launch.
-    pub(super) fn launching(provider: &Resolved) {
+    /// Records the configuration handed to the launch. While this thread
+    /// pretends, the launch succeeds without starting anything.
+    pub(super) fn launching(provider: &Resolved) -> Option<Result<Started>> {
         LAUNCHED.with(|s| *s.borrow_mut() = Some(provider.clone()));
+        PRETEND.with(Cell::get).then(|| {
+            Ok(Started::OpenCode(serve_opencode::Report {
+                name: String::new(),
+                service_key: String::new(),
+            }))
+        })
+    }
+
+    #[test]
+    fn a_restore_starts_what_is_saved_and_saves_nothing() {
+        let support = tempfile::tempdir().expect("support");
+        let profiles = support.path().join("hosting");
+        let name = "restore-test";
+        let runtime = Runtime::Codex {
+            port: 18080,
+            binary: None,
+            proxy: None,
+        };
+        PRETEND.with(|p| p.set(true));
+        // The editor's Start saves the host (normalized) and records it as
+        // running.
+        let input = ProfileInput {
+            model: Some(" m1 ".into()),
+            ..custom("https://gw.example.com/v1/", "").input
+        };
+        let first = Change {
+            input: input.clone(),
+            key: KeyChange::Replace(Secret::new("sk-1")),
+            runtime: RuntimeChange::Keep,
+        };
+        start_in(support.path(), &profiles, Some(name), runtime, first).expect("start");
+        let saved = host_profiles::get_in(&profiles, name).expect("saved");
+        let choice = host_lifecycle::entries_in(&profiles).expect("choices")[name].revision;
+        let files = || {
+            ["profiles.json", "lifecycle.json"].map(|f| std::fs::read(profiles.join(f)).expect(f))
+        };
+        let before = files();
+
+        // Every app start restores it, and so does a second app on the same
+        // state while the first still runs it: each runs the saved revision
+        // (so no change is pending) and writes nothing.
+        for _ in 0..2 {
+            host_lifecycle::restore_in(support.path(), &profiles, name, Some(choice), None)
+                .expect("restore");
+            let launched = LAUNCHED.with(|s| s.borrow_mut().take()).expect("launched");
+            assert_eq!(launched.revision, saved.revision);
+            assert_eq!(files(), before, "a restore saves nothing");
+        }
+
+        // An explicit edit moves the revision; the next start runs it.
+        let edit = Change {
+            input: ProfileInput {
+                model: Some("m2".into()),
+                ..input
+            },
+            key: KeyChange::Keep,
+            runtime: RuntimeChange::Keep,
+        };
+        let edited =
+            host_profiles::save_in(&profiles, name, &edit, Some(saved.revision), Engine::Codex)
+                .expect("edit");
+        assert_eq!(edited.revision, saved.revision + 1);
+        host_lifecycle::restore_in(support.path(), &profiles, name, Some(choice), None)
+            .expect("restore the edit");
+        let launched = LAUNCHED.with(|s| s.borrow_mut().take()).expect("launched");
+        assert_eq!(launched.revision, edited.revision);
+        assert_eq!(launched.endpoint.and_then(|e| e.model).as_deref(), Some("m2"));
+        assert_eq!(
+            host_profiles::get_in(&profiles, name)
+                .expect("get")
+                .revision,
+            edited.revision
+        );
+        PRETEND.with(|p| p.set(false));
     }
 
     fn custom(url: &str, key: &str) -> Change {

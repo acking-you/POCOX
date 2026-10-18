@@ -144,7 +144,10 @@ leaving the field empty keeps it, typing replaces it, and "Remove stored key"
 left by an earlier host of the same name.
 
 Every save carries the revision it was read at; a save over a newer revision
-is refused. Records carry an `authority` generation that changes with the
+is refused. The revision moves only when the record changes: a save of the
+same values, or the restore of a host when the app starts, writes nothing, so
+a host restored as saved shows no pending change and open editors stay
+current. Records carry an `authority` generation that changes with the
 source, URL, protocol, model or key (not with a runtime-only save); ACP
 session stores are keyed by it, so history made through one provider is never
 adopted through another.

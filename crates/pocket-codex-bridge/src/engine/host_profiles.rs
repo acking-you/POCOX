@@ -35,6 +35,15 @@
 //! invalid URL, missing key file) is reported as such and never resolved to
 //! another provider; saving over it replaces it.
 //!
+//! # Revisions
+//!
+//! A record's revision names its content: editors pass it back with a save
+//! or an apply, and a running host reports the one it launched with, so a
+//! different saved revision means "restart to apply". It moves only when
+//! the record changes. A save or start with exactly what is saved (a
+//! restore when the app starts, the same values saved again) writes nothing
+//! and keeps it.
+//!
 //! # Authority
 //!
 //! Every non-inherited record carries an opaque `authority` generation that
@@ -336,14 +345,16 @@ pub fn save_in(
 ///
 /// The stage pins its previous and new key files in the record file until
 /// it finishes or rolls back, so another save's cleanup never removes a key
-/// this stage may still restore or launch with.
+/// this stage may still restore or launch with. A stage that changed nothing
+/// wrote nothing, so finishing or rolling it back writes nothing either.
 #[must_use = "finish or roll back a staged save"]
 pub struct Staged {
     root: PathBuf,
     name: String,
     previous: Option<Record>,
-    revision: u64,
-    pin: String,
+    /// The revision this stage committed and its pin; `None` when the
+    /// record was left as it was.
+    committed: Option<(u64, String)>,
     /// What the committed record resolves to, read under the same lock as
     /// the commit (an error is safe to show).
     resolved: std::result::Result<Resolved, String>,
@@ -372,13 +383,15 @@ impl Staged {
     }
 
     fn settle(&self, restore: bool) -> Result<()> {
+        let Some((revision, pin)) = &self.committed else {
+            return Ok(());
+        };
         // Cleanup only under the lock and after an authoritative read.
         let lock = lock(&self.root, true)?;
         let mut profiles = lock.load(&self.root)?;
         let current = profiles.hosts.get(&self.name).map(|r| r.revision);
-        if restore && current == Some(self.revision) {
-            let next = self
-                .revision
+        if restore && current == Some(*revision) {
+            let next = revision
                 .checked_add(1)
                 .ok_or_else(|| anyhow!("the saved revision cannot move further"))?;
             match self.previous.clone() {
@@ -391,7 +404,7 @@ impl Staged {
                 },
             }
         }
-        profiles.pins.remove(&self.pin);
+        profiles.pins.remove(pin);
         match store(&self.root, &mut profiles)? {
             Committed::Durable => sweep(&self.root, &self.name, &profiles),
             // A crash could bring back an earlier record file naming keys
@@ -578,7 +591,7 @@ pub(super) fn stage_checked_in(
         #[cfg(test)]
         RuntimeChange::Clear => None,
     };
-    let record = Record {
+    let mut record = Record {
         claude_env: new_env.clone(),
         source,
         protocol: protocol.map(|p| p.as_str().to_string()),
@@ -587,8 +600,21 @@ pub(super) fn stage_checked_in(
         key: new_key.clone(),
         authority,
         runtime,
-        revision,
+        revision: current,
     };
+    if previous.as_ref() == Some(&record) {
+        // Exactly what is saved, so no key or environment file was written
+        // either (a new one always has a new name): commit nothing.
+        let resolved = resolve_record(root, &name, &record).map_err(|e| format!("{e:#}"));
+        return Ok((profile_of(root, &name, Some(&record)), Staged {
+            root: root.to_path_buf(),
+            name,
+            previous,
+            committed: None,
+            resolved,
+        }));
+    }
+    record.revision = revision;
     let resolved = resolve_record(root, &name, &record).map_err(|e| format!("{e:#}"));
     profiles.hosts.insert(name.clone(), record);
     // Other stages' pins stay however old they are: only their own stage
@@ -630,8 +656,7 @@ pub(super) fn stage_checked_in(
         root: root.to_path_buf(),
         name,
         previous,
-        revision,
-        pin,
+        committed: Some((revision, pin)),
         resolved,
     }))
 }

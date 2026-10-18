@@ -174,7 +174,10 @@ override with no runtime means stopped (locally or from another device) and
 suppresses older UI preferences for that name; remotely added hosts restore
 too. If the overrides cannot be read, nothing is restored and the reason is
 shown under the switch. Each restore is revalidated by the host
-(`hostRestoreService`); a stopped host is never restarted by polling.
+(`hostRestoreService`); a stopped host is never restarted by polling. A
+restore starts what is saved and saves nothing: neither the configuration's
+revision nor the restore choice moves, so the restored host runs the revision
+controllers see as saved.
 
 ## Default project folder
 

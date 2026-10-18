@@ -153,20 +153,24 @@ fn keep_replace_and_remove_change_only_the_key() {
     );
     let first_files = key_files(dir.path());
     assert_eq!(first_files.len(), 1);
-    assert!(save(KeyChange::Keep, Some(1)).expect("2").key_set);
+    let file = std::fs::read(profiles_path(dir.path())).expect("record");
+    let kept = save(KeyChange::Keep, Some(1)).expect("unchanged");
+    assert!(kept.key_set);
+    assert_eq!(kept.revision, 1, "an unchanged save commits nothing");
+    assert_eq!(std::fs::read(profiles_path(dir.path())).expect("record"), file);
     assert_eq!(key_files(dir.path()), first_files, "keep reuses the same file");
     assert_eq!(stored_key(dir.path(), "oc").as_deref(), Some("one"));
-    save(KeyChange::Replace(Secret::new("two")), Some(2)).expect("3");
+    save(KeyChange::Replace(Secret::new("two")), Some(1)).expect("2");
     assert_eq!(stored_key(dir.path(), "oc").as_deref(), Some("two"));
     let replaced = key_files(dir.path());
     assert_eq!(replaced.len(), 1, "the old key file is removed after the commit");
     assert_ne!(replaced, first_files, "a new generation");
-    let removed = save(KeyChange::Remove, Some(3)).expect("4");
+    let removed = save(KeyChange::Remove, Some(2)).expect("3");
     assert!(!removed.key_set);
-    assert_eq!(removed.revision, 4);
+    assert_eq!(removed.revision, 3);
     assert!(key_files(dir.path()).is_empty());
-    assert!(save(KeyChange::Replace(Secret::new("  ")), Some(4)).is_err());
-    assert_eq!(get_in(dir.path(), "oc").expect("get").revision, 4);
+    assert!(save(KeyChange::Replace(Secret::new("  ")), Some(3)).is_err());
+    assert_eq!(get_in(dir.path(), "oc").expect("get").revision, 3);
 }
 
 #[test]
@@ -380,8 +384,12 @@ fn an_uncertain_record_write_removes_no_key() {
     staged.finish();
     assert_eq!(key_files(dir.path()).len(), 2, "K0 kept");
     assert_eq!(stored_key(dir.path(), "c").as_deref(), Some("k1"));
-    // A later durable save cleans it up.
-    save(dir.path(), "c", &input, KeyChange::Keep, Some(2), Engine::Codex).expect("durable");
+    // A later durable save (one that changes the record) cleans it up.
+    let edited = ProfileInput {
+        model: Some("m2".into()),
+        ..input
+    };
+    save(dir.path(), "c", &edited, KeyChange::Keep, Some(2), Engine::Codex).expect("durable");
     assert_eq!(key_files(dir.path()).len(), 1, "only K1 is left");
 }
 
@@ -653,7 +661,11 @@ fn a_runtime_is_saved_validated_and_kind_checked() {
     let resolved = resolve_in(dir.path(), "c").expect("resolve");
     assert_eq!(resolved.runtime, saved.runtime, "one revision for both");
     // A provider-only save keeps it; a clear forgets it.
-    save(dir.path(), "c", &inherited(), KeyChange::Keep, Some(1), Engine::Codex).expect("2");
+    let official = ProfileInput {
+        source: Source::Official,
+        ..inherited()
+    };
+    save(dir.path(), "c", &official, KeyChange::Keep, Some(1), Engine::Codex).expect("2");
     assert!(get_in(dir.path(), "c").expect("get").runtime.is_some());
     let cleared = save_in(
         dir.path(),

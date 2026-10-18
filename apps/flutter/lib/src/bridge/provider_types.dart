@@ -170,7 +170,7 @@ class HostConfig {
   /// Explicit Claude overrides; null values indicate stored secrets.
   final Map<String, String?> claudeEnv;
 
-  /// Moves on every save; `0` when never saved.
+  /// Moves on every save that changes the record; `0` when never saved.
   final int revision;
 
   /// The saved desired runtime, when one was saved.

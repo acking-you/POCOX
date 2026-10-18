@@ -132,8 +132,9 @@ pub struct HostConfigDto {
     pub model: Option<String>,
     /// A key is stored for this instance.
     pub key_set: bool,
-    /// Moves on every save; `0` when never saved. Pass it back as the
-    /// expected revision so a concurrent save is not overwritten.
+    /// Moves on every save that changes the record; `0` when never saved.
+    /// Pass it back as the expected revision so a concurrent save is not
+    /// overwritten.
     pub revision: u64,
     /// The saved desired runtime, when one was saved.
     pub runtime: Option<HostRuntimeDto>,

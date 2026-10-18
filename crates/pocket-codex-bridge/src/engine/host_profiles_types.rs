@@ -239,7 +239,8 @@ pub struct HostProfile {
     pub claude_env: environment::Input,
     /// The desired runtime, when one was saved.
     pub runtime: Option<Runtime>,
-    /// Moves on every save; `0` when nothing was ever saved.
+    /// Moves on every save that changes the record; `0` when nothing was
+    /// ever saved.
     pub revision: u64,
     /// Why the saved record cannot be used as is (safe to show); saving
     /// replaces it.

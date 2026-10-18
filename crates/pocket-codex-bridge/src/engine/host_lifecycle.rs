@@ -24,7 +24,7 @@ use super::{
 /// Last explicit lifecycle choice for one host (local persistence only).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Entry {
-    /// Monotonic file revision at which this entry changed.
+    /// Monotonic file revision at which this entry last changed.
     pub revision: u64,
     /// Runtime to restore; `None` suppresses any old Flutter restore record.
     pub runtime: Option<Runtime>,
@@ -62,7 +62,8 @@ pub fn entries() -> Result<BTreeMap<String, Entry>> {
     entries_in(&host_profiles::root()?)
 }
 
-fn entries_in(root: &Path) -> Result<BTreeMap<String, Entry>> {
+/// [`entries`] of the saved state at `root`.
+pub(super) fn entries_in(root: &Path) -> Result<BTreeMap<String, Entry>> {
     // Writers atomically replace the complete file, so readers need no lock.
     Ok(read(root)?.entries)
 }
@@ -158,10 +159,25 @@ fn restore_choice(root: &Path, name: &str, expected: Option<u64>) -> Result<Opti
 /// Legacy runtime is accepted only locally and only in the absence of any
 /// authoritative lifecycle record; remote HTTP never accepts it.
 pub fn restore(name: &str, expected: Option<u64>, legacy: Option<Runtime>) -> Result<()> {
+    restore_in(&super::runtime::support_dir()?, &host_profiles::root()?, name, expected, legacy)?;
+    super::management::enable_after_hosting();
+    Ok(())
+}
+
+/// [`restore`] with the app's support directory and saved state at
+/// `support` and `root`. It starts what is saved and saves nothing: neither
+/// the configuration's revision nor the restore choice moves, so the host
+/// runs the revision every controller sees as saved.
+pub(super) fn restore_in(
+    support: &Path,
+    root: &Path,
+    name: &str,
+    expected: Option<u64>,
+    legacy: Option<Runtime>,
+) -> Result<()> {
     use super::host_profiles::{Change, KeyChange, ProfileInput, RuntimeChange};
-    let root = host_profiles::root()?;
-    let choice = restore_choice(&root, name, expected)?;
-    let saved = host_profiles::get_in(&root, name)?;
+    let choice = restore_choice(root, name, expected)?;
+    let saved = host_profiles::get_in(root, name)?;
     if saved.problem.is_some() {
         bail!("saved host configuration is unavailable; automatic restore was skipped");
     }
@@ -171,7 +187,9 @@ pub fn restore(name: &str, expected: Option<u64>, legacy: Option<Runtime>) -> Re
         .or(choice)
         .or(legacy)
         .context("no runtime to restore")?;
-    super::host_start::start_configured_checked(
+    super::host_start::start_checked_in(
+        support,
+        root,
         Some(name),
         runtime,
         Change {
@@ -186,19 +204,29 @@ pub fn restore(name: &str, expected: Option<u64>, legacy: Option<Runtime>) -> Re
             runtime: RuntimeChange::Keep,
         },
         Some(saved.revision),
-        &|| restore_choice(&root, name, expected).map(drop),
+        &|| restore_choice(root, name, expected).map(drop),
     )?;
-    super::management::enable_after_hosting();
     Ok(())
 }
 
 /// Persist one choice while the caller holds the host's lifecycle lease.
 /// A failure before commit prevents the caller's destructive operation. A
 /// committed record with uncertain durability permits it, with a warning.
+/// The choice already recorded (a restore starting what it found) is not
+/// recorded again, unless a warning about it still needs a write to settle.
 pub(super) fn record_in(root: &Path, name: &str, runtime: Option<Runtime>) -> Result<Entry> {
     let name = host_names::canonical(name)?;
     let _lock = FileLock::acquire(root)?;
     let mut ledger = read(root)?;
+    let warned = warnings()
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .contains_key(&(root.to_owned(), name.clone()));
+    if let Some(entry) = ledger.entries.get(&name) {
+        if entry.runtime == runtime && !warned {
+            return Ok(entry.clone());
+        }
+    }
     ledger.revision = ledger
         .revision
         .checked_add(1)

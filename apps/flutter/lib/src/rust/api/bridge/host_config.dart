@@ -321,8 +321,9 @@ class HostConfigDto {
   /// A key is stored for this instance.
   final bool keySet;
 
-  /// Moves on every save; `0` when never saved. Pass it back as the
-  /// expected revision so a concurrent save is not overwritten.
+  /// Moves on every save that changes the record; `0` when never saved.
+  /// Pass it back as the expected revision so a concurrent save is not
+  /// overwritten.
   final BigInt revision;
 
   /// The saved desired runtime, when one was saved.
