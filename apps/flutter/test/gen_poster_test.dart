@@ -1,13 +1,14 @@
-// Derives the README poster from the app itself: a desktop on Codex with the
-// switcher over every device's agents open, and a phone on Claude answering a
-// permission request, rendered with the bundled fonts, the light theme and
-// fixture data (no real session), beside the mark, the POCOX wordmark (spelled
-// out of "POcket COdeX") and the services within reach.
+// Derives the README poster from the app itself, rendered with the bundled
+// fonts, the light theme and fixture data (no real session): on the computer,
+// POCOX's Local sessions view of every session its agents' own apps run; on
+// the phone, one of those sessions, in use by Codex's app, ready to be taken
+// over. Beside them: the mark, the POCOX wordmark (spelled out of "POcket
+// COdeX") and the agents and services a pocket reaches.
 //
 // Opt-in like gen_icon_test (PNG output differs across platforms):
 //   REGEN_ICONS=1 fvm flutter test test/gen_poster_test.dart
 //
-// Outputs (both copies kept identical):
+// Outputs (both copies kept identical, at twice the layout size):
 //   assets/logo/poster.png, apps/flutter/assets/logo/poster.png
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -21,27 +22,24 @@ import 'package:image/image.dart' as img;
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session/agent_permission_card.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocket_codex/src/screens/local_sessions_screen.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 
 import 'fake_bridge_api.dart';
 import 'gen_icon_test.dart' show renderMark;
-import 'support/acp_capabilities.dart';
 import 'support/ui_preview.dart';
 
 const _codex = 'pcx:studio:app:default';
-const _claude = 'pcx:studio:acp:claude';
-const _openCode = 'pcx:devbox:opencode:opencode';
-const _windows = 'pcx:gaming-pc:app:default';
 const _cwd = '/Users/me/work/atlas';
 
-/// The poster's size, in pixels.
+/// The poster's layout size; it is written at [_outputScale] times this.
 const _poster = Size(1536, 1024);
+const _outputScale = 2.0;
 
 /// Screens are captured at twice their logical size, so they stay sharp once
-/// scaled into the poster.
+/// placed in the poster.
 const _captureScale = 2.0;
 
 // The theme's own tokens (theme.dart): ink, the neutral surface, muted text
@@ -56,18 +54,76 @@ const _hairline = Color(0xFFE4E4E2);
 int _ago(Duration d) =>
     DateTime.now().subtract(d).millisecondsSinceEpoch ~/ 1000;
 
-ThreadMeta _thread(String id, String name, Duration ago, {String? cwd}) =>
-    ThreadMeta(
-      id: id,
-      preview: name,
-      name: name,
-      cwd: cwd ?? _cwd,
-      updatedAt: _ago(ago),
-    );
+/// The session Codex's own app holds, as both screens show it.
+const _held = 'Speed up the Windows build';
 
-/// One account's devices: a Mac hosting Codex and Claude, a Linux box hosting
-/// OpenCode and a Windows PC hosting Codex.
-Future<FakeBridgeApi> _api(String connect, ThreadHistory history) async {
+/// Sessions the agents' own apps and CLIs ran on this computer.
+List<LocalSession> _sessions() {
+  LocalSession row(
+    String id,
+    String title,
+    String source,
+    Duration ago, {
+    String safety = 'resumable',
+    bool held = false,
+    bool resume = true,
+    bool takeover = false,
+    String? status,
+  }) => LocalSession(
+    threadId: id,
+    cwd: _cwd,
+    preview: title,
+    name: title,
+    status: status,
+    source: source,
+    updatedAt: _ago(ago),
+    turnState: safety == 'ownedRunning' ? 'incomplete' : 'completed',
+    heldOpen: held,
+    safety: safety,
+    allowsResume: resume,
+    requiresTakeover: takeover,
+  );
+  return [
+    row(
+      's1',
+      'Refactor the sync engine',
+      'vscode',
+      Duration.zero,
+      safety: 'ownedRunning',
+      held: true,
+      resume: false,
+    ),
+    row(
+      's2',
+      'Profile the import pipeline',
+      'cli',
+      const Duration(minutes: 2),
+      safety: 'ownedRunning',
+      held: true,
+      status: 'active',
+    ),
+    row(
+      't1',
+      _held,
+      'vscode',
+      const Duration(minutes: 9),
+      safety: 'ownedIdle',
+      held: true,
+      takeover: true,
+    ),
+    row(
+      's4',
+      'Tidy the settings page on phones',
+      'appServer',
+      const Duration(hours: 3),
+    ),
+    row('s5', 'Draft the release notes', 'cli', const Duration(hours: 6)),
+    row('s6', 'Why is the nightly build red?', 'exec', const Duration(days: 1)),
+    row('s7', 'Explain the relay handshake', 'vscode', const Duration(days: 2)),
+  ];
+}
+
+Future<FakeBridgeApi> _api() async {
   final api =
       FakeBridgeApi(
           config: const ConfigInfo(
@@ -81,139 +137,41 @@ Future<FakeBridgeApi> _api(String connect, ThreadHistory history) async {
               name: 'default',
               key: _codex,
             ),
-            ServiceEntry(
-              device: 'studio',
-              kind: 'acp',
-              name: 'claude',
-              key: _claude,
-            ),
-            ServiceEntry(
-              device: 'devbox',
-              kind: 'opencode',
-              name: 'opencode',
-              key: _openCode,
-            ),
-            ServiceEntry(
-              device: 'gaming-pc',
-              kind: 'app',
-              name: 'default',
-              key: _windows,
-            ),
           ],
         )
-        ..acpCapabilities[_claude] = negotiatedAcpCapabilities(
-          providerName: 'Claude',
-          profileId: 'claude',
-          steer: true,
-        )
-        ..acpCapabilities[_openCode] = negotiatedOpenCodeCapabilities()
-        // Signed in to Codex on this Mac.
-        ..codexStatus = const CodexSetupStatus(
-          codexHome: '/Users/me/.codex',
-          hasConfig: true,
-          hasAuth: true,
-          hasCustomProvider: false,
-          authMode: 'chatgpt',
-          needsSetup: false,
-          promptVariant: 'default',
-        )
-        // This Mac's own hosts, so the switcher knows their agents.
-        ..serveHosts.addAll(const [
-          AppServeStatus(
-            name: 'default',
-            device: 'studio',
-            alive: true,
-            appServiceKey: _codex,
-            appRegistered: true,
-          ),
-          AppServeStatus(
-            name: 'claude',
-            device: 'studio',
-            alive: true,
-            appServiceKey: _claude,
-            appRegistered: true,
-            provider: 'acp',
-            providerName: 'Claude',
-            profileId: 'claude',
-          ),
-        ])
-        ..modelLists[_codex] = const [
-          ModelInfo(
-            id: 'gpt-6-astra',
-            displayName: 'GPT-6-Astra',
-            description: '',
-            supportedReasoningEfforts: ['low', 'medium', 'high', 'xhigh'],
-            defaultReasoningEffort: 'medium',
-          ),
-        ]
-        ..sessionSettings['$_claude|ses-1'] = const SessionSettings(
-          configOptions: [
-            SessionConfigOption(
-              id: 'model',
-              name: 'Model',
-              category: 'model',
-              currentValue: 'opus',
-              values: [
-                SessionConfigValue(value: 'opus', name: 'Opus 5.5'),
-                SessionConfigValue(value: 'sonnet', name: 'Sonnet 5.5'),
-              ],
-            ),
-          ],
-        )
-        ..appThreads.addAll([
-          _thread(
-            't1',
-            'Speed up the Windows build',
-            const Duration(minutes: 4),
-          ),
-          _thread(
-            't2',
-            'Profile the import pipeline',
-            const Duration(minutes: 1),
-          ),
-          _thread(
-            't3',
-            'Tidy the settings page on phones',
-            const Duration(hours: 3),
-          ),
-          _thread(
-            't4',
-            'Draft the release notes',
-            const Duration(hours: 6),
-            cwd: '/Users/me/work/atlas-site',
-          ),
-          _thread(
-            'ses-1',
-            'Why is the nightly build red?',
-            const Duration(seconds: 30),
-          ),
-        ])
-        ..localSessions = [
-          LocalSession(
-            threadId: 't2',
+        ..appThreads.add(
+          ThreadMeta(
+            id: 't1',
+            preview: _held,
+            name: _held,
             cwd: _cwd,
-            preview: 'Profile the import pipeline',
-            name: 'Profile the import pipeline',
-            status: 'active',
-            updatedAt: _ago(Duration.zero),
-            turnState: 'incomplete',
-            heldOpen: true,
-            safety: 'ownedRunning',
-            allowsResume: true,
-            requiresTakeover: false,
+            updatedAt: _ago(const Duration(minutes: 9)),
           ),
-        ]
-        ..readResult = history;
-  await api.appConnect(connect, 1);
+        )
+        ..localSessions = _sessions()
+        // Codex's own app still holds the session: the phone follows it.
+        ..appThreadResumeError = StateError(
+          'thread already has an active writer',
+        )
+        ..metadataOnlyFollow = true
+        ..liveness['t1'] = const SessionLiveness(
+          threadId: 't1',
+          turnState: 'completed',
+          heldOpen: true,
+          safety: 'ownedIdle',
+          allowsResume: true,
+          requiresTakeover: true,
+          holders: [],
+        )
+        ..readResult = _heldHistory;
+  await api.appConnect(_codex, 1);
   return api;
 }
 
-const _desktopHistory = ThreadHistory(
+const _heldHistory = ThreadHistory(
   running: false,
   branch: 'ci-cache',
   cwd: _cwd,
-  model: 'gpt-6-astra',
-  reasoningEffort: 'high',
   items: [
     ThreadItem(
       id: 'u0',
@@ -262,30 +220,6 @@ const _desktopHistory = ThreadHistory(
   ],
 );
 
-const _phoneHistory = ThreadHistory(
-  running: true,
-  activeTurnId: 'turn2',
-  cwd: _cwd,
-  items: [
-    ThreadItem(
-      id: 'u2',
-      itemType: 'userMessage',
-      title: '',
-      text: 'Find out why the nightly build is red, and fix it.',
-      turnId: 'turn2',
-    ),
-    ThreadItem(
-      id: 'a2',
-      itemType: 'agentMessage',
-      title: '',
-      text:
-          'The arm64 job links with the host `ar`. Pointing it at the cross '
-          "toolchain's archiver fixes the link; I'd like to edit the workflow.",
-      turnId: 'turn2',
-    ),
-  ],
-);
-
 /// Bounded pumps: connection probes and spinners never settle.
 Future<void> _frames(WidgetTester t, [int count = 10]) async {
   for (var i = 0; i < count; i++) {
@@ -301,7 +235,6 @@ Future<ui.Image> _shot(
   required Widget child,
   FakeBridgeApi? api,
   EdgeInsets safeArea = EdgeInsets.zero,
-  Future<void> Function()? then,
 }) async {
   debugDefaultTargetPlatformOverride = platform;
   try {
@@ -330,7 +263,6 @@ Future<ui.Image> _shot(
       ),
     );
     await _frames(t);
-    await then?.call();
     final boundary = t.renderObject<RenderRepaintBoundary>(
       find.byKey(previewKey),
     );
@@ -526,7 +458,7 @@ Future<ui.Image> _compose({
   required ui.Image mark,
 }) {
   final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
+  final canvas = Canvas(recorder)..scale(_outputScale);
   final bounds = Offset.zero & _poster;
   // The app's backdrop: neutral, lit only by white.
   canvas.drawRect(
@@ -548,10 +480,10 @@ Future<ui.Image> _compose({
   );
 
   const left = 96.0;
-  _image(canvas, mark, const Rect.fromLTWH(left - 4, 150, 100, 100));
+  _image(canvas, mark, const Rect.fromLTWH(left - 4, 132, 100, 100));
   canvas.drawParagraph(
     _text([('POCOX', _ink)], size: 120, weight: FontWeight.w700, spacing: -2.5),
-    const Offset(left - 6, 262),
+    const Offset(left - 6, 244),
   );
   // The name, spelled out of the words it comes from.
   canvas.drawParagraph(
@@ -567,7 +499,7 @@ Future<ui.Image> _compose({
       weight: FontWeight.w600,
       spacing: 1,
     ),
-    const Offset(left, 410),
+    const Offset(left, 392),
   );
   canvas.drawParagraph(
     _text(
@@ -578,29 +510,30 @@ Future<ui.Image> _compose({
       spacing: -0.6,
       width: 460,
     ),
-    const Offset(left, 504),
+    const Offset(left, 486),
   );
   canvas.drawParagraph(
     _text(
       [
         (
-          'Your computers, and the agents, services and subscriptions on '
-              'them, within reach from a phone, a tablet or any other '
-              'machine.',
+          'Keep using Codex, Claude Code and OpenCode the way their makers '
+              'ship them. POCOX sees every session they run, lets you pick '
+              'any of them up from another device, and opens each machine\'s '
+              'services to the rest.',
           _muted,
         ),
       ],
-      size: 20,
+      size: 19,
       height: 1.5,
-      width: 420,
+      width: 430,
     ),
-    const Offset(left, 636),
+    const Offset(left, 618),
   );
   final chips = Size(
     services.width / _captureScale,
     services.height / _captureScale,
   );
-  _image(canvas, services, const Offset(left, 772) & chips);
+  _image(canvas, services, const Offset(left, 790) & chips);
   canvas.drawParagraph(
     _text(
       [('iOS · Android · macOS · Windows · Linux', _faint)],
@@ -608,14 +541,14 @@ Future<ui.Image> _compose({
       weight: FontWeight.w500,
       spacing: 0.2,
     ),
-    Offset(left + 2, 772 + chips.height + 18),
+    Offset(left + 2, 790 + chips.height + 18),
   );
 
-  _window(canvas, desktop, const Rect.fromLTWH(696, 104, 776, 552));
-  _phone(canvas, phone, const Rect.fromLTWH(584, 384, 266, 568));
+  _window(canvas, desktop, const Rect.fromLTWH(664, 104, 824, 570));
+  _phone(canvas, phone, const Rect.fromLTWH(570, 404, 266, 568));
   return recorder.endRecording().toImage(
-    _poster.width.toInt(),
-    _poster.height.toInt(),
+    (_poster.width * _outputScale).toInt(),
+    (_poster.height * _outputScale).toInt(),
   );
 }
 
@@ -627,24 +560,14 @@ void main() {
   setUp(AppSessionScreen.debugResetThreadMemory);
 
   testWidgets('derive the README poster from the app', (t) async {
-    final desktopApi = await _api(_codex, _desktopHistory);
     final desktop = await _shot(
       t,
       platform: TargetPlatform.macOS,
-      size: const Size(1040, 740),
-      api: desktopApi,
-      child: AppSessionScreen(
-        serviceKey: _codex,
-        threadId: 't1',
-        home: true,
-        services: desktopApi.services,
-      ),
-      then: () async {
-        await t.tap(find.byKey(const Key('sidebar-service-switcher')));
-        await _frames(t);
-      },
+      size: const Size(1040, 720),
+      api: await _api(),
+      child: const LocalSessionsScreen(),
     );
-    final phoneApi = await _api(_claude, _phoneHistory);
+    final phoneApi = await _api();
     final phone = await _shot(
       t,
       platform: TargetPlatform.iOS,
@@ -652,31 +575,11 @@ void main() {
       safeArea: const EdgeInsets.only(top: 54, bottom: 34),
       api: phoneApi,
       child: AppSessionScreen(
-        serviceKey: _claude,
-        threadId: 'ses-1',
+        serviceKey: _codex,
+        threadId: 't1',
         home: true,
         services: phoneApi.services,
       ),
-      then: () async {
-        phoneApi.pushEvent(
-          _claude,
-          const AppEvent(
-            kind: agentPermissionKind,
-            threadId: 'ses-1',
-            requestId: 'p1',
-            title: 'Edit .github/workflows/nightly.yml',
-            raw:
-                '{"threadId":"ses-1","toolCall":{"title":"Edit '
-                '.github/workflows/nightly.yml","locations":[{"path":'
-                '"$_cwd/.github/workflows/nightly.yml"}]},"options":['
-                '{"optionId":"allow","name":"Allow once","kind":"allow_once"},'
-                '{"optionId":"always","name":"Always allow edits",'
-                '"kind":"allow_always"},'
-                '{"optionId":"reject","name":"Reject","kind":"reject_once"}]}',
-          ),
-        );
-        await _frames(t);
-      },
     );
     final services = await _shot(
       t,
@@ -686,7 +589,7 @@ void main() {
     );
     final png = await t.runAsync(() async {
       final codec = await ui.instantiateImageCodec(
-        img.encodePng(await renderMark(224)),
+        img.encodePng(await renderMark((100 * _outputScale).round())),
       );
       final mark = (await codec.getNextFrame()).image;
       final poster = await _compose(

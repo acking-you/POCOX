@@ -31,12 +31,17 @@
 ## 这是什么？
 
 POCOX（取自 **PO**cket **CO**de**X**）把你拥有的每一台设备都装进口袋。
-每台电脑照常做它本来就在做的事：运行 Codex、Claude Code、OpenCode 这样的编程
-智能体，保存你的登录与订阅；POCOX 让这一切都能从手机、平板或任何另一台机器上
-触及。
+它是媒介，而不是又一个智能体 harness：Codex、Claude Code 和 OpenCode 照原厂的方式
+继续用，我们也推荐这样做。POCOX 在每台电脑上陪在它们旁边：看到它们运行的每一个
+会话，让你在手机、平板或另一台机器上实时跟进、随时接手，并把这台电脑的服务开放给
+你的其它所有设备。
 
 现在已经能做到：
 
+- **这台机器上的每一个会话。** POCOX 列出 Codex、Claude Code 与 OpenCode 在一台电脑
+  上运行的会话，包括在它们自己的 App 和 CLI 里开启的，并实时跟进。空闲的 Codex 会话
+  可以从任意设备接管；Claude Code 与 OpenCode 的会话在其原生客户端释放后，可在
+  POCOX 托管上继续。
 - **任意桌面都能托管智能体。** macOS、Windows 与 Linux 可以托管 Codex（通过它的
   [`app-server`](https://github.com/openai/codex) 协议）、原生 OpenCode，以及经
   ACP 接入的 Claude Code 或其它智能体，多个可以同时运行。

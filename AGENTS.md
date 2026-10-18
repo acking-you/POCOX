@@ -8,7 +8,10 @@
 
 POCOX (from **PO**cket **CO**de**X**) aims to put every device a user owns
 in their pocket: the agents, services and subscriptions on each computer,
-reachable from any other device. Concretely, it turns the upstream
+reachable from any other device. It is a medium, not a harness: users keep
+(and are encouraged to keep) the vendors' own apps and CLIs, while POCOX
+discovers, follows and takes over their sessions and exposes each machine's
+services. Concretely, it turns the upstream
 [`codex app-server`](https://github.com/openai/codex) protocol into a
 portable, multi-device experience, and additionally exposes the host's
 Codex login as a relay-reachable Responses API endpoint for any device:
@@ -1266,8 +1269,10 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     (renamed from `pocket-codex`, whose URLs GitHub redirects); links in the
     tree use the new name. The Windows installer keeps its AppId and removes
     shortcuts made under the old name. The README leads with the aim, every
-    device in your pocket, and its poster is regenerated from the app's own
-    screens (`test/gen_poster_test.dart`).
+    device in your pocket, and with POCOX as a medium beside the vendors' own
+    harnesses. Its poster is regenerated at 2x from the app's own screens
+    (`test/gen_poster_test.dart`): Local sessions on a Mac and a phone ready
+    to take over a session Codex's app holds.
 
 39. **Cross-device agent tool (planned, not started).** A built-in tool that
     lets an agent on one device work with the user's other devices and their

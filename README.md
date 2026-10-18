@@ -33,12 +33,19 @@
 ## What is this?
 
 POCOX (**PO**cket **CO**de**X**) puts every device you own in your pocket.
-Each computer keeps doing what it already does, running coding agents such as
-Codex, Claude Code and OpenCode and holding your logins and subscriptions, and
-POCOX makes all of it reachable from your phone, a tablet or any other machine.
+It is a medium, not another agent harness: keep using Codex, Claude Code and
+OpenCode the way their makers ship them; we recommend it. POCOX works beside
+them on each computer. It sees every session they run, lets you follow any of
+them live and pick one up from your phone, a tablet or another machine, and
+exposes the computer's services to every other device you own.
 
 What works today:
 
+- **Every session on the machine.** POCOX lists the sessions Codex, Claude Code
+  and OpenCode run on a computer, including ones started in their own apps and
+  CLIs, and follows them live. An idle Codex session can be taken over from any
+  device; Claude Code and OpenCode sessions continue on a POCOX host once their
+  own client has let go.
 - **Agents on any desktop.** macOS, Windows and Linux host Codex through its
   [`app-server`](https://github.com/openai/codex) protocol, OpenCode natively,
   and Claude Code or any other agent through ACP, several side by side.
