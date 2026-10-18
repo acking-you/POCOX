@@ -1,11 +1,14 @@
 //! `/services/v1` on the device's management entry: the catalog, its event
 //! stream, and the user's answers from any of their devices.
 //!
-//! Reached only through the relay by the user's own devices (the entry is
-//! published in the account's namespace or under the relay key). Every
-//! request, and every event a stream sends, first checks that the entry is
-//! still admitted, so a stream ends by itself when management is withdrawn
-//! or the account changes.
+//! The user's devices reach it through the relay (the entry is published in
+//! the account's namespace or under the relay key). Like the rest of device
+//! management, its listener is on this machine's loopback, so a program
+//! running as the user here can reach it too: these routes trust the same
+//! boundary (`docs/agent-tools.md`, Trust boundary). Browsers are refused by
+//! the entry's loopback guard. Every request, and every event a stream sends,
+//! first checks that the entry is still admitted, so a stream ends by itself
+//! when management is withdrawn or the account changes.
 
 use std::{convert::Infallible, sync::Arc, time::Duration};
 
@@ -19,7 +22,9 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use once_cell::sync::Lazy;
 use serde::Deserialize;
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 use super::{
     catalog, consent,
@@ -30,6 +35,9 @@ use super::{
 
 /// Whether the entry still admits requests.
 pub type Admitted = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// Event streams served at once (one per controller following this device).
+static STREAMS: Lazy<Arc<Semaphore>> = Lazy::new(|| Arc::new(Semaphore::new(32)));
 
 fn refused() -> Response {
     (
@@ -47,7 +55,9 @@ pub fn failure(error: ToolError) -> Response {
     let status = match error {
         ToolError::NotFound(_) => StatusCode::NOT_FOUND,
         ToolError::Invalid(_) => StatusCode::BAD_REQUEST,
-        ToolError::NotOwner | ToolError::Off | ToolError::Declined => StatusCode::FORBIDDEN,
+        ToolError::NotOwner | ToolError::Off | ToolError::Declined | ToolError::Revoked => {
+            StatusCode::FORBIDDEN
+        },
         ToolError::NotHosting | ToolError::Relay(_) => StatusCode::SERVICE_UNAVAILABLE,
         ToolError::Conflict(_) => StatusCode::CONFLICT,
     };
@@ -82,11 +92,15 @@ pub struct ShareBody {
     pub path: Option<String>,
 }
 
-fn events(admitted: Admitted) -> impl futures::Stream<Item = Result<Event, Infallible>> {
+/// The catalog's events; `permit` is held for the stream's lifetime.
+fn events(
+    admitted: Admitted,
+    permit: OwnedSemaphorePermit,
+) -> impl futures::Stream<Item = Result<Event, Infallible>> {
     let changes = state::changes();
     futures::stream::unfold(
-        (changes, None::<Catalog>, admitted),
-        |(mut changes, previous, admitted)| async move {
+        (changes, None::<Catalog>, admitted, permit),
+        |(mut changes, previous, admitted, permit)| async move {
             if previous.is_some() {
                 loop {
                     tokio::select! {
@@ -113,7 +127,7 @@ fn events(admitted: Admitted) -> impl futures::Stream<Item = Result<Event, Infal
             let catalog = catalog::local().ok()?;
             let event = CatalogEvent::after(previous.as_ref(), catalog.clone());
             let message = Event::default().event("catalog").json_data(event).ok()?;
-            Some((Ok(message), (changes, Some(catalog), admitted)))
+            Some((Ok(message), (changes, Some(catalog), admitted, permit)))
         },
     )
 }
@@ -148,7 +162,10 @@ pub fn router(admitted: Admitted) -> Router {
                 if let Some(refusal) = guard(&a2) {
                     return refusal;
                 }
-                Sse::new(events(a2.clone()))
+                let Ok(permit) = STREAMS.clone().try_acquire_owned() else {
+                    return StatusCode::SERVICE_UNAVAILABLE.into_response();
+                };
+                Sse::new(events(a2.clone(), permit))
                     .keep_alive(KeepAlive::default())
                     .into_response()
             }),

@@ -19,10 +19,19 @@ final toolsOverviewProvider = Provider<ToolsOverview>(
       ToolsOverview.empty,
 );
 
-/// This installation's switch, re-read after every change.
-final toolsStatusProvider = StateProvider<AgentToolsStatus>(
-  (ref) => ref.watch(bridgeApiProvider).toolsStatus(),
-);
+/// This installation's switch, endpoint and problem: read when a page shows
+/// it, again on every catalog update (a change made elsewhere, such as
+/// `pocox tools disable` or a moved port, brings one), and replaced by the
+/// answer to a change made here.
+final toolsStatusProvider = StateProvider.autoDispose<AgentToolsStatus>((ref) {
+  ref.watch(toolsUpdatesProvider);
+  return ref.watch(bridgeApiProvider).toolsStatus();
+});
+
+/// Port keys connected here for a share, automatically or on Open, with the
+/// device that shares them: [ToolsHost] ends each when its share ends, so a
+/// share never leaves a tunnel to nothing behind.
+final shareConnectionsProvider = Provider<Map<String, String>>((ref) => {});
 
 /// Every share across the user's devices, newest first.
 final toolsSharesProvider =

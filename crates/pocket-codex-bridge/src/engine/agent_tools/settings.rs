@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::engine::host_profiles::{
@@ -44,6 +44,17 @@ impl Default for Settings {
     }
 }
 
+impl Settings {
+    /// What applies while the saved settings cannot be read: off, since the
+    /// user may have switched the tools off.
+    pub fn closed() -> Self {
+        Self {
+            enabled: false,
+            ..Self::default()
+        }
+    }
+}
+
 fn path(root: &Path) -> PathBuf {
     root.join("agent-tools.json")
 }
@@ -58,13 +69,15 @@ pub fn load_at(root: &Path) -> Result<Settings> {
     }
 }
 
-/// Change the settings saved in `root` under the store lock, durably.
+/// Change the settings saved in `root` under the store lock, durably. An
+/// unreadable file is replaced, starting from [`Settings::closed`].
 pub fn update_at(root: &Path, change: impl FnOnce(&mut Settings)) -> Result<Settings> {
     let _lock = FileLock::acquire(root)?;
-    let mut settings = load_at(root).unwrap_or_default();
+    let mut settings = load_at(root).unwrap_or_else(|_| Settings::closed());
     change(&mut settings);
+    // Once renamed into place the file is committed, synced or not.
     if write_private(&path(root), &serde_json::to_vec_pretty(&settings)?)? != Committed::Durable {
-        bail!("the agent tools setting could not be durably saved");
+        tracing::warn!("the agent tools setting was saved but may not survive a crash");
     }
     Ok(settings)
 }
@@ -82,6 +95,15 @@ pub fn update(change: impl FnOnce(&mut Settings)) -> Result<Settings> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_unreadable_file_never_switches_the_tools_on() {
+        let root = tempfile::tempdir().expect("dir");
+        std::fs::write(path(root.path()), b"{not json").expect("write");
+        assert!(load_at(root.path()).is_err());
+        let saved = update_at(root.path(), |s| s.ask_before_sharing = false).expect("update");
+        assert!(!saved.enabled && !saved.ask_before_sharing);
+    }
 
     #[test]
     fn missing_fields_keep_the_shipped_defaults() {

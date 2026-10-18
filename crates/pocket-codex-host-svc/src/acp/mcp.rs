@@ -7,7 +7,8 @@
 
 use serde_json::{Map, Value};
 
-/// Told the id of a session created with a grant.
+/// Told the id of the session a grant was accepted for; dropped uncalled when
+/// the request failed.
 pub type Adopt = Box<dyn FnOnce(&str) + Send>;
 
 /// What one session request gets.
@@ -16,7 +17,9 @@ pub struct McpGrant {
     pub servers: Vec<Value>,
     /// Merged into the request's `_meta` (objects merge key by key).
     pub meta: Option<Map<String, Value>>,
-    /// Told the id of a session created with this grant.
+    /// Told the session's id once the agent created or reopened it with this
+    /// grant; dropped uncalled when the request failed, so the owner can
+    /// withdraw what it handed out.
     pub adopt: Option<Adopt>,
 }
 
@@ -25,6 +28,10 @@ pub trait SessionMcp: Send + Sync {
     /// The grant for a session being created (`None`) or reopened; `None`
     /// sends no servers.
     fn grant(&self, session: Option<&str>) -> Option<McpGrant>;
+
+    /// The host stopped tracking `session` (evicted, or closed after a
+    /// failed claim): what it was granted can end.
+    fn closed(&self, _session: &str) {}
 }
 
 /// Merge `patch` into `target`: objects key by key, anything else replaced.

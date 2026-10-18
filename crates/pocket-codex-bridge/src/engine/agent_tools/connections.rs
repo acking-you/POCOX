@@ -3,6 +3,7 @@
 
 use std::time::Duration;
 
+use pocket_codex_account_proto::key::NamespacedServiceId;
 use pocket_codex_core::service::{sanitize_component, ServiceId, ServiceKind};
 
 use super::{
@@ -20,7 +21,8 @@ const FAMILY: &str = "tools\u{1f}";
 /// What to connect to.
 #[derive(Debug, Clone, Default)]
 pub struct ConnectRequest {
-    /// A key (`pcx:devbox:port:8000`), `devbox:port:8000` or `devbox/8000`.
+    /// A key (`pcx:devbox:port:8000`, or the account form `pcxu:<user>:…`),
+    /// `devbox:port:8000` or `devbox/8000`.
     pub service: String,
     /// A local port to prefer over the service's own number.
     pub local_port: Option<u16>,
@@ -36,6 +38,7 @@ fn connectable(kind: ServiceKind) -> bool {
 pub fn resolve(wanted: &str, services: &[ServiceId]) -> Result<ServiceId, ToolError> {
     let wanted = wanted.trim();
     let parsed = ServiceId::parse_key(wanted)
+        .or_else(|| NamespacedServiceId::parse_key(wanted).map(|id| id.service))
         .or_else(|| ServiceId::parse_key(&format!("pcx:{wanted}")))
         .map(|id| vec![id]);
     let candidates: Vec<ServiceId> = match parsed {
@@ -133,12 +136,13 @@ pub async fn connect(
     .await
     .map_err(|e| ToolError::Relay(format!("{e}")))?
     .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+    // Only the service's own number keeps absolute localhost URLs working.
     let same_port = status
         .local_addr
         .rsplit(':')
         .next()
         .and_then(|p| p.parse::<u16>().ok())
-        .is_some_and(|port| Some(port) == own_port || (preferred != 0 && port == preferred));
+        .is_some_and(|port| Some(port) == own_port);
     let user = caller.is_user();
     let connection = Connection {
         service: key,
@@ -151,6 +155,13 @@ pub async fn connect(
     };
     let view = connection.view();
     let mut state = state::lock();
+    // The call may have waited for the relay: the switch or the token may
+    // have ended meanwhile.
+    if let Err(error) = state.admits(caller) {
+        drop(state);
+        runtime::unsubscribe_service(&connection.registry_key);
+        return Err(error);
+    }
     state
         .connections
         .retain(|c| c.service != connection.service);
@@ -181,7 +192,7 @@ fn reuse(caller: &Caller, key: &str) -> Option<ConnectionView> {
 }
 
 /// End the connection to `service` (a key or its local address). An agent
-/// ends only its own; `None` is the user.
+/// ends only what its own conversation connected; `None` is the user.
 pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionView, ToolError> {
     let service = service.trim();
     let mut state = state::lock();
@@ -198,11 +209,7 @@ pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionVi
         })
         .ok_or_else(|| ToolError::NotFound(format!("A connection to `{}`", bounded(service))))?;
     if let Some(caller) = caller.filter(|c| !c.is_user()) {
-        let mine = state.connections[index]
-            .key
-            .as_ref()
-            .is_some_and(|key| key.token == caller.principal.id);
-        if !mine {
+        if state.connections[index].key.as_ref() != Some(&caller.key()) {
             return Err(ToolError::NotOwner);
         }
     }
@@ -280,6 +287,7 @@ mod tests {
         ];
         assert_eq!(resolve("devbox/8000", &services), Ok(services[0].clone()));
         assert_eq!(resolve("pcx:devbox:api:default", &services), Ok(services[1].clone()));
+        assert_eq!(resolve("pcxu:u1:devbox:api:default", &services), Ok(services[1].clone()));
         assert_eq!(resolve("devbox:port:8000", &services), Ok(services[0].clone()));
         assert!(matches!(resolve("devbox/9999", &services), Err(ToolError::NotFound(_))));
         assert!(matches!(resolve("devbox:app:default", &services), Err(ToolError::Invalid(_))));

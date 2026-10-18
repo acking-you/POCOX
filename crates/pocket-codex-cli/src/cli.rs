@@ -404,7 +404,7 @@ pub struct ToolsConfigArgs {
 pub enum HarnessArg {
     /// Codex (`~/.codex/config.toml`).
     Codex,
-    /// Claude Code (`claude mcp add`).
+    /// Claude Code (`mcpServers` entry for ~/.claude.json).
     Claude,
     /// OpenCode (`opencode.json`).
     Opencode,

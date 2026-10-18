@@ -2,8 +2,10 @@
 //! desktop app or the CLI host (`pocox serve --allow-remote-management`).
 //!
 //! Each serves the agent tools' loopback endpoint and announces it in its
-//! private hosting store, beside a token only this user can read. Shares and
-//! connections live in that process, so they outlive the command that asked.
+//! private hosting store, beside a token only this user can read. The CLI
+//! sends that token only after the listener proved it is the process that
+//! announced it. Shares and connections live in that process, so they
+//! outlive the command that asked.
 
 use std::{path::PathBuf, time::Duration};
 
@@ -26,11 +28,11 @@ impl Installation {
         self.root.join("agent-tools")
     }
 
-    /// Its endpoint and the user's token, when it announced one.
-    pub fn announced(&self) -> Option<(String, String)> {
+    /// Its announcement and the user's token, when it announced one.
+    pub fn announced(&self) -> Option<(endpoint::Discovery, String)> {
         let discovery = endpoint::read_discovery(&self.dir())?;
         let token = tokens::read_user_token(&self.dir()).ok()?;
-        Some((discovery.url, token))
+        Some((discovery, token))
     }
 }
 
@@ -67,9 +69,15 @@ pub(super) struct Local {
 
 /// `installation`, when it runs and answers.
 pub(super) async fn reach(installation: &Installation) -> Option<Local> {
-    let (url, token) = installation.announced()?;
+    let (discovery, token) = installation.announced()?;
+    // A stale announcement's port may belong to another program by now (even
+    // another user's): it gets the token only once it proves it wrote this
+    // announcement.
+    if !proven(&discovery).await {
+        return None;
+    }
     let local = Local {
-        url,
+        url: discovery.url,
         token,
     };
     local
@@ -77,6 +85,25 @@ pub(super) async fn reach(installation: &Installation) -> Option<Local> {
         .await
         .is_ok()
         .then_some(local)
+}
+
+async fn proven(discovery: &endpoint::Discovery) -> bool {
+    let challenge = endpoint::new_secret();
+    let Ok(client) = client() else { return false };
+    let answer = async {
+        client
+            .get(format!("{}/local/v1/hello", discovery.url))
+            .query(&[("challenge", challenge.as_str())])
+            .send()
+            .await
+            .ok()?
+            .json::<serde_json::Value>()
+            .await
+            .ok()
+    }
+    .await;
+    answer.as_ref().and_then(|value| value["proof"].as_str())
+        == Some(endpoint::proof(&discovery.secret, &challenge).as_str())
 }
 
 /// The first running host that answers.

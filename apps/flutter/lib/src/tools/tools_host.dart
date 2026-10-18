@@ -10,9 +10,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/glass_recipe.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/planet_glyph.dart';
 import 'package:pocket_codex/src/tools/share_card.dart';
@@ -34,21 +36,15 @@ Widget ownerMark(ToolsOwner owner, {double size = 18}) {
   return AgentIcon(kind: kind, name: owner.label, size: size);
 }
 
-/// One thing the host is showing.
-sealed class _Prompt {
-  const _Prompt(this.device, this.id);
+/// A new share the host is announcing.
+class _Notice {
+  const _Notice(this.device, this.id);
   final String device;
   final String id;
-  String get key => '$runtimeType/$device/$id';
+  String get key => '$device/$id';
 }
 
-final class _Consent extends _Prompt {
-  const _Consent(super.device, super.id);
-}
-
-final class _NewShare extends _Prompt {
-  const _NewShare(super.device, super.id);
-}
+String _consentKey(String device, String id) => '$device/$id';
 
 /// Wraps the app's pages with the agent tools' prompts.
 class ToolsHost extends ConsumerStatefulWidget {
@@ -63,9 +59,15 @@ class ToolsHost extends ConsumerStatefulWidget {
 }
 
 class _ToolsHostState extends ConsumerState<ToolsHost> {
-  final List<_Prompt> _prompts = [];
+  final List<_Notice> _notices = [];
   final Map<String, Timer> _expiry = {};
+
+  /// Requests being answered here.
   final Set<String> _answering = {};
+
+  /// Requests answered here: hidden until their device stops listing them,
+  /// however late a stale overview drops them.
+  final Set<String> _answered = {};
 
   @override
   void initState() {
@@ -91,88 +93,96 @@ class _ToolsHostState extends ConsumerState<ToolsHost> {
 
   void _arrived(ToolsUpdate update) {
     final overview = update.overview;
+    final api = ref.read(bridgeApiProvider);
+    final pending = {
+      for (final entry in overview.consents)
+        _consentKey(entry.device.name, entry.consent.id),
+    };
+    _answered.retainWhere(pending.contains);
     var changed = false;
-    for (final added in update.consentsAdded) {
-      final prompt = _Consent(added.device, added.id);
-      if (_prompts.every((p) => p.key != prompt.key)) {
-        _prompts.add(prompt);
-        changed = true;
-      }
-    }
     for (final added in update.added) {
-      final found = overview.devices
-          .where((d) => d.name == added.device)
-          .expand((d) => d.shares)
-          .where((s) => s.id == added.id)
-          .firstOrNull;
+      final found = _shareOf(overview, added.device, added.id);
       // The user's own shares made here need no announcement.
       final own =
           added.device == overview.thisDevice && found?.owner.isAgent != true;
       if (found == null || own) continue;
-      final prompt = _NewShare(added.device, added.id);
-      if (_prompts.any((p) => p.key == prompt.key)) continue;
-      // Connected right away, so Open is instant: at its own port numbers
-      // when they are free here.
-      if (added.device != overview.thisDevice) {
-        final api = ref.read(bridgeApiProvider);
+      final notice = _Notice(added.device, added.id);
+      if (_notices.any((n) => n.key == notice.key)) continue;
+      // A phone connects it right away, so Open is instant: at its own port
+      // numbers when they are free here. A desktop connects on Open.
+      if (!isDesktop && added.device != overview.thisDevice) {
         for (final port in found.ports) {
           if (overview.connectionTo(port.key) == null) {
-            unawaited(api.toolsConnect(port.key).then((_) {}, onError: (_) {}));
+            _autoConnect(api, added.device, port.key);
           }
         }
       }
-      _prompts.add(prompt);
-      _expiry[prompt.key] = Timer(
+      _notices.add(notice);
+      _expiry[notice.key] = Timer(
         const Duration(seconds: 12),
-        () => _dismiss(prompt),
+        () => _dismiss(notice),
       );
       changed = true;
     }
-    // Requests answered elsewhere, or lapsed, leave on their own.
-    final before = _prompts.length;
-    _prompts.removeWhere(
-      (p) => p is _Consent && _consentOf(overview, p) == null,
-    );
-    if (changed || before != _prompts.length) setState(() {});
+    _endEnded(api, overview);
+    if (changed) setState(() {});
   }
 
-  ToolsConsent? _consentOf(ToolsOverview overview, _Prompt prompt) => overview
-      .devices
-      .where((d) => d.name == prompt.device)
-      .expand((d) => d.consents)
-      .where((c) => c.id == prompt.id)
-      .firstOrNull;
+  void _autoConnect(BridgeApi api, String device, String key) {
+    final connected = ref.read(shareConnectionsProvider);
+    connected[key] = device;
+    unawaited(
+      api.toolsConnect(key).then((_) {
+        // Its share ended while it connected.
+        if (!connected.containsKey(key)) _disconnect(api, key);
+      }, onError: (_) => connected.remove(key)),
+    );
+  }
 
-  ToolsShare? _shareOf(ToolsOverview overview, _Prompt prompt) => overview
-      .devices
-      .where((d) => d.name == prompt.device)
-      .expand((d) => d.shares)
-      .where((s) => s.id == prompt.id)
-      .firstOrNull;
+  /// End the connections made for a share that ended: its device's catalog
+  /// is here and lists it no more. A device whose catalog is missing (its
+  /// stream dropped) keeps them.
+  void _endEnded(BridgeApi api, ToolsOverview overview) {
+    final connected = ref.read(shareConnectionsProvider);
+    for (final MapEntry(:key, value: name) in [...connected.entries]) {
+      final device = overview.devices.where((d) => d.name == name).firstOrNull;
+      if (device == null || !device.catalog) continue;
+      if (device.shares.any((s) => s.ports.any((p) => p.key == key))) continue;
+      connected.remove(key);
+      _disconnect(api, key);
+    }
+  }
 
-  void _dismiss(_Prompt prompt) {
-    _expiry.remove(prompt.key)?.cancel();
+  void _disconnect(BridgeApi api, String key) =>
+      unawaited(api.toolsDisconnect(key).then((_) {}, onError: (_) {}));
+
+  ToolsShare? _shareOf(ToolsOverview overview, String device, String id) =>
+      overview.devices
+          .where((d) => d.name == device)
+          .expand((d) => d.shares)
+          .where((s) => s.id == id)
+          .firstOrNull;
+
+  void _dismiss(_Notice notice) {
+    _expiry.remove(notice.key)?.cancel();
     if (!mounted) return;
-    setState(() => _prompts.removeWhere((p) => p.key == prompt.key));
+    setState(() => _notices.removeWhere((n) => n.key == notice.key));
   }
 
   Future<void> _answer(
     BuildContext context,
-    _Consent prompt,
+    String device,
     ToolsConsent consent,
     String decision,
   ) async {
-    setState(() => _answering.add(prompt.key));
-    final ok = await answerConsent(
-      context,
-      ref,
-      prompt.device,
-      consent,
-      decision,
-    );
+    final key = _consentKey(device, consent.id);
+    setState(() => _answering.add(key));
+    final ok = await answerConsent(context, ref, device, consent, decision);
     if (!mounted) return;
-    setState(() => _answering.remove(prompt.key));
-    if (ok) _dismiss(prompt);
+    setState(() {
+      _answering.remove(key);
+      if (ok) _answered.add(key);
+    });
   }
 
   @override
@@ -181,33 +191,31 @@ class _ToolsHostState extends ConsumerState<ToolsHost> {
       if (next.valueOrNull case final update?) _arrived(update);
     });
     final overview = ref.watch(toolsOverviewProvider);
+    // Every pending request, whichever device holds it, oldest first; then
+    // the new shares.
     final cards = <Widget>[
-      for (final prompt in _prompts.take(3))
-        switch (prompt) {
-          _Consent() => switch (_consentOf(overview, prompt)) {
-            final consent? => _ConsentCard(
-              key: ValueKey(prompt.key),
-              device: prompt.device,
-              thisDevice: overview.thisDevice,
-              consent: consent,
-              busy: _answering.contains(prompt.key),
-              onAnswer: (decision) =>
-                  _answer(context, prompt, consent, decision),
-            ),
-            null => const SizedBox.shrink(),
-          },
-          _NewShare() => switch (_shareOf(overview, prompt)) {
-            final share? => _ShareNotice(
-              key: ValueKey(prompt.key),
-              device: prompt.device,
-              thisDevice: overview.thisDevice,
-              share: share,
-              onClose: () => _dismiss(prompt),
-            ),
-            null => const SizedBox.shrink(),
-          },
-        },
-    ];
+      for (final (:device, :consent) in overview.consents)
+        if (_consentKey(device.name, consent.id) case final key
+            when !_answered.contains(key))
+          _ConsentCard(
+            key: ValueKey('consent/$key'),
+            device: device.name,
+            thisDevice: overview.thisDevice,
+            consent: consent,
+            busy: _answering.contains(key),
+            onAnswer: (decision) =>
+                _answer(context, device.name, consent, decision),
+          ),
+      for (final notice in _notices)
+        if (_shareOf(overview, notice.device, notice.id) case final share?)
+          _ShareNotice(
+            key: ValueKey('share/${notice.key}'),
+            device: notice.device,
+            thisDevice: overview.thisDevice,
+            share: share,
+            onClose: () => _dismiss(notice),
+          ),
+    ].take(3).toList();
     final size = MediaQuery.sizeOf(context);
     final wide = size.width >= 720;
     final top = MediaQuery.paddingOf(context).top + (wide ? 64 : 8);
@@ -248,7 +256,7 @@ class _Arrive extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TweenAnimationBuilder<double>(
     tween: Tween(begin: 0, end: 1),
-    duration: Motion.medium,
+    duration: Motion.of(context, Motion.medium),
     curve: Motion.emphasized,
     builder: (context, t, child) => Opacity(
       opacity: t,
@@ -282,7 +290,9 @@ class _ConsentCard extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final where = device == thisDevice ? l10n.toolsThisDevice : device;
+    final where = device == thisDevice
+        ? l10n.toolsThisDevice
+        : deviceLabel(device);
     final known = consent.owner.conversation != null;
     return _Arrive(
       child: Glass(
@@ -371,7 +381,9 @@ class _ShareNotice extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final where = device == thisDevice ? l10n.toolsThisDevice : device;
+    final where = device == thisDevice
+        ? l10n.toolsThisDevice
+        : deviceLabel(device);
     return _Arrive(
       child: Glass(
         depth: GlassDepth.overlay,

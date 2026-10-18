@@ -277,15 +277,18 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     // host's tokens.
     let mut launch = prepared.launch.clone();
     let name = &prepared.name;
-    if let Some(grant) =
-        agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}"))
-    {
-        let inherited = std::env::var_os("OPENCODE_CONFIG_CONTENT");
-        match agent_tools::inject::opencode(&grant, &mut launch.env, inherited.as_deref()) {
-            Ok(()) => agent_tools::inject::hosted_started(name, &grant, false),
-            Err(error) => tracing::warn!("agent tools not given to OpenCode `{name}`: {error:#}"),
-        }
-    }
+    // Revoked when dropped uncommitted: any failure below.
+    let tools = agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}"))
+        .and_then(|grant| {
+            let inherited = std::env::var_os("OPENCODE_CONFIG_CONTENT");
+            match agent_tools::inject::opencode(&grant, &mut launch.env, inherited.as_deref()) {
+                Ok(()) => Some(grant),
+                Err(error) => {
+                    tracing::warn!("agent tools not given to OpenCode `{name}`: {error:#}");
+                    None
+                },
+            }
+        });
     let (host, pid) = rt.block_on(async {
         let server = Server::start(&launch).await?;
         let pid = server.pid;
@@ -356,6 +359,9 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
         stop(&name)
             .context("OpenCode startup cleanup did not confirm exit; stop this host again")?;
         return Err(error);
+    }
+    if let Some(grant) = tools {
+        agent_tools::inject::hosted_started(&name, grant, false);
     }
     Ok(out)
 }

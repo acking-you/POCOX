@@ -52,10 +52,15 @@ sequenceDiagram
   so a page that calls `localhost:8000` for its API works if both ports were
   shared), and shows it: as a notice above any page, under **Shared with you**,
   and as a card at the agent's tool call where POCOX shows the conversation.
+  Desktops show it the same way but connect only when it is opened, so a
+  share never takes a port the user's own servers need; a connection made
+  for a share ends when the share does.
 - Phones open the page in an in-app browser, which keeps the tunnel alive;
-  desktops use the system browser. **Send to agent** adds the page's address
-  and its recent console errors to the conversation's draft; nothing is sent
-  by itself.
+  desktops use the system browser. The in-app browser loads only pages on
+  the phone's loopback (where shares are connected) and stays on the page's
+  origin; other web links open in the system browser. **Send to agent** adds
+  the page's address and its recent console errors to the conversation's
+  draft; nothing is sent by itself.
 
 ### Use a service on another device
 
@@ -134,14 +139,20 @@ One `action` with its fields:
 | Action | Fields | Result |
 | --- | --- | --- |
 | `share` | `ports` (1–4, the page's first), `title`, `path`, `wait_ready_seconds` (≤ 20) | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
-| `stop_sharing` | `service` (share id, port or key) | `stopped`; only the caller's own |
+| `stop_sharing` | `service` (share id, port or key) | `stopped`; only what the caller's conversation shared |
 | `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port` | `connected` with the local address; shared ports and APIs only |
-| `disconnect` | `service` | `disconnected`; only the caller's own |
+| `disconnect` | `service` | `disconnected`; only what the caller's conversation connected |
 
 - A share is published only after its first port answers on 127.0.0.1 or
   ::1 (a server listening on 0.0.0.0 is fine). Sharing ports the caller
   already shares returns that share; more ports extend it. At most eight
-  ports per device are shared.
+  ports per device are shared. A call that cannot publish all its ports
+  shares none of them.
+- POCOX's own ports (its tool endpoints, its hosts' listeners, its
+  management entry and its tunnels to other devices) cannot be shared: they
+  are reachable as services already.
+- A port the relay refused shows as refused and is tried again every minute;
+  an unreachable relay is retried every 15 seconds.
 - Agent hosts cannot be connected to through the tools: they are for the
   user's controllers, not for other agents.
 - Every failure says what to do next (`tools_off`, `not_hosting`,
@@ -150,13 +161,22 @@ One `action` with its fields:
 ## Consent
 
 The first share of each owner (a conversation, or a token when the harness
-names none) needs the user's answer: **Allow once**, **Allow in this
-conversation** or **Deny**. It is asked on the user's own POCOX devices,
-above whatever page is open, or with `pocox tools requests|allow|deny` in a
-terminal. The tool call waits for the answer (110 s for hosted harnesses,
-whose tool timeout POCOX sets to 180 s, 18 s for others) and otherwise
-returns `waiting_for_user`; an answer given later applies to the next call. A
-denied owner is not asked again for ten minutes.
+names none) needs the user's answer. It is asked on every POCOX device of the
+user, the agent's own included, above whatever page is open, or with
+`pocox tools requests|allow|deny` in a terminal. A request names its ports,
+and an answer covers what the user was shown:
+
+- **Allow once** admits the ports of that request, once; a call for other
+  ports is a request of its own.
+- **Allow in this conversation** lets the owner share without asking again.
+- **Deny** refuses the owner for ten minutes.
+
+The last two settle the owner's other waiting requests too. The tool call
+waits for the answer (110 s for hosted harnesses, whose tool timeout POCOX
+sets to 180 s, 18 s for others) and otherwise returns `waiting_for_user`; an
+answer given later applies to the next call with the same ports. A waiting
+call fails as soon as the switch goes off or its token ends, and nothing is
+published after that. At most 16 requests wait at once, 4 per token.
 
 Harness prompts (MCP elicitation, multi round-trip requests) are deliberately
 not used: a harness may answer them itself — Codex accepts a plain
@@ -176,9 +196,17 @@ as digests; the secret reaches its holder once, never through a command line.
 
 An agent's share or connection ends when the first of these happens: the agent
 stops it; its hosted instance stops or restarts (its tokens are revoked); its
-token is revoked in Settings; 24 hours pass; the switch goes off; POCOX quits.
-**Keep sharing** makes it the user's, with no expiry. The user's own shares
-(from the CLI or Share and open) survive restarts until stopped.
+token is revoked in Settings; 24 hours pass; the switch goes off; the account
+or relay changes; POCOX quits. **Keep sharing** makes it the user's, with no
+expiry, and so does the user sharing the same port. The user's own shares
+(from the CLI or Share and open) survive restarts until stopped, and follow
+an account or relay change as hosts do.
+
+A token is committed only when its harness has started: a launch that fails
+revokes it. A reopened ACP session gets a new token; once the agent accepts
+it, the session's earlier tokens end and what they made is the new one's, so
+the session can still stop its shares. A revocation from Settings is saved
+before it takes effect, so a restart cannot bring the token back.
 
 ## The switch
 
@@ -187,9 +215,10 @@ preference (`agent-tools.json` in the hosting store; not `config.toml`, which
 older builds would refuse to read). Settings › Agent tools (desktops) and
 `pocox tools enable|disable|ask` change it; a running POCOX applies a change
 within seconds. Off means: the MCP server refuses every call, hosted harnesses
-start without the entry, and everything agents shared or connected ends. The
-user's own surface (`pocox services share|connect`, Share and open) keeps
-working.
+start without the entry, and everything agents shared or connected ends,
+with their waiting requests and the user's earlier answers. The user's own
+surface (`pocox services share|connect`, Share and open) keeps working. A file
+that cannot be read keeps the tools off until the switch is saved again.
 
 ## Getting the tools into each harness
 
@@ -199,9 +228,10 @@ working.
 | Claude (ACP adapter) | an HTTP entry in `mcpServers` of every `session/new`/`session/load`, with a token for that session | `_meta.claudeCode.options.allowedTools` |
 | Other ACP agents | the same entry when they advertise `mcpCapabilities.http` | the agent's own prompt |
 | Native OpenCode | a `mcp.pocox` remote entry (headers, `oauth: false`, `timeout`) merged into its inline configuration at launch | OpenCode does not prompt for MCP tools |
-| Anything else | Settings › Agent tools › Add to another agent, or `pocox tools config --harness codex|claude|opencode|generic`: a ready entry with a new token | the harness's own |
+| Anything else | Settings › Agent tools › Add to another agent, or `pocox tools config --harness codex|claude|opencode|generic`: a ready entry with a new token for the harness's configuration file (`~/.codex/config.toml`, an `mcpServers` entry for `~/.claude.json`, `opencode.json`) | the harness's own |
 
-Nothing writes another program's files.
+Nothing writes another program's files, and no entry is a shell command: the
+token never reaches a command line.
 
 ## The CLI
 
@@ -212,7 +242,11 @@ Nothing writes another program's files.
 - `pocox tools status|enable|disable|ask on|off|requests|allow|deny|config`.
 
 They talk to the POCOX running on this computer (the CLI host first, then the
-app) through its loopback endpoint and the token only this user can read.
+app) through its loopback endpoint and the token only this user can read. The
+token is sent only after the endpoint proves it is the process that announced
+itself (`/local/v1/hello`, answered with a secret from the private
+`endpoint.json`), so a program listening on a stale port never receives it.
+Deleting `user-token` and restarting POCOX issues a new one.
 
 ## The galaxy
 
@@ -249,10 +283,32 @@ disk from higher above so it fills their height.
   user's own devices (the account namespace or the relay key).
 - The endpoint listens on loopback only, refuses any request with an `Origin`
   or a `Host` that is not its own loopback address (DNS rebinding), and
-  requires a bearer token; `/local/v1` accepts only the CLI's own token.
-- Consent is enforced by POCOX, also for agents with full access.
+  requires a bearer token; `/local/v1` accepts only the CLI's own token. The
+  management entry's loopback listener refuses the same browser requests.
+- Consent is enforced by POCOX for every harness and approval policy. Agents
+  never see consent requests or conversation ids, and every action is checked
+  again right before it publishes or connects.
 - Owners, conversations and times come from POCOX, never from the agent;
-  titles and labels from other devices are bounded and treated as data.
+  titles and labels from other devices are bounded, stripped of invisible
+  and bidirectional formatting, and treated as data.
+- Flutter's framework deep linking is off on iOS and Android, so no outside
+  link opens an app route (sign-in callbacks use their own handler).
+
+### Trust boundary
+
+Consent and ownership hold for an agent that reaches POCOX only through its
+tools, including one whose shell is sandboxed without network access (Codex's
+default sandbox blocks loopback too). A program that runs as the same user
+with network access to this machine — an unsandboxed shell, a full-access
+agent mode — can do whatever the user can: read POCOX's private files, run
+`pocox`, or call the management entry on loopback. No local program can tell
+it from the user, so POCOX does not claim to; the harness's sandbox is that
+boundary.
+
+On a computer shared with other users, a copied harness entry names a fixed
+loopback port: while POCOX is not running, another user could listen there
+and receive that entry's token. Revoke entries that stop working; the CLI's
+own token is protected by the proof above.
 
 ## Compatibility
 
@@ -276,10 +332,18 @@ disk from higher above so it fills their height.
   app-server listed both tools with its bearer token
   (`mcpServerStatus/list`).
 - Rust unit and endpoint tests (MCP over HTTP: token, Origin, initialize,
-  tools/list, tool errors); Flutter widget tests for the share card, the
-  consent prompt, Settings and the galaxy, with offscreen renders of the galaxy
-  in both themes and on a phone.
+  tools/list, tool errors, the user-only local surface and its proof);
+  Flutter widget tests for the share card, the consent prompt, Settings and
+  the galaxy, with offscreen renders of the galaxy in both themes and on a
+  phone.
+- The review round of PR #119 (Codex review and three independent reviews)
+  added tests for what it fixed: answers covering only the ports shown, owner
+  answers settling waiting requests, calls ending with their token, unreadable
+  settings staying off, POCOX's own ports refused, the user taking over an
+  agent's share, browser requests refused by the management entry, and
+  consent prompts raised on the agent's own device. Those fixes were not
+  re-run against a live relay.
 - Not verified: a phone or the iOS/Android in-app browser against a real
-  share, Claude and OpenCode hosts calling the tools, Windows and Linux,
-  account mode across machines, and the nebula on device (the headless renderer
-  has no shader).
+  share (including Android's loopback cleartext allowance), Claude and
+  OpenCode hosts calling the tools, Windows and Linux, account mode across
+  machines, and the nebula on device (the headless renderer has no shader).

@@ -3,15 +3,18 @@
 //! ```text
 //!   share ─► check ports answer ─► consent (agents) ─► reserve ─► publish
 //!                                                         │
-//!   maintain (every tick): expire leases, re-publish, re-check listeners
+//!   maintain (every tick): expire leases, schedule publications, re-check
 //! ```
 //!
 //! A share is reserved in the table before it is published, so a repeated or
-//! concurrent call sees it and returns it instead of publishing twice.
+//! concurrent call sees it and returns it instead of publishing twice. Each
+//! port has at most one publication in flight, and the supervisor only
+//! schedules them: it never waits for the relay itself.
 
 use std::{
     collections::BTreeSet,
     net::{Ipv6Addr, SocketAddr},
+    sync::atomic::{AtomicBool, Ordering},
     time::Duration,
 };
 
@@ -24,15 +27,21 @@ use super::{
     error::{Pending, ToolError},
     model::{
         bounded, clean_path, open_link, OwnerKind, OwnerView, ShareView, Shared, AGENT_LEASE_MS,
-        MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
+        APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
     },
-    state::{self, now_ms, OwnerKey, Share, SharedPort},
+    state::{self, now_ms, OwnerKey, Share, SharedPort, State},
     tokens::{Kind, Principal},
 };
-use crate::engine::{runtime, transport};
+use crate::engine::{management, runtime, transport};
 
 /// Longest wait for a port to answer within one call.
 const MAX_READY_WAIT: Duration = Duration::from_secs(20);
+
+/// Pause before publishing again after the relay could not be reached.
+const RETRY_MS: i64 = 15_000;
+
+/// Pause before publishing again after the relay refused a registration.
+const REFUSED_RETRY_MS: i64 = 60_000;
 
 /// Who is calling, as POCOX knows it.
 #[derive(Debug, Clone)]
@@ -59,7 +68,7 @@ impl Caller {
         }
     }
 
-    /// What keeps its shares alive.
+    /// What keeps its shares alive, and what owns them.
     pub fn key(&self) -> OwnerKey {
         OwnerKey {
             token: self.principal.id.clone(),
@@ -131,7 +140,35 @@ async fn wait_answering(port: u16, budget: Duration) -> Option<SocketAddr> {
     }
 }
 
-fn validate(request: &ShareRequest, endpoint_port: Option<u16>) -> Result<Vec<u16>, ToolError> {
+fn port_of(addr: &str) -> Option<u16> {
+    addr.trim_end_matches('/').rsplit(':').next()?.parse().ok()
+}
+
+/// Ports POCOX listens on itself: the tools endpoints, its hosts' listeners,
+/// its management entry and its tunnels to other devices. Those are reachable
+/// as services already; shared as a plain port, one would hand an agent host
+/// or a management entry to whoever connects.
+fn own_ports() -> BTreeSet<u16> {
+    let mut ports: BTreeSet<u16> = runtime::list_subscriptions()
+        .iter()
+        .filter_map(|subscription| port_of(&subscription.local_addr))
+        .collect();
+    ports.extend(
+        management::local_status()
+            .ok()
+            .and_then(|status| status.listen_addr)
+            .as_deref()
+            .and_then(port_of),
+    );
+    let state = state::lock();
+    ports.extend([APP_PORT, CLI_PORT]);
+    ports.extend(state.settings.port);
+    ports.extend(state.endpoint.as_deref().and_then(port_of));
+    ports.extend(state.own_ports.iter().copied());
+    ports
+}
+
+fn validate(request: &ShareRequest, own: &BTreeSet<u16>) -> Result<Vec<u16>, ToolError> {
     let mut seen = BTreeSet::new();
     let ports: Vec<u16> = request
         .ports
@@ -147,11 +184,14 @@ fn validate(request: &ShareRequest, endpoint_port: Option<u16>) -> Result<Vec<u1
             "Share at most {MAX_PORTS_PER_SHARE} ports at once."
         )));
     }
-    if let Some(port) = ports
-        .iter()
-        .find(|p| **p == 0 || Some(**p) == endpoint_port)
-    {
-        return Err(ToolError::Invalid(format!("Port {port} cannot be shared.")));
+    if ports.contains(&0) {
+        return Err(ToolError::Invalid("Port 0 cannot be shared.".into()));
+    }
+    if let Some(port) = ports.iter().find(|port| own.contains(port)) {
+        return Err(ToolError::Invalid(format!(
+            "Port {port} belongs to POCOX itself; its services are already reachable from the \
+             user's devices."
+        )));
     }
     Ok(ports)
 }
@@ -188,18 +228,18 @@ pub async fn share(
     caller: &Caller,
     request: ShareRequest,
 ) -> Result<Result<Shared, Pending>, ToolError> {
-    let endpoint_port = {
+    {
         let state = state::lock();
         if !state.hosting {
             return Err(ToolError::NotHosting);
         }
-        if !state.settings.enabled && !caller.is_user() {
-            return Err(ToolError::Off);
-        }
-        state.settings.port
-    };
-    let ports = validate(&request, endpoint_port)?;
+        state.admits(caller)?;
+    }
+    let ports = validate(&request, &own_ports())?;
     let key = caller.key();
+    if caller.is_user() {
+        take_over(&mut state::lock(), &ports, caller);
+    }
     if let Some(done) = existing(&ports, &key) {
         return Ok(Ok(shared(done)));
     }
@@ -244,8 +284,8 @@ pub async fn share(
             return Ok(Err(pending));
         }
     }
-    let id = reserve(caller, &key, title, clean_path(request.path.as_deref()), &addrs)?;
-    publish_reserved(&id).await?;
+    let (id, reserved) = reserve(caller, &key, title, clean_path(request.path.as_deref()), &addrs)?;
+    publish_reserved(&id, &reserved).await?;
     let view = state::lock()
         .shares
         .iter()
@@ -254,6 +294,26 @@ pub async fn share(
         .ok_or_else(|| ToolError::NotFound("The share".into()))?;
     tracing::info!(share = %id, owner = %view.owner.label, ports = ?ports, "shared ports");
     Ok(Ok(shared(view)))
+}
+
+/// The user sharing ports an agent shares makes those shares the user's: no
+/// owner lifetime, no expiry, kept across restarts.
+fn take_over(state: &mut State, ports: &[u16], user: &Caller) {
+    let mut taken = false;
+    for share in state
+        .shares
+        .iter_mut()
+        .filter(|share| share.key.is_some() && share.ports.iter().any(|p| ports.contains(&p.port)))
+    {
+        share.key = None;
+        share.expires_ms = None;
+        share.owner = user.owner();
+        taken = true;
+    }
+    if taken {
+        state.save_shares();
+        state::changed(state);
+    }
 }
 
 /// A share that already covers every requested port (shared again: same
@@ -271,15 +331,22 @@ fn existing(ports: &[u16], key: &OwnerKey) -> Option<ShareView> {
         .map(|share| share.view())
 }
 
+/// Reserve the free ports of `addrs` for `caller`, checking once more that
+/// it may act: the call may have waited long for a port or for the user.
+/// Returns the share and the ports this call reserved.
 fn reserve(
     caller: &Caller,
     key: &OwnerKey,
     title: String,
     path: String,
     addrs: &[(u16, SocketAddr)],
-) -> Result<String, ToolError> {
+) -> Result<(String, Vec<u16>), ToolError> {
     let device = runtime::device_id().map_err(|e| ToolError::Relay(format!("{e:#}")))?;
     let mut state = state::lock();
+    if !state.hosting {
+        return Err(ToolError::NotHosting);
+    }
+    state.admits(caller)?;
     let wanted = addrs;
     let addrs: Vec<(u16, SocketAddr)> = wanted
         .iter()
@@ -291,7 +358,7 @@ fn reserve(
         return wanted
             .first()
             .and_then(|(port, _)| state.share_with_port(*port))
-            .map(|share| share.id.clone())
+            .map(|share| (share.id.clone(), Vec::new()))
             .ok_or_else(|| ToolError::NotFound("The share".into()));
     }
     if state.shared_ports() + addrs.len() > MAX_SHARED_PORTS {
@@ -300,13 +367,14 @@ fn reserve(
             state.shared_ports()
         )));
     }
-    let ports = addrs.iter().map(|(port, addr)| SharedPort {
-        port: *port,
-        key: ServiceId::new(&device, ServiceKind::Port, port.to_string()).key(),
-        addr: *addr,
-        published: None,
-        epoch: 0,
-        reachable: true,
+    let reserved: Vec<u16> = addrs.iter().map(|(port, _)| *port).collect();
+    let ports = addrs.iter().map(|(port, addr)| {
+        let key = ServiceId::new(&device, ServiceKind::Port, port.to_string()).key();
+        // Published by this call, not by the supervisor.
+        SharedPort {
+            publishing: true,
+            ..SharedPort::new(*port, key, *addr, true)
+        }
     });
     // The same owner sharing more ports extends its share.
     let id = if let Some(share) = state
@@ -334,25 +402,26 @@ fn reserve(
     };
     state.save_shares();
     state::changed(&mut state);
-    Ok(id)
+    Ok((id, reserved))
 }
 
-/// Publish every unpublished port of share `id`.
-async fn publish_reserved(id: &str) -> Result<(), ToolError> {
+/// Publish the ports of share `id` this call reserved. A failure withdraws
+/// all of them, so the call fails as a whole and nothing it asked for stays
+/// shared.
+async fn publish_reserved(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
     let todo: Vec<(u16, String, SocketAddr)> = state::lock()
         .shares
         .iter()
         .filter(|share| share.id == id)
         .flat_map(|share| share.ports.iter())
-        .filter(|port| port.published.is_none())
+        .filter(|port| reserved.contains(&port.port))
         .map(|port| (port.port, port.key.clone(), port.addr))
         .collect();
     for (port, key, addr) in todo {
         match publish(&key, addr).await {
-            Ok(Some((published, epoch))) => store(id, port, published, epoch),
-            Ok(None) => {},
+            Ok(outcome) => settle(id, port, outcome),
             Err(error) => {
-                remove_port(id, port);
+                withdraw(id, reserved);
                 return Err(error);
             },
         }
@@ -379,44 +448,64 @@ async fn publish(key: &str, addr: SocketAddr) -> Result<Option<(Published, u64)>
                 .into(),
         )),
         Err(PublishError::Other(error)) => {
-            tracing::warn!(%key, "sharing will retry: {error:#}");
+            tracing::debug!(%key, "sharing will retry: {error:#}");
             Ok(None)
         },
     }
 }
 
-fn store(id: &str, port: u16, published: Published, epoch: u64) {
+/// Record the outcome of the publication in flight for `port` of share `id`.
+fn settle(id: &str, port: u16, outcome: Option<(Published, u64)>) {
     let mut state = state::lock();
     let slot = state
         .shares
         .iter_mut()
         .filter(|share| share.id == id)
         .flat_map(|share| share.ports.iter_mut())
-        .find(|p| p.port == port && p.published.is_none());
-    match slot {
-        Some(slot) => {
+        .find(|p| p.port == port && p.publishing);
+    match (slot, outcome) {
+        (Some(slot), Some((published, epoch))) => {
+            slot.publishing = false;
+            slot.refused = false;
+            slot.retry_at_ms = 0;
             slot.published = Some(published);
             slot.epoch = epoch;
             state::changed(&mut state);
         },
+        (Some(slot), None) => {
+            slot.publishing = false;
+            if slot.retry_at_ms == 0 {
+                tracing::warn!(key = %slot.key, "the relay is unreachable; sharing will retry");
+            }
+            slot.retry_at_ms = now_ms() + RETRY_MS;
+        },
         // Stopped while publishing: release it.
-        None => {
+        (None, Some((published, _))) => {
             drop(state);
             runtime::runtime().spawn(async move {
                 let _ = published.stop().await;
             });
         },
+        (None, None) => {},
     }
 }
 
-fn remove_port(id: &str, port: u16) {
+/// Take `ports` out of share `id`, releasing whatever was published.
+fn withdraw(id: &str, ports: &[u16]) {
     let mut state = state::lock();
+    let mut gone = Vec::new();
     for share in state.shares.iter_mut().filter(|share| share.id == id) {
-        share.ports.retain(|p| p.port != port);
+        let (out, kept): (Vec<SharedPort>, Vec<SharedPort>) = std::mem::take(&mut share.ports)
+            .into_iter()
+            .partition(|p| ports.contains(&p.port));
+        share.ports = kept;
+        gone.extend(out);
     }
     state.shares.retain(|share| !share.ports.is_empty());
     state.save_shares();
     state::changed(&mut state);
+    drop(state);
+    release(gone);
 }
 
 /// Release registrations in the background.
@@ -435,7 +524,7 @@ pub fn release(ports: Vec<SharedPort>) {
 }
 
 /// End the share `target` names (its id, a port number or a port's key).
-/// An agent ends only its own; `None` is the user.
+/// An agent ends only what its own conversation shared; `None` is the user.
 pub fn stop(caller: Option<&Caller>, target: &str) -> Result<ShareView, ToolError> {
     let target = target.trim();
     let mut state = state::lock();
@@ -451,11 +540,7 @@ pub fn stop(caller: Option<&Caller>, target: &str) -> Result<ShareView, ToolErro
         })
         .ok_or_else(|| ToolError::NotFound(format!("The share `{}`", bounded(target))))?;
     if let Some(caller) = caller.filter(|c| !c.is_user()) {
-        let mine = state.shares[index]
-            .key
-            .as_ref()
-            .is_some_and(|key| key.token == caller.principal.id);
-        if !mine {
+        if state.shares[index].key.as_ref() != Some(&caller.key()) {
             return Err(ToolError::NotOwner);
         }
     }
@@ -517,13 +602,9 @@ pub fn restore(saved: Vec<state::SavedShare>) {
             .ports
             .iter()
             .filter(|port| state.share_with_port(**port).is_none())
-            .map(|port| SharedPort {
-                port: *port,
-                key: ServiceId::new(&device, ServiceKind::Port, port.to_string()).key(),
-                addr: SocketAddr::from(([127, 0, 0, 1], *port)),
-                published: None,
-                epoch: 0,
-                reachable: false,
+            .map(|port| {
+                let key = ServiceId::new(&device, ServiceKind::Port, port.to_string()).key();
+                SharedPort::new(*port, key, SocketAddr::from(([127, 0, 0, 1], *port)), false)
             })
             .collect::<Vec<_>>();
         if ports.is_empty() {
@@ -543,9 +624,10 @@ pub fn restore(saved: Vec<state::SavedShare>) {
     state::changed(&mut state);
 }
 
-/// One maintenance pass: expire, re-publish and (with `probe`) re-check
-/// listeners.
-pub async fn maintain(probe: bool) {
+/// One maintenance pass: expire leases, release what the relay refused or
+/// what belongs to an old account or relay, and schedule publications;
+/// with `probe`, re-check listeners in the background.
+pub fn maintain(probe: bool) {
     let now = now_ms();
     let expired: Vec<Share> = {
         let mut state = state::lock();
@@ -563,42 +645,54 @@ pub async fn maintain(probe: bool) {
         tracing::info!(share = %share.id, "share expired");
         release(share.ports);
     }
-    let stale: Vec<(String, u16, String, SocketAddr)> = {
+    let mut released = Vec::new();
+    let mut todo: Vec<(String, u16, String, SocketAddr)> = Vec::new();
+    {
         let mut state = state::lock();
-        let mut stale = Vec::new();
-        let mut released = Vec::new();
+        let mut changed = false;
         for share in &mut state.shares {
             for port in &mut share.ports {
                 let moved = port.published.is_some() && !transport::is_current(port.epoch);
-                let failed = port
-                    .published
-                    .as_ref()
-                    .is_some_and(|p| p.failure().is_some());
-                if moved || failed {
-                    released.extend(port.published.take());
+                let refusal = port.published.as_ref().and_then(Published::failure);
+                if let Some(why) = &refusal {
+                    tracing::warn!(key = %port.key, "the relay refused a shared port: {why}");
+                    port.refused = true;
+                    port.retry_at_ms = now + REFUSED_RETRY_MS;
                 }
-                if port.published.is_none() {
-                    stale.push((share.id.clone(), port.port, port.key.clone(), port.addr));
+                if moved || refusal.is_some() {
+                    released.extend(port.published.take());
+                    changed = true;
+                }
+                if port.published.is_none() && !port.publishing && port.retry_at_ms <= now {
+                    port.publishing = true;
+                    todo.push((share.id.clone(), port.port, port.key.clone(), port.addr));
                 }
             }
         }
-        drop(state);
-        for registration in released {
-            runtime::runtime().spawn(async move {
-                let _ = registration.stop().await;
-            });
-        }
-        stale
-    };
-    for (id, port, key, addr) in stale {
-        match publish(&key, addr).await {
-            Ok(Some((published, epoch))) => store(&id, port, published, epoch),
-            Ok(None) => {},
-            Err(error) => tracing::warn!(%key, "a shared port could not be published: {error}"),
+        if changed {
+            state::changed(&mut state);
         }
     }
-    if probe {
-        recheck().await;
+    for registration in released {
+        runtime::runtime().spawn(async move {
+            let _ = registration.stop().await;
+        });
+    }
+    for (id, port, key, addr) in todo {
+        runtime::runtime().spawn(async move {
+            let outcome = publish(&key, addr).await.unwrap_or_else(|error| {
+                tracing::debug!(%key, "a shared port could not be published: {error}");
+                None
+            });
+            settle(&id, port, outcome);
+        });
+    }
+    static RECHECKING: AtomicBool = AtomicBool::new(false);
+    if probe && !RECHECKING.swap(true, Ordering::SeqCst) {
+        runtime::runtime().spawn(async {
+            recheck().await;
+            RECHECKING.store(false, Ordering::SeqCst);
+        });
     }
 }
 
@@ -651,15 +745,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn requests_name_real_ports_only() {
+    fn requests_name_real_ports_that_are_not_pocox_own() {
         let request = |ports: Vec<u16>| ShareRequest {
             ports,
             ..ShareRequest::default()
         };
-        assert_eq!(validate(&request(vec![5173, 5173, 8000]), None), Ok(vec![5173, 8000]));
-        assert!(validate(&request(vec![]), None).is_err());
-        assert!(validate(&request(vec![0]), None).is_err());
-        assert!(validate(&request(vec![17863]), Some(17863)).is_err());
-        assert!(validate(&request(vec![1, 2, 3, 4, 5]), None).is_err());
+        let own = BTreeSet::from([17863, 41000]);
+        assert_eq!(validate(&request(vec![5173, 5173, 8000]), &own), Ok(vec![5173, 8000]));
+        assert!(validate(&request(vec![]), &own).is_err());
+        assert!(validate(&request(vec![0]), &own).is_err());
+        assert!(validate(&request(vec![5173, 41000]), &own).is_err());
+        assert!(validate(&request(vec![1, 2, 3, 4, 5]), &own).is_err());
+    }
+
+    #[test]
+    fn the_user_sharing_an_agents_port_makes_that_share_theirs() {
+        let mut state = State::default();
+        let addr = SocketAddr::from(([127, 0, 0, 1], 5173));
+        state.shares.push(Share {
+            id: "s1".into(),
+            title: "Landing".into(),
+            path: "/".into(),
+            owner: Caller::user("agent").owner(),
+            key: Some(OwnerKey {
+                token: "t1".into(),
+                conversation: Some("c1".into()),
+            }),
+            created_ms: 0,
+            expires_ms: Some(1),
+            ports: vec![SharedPort::new(5173, "pcx:studio:port:5173".into(), addr, true)],
+        });
+        take_over(&mut state, &[8000], &Caller::user("You"));
+        assert!(state.shares[0].key.is_some(), "other ports are left alone");
+        take_over(&mut state, &[5173], &Caller::user("You"));
+        let share = &state.shares[0];
+        assert!(share.key.is_none() && share.expires_ms.is_none() && share.durable());
     }
 }

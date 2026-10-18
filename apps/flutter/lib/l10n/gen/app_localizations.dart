@@ -7099,6 +7099,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sharing…'**
   String get toolsSharing;
+
+  /// No description provided for @toolsStatusRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused by the relay'**
+  String get toolsStatusRefused;
+
+  /// No description provided for @toolsHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} h'**
+  String toolsHours(int count);
+
+  /// No description provided for @toolsMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} min'**
+  String toolsMinutes(int count);
+
+  /// No description provided for @browserNoteNoErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of \"{title}\" ({url}, shared from {device}): no console errors.'**
+  String browserNoteNoErrors(String title, String url, String device);
+
+  /// No description provided for @browserNoteConsole.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of \"{title}\" ({url}, shared from {device}), recent console messages:'**
+  String browserNoteConsole(String title, String url, String device);
+
+  /// No description provided for @browserNotLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Only pages shared from your devices open here.'**
+  String get browserNotLocal;
 }
 
 class _AppLocalizationsDelegate

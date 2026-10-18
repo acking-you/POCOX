@@ -3864,4 +3864,30 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolsSharing => '正在共享…';
+
+  @override
+  String get toolsStatusRefused => '中继拒绝了它';
+
+  @override
+  String toolsHours(int count) {
+    return '$count 小时';
+  }
+
+  @override
+  String toolsMinutes(int count) {
+    return '$count 分钟';
+  }
+
+  @override
+  String browserNoteNoErrors(String title, String url, String device) {
+    return '预览“$title”（$url，由 $device 共享）：控制台没有错误。';
+  }
+
+  @override
+  String browserNoteConsole(String title, String url, String device) {
+    return '预览“$title”（$url，由 $device 共享），最近的控制台消息：';
+  }
+
+  @override
+  String get browserNotLocal => '这里只能打开你的设备共享的页面。';
 }

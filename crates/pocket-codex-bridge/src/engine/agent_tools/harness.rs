@@ -1,13 +1,28 @@
 //! Configuration for harnesses POCOX does not launch: a ready-to-paste
-//! entry with the endpoint and a token issued to that harness.
+//! entry with the endpoint and a token issued to that harness. Entries go
+//! into configuration files, never onto a command line, where the token
+//! would reach shell history and other users' process listings.
 
 use serde_json::json;
 
 use super::Issued;
 
-/// The entry for `harness`: `codex` (config.toml), `claude` (a `claude mcp
-/// add` command), `opencode` (opencode.json) or any other MCP client
-/// (`mcpServers` JSON).
+/// Where the entry for `harness` goes.
+pub fn destination(harness: &str) -> &'static str {
+    match harness {
+        "codex" => "Add it to ~/.codex/config.toml.",
+        "claude" => {
+            "Add the pocox entry to \"mcpServers\" in ~/.claude.json (every project), or in a \
+             project's .mcp.json kept out of version control."
+        },
+        "opencode" => "Merge it into ~/.config/opencode/opencode.json.",
+        _ => "Add the pocox entry to your MCP client's servers.",
+    }
+}
+
+/// The entry for `harness`: `codex` (config.toml), `opencode`
+/// (opencode.json), or `mcpServers` JSON for Claude Code and any other MCP
+/// client.
 pub fn snippet(harness: &str, issued: &Issued) -> String {
     let bearer = format!("Bearer {}", issued.token);
     match harness {
@@ -16,11 +31,6 @@ pub fn snippet(harness: &str, issued: &Issued) -> String {
              Authorization = {bearer} }}\ntool_timeout_sec = 180\n",
             url = json!(issued.url),
             bearer = json!(bearer),
-        ),
-        "claude" => format!(
-            "claude mcp add --transport http --scope user pocox {} --header {}\n",
-            issued.url,
-            shell_quote(&format!("Authorization: {bearer}")),
         ),
         "opencode" => format!(
             "{:#}\n",
@@ -36,10 +46,6 @@ pub fn snippet(harness: &str, issued: &Issued) -> String {
             }}})
         ),
     }
-}
-
-fn shell_quote(text: &str) -> String {
-    format!("'{}'", text.replace('\'', r"'\''"))
 }
 
 #[cfg(test)]
@@ -58,6 +64,9 @@ mod tests {
             assert!(text.contains("http://127.0.0.1:17863/mcp"), "{harness}");
             assert_eq!(text.matches("pcxt_abc").count(), 1, "{harness}");
         }
+        let claude: serde_json::Value =
+            serde_json::from_str(&snippet("claude", &issued)).expect("json");
+        assert_eq!(claude["mcpServers"]["pocox"]["headers"]["Authorization"], "Bearer pcxt_abc");
         let codex: toml::Value = toml::from_str(&snippet("codex", &issued)).expect("toml");
         assert_eq!(
             codex["mcp_servers"]["pocox"]["http_headers"]["Authorization"].as_str(),

@@ -1296,28 +1296,47 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     after its first port answers on 127.0.0.1 or ::1. Each device's management
     entry gains `/services/v1` (catalog, event stream, the user's answers and
     shares); the app follows every device's stream. Consent for an agent's
-    first share per conversation (or token) is asked on the user's own devices
-    while the call waits (110 s hosted, 18 s otherwise); harness elicitation
-    and multi round-trip prompts are never used for it, because a harness may
-    answer them itself. Every call carries a bearer token (per hosted Codex or
-    OpenCode instance, per ACP session for agents advertising
-    `mcpCapabilities.http`, per copied entry, one for the CLI); tokens are kept
-    as digests and never reach a command line. Requests with an Origin or a
-    foreign Host are refused. Agents' shares and connections end with their
-    harness or token, after 24 h, or when the switch goes off; Keep sharing and
-    the user's own shares last until stopped. The switch (on by default) lives
-    in `agent-tools.json`, not `config.toml`; off refuses MCP calls but keeps
-    the user's surface. Hosted Codex, Claude (with its read tool pre-allowed)
-    and native OpenCode get the server at launch; others get a copied entry
-    (`pocox tools config`). CLI: `pocox services share|unshare|connect|
-    disconnect|list --json`, `pocox open`, `pocox tools …`. App: app-wide
-    consent prompts and share notices (announced shares connect right away),
-    share cards at the agent's tool call, Shared with you, the phone's in-app
-    browser with Send to agent (draft only), Share and open for localhost links,
-    Settings › Agent tools, and the galaxy (`/galaxy`, ⌘2): a turning
-    perspective disk of device star systems and orbiting services, light and
-    dark, with list mode, keyboard focus and reduced motion. See
-    `docs/agent-tools.md` (Verification lists what was exercised).
+    first share per conversation (or token) is asked on all the user's
+    devices, the agent's own included, while the call waits (110 s hosted,
+    18 s otherwise); harness elicitation and multi round-trip prompts are
+    never used for it, because a harness may answer them itself. An answer
+    covers what was shown: Allow once admits that request's ports only;
+    Allow in this conversation and Deny apply to the owner and settle its
+    other requests. Agents never see consent requests or conversation ids,
+    and every share and connection re-checks the switch and the caller's
+    token right before it publishes or connects. Every call carries a bearer
+    token (per hosted Codex or OpenCode instance, committed only once the
+    host is recorded; per ACP session for agents advertising
+    `mcpCapabilities.http`, carried over on a reopen the agent accepted; per
+    copied entry; one for the CLI, sent only after the endpoint's
+    `/local/v1/hello` proof); tokens are kept as digests, revocations are
+    saved before they apply, and no token reaches a command line (copied
+    entries are configuration, never shell commands). Requests with an
+    Origin or a foreign Host are refused, by the endpoint and the management
+    entry alike. POCOX's own ports cannot be shared. Agents' shares and
+    connections end with their harness or token, after 24 h, when the switch
+    goes off or the account or relay changes; Keep sharing, the user sharing
+    the same port, and the user's own shares last until stopped. Ownership
+    is the token and conversation, not the token alone. The switch (on by
+    default; off while its file is unreadable) lives in `agent-tools.json`,
+    not `config.toml`; off refuses MCP calls but keeps the user's surface.
+    Consent holds for agents that reach POCOX only through the tools; a
+    same-user program with loopback access can act as the user, and the
+    harness's sandbox is that boundary (never claim otherwise). Hosted Codex,
+    Claude (with its read tool pre-allowed) and native OpenCode get the
+    server at launch; others get a copied entry (`pocox tools config`). CLI:
+    `pocox services share|unshare|connect|disconnect|list --json`, `pocox
+    open`, `pocox tools …`. App: app-wide consent prompts and share notices
+    (phones connect announced shares right away; desktops when opened, and a
+    share's connection ends with it), share cards at the agent's tool call,
+    Shared with you, the phone's in-app browser (loopback pages only; Flutter
+    deep linking is off on iOS and Android, sign-in callbacks keep their own
+    handler) with Send to agent (draft only), Share and open for localhost
+    links, Settings
+    › Agent tools, and the galaxy (`/galaxy`, ⌘2): a turning perspective
+    disk of device star systems and orbiting services, light and dark, with
+    list mode, keyboard focus and reduced motion. See `docs/agent-tools.md`
+    (Trust boundary; Verification lists what was exercised).
 
 ### UI and history maintenance (2026-09-13)
 

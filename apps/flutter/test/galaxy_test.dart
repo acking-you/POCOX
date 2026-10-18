@@ -7,6 +7,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_screen.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
@@ -151,6 +152,7 @@ Widget _app(
   FakeBridgeApi api, {
   required bool dark,
   Size size = const Size(1440, 900),
+  bool still = false,
 }) => ProviderScope(
   overrides: [bridgeApiProvider.overrideWithValue(api)],
   child: MaterialApp.router(
@@ -160,6 +162,10 @@ Widget _app(
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(disableAnimations: still),
+      child: child!,
+    ),
     routerConfig: GoRouter(
       initialLocation: '/galaxy',
       routes: [
@@ -222,5 +228,45 @@ void main() {
     }
     await capturePreview(t, 'galaxy-phone');
     await t.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('a still galaxy stops drawing once its camera rests, also on a '
+      'selected planet, and wakes for input', (t) async {
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final api = FakeBridgeApi()..toolsOverviewValue = fixture();
+    await t.pumpWidget(_app(api, dark: false, still: true));
+    Future<void> rest() async {
+      for (var i = 0; i < 80 && t.binding.hasScheduledFrame; i++) {
+        await t.pump(const Duration(milliseconds: 100));
+      }
+    }
+
+    await rest();
+    expect(t.binding.hasScheduledFrame, isFalse);
+    // A planet stands still where it is drawn, so the camera reaches it.
+    await t.tap(find.byKey(const Key('galaxy-list-toggle')));
+    await t.pump();
+    await t.tap(find.byKey(const Key('galaxy-list-pcx:studio:app:default')));
+    await t.pump();
+    expect(t.binding.hasScheduledFrame, isTrue);
+    await rest();
+    expect(find.byKey(const Key('galaxy-panel-close')), findsOneWidget);
+    expect(t.binding.hasScheduledFrame, isFalse);
+    await t.pumpWidget(const SizedBox());
+  });
+
+  test('a body drawn under the pointer wins over a star\'s reach', () {
+    final view = GalaxyView()
+      ..hits = const [
+        Hit('device:studio', Offset(100, 100), 16, 5, 'studio'),
+        Hit('pcx:studio:port:5173', Offset(124, 100), 6, 9, 'Landing page'),
+      ];
+    expect(view.hitAt(const Offset(124, 100))?.id, 'pcx:studio:port:5173');
+    expect(view.hitAt(const Offset(104, 100))?.id, 'device:studio');
+    // Beside both: the nearest within reach.
+    expect(view.hitAt(const Offset(124, 116))?.id, 'pcx:studio:port:5173');
+    view.dispose();
   });
 }

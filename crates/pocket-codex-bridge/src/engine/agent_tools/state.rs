@@ -16,11 +16,13 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{watch, Notify};
 
 use super::{
+    error::ToolError,
     model::{
         ConnectionView, ConsentView, Decision, HostedView, OwnerKind, OwnerView, PortStatus,
         PortView, ShareView,
     },
     settings::Settings,
+    shares::Caller,
     tokens::Tokens,
 };
 
@@ -48,14 +50,38 @@ pub struct SharedPort {
     pub epoch: u64,
     /// The last local check found a listener.
     pub reachable: bool,
+    /// A publication is in flight (only one at a time).
+    pub publishing: bool,
+    /// The relay refused the last registration.
+    pub refused: bool,
+    /// No new publication before this (Unix milliseconds).
+    pub retry_at_ms: i64,
 }
 
 impl SharedPort {
+    /// A port reserved for publication.
+    pub fn new(port: u16, key: String, addr: SocketAddr, reachable: bool) -> Self {
+        Self {
+            port,
+            key,
+            addr,
+            published: None,
+            epoch: 0,
+            reachable,
+            publishing: false,
+            refused: false,
+            retry_at_ms: 0,
+        }
+    }
+
     fn status(&self) -> PortStatus {
-        match (self.published.as_ref().is_some_and(|p| p.is_live()), self.reachable) {
-            (false, _) => PortStatus::Starting,
-            (true, true) => PortStatus::Online,
-            (true, false) => PortStatus::Unreachable,
+        if self.published.as_ref().is_some_and(|p| p.is_live()) {
+            return if self.reachable { PortStatus::Online } else { PortStatus::Unreachable };
+        }
+        if self.refused {
+            PortStatus::Refused
+        } else {
+            PortStatus::Starting
         }
     }
 }
@@ -200,6 +226,9 @@ pub struct State {
     pub endpoint: Option<String>,
     /// Why the endpoint is not serving, safe to show.
     pub problem: Option<String>,
+    /// The saved settings could not be read: the tools stay off until they
+    /// can.
+    pub settings_unreadable: bool,
     /// Shares of this device.
     pub shares: Vec<Share>,
     /// Requests waiting for the user.
@@ -212,6 +241,8 @@ pub struct State {
     pub connections: Vec<Connection>,
     /// Agent hosts and APIs this process serves, as last read.
     pub services: Vec<HostedView>,
+    /// Loopback ports those hosts listen on, as last read.
+    pub own_ports: Vec<u16>,
     /// Moves with every change.
     pub revision: u64,
 }
@@ -241,6 +272,26 @@ pub fn now_ms() -> i64 {
 }
 
 impl State {
+    /// Whether `caller` may still act now: an agent needs this process to
+    /// serve the tools, the switch on and a token nobody revoked meanwhile.
+    /// Checked again right before anything is published or connected, since
+    /// a call can wait a long time for a port or for the user.
+    pub fn admits(&self, caller: &Caller) -> Result<(), ToolError> {
+        if caller.is_user() {
+            return Ok(());
+        }
+        if !self.hosting {
+            return Err(ToolError::NotHosting);
+        }
+        if !self.settings.enabled {
+            return Err(ToolError::Off);
+        }
+        if !self.tokens.contains(&caller.principal.id) {
+            return Err(ToolError::Revoked);
+        }
+        Ok(())
+    }
+
     /// Ports already shared on this device.
     pub fn shared_ports(&self) -> usize {
         self.shares.iter().map(|share| share.ports.len()).sum()

@@ -338,7 +338,9 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
-                  if (ref.watch(toolsStatusProvider).supported) ...[
+                  if (ref.watch(
+                    toolsStatusProvider.select((status) => status.supported),
+                  )) ...[
                     const SizedBox(height: 10),
                     const AgentToolsSettings(),
                   ],

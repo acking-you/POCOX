@@ -84,7 +84,8 @@ class ToolsPort {
   /// Its relay service key.
   final String key;
 
-  /// `online`, `starting` or `unreachable`.
+  /// `online`, `starting`, `unreachable` or `refused` (the relay refused
+  /// its registration; it is retried).
   final String status;
 }
 
@@ -187,7 +188,7 @@ class ToolsService {
   /// Instance name (the port number for a shared port).
   final String name;
 
-  /// `online`, `starting`, `unreachable` or `offline`.
+  /// `online`, `starting`, `unreachable`, `refused` or `offline`.
   final String status;
 
   /// The agent, for an agent host (`codex`, `claude`, `opencode`, …).
@@ -338,7 +339,7 @@ class ToolsOverview {
   }
 }
 
-/// Something new on a device: a share or a consent request.
+/// A share that is new on a device.
 class ToolsRef {
   /// Creates a reference.
   const ToolsRef({required this.device, required this.id});
@@ -346,27 +347,21 @@ class ToolsRef {
   /// The device.
   final String device;
 
-  /// The share or request id.
+  /// The share id.
   final String id;
 }
 
-/// One update of [BridgeApi.toolsWatch].
+/// One update of [BridgeApi.toolsWatch]. Pending consent requests are read
+/// from [overview], whichever device holds them.
 class ToolsUpdate {
   /// Creates an update.
-  const ToolsUpdate({
-    required this.overview,
-    this.added = const [],
-    this.consentsAdded = const [],
-  });
+  const ToolsUpdate({required this.overview, this.added = const []});
 
   /// Everything visible now.
   final ToolsOverview overview;
 
-  /// Shares announced since the previous update.
+  /// Shares announced since the previous update, this device's included.
   final List<ToolsRef> added;
-
-  /// Consent requests that appeared since the previous update.
-  final List<ToolsRef> consentsAdded;
 }
 
 /// A share this device made, from [BridgeApi.toolsShare].

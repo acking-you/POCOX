@@ -680,21 +680,14 @@ class ToolsUpdateDto {
   /// Everything visible now.
   final ToolsOverviewDto overview;
 
-  /// Shares announced since the previous update.
+  /// Shares announced since the previous update, this device's own
+  /// included.
   final List<ToolsRefDto> added;
 
-  /// Consent requests that appeared since the previous update.
-  final List<ToolsRefDto> consentsAdded;
-
-  const ToolsUpdateDto({
-    required this.overview,
-    required this.added,
-    required this.consentsAdded,
-  });
+  const ToolsUpdateDto({required this.overview, required this.added});
 
   @override
-  int get hashCode =>
-      overview.hashCode ^ added.hashCode ^ consentsAdded.hashCode;
+  int get hashCode => overview.hashCode ^ added.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -702,6 +695,5 @@ class ToolsUpdateDto {
       other is ToolsUpdateDto &&
           runtimeType == other.runtimeType &&
           overview == other.overview &&
-          added == other.added &&
-          consentsAdded == other.consentsAdded;
+          added == other.added;
 }

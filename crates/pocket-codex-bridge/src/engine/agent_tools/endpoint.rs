@@ -3,26 +3,31 @@
 //!
 //! It listens on 127.0.0.1 only, refuses anything a browser could send (an
 //! `Origin` header, or a `Host` that is not this loopback address, against DNS
-//! rebinding) and requires a bearer token on every request. The MCP server is
-//! stateless, so a harness keeps working across POCOX restarts, and refuses
-//! every call while the user has switched the tools off.
+//! rebinding) and requires a bearer token on every request but `hello`, with
+//! which the CLI first checks that the listener is the POCOX process that
+//! announced it (a fixed port could be taken by another program, even another
+//! user's, while POCOX is not running). The MCP server is stateless, so a
+//! harness keeps working across POCOX restarts, and refuses every call while
+//! the user has switched the tools off.
 
 use std::{net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::{DefaultBodyLimit, Request},
+    extract::{DefaultBodyLimit, Query, Request},
     http::{header, HeaderValue, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
     Extension, Json, Router,
 };
+use pocket_codex_core::history_sync::digest_bytes;
 use rmcp::transport::streamable_http_server::{
     session::never::NeverSessionManager, StreamableHttpServerConfig, StreamableHttpService,
 };
 use serde::{Deserialize, Serialize};
 
+pub use super::model::{APP_PORT, CLI_PORT};
 use super::{
     catalog, connections,
     connections::ConnectRequest,
@@ -34,11 +39,6 @@ use super::{
     tokens::{Kind, Principal},
 };
 
-/// The app's preferred port; the CLI host uses the next one.
-pub const APP_PORT: u16 = 17863;
-/// The CLI host's preferred port.
-pub const CLI_PORT: u16 = 17864;
-
 /// Where a running endpoint says it is, for the local CLI.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,16 +49,30 @@ pub struct Discovery {
     pub url: String,
     /// The serving process.
     pub pid: u32,
+    /// What this process proves it knows through `hello`; private like the
+    /// file (and the user's token beside it).
+    pub secret: String,
 }
 
 const DISCOVERY: &str = "endpoint.json";
 
+/// A fresh random secret (128 bits from two v4 UUIDs, hex).
+pub fn new_secret() -> String {
+    format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple())
+}
+
+/// The answer to `challenge` from a process that knows `secret`.
+pub fn proof(secret: &str, challenge: &str) -> String {
+    digest_bytes(format!("{secret}\n{challenge}").as_bytes())
+}
+
 /// Write the discovery file for this process.
-pub fn announce(dir: &Path, url: &str) -> Result<()> {
+pub fn announce(dir: &Path, url: &str, secret: &str) -> Result<()> {
     let discovery = Discovery {
         protocol: PROTOCOL,
         url: url.to_string(),
         pid: std::process::id(),
+        secret: secret.to_string(),
     };
     crate::engine::host_profiles::files::write_private(
         &dir.join(DISCOVERY),
@@ -111,6 +125,10 @@ async fn guard(port: u16, mut request: Request, next: Next) -> Response {
     let headers = request.headers();
     if headers.contains_key(header::ORIGIN) || !loopback_host(headers.get(header::HOST), port) {
         return StatusCode::FORBIDDEN.into_response();
+    }
+    // Proving who listens needs no token: the CLI asks before it sends one.
+    if request.uri().path() == HELLO {
+        return next.run(request).await;
     }
     // The switch governs agents only: the user's own surface stays up.
     if request.uri().path().starts_with("/mcp") && !state::lock().settings.enabled {
@@ -181,11 +199,33 @@ fn forbidden() -> Response {
     (StatusCode::FORBIDDEN, Json(serde_json::json!({"code": "user_only"}))).into_response()
 }
 
-fn local_routes() -> Router {
+const HELLO: &str = "/local/v1/hello";
+
+#[derive(Deserialize)]
+struct Hello {
+    challenge: String,
+}
+
+fn local_routes(secret: Arc<str>) -> Router {
     Router::new()
         .route(
+            HELLO,
+            get(move |Query(hello): Query<Hello>| async move {
+                if hello.challenge.is_empty() || hello.challenge.len() > 128 {
+                    return StatusCode::BAD_REQUEST.into_response();
+                }
+                Json(serde_json::json!({"proof": proof(&secret, &hello.challenge)}))
+                    .into_response()
+            }),
+        )
+        .route(
             "/local/v1/status",
-            get(|| async { Json(super::status()).into_response() }),
+            get(|Extension(principal): Extension<Principal>| async move {
+                if user(&principal).is_none() {
+                    return forbidden();
+                }
+                Json(super::status()).into_response()
+            }),
         )
         .route(
             "/local/v1/overview",
@@ -290,8 +330,9 @@ fn local_routes() -> Router {
         )
 }
 
-/// The endpoint's routes for a listener on `port`.
-pub fn router(port: u16, cancel: tokio_util::sync::CancellationToken) -> Router {
+/// The endpoint's routes for a listener on `port`, proving `secret` (the one
+/// announced beside it) to the CLI.
+pub fn router(port: u16, cancel: tokio_util::sync::CancellationToken, secret: Arc<str>) -> Router {
     let config = StreamableHttpServerConfig::default()
         .with_legacy_session_mode(false)
         .with_json_response(true)
@@ -299,7 +340,7 @@ pub fn router(port: u16, cancel: tokio_util::sync::CancellationToken) -> Router 
         .with_cancellation_token(cancel);
     let mcp =
         StreamableHttpService::new(|| Ok(Tools), Arc::new(NeverSessionManager::default()), config);
-    local_routes()
+    local_routes(secret)
         .route_service("/mcp", mcp)
         .layer(DefaultBodyLimit::max(256 * 1024))
         .layer(middleware::from_fn(move |request: Request, next: Next| guard(port, request, next)))
@@ -334,7 +375,7 @@ mod tests {
             .expect("token");
         let listener = bind(None, 0).expect("bind");
         let port = listener.local_addr().expect("addr").port();
-        let app = router(port, tokio_util::sync::CancellationToken::new());
+        let app = router(port, tokio_util::sync::CancellationToken::new(), Arc::from("s3cret"));
         let listener = tokio::net::TcpListener::from_std(listener).expect("listener");
         let server = tokio::spawn(async move { axum::serve(listener, app).await });
         let client = reqwest::Client::builder()
@@ -359,6 +400,23 @@ mod tests {
             .await
             .expect("response");
         assert_eq!(browser.status(), StatusCode::FORBIDDEN);
+        // The local surface is the user's: an agent's token reads nothing.
+        let status = client
+            .get(format!("http://127.0.0.1:{port}/local/v1/status"))
+            .bearer_auth(&token)
+            .send()
+            .await
+            .expect("response");
+        assert_eq!(status.status(), StatusCode::FORBIDDEN);
+        let hello: serde_json::Value = client
+            .get(format!("http://127.0.0.1:{port}{HELLO}?challenge=c1"))
+            .send()
+            .await
+            .expect("response")
+            .json()
+            .await
+            .expect("json");
+        assert_eq!(hello["proof"], proof("s3cret", "c1"));
 
         let started: serde_json::Value = rpc(&client, &url, Some(&token), initialize)
             .await

@@ -15,6 +15,7 @@ class ShareRef {
     this.path = '/',
     this.title,
     this.ports = const [],
+    this.secure = false,
   });
 
   /// The first port's relay key.
@@ -22,6 +23,12 @@ class ShareRef {
 
   /// Path to open.
   final String path;
+
+  /// Whether the page is served over TLS (an `https://localhost` link).
+  final bool secure;
+
+  /// The scheme the page opens with.
+  String get scheme => secure ? 'https' : 'http';
 
   /// Title, when the tool call carried it.
   final String? title;

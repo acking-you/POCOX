@@ -624,9 +624,6 @@ fn launch_codex(
                     return Err(kept(startup_failure_error(*failure), exited));
                 },
             };
-        if let Some(grant) = &tools {
-            super::agent_tools::inject::hosted_started(&name, grant, report.reused);
-        }
         // An adopted app-server was not launched with this instance's
         // provider arguments: refuse it (never killed) rather than publish a
         // host that silently uses another model service.
@@ -795,6 +792,10 @@ fn launch_codex(
 
     // Recorded only while the app is not quitting; otherwise torn down here.
     commit_host(host)?;
+    // Only a committed host keeps its token; a failed start revoked it.
+    if let Some(grant) = tools {
+        super::agent_tools::inject::hosted_started(&name, grant, adopted);
+    }
 
     Ok(ServeReport {
         device,

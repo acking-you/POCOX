@@ -100,6 +100,7 @@ fn port_status(status: model::PortStatus) -> String {
         model::PortStatus::Online => "online",
         model::PortStatus::Starting => "starting",
         model::PortStatus::Unreachable => "unreachable",
+        model::PortStatus::Refused => "refused",
     }
     .into()
 }
@@ -274,10 +275,9 @@ pub struct ToolsRefDto {
 pub struct ToolsUpdateDto {
     /// Everything visible now.
     pub overview: ToolsOverviewDto,
-    /// Shares announced since the previous update.
+    /// Shares announced since the previous update, this device's own
+    /// included.
     pub added: Vec<ToolsRefDto>,
-    /// Consent requests that appeared since the previous update.
-    pub consents_added: Vec<ToolsRefDto>,
 }
 
 fn refs(items: Vec<(String, String)>) -> Vec<ToolsRefDto> {
@@ -344,7 +344,6 @@ pub fn tools_watch(sink: StreamSink<ToolsUpdateDto>) -> Result<()> {
         sink.add(ToolsUpdateDto {
             overview: overview(update.overview),
             added: refs(update.added),
-            consents_added: refs(update.consents_added),
         })
         .is_ok()
     }));
@@ -454,8 +453,8 @@ pub fn tools_tokens() -> Vec<ToolsTokenDto> {
 }
 
 /// Revoke a token; what its holder shared or connected ends.
-pub fn tools_revoke(token_id: String) {
-    tools::revoke(&token_id);
+pub fn tools_revoke(token_id: String) -> Result<()> {
+    tools::revoke(&token_id)
 }
 
 /// A ready-to-paste entry for a harness POCOX does not launch (`codex`,

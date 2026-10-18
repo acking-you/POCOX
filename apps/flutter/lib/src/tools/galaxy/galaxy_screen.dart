@@ -3,6 +3,7 @@
 /// Drag to orbit, pinch or scroll to zoom, tap a body to see and manage it.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
@@ -45,9 +46,11 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   late final Ticker _ticker = createTicker(_onTick);
   Duration _last = Duration.zero;
   DateTime _touched = DateTime.fromMillisecondsSinceEpoch(0);
+  Timer? _glide;
   bool _settled = true;
   bool _first = true;
   bool? _list;
+  bool _listShown = false;
   double _pinch = 1;
   Size _canvas = Size.zero;
   GalaxyScene _full = GalaxyScene.empty;
@@ -62,6 +65,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
 
   @override
   void dispose() {
+    _glide?.cancel();
     _ticker.dispose();
     _focus.dispose();
     _search.dispose();
@@ -73,8 +77,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     final dt = ((elapsed - _last).inMicroseconds / 1e6).clamp(0.0, 0.05);
     _last = elapsed;
     final camera = _view.camera;
-    final idle =
-        DateTime.now().difference(_touched) > const Duration(seconds: 4);
+    final idle = _idleFor >= _glideAfter;
     if (idle && !_settled && _view.selected == null) {
       camera.overview();
       _settled = true;
@@ -86,11 +89,39 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     camera.step(dt, drifting: idle && _view.selected == null && !_view.still);
     _view.time += dt;
     _view.tick();
+    // Nothing moves in the list, or in a still scene once the camera rests:
+    // stop drawing frames until something changes.
+    if (_listShown || (_view.still && camera.settled)) {
+      _ticker.stop();
+      if (!_listShown && !_settled && _view.selected == null) {
+        _glide = Timer(_glideAfter - _idleFor, _wake);
+      }
+    }
+  }
+
+  /// After this long without input the camera glides back to the galaxy.
+  static const _glideAfter = Duration(seconds: 4);
+
+  Duration get _idleFor => DateTime.now().difference(_touched);
+
+  /// Draw frames again: something moved, changed or was asked for.
+  void _wake() {
+    _glide?.cancel();
+    _glide = null;
+    if (!mounted || _ticker.isActive) return;
+    _last = Duration.zero;
+    _ticker.start();
   }
 
   void _touch() {
     _touched = DateTime.now();
     _settled = false;
+    _wake();
+  }
+
+  /// The backdrop arrived: paint it, unless this page is gone.
+  void _backdropReady() {
+    if (mounted) _view.tick();
   }
 
   /// Frame every system again (the device set or the canvas changed).
@@ -100,6 +131,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
       reach = math.max(reach, system.position.length + system.extent);
     }
     final camera = _view.camera..fit(reach, _canvas);
+    _wake();
     if (entrance) {
       // The galaxy arrives from a little further out.
       camera
@@ -125,6 +157,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     if (_view.selected case final id?) {
       if (scene.systemOf(id) == null && scene.planetOf(id) == null) {
         _view.selected = null;
+        _wake();
       }
     }
   }
@@ -132,6 +165,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   void _setFilter(GalaxyFilter filter) {
     setState(() => _filter = filter);
     _view.update(filterScene(_full, filter), first: false);
+    _wake();
   }
 
   void _select(String? id) {
@@ -155,7 +189,13 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
 
   void _hover(Offset point) {
     final id = _view.hitAt(point)?.id;
-    if (id != _view.hovered) setState(() => _view.hovered = id);
+    if (id != _view.hovered) _mark(() => _view.hovered = id);
+  }
+
+  /// Change what is highlighted, and draw it.
+  void _mark(VoidCallback change) {
+    setState(change);
+    _wake();
   }
 
   List<String> get _order => [
@@ -175,10 +215,10 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     final at = order.indexOf(_view.focused ?? _view.selected ?? '');
     if (key == LogicalKeyboardKey.arrowRight ||
         key == LogicalKeyboardKey.arrowDown) {
-      setState(() => _view.focused = order[(at + 1) % order.length]);
+      _mark(() => _view.focused = order[(at + 1) % order.length]);
     } else if (key == LogicalKeyboardKey.arrowLeft ||
         key == LogicalKeyboardKey.arrowUp) {
-      setState(
+      _mark(
         () => _view.focused = order[(at - 1 + order.length) % order.length],
       );
     } else if (key == LogicalKeyboardKey.enter ||
@@ -198,10 +238,18 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final overview = ref.watch(toolsOverviewProvider);
+    final still = MediaQuery.disableAnimationsOf(context);
+    if (still != _view.still) {
+      _view.still = still;
+      _wake();
+    }
     if (!identical(overview, _source)) _rebuild(overview);
-    _view.still = MediaQuery.disableAnimationsOf(context);
     // A screen reader gets the list unless the user chose the galaxy.
     final list = _list ?? MediaQuery.accessibleNavigationOf(context);
+    if (list != _listShown) {
+      _listShown = list;
+      _wake();
+    }
     final palette = GalaxyPalette(
       dark: theme.brightness == Brightness.dark,
       ratio: MediaQuery.devicePixelRatioOf(context),
@@ -274,7 +322,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                         ? SystemMouseCursors.grab
                         : SystemMouseCursors.click,
                     onHover: (event) => _hover(event.localPosition),
-                    onExit: (_) => setState(() => _view.hovered = null),
+                    onExit: (_) => _mark(() => _view.hovered = null),
                     child: RepaintBoundary(
                       child: CustomPaint(
                         key: const Key('galaxy-canvas'),
@@ -282,9 +330,10 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                         painter: GalaxyPainter(
                           view: _view,
                           palette: palette,
+                          l10n: l10n,
                           labels: _labels,
                           starfield: _stars,
-                          onBackdrop: _view.tick,
+                          onBackdrop: _backdropReady,
                         ),
                       ),
                     ),

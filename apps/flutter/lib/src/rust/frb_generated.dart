@@ -6462,7 +6462,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
+          decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiBridgeAgentToolsToolsRevokeConstMeta,
         argValues: [tokenId],
@@ -8640,12 +8640,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsUpdateDto dco_decode_tools_update_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return ToolsUpdateDto(
       overview: dco_decode_tools_overview_dto(arr[0]),
       added: dco_decode_list_tools_ref_dto(arr[1]),
-      consentsAdded: dco_decode_list_tools_ref_dto(arr[2]),
     );
   }
 
@@ -11319,12 +11318,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_overview = sse_decode_tools_overview_dto(deserializer);
     var var_added = sse_decode_list_tools_ref_dto(deserializer);
-    var var_consentsAdded = sse_decode_list_tools_ref_dto(deserializer);
-    return ToolsUpdateDto(
-      overview: var_overview,
-      added: var_added,
-      consentsAdded: var_consentsAdded,
-    );
+    return ToolsUpdateDto(overview: var_overview, added: var_added);
   }
 
   @protected
@@ -13495,7 +13489,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_tools_overview_dto(self.overview, serializer);
     sse_encode_list_tools_ref_dto(self.added, serializer);
-    sse_encode_list_tools_ref_dto(self.consentsAdded, serializer);
   }
 
   @protected

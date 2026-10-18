@@ -6308,12 +6308,13 @@ fn wire__crate__api__bridge__agent_tools__tools_revoke_impl(
             let api_token_id = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
-                transform_result_sse::<_, ()>((move || {
-                    let output_ok = Result::<_, ()>::Ok({
-                        crate::api::bridge::agent_tools::tools_revoke(api_token_id);
-                    })?;
-                    Ok(output_ok)
-                })())
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok =
+                            crate::api::bridge::agent_tools::tools_revoke(api_token_id)?;
+                        Ok(output_ok)
+                    })(),
+                )
             }
         },
     )
@@ -9114,12 +9115,9 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsUpdateDto {
             <crate::api::bridge::agent_tools::ToolsOverviewDto>::sse_decode(deserializer);
         let mut var_added =
             <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_decode(deserializer);
-        let mut var_consentsAdded =
-            <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_decode(deserializer);
         return crate::api::bridge::agent_tools::ToolsUpdateDto {
             overview: var_overview,
             added: var_added,
-            consents_added: var_consentsAdded,
         };
     }
 }
@@ -12222,12 +12220,8 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsTok
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsUpdateDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [
-            self.overview.into_into_dart().into_dart(),
-            self.added.into_into_dart().into_dart(),
-            self.consents_added.into_into_dart().into_dart(),
-        ]
-        .into_dart()
+        [self.overview.into_into_dart().into_dart(), self.added.into_into_dart().into_dart()]
+            .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
@@ -14024,10 +14018,6 @@ impl SseEncode for crate::api::bridge::agent_tools::ToolsUpdateDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::bridge::agent_tools::ToolsOverviewDto>::sse_encode(self.overview, serializer);
         <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_encode(self.added, serializer);
-        <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_encode(
-            self.consents_added,
-            serializer,
-        );
     }
 }
 

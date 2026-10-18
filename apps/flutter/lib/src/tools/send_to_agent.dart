@@ -13,38 +13,38 @@ import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 
-/// The conversation service of the harness behind a share's owner.
-String? conversationService(String device, String? harness, String? host) {
-  if (host == null || host.isEmpty || device.isEmpty) return null;
+/// The conversation service of the harness behind the owner of the share
+/// keyed [shareKey]: on the same device, in the same namespace (`pcx:` or an
+/// account's `pcxu:<user>:`).
+String? conversationService(String shareKey, String? harness, String? host) {
+  final parsed = parseServiceKey(shareKey);
+  if (host == null || host.isEmpty || parsed.device.isEmpty) return null;
   final kind = switch (harness) {
     'codex' => 'app',
     'opencode' => 'opencode',
     null || '' => null,
     _ => 'acp',
   };
-  return kind == null ? null : 'pcx:$device:$kind:$host';
+  if (kind == null) return null;
+  final tail = ':${parsed.kind}:${parsed.name}';
+  return '${shareKey.substring(0, shareKey.length - tail.length)}:$kind:$host';
 }
 
-/// The note added to the draft.
-String previewNote({
+/// The note added to the draft, in the user's language.
+String previewNote(
+  AppLocalizations l10n, {
   required String title,
   required String url,
   required String device,
   required List<String> console,
 }) {
-  final buffer = StringBuffer(
-    'Preview of "$title" ($url, shared from $device)',
-  );
-  if (console.isEmpty) {
-    buffer.write(': no console errors.');
-  } else {
-    buffer
-      ..writeln(', recent console messages:')
-      ..writeln('```')
-      ..writeln(console.join('\n'))
-      ..write('```');
-  }
-  return buffer.toString();
+  if (console.isEmpty) return l10n.browserNoteNoErrors(title, url, device);
+  return [
+    l10n.browserNoteConsole(title, url, device),
+    '```',
+    ...console,
+    '```',
+  ].join('\n');
 }
 
 /// Add the preview of share [serviceKey] to its agent's conversation draft
@@ -62,13 +62,16 @@ Future<void> sendPreviewToAgent(
   final live = serviceKey == null ? null : overview.shareOfKey(serviceKey);
   final device = serviceKey == null ? '' : parseServiceKey(serviceKey).device;
   final note = previewNote(
+    l10n,
     title: title,
     url: url,
-    device: device,
+    device: deviceLabel(device),
     console: console,
   );
   final owner = live?.share.owner;
-  final service = conversationService(device, owner?.harness, owner?.host);
+  final service = serviceKey == null
+      ? null
+      : conversationService(serviceKey, owner?.harness, owner?.host);
   final thread = owner?.conversation;
   if (service == null || thread == null) {
     await Clipboard.setData(ClipboardData(text: note));

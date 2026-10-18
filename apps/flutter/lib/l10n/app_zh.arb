@@ -1301,5 +1301,11 @@
   "browserSentToDraft": "已添加到对话草稿",
   "galaxyServices": "{count} 个服务",
   "toolsShareAndOpen": "共享并打开",
-  "toolsSharing": "正在共享…"
+  "toolsSharing": "正在共享…",
+  "toolsStatusRefused": "中继拒绝了它",
+  "toolsHours": "{count} 小时",
+  "toolsMinutes": "{count} 分钟",
+  "browserNoteNoErrors": "预览“{title}”（{url}，由 {device} 共享）：控制台没有错误。",
+  "browserNoteConsole": "预览“{title}”（{url}，由 {device} 共享），最近的控制台消息：",
+  "browserNotLocal": "这里只能打开你的设备共享的页面。"
 }

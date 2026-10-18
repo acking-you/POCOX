@@ -3,6 +3,8 @@
 /// alive; console messages are kept so they can go to the agent.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +13,27 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/tools/send_to_agent.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:pocket_codex/src/widgets/links.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+
+/// [url] as the in-app browser opens it: an `http` or `https` address on this
+/// device's loopback, where shares are connected, rebuilt from its parts so
+/// what loads is what was checked. Null for anything else, which never loads.
+Uri? loopbackPage(String url) {
+  final uri = Uri.tryParse(url.trim());
+  if (uri == null || !uri.hasAuthority) return null;
+  if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+  final host = uri.host.toLowerCase();
+  if (host != 'localhost' && host != '127.0.0.1' && host != '::1') return null;
+  return Uri(
+    scheme: uri.scheme,
+    host: host,
+    port: uri.hasPort ? uri.port : null,
+    path: uri.path.isEmpty ? '/' : uri.path,
+    query: uri.hasQuery ? uri.query : null,
+    fragment: uri.hasFragment ? uri.fragment : null,
+  );
+}
 
 /// The in-app browser.
 class PreviewBrowserScreen extends ConsumerStatefulWidget {
@@ -39,7 +60,10 @@ class PreviewBrowserScreen extends ConsumerStatefulWidget {
 }
 
 class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
-  late final WebViewController _controller;
+  /// The page's origin, which the browser keeps to; null when the address is
+  /// not one it opens.
+  late final Uri? _origin = loopbackPage(widget.url);
+  WebViewController? _controller;
   final List<String> _console = [];
   String? _pageTitle;
   String _current = '';
@@ -48,7 +72,9 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
   @override
   void initState() {
     super.initState();
-    _current = widget.url;
+    final origin = _origin;
+    if (origin == null) return;
+    _current = origin.toString();
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setOnConsoleMessage((message) {
@@ -60,32 +86,59 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
       })
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: _navigation,
           onProgress: (progress) {
             if (mounted) setState(() => _progress = progress);
           },
+          onUrlChange: (change) => _arrived(change.url),
           onPageFinished: (url) async {
-            final title = await _controller.getTitle();
+            final title = await _controller?.getTitle();
             if (!mounted) return;
-            setState(() {
-              _current = url;
-              _pageTitle = (title == null || title.trim().isEmpty)
+            _arrived(url);
+            setState(
+              () => _pageTitle = (title == null || title.trim().isEmpty)
                   ? null
-                  : title.trim();
-            });
+                  : title.trim(),
+            );
           },
         ),
       )
-      ..loadRequest(Uri.parse(widget.url));
+      ..loadRequest(origin);
+  }
+
+  bool _ownOrigin(Uri? uri) {
+    final origin = _origin;
+    return origin != null &&
+        uri != null &&
+        uri.scheme == origin.scheme &&
+        uri.host.toLowerCase() == origin.host &&
+        uri.port == origin.port;
+  }
+
+  /// The page stays on its own origin; another web address opens in the
+  /// system browser, and anything else does not open.
+  NavigationDecision _navigation(NavigationRequest request) {
+    if (!request.isMainFrame) return NavigationDecision.navigate;
+    final target = Uri.tryParse(request.url);
+    if (_ownOrigin(target)) return NavigationDecision.navigate;
+    if (mounted && (target?.scheme == 'http' || target?.scheme == 'https')) {
+      unawaited(openWebUrl(context, request.url));
+    }
+    return NavigationDecision.prevent;
+  }
+
+  /// The page moved to [url]: kept only on its own origin, so what is copied,
+  /// opened elsewhere or sent to the agent is always this device's loopback.
+  void _arrived(String? url) {
+    if (url == null || !mounted || !_ownOrigin(Uri.tryParse(url))) return;
+    setState(() => _current = url);
   }
 
   Future<void> _menu(String choice) async {
     final l10n = AppLocalizations.of(context);
     switch (choice) {
       case 'external':
-        await launchUrl(
-          Uri.parse(_current),
-          mode: LaunchMode.externalApplication,
-        );
+        await openWebUrl(context, _current);
       case 'copy':
         await Clipboard.setData(ClipboardData(text: _current));
         if (mounted) showToastOk(context, l10n.copied);
@@ -105,12 +158,43 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    final controller = _controller;
+    final close = IconButton(
+      icon: const Icon(AppIcons.close),
+      onPressed: () => context.pop(),
+    );
+    if (controller == null) {
+      return Scaffold(
+        appBar: AppBar(leading: close),
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                key: const Key('preview-not-local'),
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    AppIcons.link_off_outlined,
+                    size: 32,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    l10n.browserNotLocal,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(AppIcons.close),
-          onPressed: () => context.pop(),
-        ),
+        leading: close,
         titleSpacing: 0,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +219,7 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
           IconButton(
             tooltip: l10n.browserReload,
             icon: const Icon(AppIcons.refresh),
-            onPressed: _controller.reload,
+            onPressed: controller.reload,
           ),
           PopupMenuButton<String>(
             icon: const Icon(AppIcons.more_horiz),
@@ -164,7 +248,7 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
               )
             : null,
       ),
-      body: SafeArea(top: false, child: WebViewWidget(controller: _controller)),
+      body: SafeArea(top: false, child: WebViewWidget(controller: controller)),
     );
   }
 }

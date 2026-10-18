@@ -21,9 +21,6 @@ mixin _RustTools implements BridgeApi {
     (u) => ToolsUpdate(
       overview: _toolsOverview(u.overview),
       added: [for (final r in u.added) ToolsRef(device: r.device, id: r.id)],
-      consentsAdded: [
-        for (final r in u.consentsAdded) ToolsRef(device: r.device, id: r.id),
-      ],
     ),
   );
 

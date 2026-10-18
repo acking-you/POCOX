@@ -225,6 +225,11 @@ impl Tokens {
             .map(Record::principal)
     }
 
+    /// Whether token `id` is still valid.
+    pub fn contains(&self, id: &str) -> bool {
+        self.records.values().any(|record| record.id == id)
+    }
+
     /// Bind a session token to the session it was minted for.
     pub fn bind_session(&mut self, id: &str, session: &str) {
         if let Some(record) = self.records.values_mut().find(|r| r.id == id) {
@@ -232,23 +237,42 @@ impl Tokens {
         }
     }
 
-    /// Revoke the tokens `which` selects; returns the revoked principals.
-    pub fn revoke_where(&mut self, which: impl Fn(&Principal) -> bool) -> Vec<Principal> {
-        let revoked: Vec<Principal> = self
-            .records
+    fn selected(&self, which: impl Fn(&Principal) -> bool) -> Vec<Principal> {
+        self.records
             .values()
             .map(Record::principal)
             .filter(|p| p.kind != Kind::User && which(p))
-            .collect();
+            .collect()
+    }
+
+    /// Revoke the tokens `which` selects, durably: nothing changes unless the
+    /// revocation was saved, so a restart cannot bring a revoked token back.
+    pub fn revoke_where(&mut self, which: impl Fn(&Principal) -> bool) -> Result<Vec<Principal>> {
+        let revoked = self.selected(which);
         if revoked.is_empty() {
-            return revoked;
+            return Ok(revoked);
         }
+        let kept = self
+            .records
+            .values()
+            .filter(|record| !revoked.iter().any(|p| p.id == record.id))
+            .cloned()
+            .collect::<Vec<_>>();
+        self.save_records(kept.iter())?;
+        self.records = kept
+            .into_iter()
+            .map(|record| (record.digest.clone(), record))
+            .collect();
+        Ok(revoked)
+    }
+
+    /// Forget the tokens `which` selects in this process only: for holders
+    /// that are gone, when the revocation could not be saved.
+    pub fn forget_where(&mut self, which: impl Fn(&Principal) -> bool) -> Vec<Principal> {
+        let forgotten = self.selected(which);
         self.records
-            .retain(|_, record| !revoked.iter().any(|p| p.id == record.id));
-        if let Err(error) = self.save() {
-            tracing::warn!("agent tool tokens not saved: {error:#}");
-        }
-        revoked
+            .retain(|_, record| !forgotten.iter().any(|p| p.id == record.id));
+        forgotten
     }
 
     /// Every token but the session ones, for Settings.
@@ -270,15 +294,18 @@ impl Tokens {
     }
 
     fn save(&self) -> Result<()> {
+        self.save_records(self.records.values())
+    }
+
+    fn save_records<'a>(&self, records: impl Iterator<Item = &'a Record>) -> Result<()> {
         let Some(dir) = &self.dir else { return Ok(()) };
         let file = File {
-            tokens: self
-                .records
-                .values()
+            tokens: records
                 .filter(|record| record.persisted())
                 .cloned()
                 .collect(),
         };
+        // Once renamed into place the file is committed, synced or not.
         write_private(&dir.join(FILE), &serde_json::to_vec(&file)?)?;
         Ok(())
     }
@@ -305,7 +332,9 @@ mod tests {
         assert_eq!(tokens.authenticate(&secret).as_ref(), Some(&codex));
         assert!(tokens.authenticate("pcxt_forged").is_none());
         assert!(tokens.authenticate(&secret[PREFIX.len()..]).is_none());
-        let revoked = tokens.revoke_where(|p| p.host.as_deref() == Some("default"));
+        let revoked = tokens
+            .revoke_where(|p| p.host.as_deref() == Some("default"))
+            .expect("revoke");
         assert_eq!(revoked, vec![codex]);
         assert!(tokens.authenticate(&secret).is_none());
     }

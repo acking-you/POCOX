@@ -145,6 +145,14 @@ class GalaxyCamera {
     if (drifting) yaw += driftSpeed * dt;
   }
 
+  /// Whether it has arrived, to far below a pixel, and nothing turns it
+  /// (drift aside).
+  bool get settled =>
+      spin == 0 &&
+      (goalTilt - tilt).abs() < 1e-4 &&
+      (goalDistance - distance).abs() < 1e-3 &&
+      (goalTarget - target).length < 1e-3;
+
   /// This frame's projection for a canvas of [size].
   Projection project(Size size) {
     final eye =

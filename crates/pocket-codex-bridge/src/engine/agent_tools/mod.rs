@@ -100,19 +100,28 @@ pub fn status() -> Status {
     }
 }
 
-/// End what the `revoked` callers shared or connected.
+/// End what the `revoked` callers shared or connected, and their requests
+/// waiting for the user.
 fn ended(revoked: &[Principal]) {
     if revoked.is_empty() {
         return;
     }
     let ids: Vec<&str> = revoked.iter().map(|p| p.id.as_str()).collect();
     let gone = |key: &OwnerKey| ids.contains(&key.token.as_str());
+    consent::withdraw(gone);
     shares::end_owned(gone);
     connections::end_owned(gone);
 }
 
-/// End everything agents made (the switch went off).
+/// End everything agents made, their waiting requests and the user's
+/// approvals (the switch went off, or the account or relay changed).
 fn end_agents() {
+    consent::withdraw(|_| true);
+    {
+        let mut state = state::lock();
+        state.allowed.clear();
+        state.declined.clear();
+    }
     shares::end_owned(|_| true);
     connections::end_owned(|_| true);
 }
@@ -137,18 +146,31 @@ pub fn initialize() {
 fn open() -> Result<()> {
     let dir = host_profiles::root()?.join("agent-tools");
     let tokens = tokens::Tokens::open(&dir)?;
-    let settings = settings::load().unwrap_or_default();
+    // Unreadable settings never switch the tools on: the user may have
+    // switched them off.
+    let settings = settings::load();
     let saved = state::saved_shares(&dir);
     {
         let mut state = state::lock();
         state.dir = Some(dir);
         state.tokens = tokens;
-        state.settings = settings;
         state.hosting = true;
+        match settings {
+            Ok(settings) => state.settings = settings,
+            Err(error) => {
+                tracing::warn!("agent tools stay off: {error:#}");
+                state.settings = settings::Settings::closed();
+                state.settings_unreadable = true;
+                state.problem = Some(UNREADABLE.into());
+            },
+        }
     }
     shares::restore(saved);
     Ok(())
 }
+
+const UNREADABLE: &str = "The agent tools setting could not be read, so the tools stay off. \
+                          Switch them on again to save it anew.";
 
 async fn supervise() {
     let mut tick: u64 = 0;
@@ -164,7 +186,7 @@ async fn supervise() {
         if tick.is_multiple_of(2) {
             let _ = tokio::task::spawn_blocking(catalog::refresh_services).await;
         }
-        shares::maintain(tick.is_multiple_of(3)).await;
+        shares::maintain(tick.is_multiple_of(3));
         connections::prune();
         consent::prune(&mut state::lock());
         tick = tick.wrapping_add(1);
@@ -179,6 +201,12 @@ async fn supervise() {
 /// switch went off.
 fn apply(saved: settings::Settings) {
     let mut state = state::lock();
+    if std::mem::take(&mut state.settings_unreadable) {
+        if state.problem.as_deref() == Some(UNREADABLE) {
+            state.problem = None;
+        }
+        state::changed(&mut state);
+    }
     let was = state.settings;
     if was == saved {
         return;
@@ -255,10 +283,12 @@ pub fn issue(harness: &str, label: Option<&str>) -> Result<Issued> {
     })
 }
 
-/// Revoke a token; what its holder shared or connected ends.
-pub fn revoke(id: &str) {
-    let revoked = state::lock().tokens.revoke_where(|p| p.id == id);
+/// Revoke a token; what its holder shared or connected ends. Fails, changing
+/// nothing, when the revocation cannot be saved.
+pub fn revoke(id: &str) -> Result<()> {
+    let revoked = state::lock().tokens.revoke_where(|p| p.id == id)?;
     ended(&revoked);
+    Ok(())
 }
 
 fn host_key(device: &str) -> String {
@@ -344,10 +374,13 @@ pub fn keep_on(device: &str, id: &str) -> Result<()> {
     on_device(device, &["services", "v1", "shares", id, "keep"], serde_json::json!({}))
 }
 
-/// The account or relay changed: connections belong to the old one, and
-/// shares are published again under the new one by the supervisor.
+/// The account or relay changed: connections belong to the old one, and so
+/// do agents' shares and the user's answers (they were for another audience).
+/// The user's own shares are published again under the new one by the
+/// supervisor, as hosts are.
 pub fn context_changed() {
     connections::context_changed();
+    end_agents();
     WAKE.notify_one();
 }
 
@@ -442,7 +475,8 @@ mod serving {
             }
         }
         let cancel = CancellationToken::new();
-        let app = endpoint::router(addr.port(), cancel.clone());
+        let secret = endpoint::new_secret();
+        let app = endpoint::router(addr.port(), cancel.clone(), secret.as_str().into());
         let task = runtime::runtime().spawn(crate::engine::host_services::supervise(
             "agent tools",
             addr,
@@ -457,7 +491,7 @@ mod serving {
             },
         ));
         if let Some(dir) = &dir {
-            if let Err(error) = endpoint::announce(dir, &base) {
+            if let Err(error) = endpoint::announce(dir, &base, &secret) {
                 tracing::warn!("agent tools endpoint not announced: {error:#}");
             }
         }

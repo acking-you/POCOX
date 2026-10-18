@@ -4094,4 +4094,31 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolsSharing => 'Sharing…';
+
+  @override
+  String get toolsStatusRefused => 'Refused by the relay';
+
+  @override
+  String toolsHours(int count) {
+    return '$count h';
+  }
+
+  @override
+  String toolsMinutes(int count) {
+    return '$count min';
+  }
+
+  @override
+  String browserNoteNoErrors(String title, String url, String device) {
+    return 'Preview of \"$title\" ($url, shared from $device): no console errors.';
+  }
+
+  @override
+  String browserNoteConsole(String title, String url, String device) {
+    return 'Preview of \"$title\" ($url, shared from $device), recent console messages:';
+  }
+
+  @override
+  String get browserNotLocal =>
+      'Only pages shared from your devices open here.';
 }

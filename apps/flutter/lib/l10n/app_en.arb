@@ -1547,5 +1547,15 @@
   "galaxyServices": "{count, plural, =1{1 service} other{{count} services}}",
   "@galaxyServices": {"placeholders": {"count": {"type": "int"}}},
   "toolsShareAndOpen": "Share and open",
-  "toolsSharing": "Sharing…"
+  "toolsSharing": "Sharing…",
+  "toolsStatusRefused": "Refused by the relay",
+  "toolsHours": "{count} h",
+  "@toolsHours": {"placeholders": {"count": {"type": "int"}}},
+  "toolsMinutes": "{count} min",
+  "@toolsMinutes": {"placeholders": {"count": {"type": "int"}}},
+  "browserNoteNoErrors": "Preview of \"{title}\" ({url}, shared from {device}): no console errors.",
+  "@browserNoteNoErrors": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
+  "browserNoteConsole": "Preview of \"{title}\" ({url}, shared from {device}), recent console messages:",
+  "@browserNoteConsole": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}}},
+  "browserNotLocal": "Only pages shared from your devices open here."
 }

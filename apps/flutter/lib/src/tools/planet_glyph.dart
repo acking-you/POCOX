@@ -7,12 +7,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/theme.dart';
 
-/// The colour of a service state: healthy, waiting, failing or gone.
+/// The colour of a service state: healthy, waiting, failing, refused or gone.
 Color statusColor(ColorScheme scheme, String status) => switch (status) {
   'online' => successColor(scheme),
   'starting' => infoColor(scheme),
   'unreachable' => cautionColor(scheme),
-  'error' => scheme.error,
+  'refused' || 'error' => scheme.error,
   _ => scheme.outline,
 };
 

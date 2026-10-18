@@ -163,10 +163,7 @@ fn failed(error: &ToolError) -> CallToolResult {
 }
 
 fn pending(pending: &Pending) -> CallToolResult {
-    let mut value = json!({"status": pending.status(), "message": pending.message()});
-    if let Pending::WaitingForUser(consent) = pending {
-        value["consent"] = json!(consent.id);
-    }
+    let value = json!({"status": pending.status(), "message": pending.message()});
     done(value, pending.message())
 }
 
@@ -188,9 +185,12 @@ async fn services(caller: &Caller, args: &JsonObject) -> CallToolResult {
             .get("mine")
             .and_then(Value::as_bool)
             .unwrap_or(false)
-            .then(|| caller.principal.id.clone()),
+            .then(|| caller.key()),
     };
-    let overview = render::filter(overview, &filter);
+    let mut overview = render::filter(overview, &filter);
+    if !caller.is_user() {
+        overview = render::for_agent(overview);
+    }
     let message = render::table(&overview);
     done(serde_json::to_value(&overview).unwrap_or_default(), message)
 }

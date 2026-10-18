@@ -34,7 +34,7 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
     final messenger = ToastMessenger.of(context);
     try {
       final status = await change(ref.read(bridgeApiProvider));
-      ref.read(toolsStatusProvider.notifier).state = status;
+      if (mounted) ref.read(toolsStatusProvider.notifier).state = status;
     } catch (error) {
       messenger.error(friendlyError(error));
     } finally {
@@ -58,11 +58,18 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
   }
 
   Future<void> _revoke(ToolsToken token) async {
+    if (_busy) return;
+    setState(() => _busy = true);
     final l10n = AppLocalizations.of(context);
     final messenger = ToastMessenger.of(context);
-    await ref.read(bridgeApiProvider).toolsRevoke(token.id);
-    messenger.ok(l10n.toolsRevoked);
-    if (mounted) setState(() {});
+    try {
+      await ref.read(bridgeApiProvider).toolsRevoke(token.id);
+      messenger.ok(l10n.toolsRevoked);
+    } catch (error) {
+      messenger.error(friendlyError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -206,7 +213,7 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
             title: token.label,
             value: l10n.toolsTokens,
             trailing: TextButton(
-              onPressed: () => _revoke(token),
+              onPressed: _busy ? null : () => _revoke(token),
               child: Text(l10n.toolsRevoke),
             ),
           ),

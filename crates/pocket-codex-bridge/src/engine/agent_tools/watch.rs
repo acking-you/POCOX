@@ -32,19 +32,18 @@ use crate::engine::{discovery, meta, runtime, transport};
 pub struct Update {
     /// Everything visible now.
     pub overview: Overview,
-    /// `(device, share id)` of shares announced since the previous update.
+    /// `(device, share id)` of shares announced since the previous update,
+    /// this device's own included.
     pub added: Vec<(String, String)>,
-    /// `(device, consent id)` of requests that appeared since the previous
-    /// update.
-    pub consents_added: Vec<(String, String)>,
 }
 
 #[derive(Default)]
 struct Seen {
     listed: Vec<ServiceId>,
     catalogs: BTreeMap<String, Catalog>,
+    /// This device's catalog at the previous update.
+    local: Option<Catalog>,
     added: Vec<(String, String)>,
-    consents_added: Vec<(String, String)>,
 }
 
 fn stream_client() -> &'static reqwest::Client {
@@ -130,12 +129,6 @@ fn record(device: &str, event: CatalogEvent, seen: &Mutex<Seen>) {
     let mut seen = seen.lock().unwrap_or_else(|p| p.into_inner());
     seen.added
         .extend(event.added.into_iter().map(|id| (device.to_string(), id)));
-    seen.consents_added.extend(
-        event
-            .consents_added
-            .into_iter()
-            .map(|id| (device.to_string(), id)),
-    );
     seen.catalogs
         .insert(device.to_string(), catalog::sanitize(event.catalog));
 }
@@ -146,6 +139,14 @@ fn overview(seen: &mut Seen) -> Update {
     let mut catalogs = seen.catalogs.clone();
     if hosting {
         if let Ok(local) = catalog::local() {
+            // This device's news, as the others learn it from its stream;
+            // what exists when the app starts is not news.
+            if let Some(previous) = &seen.local {
+                let event = CatalogEvent::after(Some(previous), local.clone());
+                seen.added
+                    .extend(event.added.into_iter().map(|id| (this_device.clone(), id)));
+            }
+            seen.local = Some(local.clone());
             catalogs.insert(this_device.clone(), local);
         }
     }
@@ -153,7 +154,6 @@ fn overview(seen: &mut Seen) -> Update {
     Update {
         overview,
         added: std::mem::take(&mut seen.added),
-        consents_added: std::mem::take(&mut seen.consents_added),
     }
 }
 

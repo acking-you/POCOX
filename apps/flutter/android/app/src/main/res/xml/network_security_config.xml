@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The in-app browser opens pages the user's other devices share at
+     http://localhost:<port>, a tunnel this app holds on the phone itself.
+     Only these loopback names may use cleartext; every other host keeps the
+     platform default. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

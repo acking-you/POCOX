@@ -71,6 +71,10 @@ class Backdrop {
   ui.Image? _image;
   bool _disposed = false;
 
+  /// Told when the image arrives: the page that asked for it last, since
+  /// one shared render may outlive the page that started it.
+  VoidCallback? _ready;
+
   /// The rendered image, once ready.
   ui.Image? get image => _image;
 
@@ -84,15 +88,15 @@ class Backdrop {
         current.size == size &&
         current.dark == dark &&
         current.ratio == ratio) {
-      return current;
+      return current.._ready = ready;
     }
     current?._dispose();
-    final next = _current = Backdrop._(size, dark, ratio);
-    next._render(ready);
+    final next = _current = Backdrop._(size, dark, ratio).._ready = ready;
+    next._render();
     return next;
   }
 
-  Future<void> _render(VoidCallback ready) async {
+  Future<void> _render() async {
     final program = await _program;
     if (_disposed || size.isEmpty) return;
     // Half resolution is plenty for smoke and keeps the render quick.
@@ -134,7 +138,7 @@ class Backdrop {
         return;
       }
       _image = image;
-      ready();
+      _ready?.call();
     } catch (_) {
       // No rasteriser (tests): the ground is painted live instead.
     } finally {
@@ -144,6 +148,7 @@ class Backdrop {
 
   void _dispose() {
     _disposed = true;
+    _ready = null;
     _image?.dispose();
     _image = null;
   }

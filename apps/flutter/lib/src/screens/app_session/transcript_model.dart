@@ -97,11 +97,18 @@ class TranscriptItem {
   int? turnDurationMs;
 
   /// The share a finished agent tool call announced (a Codex `pocox` call, or
-  /// any tool output with a `pocox://open` link), read again only when the
-  /// row's text changes.
+  /// any tool output with a `pocox://open` link), read again only when what
+  /// it is read from changes. A live call often has its final text before it
+  /// finishes, so finishing alone reads it again.
   ShareRef? get share {
-    if (!identical(_shareText, text)) {
+    if (!identical(_shareText, text) ||
+        !identical(_shareTitle, title) ||
+        _shareType != type ||
+        _shareStreaming != streaming) {
       _shareText = text;
+      _shareTitle = title;
+      _shareType = type;
+      _shareStreaming = streaming;
       _share = isMessage || streaming
           ? null
           : shareOfToolCall(type: type, title: title, text: text);
@@ -110,6 +117,9 @@ class TranscriptItem {
   }
 
   String? _shareText;
+  String? _shareTitle;
+  String? _shareType;
+  bool? _shareStreaming;
   ShareRef? _share;
 
   /// Whether this row is the user's own message.

@@ -9,6 +9,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_painter.dart';
 import 'package:pocket_codex/src/tools/planet_glyph.dart';
@@ -145,7 +146,7 @@ class _SystemDetail extends ConsumerWidget {
     final device = system.device;
     final facts = [
       if (system.home) l10n.toolsThisDevice,
-      ?device.platform,
+      if (device.platform case final platform?) osLabel(platform),
       if (device.toolsEnabled == false) l10n.toolsOffHere,
       if (!device.catalog) l10n.galaxyOlderPocox,
     ].join(' · ');
@@ -155,7 +156,7 @@ class _SystemDetail extends ConsumerWidget {
       children: [
         _Header(
           leading: Icon(platformIcon(device.platform), size: 26),
-          title: device.name,
+          title: deviceLabel(device.name),
           subtitle: facts.isEmpty ? null : facts,
         ),
         Row(
@@ -193,7 +194,7 @@ class _SystemDetail extends ConsumerWidget {
                     orbit: planet.share?.owner.isAgent ?? false,
                   ),
                   title: Text(
-                    planetLabel(planet),
+                    planetLabel(l10n, planet),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -276,9 +277,10 @@ class _PlanetDetail extends ConsumerWidget {
             color: statusColor(scheme, service.status),
             size: 34,
           ),
-          title: planetLabel(planet),
+          title: planetLabel(l10n, planet),
           subtitle:
-              '${kindLabel(l10n, planet.kind)} · ${system.home ? l10n.toolsThisDevice : system.device.name}',
+              '${kindLabel(l10n, planet.kind)} · '
+              '${system.home ? l10n.toolsThisDevice : deviceLabel(system.device.name)}',
         ),
         Row(
           children: [

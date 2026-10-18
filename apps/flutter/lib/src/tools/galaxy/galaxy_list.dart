@@ -5,6 +5,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_painter.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_panel.dart';
@@ -68,8 +69,8 @@ class GalaxyList extends ConsumerWidget {
         for (final system in scene.systems) ...[
           heading(
             system.home
-                ? '${system.device.name} · ${l10n.toolsThisDevice}'
-                : system.device.name,
+                ? '${deviceLabel(system.device.name)} · ${l10n.toolsThisDevice}'
+                : deviceLabel(system.device.name),
           ),
           if (system.planets.isEmpty)
             Padding(
@@ -93,14 +94,16 @@ class GalaxyList extends ConsumerWidget {
                 orbit: planet.share?.owner.isAgent ?? false,
               ),
               title: Text(
-                planetLabel(planet),
+                planetLabel(l10n, planet),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
                 [
                   kindLabel(l10n, planet.kind),
-                  if (planet.service.owner case final owner?)
+                  if (planet.share?.owner case final owner?)
+                    l10n.toolsBy(ownerLabel(l10n, owner))
+                  else if (planet.service.owner case final owner?)
                     l10n.toolsBy(owner),
                 ].join(' · '),
                 maxLines: 1,

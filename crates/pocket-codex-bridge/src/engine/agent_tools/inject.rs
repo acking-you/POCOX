@@ -15,14 +15,17 @@ use pocket_codex_host_svc::acp::{McpGrant, SessionMcp};
 use serde_json::{json, Map, Value};
 
 use super::{
-    state,
+    model::bounded,
+    state::{self, OwnerKey, State},
     tokens::{Kind, Principal},
 };
 
 /// The environment variable that carries a hosted Codex's token.
 pub const TOKEN_VAR: &str = "POCOX_TOOLS_TOKEN";
 
-/// What one launch gets: where the tools are, and its own token.
+/// What one launch gets: where the tools are, and its own token. The token
+/// is revoked when the grant is dropped before [`hosted_started`] committed
+/// it, so a launch that fails anywhere leaves no valid credential behind.
 pub struct Grant {
     /// The MCP URL.
     pub url: String,
@@ -30,6 +33,33 @@ pub struct Grant {
     pub token: Secret,
     /// The token's id.
     pub token_id: String,
+    committed: bool,
+}
+
+impl Drop for Grant {
+    fn drop(&mut self) {
+        if !self.committed {
+            let id = self.token_id.clone();
+            retract(move |p| p.id == id);
+        }
+    }
+}
+
+/// Revoke the tokens `which` selects and end what they made. A revocation
+/// that cannot be saved still ends them in this process: their holder is
+/// gone or failed to start.
+fn retract(which: impl Fn(&Principal) -> bool) {
+    let revoked = {
+        let mut state = state::lock();
+        match state.tokens.revoke_where(&which) {
+            Ok(revoked) => revoked,
+            Err(error) => {
+                tracing::warn!("agent tool tokens not saved: {error:#}");
+                state.tokens.forget_where(&which)
+            },
+        }
+    };
+    super::ended(&revoked);
 }
 
 fn endpoint() -> Option<String> {
@@ -55,6 +85,7 @@ pub fn hosted(host: &str, harness: &str, label: &str) -> Option<Grant> {
             url: mcp_url(&base),
             token: Secret::new(secret),
             token_id: principal.id,
+            committed: false,
         }),
         Err(error) => {
             tracing::warn!("agent tools not given to `{host}`: {error:#}");
@@ -63,25 +94,23 @@ pub fn hosted(host: &str, harness: &str, label: &str) -> Option<Grant> {
     }
 }
 
-/// A hosted launch came up: an adopted process kept its earlier token, so the
-/// new one is withdrawn; a fresh one replaces the earlier tokens of `host`.
-pub fn hosted_started(host: &str, grant: &Grant, reused: bool) {
+/// A hosted launch is committed (recorded as running): an adopted process
+/// kept its earlier token, so the new one is withdrawn; a fresh one replaces
+/// the earlier tokens of `host`.
+pub fn hosted_started(host: &str, mut grant: Grant, reused: bool) {
+    grant.committed = true;
     let id = grant.token_id.clone();
-    let revoked = state::lock().tokens.revoke_where(|p| {
+    retract(|p| {
         p.kind == Kind::Hosted
             && p.host.as_deref() == Some(host)
             && if reused { p.id == id } else { p.id != id }
     });
-    super::ended(&revoked);
 }
 
 /// A hosted instance stopped: its tokens are revoked and what its harness
 /// shared or connected ends.
 pub fn hosted_stopped(host: &str) {
-    let revoked = state::lock().tokens.revoke_where(|p| {
-        matches!(p.kind, Kind::Hosted | Kind::Session) && p.host.as_deref() == Some(host)
-    });
-    super::ended(&revoked);
+    retract(|p| matches!(p.kind, Kind::Hosted | Kind::Session) && p.host.as_deref() == Some(host));
 }
 
 /// Codex launch overrides for `grant`, with the token's environment entry.
@@ -152,6 +181,83 @@ struct AcpTools {
     claude: bool,
 }
 
+/// One session request's token: revoked unless the agent accepted the
+/// request ([`SessionToken::adopt`]).
+struct SessionToken {
+    id: String,
+    host: String,
+    adopted: bool,
+}
+
+impl SessionToken {
+    /// The agent created or reopened `session` with this token. Earlier
+    /// tokens of a reopened session end, and what they made is the new
+    /// token's, so the session still owns (and can stop) its shares.
+    fn adopt(mut self, session: &str) {
+        self.adopted = true;
+        let session = bounded(session);
+        let mut state = state::lock();
+        state.tokens.bind_session(&self.id, &session);
+        let older: Vec<String> = state
+            .tokens
+            .forget_where(|p| {
+                p.kind == Kind::Session
+                    && p.host.as_deref() == Some(self.host.as_str())
+                    && p.session.as_deref() == Some(session.as_str())
+                    && p.id != self.id
+            })
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
+        rekey(&mut state, &older, &self.id);
+    }
+}
+
+impl Drop for SessionToken {
+    fn drop(&mut self) {
+        if !self.adopted {
+            let id = self.id.clone();
+            retract(move |p| p.id == id);
+        }
+    }
+}
+
+/// Give what tokens `older` own to token `id`.
+fn rekey(state: &mut State, older: &[String], id: &str) {
+    if older.is_empty() {
+        return;
+    }
+    let moved = |key: &mut OwnerKey| {
+        if older.contains(&key.token) {
+            key.token = id.to_string();
+        }
+    };
+    for key in state
+        .shares
+        .iter_mut()
+        .filter_map(|share| share.key.as_mut())
+    {
+        moved(key);
+    }
+    for key in state.connections.iter_mut().filter_map(|c| c.key.as_mut()) {
+        moved(key);
+    }
+    for consent in &mut state.consents {
+        moved(&mut consent.key);
+    }
+    for (key, _) in &mut state.declined {
+        moved(key);
+    }
+    state.allowed = std::mem::take(&mut state.allowed)
+        .into_iter()
+        .map(|mut key| {
+            moved(&mut key);
+            key
+        })
+        .collect();
+    state::changed(state);
+}
+
 impl SessionMcp for AcpTools {
     fn grant(&self, session: Option<&str>) -> Option<McpGrant> {
         let base = endpoint()?;
@@ -169,6 +275,11 @@ impl SessionMcp for AcpTools {
             }
             (principal, secret)
         };
+        let token = SessionToken {
+            id: principal.id,
+            host: self.host.clone(),
+            adopted: false,
+        };
         let servers = vec![json!({
             "type": "http",
             "name": "pocox",
@@ -185,14 +296,20 @@ impl SessionMcp for AcpTools {
             );
             meta
         });
-        let id = principal.id;
         Some(McpGrant {
             servers,
             meta,
-            adopt: Some(Box::new(move |session: &str| {
-                state::lock().tokens.bind_session(&id, session);
-            })),
+            adopt: Some(Box::new(move |session: &str| token.adopt(session))),
         })
+    }
+
+    fn closed(&self, session: &str) {
+        let session = bounded(session);
+        retract(|p| {
+            p.kind == Kind::Session
+                && p.host.as_deref() == Some(self.host.as_str())
+                && p.session.as_deref() == Some(session.as_str())
+        });
     }
 }
 
@@ -216,6 +333,7 @@ mod tests {
             url: "http://127.0.0.1:17863/mcp".into(),
             token: Secret::new("pcxt_secret"),
             token_id: "t".into(),
+            committed: true,
         }
     }
 

@@ -20,8 +20,8 @@ pub struct Filter {
     pub kind: Option<String>,
     /// `online`, `offline` or `all`.
     pub status: Option<String>,
-    /// Only what this token shared or connected.
-    pub mine: Option<String>,
+    /// Only what this owner (token and conversation) shared or connected.
+    pub mine: Option<state::OwnerKey>,
 }
 
 /// `overview` narrowed by `filter`. Management entries are never listed.
@@ -39,9 +39,9 @@ pub fn filter(mut overview: Overview, filter: &Filter) -> Overview {
                 && status.is_none_or(|s| (service.status == "online") == (s == "online"))
         });
     }
-    if let Some(token) = &filter.mine {
+    if let Some(owner) = &filter.mine {
         let state = state::lock();
-        let owned = |key: Option<&state::OwnerKey>| key.is_some_and(|k| &k.token == token);
+        let owned = |key: Option<&state::OwnerKey>| key == Some(owner);
         let shares: HashSet<String> = state
             .shares
             .iter()
@@ -66,6 +66,21 @@ pub fn filter(mut overview: Overview, filter: &Filter) -> Overview {
         overview
             .connections
             .retain(|c| connections.contains(&c.service));
+    }
+    overview
+}
+
+/// What an agent sees: no requests waiting for the user (answering them is
+/// the user's) and no conversation ids, which only the user's devices need.
+pub fn for_agent(mut overview: Overview) -> Overview {
+    for device in &mut overview.devices {
+        device.consents.clear();
+        for share in &mut device.shares {
+            share.owner.conversation = None;
+        }
+    }
+    for connection in &mut overview.connections {
+        connection.owner.conversation = None;
     }
     overview
 }

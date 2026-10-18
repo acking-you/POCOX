@@ -3,6 +3,8 @@
 /// bodies that just appeared, changed or left.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_camera.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
@@ -60,6 +62,10 @@ class GalaxyView extends ChangeNotifier {
   /// Whether motion is reduced (a still scene).
   bool still = false;
 
+  /// The time orbits are drawn at: a still scene keeps every body where its
+  /// orbit starts while the clock runs on.
+  double get orbitTime => still ? 0 : time;
+
   /// The selected body.
   String? selected;
 
@@ -84,14 +90,16 @@ class GalaxyView extends ChangeNotifier {
   /// Repaint.
   void tick() => notifyListeners();
 
-  /// Take [next] as the scene, noting what appeared, changed or left.
+  /// Take [next] as the scene, noting what appeared, changed or left (a
+  /// still scene shows changes without motion).
   void update(GalaxyScene next, {required bool first}) {
+    final animate = !first && !still;
     final before = <String, ({String status, Vec3 at, double size})>{};
     for (final system in scene.systems) {
       for (final planet in system.planets) {
         before[planet.id] = (
           status: planet.service.status,
-          at: system.position + planet.offsetAt(time),
+          at: system.position + planet.offsetAt(orbitTime),
           size: planet.size,
         );
       }
@@ -102,14 +110,14 @@ class GalaxyView extends ChangeNotifier {
         now.add(planet.id);
         final old = before[planet.id];
         if (old == null) {
-          if (!first) appeared[planet.id] = time;
-        } else if (old.status != planet.service.status) {
+          if (animate) appeared[planet.id] = time;
+        } else if (old.status != planet.service.status && animate) {
           rippled[planet.id] = time;
         }
       }
     }
     for (final entry in before.entries) {
-      if (!now.contains(entry.key) && !first) {
+      if (!now.contains(entry.key) && animate) {
         ghosts.add(Ghost(entry.value.at, Colors.white, entry.value.size, time));
       }
     }
@@ -117,27 +125,37 @@ class GalaxyView extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The world position of body [id] now, if it exists.
+  /// The world position of body [id] as it is drawn now, if it exists.
   Vec3? positionOf(String id) {
     for (final system in scene.systems) {
       if (system.id == id) return system.position;
       for (final planet in system.planets) {
-        if (planet.id == id) return system.position + planet.offsetAt(time);
+        if (planet.id == id) {
+          return system.position + planet.offsetAt(orbitTime);
+        }
       }
     }
     return null;
   }
 
-  /// The front-most body within reach of [point].
+  /// The front-most body drawn under [point]; else the nearest one within
+  /// reach, so a small body still takes a fingertip.
   Hit? hitAt(Offset point) {
-    Hit? best;
+    Hit? drawn;
+    Hit? near;
+    var nearest = double.infinity;
     for (final hit in hits) {
-      final reach = hit.radius + 12 < 22 ? 22 : hit.radius + 12;
-      if ((hit.center - point).distance <= reach &&
-          (best == null || hit.depth < best.depth)) {
-        best = hit;
+      final distance = (hit.center - point).distance;
+      if (distance <= hit.radius &&
+          (drawn == null || hit.depth < drawn.depth)) {
+        drawn = hit;
+      }
+      final reach = math.max(22.0, hit.radius + 12);
+      if (distance <= reach && distance < nearest) {
+        near = hit;
+        nearest = distance;
       }
     }
-    return best;
+    return drawn ?? near;
   }
 }

@@ -18,14 +18,29 @@ pub const MAX_SHARED_PORTS: usize = 8;
 /// Most ports one share holds.
 pub const MAX_PORTS_PER_SHARE: usize = 4;
 
+/// The app's preferred endpoint port; the CLI host uses the next one.
+pub const APP_PORT: u16 = 17863;
+
+/// The CLI host's preferred endpoint port.
+pub const CLI_PORT: u16 = 17864;
+
 /// How long an agent's share or connection lives unless kept.
 pub const AGENT_LEASE_MS: i64 = 24 * 60 * 60 * 1000;
 
-/// `text` without control characters, trimmed and at most [`MAX_LABEL`]
-/// characters.
+/// Characters that change how text around them is shown without being
+/// visible themselves: bidirectional controls (which can make "port 3715"
+/// read as "5173" in a consent prompt), zero-width and other format marks.
+fn invisible(c: char) -> bool {
+    matches!(c,
+        '\u{061C}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}'
+        | '\u{2060}'..='\u{206F}' | '\u{FEFF}' | '\u{FFF9}'..='\u{FFFB}')
+}
+
+/// `text` without control or invisible formatting characters, trimmed and at
+/// most [`MAX_LABEL`] characters.
 pub fn bounded(text: &str) -> String {
     text.chars()
-        .filter(|c| !c.is_control())
+        .filter(|c| !c.is_control() && !invisible(*c))
         .collect::<String>()
         .trim()
         .chars()
@@ -146,6 +161,8 @@ pub enum PortStatus {
     Starting,
     /// Published, but nothing answers on the port.
     Unreachable,
+    /// The relay refused the registration; retried with a pause.
+    Refused,
 }
 
 /// A share waiting for the user's answer.
@@ -176,10 +193,6 @@ pub struct CatalogEvent {
     /// Shares that appeared since the previous message (none in the first).
     #[serde(default)]
     pub added: Vec<String>,
-    /// Consent requests that appeared since the previous message (all
-    /// pending ones in the first).
-    #[serde(default)]
-    pub consents_added: Vec<String>,
 }
 
 impl CatalogEvent {
@@ -194,19 +207,9 @@ impl CatalogEvent {
                 .map(|share| share.id.clone())
                 .collect(),
         };
-        let consents_added = catalog
-            .consents
-            .iter()
-            .filter(|consent| {
-                previous
-                    .is_none_or(|previous| previous.consents.iter().all(|old| old.id != consent.id))
-            })
-            .map(|consent| consent.id.clone())
-            .collect();
         Self {
             catalog,
             added,
-            consents_added,
         }
     }
 }

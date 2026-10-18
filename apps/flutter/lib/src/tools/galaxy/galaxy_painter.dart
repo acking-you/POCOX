@@ -6,6 +6,8 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_camera.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
@@ -81,28 +83,28 @@ Vec3 _turned(Vec3 p, double angle) {
 }
 
 /// What a planet is called on its label.
-String planetLabel(Planet planet) {
+String planetLabel(AppLocalizations l10n, Planet planet) {
   final service = planet.service;
   return switch (planet.kind) {
-    BodyKind.port => service.title ?? 'port ${service.name}',
-    BodyKind.agent => _agentLabel(service.agent, service.name),
+    BodyKind.port => service.title ?? l10n.toolsPort(service.name),
+    BodyKind.agent => _agentLabel(l10n, service.agent, service.name),
     BodyKind.api => 'API · ${service.name}',
   };
 }
 
 /// `Claude`, or `Codex · work` when the instance has a name of its own.
-String _agentLabel(String? agent, String name) {
-  final title = _agentName(agent);
+String _agentLabel(AppLocalizations l10n, String? agent, String name) {
+  final title = _agentName(l10n, agent);
   final plain =
       name == 'default' || name.toLowerCase() == (agent ?? '').toLowerCase();
   return plain ? title : '$title · $name';
 }
 
-String _agentName(String? agent) => switch (agent) {
+String _agentName(AppLocalizations l10n, String? agent) => switch (agent) {
   'codex' => 'Codex',
   'claude' => 'Claude',
   'opencode' => 'OpenCode',
-  null || '' => 'Agent',
+  null || '' || 'acp' => l10n.galaxyKindAgent,
   final other => other,
 };
 
@@ -118,6 +120,7 @@ class GalaxyPainter extends CustomPainter {
   GalaxyPainter({
     required this.view,
     required this.palette,
+    required this.l10n,
     required this.labels,
     required this.starfield,
     required this.onBackdrop,
@@ -128,6 +131,9 @@ class GalaxyPainter extends CustomPainter {
 
   /// In which colours.
   final GalaxyPalette palette;
+
+  /// In which language bodies are named.
+  final AppLocalizations l10n;
 
   /// Label layout cache.
   final LabelCache labels;
@@ -141,6 +147,12 @@ class GalaxyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
+    if (view.still) {
+      // A still scene has no entrances, ripples or fading ghosts.
+      view.appeared.clear();
+      view.rippled.clear();
+      view.ghosts.clear();
+    }
     final dark = palette.dark;
     final camera = view.camera;
     Backdrop.of(size, dark, palette.ratio, onBackdrop).paint(canvas);
@@ -171,7 +183,7 @@ class GalaxyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(GalaxyPainter old) =>
-      old.view != view || !old.palette.same(palette);
+      old.view != view || !old.palette.same(palette) || old.l10n != l10n;
 }
 
 /// One frame's drawing state.
@@ -344,7 +356,7 @@ class _Frame {
     final since = view.appeared[planet.id];
     final appear = since == null ? 1.0 : _easeOut((view.time - since) / 1.6);
     if (since != null && appear >= 1) view.appeared.remove(planet.id);
-    final orbit = planet.offsetAt(view.still ? 0 : view.time);
+    final orbit = planet.offsetAt(view.orbitTime);
     // A new body spirals out of its star: it turns half a revolution while
     // its distance grows.
     final local = appear >= 1
@@ -435,7 +447,15 @@ class _Frame {
       paintPlanet(canvas, c, radius, color, dark: false, opacity: opacity);
     }
     _focusRings(system.id, c, radius);
-    hits.add(Hit(system.id, c, radius * 1.6, core.depth, system.device.name));
+    hits.add(
+      Hit(
+        system.id,
+        c,
+        radius * 1.6,
+        core.depth,
+        deviceLabel(system.device.name),
+      ),
+    );
   }
 
   void _planet(
@@ -486,7 +506,15 @@ class _Frame {
       _agentShare(c, radius, share.owner.harness, share.expiresMs, opacity);
     }
     _focusRings(planet.id, c, radius);
-    hits.add(Hit(planet.id, c, radius, projected.depth, planetLabel(planet)));
+    hits.add(
+      Hit(
+        planet.id,
+        c,
+        radius,
+        projected.depth,
+        planetLabel(painter.l10n, planet),
+      ),
+    );
   }
 
   /// An agent's share: a dashed orbit, its harness as a moon, and a thin arc
@@ -568,8 +596,7 @@ class _Frame {
   void links() {
     for (final link in view.scene.links) {
       final from =
-          link.from.system.position +
-          link.from.planet.offsetAt(view.still ? 0 : view.time);
+          link.from.system.position + link.from.planet.offsetAt(view.orbitTime);
       final to = link.to.position;
       final rise = (to - from).length * 0.42 + 0.4;
       final control = from.lerp(to, 0.5) + Vec3(0, rise, 0);

@@ -47,7 +47,8 @@ struct Row {
 }
 
 async fn row(installation: &Installation) -> Row {
-    let saved = settings::load_at(&installation.root).unwrap_or_default();
+    let saved =
+        settings::load_at(&installation.root).unwrap_or_else(|_| settings::Settings::closed());
     let live: Option<Status> = match local_tools::reach(installation).await {
         Some(local) => local.get::<Status>("status").await.ok(),
         None => None,
@@ -141,7 +142,10 @@ async fn config(harness: &str) -> Result<()> {
         .await?;
     // The entry alone goes to stdout, so it can be piped into a file.
     print!("{}", harness::snippet(harness, &issued));
-    eprintln!("The token is shown once; revoke it in POCOX settings.");
+    eprintln!(
+        "{} The token is shown once; revoke it in POCOX settings.",
+        harness::destination(harness)
+    );
     Ok(())
 }
 
@@ -160,8 +164,10 @@ fn change(
         })
         .collect();
     if chosen.is_empty() {
-        ui::muted("no POCOX installation has hosted on this computer yet");
-        return Ok(());
+        anyhow::bail!(
+            "no POCOX installation has hosted on this computer yet; pass --app or --cli-host to \
+             choose which one to set"
+        );
     }
     for installation in chosen {
         settings::update_at(&installation.root, &apply)?;

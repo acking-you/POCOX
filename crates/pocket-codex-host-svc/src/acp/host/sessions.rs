@@ -20,7 +20,7 @@ impl AgentHost {
 
     /// A session request: `params` with this host's `_meta` and the MCP
     /// servers for `session` (`None`: being created), and what to tell the
-    /// servers' owner once a new session has its id.
+    /// servers' owner once the agent accepted it.
     fn session_request(
         &self,
         params: Value,
@@ -44,7 +44,14 @@ impl AgentHost {
     }
 
     fn close_session(&self, session: Option<String>, peer: &Peer, caps: &AgentCapabilities) {
-        let (Some(session), true) = (session, caps.close_session) else { return };
+        let Some(session) = session else { return };
+        let mcp = lock(&self.inner.session_mcp).clone();
+        if let Some(mcp) = mcp {
+            mcp.closed(&session);
+        }
+        if !caps.close_session {
+            return;
+        }
         let peer = peer.clone();
         tokio::spawn(async move {
             let _ = peer
@@ -222,7 +229,7 @@ impl AgentHost {
             evicted
         };
         self.close_session(evicted, &peer, &caps);
-        let (params, _) =
+        let (params, adopt) =
             self.session_request(json!({"sessionId": id, "cwd": cwd}), Some(id), &caps);
         let result = peer.request(method, params, Some(LOAD_TIMEOUT)).await;
         let result = match result {
@@ -282,6 +289,9 @@ impl AgentHost {
             self.inner
                 .persist
                 .submit(|pending| pending.record(id, cwd, title));
+        }
+        if let Some(adopt) = adopt {
+            adopt(id);
         }
         Ok(self.opened(id, mode))
     }

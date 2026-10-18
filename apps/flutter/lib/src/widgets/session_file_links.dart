@@ -126,6 +126,7 @@ class _HostWebLinkState extends State<_HostWebLink> {
           service: key,
           path: shared.share.path,
           title: shared.share.title,
+          secure: uri.scheme == 'https',
         ),
       );
       if (mounted) Navigator.of(context).pop();

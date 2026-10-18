@@ -29,6 +29,7 @@ String ownerLabel(AppLocalizations l10n, ToolsOwner owner) =>
 String statusLabel(AppLocalizations l10n, String status) => switch (status) {
   'online' => l10n.toolsStatusOnline,
   'unreachable' => l10n.toolsStatusUnreachable,
+  'refused' => l10n.toolsStatusRefused,
   'offline' => l10n.toolsStatusOffline,
   _ => l10n.toolsStatusStarting,
 };
@@ -42,8 +43,8 @@ String endsLabel(AppLocalizations l10n, ToolsShare share) {
   ).difference(DateTime.now());
   if (left.isNegative) return l10n.toolsEnded;
   final time = left.inHours >= 1
-      ? '${left.inHours} h'
-      : '${left.inMinutes} min';
+      ? l10n.toolsHours(left.inHours)
+      : l10n.toolsMinutes(left.inMinutes);
   return l10n.toolsEndsIn(time);
 }
 
@@ -77,9 +78,12 @@ Future<void> openShareWith(
     if (share.device == overview.thisDevice) {
       port = share.port;
     } else {
-      final connection =
-          overview.connectionTo(share.service) ??
-          await api.toolsConnect(share.service);
+      final connected = read(shareConnectionsProvider);
+      var connection = overview.connectionTo(share.service);
+      if (connection == null) {
+        connection = await api.toolsConnect(share.service);
+        connected[share.service] = share.device;
+      }
       port = connection.localPort;
       if (!connection.samePort && share.port != null) {
         messenger.notice(
@@ -90,12 +94,19 @@ Future<void> openShareWith(
       for (final other in shared?.share.ports ?? const <ToolsPort>[]) {
         if (other.key != share.service &&
             overview.connectionTo(other.key) == null) {
-          unawaited(api.toolsConnect(other.key).then((_) {}, onError: (_) {}));
+          unawaited(
+            api
+                .toolsConnect(other.key)
+                .then(
+                  (_) => connected[other.key] = share.device,
+                  onError: (_) {},
+                ),
+          );
         }
       }
     }
     if (port == null) throw StateError('no local port');
-    final url = 'http://localhost:$port${share.path}';
+    final url = '${share.scheme}://localhost:$port${share.path}';
     final name = title ?? shared?.share.title ?? share.title ?? url;
     if (isDesktop) {
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
