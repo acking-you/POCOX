@@ -173,10 +173,11 @@ jobs:
           mkdir -p "dist/$name"
           # The former command name ships beside it, so an archive extracted
           # over an older install keeps scripts written for `pocket-codex`
-          # working.
+          # working. Windows gets a copy of the binary rather than a shim: an
+          # older `pocket-codex.exe` left in place would win over a `.cmd`.
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/"
-            printf '@"%%~dp0pocox.exe" %%*\r\n' > "dist/$name/pocket-codex.cmd"
+            cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/pocket-codex.exe"
             (cd dist && 7z a "$name.zip" "$name" >/dev/null)
           else
             cp "target/${{ matrix.target }}/release/pocox" "dist/$name/"

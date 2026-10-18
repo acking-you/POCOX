@@ -149,6 +149,11 @@ else
   bindir="$HOME/.local/bin"
 fi
 mkdir -p "$bindir" || err "could not create install dir: $bindir"
+# A `pocket-codex` link there (the desktop app's, or the alias of a newer
+# `pocox`) is never replaced by an older CLI.
+if [ "$name" = "$OLD_BIN" ] && [ -L "$bindir/$OLD_BIN" ]; then
+  err "$bindir/$OLD_BIN is a link this release would replace; choose another POCKET_CODEX_BIN_DIR."
+fi
 mv -f "$src" "$bindir/$name" || err "could not write to $bindir (try POCKET_CODEX_BIN_DIR=/some/writable/dir)."
 
 newver="$("$bindir/$name" --version 2>/dev/null | awk 'NR==1{print $NF}')"

@@ -13,7 +13,8 @@ breaking change goes.
   in place (also in an explicit `POCKET_CODEX_BIN_DIR`) and keep that name as an
   alias, so scripts and systemd units written for it keep working, and workers
   it started stay manageable after the upgrade. Release archives carry the
-  alias too. A release from before the rename installs under its own name.
+  alias too (a symlink in the tarballs, a copy of the binary in the Windows
+  zip). A release from before the rename installs under its own name.
   Release asset names are unchanged.
 
 ## 0.4.0 — 2026-10-18
