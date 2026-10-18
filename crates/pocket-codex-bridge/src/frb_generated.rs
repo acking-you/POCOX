@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1723586774;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -79871735;
 
 
 // Section: executor
@@ -6174,6 +6174,47 @@ fn wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
         },
     )
 }
+fn wire__crate__api__bridge__agent_tools__tools_grant_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tools_grant",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_service = <String>::sse_decode(&mut deserializer);
+            let api_conversation = <String>::sse_decode(&mut deserializer);
+            let api_tools = <Vec<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || {
+                        let output_ok = crate::api::bridge::agent_tools::tools_grant(
+                            api_service,
+                            api_conversation,
+                            api_tools,
+                        )?;
+                        Ok(output_ok)
+                    })(),
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -7867,6 +7908,20 @@ impl SseDecode for Vec<crate::api::bridge::threads::ThreadMetaDto> {
     }
 }
 
+impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsBuiltinToolDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::bridge::agent_tools::ToolsBuiltinToolDto>::sse_decode(
+                deserializer,
+            ));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::bridge::agent_tools::ToolsConnectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -8897,6 +8952,22 @@ impl SseDecode for crate::api::bridge::threads::ThreadRuntimeConfigDto {
     }
 }
 
+impl SseDecode for crate::api::bridge::agent_tools::ToolsBuiltinToolDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_id = <String>::sse_decode(deserializer);
+        let mut var_title = <String>::sse_decode(deserializer);
+        let mut var_summary = <String>::sse_decode(deserializer);
+        let mut var_gated = <bool>::sse_decode(deserializer);
+        return crate::api::bridge::agent_tools::ToolsBuiltinToolDto {
+            id: var_id,
+            title: var_title,
+            summary: var_summary,
+            gated: var_gated,
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::agent_tools::ToolsConnectionDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -8951,6 +9022,8 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsDeviceDto {
             <Vec<crate::api::bridge::agent_tools::ToolsShareDto>>::sse_decode(deserializer);
         let mut var_consents =
             <Vec<crate::api::bridge::agent_tools::ToolsConsentDto>>::sse_decode(deserializer);
+        let mut var_builtinTools =
+            <Vec<crate::api::bridge::agent_tools::ToolsBuiltinToolDto>>::sse_decode(deserializer);
         return crate::api::bridge::agent_tools::ToolsDeviceDto {
             name: var_name,
             platform: var_platform,
@@ -8960,6 +9033,7 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsDeviceDto {
             services: var_services,
             shares: var_shares,
             consents: var_consents,
+            builtin_tools: var_builtinTools,
         };
     }
 }
@@ -10033,61 +10107,67 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        162 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
+        162 => wire__crate__api__bridge__agent_tools__tools_grant_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        163 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
+        163 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        164 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
+        164 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        165 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
+        165 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        166 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
+        166 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        167 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
+        167 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        168 => wire__crate__api__bridge__agent_tools__tools_share_impl(
+        168 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        169 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
+        169 => wire__crate__api__bridge__agent_tools__tools_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        171 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+        170 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        173 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
+        172 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        174 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
             port,
             ptr,
             rust_vec_len,
@@ -10159,10 +10239,10 @@ fn pde_ffi_dispatcher_sync_impl(
             rust_vec_len,
             data_len,
         ),
-        170 => {
+        171 => {
             wire__crate__api__bridge__agent_tools__tools_status_impl(ptr, rust_vec_len, data_len)
         },
-        172 => {
+        173 => {
             wire__crate__api__bridge__agent_tools__tools_tokens_impl(ptr, rust_vec_len, data_len)
         },
         _ => unreachable!(),
@@ -11959,6 +12039,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::threads::ThreadRuntim
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsBuiltinToolDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.id.into_into_dart().into_dart(),
+            self.title.into_into_dart().into_dart(),
+            self.summary.into_into_dart().into_dart(),
+            self.gated.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::agent_tools::ToolsBuiltinToolDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsBuiltinToolDto>
+    for crate::api::bridge::agent_tools::ToolsBuiltinToolDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::agent_tools::ToolsBuiltinToolDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsConnectionDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -12019,6 +12122,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::agent_tools::ToolsDev
             self.services.into_into_dart().into_dart(),
             self.shares.into_into_dart().into_dart(),
             self.consents.into_into_dart().into_dart(),
+            self.builtin_tools.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -13164,6 +13268,16 @@ impl SseEncode for Vec<crate::api::bridge::threads::ThreadMetaDto> {
     }
 }
 
+impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsBuiltinToolDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::bridge::agent_tools::ToolsBuiltinToolDto>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::api::bridge::agent_tools::ToolsConnectionDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -13882,6 +13996,16 @@ impl SseEncode for crate::api::bridge::threads::ThreadRuntimeConfigDto {
     }
 }
 
+impl SseEncode for crate::api::bridge::agent_tools::ToolsBuiltinToolDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.id, serializer);
+        <String>::sse_encode(self.title, serializer);
+        <String>::sse_encode(self.summary, serializer);
+        <bool>::sse_encode(self.gated, serializer);
+    }
+}
+
 impl SseEncode for crate::api::bridge::agent_tools::ToolsConnectionDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -13920,6 +14044,10 @@ impl SseEncode for crate::api::bridge::agent_tools::ToolsDeviceDto {
         <Vec<crate::api::bridge::agent_tools::ToolsShareDto>>::sse_encode(self.shares, serializer);
         <Vec<crate::api::bridge::agent_tools::ToolsConsentDto>>::sse_encode(
             self.consents,
+            serializer,
+        );
+        <Vec<crate::api::bridge::agent_tools::ToolsBuiltinToolDto>>::sse_encode(
+            self.builtin_tools,
             serializer,
         );
     }

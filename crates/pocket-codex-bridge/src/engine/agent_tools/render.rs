@@ -212,6 +212,7 @@ mod tests {
                 ],
                 shares: vec![],
                 consents: vec![],
+                builtin: vec![],
             }],
             connections: vec![],
         };

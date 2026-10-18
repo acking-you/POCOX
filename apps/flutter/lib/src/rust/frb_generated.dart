@@ -82,7 +82,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1723586774;
+  int get rustContentHash => -79871735;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -822,6 +822,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiBridgeAgentToolsToolsDisconnect({
     required String service,
+  });
+
+  Future<void> crateApiBridgeAgentToolsToolsGrant({
+    required String service,
+    required String conversation,
+    required List<String> tools,
   });
 
   Future<String> crateApiBridgeAgentToolsToolsHarnessConfig({
@@ -6353,6 +6359,43 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "tools_disconnect", argNames: ["service"]);
 
   @override
+  Future<void> crateApiBridgeAgentToolsToolsGrant({
+    required String service,
+    required String conversation,
+    required List<String> tools,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(service, serializer);
+          sse_encode_String(conversation, serializer);
+          sse_encode_list_String(tools, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 162,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiBridgeAgentToolsToolsGrantConstMeta,
+        argValues: [service, conversation, tools],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeAgentToolsToolsGrantConstMeta =>
+      const TaskConstMeta(
+        debugName: "tools_grant",
+        argNames: ["service", "conversation", "tools"],
+      );
+
+  @override
   Future<String> crateApiBridgeAgentToolsToolsHarnessConfig({
     required String harness,
   }) {
@@ -6364,7 +6407,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 162,
+            funcId: 163,
             port: port_,
           );
         },
@@ -6399,7 +6442,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 163,
+            funcId: 164,
             port: port_,
           );
         },
@@ -6429,7 +6472,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 164,
+            funcId: 165,
             port: port_,
           );
         },
@@ -6457,7 +6500,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 165,
+            funcId: 166,
             port: port_,
           );
         },
@@ -6487,7 +6530,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 166,
+            funcId: 167,
             port: port_,
           );
         },
@@ -6521,7 +6564,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 167,
+            funcId: 168,
             port: port_,
           );
         },
@@ -6558,7 +6601,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 168,
+            funcId: 169,
             port: port_,
           );
         },
@@ -6599,7 +6642,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 169,
+            funcId: 170,
             port: port_,
           );
         },
@@ -6629,7 +6672,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 170,
+            funcId: 171,
           )!;
         },
         codec: SseCodec(
@@ -6660,7 +6703,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 171,
+            funcId: 172,
             port: port_,
           );
         },
@@ -6690,7 +6733,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 172,
+            funcId: 173,
           )!;
         },
         codec: SseCodec(
@@ -6719,7 +6762,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 173,
+              funcId: 174,
               port: port_,
             );
           },
@@ -7765,6 +7808,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ToolsBuiltinToolDto> dco_decode_list_tools_builtin_tool_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_tools_builtin_tool_dto)
+        .toList();
+  }
+
+  @protected
   List<ToolsConnectionDto> dco_decode_list_tools_connection_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_tools_connection_dto).toList();
@@ -8473,6 +8526,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ToolsBuiltinToolDto dco_decode_tools_builtin_tool_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return ToolsBuiltinToolDto(
+      id: dco_decode_String(arr[0]),
+      title: dco_decode_String(arr[1]),
+      summary: dco_decode_String(arr[2]),
+      gated: dco_decode_bool(arr[3]),
+    );
+  }
+
+  @protected
   ToolsConnectionDto dco_decode_tools_connection_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -8507,8 +8574,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsDeviceDto dco_decode_tools_device_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return ToolsDeviceDto(
       name: dco_decode_String(arr[0]),
       platform: dco_decode_opt_String(arr[1]),
@@ -8518,6 +8585,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       services: dco_decode_list_tools_service_dto(arr[5]),
       shares: dco_decode_list_tools_share_dto(arr[6]),
       consents: dco_decode_list_tools_consent_dto(arr[7]),
+      builtinTools: dco_decode_list_tools_builtin_tool_dto(arr[8]),
     );
   }
 
@@ -10109,6 +10177,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<ToolsBuiltinToolDto> sse_decode_list_tools_builtin_tool_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <ToolsBuiltinToolDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_tools_builtin_tool_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<ToolsConnectionDto> sse_decode_list_tools_connection_dto(
     SseDeserializer deserializer,
   ) {
@@ -11132,6 +11214,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ToolsBuiltinToolDto sse_decode_tools_builtin_tool_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_title = sse_decode_String(deserializer);
+    var var_summary = sse_decode_String(deserializer);
+    var var_gated = sse_decode_bool(deserializer);
+    return ToolsBuiltinToolDto(
+      id: var_id,
+      title: var_title,
+      summary: var_summary,
+      gated: var_gated,
+    );
+  }
+
+  @protected
   ToolsConnectionDto sse_decode_tools_connection_dto(
     SseDeserializer deserializer,
   ) {
@@ -11180,6 +11279,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_services = sse_decode_list_tools_service_dto(deserializer);
     var var_shares = sse_decode_list_tools_share_dto(deserializer);
     var var_consents = sse_decode_list_tools_consent_dto(deserializer);
+    var var_builtinTools = sse_decode_list_tools_builtin_tool_dto(deserializer);
     return ToolsDeviceDto(
       name: var_name,
       platform: var_platform,
@@ -11189,6 +11289,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       services: var_services,
       shares: var_shares,
       consents: var_consents,
+      builtinTools: var_builtinTools,
     );
   }
 
@@ -12557,6 +12658,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_tools_builtin_tool_dto(
+    List<ToolsBuiltinToolDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_tools_builtin_tool_dto(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_tools_connection_dto(
     List<ToolsConnectionDto> self,
     SseSerializer serializer,
@@ -13349,6 +13462,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_tools_builtin_tool_dto(
+    ToolsBuiltinToolDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.title, serializer);
+    sse_encode_String(self.summary, serializer);
+    sse_encode_bool(self.gated, serializer);
+  }
+
+  @protected
   void sse_encode_tools_connection_dto(
     ToolsConnectionDto self,
     SseSerializer serializer,
@@ -13389,6 +13514,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_list_tools_service_dto(self.services, serializer);
     sse_encode_list_tools_share_dto(self.shares, serializer);
     sse_encode_list_tools_consent_dto(self.consents, serializer);
+    sse_encode_list_tools_builtin_tool_dto(self.builtinTools, serializer);
   }
 
   @protected

@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+pub use super::builtin::BuiltinTool;
+
 /// Version of `/services/v1` and of the local surface.
 pub const PROTOCOL: u32 = 1;
 
@@ -70,6 +72,10 @@ pub struct Catalog {
     /// Agent hosts and APIs this device serves.
     #[serde(default)]
     pub services: Vec<HostedView>,
+    /// Built-in tools a conversation on this device can be handed from the
+    /// composer (none from a POCOX that predates them).
+    #[serde(default)]
+    pub builtin: Vec<BuiltinTool>,
 }
 
 /// The switch of one installation.
@@ -284,6 +290,9 @@ pub struct DeviceView {
     /// Shares of it waiting for the user.
     #[serde(default)]
     pub consents: Vec<ConsentView>,
+    /// Its built-in tools, when its catalog answered.
+    #[serde(default)]
+    pub builtin: Vec<BuiltinTool>,
 }
 
 /// One service in an [`Overview`].

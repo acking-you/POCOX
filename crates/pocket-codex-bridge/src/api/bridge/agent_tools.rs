@@ -166,6 +166,18 @@ pub struct ToolsServiceDto {
     pub share: Option<String>,
 }
 
+/// A built-in tool the composer can hand a conversation on a device.
+pub struct ToolsBuiltinToolDto {
+    /// Stable id (`services`, `share`, `connect`).
+    pub id: String,
+    /// English name, for an id this app does not know.
+    pub title: String,
+    /// What it lets the agent do, for an id this app does not know.
+    pub summary: String,
+    /// Picking it gives the user's consent for the conversation.
+    pub gated: bool,
+}
+
 /// One device.
 pub struct ToolsDeviceDto {
     /// Device id.
@@ -184,6 +196,8 @@ pub struct ToolsDeviceDto {
     pub shares: Vec<ToolsShareDto>,
     /// Its shares waiting for the user.
     pub consents: Vec<ToolsConsentDto>,
+    /// Its built-in tools (none from an older POCOX).
+    pub builtin_tools: Vec<ToolsBuiltinToolDto>,
 }
 
 /// A service of another device reachable here.
@@ -258,6 +272,16 @@ fn overview(o: model::Overview) -> ToolsOverviewDto {
                         ports: c.ports,
                         created_ms: c.created_ms,
                         expires_ms: c.expires_ms,
+                    })
+                    .collect(),
+                builtin_tools: d
+                    .builtin
+                    .into_iter()
+                    .map(|t| ToolsBuiltinToolDto {
+                        id: t.id,
+                        title: t.title,
+                        summary: t.summary,
+                        gated: t.gated,
                     })
                     .collect(),
             })
@@ -359,6 +383,19 @@ pub fn tools_answer(device: String, consent_id: String, decision: String) -> Res
     let decision: model::Decision = serde_json::from_value(serde_json::Value::String(decision))
         .map_err(|_| anyhow!("unknown decision"))?;
     tools::answer_on(&device, &consent_id, decision)
+}
+
+/// Hand built-in `tools` the user picked in the composer to `conversation`
+/// of agent service `service`, on whichever device hosts it: the gated ones
+/// need no consent prompt in that conversation.
+pub fn tools_grant(service: String, conversation: String, tools: Vec<String>) -> Result<()> {
+    use pocket_codex_account_proto::key::NamespacedServiceId;
+    use pocket_codex_core::service::ServiceId;
+    let device = ServiceId::parse_key(&service)
+        .or_else(|| NamespacedServiceId::parse_key(&service).map(|id| id.service))
+        .map(|id| id.device)
+        .ok_or_else(|| anyhow!("not a service key"))?;
+    tools::grant_on(&device, &service, &conversation, &tools)
 }
 
 /// Stop a share of `device`, as the user.

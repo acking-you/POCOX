@@ -15,6 +15,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Notify;
 
 use super::{
+    builtin::SHARE,
     error::{Pending, ToolError},
     model::{ConsentView, Decision},
     shares::Caller,
@@ -59,7 +60,10 @@ fn look(
     }) {
         return Ok(Answer::Allowed);
     }
-    if !state.settings.ask_before_sharing || state.allowed.contains(key) {
+    if !state.settings.ask_before_sharing
+        || state.allowed.contains(key)
+        || state.granted(caller, key, SHARE)
+    {
         return Ok(Answer::Allowed);
     }
     if state
@@ -194,6 +198,26 @@ fn answer_in(
     Ok(woken)
 }
 
+/// The user handed a gated built-in tool to conversation `conversation` of
+/// hosted instance `host` from the composer: its requests waiting for an
+/// answer go ahead (the woken calls find the grant). Returns the calls to
+/// wake once the state is unlocked.
+pub fn settle_granted(
+    state: &mut State,
+    host: &str,
+    conversation: Option<&str>,
+) -> Vec<Arc<Notify>> {
+    let (gone, kept): (Vec<Consent>, Vec<Consent>) = std::mem::take(&mut state.consents)
+        .into_iter()
+        .partition(|consent| {
+            consent.decision.is_none()
+                && consent.view.owner.host.as_deref() == Some(host)
+                && consent.key.conversation.as_deref() == conversation
+        });
+    state.consents = kept;
+    gone.into_iter().map(|consent| consent.answered).collect()
+}
+
 fn remove(state: &mut State, which: impl Fn(&OwnerKey) -> bool) -> Vec<Arc<Notify>> {
     let (gone, kept): (Vec<Consent>, Vec<Consent>) = std::mem::take(&mut state.consents)
         .into_iter()
@@ -309,5 +333,40 @@ mod tests {
             look(&mut state, &caller, &key, "Docs", &[9000]),
             Err(ToolError::Revoked)
         ));
+    }
+
+    #[test]
+    fn a_tool_picked_in_the_composer_admits_its_own_conversation_only() {
+        let mut state = State {
+            hosting: true,
+            ..State::default()
+        };
+        state.settings.ask_before_sharing = true;
+        let (principal, _) = state
+            .tokens
+            .mint(Kind::Hosted, "Codex · live", Some("codex"), Some("live"))
+            .expect("mint");
+        let caller = |conversation: &str| Caller {
+            principal: principal.clone(),
+            conversation: Some(conversation.into()),
+        };
+        let (here, elsewhere) = (caller("t1"), caller("t2"));
+        // The agent already waits for the user when the user picks Share.
+        waiting(look(&mut state, &here, &here.key(), "Landing", &[5173]));
+        state
+            .granted
+            .insert(crate::engine::agent_tools::state::Granted {
+                host: "live".into(),
+                conversation: Some("t1".into()),
+                tool: SHARE.into(),
+            });
+        assert_eq!(settle_granted(&mut state, "live", Some("t1")).len(), 1);
+        assert!(state.consents.is_empty());
+        assert!(matches!(
+            look(&mut state, &here, &here.key(), "Landing", &[5173]),
+            Ok(Answer::Allowed)
+        ));
+        // Another conversation of the same instance still asks.
+        waiting(look(&mut state, &elsewhere, &elsewhere.key(), "API", &[8000]));
     }
 }

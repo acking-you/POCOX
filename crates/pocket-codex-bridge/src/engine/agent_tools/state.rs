@@ -36,6 +36,20 @@ pub struct OwnerKey {
     pub conversation: Option<String>,
 }
 
+/// A gated built-in tool the user picked in the composer for one
+/// conversation of a hosted instance: its agents use it without asking, as
+/// if the user had answered Allow in this conversation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Granted {
+    /// The hosted instance.
+    pub host: String,
+    /// The conversation; `None` for an instance whose harness names none
+    /// (native OpenCode), where the instance is the owner.
+    pub conversation: Option<String>,
+    /// The built-in tool's id.
+    pub tool: String,
+}
+
 /// One shared port and its registration.
 pub struct SharedPort {
     /// Port number on this device.
@@ -272,6 +286,8 @@ pub struct State {
     pub consents: Vec<Consent>,
     /// Owners the user let share without asking again.
     pub allowed: HashSet<OwnerKey>,
+    /// Gated built-in tools the user handed conversations from the composer.
+    pub granted: HashSet<Granted>,
     /// Recently declined owners (they are not asked again for a while).
     pub declined: Vec<(OwnerKey, i64)>,
     /// Connections of this device.
@@ -325,6 +341,18 @@ impl State {
             return Err(ToolError::Revoked);
         }
         Ok(())
+    }
+
+    /// Whether the user handed gated built-in tool `tool` to the
+    /// conversation `key` of `caller`'s hosted instance from the composer.
+    pub fn granted(&self, caller: &Caller, key: &OwnerKey, tool: &str) -> bool {
+        caller.principal.host.as_ref().is_some_and(|host| {
+            self.granted.contains(&Granted {
+                host: host.clone(),
+                conversation: key.conversation.clone(),
+                tool: tool.to_string(),
+            })
+        })
     }
 
     /// Ports already shared on this device.

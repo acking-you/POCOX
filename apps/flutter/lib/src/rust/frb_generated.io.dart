@@ -345,6 +345,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ThreadMetaDto> dco_decode_list_thread_meta_dto(dynamic raw);
 
   @protected
+  List<ToolsBuiltinToolDto> dco_decode_list_tools_builtin_tool_dto(dynamic raw);
+
+  @protected
   List<ToolsConnectionDto> dco_decode_list_tools_connection_dto(dynamic raw);
 
   @protected
@@ -542,6 +545,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ThreadRuntimeConfigDto dco_decode_thread_runtime_config_dto(dynamic raw);
+
+  @protected
+  ToolsBuiltinToolDto dco_decode_tools_builtin_tool_dto(dynamic raw);
 
   @protected
   ToolsConnectionDto dco_decode_tools_connection_dto(dynamic raw);
@@ -1014,6 +1020,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<ToolsBuiltinToolDto> sse_decode_list_tools_builtin_tool_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   List<ToolsConnectionDto> sse_decode_list_tools_connection_dto(
     SseDeserializer deserializer,
   );
@@ -1267,6 +1278,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ThreadRuntimeConfigDto sse_decode_thread_runtime_config_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ToolsBuiltinToolDto sse_decode_tools_builtin_tool_dto(
     SseDeserializer deserializer,
   );
 
@@ -1849,6 +1865,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_tools_builtin_tool_dto(
+    List<ToolsBuiltinToolDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_tools_connection_dto(
     List<ToolsConnectionDto> self,
     SseSerializer serializer,
@@ -2172,6 +2194,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_thread_runtime_config_dto(
     ThreadRuntimeConfigDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_builtin_tool_dto(
+    ToolsBuiltinToolDto self,
     SseSerializer serializer,
   );
 

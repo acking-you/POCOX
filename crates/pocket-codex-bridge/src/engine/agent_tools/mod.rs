@@ -109,6 +109,20 @@ fn ended(revoked: &[Principal]) {
     }
     let ids: Vec<&str> = revoked.iter().map(|p| p.id.as_str()).collect();
     let gone = |key: &OwnerKey| ids.contains(&key.token.as_str());
+    // An instance that stopped (or started afresh) and a closed session
+    // lose what the user handed them from the composer.
+    state::lock().granted.retain(|granted| {
+        !revoked.iter().any(|p| {
+            p.host.as_deref() == Some(granted.host.as_str())
+                && match p.kind {
+                    tokens::Kind::Hosted => true,
+                    tokens::Kind::Session => {
+                        p.session.as_deref() == granted.conversation.as_deref()
+                    },
+                    _ => false,
+                }
+        })
+    });
     consent::withdraw(gone);
     shares::end_owned(gone);
     connections::end_owned(gone);
@@ -121,6 +135,7 @@ fn end_agents() {
     {
         let mut state = state::lock();
         state.allowed.clear();
+        state.granted.clear();
         state.declined.clear();
     }
     shares::end_owned(|_| true);
@@ -243,6 +258,7 @@ fn apply(saved: settings::Settings) {
     state.settings = saved;
     if !saved.ask_before_sharing {
         state.allowed.clear();
+        state.granted.clear();
     }
     state::changed(&mut state);
     drop(state);
@@ -345,6 +361,92 @@ fn on_device(device: &str, segments: &[&str], body: serde_json::Value) -> Result
         Some(&body),
     )?;
     Ok(())
+}
+
+/// The user picked built-in `tools` in the composer for `conversation` of
+/// the agent service `service` hosted here: the gated ones are granted to
+/// that conversation, as if the user had answered Allow in this conversation
+/// (to the whole instance for a harness that names no conversation, native
+/// OpenCode), and its requests waiting for an answer go ahead. `epoch`
+/// binds a request from another device to the account or relay it was made
+/// for.
+pub fn grant(
+    service: &str,
+    conversation: &str,
+    tools: &[String],
+    epoch: Option<u64>,
+) -> Result<(), error::ToolError> {
+    let (device, host, conversation) = grant_target(service, conversation)?;
+    if runtime::device_id().ok().as_deref() != Some(device.as_str()) {
+        return Err(error::ToolError::NotFound(format!("`{}`", model::bounded(service))));
+    }
+    let gated: Vec<String> = builtin::catalog()
+        .into_iter()
+        .filter(|tool| tool.gated && tools.contains(&tool.id))
+        .map(|tool| tool.id)
+        .collect();
+    let mut state = state::lock();
+    if !state.hosting {
+        return Err(error::ToolError::NotHosting);
+    }
+    if !state.settings.enabled {
+        return Err(error::ToolError::Off);
+    }
+    if epoch.is_some_and(|epoch| !crate::engine::transport::is_current(epoch)) {
+        return Err(error::ToolError::ContextChanged);
+    }
+    if gated.is_empty() {
+        return Ok(());
+    }
+    for tool in gated {
+        state.granted.insert(state::Granted {
+            host: host.clone(),
+            conversation: conversation.clone(),
+            tool,
+        });
+    }
+    let woken = consent::settle_granted(&mut state, &host, conversation.as_deref());
+    state::changed(&mut state);
+    drop(state);
+    for answered in woken {
+        answered.notify_waiters();
+    }
+    Ok(())
+}
+
+/// Where a grant for `conversation` of `service` applies: the device, the
+/// hosted instance, and the conversation its agents name (none for native
+/// OpenCode, whose instance is the owner). Only agent hosts take grants.
+fn grant_target(
+    service: &str,
+    conversation: &str,
+) -> Result<(String, String, Option<String>), error::ToolError> {
+    use pocket_codex_account_proto::key::NamespacedServiceId;
+    use pocket_codex_core::service::{ServiceId, ServiceKind};
+    let id = ServiceId::parse_key(service)
+        .or_else(|| NamespacedServiceId::parse_key(service).map(|id| id.service))
+        .ok_or_else(|| error::ToolError::Invalid("Not a service key.".into()))?;
+    let conversation = match id.kind {
+        ServiceKind::OpenCode => None,
+        ServiceKind::App | ServiceKind::Acp => Some(model::bounded(conversation)),
+        _ => return Err(error::ToolError::Invalid("Not an agent host.".into())),
+    };
+    if conversation.as_deref().is_some_and(str::is_empty) {
+        return Err(error::ToolError::Invalid("No conversation.".into()));
+    }
+    Ok((id.device, model::bounded(&id.name), conversation))
+}
+
+/// [`grant`] on `device`, from any of the user's devices.
+pub fn grant_on(device: &str, service: &str, conversation: &str, tools: &[String]) -> Result<()> {
+    if is_local(device) {
+        return grant(service, conversation, tools, None).map_err(Into::into);
+    }
+    on_device(
+        device,
+        &["services", "v1", "grants"],
+        serde_json::json!({ "service": service, "conversation": conversation, "tools": tools }),
+    )
 }
 
 /// Answer consent request `id` of `device`, from any of the user's devices.
@@ -562,5 +664,24 @@ mod serving {
             endpoint::withdraw(&dir);
         }
         state::lock().endpoint = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_grant_names_the_conversation_its_harness_reports() {
+        let conversation = |service: &str, id: &str| grant_target(service, id).ok().map(|t| t.2);
+        assert_eq!(
+            grant_target("pcx:studio:app:live", "t1").ok(),
+            Some(("studio".into(), "live".into(), Some("t1".into())))
+        );
+        assert_eq!(conversation("pcxu:u1:studio:acp:claude", "s1"), Some(Some("s1".into())));
+        // Native OpenCode names no conversation: its instance is the owner.
+        assert_eq!(conversation("pcx:studio:opencode:oc", "ses_1"), Some(None));
+        assert_eq!(conversation("pcx:studio:port:5173", "t1"), None, "not an agent host");
+        assert_eq!(conversation("pcx:studio:app:live", ""), None, "no conversation");
     }
 }

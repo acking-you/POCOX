@@ -75,6 +75,7 @@ pub fn local() -> Result<Catalog> {
         shares: state.shares.iter().map(Share::view).collect(),
         consents: consent::pending(&state),
         services: state.services.clone(),
+        builtin: super::builtin::catalog(),
     })
 }
 
@@ -143,6 +144,12 @@ pub fn sanitize(mut catalog: Catalog) -> Catalog {
     for service in &mut catalog.services {
         service.name = bounded(&service.name);
         service.agent = service.agent.as_deref().map(bounded);
+    }
+    catalog.builtin.truncate(32);
+    for tool in &mut catalog.builtin {
+        tool.id = bounded(&tool.id);
+        tool.title = bounded(&tool.title);
+        tool.summary = bounded(&tool.summary);
     }
     catalog
 }
@@ -241,6 +248,7 @@ fn device_view(name: &str, listed: &[ServiceId], catalog: Option<&Catalog>) -> D
         services,
         shares: catalog.map(|c| c.shares.clone()).unwrap_or_default(),
         consents: catalog.map(|c| c.consents.clone()).unwrap_or_default(),
+        builtin: catalog.map(|c| c.builtin.clone()).unwrap_or_default(),
     }
 }
 
@@ -376,6 +384,7 @@ mod tests {
             shares: vec![share],
             consents: vec![],
             services: vec![],
+            builtin: vec![],
         };
         let view = device_view("studio", &listed, Some(&catalog));
         let keys: Vec<_> = view

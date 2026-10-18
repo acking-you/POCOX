@@ -80,6 +80,19 @@ struct Answer {
     decision: Decision,
 }
 
+/// Built-in tools the user picked in the composer of another of their
+/// devices, for one conversation of an agent host on this device.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrantBody {
+    /// The agent service (`pcx:<device>:<kind>:<name>` or the account form).
+    pub service: String,
+    /// Its conversation (thread or session id).
+    pub conversation: String,
+    /// The picked built-in tools' ids.
+    pub tools: Vec<String>,
+}
+
 /// A share the user asks for from another of their devices (Share and open
 /// on a `localhost` link in a conversation).
 #[derive(Deserialize)]
@@ -142,7 +155,8 @@ fn events(
 /// `epoch` (a share asked under it is never made under another account).
 pub fn router(admitted: Admitted, epoch: u64) -> Router {
     let guard = |admitted: &Admitted| -> Option<Response> { (!admitted()).then(refused) };
-    let (a1, a2, a3, a4, a5, a6) = (
+    let (a1, a2, a3, a4, a5, a6, a7) = (
+        admitted.clone(),
         admitted.clone(),
         admitted.clone(),
         admitted.clone(),
@@ -184,6 +198,18 @@ pub fn router(admitted: Admitted, epoch: u64) -> Router {
                     return refusal;
                 }
                 reply(consent::answer(&id, answer.decision).map(|()| serde_json::json!({})))
+            }),
+        )
+        .route(
+            "/services/v1/grants",
+            post(move |Json(body): Json<GrantBody>| async move {
+                if let Some(refusal) = guard(&a7) {
+                    return refusal;
+                }
+                reply(
+                    super::grant(&body.service, &body.conversation, &body.tools, Some(epoch))
+                        .map(|()| serde_json::json!({})),
+                )
             }),
         )
         .route(

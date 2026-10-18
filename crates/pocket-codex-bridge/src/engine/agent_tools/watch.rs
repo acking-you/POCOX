@@ -174,6 +174,7 @@ fn overview(seen: &mut Seen) -> Update {
                 services: Vec::new(),
                 shares: Vec::new(),
                 consents: Vec::new(),
+                builtin: Vec::new(),
             });
         }
     }
