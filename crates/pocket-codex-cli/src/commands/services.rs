@@ -202,13 +202,28 @@ async fn disconnect(args: ServicesTargetArgs) -> Result<()> {
     Ok(())
 }
 
-/// The service and path a `pocox://open` link names, or `target` itself.
-fn parse_link(target: &str) -> (String, Option<String>) {
+/// What a `pocox://open` link names (or `target` itself, as a service).
+#[derive(Debug, PartialEq, Eq)]
+struct Link {
+    service: String,
+    path: Option<String>,
+    /// The page is served over TLS (`scheme=https`).
+    secure: bool,
+}
+
+fn parse_link(target: &str) -> Link {
     let Some(query) = target.strip_prefix("pocox://open?") else {
-        return (target.to_string(), None);
+        return Link {
+            service: target.to_string(),
+            path: None,
+            secure: false,
+        };
     };
-    let mut service = String::new();
-    let mut path = None;
+    let mut link = Link {
+        service: String::new(),
+        path: None,
+        secure: false,
+    };
     for pair in query.split('&') {
         let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
         let value = url::form_urlencoded::parse(format!("v={value}").as_bytes())
@@ -216,25 +231,27 @@ fn parse_link(target: &str) -> (String, Option<String>) {
             .map(|(_, v)| v.into_owned())
             .unwrap_or_default();
         match name {
-            "service" => service = value,
-            "path" => path = Some(value),
+            "service" => link.service = value,
+            "path" => link.path = Some(value),
+            "scheme" => link.secure = value == "https",
             _ => {},
         }
     }
-    (service, path)
+    link
 }
 
 /// `pocox open`: connect a shared service here and open it.
 pub async fn open(args: OpenArgs) -> Result<()> {
-    let (service, link_path) = parse_link(args.target.trim());
-    if service.is_empty() {
+    let link = parse_link(args.target.trim());
+    if link.service.is_empty() {
         bail!("the link names no service");
     }
-    let view = connect_to(&service, None).await?;
-    let path = args.path.or(link_path).unwrap_or_else(|| "/".into());
+    let view = connect_to(&link.service, None).await?;
+    let path = args.path.or(link.path).unwrap_or_else(|| "/".into());
     let port = view.local.rsplit(':').next().unwrap_or_default();
     let path = if path.starts_with('/') { path } else { format!("/{path}") };
-    let url = format!("http://localhost:{port}{path}");
+    let scheme = if link.secure { "https" } else { "http" };
+    let url = format!("{scheme}://localhost:{port}{path}");
     if args.no_browser {
         println!("{url}");
         return Ok(());
@@ -252,10 +269,12 @@ mod tests {
 
     #[test]
     fn links_name_their_service_and_path() {
-        assert_eq!(
-            parse_link("pocox://open?service=pcx:studio:port:5173&path=/a%20b"),
-            ("pcx:studio:port:5173".to_string(), Some("/a b".to_string()))
-        );
-        assert_eq!(parse_link("studio/5173"), ("studio/5173".to_string(), None));
+        assert_eq!(parse_link("pocox://open?service=pcx:studio:port:5173&path=/a%20b"), Link {
+            service: "pcx:studio:port:5173".into(),
+            path: Some("/a b".into()),
+            secure: false,
+        });
+        assert!(parse_link("pocox://open?service=pcx:studio:port:8443&scheme=https").secure);
+        assert_eq!(parse_link("studio/5173").service, "studio/5173");
     }
 }

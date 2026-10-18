@@ -144,6 +144,10 @@ void main() {
       turnId: 't',
     );
     expect(other.share, isNull);
+    final copied = parseOpenLink(
+      'pocox://open?service=pcx:studio:port:8443&path=/&scheme=https',
+    );
+    expect(copied?.scheme, 'https', reason: 'a copied https link stays https');
     final rows = buildTranscriptRows([
       TranscriptItem(
         id: 'u',

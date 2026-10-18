@@ -51,7 +51,7 @@ pub fn filter(mut overview: Overview, filter: &Filter) -> Overview {
         let connections: HashSet<String> = state
             .connections
             .iter()
-            .filter(|c| owned(c.key.as_ref()))
+            .filter(|c| c.held_by(owner))
             .map(|c| c.service.clone())
             .collect();
         drop(state);

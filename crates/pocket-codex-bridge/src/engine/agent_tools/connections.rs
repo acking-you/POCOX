@@ -105,7 +105,7 @@ pub async fn connect(
             "`{key}` runs on this device; use it at its own local address."
         )));
     }
-    if let Some(existing) = reuse(caller, &key) {
+    if let Some(existing) = reuse(caller, &key)? {
         return Ok(existing);
     }
     let own_port = (id.kind == ServiceKind::Port)
@@ -150,10 +150,9 @@ pub async fn connect(
         local: status.local_addr,
         same_port,
         owner: caller.owner(),
-        key: (!user).then(|| caller.key()),
-        expires_ms: (!user).then(|| now_ms() + AGENT_LEASE_MS),
+        holders: if user { Vec::new() } else { vec![(caller.key(), now_ms() + AGENT_LEASE_MS)] },
+        user,
     };
-    let view = connection.view();
     let mut state = state::lock();
     // The call may have waited for the relay: the switch or the token may
     // have ended meanwhile.
@@ -162,37 +161,66 @@ pub async fn connect(
         runtime::unsubscribe_service(&connection.registry_key);
         return Err(error);
     }
-    state
+    let view = match state
         .connections
-        .retain(|c| c.service != connection.service);
-    state.connections.push(connection);
+        .iter_mut()
+        .find(|c| c.service == connection.service)
+    {
+        // A concurrent connect made the same tunnel first: join it.
+        Some(existing) => {
+            existing.user |= connection.user;
+            if existing.user {
+                existing.holders.clear();
+            } else {
+                existing.holders.extend(connection.holders);
+            }
+            existing.view()
+        },
+        None => {
+            let view = connection.view();
+            state.connections.push(connection);
+            view
+        },
+    };
     state::changed(&mut state);
     tracing::info!(service = %view.service, local = %view.local, "connected");
     Ok(view)
 }
 
-/// A live connection to `key`; the user's own connect takes it over.
-fn reuse(caller: &Caller, key: &str) -> Option<ConnectionView> {
+/// A live connection to `key`, shared with `caller`: an agent joins those
+/// keeping it alive (with its own lease), and the user's own connect takes
+/// it over.
+fn reuse(caller: &Caller, key: &str) -> Result<Option<ConnectionView>, ToolError> {
     let mut state = state::lock();
-    let index = state.connections.iter().position(|c| c.service == key)?;
+    state.admits(caller)?;
+    let Some(index) = state.connections.iter().position(|c| c.service == key) else {
+        return Ok(None);
+    };
     if !alive(&state.connections[index].registry_key) {
         state.connections.remove(index);
         state::changed(&mut state);
-        return None;
+        return Ok(None);
     }
+    let connection = &mut state.connections[index];
     if caller.is_user() {
-        let connection = &mut state.connections[index];
-        connection.key = None;
-        connection.expires_ms = None;
+        connection.user = true;
+        connection.holders.clear();
         connection.owner = caller.owner();
+    } else if !connection.user {
+        let (owner, until) = (caller.key(), now_ms() + AGENT_LEASE_MS);
+        match connection.holders.iter_mut().find(|(key, _)| *key == owner) {
+            Some(holder) => holder.1 = until,
+            None => connection.holders.push((owner, until)),
+        }
     }
-    let view = state.connections[index].view();
+    let view = connection.view();
     state::changed(&mut state);
-    Some(view)
+    Ok(Some(view))
 }
 
 /// End the connection to `service` (a key or its local address). An agent
-/// ends only what its own conversation connected; `None` is the user.
+/// only lets go of what its own conversation connected, and the tunnel ends
+/// once nobody holds it; `None` is the user, who ends it.
 pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionView, ToolError> {
     let service = service.trim();
     let mut state = state::lock();
@@ -209,8 +237,17 @@ pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionVi
         })
         .ok_or_else(|| ToolError::NotFound(format!("A connection to `{}`", bounded(service))))?;
     if let Some(caller) = caller.filter(|c| !c.is_user()) {
-        if state.connections[index].key.as_ref() != Some(&caller.key()) {
+        let owner = caller.key();
+        let connection = &mut state.connections[index];
+        if connection.user || !connection.held_by(&owner) {
             return Err(ToolError::NotOwner);
+        }
+        connection.holders.retain(|(key, _)| *key != owner);
+        if !connection.abandoned() {
+            // Others still use it.
+            let view = connection.view();
+            state::changed(&mut state);
+            return Ok(view);
         }
     }
     let connection = state.connections.remove(index);
@@ -221,14 +258,23 @@ pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionVi
     Ok(connection.view())
 }
 
-/// End every connection whose owner `ended` selects.
-pub fn end_owned(ended: impl Fn(&OwnerKey) -> bool) {
+/// Let go of every hold `release` selects, ending the connections nobody
+/// holds any more and those `dead` selects.
+fn release_where(release: impl Fn(&OwnerKey, i64) -> bool, dead: impl Fn(&Connection) -> bool) {
     let mut state = state::lock();
+    let mut changed = false;
+    for connection in &mut state.connections {
+        let before = connection.holders.len();
+        connection
+            .holders
+            .retain(|(key, until)| !release(key, *until));
+        changed |= connection.holders.len() != before;
+    }
     let (gone, kept): (Vec<Connection>, Vec<Connection>) = std::mem::take(&mut state.connections)
         .into_iter()
-        .partition(|c| c.key.as_ref().is_some_and(&ended));
+        .partition(|c| c.abandoned() || dead(c));
     state.connections = kept;
-    if gone.is_empty() {
+    if !changed && gone.is_empty() {
         return;
     }
     state::changed(&mut state);
@@ -238,22 +284,15 @@ pub fn end_owned(ended: impl Fn(&OwnerKey) -> bool) {
     }
 }
 
-/// Drop expired and dead connections.
+/// End the holds of the owners `ended` selects.
+pub fn end_owned(ended: impl Fn(&OwnerKey) -> bool) {
+    release_where(|key, _| ended(key), |_| false);
+}
+
+/// Drop expired holds and dead connections.
 pub fn prune() {
     let now = now_ms();
-    let mut state = state::lock();
-    let (gone, kept): (Vec<Connection>, Vec<Connection>) = std::mem::take(&mut state.connections)
-        .into_iter()
-        .partition(|c| c.expires_ms.is_some_and(|at| at <= now) || !alive(&c.registry_key));
-    state.connections = kept;
-    if gone.is_empty() {
-        return;
-    }
-    state::changed(&mut state);
-    drop(state);
-    for connection in gone {
-        runtime::unsubscribe_service(&connection.registry_key);
-    }
+    release_where(|_, until| until <= now, |c| !alive(&c.registry_key));
 }
 
 /// The account or relay changed: these tunnels belong to the old one.
@@ -292,5 +331,40 @@ mod tests {
         assert!(matches!(resolve("devbox/9999", &services), Err(ToolError::NotFound(_))));
         assert!(matches!(resolve("devbox:app:default", &services), Err(ToolError::Invalid(_))));
         assert!(matches!(resolve("nonsense", &services), Err(ToolError::Invalid(_))));
+    }
+
+    #[test]
+    fn a_shared_tunnel_lasts_until_its_last_holder_lets_go() {
+        let service = "pcx:holders-test:port:7001";
+        let a = OwnerKey {
+            token: "holders-a".into(),
+            conversation: Some("c1".into()),
+        };
+        let b = OwnerKey {
+            token: "holders-b".into(),
+            conversation: None,
+        };
+        state::lock().connections.push(Connection {
+            service: service.into(),
+            registry_key: format!("{FAMILY}test\u{1f}{service}"),
+            local: "127.0.0.1:7001".into(),
+            same_port: true,
+            owner: Caller::user("agent").owner(),
+            holders: vec![(a.clone(), i64::MAX), (b.clone(), i64::MAX)],
+            user: false,
+        });
+        let held = |key: &OwnerKey| {
+            state::lock()
+                .connections
+                .iter()
+                .any(|c| c.service == service && c.held_by(key))
+        };
+        end_owned(|key| *key == a);
+        assert!(!held(&a) && held(&b), "the other holder keeps it");
+        end_owned(|key| *key == b);
+        assert!(state::lock()
+            .connections
+            .iter()
+            .all(|c| c.service != service));
     }
 }

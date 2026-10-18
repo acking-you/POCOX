@@ -3,8 +3,6 @@
 /// request.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -90,19 +88,26 @@ Future<void> openShareWith(
           l10n.toolsPortMoved(share.port.toString(), connection.local),
         );
       }
-      // The page's other ports (its API) come along, at their own numbers.
-      for (final other in shared?.share.ports ?? const <ToolsPort>[]) {
-        if (other.key != share.service &&
-            overview.connectionTo(other.key) == null) {
-          unawaited(
-            api
-                .toolsConnect(other.key)
-                .then(
-                  (_) => connected[other.key] = share.device,
-                  onError: (_) {},
-                ),
-          );
+      // The page's other ports (its API) come along, at their own numbers,
+      // before it opens: its first request may already need them.
+      final failed = <String>[];
+      Future<void> companion(ToolsPort other) async {
+        try {
+          await api.toolsConnect(other.key);
+          connected[other.key] = share.device;
+        } catch (_) {
+          failed.add(other.port.toString());
         }
+      }
+
+      await Future.wait([
+        for (final other in shared?.share.ports ?? const <ToolsPort>[])
+          if (other.key != share.service &&
+              overview.connectionTo(other.key) == null)
+            companion(other),
+      ]);
+      if (failed.isNotEmpty) {
+        messenger.notice(l10n.toolsPortsNotConnected(failed.join(', ')));
       }
     }
     if (port == null) throw StateError('no local port');
@@ -130,7 +135,11 @@ Future<void> copyShareLink(BuildContext context, ShareRef share) async {
   final link = Uri(
     scheme: 'pocox',
     host: 'open',
-    queryParameters: {'service': share.service, 'path': share.path},
+    queryParameters: {
+      'service': share.service,
+      'path': share.path,
+      if (share.secure) 'scheme': 'https',
+    },
   ).toString();
   await Clipboard.setData(ClipboardData(text: link));
   messenger.ok(l10n.toolsLinkCopied);

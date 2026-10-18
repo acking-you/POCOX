@@ -46,8 +46,8 @@ impl Drop for Grant {
 }
 
 /// Revoke the tokens `which` selects and end what they made. A revocation
-/// that cannot be saved still ends them in this process: their holder is
-/// gone or failed to start.
+/// that cannot be saved now still ends them in this process at once (their
+/// holder is gone or failed to start) and reaches the disk as soon as it can.
 fn retract(which: impl Fn(&Principal) -> bool) {
     let revoked = {
         let mut state = state::lock();
@@ -239,7 +239,11 @@ fn rekey(state: &mut State, older: &[String], id: &str) {
     {
         moved(key);
     }
-    for key in state.connections.iter_mut().filter_map(|c| c.key.as_mut()) {
+    for (key, _) in state
+        .connections
+        .iter_mut()
+        .flat_map(|c| c.holders.iter_mut())
+    {
         moved(key);
     }
     for consent in &mut state.consents {

@@ -311,7 +311,7 @@ fn take_over(state: &mut State, ports: &[u16], user: &Caller) {
         taken = true;
     }
     if taken {
-        state.save_shares();
+        let _ = state.save_shares();
         state::changed(state);
     }
 }
@@ -400,7 +400,7 @@ fn reserve(
         });
         id
     };
-    state.save_shares();
+    let _ = state.save_shares();
     state::changed(&mut state);
     Ok((id, reserved))
 }
@@ -502,7 +502,7 @@ fn withdraw(id: &str, ports: &[u16]) {
         gone.extend(out);
     }
     state.shares.retain(|share| !share.ports.is_empty());
-    state.save_shares();
+    let _ = state.save_shares();
     state::changed(&mut state);
     drop(state);
     release(gone);
@@ -544,9 +544,16 @@ pub fn stop(caller: Option<&Caller>, target: &str) -> Result<ShareView, ToolErro
             return Err(ToolError::NotOwner);
         }
     }
+    let unsaved = state.shares_unsaved;
     let share = state.shares.remove(index);
+    // A stopped share that outlives restarts must not come back after one:
+    // unless its removal is saved, nothing changes.
+    if state.save_shares().is_err() && share.durable() {
+        state.shares.insert(index, share);
+        state.shares_unsaved = unsaved;
+        return Err(ToolError::NotSaved);
+    }
     let view = share.view();
-    state.save_shares();
     state::changed(&mut state);
     drop(state);
     release(share.ports);
@@ -565,7 +572,7 @@ pub fn keep(id: &str) -> Result<ShareView, ToolError> {
     share.key = None;
     share.expires_ms = None;
     let view = share.view();
-    state.save_shares();
+    let _ = state.save_shares();
     state::changed(&mut state);
     Ok(view)
 }
@@ -580,7 +587,7 @@ pub fn end_owned(ended: impl Fn(&OwnerKey) -> bool) {
     if gone.is_empty() {
         return;
     }
-    state.save_shares();
+    let _ = state.save_shares();
     state::changed(&mut state);
     drop(state);
     for share in gone {
@@ -636,7 +643,7 @@ pub fn maintain(probe: bool) {
             .partition(|share| share.expires_ms.is_some_and(|at| at <= now));
         state.shares = kept;
         if !gone.is_empty() {
-            state.save_shares();
+            let _ = state.save_shares();
             state::changed(&mut state);
         }
         gone

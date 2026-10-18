@@ -60,6 +60,7 @@ pub fn failure(error: ToolError) -> Response {
         },
         ToolError::NotHosting | ToolError::Relay(_) => StatusCode::SERVICE_UNAVAILABLE,
         ToolError::Conflict(_) => StatusCode::CONFLICT,
+        ToolError::NotSaved => StatusCode::INTERNAL_SERVER_ERROR,
     };
     (status, Json(serde_json::json!({"code": error.code(), "message": error.message()})))
         .into_response()

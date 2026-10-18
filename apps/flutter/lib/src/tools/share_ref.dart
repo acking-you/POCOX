@@ -45,7 +45,7 @@ class ShareRef {
 
 final _openLink = RegExp(r'pocox://open\?[^\s)\]"<>`]+');
 
-/// The share a `pocox://open?service=…&path=…` link names.
+/// The share a `pocox://open?service=…&path=…[&scheme=https]` link names.
 ShareRef? parseOpenLink(String link) {
   final uri = Uri.tryParse(link.trim());
   if (uri == null || uri.scheme != 'pocox' || uri.host != 'open') return null;
@@ -55,6 +55,7 @@ ShareRef? parseOpenLink(String link) {
   return ShareRef(
     service: service,
     path: (path == null || !path.startsWith('/')) ? '/' : path,
+    secure: uri.queryParameters['scheme'] == 'https',
   );
 }
 
