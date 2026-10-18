@@ -6,7 +6,7 @@
 //!                      │      │          │        └── instance name
 //!                      │      │          │            (e.g. "default", "work")
 //!                      │      │          └─────────── ServiceKind::as_key_segment
-//!                      │      │                       ("app" | "api" | "meta" | "acp" | "opencode")
+//!                      │      │                       ("app" | "api" | "meta" | "acp" | "opencode" | "host" | "port")
 //!                      │      └────────────────────── sanitised host id
 //!                      │                              (hosting installation ID)
 //!                      └───────────────────────────── SERVICE_KEY_PREFIX
@@ -50,6 +50,10 @@ pub enum ServiceKind {
     Meta,
     /// Device-level management, independent of any running engine.
     Host,
+    /// A loopback port of the device shared with the user's other devices
+    /// (a dev server, an API). The name is the port number; the share's title
+    /// and owner are host metadata, never part of the key.
+    Port,
     /// A service kind this build does not recognise — e.g. one a newer peer
     /// introduced. Only ever produced by **deserialization**
     /// (`#[serde(other)]`), so an older client tolerates a future kind in a
@@ -70,6 +74,7 @@ impl ServiceKind {
             Self::OpenCode => "opencode",
             Self::Meta => "meta",
             Self::Host => "host",
+            Self::Port => "port",
             Self::Unknown => "unknown",
         }
     }
@@ -92,6 +97,7 @@ impl FromStr for ServiceKind {
             "opencode" => Ok(Self::OpenCode),
             "meta" => Ok(Self::Meta),
             "host" => Ok(Self::Host),
+            "port" => Ok(Self::Port),
             _ => Err(()),
         }
     }

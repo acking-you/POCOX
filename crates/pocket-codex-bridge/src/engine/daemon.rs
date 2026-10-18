@@ -126,6 +126,8 @@ impl Manager {
         })?;
         let _ = rustls::crypto::ring::default_provider().install_default();
         runtime::init(options.config_dir)?;
+        // Before any host starts, so restored harnesses get the tools.
+        super::agent_tools::initialize();
         let mut manager = Self {
             state_dir: options.state_dir,
             stopped: false,

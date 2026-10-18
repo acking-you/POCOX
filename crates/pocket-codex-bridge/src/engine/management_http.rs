@@ -320,6 +320,14 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
             },
             limit: Arc::new(tokio::sync::Semaphore::new(8)),
         })
+        .merge(crate::engine::agent_tools::routes::router(Arc::new(move || {
+            AdmissionToken {
+                epoch,
+                generation,
+            }
+            .check()
+            .is_ok()
+        })))
 }
 
 #[cfg(test)]

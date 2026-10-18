@@ -254,6 +254,7 @@ impl Config {
             | ServiceKind::OpenCode
             | ServiceKind::Meta
             | ServiceKind::Host
+            | ServiceKind::Port
             | ServiceKind::Unknown => None,
         }
     }
@@ -278,6 +279,7 @@ impl Config {
             | ServiceKind::OpenCode
             | ServiceKind::Meta
             | ServiceKind::Host
+            | ServiceKind::Port
             | ServiceKind::Unknown => {},
         }
     }

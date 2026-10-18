@@ -224,6 +224,11 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
             native_history,
         )
     };
+    host.set_session_mcp(crate::engine::agent_tools::inject::acp(
+        &name,
+        Some(spec.profile_id.as_str()),
+        &format!("{} · {name}", spec.display_name),
+    ));
     // Visible to a quit before the agent exists, so it can never escape it.
     let Some(id) = owners().begin(host.clone()) else {
         bail!("the app is quitting");

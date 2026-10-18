@@ -544,7 +544,13 @@ fn launch_codex(
     }
 
     // As child-only `-c` arguments and environment.
-    let launch = host_profiles::codex(&provider, &name)?;
+    let mut launch = host_profiles::codex(&provider, &name)?;
+    let tools = super::agent_tools::inject::hosted(&name, "codex", &format!("Codex · {name}"));
+    if let Some(grant) = &tools {
+        let (args, env) = super::agent_tools::inject::codex(grant);
+        launch.args.extend(args);
+        launch.env.push(env);
+    }
     let expected = launch.expected.clone();
     let incarnation = uuid::Uuid::new_v4().to_string();
 
@@ -618,6 +624,9 @@ fn launch_codex(
                     return Err(kept(startup_failure_error(*failure), exited));
                 },
             };
+        if let Some(grant) = &tools {
+            super::agent_tools::inject::hosted_started(&name, grant, report.reused);
+        }
         // An adopted app-server was not launched with this instance's
         // provider arguments: refuse it (never killed) rather than publish a
         // host that silently uses another model service.

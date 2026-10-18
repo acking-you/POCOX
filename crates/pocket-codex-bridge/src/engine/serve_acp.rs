@@ -637,6 +637,7 @@ pub(super) fn stop_all() {
 
 fn stop_host(host: AcpServe) {
     let name = host.name.clone();
+    crate::engine::agent_tools::inject::hosted_stopped(&name);
     runtime::runtime().block_on(async {
         // The owned process first (bounded), then the relay keys.
         host.gateway_task.abort();

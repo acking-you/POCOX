@@ -26,7 +26,8 @@ use pocket_codex_pb::Published;
 use tokio::task::JoinHandle;
 
 use super::{
-    host_lease, host_profiles, host_services, hosting, runtime, serve::ServeStatus, transport,
+    agent_tools, host_lease, host_profiles, host_services, hosting, runtime, serve::ServeStatus,
+    transport,
 };
 
 #[path = "serve_opencode_registration.rs"]
@@ -271,8 +272,22 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let (gateway, local) = host_services::bind_loopback("OpenCode gateway")?;
     let (meta_listener, meta) = host_services::bind_loopback("OpenCode meta")?;
     let rt = runtime::runtime();
+    // The tools are added at launch, not when the launch is prepared: an
+    // apply prepares before it stops the previous host, which ends that
+    // host's tokens.
+    let mut launch = prepared.launch.clone();
+    let name = &prepared.name;
+    if let Some(grant) =
+        agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}"))
+    {
+        let inherited = std::env::var_os("OPENCODE_CONFIG_CONTENT");
+        match agent_tools::inject::opencode(&grant, &mut launch.env, inherited.as_deref()) {
+            Ok(()) => agent_tools::inject::hosted_started(name, &grant, false),
+            Err(error) => tracing::warn!("agent tools not given to OpenCode `{name}`: {error:#}"),
+        }
+    }
     let (host, pid) = rt.block_on(async {
-        let server = Server::start(&prepared.launch).await?;
+        let server = Server::start(&launch).await?;
         let pid = server.pid;
         Ok::<_, anyhow::Error>((Host::new(server).await?, pid))
     })?;
@@ -375,6 +390,7 @@ pub(super) fn retire(name: &str) -> Result<Option<Prepared>> {
     }
     let removed = hosts().hosts.remove(name);
     let Some(host) = removed else { return Ok(None) };
+    agent_tools::inject::hosted_stopped(name);
     runtime::runtime().block_on(async {
         for task in host.tasks {
             task.abort();

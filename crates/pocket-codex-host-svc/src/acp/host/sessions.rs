@@ -12,6 +12,37 @@ impl AgentHost {
         params
     }
 
+    /// Give each session of this host the owner's MCP servers, when the
+    /// agent accepts HTTP ones.
+    pub fn set_session_mcp(&self, mcp: Arc<dyn crate::acp::SessionMcp>) {
+        *lock(&self.inner.session_mcp) = Some(mcp);
+    }
+
+    /// A session request: `params` with this host's `_meta` and the MCP
+    /// servers for `session` (`None`: being created), and what to tell the
+    /// servers' owner once a new session has its id.
+    fn session_request(
+        &self,
+        params: Value,
+        session: Option<&str>,
+        caps: &AgentCapabilities,
+    ) -> (Value, Option<crate::acp::mcp::Adopt>) {
+        let mut params = self.session_params(params);
+        let mcp = lock(&self.inner.session_mcp).clone();
+        let grant = mcp
+            .filter(|_| caps.mcp_http)
+            .and_then(|mcp| mcp.grant(session));
+        let Some(grant) = grant else {
+            params["mcpServers"] = json!([]);
+            return (params, None);
+        };
+        params["mcpServers"] = Value::Array(grant.servers);
+        if let Some(meta) = grant.meta {
+            crate::acp::mcp::merge(&mut params["_meta"], Value::Object(meta));
+        }
+        (params, grant.adopt)
+    }
+
     fn close_session(&self, session: Option<String>, peer: &Peer, caps: &AgentCapabilities) {
         let (Some(session), true) = (session, caps.close_session) else { return };
         let peer = peer.clone();
@@ -35,12 +66,9 @@ impl AgentHost {
         {
             return Err(HostError::Capacity);
         }
+        let (params, adopt) = self.session_request(json!({"cwd": cwd}), None, &caps);
         let result = peer
-            .request(
-                "session/new",
-                self.session_params(json!({"cwd": cwd, "mcpServers": []})),
-                Some(SESSION_TIMEOUT),
-            )
+            .request("session/new", params, Some(SESSION_TIMEOUT))
             .await
             .map_err(|error| self.call_error(generation, error))?;
         let id = result["sessionId"]
@@ -48,6 +76,9 @@ impl AgentHost {
             .filter(|id| !id.is_empty() && id.len() <= MAX_ID)
             .ok_or_else(|| HostError::Agent("the agent returned no session id".into()))?
             .to_string();
+        if let Some(adopt) = adopt {
+            adopt(&id);
+        }
         self.claim_native_session(&id, generation)
             .inspect_err(|_| {
                 self.close_session(Some(id.clone()), &peer, &caps);
@@ -191,13 +222,9 @@ impl AgentHost {
             evicted
         };
         self.close_session(evicted, &peer, &caps);
-        let result = peer
-            .request(
-                method,
-                self.session_params(json!({"sessionId": id, "cwd": cwd, "mcpServers": []})),
-                Some(LOAD_TIMEOUT),
-            )
-            .await;
+        let (params, _) =
+            self.session_request(json!({"sessionId": id, "cwd": cwd}), Some(id), &caps);
+        let result = peer.request(method, params, Some(LOAD_TIMEOUT)).await;
         let result = match result {
             Ok(result) => result,
             Err(error) => {

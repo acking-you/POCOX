@@ -1,12 +1,17 @@
-//! `pocox services …` subcommand handlers.
+//! `pocox services …` subcommand handlers, and `pocox open`.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use comfy_table::Cell;
+use pocket_codex_bridge::agent_tools::model::{ConnectionView, Overview, ShareView, Shared};
 use pocket_codex_core::{config::Config, service::ServiceKind};
+use serde::Serialize;
 
 use crate::{
-    cli::{ServicesCmd, ServicesDefaultCmd, ServicesDefaultSetArgs, ServicesListArgs},
-    commands::{service_target::discover_services, transport, ui},
+    cli::{
+        OpenArgs, ServicesCmd, ServicesConnectArgs, ServicesDefaultCmd, ServicesDefaultSetArgs,
+        ServicesListArgs, ServicesShareArgs, ServicesTargetArgs,
+    },
+    commands::{local_tools, service_target::discover_services, transport, ui},
 };
 
 /// Dispatch the `services` subcommand group.
@@ -14,7 +19,25 @@ pub async fn run(cmd: ServicesCmd) -> Result<()> {
     match cmd {
         ServicesCmd::List(args) => list(args).await,
         ServicesCmd::Default(ServicesDefaultCmd::Set(args)) => default_set(args),
+        ServicesCmd::Share(args) => share(args).await,
+        ServicesCmd::Unshare(args) => unshare(args).await,
+        ServicesCmd::Connect(args) => connect(args).await,
+        ServicesCmd::Disconnect(args) => disconnect(args).await,
     }
+}
+
+#[derive(Serialize)]
+struct Listed {
+    key: String,
+    device: String,
+    kind: String,
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    owner: Option<String>,
 }
 
 /// List the services this device can reach — the relay's own listing in both
@@ -30,6 +53,41 @@ async fn list(args: ServicesListArgs) -> Result<()> {
         services.extend(discover_services(&transport, kind).await?);
     }
     services.sort_by_key(|id| id.key());
+
+    if args.json {
+        // Titles, status and owners come from the POCOX running here, when
+        // there is one; the relay's listing stands on its own otherwise.
+        let overview: Option<Overview> = match local_tools::running().await? {
+            Some(local) => local.get("overview").await.ok(),
+            None => None,
+        };
+        let described = |key: &str| {
+            overview.as_ref().and_then(|o| {
+                o.devices
+                    .iter()
+                    .flat_map(|d| d.services.iter())
+                    .find(|s| s.key == key)
+            })
+        };
+        let rows: Vec<Listed> = services
+            .iter()
+            .map(|service| {
+                let key = service.key();
+                let entry = described(&key);
+                Listed {
+                    key: transport.key(service),
+                    device: service.device.clone(),
+                    kind: service.kind.as_key_segment().into(),
+                    name: service.name.clone(),
+                    title: entry.and_then(|e| e.title.clone()),
+                    status: entry.map(|e| e.status.clone()),
+                    owner: entry.and_then(|e| e.owner.clone()),
+                }
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&rows)?);
+        return Ok(());
+    }
 
     if services.is_empty() {
         ui::muted(match transport.is_account() {
@@ -58,11 +116,14 @@ async fn list(args: ServicesListArgs) -> Result<()> {
 /// implementation detail, and listing it invites a user to connect to something
 /// that is not a codex endpoint.
 fn all_kinds() -> Vec<ServiceKind> {
-    vec![ServiceKind::App, ServiceKind::Api]
+    vec![ServiceKind::App, ServiceKind::Api, ServiceKind::Port]
 }
 
 fn default_set(args: ServicesDefaultSetArgs) -> Result<()> {
     let kind = ServiceKind::from(args.kind);
+    if kind == ServiceKind::Port {
+        bail!("shared ports have no default target; connect to one with `pocox services connect`");
+    }
     let mut config = Config::load()?;
     config.set_default_service(kind, &args.device, &args.name);
     config.save()?;
@@ -72,4 +133,129 @@ fn default_set(args: ServicesDefaultSetArgs) -> Result<()> {
     ui::headline(ui::Tone::Ok, &format!("default {kind} service"));
     ui::field("target", &format!("pcx:{}:{}:{}", target.device, kind, target.name));
     Ok(())
+}
+
+async fn share(args: ServicesShareArgs) -> Result<()> {
+    let local = local_tools::require().await?;
+    let shared: Shared = local
+        .post(
+            "share",
+            &serde_json::json!({
+                "ports": args.ports, "title": args.title, "path": args.path,
+                "waitReadySeconds": 10,
+            }),
+        )
+        .await?;
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&shared)?);
+        return Ok(());
+    }
+    ui::headline(ui::Tone::Ok, &format!("shared {}", shared.share.title));
+    ui::field("id", &shared.share.id);
+    for port in &shared.share.ports {
+        ui::field(&format!("port {}", port.port), &port.key);
+    }
+    ui::field("here", &shared.on_this_machine);
+    ui::field("link", &shared.open);
+    ui::muted("open it from POCOX on your other devices, or with `pocox open <link>`");
+    Ok(())
+}
+
+async fn unshare(args: ServicesTargetArgs) -> Result<()> {
+    let local = local_tools::require().await?;
+    let share: ShareView = local
+        .post("stop", &serde_json::json!({ "target": args.target }))
+        .await?;
+    ui::headline(ui::Tone::Ok, &format!("stopped sharing {}", share.title));
+    Ok(())
+}
+
+async fn connect_to(service: &str, port: Option<u16>) -> Result<ConnectionView> {
+    let local = local_tools::require().await?;
+    local
+        .post("connect", &serde_json::json!({ "service": service, "localPort": port }))
+        .await
+}
+
+async fn connect(args: ServicesConnectArgs) -> Result<()> {
+    let view = connect_to(&args.service, args.port).await?;
+    if args.json {
+        println!("{}", serde_json::to_string_pretty(&view)?);
+        return Ok(());
+    }
+    ui::headline(ui::Tone::Ok, &format!("connected {}", view.service));
+    ui::field("local", &view.local);
+    if !view.same_port {
+        ui::warn(
+            "its own port was busy here; absolute localhost URLs to that port will not reach it",
+        );
+    }
+    Ok(())
+}
+
+async fn disconnect(args: ServicesTargetArgs) -> Result<()> {
+    let local = local_tools::require().await?;
+    let view: ConnectionView = local
+        .post("disconnect", &serde_json::json!({ "target": args.target }))
+        .await?;
+    ui::headline(ui::Tone::Ok, &format!("disconnected {}", view.service));
+    Ok(())
+}
+
+/// The service and path a `pocox://open` link names, or `target` itself.
+fn parse_link(target: &str) -> (String, Option<String>) {
+    let Some(query) = target.strip_prefix("pocox://open?") else {
+        return (target.to_string(), None);
+    };
+    let mut service = String::new();
+    let mut path = None;
+    for pair in query.split('&') {
+        let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
+        let value = url::form_urlencoded::parse(format!("v={value}").as_bytes())
+            .next()
+            .map(|(_, v)| v.into_owned())
+            .unwrap_or_default();
+        match name {
+            "service" => service = value,
+            "path" => path = Some(value),
+            _ => {},
+        }
+    }
+    (service, path)
+}
+
+/// `pocox open`: connect a shared service here and open it.
+pub async fn open(args: OpenArgs) -> Result<()> {
+    let (service, link_path) = parse_link(args.target.trim());
+    if service.is_empty() {
+        bail!("the link names no service");
+    }
+    let view = connect_to(&service, None).await?;
+    let path = args.path.or(link_path).unwrap_or_else(|| "/".into());
+    let port = view.local.rsplit(':').next().unwrap_or_default();
+    let path = if path.starts_with('/') { path } else { format!("/{path}") };
+    let url = format!("http://localhost:{port}{path}");
+    if args.no_browser {
+        println!("{url}");
+        return Ok(());
+    }
+    ui::field("opening", &url);
+    if open::that_detached(&url).is_err() {
+        ui::warn("no browser could be opened; visit the address above");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn links_name_their_service_and_path() {
+        assert_eq!(
+            parse_link("pocox://open?service=pcx:studio:port:5173&path=/a%20b"),
+            ("pcx:studio:port:5173".to_string(), Some("/a b".to_string()))
+        );
+        assert_eq!(parse_link("studio/5173"), ("studio/5173".to_string(), None));
+    }
 }

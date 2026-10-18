@@ -27,6 +27,7 @@ pub mod client;
 pub mod fold;
 pub mod host;
 pub mod jsonrpc;
+pub mod mcp;
 pub mod peer;
 pub mod provider;
 pub mod replica;
@@ -38,6 +39,7 @@ pub mod store;
 
 pub use client::{ClientError, GatewayClient};
 pub use host::{AgentHost, HostError, HostOptions, Identity};
+pub use mcp::{McpGrant, SessionMcp};
 pub use replica::Replica;
 pub use schema::SteerOutcome;
 pub use spec::{AgentSpec, Preset, SpecError, PRESETS};
