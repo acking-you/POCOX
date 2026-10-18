@@ -11,6 +11,7 @@ import 'package:pocket_codex/src/managed/managed_host_editor.dart';
 import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/managed/management_failure.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
@@ -258,7 +259,7 @@ class _ManagedDevicePanelState extends ConsumerState<ManagedDevicePanel> {
       title: l10n.managedComputerTitle,
       hint: device == null
           ? null
-          : l10n.managedComputerSummary(device.os, device.appVersion),
+          : l10n.managedComputerSummary(osLabel(device.os), device.appVersion),
       trailing: IconButton(
         key: const Key('managed-device-refresh'),
         tooltip: l10n.managedRefreshComputer,
@@ -289,6 +290,14 @@ class _ManagedDevicePanelState extends ConsumerState<ManagedDevicePanel> {
           DiagnosticLine(label: l10n.managedKey, value: widget.serviceKey),
           if (device != null)
             DiagnosticLine(label: l10n.managedDevice, value: device.device),
+          if (device?.metadata case final metadata?) ...[
+            if (metadata.hostId case final id?)
+              DiagnosticLine(label: l10n.managedInstallationId, value: id),
+            DiagnosticLine(
+              label: l10n.managedProcessInstance,
+              value: metadata.instanceId,
+            ),
+          ],
           if (device != null)
             for (final host in device.hosts)
               if (host.status case final status?)

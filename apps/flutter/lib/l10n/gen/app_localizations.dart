@@ -2501,7 +2501,7 @@ abstract class AppLocalizations {
   /// No description provided for @servicesDeviceCapabilityCount.
   ///
   /// In en, this message translates to:
-  /// **'{count} capabilities'**
+  /// **'{count, plural, =1{1 capability} other{{count} capabilities}}'**
   String servicesDeviceCapabilityCount(int count);
 
   /// No description provided for @servicesLocalDevice.
@@ -2509,6 +2509,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This device'**
   String get servicesLocalDevice;
+
+  /// No description provided for @servicesPlatformUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Platform unknown'**
+  String get servicesPlatformUnknown;
 
   /// No description provided for @servicesCapabilities.
   ///
@@ -6415,6 +6421,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Device'**
   String get managedDevice;
+
+  /// No description provided for @managedInstallationId.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation ID'**
+  String get managedInstallationId;
+
+  /// No description provided for @managedProcessInstance.
+  ///
+  /// In en, this message translates to:
+  /// **'Process instance'**
+  String get managedProcessInstance;
 
   /// No description provided for @managedSwitchTitle.
   ///

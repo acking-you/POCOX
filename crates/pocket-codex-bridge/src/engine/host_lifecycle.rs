@@ -108,6 +108,20 @@ pub(super) fn record_running_in(root: &Path, name: &str, runtime: Runtime) {
     }
 }
 
+/// Show a failed boot restore beside its host, to every controller, until the
+/// next start or stop records a choice. The cause stays in the local log.
+pub(super) fn record_restore_failure(name: &str) {
+    let Ok(root) = host_profiles::root() else {
+        return;
+    };
+    warnings().lock().unwrap_or_else(|p| p.into_inner()).insert(
+        (root, host_names::canonical(name).unwrap_or_else(|_| name.into())),
+        "This service could not be restored when the host started. Start it again; the host's log \
+         has the cause."
+            .into(),
+    );
+}
+
 /// A corrupt ledger already disables every automatic restore. It must not
 /// prevent stopping a live process. For a readable ledger, refusing a failed
 /// write is necessary: its old start choice could otherwise resurrect it.

@@ -5,10 +5,10 @@ import 'package:pocket_codex/src/providers.dart';
 /// A remote computer's management view, by its `host:` service key. Reads
 /// only: invalidating it never starts or stops anything.
 final managedDeviceProvider = FutureProvider.autoDispose
-    .family<ManagedDevice, String>(
-      (ref, serviceKey) =>
-          ref.watch(bridgeApiProvider).managedDevice(serviceKey),
-    );
+    .family<ManagedDevice, String>((ref, serviceKey) {
+      ref.watch(configProvider);
+      return ref.watch(bridgeApiProvider).managedDevice(serviceKey);
+    });
 
 /// Runtimes installed on a remote computer. Discovery never installs or
 /// signs in.

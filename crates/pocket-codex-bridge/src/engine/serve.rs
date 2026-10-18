@@ -46,7 +46,7 @@ use pocket_codex_codex::{
 };
 use pocket_codex_core::{
     process::tcp_port_open,
-    service::{default_device_id, ServiceId, ServiceKind},
+    service::{ServiceId, ServiceKind},
 };
 use pocket_codex_pb::Published;
 use tokio::task::JoinHandle;
@@ -528,7 +528,7 @@ fn launch_codex(
     let codex_binary_display = binary.as_ref().map(|p| p.display().to_string());
     let binary_path = binary.clone();
 
-    let device = default_device_id();
+    let device = runtime::device_id()?;
     let app_key = ServiceId::new(&device, ServiceKind::App, &name).key();
     let api_key = ServiceId::new(&device, ServiceKind::Api, &name).key();
     let meta_key = ServiceId::new(&device, ServiceKind::Meta, &name).key();
@@ -875,8 +875,9 @@ fn codex_status() -> Vec<ServeStatus> {
             .filter(|owner| !guard.keys().any(|name| host_names::same(name, owner)))
             .map(|owner| ServeStatus {
                 name: owner.clone(),
-                // As its start named it, so it is listed under this device.
-                device: default_device_id(),
+                // As its start named it, so it is listed under this device;
+                // that start already loaded the identity.
+                device: runtime::device_id().unwrap_or_default(),
                 provider: "codex".to_string(),
                 protocol: "codex-app-server".to_string(),
                 provider_name: "Codex".to_string(),

@@ -286,19 +286,19 @@ fn publish(
 ) -> Result<AcpServe, (anyhow::Error, Owner)> {
     let prepared = (|| {
         Ok::<_, anyhow::Error>((
+            runtime::device_id()?,
             host_services::config_store()?,
             host_services::host_store()?,
             bind_loopback("ACP gateway")?,
             bind_loopback("meta service")?,
         ))
     })();
-    let (config_store, host_store, (gateway_std, gateway_local), (meta_std, meta_local)) =
+    let (device, config_store, host_store, (gateway_std, gateway_local), (meta_std, meta_local)) =
         match prepared {
             Ok(prepared) => prepared,
             Err(error) => return Err((error, owner)),
         };
     let rt = runtime::runtime();
-    let device = default_device_id();
     let gateway_host = host.clone();
     let gateway_task = rt.spawn(host_services::supervise(
         "the ACP gateway",

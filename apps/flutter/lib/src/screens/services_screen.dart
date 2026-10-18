@@ -97,9 +97,14 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     }
   }
 
-  void _refreshServices({bool subscriptions = false}) {
+  /// [manual] is the refresh button (or retry): it also re-reads what only
+  /// changes when a host restarts, which the timer leaves alone.
+  void _refreshServices({bool manual = false}) {
     ref.invalidate(servicesProvider);
-    if (subscriptions) ref.invalidate(subscriptionsProvider);
+    if (manual) {
+      ref.invalidate(subscriptionsProvider);
+      ref.invalidate(serviceDeviceMetadataProvider);
+    }
     ref.invalidate(appReachableProvider);
     ref.invalidate(apiReachableProvider);
     ref.invalidate(appReachableLocalProvider);
@@ -148,7 +153,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
           // Re-discover services, re-read subscription health, and re-probe
           // every app-server's backend reachability, then rebuild so each
           // status re-evaluates.
-          onPressed: () => _refreshServices(subscriptions: true),
+          onPressed: () => _refreshServices(manual: true),
         ),
       ],
       // Always on desktop, whatever is selected, loading or failed: hosting
@@ -184,7 +189,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
               detail: detail,
               relay: config?.relay,
               compact: _hostingSupported,
-              onRetry: () => _refreshServices(subscriptions: true),
+              onRetry: () => _refreshServices(manual: true),
             );
             // The relay only lists other devices: this computer's own
             // services are known here and still work here, so they stay on

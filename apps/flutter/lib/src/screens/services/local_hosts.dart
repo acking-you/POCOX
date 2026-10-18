@@ -142,7 +142,7 @@ class _LocalHostCard extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                host.device,
+                deviceLabel(host.device),
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),

@@ -539,11 +539,12 @@
   "manageServices": "Manage services",
   "servicesHostThisDevice": "Host this device",
   "servicesDevices": "Devices",
-  "servicesDeviceCapabilityCount": "{count} capabilities",
+  "servicesDeviceCapabilityCount": "{count, plural, =1{1 capability} other{{count} capabilities}}",
   "@servicesDeviceCapabilityCount": {
     "placeholders": { "count": { "type": "int" } }
   },
   "servicesLocalDevice": "This device",
+  "servicesPlatformUnknown": "Platform unknown",
   "servicesCapabilities": "Available capabilities",
   "servicesChatCapability": "Conversation service",
   "servicesApiCapability": "Responses API",
@@ -1412,6 +1413,8 @@
   "managedDiagnostics": "Diagnostics",
   "managedKey": "Management key",
   "managedDevice": "Device",
+  "managedInstallationId": "Installation ID",
+  "managedProcessInstance": "Process instance",
   "managedSwitchTitle": "Allow management from my other devices",
   "managedSwitchOn": "On",
   "managedSwitchOff": "Off",

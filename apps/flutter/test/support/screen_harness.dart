@@ -194,6 +194,15 @@ Future<void> openDevice(WidgetTester t, [String? device]) async {
   await t.pumpAndSettle();
 }
 
+/// Scroll the widget keyed [key] into view, then tap it.
+Future<void> tapKey(WidgetTester t, String key) async {
+  final target = find.byKey(Key(key));
+  await t.ensureVisible(target);
+  await t.pumpAndSettle();
+  await t.tap(target);
+  await t.pumpAndSettle();
+}
+
 /// A 1×1 transparent PNG — the smallest thing `Image.memory` will decode, so a
 /// host-image test can assert on a real thumbnail rather than a broken one.
 final Uint8List onePixelPng = base64Decode(

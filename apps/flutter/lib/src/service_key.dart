@@ -89,6 +89,84 @@ SessionProtocol sessionProtocolOf(String key) =>
 /// The device that publishes [key], or empty when [key] isn't a service key.
 String serviceKeyDevice(String key) => parseServiceKey(key).device;
 
+final _installationId = RegExp(r'^[0-9a-f]{32}$');
+
+/// The parts of a device segment generated from a hosting installation's
+/// identity, `<source>.<hostname>.<id>`; null for an explicit `--device`
+/// override or an older hostname-only device. Routing always keeps the full
+/// segment: this is for display only.
+({String source, String hostname, String id})? installationOf(String device) {
+  final first = device.indexOf('.');
+  final last = device.lastIndexOf('.');
+  if (first < 1 || last <= first + 1) return null;
+  final id = device.substring(last + 1);
+  if (!_installationId.hasMatch(id)) return null;
+  return (
+    source: device.substring(0, first),
+    hostname: device.substring(first + 1, last),
+    id: id,
+  );
+}
+
+/// The OS (or `wsl`) a publisher reports, as people write it.
+String osLabel(String os) => switch (os) {
+  'windows' => 'Windows',
+  'macos' => 'macOS',
+  'linux' => 'Linux',
+  'wsl' => 'WSL',
+  'android' => 'Android',
+  'ios' => 'iOS',
+  _ => os,
+};
+
+/// The first eight hex digits of a stable ID: enough to tell installations of
+/// the same name apart without showing the whole UUID.
+String shortId(String id) {
+  final hex = id.replaceAll('-', '');
+  return hex.length <= 8 ? hex : hex.substring(0, 8);
+}
+
+final _versionDash = RegExp(r'(\d)-(\d)');
+
+/// How [device] is named to people: `studio (WSL Ubuntu-24.04)` for a
+/// generated installation segment, otherwise the segment itself. A WSL
+/// distribution's name is its owner's choice, so all of it is kept; a native
+/// Linux source is its release's long name, of which the first word says
+/// enough (the selected device's header has the full platform).
+String deviceLabel(String device) {
+  final installation = installationOf(device);
+  if (installation == null) return device;
+  final [os, ...words] = installation.source.split('-');
+  final distribution = os == 'wsl'
+      ? words.join('-').replaceAllMapped(_versionDash, (m) => '${m[1]}.${m[2]}')
+      : words.firstOrNull ?? '';
+  final from = [
+    osLabel(os),
+    if (distribution.isNotEmpty)
+      distribution[0].toUpperCase() + distribution.substring(1),
+  ].join(' ');
+  return '${installation.hostname} ($from)';
+}
+
+/// The devices among [devices] that share their [deviceLabel] with another
+/// one: those need their [deviceShortId] shown to be told apart.
+Set<String> sameNamedDevices(Iterable<String> devices) {
+  final byLabel = <String, Set<String>>{};
+  for (final device in devices) {
+    (byLabel[deviceLabel(device)] ??= {}).add(device);
+  }
+  return {
+    for (final same in byLabel.values)
+      if (same.length > 1) ...same,
+  };
+}
+
+/// The [shortId] of a generated installation segment; null for any other.
+String? deviceShortId(String device) => switch (installationOf(device)) {
+  final installation? => shortId(installation.id),
+  null => null,
+};
+
 /// The instance name in [key], falling back to the whole key so a label is never
 /// blank.
 String serviceKeyName(String key) {
@@ -101,7 +179,7 @@ String serviceKeyName(String key) {
 String serviceKeyLabel(String key) {
   final parsed = parseServiceKey(key);
   if (parsed.device.isEmpty) return key;
-  return '${parsed.device} · ${parsed.name}';
+  return '${deviceLabel(parsed.device)} · ${parsed.name}';
 }
 
 /// The route of conversation [threadId] on the session service [key].

@@ -89,12 +89,20 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
   }
 
   Widget _agentGrid() {
+    final l10n = AppLocalizations.of(context);
+    final local = ref.watch(localDeviceMetadataProvider);
     final saved =
         ref.watch(uiPrefsProvider).valueOrNull?.acpAgents ??
         const <AcpAgentSpec>[];
     return GroupCard(
       key: const Key('host-agent-section'),
-      title: AppLocalizations.of(context).hostSectionAgent,
+      title: l10n.hostSectionAgent,
+      // Where the agent will run: Windows and WSL can share a hostname.
+      hint: [
+        l10n.servicesLocalDevice,
+        if (local.hostname.isNotEmpty) local.hostname,
+        local.platform,
+      ].join(' · '),
       children: [
         EditorBlock(
           child: AgentChoiceGrid(

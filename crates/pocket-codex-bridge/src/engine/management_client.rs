@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use once_cell::sync::OnceCell;
+use pocket_codex_core::device::DeviceMetadata;
 use reqwest::{Client, Method};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -127,6 +128,39 @@ fn check_key(key: &str) -> Result<()> {
     Ok(())
 }
 
+/// Read publisher metadata without inferring capabilities from its label.
+/// `None` is an older publisher without the route.
+pub fn device_metadata(key: &str) -> Result<Option<DeviceMetadata>> {
+    let epoch = transport::epoch();
+    let url = meta::device_endpoint(key)?;
+    if !transport::is_current(epoch) {
+        bail!("connection changed; refresh the host");
+    }
+    let api = pocket_codex_core::service::ServiceId::parse_key(key)
+        .is_some_and(|id| id.kind == pocket_codex_core::service::ServiceKind::Api);
+    metadata_result(
+        runtime::runtime().block_on(request_at::<_, ()>(url.into(), Method::GET, None, epoch)),
+        api,
+    )
+}
+
+/// An older standalone Responses API proxy answers every path but its own
+/// with 403, so for an `api` key that also means "no metadata route".
+fn metadata_result(response: Result<DeviceMetadata>, api: bool) -> Result<Option<DeviceMetadata>> {
+    match response {
+        Ok(value) if value.protocol == DeviceMetadata::PROTOCOL => Ok(Some(value)),
+        Ok(_) => Ok(None),
+        Err(error)
+            if error.downcast_ref::<RemoteError>().is_some_and(|error| {
+                matches!(error.status, 404 | 405) || api && error.status == 403
+            }) =>
+        {
+            Ok(None)
+        },
+        Err(error) => Err(error),
+    }
+}
+
 /// Read the selected computer's management state.
 pub fn device(key: &str) -> Result<management::DeviceView> {
     check_key(key)?;
@@ -226,6 +260,45 @@ mod tests {
         let url = format!("http://{}", listener.local_addr().expect("address"));
         let task = tokio::spawn(async move { axum::serve(listener, app).await.expect("serve") });
         (url, task)
+    }
+
+    #[tokio::test]
+    async fn missing_metadata_is_distinct_from_outages_and_invalid_responses() {
+        let (url, task) = serve(
+            Router::new()
+                .route("/method", get(|| async { StatusCode::METHOD_NOT_ALLOWED }))
+                .route("/forbidden", get(|| async { StatusCode::FORBIDDEN }))
+                .route("/offline", get(|| async { StatusCode::SERVICE_UNAVAILABLE }))
+                .route("/invalid", get(|| async { "not JSON" }))
+                .route(
+                    "/future",
+                    get(|| async {
+                        let mut value = DeviceMetadata::current();
+                        value.protocol = 2;
+                        axum::Json(value)
+                    }),
+                ),
+        )
+        .await;
+        let read = |path: &'static str, api| {
+            let url = format!("{url}/{path}");
+            async move {
+                metadata_result(
+                    request_at::<_, ()>(url, Method::GET, None, transport::epoch()).await,
+                    api,
+                )
+            }
+        };
+        for path in ["missing", "method", "future"] {
+            assert_eq!(read(path, false).await.expect("older host"), None, "{path}");
+        }
+        // Only an older standalone API proxy refuses unknown paths with 403.
+        assert_eq!(read("forbidden", true).await.expect("older API proxy"), None);
+        assert!(read("forbidden", false).await.is_err());
+        for path in ["offline", "invalid"] {
+            assert!(read(path, false).await.is_err(), "{path} is not an older host");
+        }
+        task.abort();
     }
 
     #[tokio::test]

@@ -1354,11 +1354,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String servicesDeviceCapabilityCount(int count) {
-    return '$count capabilities';
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count capabilities',
+      one: '1 capability',
+    );
+    return '$_temp0';
   }
 
   @override
   String get servicesLocalDevice => 'This device';
+
+  @override
+  String get servicesPlatformUnknown => 'Platform unknown';
 
   @override
   String get servicesCapabilities => 'Available capabilities';
@@ -3696,6 +3705,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get managedDevice => 'Device';
+
+  @override
+  String get managedInstallationId => 'Installation ID';
+
+  @override
+  String get managedProcessInstance => 'Process instance';
 
   @override
   String get managedSwitchTitle => 'Allow management from my other devices';
