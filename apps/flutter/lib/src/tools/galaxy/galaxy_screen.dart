@@ -25,6 +25,7 @@ import 'package:pocket_codex/src/tools/planet_glyph.dart';
 import 'package:pocket_codex/src/tools/tools_actions.dart';
 import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocket_codex/src/widgets/height_reporter.dart';
 import 'package:pocket_codex/src/widgets/utility_page.dart';
 
 /// The galaxy page.
@@ -53,6 +54,10 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   bool _listShown = false;
   double _pinch = 1;
   Size _canvas = Size.zero;
+
+  /// The search bar's height (two rows on a phone, more with large text):
+  /// the list and the details panel start below it.
+  double _barHeight = 48;
   GalaxyScene _full = GalaxyScene.empty;
   GalaxyFilter _filter = const GalaxyFilter();
   ToolsOverview? _source;
@@ -342,6 +347,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
               ),
             ),
           );
+          final below = 12 + _barHeight;
           return ClipRect(
             child: Stack(
               children: [
@@ -353,6 +359,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                         alpha: 0.86,
                       ),
                       child: GalaxyList(
+                        top: below + 12,
                         scene: _view.scene,
                         onPick: (id) {
                           setState(() => _list = false);
@@ -378,11 +385,18 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                     alignment: Alignment.topCenter,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 680),
-                      child: _Bar(
-                        search: _search,
-                        filter: _filter,
-                        wide: wide,
-                        onFilter: _setFilter,
+                      child: HeightReporter(
+                        onHeight: (height) {
+                          if (mounted && height != _barHeight) {
+                            setState(() => _barHeight = height);
+                          }
+                        },
+                        child: _Bar(
+                          search: _search,
+                          filter: _filter,
+                          wide: wide,
+                          onFilter: _setFilter,
+                        ),
                       ),
                     ),
                   ),
@@ -391,7 +405,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                   const Positioned(left: 18, bottom: 16, child: _Legend()),
                 if (selected != null && !list)
                   Positioned(
-                    top: wide ? 76 : null,
+                    top: wide ? below + 16 : null,
                     right: wide ? 16 : 8,
                     left: wide ? null : 8,
                     bottom: wide ? null : 8,
@@ -399,7 +413,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
                         maxHeight: wide
-                            ? constraints.maxHeight - 96
+                            ? constraints.maxHeight - below - 36
                             : constraints.maxHeight * 0.6,
                       ),
                       child: Glass(

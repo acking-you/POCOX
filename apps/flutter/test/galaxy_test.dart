@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_screen.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
+import 'package:pocket_codex/src/widgets/glass.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
@@ -227,6 +228,22 @@ void main() {
       await t.pump(const Duration(milliseconds: 100));
     }
     await capturePreview(t, 'galaxy-phone');
+    // The list starts below the search bar, which takes two rows here.
+    await t.tap(find.byKey(const Key('galaxy-list-toggle')));
+    await t.pump();
+    await t.pump();
+    final bar = t.getRect(
+      find
+          .ancestor(
+            of: find.byKey(const Key('galaxy-search')),
+            matching: find.byType(Glass),
+          )
+          .first,
+    );
+    expect(
+      t.getRect(find.text('Shared with you')).top,
+      greaterThanOrEqualTo(bar.bottom),
+    );
     await t.pumpWidget(const SizedBox());
   });
 
