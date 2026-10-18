@@ -16,10 +16,15 @@ class ShareRef {
     this.title,
     this.ports = const [],
     this.secure = false,
+    this.shareId,
   });
 
   /// The first port's relay key.
   final String service;
+
+  /// The share's id on its device, when known (an agent's tool result): a
+  /// later share of the same port is another share.
+  final String? shareId;
 
   /// Path to open.
   final String path;
@@ -90,8 +95,10 @@ ShareRef? _structuredShare(String text) {
     final ports = share['ports'];
     final path = share['path'];
     final title = share['title'];
+    final id = share['id'];
     return ShareRef(
       service: service,
+      shareId: id is String ? id : null,
       path: path is String && path.startsWith('/') ? path : '/',
       title: title is String ? title : null,
       secure: share['secure'] == true,

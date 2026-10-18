@@ -47,6 +47,10 @@ struct Seen {
     /// Every device seen in this context, with its platform when known:
     /// one that leaves the relay stays listed, offline.
     known: BTreeMap<String, Option<String>>,
+    /// Each device's share ids at its last event, kept when its stream drops:
+    /// a reconnected stream's first event is compared with them, so a share
+    /// made in between is still announced.
+    shares_seen: BTreeMap<String, Vec<String>>,
 }
 
 fn stream_client() -> &'static reqwest::Client {
@@ -135,9 +139,25 @@ fn parse(frame: &[u8]) -> Option<CatalogEvent> {
 
 fn record(device: &str, event: CatalogEvent, seen: &Mutex<Seen>) {
     let mut seen = seen.lock().unwrap_or_else(|p| p.into_inner());
-    seen.added
-        .extend(event.added.into_iter().map(|id| (device.to_string(), id)));
     let catalog = catalog::sanitize(event.catalog);
+    let ids: Vec<String> = catalog
+        .shares
+        .iter()
+        .map(|share| share.id.clone())
+        .collect();
+    // The first time a device is seen its shares are not news (the stream's
+    // own first event says none); afterwards, whatever it did not have.
+    let added = match seen.shares_seen.get(device) {
+        Some(before) => ids
+            .iter()
+            .filter(|id| !before.contains(id))
+            .cloned()
+            .collect(),
+        None => event.added,
+    };
+    seen.added
+        .extend(added.into_iter().map(|id| (device.to_string(), id)));
+    seen.shares_seen.insert(device.to_string(), ids);
     seen.known
         .insert(device.to_string(), Some(catalog.platform.clone()).filter(|p| !p.is_empty()));
     seen.catalogs.insert(device.to_string(), catalog);
@@ -306,6 +326,32 @@ mod tests {
         );
         assert!(parse(b": keep-alive\n\n").is_none());
         assert_eq!(find_blank_line(b"event: x\ndata: y\n\nrest"), Some(18));
+    }
+
+    #[test]
+    fn a_share_made_while_a_stream_was_down_is_still_announced() {
+        let event = |ids: &[&str]| -> CatalogEvent {
+            let shares: Vec<serde_json::Value> = ids
+                .iter()
+                .map(|id| {
+                    serde_json::json!({"id": id, "title": "Page", "path": "/", "ports": [],
+                        "owner": {"kind": "agent", "label": "Codex"}, "createdMs": 1})
+                })
+                .collect();
+            serde_json::from_value(serde_json::json!({
+                "catalog": {"protocol": 1, "device": "studio", "revision": 1,
+                            "tools": {"enabled": true, "askBeforeSharing": true},
+                            "shares": shares, "consents": []},
+                "added": [],
+            }))
+            .expect("event")
+        };
+        let seen = Mutex::new(Seen::default());
+        record("studio", event(&["s1"]), &seen);
+        assert!(seen.lock().unwrap().added.is_empty(), "what exists at first is not news");
+        // The stream dropped; its replacement's first event names nothing new.
+        record("studio", event(&["s1", "s2"]), &seen);
+        assert_eq!(seen.lock().unwrap().added, [("studio".to_string(), "s2".to_string())]);
     }
 
     #[test]

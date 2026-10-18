@@ -253,6 +253,20 @@ pub async fn share(
     if let Some(done) = existing(&ports) {
         return Ok(Ok(shared(done)));
     }
+    // An agent's other ports cannot join a page someone else shares, and a
+    // page split from its API would open without it.
+    if !caller.is_user() {
+        let state = state::lock();
+        if let Some(page) = state
+            .share_with_port(ports[0])
+            .filter(|share| share.key.as_ref() != Some(&key))
+        {
+            return Err(ToolError::Invalid(format!(
+                "Port {} is already shared by {}; share the other ports in a call of their own.",
+                ports[0], page.owner.label
+            )));
+        }
+    }
     let new: Vec<u16> = {
         let state = state::lock();
         ports
@@ -546,6 +560,19 @@ async fn publish(
         codec: true,
     };
     match publish_pending(&owned.transport.session, options).await {
+        // The wait can be long: a handle of an account or relay that changed
+        // meanwhile is the old one's. A bound request fails; any other is
+        // published again under the new one.
+        Ok((published, _)) if !transport::is_current(owned.epoch) => {
+            runtime::runtime().spawn(async move {
+                let _ = published.stop().await;
+            });
+            if epoch.is_some() {
+                Err(ToolError::ContextChanged)
+            } else {
+                Ok(None)
+            }
+        },
         Ok((published, _)) => Ok(Some((published, owned.epoch))),
         Err(PublishError::Conflict {
             ..

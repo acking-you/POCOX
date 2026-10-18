@@ -202,6 +202,26 @@ void main() {
     expect(api.toolsConnected, ['pcx:studio:port:5173']);
   });
 
+  testWidgets('a card acts only on the share it names, not a later one', (
+    t,
+  ) async {
+    final api = FakeBridgeApi()..toolsOverviewValue = remoteShare();
+    const menu = Key('share-menu-pcx:studio:port:5173');
+    for (final (id, actions) in [('s1', true), ('an-earlier-share', false)]) {
+      await t.pumpWidget(
+        _host(
+          api,
+          ShareCard(
+            key: ValueKey(id),
+            share: ShareRef(service: 'pcx:studio:port:5173', shareId: id),
+          ),
+        ),
+      );
+      await t.pump();
+      expect(find.byKey(menu), actions ? findsOneWidget : findsNothing);
+    }
+  });
+
   testWidgets('opening a share an agent here connected takes its tunnel over', (
     t,
   ) async {
