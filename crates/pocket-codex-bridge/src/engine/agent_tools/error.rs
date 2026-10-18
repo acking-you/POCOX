@@ -20,6 +20,8 @@ pub enum ToolError {
     /// The caller's token ended while the call ran (its harness stopped, or
     /// the user revoked it).
     Revoked,
+    /// The change could not be saved, so it was not made.
+    NotSaved,
     /// The relay cannot be reached or refused.
     Relay(String),
 }
@@ -36,6 +38,7 @@ impl ToolError {
             Self::NotFound(_) => "not_found",
             Self::NotOwner => "not_owner",
             Self::Revoked => "token_revoked",
+            Self::NotSaved => "not_saved",
             Self::Relay(_) => "relay_unavailable",
         }
     }
@@ -62,6 +65,9 @@ impl ToolError {
             },
             Self::Revoked => "This harness no longer has access to the POCOX tools: it was \
                               stopped, or the user revoked its access."
+                .into(),
+            Self::NotSaved => "POCOX could not save this change, so nothing changed. Check the \
+                               disk, then try again."
                 .into(),
             Self::Relay(why) => format!("The relay is unavailable: {why}. Try again later."),
         }

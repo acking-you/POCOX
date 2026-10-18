@@ -190,12 +190,13 @@ pub struct Connection {
     pub local: String,
     /// Whether it got the service's own port number.
     pub same_port: bool,
-    /// Recorded owner.
+    /// Recorded owner: who made it, or the user once they took it over.
     pub owner: OwnerView,
-    /// Who keeps it alive; `None` for the user's own.
-    pub key: Option<OwnerKey>,
-    /// When it ends on its own.
-    pub expires_ms: Option<i64>,
+    /// The agents that keep it alive, each until its own lease ends. It ends
+    /// with the last of them, unless it is the user's.
+    pub holders: Vec<(OwnerKey, i64)>,
+    /// The user's own: kept until the user ends it.
+    pub user: bool,
 }
 
 impl Connection {
@@ -206,8 +207,22 @@ impl Connection {
             local: self.local.clone(),
             same_port: self.same_port,
             owner: self.owner.clone(),
-            expires_ms: self.expires_ms,
+            expires_ms: if self.user {
+                None
+            } else {
+                self.holders.iter().map(|(_, until)| *until).max()
+            },
         }
+    }
+
+    /// Whether `owner` keeps it alive.
+    pub fn held_by(&self, owner: &OwnerKey) -> bool {
+        self.holders.iter().any(|(key, _)| key == owner)
+    }
+
+    /// Whether nothing keeps it alive any more.
+    pub fn abandoned(&self) -> bool {
+        !self.user && self.holders.is_empty()
     }
 }
 
@@ -229,6 +244,8 @@ pub struct State {
     /// The saved settings could not be read: the tools stay off until they
     /// can.
     pub settings_unreadable: bool,
+    /// The last save of the shares failed; the supervisor tries again.
+    pub shares_unsaved: bool,
     /// Shares of this device.
     pub shares: Vec<Share>,
     /// Requests waiting for the user.
@@ -304,24 +321,27 @@ impl State {
             .find(|share| share.ports.iter().any(|p| p.port == port))
     }
 
-    /// Save the shares that outlive this process.
-    pub fn save_shares(&self) {
-        let Some(dir) = &self.dir else { return };
+    /// Save the shares that outlive this process. A failure is remembered
+    /// and retried by the supervisor; a caller that must not report success
+    /// unsaved checks the result.
+    pub fn save_shares(&mut self) -> anyhow::Result<()> {
+        let Some(dir) = &self.dir else { return Ok(()) };
         let saved: Vec<SavedShare> = self
             .shares
             .iter()
             .filter(|share| share.durable())
             .map(Share::saved)
             .collect();
-        let bytes = match serde_json::to_vec(&saved) {
-            Ok(bytes) => bytes,
-            Err(error) => return tracing::warn!(%error, "shares not saved"),
-        };
-        if let Err(error) =
-            crate::engine::host_profiles::files::write_private(&dir.join("shares.json"), &bytes)
-        {
+        let written = serde_json::to_vec(&saved)
+            .map_err(anyhow::Error::from)
+            .and_then(|bytes| {
+                crate::engine::host_profiles::files::write_private(&dir.join("shares.json"), &bytes)
+            });
+        self.shares_unsaved = written.is_err();
+        if let Err(error) = &written {
             tracing::warn!("shares not saved: {error:#}");
         }
+        written.map(drop)
     }
 }
 

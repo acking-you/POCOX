@@ -133,6 +133,9 @@ struct File {
 pub struct Tokens {
     dir: Option<PathBuf>,
     records: HashMap<String, Record>,
+    /// Records were forgotten but the file still holds them: saved again by
+    /// [`Tokens::flush`] until it works.
+    unsaved: bool,
 }
 
 fn now_ms() -> i64 {
@@ -162,6 +165,7 @@ impl Tokens {
                 .into_iter()
                 .map(|record| (record.digest.clone(), record))
                 .collect(),
+            unsaved: false,
         };
         tokens.ensure_user()?;
         Ok(tokens)
@@ -207,9 +211,14 @@ impl Tokens {
         };
         let principal = record.principal();
         let persisted = record.persisted();
-        self.records.insert(record.digest.clone(), record);
+        let digest = record.digest.clone();
+        self.records.insert(digest.clone(), record);
         if persisted {
-            self.save()?;
+            if let Err(error) = self.save() {
+                // Never handed out, so never valid.
+                self.records.remove(&digest);
+                return Err(error);
+            }
         }
         Ok((principal, secret))
     }
@@ -266,13 +275,31 @@ impl Tokens {
         Ok(revoked)
     }
 
-    /// Forget the tokens `which` selects in this process only: for holders
-    /// that are gone, when the revocation could not be saved.
+    /// Forget the tokens `which` selects now, saving the file later if it
+    /// cannot be saved now ([`Tokens::flush`]): for holders that are gone,
+    /// whose revocation must not wait for the disk.
     pub fn forget_where(&mut self, which: impl Fn(&Principal) -> bool) -> Vec<Principal> {
         let forgotten = self.selected(which);
+        let persisted = self
+            .records
+            .values()
+            .any(|record| record.persisted() && forgotten.iter().any(|p| p.id == record.id));
         self.records
             .retain(|_, record| !forgotten.iter().any(|p| p.id == record.id));
+        if persisted {
+            self.unsaved = true;
+            let _ = self.flush();
+        }
         forgotten
+    }
+
+    /// Save what [`Tokens::forget_where`] could not, if anything.
+    pub fn flush(&mut self) -> Result<()> {
+        if self.unsaved {
+            self.save()?;
+            self.unsaved = false;
+        }
+        Ok(())
     }
 
     /// Every token but the session ones, for Settings.
@@ -337,6 +364,32 @@ mod tests {
             .expect("revoke");
         assert_eq!(revoked, vec![codex]);
         assert!(tokens.authenticate(&secret).is_none());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_revocation_that_could_not_be_saved_reaches_the_disk_later() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().expect("dir");
+        let mut tokens = Tokens::open(dir.path()).expect("open");
+        let (hosted, secret) = tokens
+            .mint(Kind::Hosted, "Codex · h", Some("codex"), Some("h"))
+            .expect("mint");
+        let mode = |mode| {
+            std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(mode))
+                .expect("chmod")
+        };
+        mode(0o500);
+        tokens.forget_where(|p| p.id == hosted.id);
+        assert!(tokens.authenticate(&secret).is_none(), "ends at once");
+        let unwritable = tokens.flush().is_err();
+        mode(0o700);
+        // Root ignores the permissions; the retry is what matters.
+        if unwritable {
+            tokens.flush().expect("saved once writable");
+        }
+        let reopened = Tokens::open(dir.path()).expect("reopen");
+        assert!(reopened.authenticate(&secret).is_none(), "a restart keeps it revoked");
     }
 
     #[test]

@@ -1265,6 +1265,7 @@
   "toolsKept": "已保持",
   "toolsOpenFailed": "无法打开：{error}",
   "toolsPortMoved": "本机端口 {port} 已被占用，已改用 {local}；指向 localhost:{port} 的链接可能无效。",
+  "toolsPortsNotConnected": "这个共享的端口 {ports} 未能在本机连接，页面的部分功能可能无法使用。",
   "toolsNothingShared": "还没有共享",
   "toolsShareHint": "智能体共享开发服务器或页面后，会出现在这里，点开即可查看。",
   "toolsThisDevice": "本机",

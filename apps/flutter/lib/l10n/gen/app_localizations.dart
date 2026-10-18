@@ -6878,6 +6878,12 @@ abstract class AppLocalizations {
   /// **'Port {port} is taken here, so it opened on {local}. Links that name localhost:{port} may not work.'**
   String toolsPortMoved(String port, String local);
 
+  /// No description provided for @toolsPortsNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Port {ports} of this share could not be connected here, so parts of the page may not work.'**
+  String toolsPortsNotConnected(String ports);
+
   /// No description provided for @toolsNothingShared.
   ///
   /// In en, this message translates to:

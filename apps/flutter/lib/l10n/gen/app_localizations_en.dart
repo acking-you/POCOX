@@ -3972,6 +3972,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String toolsPortsNotConnected(String ports) {
+    return 'Port $ports of this share could not be connected here, so parts of the page may not work.';
+  }
+
+  @override
   String get toolsNothingShared => 'Nothing shared yet';
 
   @override

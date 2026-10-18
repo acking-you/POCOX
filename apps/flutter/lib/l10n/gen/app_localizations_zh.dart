@@ -3749,6 +3749,11 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String toolsPortsNotConnected(String ports) {
+    return '这个共享的端口 $ports 未能在本机连接，页面的部分功能可能无法使用。';
+  }
+
+  @override
   String get toolsNothingShared => '还没有共享';
 
   @override

@@ -187,6 +187,7 @@ async fn supervise() {
             let _ = tokio::task::spawn_blocking(catalog::refresh_services).await;
         }
         shares::maintain(tick.is_multiple_of(3));
+        retry_saves();
         connections::prune();
         consent::prune(&mut state::lock());
         tick = tick.wrapping_add(1);
@@ -194,6 +195,18 @@ async fn supervise() {
             _ = tokio::time::sleep(Duration::from_secs(2)) => {},
             _ = WAKE.notified() => {},
         }
+    }
+}
+
+/// Save again what could not be saved: a revocation or a stopped share must
+/// reach the disk, or a restart would bring it back.
+fn retry_saves() {
+    let mut state = state::lock();
+    if let Err(error) = state.tokens.flush() {
+        tracing::debug!("agent tool tokens still not saved: {error:#}");
+    }
+    if state.shares_unsaved {
+        let _ = state.save_shares();
     }
 }
 
