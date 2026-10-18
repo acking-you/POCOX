@@ -11,6 +11,12 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge.dart'
 String friendlyError(Object error) {
   var text = error is AnyhowException ? error.message : error.toString();
 
+  // Some stored host errors have already crossed a String boundary.
+  const wrapper = 'AnyhowException(';
+  if (text.startsWith(wrapper) && text.endsWith(')')) {
+    text = text.substring(wrapper.length, text.length - 1);
+  }
+
   // anyhow appends the backtrace after a blank line; cut it off. Match a few
   // spellings defensively (`Stack backtrace:` / `Backtrace:`).
   for (final marker in const [

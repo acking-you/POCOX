@@ -182,19 +182,36 @@ pub async fn register_background(
     session: &RelaySession,
     opts: RegisterOptions,
 ) -> Result<Registration> {
-    session
-        .client()?
-        .register(RegisterRequest {
-            key: opts.key.clone(),
-            local_addr: opts.local_addr.clone(),
-            transport: Transport::Tcp,
-            codec: opts.codec,
-            // Never force a namespace: a temporary credential owns exactly one,
-            // and forcing is an admin-only override we have no use for.
-            force_namespace: false,
-        })
-        .await
-        .with_context(|| format!("registering `{}` on {}", opts.key, session.relay_addr))
+    let client = session.client()?;
+    let request = RegisterRequest {
+        key: opts.key.clone(),
+        local_addr: opts.local_addr.clone(),
+        transport: Transport::Tcp,
+        codec: opts.codec,
+        force_namespace: false,
+    };
+    let registration = match service_idle_timeout(&opts.key) {
+        Some(timeout) => client.register_with_idle_timeout(request, timeout).await,
+        None => client.register(request).await,
+    };
+    registration.with_context(|| format!("registering `{}` on {}", opts.key, session.relay_addr))
+}
+
+// Bound abandoned probes on both old and current controllers. Active Codex
+// connections ping every 15s; HTTP event streams keep alive every 15s. ACP's
+// longest synchronous operation is session loading (120s, client budget 150s).
+// Generic ports and Responses streams have no such contract and keep SDK
+// defaults.
+fn service_idle_timeout(key: &str) -> Option<Duration> {
+    use pocket_codex_core::service::{ServiceId, ServiceKind};
+    let kind = ServiceId::parse_key(key).map(|id| id.kind).or_else(|| {
+        pocket_codex_account_proto::NamespacedServiceId::parse_key(key).map(|id| id.service.kind)
+    })?;
+    match kind {
+        ServiceKind::App | ServiceKind::OpenCode => Some(Duration::from_secs(90)),
+        ServiceKind::Acp | ServiceKind::Meta | ServiceKind::Host => Some(Duration::from_secs(180)),
+        ServiceKind::Api | ServiceKind::Port | ServiceKind::Unknown => None,
+    }
 }
 
 /// Register, returning the handle AND the readiness outcome separately.
@@ -435,5 +452,24 @@ mod tests {
         assert!(parse_relay_addr("lb7666.top").is_err(), "a missing port is a typo");
         assert!(parse_relay_addr("lb7666.top:nope").is_err());
         assert!(parse_relay_addr(":7666").is_err());
+    }
+}
+
+#[cfg(test)]
+mod idle_policy_tests {
+    use super::*;
+
+    #[test]
+    fn only_known_harness_contracts_receive_idle_deadlines() {
+        assert_eq!(service_idle_timeout("pcx:mac:app:default"), Some(Duration::from_secs(90)));
+        assert_eq!(
+            service_idle_timeout("pcxu:user:mac:acp:claude"),
+            Some(Duration::from_secs(180))
+        );
+        for key in
+            ["pcx:mac:api:default", "pcxu:user:mac:port:8080", "custom", "pcx:mac:future:default"]
+        {
+            assert_eq!(service_idle_timeout(key), None);
+        }
     }
 }

@@ -25,6 +25,18 @@ void main() {
     );
   });
 
+  test('stored bridge errors retain the cause without a wrapper or stack', () {
+    final error = AnyhowException(
+      'OpenCode inspection failed: file/socket handles exhausted\n\n'
+      'Stack backtrace:\n  0: <unknown>',
+    );
+    expect(friendlyError(error.toString()), friendlyError(error));
+    expect(
+      friendlyError(AnyhowException('failed (os error 24)').toString()),
+      'failed (os error 24)',
+    );
+  });
+
   test('passes through plain errors untouched', () {
     expect(friendlyError(StateError('boom')), contains('boom'));
   });
