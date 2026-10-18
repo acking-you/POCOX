@@ -149,9 +149,24 @@ fn open() -> Result<()> {
     // Unreadable settings never switch the tools on: the user may have
     // switched them off.
     let settings = settings::load();
-    let saved = state::saved_shares(&dir);
+    // The user's shares last until stopped: an unreadable file is set aside
+    // for them, never overwritten.
+    let (saved, blocked) = match state::saved_shares(&dir) {
+        Ok(saved) => (saved, false),
+        Err(error) => match state::set_aside_shares(&dir) {
+            Ok(aside) => {
+                tracing::warn!("saved shares unreadable, kept at {}: {error:#}", aside.display());
+                (Vec::new(), false)
+            },
+            Err(moved) => {
+                tracing::warn!("saved shares unreadable and kept in place: {error:#}; {moved}");
+                (Vec::new(), true)
+            },
+        },
+    };
     {
         let mut state = state::lock();
+        state.shares_blocked = blocked;
         state.dir = Some(dir);
         state.tokens = tokens;
         state.hosting = true;
@@ -355,6 +370,7 @@ pub fn share_on(
             path,
             wait_ready_seconds: Some(5),
             secure,
+            epoch: None,
         };
         let shared =
             runtime::runtime().block_on(shares::share(&shares::Caller::user("You"), request));

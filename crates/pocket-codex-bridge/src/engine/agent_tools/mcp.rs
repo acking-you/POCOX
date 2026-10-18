@@ -215,6 +215,7 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                 path: text(args.get("path")),
                 wait_ready_seconds: args.get("wait_ready_seconds").and_then(number),
                 secure: text(args.get("scheme")).as_deref() == Some("https"),
+                epoch: None,
             };
             match shares::share(caller, request).await {
                 Ok(Ok(shared)) => {

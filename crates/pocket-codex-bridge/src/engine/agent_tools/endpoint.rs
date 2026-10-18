@@ -254,6 +254,7 @@ fn local_routes(secret: Arc<str>) -> Router {
                     path: body.path,
                     wait_ready_seconds: body.wait_ready_seconds,
                     secure: body.secure,
+                    epoch: None,
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),

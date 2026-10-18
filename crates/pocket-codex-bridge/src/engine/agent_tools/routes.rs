@@ -55,9 +55,11 @@ pub fn failure(error: ToolError) -> Response {
     let status = match error {
         ToolError::NotFound(_) => StatusCode::NOT_FOUND,
         ToolError::Invalid(_) => StatusCode::BAD_REQUEST,
-        ToolError::NotOwner | ToolError::Off | ToolError::Declined | ToolError::Revoked => {
-            StatusCode::FORBIDDEN
-        },
+        ToolError::NotOwner
+        | ToolError::Off
+        | ToolError::Declined
+        | ToolError::Revoked
+        | ToolError::ContextChanged => StatusCode::FORBIDDEN,
         ToolError::NotHosting | ToolError::Relay(_) => StatusCode::SERVICE_UNAVAILABLE,
         ToolError::Conflict(_) => StatusCode::CONFLICT,
         ToolError::NotSaved => StatusCode::INTERNAL_SERVER_ERROR,
@@ -136,8 +138,9 @@ fn events(
     )
 }
 
-/// The routes, guarded by `admitted`.
-pub fn router(admitted: Admitted) -> Router {
+/// The routes, guarded by `admitted`, for an entry admitted under transport
+/// `epoch` (a share asked under it is never made under another account).
+pub fn router(admitted: Admitted, epoch: u64) -> Router {
     let guard = |admitted: &Admitted| -> Option<Response> { (!admitted()).then(refused) };
     let (a1, a2, a3, a4, a5, a6) = (
         admitted.clone(),
@@ -198,6 +201,7 @@ pub fn router(admitted: Admitted) -> Router {
                     path: body.path,
                     wait_ready_seconds: Some(5),
                     secure: body.secure,
+                    epoch: Some(epoch),
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),

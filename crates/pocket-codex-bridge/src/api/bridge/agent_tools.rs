@@ -383,6 +383,7 @@ pub fn tools_share(
         path,
         wait_ready_seconds: Some(5),
         secure: false,
+        epoch: None,
     };
     let caller = shares::Caller::user("You");
     match runtime::runtime().block_on(shares::share(&caller, request)) {

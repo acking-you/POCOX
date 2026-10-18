@@ -106,6 +106,9 @@ pub struct Share {
     pub expires_ms: Option<i64>,
     /// Its ports.
     pub ports: Vec<SharedPort>,
+    /// Its call finished: the user's share is saved only once it is
+    /// published, so a failed share never reaches the file.
+    pub confirmed: bool,
 }
 
 impl Share {
@@ -134,7 +137,7 @@ impl Share {
     /// Whether it survives a restart: kept shares and the user's own. An
     /// agent's share ends with the process that served its tools.
     pub fn durable(&self) -> bool {
-        self.key.is_none() || self.owner.kind == OwnerKind::User
+        self.confirmed && (self.key.is_none() || self.owner.kind == OwnerKind::User)
     }
 
     /// The saved form.
@@ -253,6 +256,9 @@ pub struct State {
     pub settings_unreadable: bool,
     /// The last save of the shares failed; the supervisor tries again.
     pub shares_unsaved: bool,
+    /// The saved shares could not be read or set aside: never overwritten,
+    /// so nothing that changes them can be saved this run.
+    pub shares_blocked: bool,
     /// Shares of this device.
     pub shares: Vec<Share>,
     /// Requests waiting for the user.
@@ -332,6 +338,9 @@ impl State {
     /// and retried by the supervisor; a caller that must not report success
     /// unsaved checks the result.
     pub fn save_shares(&mut self) -> anyhow::Result<()> {
+        if self.shares_blocked {
+            anyhow::bail!("the saved shares could not be read, so they are not overwritten");
+        }
         let Some(dir) = &self.dir else { return Ok(()) };
         let saved: Vec<SavedShare> = self
             .shares
@@ -352,10 +361,21 @@ impl State {
     }
 }
 
-/// The saved shares in `dir`.
-pub fn saved_shares(dir: &std::path::Path) -> Vec<SavedShare> {
-    std::fs::read(dir.join("shares.json"))
-        .ok()
-        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-        .unwrap_or_default()
+/// The shares saved in `dir`: none when nothing was saved, an error when the
+/// file cannot be read or parsed.
+pub fn saved_shares(dir: &std::path::Path) -> anyhow::Result<Vec<SavedShare>> {
+    use anyhow::Context as _;
+    match std::fs::read(dir.join("shares.json")) {
+        Ok(bytes) => serde_json::from_slice(&bytes).context("reading the saved shares"),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => Err(error).context("reading the saved shares"),
+    }
+}
+
+/// Move an unreadable shares file aside (kept for the user, never
+/// overwritten); returns where it went.
+pub fn set_aside_shares(dir: &std::path::Path) -> std::io::Result<PathBuf> {
+    let aside = dir.join(format!("shares.json.unreadable-{}", now_ms()));
+    std::fs::rename(dir.join("shares.json"), &aside)?;
+    Ok(aside)
 }

@@ -113,6 +113,9 @@ pub struct ShareRequest {
     pub wait_ready_seconds: Option<u64>,
     /// The page is served over TLS (opened with `https`).
     pub secure: bool,
+    /// Only while the account or relay stays the one the request was
+    /// admitted under (a request from another device's management entry).
+    pub epoch: Option<u64>,
 }
 
 /// The loopback address answering on `port`, IPv4 first.
@@ -298,13 +301,21 @@ pub async fn share(
         path: clean_path(request.path.as_deref()),
         secure: request.secure,
     };
-    let (id, reserved) = reserve(caller, &key, page, &addrs)?;
-    publish_reserved(&id, &reserved).await?;
-    let view = state::lock()
-        .shares
-        .iter()
-        .find(|share| share.id == id)
-        .map(Share::view)
+    let (id, reserved) = reserve(caller, &key, page, &addrs, request.epoch)?;
+    publish_reserved(&id, &reserved, request.epoch).await?;
+    if caller.is_user() {
+        confirm(&id, &reserved)?;
+    }
+    // The answer describes the page: the share holding the first port, even
+    // when this call only added its other ports.
+    let view = existing(&ports)
+        .or_else(|| {
+            state::lock()
+                .shares
+                .iter()
+                .find(|s| s.id == id)
+                .map(Share::view)
+        })
         .ok_or_else(|| ToolError::NotFound("The share".into()))?;
     tracing::info!(share = %id, owner = %view.owner.label, ports = ?ports, "shared ports");
     Ok(Ok(shared(view)))
@@ -378,6 +389,7 @@ fn reserve(
     key: &OwnerKey,
     page: Page,
     addrs: &[(u16, SocketAddr)],
+    epoch: Option<u64>,
 ) -> Result<(String, Vec<u16>), ToolError> {
     let device = runtime::device_id().map_err(|e| ToolError::Relay(format!("{e:#}")))?;
     let mut state = state::lock();
@@ -385,6 +397,9 @@ fn reserve(
         return Err(ToolError::NotHosting);
     }
     state.admits(caller)?;
+    if epoch.is_some_and(|epoch| !transport::is_current(epoch)) {
+        return Err(ToolError::ContextChanged);
+    }
     let wanted = addrs;
     let addrs: Vec<(u16, SocketAddr)> = wanted
         .iter()
@@ -414,7 +429,6 @@ fn reserve(
             ..SharedPort::new(*port, key, *addr, true)
         }
     });
-    let unsaved = state.shares_unsaved;
     // The same owner sharing more ports extends its share.
     let id = if let Some(share) = state
         .shares
@@ -437,26 +451,40 @@ fn reserve(
             created_ms: now_ms(),
             expires_ms: (!user).then(|| now_ms() + AGENT_LEASE_MS),
             ports: ports.collect(),
+            // The user's is saved once published ([`confirm`]).
+            confirmed: !user,
         });
         id
     };
-    // The user's shares outlive restarts: reported only once saved.
-    if state.save_shares().is_err() && caller.is_user() {
-        for share in state.shares.iter_mut().filter(|share| share.id == id) {
-            share.ports.retain(|p| !reserved.contains(&p.port));
-        }
-        state.shares.retain(|share| !share.ports.is_empty());
-        state.shares_unsaved = unsaved;
-        return Err(ToolError::NotSaved);
-    }
     state::changed(&mut state);
     Ok((id, reserved))
+}
+
+/// Save the user's share `id` now that it is published: it outlives
+/// restarts, so the call succeeds only once it is saved. Unsaved, it is
+/// withdrawn and the call fails; until then it was never in the file.
+fn confirm(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
+    let mut state = state::lock();
+    let unsaved = state.shares_unsaved;
+    let Some(share) = state.shares.iter_mut().find(|share| share.id == id) else {
+        // Stopped meanwhile.
+        return Ok(());
+    };
+    share.confirmed = true;
+    if state.save_shares().is_ok() {
+        state::changed(&mut state);
+        return Ok(());
+    }
+    state.shares_unsaved = unsaved;
+    drop(state);
+    withdraw(id, reserved);
+    Err(ToolError::NotSaved)
 }
 
 /// Publish the ports of share `id` this call reserved. A failure withdraws
 /// all of them, so the call fails as a whole and nothing it asked for stays
 /// shared.
-async fn publish_reserved(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
+async fn publish_reserved(id: &str, reserved: &[u16], epoch: Option<u64>) -> Result<(), ToolError> {
     let todo: Vec<(u16, String, SocketAddr)> = state::lock()
         .shares
         .iter()
@@ -466,7 +494,7 @@ async fn publish_reserved(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
         .map(|port| (port.port, port.key.clone(), port.addr))
         .collect();
     for (port, key, addr) in todo {
-        match publish(&key, addr).await {
+        match publish(&key, addr, epoch).await {
             Ok(outcome) => settle(id, port, outcome),
             Err(error) => {
                 withdraw(id, reserved);
@@ -477,10 +505,19 @@ async fn publish_reserved(id: &str, reserved: &[u16]) -> Result<(), ToolError> {
     Ok(())
 }
 
-async fn publish(key: &str, addr: SocketAddr) -> Result<Option<(Published, u64)>, ToolError> {
+/// Publish `key` for `addr` under the current account or relay, or under
+/// `epoch`'s only.
+async fn publish(
+    key: &str,
+    addr: SocketAddr,
+    epoch: Option<u64>,
+) -> Result<Option<(Published, u64)>, ToolError> {
     let owned = transport::resolve_owned()
         .await
         .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+    if epoch.is_some_and(|epoch| epoch != owned.epoch) {
+        return Err(ToolError::ContextChanged);
+    }
     let options = RegisterOptions {
         key: owned.transport.relay_key(key),
         local_addr: addr.to_string(),
@@ -682,6 +719,7 @@ pub fn restore(saved: Vec<state::SavedShare>) {
             created_ms: share.created_ms,
             expires_ms: share.expires_ms,
             ports,
+            confirmed: true,
         });
     }
     state::changed(&mut state);
@@ -743,7 +781,7 @@ pub fn maintain(probe: bool) {
     }
     for (id, port, key, addr) in todo {
         runtime::runtime().spawn(async move {
-            let outcome = publish(&key, addr).await.unwrap_or_else(|error| {
+            let outcome = publish(&key, addr, None).await.unwrap_or_else(|error| {
                 tracing::debug!(%key, "a shared port could not be published: {error}");
                 None
             });
@@ -838,6 +876,7 @@ mod tests {
             created_ms: 0,
             expires_ms: Some(1),
             ports: vec![SharedPort::new(5173, "pcx:studio:port:5173".into(), addr, true)],
+            confirmed: true,
         });
         take_over(&mut state, &[8000], &Caller::user("You")).expect("nothing to take");
         assert!(state.shares[0].key.is_some(), "other ports are left alone");

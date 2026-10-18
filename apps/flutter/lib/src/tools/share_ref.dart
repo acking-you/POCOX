@@ -94,6 +94,7 @@ ShareRef? _structuredShare(String text) {
       service: service,
       path: path is String && path.startsWith('/') ? path : '/',
       title: title is String ? title : null,
+      secure: share['secure'] == true,
       ports: [
         if (ports is List)
           for (final port in ports)

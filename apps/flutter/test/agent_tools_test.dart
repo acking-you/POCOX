@@ -10,6 +10,7 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_rows.dart';
 import 'package:pocket_codex/src/tools/preview_browser.dart';
+import 'package:pocket_codex/src/tools/send_to_agent.dart';
 import 'package:pocket_codex/src/tools/share_card.dart';
 import 'package:pocket_codex/src/tools/share_ref.dart';
 import 'package:pocket_codex/src/tools/tools_host.dart';
@@ -18,7 +19,10 @@ import 'package:pocket_codex/src/tools/tools_settings.dart';
 import 'fake_bridge_api.dart';
 
 /// The detail a Codex `pocox.connect` call carries once it shared.
-String sharedCall({String service = 'pcx:studio:port:5173'}) => jsonEncode({
+String sharedCall({
+  String service = 'pcx:studio:port:5173',
+  bool secure = false,
+}) => jsonEncode({
   'arguments': {
     'action': 'share',
     'ports': [5173],
@@ -35,6 +39,7 @@ String sharedCall({String service = 'pcx:studio:port:5173'}) => jsonEncode({
         'id': 's1',
         'title': 'Landing page',
         'path': '/',
+        if (secure) 'secure': true,
         'ports': [
           {'port': 5173, 'key': service, 'status': 'online'},
         ],
@@ -148,6 +153,19 @@ void main() {
       'pocox://open?service=pcx:studio:port:8443&path=/&scheme=https',
     );
     expect(copied?.scheme, 'https', reason: 'a copied https link stays https');
+    final tls = TranscriptItem(
+      id: 'tls',
+      type: 'mcpToolCall',
+      title: 'pocox.connect',
+      text: sharedCall(secure: true),
+      turnId: 't',
+    );
+    expect(tls.share?.scheme, 'https');
+    // The phone may open it on another port; the agent gets the share's own.
+    expect(
+      sharedPageUrl('http://localhost:61234/a?b=1#c', 'pcx:studio:port:5173'),
+      'http://localhost:5173/a?b=1#c',
+    );
     final rows = buildTranscriptRows([
       TranscriptItem(
         id: 'u',

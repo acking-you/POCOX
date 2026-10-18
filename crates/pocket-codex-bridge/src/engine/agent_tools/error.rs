@@ -22,6 +22,8 @@ pub enum ToolError {
     Revoked,
     /// The change could not be saved, so it was not made.
     NotSaved,
+    /// The account or relay changed while the request ran.
+    ContextChanged,
     /// The relay cannot be reached or refused.
     Relay(String),
 }
@@ -39,6 +41,7 @@ impl ToolError {
             Self::NotOwner => "not_owner",
             Self::Revoked => "token_revoked",
             Self::NotSaved => "not_saved",
+            Self::ContextChanged => "connection_changed",
             Self::Relay(_) => "relay_unavailable",
         }
     }
@@ -68,6 +71,9 @@ impl ToolError {
                 .into(),
             Self::NotSaved => "POCOX could not save this change, so nothing changed. Check the \
                                disk, then try again."
+                .into(),
+            Self::ContextChanged => "The account or relay changed while this ran, so nothing was \
+                                     shared. Refresh, then try again."
                 .into(),
             Self::Relay(why) => format!("The relay is unavailable: {why}. Try again later."),
         }

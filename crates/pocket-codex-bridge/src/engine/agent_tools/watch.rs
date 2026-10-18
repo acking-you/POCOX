@@ -22,7 +22,7 @@ use tokio::{sync::Notify, task::JoinHandle};
 
 use super::{
     catalog,
-    model::{Catalog, CatalogEvent, Overview},
+    model::{Catalog, CatalogEvent, DeviceView, Overview},
     state,
 };
 use crate::engine::{discovery, meta, runtime, transport};
@@ -44,6 +44,9 @@ struct Seen {
     /// This device's catalog at the previous update.
     local: Option<Catalog>,
     added: Vec<(String, String)>,
+    /// Every device seen in this context, with its platform when known:
+    /// one that leaves the relay stays listed, offline.
+    known: BTreeMap<String, Option<String>>,
 }
 
 fn stream_client() -> &'static reqwest::Client {
@@ -129,8 +132,10 @@ fn record(device: &str, event: CatalogEvent, seen: &Mutex<Seen>) {
     let mut seen = seen.lock().unwrap_or_else(|p| p.into_inner());
     seen.added
         .extend(event.added.into_iter().map(|id| (device.to_string(), id)));
-    seen.catalogs
-        .insert(device.to_string(), catalog::sanitize(event.catalog));
+    let catalog = catalog::sanitize(event.catalog);
+    seen.known
+        .insert(device.to_string(), Some(catalog.platform.clone()).filter(|p| !p.is_empty()));
+    seen.catalogs.insert(device.to_string(), catalog);
 }
 
 fn overview(seen: &mut Seen) -> Update {
@@ -150,7 +155,27 @@ fn overview(seen: &mut Seen) -> Update {
             catalogs.insert(this_device.clone(), local);
         }
     }
-    let overview = catalog::assemble(this_device, &seen.listed, &catalogs);
+    let mut overview = catalog::assemble(this_device, &seen.listed, &catalogs);
+    // Devices that left the relay stay, offline and without services (the
+    // galaxy's dim embers), until the account or relay changes.
+    for (name, platform) in &seen.known {
+        if overview.devices.iter().all(|device| &device.name != name) {
+            overview.devices.push(DeviceView {
+                name: name.clone(),
+                platform: platform.clone(),
+                online: false,
+                catalog: false,
+                tools: None,
+                services: Vec::new(),
+                shares: Vec::new(),
+                consents: Vec::new(),
+            });
+        }
+    }
+    let this_device = overview.this_device.clone();
+    overview
+        .devices
+        .sort_by_key(|d| (d.name != this_device, d.name.clone()));
     Update {
         overview,
         added: std::mem::take(&mut seen.added),
@@ -208,6 +233,9 @@ async fn run_in_context(deliver: &mut (impl FnMut(Update) -> bool + Send)) -> Re
                 {
                     let mut seen = seen.lock().unwrap_or_else(|p| p.into_inner());
                     seen.catalogs.retain(|device, _| hosts.contains_key(device));
+                    for id in &listed {
+                        seen.known.entry(id.device.clone()).or_insert(None);
+                    }
                     seen.listed = listed;
                 }
                 for (device, key) in hosts {
@@ -273,5 +301,20 @@ mod tests {
         );
         assert!(parse(b": keep-alive\n\n").is_none());
         assert_eq!(find_blank_line(b"event: x\ndata: y\n\nrest"), Some(18));
+    }
+
+    #[test]
+    fn a_device_that_left_the_relay_stays_listed_offline() {
+        let mut seen = Seen::default();
+        seen.known.insert("devbox".into(), Some("linux".into()));
+        let update = overview(&mut seen);
+        let devbox = update
+            .overview
+            .devices
+            .iter()
+            .find(|d| d.name == "devbox")
+            .expect("kept");
+        assert!(!devbox.online && devbox.services.is_empty());
+        assert_eq!(devbox.platform.as_deref(), Some("linux"));
     }
 }

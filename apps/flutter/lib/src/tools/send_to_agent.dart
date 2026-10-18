@@ -32,6 +32,17 @@ String? conversationService(String shareKey, String? harness, String? host) {
   return '${shareKey.substring(0, shareKey.length - tail.length)}:$kind:$host';
 }
 
+/// [url] as the sharing computer reaches it: on the share's own port, which
+/// this device may have had to replace with another.
+String sharedPageUrl(String url, String? serviceKey) {
+  final port = serviceKey == null
+      ? null
+      : int.tryParse(parseServiceKey(serviceKey).name);
+  final uri = Uri.tryParse(url);
+  if (port == null || uri == null || !uri.hasAuthority) return url;
+  return uri.replace(port: port).toString();
+}
+
 /// The note added to the draft, in the user's language.
 String previewNote(
   AppLocalizations l10n, {
@@ -67,7 +78,7 @@ Future<void> sendPreviewToAgent(
   final note = previewNote(
     l10n,
     title: title,
-    url: url,
+    url: sharedPageUrl(url, serviceKey),
     device: deviceLabel(device),
     console: console,
   );
