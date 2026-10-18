@@ -22,6 +22,7 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
   title: share.title,
   ports: [for (final port in share.ports) port.port],
   secure: share.secure,
+  shareId: share.id,
 );
 
 /// What a share is right now, as far as this device can tell.
@@ -30,6 +31,11 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
   ShareRef ref,
 ) {
   final live = overview.shareOfKey(ref.service);
+  // A card names one share: a later share of the same port is not it, and
+  // its owner's actions are not this card's.
+  if (live != null && ref.shareId != null && live.share.id != ref.shareId) {
+    return (status: 'ended', device: live.device, share: null);
+  }
   if (live != null) {
     return (status: live.share.status, device: live.device, share: live.share);
   }
