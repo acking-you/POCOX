@@ -76,10 +76,11 @@ impl TurnState {
 /// after a complete line boundary; replacement and truncation restart it.
 /// A compressed rollout is [`TurnState::Unknown`].
 pub fn classify_turn_state(path: &Path) -> Result<TurnState> {
-    if super::is_compressed(path) {
+    let path = super::current_rollout(path);
+    if super::is_compressed(&path) {
         return Ok(TurnState::Unknown);
     }
-    super::state_cache::classify(path)
+    super::state_cache::classify(&path)
 }
 
 /// Classify turn state from an ordered iterator of rollout lines.

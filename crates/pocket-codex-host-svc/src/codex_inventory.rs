@@ -21,6 +21,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use futures::StreamExt;
 use pocket_codex_codex::{
     liveness::held_open_paths,
     rollout::{self, TurnState},
@@ -40,6 +41,8 @@ const PAGE_LIMIT: u64 = 100;
 /// Bounds a listing against a server that keeps returning cursors.
 const MAX_THREADS: usize = 5000;
 const GUARDIAN: &str = "guardian_review";
+/// `thread/read` requests one running-session poll keeps in flight.
+const CONCURRENT_READS: usize = 8;
 
 /// Every session, newest first.
 pub(crate) async fn list(reader: &CodexReader) -> Result<Vec<LocalSession>> {
@@ -150,7 +153,9 @@ async fn list_threads(reader: &CodexReader) -> Result<Vec<Value>> {
 }
 
 /// Every thread this app-server has loaded, read without attaching to any.
-/// A thread unloaded between the two requests is left out.
+/// A thread unloaded between the two requests is left out. Reads run a few
+/// at a time, so a server holding many loaded threads never receives one
+/// poll's reads all at once.
 async fn loaded_threads(reader: &CodexReader) -> Result<Vec<Value>> {
     let mut ids = Vec::new();
     let mut cursor: Option<String> = None;
@@ -172,10 +177,13 @@ async fn loaded_threads(reader: &CodexReader) -> Result<Vec<Value>> {
             break;
         }
     }
-    let reads =
-        futures::future::join_all(ids.iter().map(|id| {
-            reader.request("thread/read", json!({"threadId": id, "includeTurns": false}))
-        }))
+    let requests = ids
+        .into_iter()
+        .map(|id| json!({"threadId": id, "includeTurns": false}));
+    let reads: Vec<_> = futures::stream::iter(requests)
+        .map(|params| reader.request("thread/read", params))
+        .buffer_unordered(CONCURRENT_READS)
+        .collect()
         .await;
     Ok(reads
         .into_iter()

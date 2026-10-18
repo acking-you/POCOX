@@ -336,7 +336,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     final q = _query.trim().toLowerCase();
     bool matches(LocalSession s) {
       bool has(String? v) => v != null && v.toLowerCase().contains(q);
-      return has(s.preview) || has(s.cwd) || has(s.source);
+      return has(s.name) || has(s.preview) || has(s.cwd) || has(s.source);
     }
 
     bool matchesFilter(LocalSession session) => switch (_filter) {

@@ -31,8 +31,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          # gh rejects --slurp combined with --jq; filter the slurped pages with jq.
           reviewed=$(gh api --paginate --slurp "repos/$GH_REPO/issues/$PR_NUMBER/comments" \
-            --jq 'any(.[][]; .user.login == "claude[bot]")')
+            | jq 'any(.[][]; .user.login == "claude[bot]")')
           echo "reviewed=$reviewed" >> "$GITHUB_OUTPUT"
 
       - name: Check Claude gateway configuration
