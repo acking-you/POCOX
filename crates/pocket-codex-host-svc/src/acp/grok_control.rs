@@ -87,10 +87,11 @@ impl GrokControl {
         program: &Path,
         path: Option<&OsString>,
         env: &[(OsString, OsString)],
-        remove: &[OsString],
+        remove: &[String],
     ) -> Result<Arc<Self>, ControlError> {
         let args: Vec<String> = grok::ARGS.iter().map(|a| (*a).to_string()).collect();
-        let spawned = process::spawn_without(program, &args, path, env, remove)
+        let removed: Vec<&str> = remove.iter().map(String::as_str).collect();
+        let spawned = process::spawn_without(program, &args, path, env, &removed)
             .map_err(|e| ControlError::Start(e.to_string()))?;
         let peer = Peer::spawn(spawned.stdout, spawned.stdin, Arc::new(Refuse));
         let process = Mutex::new(Some(spawned.process));

@@ -5618,6 +5618,12 @@ abstract class AppLocalizations {
   /// **'“{name}” is using the shared history, and only one host can at a time. Choose “This host only”.'**
   String openCodeHistoryTaken(String name);
 
+  /// No description provided for @openCodeHistoryBackgroundServer.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server serves the shared history, and a custom provider cannot use it: this host could only follow its sessions. Choose “This host only”.'**
+  String get openCodeHistoryBackgroundServer;
+
   /// No description provided for @openCodePath.
   ///
   /// In en, this message translates to:
@@ -5665,6 +5671,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'None'**
   String get openCodeNone;
+
+  /// No description provided for @openCodeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get openCodeServer;
+
+  /// No description provided for @openCodeBackgroundServer.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server (shared, without POCOX tools)'**
+  String get openCodeBackgroundServer;
 
   /// No description provided for @openCodeConfigNote.
   ///
@@ -5881,6 +5899,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.'**
   String get accessSourceOpenDetail;
+
+  /// No description provided for @accessOpenCodeServiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server has this history open'**
+  String get accessOpenCodeServiceTitle;
+
+  /// No description provided for @accessOpenCodeServiceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.'**
+  String get accessOpenCodeServiceDetail;
+
+  /// No description provided for @accessOpenCodeClientTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Another OpenCode client is connected'**
+  String get accessOpenCodeClientTitle;
+
+  /// No description provided for @accessOpenCodeClientDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.'**
+  String get accessOpenCodeClientDetail;
 
   /// No description provided for @accessPocketHostTitle.
   ///

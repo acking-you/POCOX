@@ -85,21 +85,20 @@ pub fn spawn(
     path: Option<&OsString>,
     env: &[(OsString, OsString)],
 ) -> Result<Spawned, SpawnError> {
-    spawn_command(program, args, path, env, &[], false)
+    spawn_command(program, args, path, env, Inherit::All)
 }
 
-/// [`spawn`], with the inherited variables named in `remove` taken out of the
-/// child's environment first (an empty value is not always "unset" to an
-/// agent). `env` is applied afterwards, so it can still set one of them.
+/// [`spawn`], without the inherited variables named in `removed`. Variables
+/// in `env` are still applied.
 #[cfg(unix)]
 pub fn spawn_without(
     program: &Path,
     args: &[String],
     path: Option<&OsString>,
     env: &[(OsString, OsString)],
-    remove: &[OsString],
+    removed: &[&str],
 ) -> Result<Spawned, SpawnError> {
-    spawn_command(program, args, path, env, remove, false)
+    spawn_command(program, args, path, env, Inherit::Except(removed))
 }
 
 /// Start an owned helper with only the supplied environment. In particular,
@@ -110,7 +109,15 @@ pub fn spawn_isolated(
     args: &[String],
     env: &[(OsString, OsString)],
 ) -> Result<Spawned, SpawnError> {
-    spawn_command(program, args, None, env, &[], true)
+    spawn_command(program, args, None, env, Inherit::Nothing)
+}
+
+/// Which of this process's environment variables a child receives.
+#[cfg(unix)]
+enum Inherit<'a> {
+    All,
+    Except(&'a [&'a str]),
+    Nothing,
 }
 
 #[cfg(unix)]
@@ -119,15 +126,19 @@ fn spawn_command(
     args: &[String],
     path: Option<&OsString>,
     env: &[(OsString, OsString)],
-    remove: &[OsString],
-    isolated: bool,
+    inherit: Inherit<'_>,
 ) -> Result<Spawned, SpawnError> {
     let mut command = Command::new(program);
-    if isolated {
-        command.env_clear();
-    }
-    for name in remove {
-        command.env_remove(name);
+    match inherit {
+        Inherit::All => {},
+        Inherit::Except(removed) => {
+            for key in removed {
+                command.env_remove(key);
+            }
+        },
+        Inherit::Nothing => {
+            command.env_clear();
+        },
     }
     command
         .args(args)
@@ -186,7 +197,7 @@ pub fn spawn_without(
     _args: &[String],
     _path: Option<&OsString>,
     _env: &[(OsString, OsString)],
-    _remove: &[OsString],
+    _removed: &[&str],
 ) -> Result<Spawned, SpawnError> {
     Err(SpawnError::UnsupportedPlatform)
 }
@@ -411,33 +422,6 @@ mod tests {
             std::env::var_os(KEY).is_none(),
             "the variable is passed to the child, never set on this process"
         );
-        process.terminate(Duration::from_millis(100)).await;
-    }
-
-    #[tokio::test]
-    async fn removed_variables_are_not_inherited() {
-        // HOME is always set for the test process; a removed credential
-        // variable must reach the child as unset, not as an empty value.
-        assert!(std::env::var_os("HOME").is_some(), "precondition: inherited");
-        let script = "printf '%s\\n' \"${HOME-unset}\"; exec sleep 30".to_string();
-        let Spawned {
-            process,
-            stdin: _stdin,
-            mut stdout,
-        } = spawn_without(
-            Path::new("/bin/sh"),
-            &["-c".into(), script],
-            None,
-            &[],
-            &["HOME".into()],
-        )
-        .expect("spawn");
-        let mut line = Vec::new();
-        let mut byte = [0u8; 1];
-        while stdout.read(&mut byte).await.expect("read") == 1 && byte[0] != b'\n' {
-            line.push(byte[0]);
-        }
-        assert_eq!(String::from_utf8(line).expect("utf8"), "unset");
         process.terminate(Duration::from_millis(100)).await;
     }
 

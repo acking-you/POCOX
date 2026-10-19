@@ -117,6 +117,9 @@ pub struct OpenCodeHostStatusDto {
     /// The host keeps its sessions in a database of its own, not in
     /// OpenCode's default one.
     pub separate_history: bool,
+    /// The host is attached to OpenCode's background server, which OpenCode's
+    /// other clients share and which keeps running when the host stops.
+    pub background_server: bool,
 }
 impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusDto {
     fn from(s: crate::engine::serve_opencode::OpenCodeStatus) -> Self {
@@ -128,6 +131,7 @@ impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusD
             agents: s.agents,
             problem: s.problem,
             separate_history: s.separate_history,
+            background_server: s.background_server,
         }
     }
 }
@@ -145,20 +149,25 @@ pub struct OpenCodeEnvironmentDto {
     pub version: Option<String>,
     /// Installation or inspection failure, safe to show.
     pub problem: Option<String>,
+    /// OpenCode's own clients share its background server, which serves the
+    /// shared history (2.x, not turned off).
+    pub background_server: bool,
 }
 
 /// Inspect an explicit OpenCode executable or the host's child PATH.
 pub fn opencode_detect(binary: Option<String>) -> OpenCodeEnvironmentDto {
     match crate::engine::serve_opencode::detect(binary.as_deref()) {
-        Ok((path, version)) => OpenCodeEnvironmentDto {
-            path: Some(path),
-            version: Some(version),
+        Ok(found) => OpenCodeEnvironmentDto {
+            path: Some(found.path),
+            version: Some(found.version),
             problem: None,
+            background_server: found.background_server,
         },
         Err(error) => OpenCodeEnvironmentDto {
             path: None,
             version: None,
             problem: Some(error.to_string()),
+            background_server: false,
         },
     }
 }

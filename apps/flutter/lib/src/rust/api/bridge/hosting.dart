@@ -719,10 +719,23 @@ class OpenCodeEnvironmentDto {
   /// Installation or inspection failure, safe to show.
   final String? problem;
 
-  const OpenCodeEnvironmentDto({this.path, this.version, this.problem});
+  /// OpenCode's own clients share its background server, which serves the
+  /// shared history (2.x, not turned off).
+  final bool backgroundServer;
+
+  const OpenCodeEnvironmentDto({
+    this.path,
+    this.version,
+    this.problem,
+    required this.backgroundServer,
+  });
 
   @override
-  int get hashCode => path.hashCode ^ version.hashCode ^ problem.hashCode;
+  int get hashCode =>
+      path.hashCode ^
+      version.hashCode ^
+      problem.hashCode ^
+      backgroundServer.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -731,7 +744,8 @@ class OpenCodeEnvironmentDto {
           runtimeType == other.runtimeType &&
           path == other.path &&
           version == other.version &&
-          problem == other.problem;
+          problem == other.problem &&
+          backgroundServer == other.backgroundServer;
 }
 
 /// Native OpenCode runtime and sanitized service-default catalog summary.
@@ -758,6 +772,10 @@ class OpenCodeHostStatusDto {
   /// OpenCode's default one.
   final bool separateHistory;
 
+  /// The host is attached to OpenCode's background server, which OpenCode's
+  /// other clients share and which keeps running when the host stops.
+  final bool backgroundServer;
+
   const OpenCodeHostStatusDto({
     required this.version,
     required this.providersConnected,
@@ -766,6 +784,7 @@ class OpenCodeHostStatusDto {
     required this.agents,
     this.problem,
     required this.separateHistory,
+    required this.backgroundServer,
   });
 
   @override
@@ -776,7 +795,8 @@ class OpenCodeHostStatusDto {
       defaultModel.hashCode ^
       agents.hashCode ^
       problem.hashCode ^
-      separateHistory.hashCode;
+      separateHistory.hashCode ^
+      backgroundServer.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -789,5 +809,6 @@ class OpenCodeHostStatusDto {
           defaultModel == other.defaultModel &&
           agents == other.agents &&
           problem == other.problem &&
-          separateHistory == other.separateHistory;
+          separateHistory == other.separateHistory &&
+          backgroundServer == other.backgroundServer;
 }

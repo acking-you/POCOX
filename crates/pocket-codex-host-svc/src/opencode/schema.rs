@@ -114,5 +114,28 @@ pub struct Prompt {
     pub parts: Vec<Value>,
 }
 
+/// One known native slash command, run through its own execution path.
+#[derive(Debug, Clone, Serialize)]
+pub struct CommandInput {
+    /// Caller-generated native message ID.
+    #[serde(rename = "messageID")]
+    pub message_id: String,
+    /// Exact command name, without `/`.
+    pub command: String,
+    /// Text after the command name.
+    pub arguments: String,
+    /// Exact `provider/model` catalog key, when selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Native primary agent, when selected.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
+    /// Exact variant advertised by the selected model.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub variant: Option<String>,
+    /// Native file parts.
+    pub parts: Vec<Value>,
+}
+
 /// The statuses known to one server instance, keyed by original session ID.
 pub type Statuses = BTreeMap<String, Status>;

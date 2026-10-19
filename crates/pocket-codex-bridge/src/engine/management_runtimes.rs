@@ -47,8 +47,8 @@ pub fn detect() -> Result<Vec<Availability>> {
     rows.push(Availability {
         kind: "opencode".into(),
         ready: opencode.is_some(),
-        path: opencode.as_ref().map(|(p, _)| p.clone()),
-        version: opencode.as_ref().map(|(_, v)| v.clone()),
+        path: opencode.as_ref().map(|found| found.path.clone()),
+        version: opencode.as_ref().map(|found| found.version.clone()),
         needs_host_login: false,
         can_prepare: false,
         problem: opencode

@@ -118,6 +118,12 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
           ? const HostConfigSupport()
           : _codexSupport,
     );
+    if (target == openCodeChoice || existing?.isOpenCode == true) {
+      // Its history follows its model service (see [OpenCodeRuntimeForm]).
+      void follow() => openCode.customProvider = draft.source == 'custom';
+      draft.addListener(follow);
+      follow();
+    }
     return draft;
   });
 

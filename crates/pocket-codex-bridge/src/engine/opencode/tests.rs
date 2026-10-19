@@ -52,6 +52,7 @@ impl Fixture {
             bytes: HashMap::new(),
             cursors: HashMap::new(),
             turn_pages: HashMap::new(),
+            admitted: HashMap::new(),
         }));
         let (tx, _) = broadcast::channel(64);
         let link = Link {
@@ -365,4 +366,43 @@ fn completed_reasoning_only_output_keeps_provenance_and_original_part_identity()
     let mixed = projection::items(&done);
     assert_eq!(mixed[1].item_type, "reasoning");
     assert_eq!(mixed[2].item_type, "agentMessage");
+}
+
+#[test]
+fn a_turn_that_ends_between_refreshes_still_starts_and_completes() {
+    let fixture = Fixture::new();
+    let mut rx = fixture.link.tx.subscribe();
+    let mut before = snapshot();
+    before.turn_id = None;
+    before.window.messages.clear();
+    let mut done = snapshot();
+    done.turn_id = None;
+    done.window.messages[1].info["time"] = json!({"completed":123});
+    done.window.messages[1].info["finish"] = json!("stop");
+    lock(&fixture.link.shared)
+        .admitted
+        .insert("ses_fixture".into(), "msg_user".into());
+    let mut turns = || {
+        std::iter::from_fn(|| rx.try_recv().ok())
+            .filter(|event| event.kind.starts_with("turn/"))
+            .map(|event| {
+                let raw: serde_json::Value = serde_json::from_str(&event.raw).expect("event");
+                (
+                    event.kind,
+                    raw["turn"]["status"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    events::announce(&fixture.link, &identity(), None, &before);
+    assert!(turns().is_empty(), "a window read before the prompt waits for a later one");
+    events::announce(&fixture.link, &identity(), Some(&before), &done);
+    assert_eq!(turns(), [
+        ("turn/started".to_owned(), "inProgress".to_owned()),
+        ("turn/completed".to_owned(), "completed".to_owned())
+    ]);
+    assert!(lock(&fixture.link.shared).admitted.is_empty());
 }

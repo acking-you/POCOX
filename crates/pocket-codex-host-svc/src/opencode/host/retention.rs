@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::{Entry, Error, Host, Status, Statuses, Value};
+use super::{Entry, Error, Host, Status};
 
 const LIMIT: usize = 256;
 
@@ -48,9 +48,9 @@ async fn reserve_slot(
             continue;
         }
         let state = tokio::try_join!(
-            client.get::<Statuses>(&["session", "status"], Some(directory), &[]),
-            client.get::<Vec<Value>>(&["permission"], Some(directory), &[]),
-            client.get::<Vec<Value>>(&["question"], Some(directory), &[]),
+            client.statuses(directory),
+            client.permissions(directory),
+            client.questions(directory),
         );
         let (statuses, permissions, questions) = match state {
             Ok(state) => state,
@@ -143,6 +143,7 @@ mod tests {
         let client = super::super::Client::new(
             &format!("http://{}/", listener.local_addr().expect("valid test fixture")),
             None,
+            crate::opencode::wire::Dialect::V1,
         )
         .expect("valid test fixture");
         let server = tokio::spawn(async move {
@@ -229,6 +230,7 @@ mod tests {
             let client = super::super::Client::new(
                 &format!("http://{}/", listener.local_addr().expect("fixture")),
                 None,
+                crate::opencode::wire::Dialect::V1,
             )
             .expect("fixture");
             let server = tokio::spawn(async move {

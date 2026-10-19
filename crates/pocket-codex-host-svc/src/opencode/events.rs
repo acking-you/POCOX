@@ -6,7 +6,7 @@ use futures::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::client::ClientError;
+use super::{client::ClientError, wire::Dialect};
 
 const MAX_EVENT_BYTES: usize = 2 * 1024 * 1024;
 
@@ -24,26 +24,6 @@ pub struct Event {
     pub properties: Value,
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum Envelope {
-    Global { directory: Option<String>, payload: Event },
-    Instance(Event),
-}
-
-fn decode(data: &[u8]) -> Result<Event, ClientError> {
-    match serde_json::from_slice(data).map_err(|_| ClientError::InvalidResponse)? {
-        Envelope::Global {
-            directory,
-            mut payload,
-        } => {
-            payload.directory = directory;
-            Ok(payload)
-        },
-        Envelope::Instance(event) => Ok(event),
-    }
-}
-
 /// One bounded native SSE connection.
 pub struct EventStream {
     bytes: Pin<Box<dyn Stream<Item = Result<bytes::Bytes, reqwest::Error>> + Send>>,
@@ -53,10 +33,12 @@ pub struct EventStream {
 }
 
 impl EventStream {
-    pub(super) fn new(response: reqwest::Response) -> Self {
+    /// `framing` decodes each frame; the Pocket gateway's frames use the 1.x
+    /// instance envelope.
+    pub(super) fn new(response: reqwest::Response, framing: Dialect) -> Self {
         Self {
             bytes: Box::pin(response.bytes_stream()),
-            decoder: Decoder::default(),
+            decoder: Decoder::new(framing),
             ready: VecDeque::new(),
             ended: false,
         }
@@ -93,14 +75,24 @@ impl EventStream {
     }
 }
 
-#[derive(Default)]
+/// Line and data buffers are reused across frames.
 struct Decoder {
     line: Vec<u8>,
     data: Vec<u8>,
     carriage_return: bool,
+    framing: Dialect,
 }
 
 impl Decoder {
+    fn new(framing: Dialect) -> Self {
+        Self {
+            line: Vec::new(),
+            data: Vec::new(),
+            carriage_return: false,
+            framing,
+        }
+    }
+
     fn push(&mut self, chunk: &[u8]) -> Result<Vec<Event>, ClientError> {
         let mut events = Vec::new();
         for &byte in chunk {
@@ -127,21 +119,22 @@ impl Decoder {
     }
 
     fn finish_line(&mut self) -> Result<Option<Event>, ClientError> {
-        let line = std::mem::take(&mut self.line);
-        if line.is_empty() {
+        if self.line.is_empty() {
             if self.data.is_empty() {
                 return Ok(None);
             }
-            let data = std::mem::take(&mut self.data);
-            return decode(&data).map(Some);
+            let event = self.framing.event(&self.data);
+            self.data.clear();
+            return event;
         }
-        if let Some(data) = line.strip_prefix(b"data:") {
+        if let Some(data) = self.line.strip_prefix(b"data:") {
             let data = data.strip_prefix(b" ").unwrap_or(data);
             if !self.data.is_empty() {
                 self.data.push(b'\n');
             }
             self.data.extend_from_slice(data);
         }
+        self.line.clear();
         Ok(None)
     }
 }
@@ -154,7 +147,7 @@ mod tests {
     fn every_chunk_boundary_preserves_utf8_crlf_and_multiline_data() {
         let wire = b": heartbeat\r\ndata: {\r\ndata: \"type\":\"session.updated\",\r\ndata: \"properties\":{\"title\":\"\xe6\x81\xa2\xe5\xa4\x8d\"}}\r\n\r\n";
         for split in 0..=wire.len() {
-            let mut decoder = Decoder::default();
+            let mut decoder = Decoder::new(Dialect::V1);
             let mut events = decoder.push(&wire[..split]).expect("first chunk");
             events.extend(decoder.push(&wire[split..]).expect("second chunk"));
             assert_eq!(events.len(), 1);
@@ -165,7 +158,7 @@ mod tests {
 
     #[test]
     fn an_unterminated_oversized_line_is_rejected_before_allocation_grows() {
-        let mut decoder = Decoder::default();
+        let mut decoder = Decoder::new(Dialect::V1);
         assert!(matches!(
             decoder.push(&vec![b'x'; MAX_EVENT_BYTES + 1]),
             Err(ClientError::TooLarge)
@@ -176,14 +169,14 @@ mod tests {
     #[test]
     fn invalid_payload_is_not_an_authoritative_event() {
         assert!(matches!(
-            Decoder::default().push(b"data: no json\n\n"),
+            Decoder::new(Dialect::V1).push(b"data: no json\n\n"),
             Err(ClientError::InvalidResponse)
         ));
     }
 
     #[test]
     fn global_stream_keeps_project_scope_and_accepts_server_heartbeats() {
-        let events = Decoder::default()
+        let events = Decoder::new(Dialect::V1)
             .push(b"data: {\"directory\":\"/work/one\",\"payload\":{\"type\":\"session.status\",\"properties\":{\"sessionID\":\"ses_a\"}}}\n\ndata: {\"payload\":{\"type\":\"server.connected\",\"properties\":{}}}\n\n")
             .expect("global frames");
         assert_eq!(events[0].directory.as_deref(), Some("/work/one"));

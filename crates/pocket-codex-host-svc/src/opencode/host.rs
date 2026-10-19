@@ -13,10 +13,10 @@ use super::{
     client::{Client, ClientError},
     fold::Window,
     live::Live,
-    ownership::{Evidence, Source},
+    ownership::{Evidence, Role, Source},
     public,
     runtime::Server,
-    schema::{Session, Status, Statuses},
+    schema::{Session, Status},
 };
 use crate::session_access::{AccessHolder, SessionAccess};
 
@@ -167,10 +167,15 @@ pub struct Snapshot {
 }
 
 impl Host {
-    /// Begin observing an already started owned native server before exposing
-    /// any mutation routes. Failure drops and stops only this server.
+    /// Begin observing an already started owned, or attached, native server
+    /// before exposing any mutation routes. Failure drops and stops only an
+    /// owned server.
     pub async fn new(server: Server) -> anyhow::Result<Self> {
-        let source = Source::new(server.detection.database.clone(), server.pid, server.started)?;
+        let mut source =
+            Source::new(server.detection.database.clone(), server.pid, server.started)?;
+        if let Some(service) = server.service() {
+            source = source.attached(service.address());
+        }
         let live = Live::start(server.client.clone()).await?;
         Ok(Self(Arc::new(Inner {
             identity: Identity {
@@ -244,11 +249,7 @@ impl Host {
 
     /// Read bounded native session metadata; this does not load a writer.
     pub async fn sessions(&self, directory: Option<&str>) -> Result<Vec<Session>, Error> {
-        Ok(self
-            .0
-            .client
-            .get(&["experimental", "session"], directory, &[("limit", "100")])
-            .await?)
+        Ok(self.0.client.sessions(directory, 100).await?)
     }
 
     /// Fresh native status for every project this gateway admitted, including
@@ -267,11 +268,7 @@ impl Host {
             .collect();
         let mut running = std::collections::BTreeSet::new();
         for directory in directories {
-            let statuses: Statuses = self
-                .0
-                .client
-                .get(&["session", "status"], Some(&directory), &[])
-                .await?;
+            let statuses = self.0.client.statuses(&directory).await?;
             let entries: Vec<_> = self
                 .0
                 .sessions
@@ -315,7 +312,7 @@ impl Host {
         }
         self.0
             .client
-            .get(&["session", session], None, &[])
+            .session(session)
             .await
             .map_err(|error| match error {
                 ClientError::Http(404) => Error::SessionNotFound,
@@ -325,15 +322,11 @@ impl Host {
 
     /// Real native model, agent and command inventory for a selected project.
     pub async fn catalog(&self, directory: Option<&str>) -> Result<Catalog, Error> {
-        Ok(Catalog::load(&self.0.client, directory).await?)
+        Ok(self.0.client.catalog(directory).await?)
     }
 
     async fn status(&self, session: &Session) -> Result<Status, Error> {
-        let statuses: Statuses = self
-            .0
-            .client
-            .get(&["session", "status"], Some(&session.directory), &[])
-            .await?;
+        let statuses = self.0.client.statuses(&session.directory).await?;
         let status = statuses.get(&session.id).cloned().unwrap_or(Status::Idle);
         self.observe_idle(&session.id, &status).await;
         Ok(status)
@@ -374,11 +367,50 @@ impl Host {
             return Ok(access);
         }
         match self.0.source.inspect().await {
+            Evidence::External(holders) if holders.iter().all(|h| h.role == Role::Client) => {
+                // Clients of the attached background server: it reports the
+                // session's turn, never which sessions a client shows.
+                let status = self.status(session).await?;
+                if matches!(status, Status::Unknown) {
+                    return Ok(access);
+                }
+                // A turn this host dispatched is not the client's.
+                let ours = self
+                    .0
+                    .sessions
+                    .lock()
+                    .await
+                    .get(&session.id)
+                    .is_some_and(|entry| entry.turn.is_some());
+                let theirs = status.running() && !ours;
+                access.turn = if status.running() || ours { "running" } else { "idle" }.into();
+                access.writer = "native_client".into();
+                access.reason =
+                    if theirs { "external_running" } else { "external_source_open" }.into();
+                access.holder = holders.first().map(|holder| AccessHolder {
+                    client: if theirs { "opencode" } else { "opencode_client" }.into(),
+                    pid: Some(holder.pid),
+                    started_at: i64::try_from(holder.started_at).ok(),
+                    host_name: None,
+                    service_key: None,
+                });
+            },
             Evidence::External(holders) => {
                 access.reason = "external_source_open".into();
                 access.writer = "native_client".into();
-                access.holder = holders.first().map(|holder| AccessHolder {
-                    client: "unknown".into(),
+                // Name OpenCode 2's background server when it is one of them:
+                // it outlives the client that started it.
+                let holder = holders
+                    .iter()
+                    .find(|holder| holder.role == Role::BackgroundServer)
+                    .or(holders.first());
+                access.holder = holder.map(|holder| AccessHolder {
+                    client: if holder.role == Role::BackgroundServer {
+                        "opencode_service"
+                    } else {
+                        "unknown"
+                    }
+                    .into(),
                     pid: Some(holder.pid),
                     started_at: i64::try_from(holder.started_at).ok(),
                     host_name: None,
@@ -453,18 +485,17 @@ impl Host {
     /// overlay. Failed reads are never reported as authoritative empty history.
     pub async fn snapshot(&self, session: &str, before: Option<&str>) -> Result<Snapshot, Error> {
         let session = self.session(session).await?;
+        // Turn state first, so the history read after it is at least as new:
+        // an ended turn is never paired with history from before its end,
+        // which 2.x, without a live overlay, would report as the outcome.
+        let access = self.access_to(&session).await?;
         let (page, permissions, questions) = tokio::try_join!(
             self.0
                 .client
                 .messages(&session.id, &session.directory, before),
-            self.0
-                .client
-                .get::<Vec<Value>>(&["permission"], Some(&session.directory), &[]),
-            self.0
-                .client
-                .get::<Vec<Value>>(&["question"], Some(&session.directory), &[]),
+            self.0.client.permissions(&session.directory),
+            self.0.client.questions(&session.directory),
         )?;
-        let access = self.access_to(&session).await?;
         let window = self
             .0
             .live

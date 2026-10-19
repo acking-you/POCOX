@@ -59,9 +59,24 @@ async fn answer(
         .map(|m| m["content"].to_string())
         .unwrap_or_default();
     let tool_done = messages.last().is_some_and(|m| m["role"] == "tool");
+    let offered = |name: &str| {
+        body["tools"]
+            .as_array()
+            .is_some_and(|tools| tools.iter().any(|tool| tool["function"]["name"] == name))
+    };
     let tool = if user.contains("PERMISSION_FIXTURE") && !tool_done {
-        Some(json!({"id":"call_fixture_bash","type":"function","index":0,"function":{
-            "name":"bash","arguments":json!({"command":"printf PCX_PERMISSION_OK","description":"Isolated permission fixture"}).to_string()}}))
+        // 1.x asks before `bash` by configuration; 2.x has no `bash` tool
+        // but asks before reading `.env` by default.
+        let (name, arguments) = if offered("bash") {
+            (
+                "bash",
+                json!({"command":"printf PCX_PERMISSION_OK","description":"Isolated permission fixture"}),
+            )
+        } else {
+            ("read", json!({"path":".env"}))
+        };
+        Some(json!({"id":"call_fixture_permission","type":"function","index":0,"function":{
+            "name":name,"arguments":arguments.to_string()}}))
     } else if user.contains("QUESTION_FIXTURE") && !tool_done {
         Some(json!({"id":"call_fixture_question","type":"function","index":0,"function":{
             "name":"question","arguments":json!({"questions":[{"question":"Choose fixture values","header":"Fixture",
@@ -72,9 +87,12 @@ async fn answer(
     let (sender, stream) = mpsc::channel(8);
     tokio::spawn(async move {
         let held = user.contains("HOLD_FIXTURE");
+        // An image reaches the model as an `image_url` content part.
+        let prefix =
+            if user.contains("image_url") { "NATIVE_PREFIX IMAGE " } else { "NATIVE_PREFIX " };
         let delta = match &tool {
             Some(tool) => json!({"role":"assistant","tool_calls":[tool]}),
-            None => json!({"role":"assistant","content":"NATIVE_PREFIX "}),
+            None => json!({"role":"assistant","content":prefix}),
         };
         if sender.send(Ok(chunk(delta, None))).await.is_err() {
             return;

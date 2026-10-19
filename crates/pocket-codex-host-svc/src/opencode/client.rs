@@ -1,25 +1,18 @@
-//! Bounded native HTTP requests. Credentials never enter URLs or errors.
-
-use std::time::Duration;
+//! Native OpenCode operations. Every OpenCode major version implements them
+//! once, and this client calls the detected version's implementation through
+//! a static `match`.
 
 use pocket_codex_core::provider::Secret;
-use reqwest::{Method, RequestBuilder, Response};
-use serde::de::DeserializeOwned;
 use serde_json::Value;
-use url::Url;
 
 use super::{
+    catalog::Catalog,
     events::EventStream,
+    http::{Http, Native, MAX_BODY},
     public,
-    schema::{Message, MessagePage},
+    schema::{CommandInput, MessagePage, Prompt, Session, Statuses},
+    wire::{dispatch, Dialect, Health, Reply},
 };
-
-const MAX_BODY: usize = 8 * 1024 * 1024;
-// One accepted image prompt can persist 40 MiB of inline images. Read it
-// within a separate native-only bound, then remove unavailable previews
-// before applying the ordinary public history-window bound.
-const MAX_NATIVE_HISTORY_BODY: usize = 48 * 1024 * 1024;
-const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// A failure talking to the native server, without echoed secrets or URLs.
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +49,24 @@ pub enum ClientError {
     /// An event connection ended and requires fresh reconciliation.
     #[error("the OpenCode event stream ended; reconnect to refresh session state")]
     EventStreamEnded,
+    /// The model or agent selection failed, so the message was never sent.
+    #[error("the OpenCode {selection} selection failed; the message was not sent")]
+    Preflight {
+        /// `model` or `agent`.
+        selection: &'static str,
+    },
+    /// The answer does not fit this OpenCode form.
+    #[error(
+        "this OpenCode form cannot take that answer here; choose a listed option or reject it"
+    )]
+    UnsupportedForm,
+}
+
+impl ClientError {
+    /// Whether the native server certainly did not admit the request.
+    pub fn not_sent(&self) -> bool {
+        matches!(self, Self::Http(400..=499) | Self::Preflight { .. })
+    }
 }
 
 impl From<reqwest::Error> for ClientError {
@@ -70,143 +81,123 @@ impl From<reqwest::Error> for ClientError {
     }
 }
 
-/// A private native server client, or a relay-mapped native gateway client.
+/// The authenticated client of one private native server.
 #[derive(Clone)]
 pub struct Client {
-    origin: Url,
-    http: reqwest::Client,
-    password: Option<Secret>,
-    gateway: bool,
+    http: Http<Native>,
+    dialect: Dialect,
 }
 
 impl Client {
-    /// Connect to an HTTP loopback endpoint. Native authentication uses the
-    /// server's `opencode` Basic user and a private password, when configured.
-    /// Redirects and environment proxies are disabled.
-    pub fn new(origin: &str, password: Option<Secret>) -> Result<Self, ClientError> {
-        let mut origin = Url::parse(origin).map_err(|_| ClientError::InvalidEndpoint)?;
-        let local = origin.host_str().is_some_and(|host| {
-            host == "localhost"
-                || host
-                    .trim_matches(['[', ']'])
-                    .parse::<std::net::IpAddr>()
-                    .is_ok_and(|ip| ip.is_loopback())
-        });
-        if origin.scheme() != "http"
-            || !local
-            || !origin.username().is_empty()
-            || origin.password().is_some()
-            || origin.query().is_some()
-            || origin.fragment().is_some()
-        {
-            return Err(ClientError::InvalidEndpoint);
-        }
-        if !origin.path().ends_with('/') {
-            origin.set_path(&format!("{}/", origin.path()));
-        }
-        let http = reqwest::Client::builder()
-            .no_proxy()
-            .redirect(reqwest::redirect::Policy::none())
-            .connect_timeout(Duration::from_secs(5))
-            .build()
-            .map_err(ClientError::from)?;
+    /// Speak `dialect` to a loopback server, authenticating as its `opencode`
+    /// Basic user when `password` is set.
+    pub(crate) fn new(
+        origin: &str,
+        password: Option<Secret>,
+        dialect: Dialect,
+    ) -> Result<Self, ClientError> {
         Ok(Self {
-            origin,
-            http,
-            password,
-            gateway: false,
+            http: Http::new(origin, password)?,
+            dialect,
         })
     }
 
-    pub(super) fn gateway(origin: &str) -> Result<Self, ClientError> {
-        let mut client = Self::new(origin, None)?;
-        client.gateway = true;
-        Ok(client)
+    pub(crate) async fn health(&self) -> Result<Health, ClientError> {
+        dispatch!(self.dialect, W => W::health(&self.http).await)
     }
 
-    fn request(
+    /// Make the server open its database; no session is restored or prompted.
+    pub(crate) async fn open_source(&self) -> Result<(), ClientError> {
+        dispatch!(self.dialect, W => W::open(&self.http).await)
+    }
+
+    /// Bounded session metadata, across every project when `directory` is
+    /// absent. This does not load a writer.
+    pub async fn sessions(
         &self,
-        method: Method,
-        path: &[&str],
         directory: Option<&str>,
-    ) -> Result<RequestBuilder, ClientError> {
-        let mut url = self.origin.clone();
-        {
-            let mut segments = url
-                .path_segments_mut()
-                .map_err(|_| ClientError::InvalidEndpoint)?;
-            segments.pop_if_empty();
-            for segment in path {
-                if segment.is_empty() || matches!(*segment, "." | "..") {
-                    return Err(ClientError::InvalidEndpoint);
-                }
-                segments.push(segment);
-            }
-        }
-        let mut request = self.http.request(method, url);
-        if let Some(password) = &self.password {
-            request = request.basic_auth("opencode", Some(password.expose()));
-        }
-        if let Some(directory) = directory {
-            // OpenCode accepts the encoded directory through the query as
-            // well; unlike an HTTP header it supports every UTF-8 path.
-            request = request.query(&[("directory", directory)]);
-        }
-        Ok(request)
+        limit: usize,
+    ) -> Result<Vec<Session>, ClientError> {
+        dispatch!(self.dialect, W => W::sessions(&self.http, directory, limit).await)
     }
 
-    /// Read one native JSON resource with encoded path segments and query.
-    pub async fn get<T: DeserializeOwned>(
+    /// One session's metadata; a missing ID is `Http(404)`.
+    pub async fn session(&self, id: &str) -> Result<Session, ClientError> {
+        dispatch!(self.dialect, W => W::session(&self.http, id).await)
+    }
+
+    /// Create an empty session in `directory`.
+    pub async fn create_session(&self, directory: &str) -> Result<Session, ClientError> {
+        dispatch!(self.dialect, W => W::create(&self.http, directory).await)
+    }
+
+    /// Rename a session.
+    pub async fn rename(
         &self,
-        path: &[&str],
-        directory: Option<&str>,
-        query: &[(&str, &str)],
-    ) -> Result<T, ClientError> {
-        let response = self
-            .request(Method::GET, path, directory)?
-            .query(query)
-            .timeout(REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(ClientError::from)?;
-        decode(response, self.gateway).await
+        id: &str,
+        directory: &str,
+        title: &str,
+    ) -> Result<Session, ClientError> {
+        dispatch!(self.dialect, W => W::rename(&self.http, id, directory, title).await)
     }
 
-    /// Submit one native JSON mutation, once. Network errors are never
-    /// automatically retried because acceptance may already have occurred.
-    pub async fn mutate<T: DeserializeOwned>(
+    /// Execution states this server reports; absent sessions are idle.
+    pub async fn statuses(&self, directory: &str) -> Result<Statuses, ClientError> {
+        dispatch!(self.dialect, W => W::statuses(&self.http, directory).await)
+    }
+
+    /// Models, agents and commands for a project.
+    pub async fn catalog(&self, directory: Option<&str>) -> Result<Catalog, ClientError> {
+        dispatch!(self.dialect, W => W::catalog(&self.http, directory).await)
+    }
+
+    /// Pending permission requests in `directory`.
+    pub async fn permissions(&self, directory: &str) -> Result<Vec<Value>, ClientError> {
+        dispatch!(self.dialect, W => W::permissions(&self.http, directory).await)
+    }
+
+    /// Pending questions in `directory`.
+    pub async fn questions(&self, directory: &str) -> Result<Vec<Value>, ClientError> {
+        dispatch!(self.dialect, W => W::questions(&self.http, directory).await)
+    }
+
+    /// Admit one prompt, once. `select` marks the prompt's model and agent as
+    /// changed since the last admitted prompt.
+    pub async fn prompt(
         &self,
-        method: Method,
-        path: &[&str],
-        directory: Option<&str>,
-        body: &impl serde::Serialize,
-    ) -> Result<T, ClientError> {
-        let response = self
-            .request(method, path, directory)?
-            .json(body)
-            .timeout(REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(ClientError::from)?;
-        decode(response, self.gateway).await
+        session: &str,
+        directory: &str,
+        prompt: &Prompt,
+        select: bool,
+    ) -> Result<(), ClientError> {
+        dispatch!(self.dialect, W => W::prompt(&self.http, session, directory, prompt, select).await)
     }
 
-    /// Wait for a native command's response without a turn-length timeout.
-    /// The owning host must cancel this future when it shuts down. This is
-    /// never retried and is not exposed as an arbitrary proxy operation.
+    /// Wait for a native command without a turn-length timeout. The owning
+    /// host must cancel this future when it shuts down; it is never retried.
     pub async fn command(
         &self,
         session: &str,
         directory: &str,
-        body: &Value,
-    ) -> Result<Value, ClientError> {
-        let response = self
-            .request(Method::POST, &["session", session, "command"], Some(directory))?
-            .json(body)
-            .send()
-            .await
-            .map_err(ClientError::from)?;
-        decode(response, self.gateway).await
+        command: &CommandInput,
+        select: bool,
+    ) -> Result<(), ClientError> {
+        dispatch!(self.dialect, W => W::command(&self.http, session, directory, command, select).await)
+    }
+
+    pub(crate) async fn reply(
+        &self,
+        session: &str,
+        request: &str,
+        directory: &str,
+        reply: Reply<'_>,
+    ) -> Result<(), ClientError> {
+        dispatch!(self.dialect, W => W::reply(&self.http, session, request, directory, reply).await)
+    }
+
+    /// Interrupt execution; `false` means nothing was running here.
+    pub async fn abort(&self, session: &str, directory: &str) -> Result<bool, ClientError> {
+        dispatch!(self.dialect, W => W::abort(&self.http, session, directory).await)
     }
 
     /// Read at most 20 public native messages, keeping the server's opaque
@@ -234,193 +225,48 @@ impl Client {
         before: Option<&str>,
         limit: usize,
     ) -> Result<MessagePage, ClientError> {
-        let mut request = self
-            .request(Method::GET, &["session", session, "message"], Some(directory))?
-            .query(&[("limit", limit)]);
-        if let Some(before) = before {
-            request = request.query(&[("before", before)]);
-        }
-        let response = request
-            .timeout(REQUEST_TIMEOUT)
-            .send()
-            .await
-            .map_err(ClientError::from)?;
-        let next_before = response
-            .headers()
-            .get("x-next-cursor")
-            .map(|value| {
-                value
-                    .to_str()
-                    .map(str::to_owned)
-                    .map_err(|_| ClientError::InvalidResponse)
-            })
-            .transpose()?;
-        if next_before
-            .as_ref()
-            .is_some_and(|cursor| cursor.len() > 4096)
-        {
-            return Err(ClientError::InvalidResponse);
-        }
-        let messages: Vec<Message> =
-            decode_bounded(response, self.gateway, MAX_NATIVE_HISTORY_BODY).await?;
-        let messages: Vec<_> = messages.into_iter().map(public::message).collect();
-        if serde_json::to_vec(&messages)
-            .map_err(|_| ClientError::InvalidResponse)?
-            .len()
-            > MAX_BODY
-        {
+        let page = dispatch!(self.dialect, W => {
+            W::page(&self.http, session, directory, before, limit).await?
+        });
+        let messages: Vec<_> = page.messages.into_iter().map(public::message).collect();
+        if !fits(&messages, MAX_BODY) {
             return Err(ClientError::TooLarge);
         }
         Ok(MessagePage {
             messages,
-            next_before,
+            next_before: page.next_before,
         })
     }
 
-    /// Open the native stream. Readiness comes from `server.connected`, not
-    /// merely a successful earlier snapshot or health response.
-    pub async fn events(&self, directory: Option<&str>) -> Result<EventStream, ClientError> {
-        let path: &[&str] = if directory.is_some() { &["event"] } else { &["global", "event"] };
-        self.event_source(path, directory, &[]).await
+    /// Open the global native stream. Readiness comes from `server.connected`,
+    /// not merely a successful earlier snapshot or health response.
+    pub async fn events(&self) -> Result<EventStream, ClientError> {
+        self.http
+            .event_source(self.dialect.events(), &[], self.dialect)
+            .await
     }
+}
 
-    pub(super) async fn event_source(
-        &self,
-        path: &[&str],
-        directory: Option<&str>,
-        query: &[(&str, &str)],
-    ) -> Result<EventStream, ClientError> {
-        let response = tokio::time::timeout(
-            Duration::from_secs(10),
-            self.request(Method::GET, path, directory)?
-                .query(query)
-                .send(),
-        )
-        .await
-        .map_err(|_| ClientError::Timeout)?
-        .map_err(ClientError::from)?;
-        success(&response)?;
-        if !response
-            .headers()
-            .get("content-type")
-            .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v.starts_with("text/event-stream"))
-        {
-            return Err(ClientError::InvalidResponse);
+/// Whether `value` serializes within `limit` bytes, measured without
+/// buffering it and stopping at the first byte over.
+fn fits(value: &impl serde::Serialize, limit: usize) -> bool {
+    struct Budget(usize);
+    impl std::io::Write for Budget {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.0 = self
+                .0
+                .checked_sub(bytes.len())
+                .ok_or(std::io::ErrorKind::FileTooLarge)?;
+            Ok(bytes.len())
         }
-        Ok(EventStream::new(response))
-    }
-}
 
-fn success(response: &Response) -> Result<(), ClientError> {
-    if response.status().is_success() {
-        Ok(())
-    } else {
-        Err(ClientError::Http(response.status().as_u16()))
-    }
-}
-
-async fn decode<T: DeserializeOwned>(response: Response, gateway: bool) -> Result<T, ClientError> {
-    decode_bounded(response, gateway, MAX_BODY).await
-}
-
-async fn decode_bounded<T: DeserializeOwned>(
-    mut response: Response,
-    gateway: bool,
-    native_limit: usize,
-) -> Result<T, ClientError> {
-    let rejected = !response.status().is_success();
-    if rejected && !gateway {
-        return Err(ClientError::Http(response.status().as_u16()));
-    }
-    let limit = if rejected {
-        4096
-    } else if gateway {
-        32 * 1024 * 1024
-    } else {
-        native_limit
-    };
-    if response
-        .content_length()
-        .is_some_and(|size| size > limit as u64)
-    {
-        return Err(ClientError::TooLarge);
-    }
-    let mut bytes = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(ClientError::from)? {
-        if bytes.len().saturating_add(chunk.len()) > limit {
-            return Err(ClientError::TooLarge);
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
         }
-        bytes.extend_from_slice(&chunk);
     }
-    if rejected {
-        let body: Value =
-            serde_json::from_slice(&bytes).map_err(|_| ClientError::InvalidResponse)?;
-        let code = body["code"]
-            .as_str()
-            .filter(|code| {
-                matches!(
-                    *code,
-                    "stale_host"
-                        | "not_ready"
-                        | "read_only"
-                        | "busy"
-                        | "turn_changed"
-                        | "invalid_input"
-                        | "capacity"
-                        | "session_not_found"
-                        | "native_request_failed"
-                )
-            })
-            .ok_or(ClientError::InvalidResponse)?;
-        return Err(ClientError::Gateway {
-            status: response.status().as_u16(),
-            code: code.into(),
-        });
-    }
-    if bytes.is_empty() {
-        serde_json::from_value(Value::Null).map_err(|_| ClientError::InvalidResponse)
-    } else {
-        serde_json::from_slice(&bytes).map_err(|_| ClientError::InvalidResponse)
-    }
+    serde_json::to_writer(Budget(limit), value).is_ok()
 }
 
 #[cfg(test)]
 #[path = "client_tests.rs"]
 mod history_tests;
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn endpoint_credentials_and_nonlocal_destinations_are_rejected() {
-        for url in [
-            "https://example.com",
-            "http://127.0.0.1:9/?key=x",
-            "http://u:p@localhost:9",
-            "http://localhost:9/#x",
-            "file:///tmp/socket",
-        ] {
-            assert!(Client::new(url, None).is_err(), "{url}");
-        }
-        assert!(Client::new("http://127.0.0.1:4096", None).is_ok());
-        assert!(Client::new("http://[::1]:4096/opencode/v1/native", None).is_ok());
-    }
-
-    #[test]
-    fn opaque_ids_and_utf8_directories_cannot_change_the_request_origin() {
-        let client = Client::new("http://127.0.0.1:4096", None).expect("client");
-        let request = client
-            .request(
-                Method::GET,
-                &["session", "ses_foo/bar?x", "message"],
-                Some("/tmp/中文 project"),
-            )
-            .expect("request")
-            .build()
-            .expect("build");
-        assert_eq!(request.url().path(), "/session/ses_foo%2Fbar%3Fx/message");
-        assert_eq!(request.url().query_pairs().next().expect("directory").1, "/tmp/中文 project");
-    }
-}

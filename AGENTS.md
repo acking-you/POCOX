@@ -1501,7 +1501,25 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     preserve healthy services and report inspection failures accurately.
     See `docs/harness-connection-lifecycle.md`.
 
-42. **Grok Build (2026-10-20).** `grok agent --no-leader stdio` is a built-in
+42. **OpenCode 2 wire (2026-10-19).** The native client speaks each OpenCode
+    major through one `Wire` implementation (`opencode/wire/`), chosen once
+    from `--version` and dispatched statically; everything above it reads
+    1.x shapes. Untested versions start with a notice. 2.x receives images
+    as `files`; custom providers and Local sessions read 2.x databases (from
+    `session_v2`). A 2.x host on the shared history with OpenCode's own
+    configuration attaches to OpenCode's background server
+    (`opencode serve --service`, `opencode/service.rs`). It starts that
+    server only through `opencode service start`, never stops or signals
+    it, and stop and quit only detach. It writes only while no process other
+    than this one is connected to that server (item 29's rule; takeover
+    stays item 35). It gets no agent tools. A replaced server is attached
+    again, a stopped one is reported, and `service set disabled true` keeps
+    an own server. The server's password is read only from its private
+    registration file, into `Secret`. A new custom-provider host, which
+    cannot use that server, defaults to its own history while the server is
+    on (editor and remote add). See `docs/opencode-native.md#versions`.
+
+43. **Grok Build (2026-10-20).** `grok agent --no-leader stdio` is a built-in
     ACP preset (profile `grok`, a plain "G" monogram since no openly
     licensed mark exists), located on the child PATH then `~/.grok/bin`.
     Model services: existing configuration; Grok account (the user's Grok

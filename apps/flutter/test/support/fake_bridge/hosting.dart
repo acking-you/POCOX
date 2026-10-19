@@ -164,6 +164,7 @@ mixin _FakeHosting on _FakeBridgeState {
     return OpenCodeEnvironment(
       path: binary,
       version: openCodeEnvironment.version,
+      backgroundServer: openCodeEnvironment.backgroundServer,
     );
   }
 

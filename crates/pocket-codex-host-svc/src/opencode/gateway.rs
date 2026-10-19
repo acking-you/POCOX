@@ -5,22 +5,24 @@ use serde_json::{json, Value};
 
 use super::{
     catalog::Catalog,
-    client::{Client, ClientError},
+    client::ClientError,
     events::EventStream,
     host::{Answer, Identity, Info, Input, Options, ReadResult, Snapshot},
+    http::{Http, Pocket},
     schema::Session,
+    wire::Dialect,
 };
 use crate::session_access::SessionAccess;
 
 /// Controller transport over a resolved loopback or relay endpoint. This
 /// client never receives or forwards the native server's private password.
 #[derive(Clone)]
-pub struct Gateway(Client);
+pub struct Gateway(Http<Pocket>);
 
 impl Gateway {
     /// Use an already resolved loopback gateway endpoint.
     pub fn new(origin: &str) -> Result<Self, ClientError> {
-        Ok(Self(Client::gateway(origin)?))
+        Ok(Self(Http::new(origin, None)?))
     }
 
     /// Verify the protocol before allowing any session operation.
@@ -235,11 +237,15 @@ impl Gateway {
         after: u64,
     ) -> Result<EventStream, ClientError> {
         self.0
-            .event_source(&["opencode", "v1", "events"], None, &[
-                ("hostId", &identity.host_id),
-                ("generation", &identity.generation.to_string()),
-                ("after", &after.to_string()),
-            ])
+            .event_source(
+                &["opencode", "v1", "events"],
+                &[
+                    ("hostId", &identity.host_id),
+                    ("generation", &identity.generation.to_string()),
+                    ("after", &after.to_string()),
+                ],
+                Dialect::V1,
+            )
             .await
     }
 }

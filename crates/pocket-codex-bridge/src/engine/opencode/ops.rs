@@ -194,7 +194,12 @@ fn send(link: &Link, session: &str, expected: Option<&str>, input: &Input) -> Re
     let turn = block(link.client.prompt(session, input, expected, &identity))?;
     // A lost/replaced connection never turns uncertain delivery into permission to
     // retry.
-    link.commit(&identity, |_| ()).map_err(|_| {
+    link.commit(&identity, |view| {
+        if expected.is_none() {
+            view.admitted.insert(session.into(), turn.clone());
+        }
+    })
+    .map_err(|_| {
         anyhow!(
             "OpenCode connection changed after sending; check the conversation before sending \
              again"

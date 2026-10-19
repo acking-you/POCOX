@@ -3024,6 +3024,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get openCodeHistoryBackgroundServer =>
+      'OpenCode 的后台服务正在服务共用历史记录，自定义提供方无法使用它，这个主机只能跟随查看其中的会话。请选择“仅此主机”。';
+
+  @override
   String get openCodePath => 'OpenCode 可执行文件';
 
   @override
@@ -3048,6 +3052,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openCodeNone => '无';
+
+  @override
+  String get openCodeServer => '服务';
+
+  @override
+  String get openCodeBackgroundServer => 'OpenCode 的后台服务（共享，不提供 POCOX 工具）';
 
   @override
   String get openCodeConfigNote =>
@@ -3172,6 +3182,20 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get accessSourceOpenDetail =>
       'Pocket 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。';
+
+  @override
+  String get accessOpenCodeServiceTitle => 'OpenCode 的后台服务打开了这个历史来源';
+
+  @override
+  String get accessOpenCodeServiceDetail =>
+      'OpenCode 2 的终端应用或 opencode run 退出后，它仍在运行。请用 opencode service stop 停止它，或让这个主机使用自己的历史，然后立即检查。';
+
+  @override
+  String get accessOpenCodeClientTitle => '另一个 OpenCode 客户端已连接';
+
+  @override
+  String get accessOpenCodeClientDetail =>
+      'OpenCode 无法知道它正在显示哪些会话。请在那里关闭它（终端应用、桌面应用或浏览器标签页），然后立即检查。';
 
   @override
   String accessPocketHostTitle(String client) {

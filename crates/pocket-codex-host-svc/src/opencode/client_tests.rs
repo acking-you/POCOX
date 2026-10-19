@@ -13,6 +13,7 @@ use axum::{
 use serde_json::json;
 
 use super::*;
+use crate::opencode::schema::Message;
 
 #[derive(Clone)]
 struct Fixture {
@@ -46,9 +47,12 @@ async fn fixture(messages: Vec<Message>) -> (Client, Fixture, Server) {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
         .expect("loopback fixture");
-    let client =
-        Client::new(&format!("http://{}/", listener.local_addr().expect("bound listener")), None)
-            .expect("local client");
+    let client = Client::new(
+        &format!("http://{}/", listener.local_addr().expect("bound listener")),
+        None,
+        Dialect::V1,
+    )
+    .expect("local client");
     let router = Router::new()
         .route("/session/ses_fixture/message", get(page))
         .with_state(state.clone());
@@ -78,6 +82,7 @@ async fn large_input_images_remain_readable_without_relaying_the_original_bytes(
     assert!(
         matches!(
             client
+                .http
                 .get::<Value>(&["session", "ses_fixture", "message"], None, &[("limit", "1")])
                 .await,
             Err(ClientError::TooLarge)

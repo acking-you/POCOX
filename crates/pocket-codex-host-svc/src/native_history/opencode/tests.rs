@@ -213,3 +213,68 @@ async fn orphan_prefix_remains_pageable_and_revert_invalidates_windows() {
     let after = source.revision(SESSION).await.expect("after");
     assert_ne!(tail.generation, after["generation"].as_str().expect("generation"));
 }
+
+#[tokio::test]
+async fn opencode_2_rows_and_sessions_beside_the_frozen_1x_table() {
+    let temp = TempDir::new().expect("temp");
+    let path = temp.path().join("opencode.db");
+    // An upgraded database: 2.x copied what it found into `session_v2`; the
+    // fixture's session in the 1.x table was written by 1.x afterwards.
+    let mut db = database(&path).await;
+    sqlx::query(
+        "CREATE TABLE session_v2 (id TEXT PRIMARY KEY,directory TEXT,title TEXT,parent_id \
+         TEXT,time_created INTEGER,time_updated INTEGER,revert TEXT)",
+    )
+    .execute(&mut db)
+    .await
+    .expect("2.x schema");
+    sqlx::query("INSERT INTO session_v2 VALUES ('ses_new','/new','New session',NULL,3,4,NULL)")
+        .execute(&mut db)
+        .await
+        .expect("2.x session");
+    let inline = json!({"data":"AA==","mime":"image/png","source":{"type":"inline"}});
+    let path_file = json!({"data":"AA==","mime":"image/png",
+        "source":{"type":"uri","uri":"file:///private.png"}});
+    let output = json!({"output":"listing","cursor":7,"size":7,"truncated":false});
+    let failed = |message: &str| json!({"outcome":"failed","error":{"message":message}});
+    for (seq, kind, data) in [
+        (1, "user", json!({"text":"look","files":[inline, path_file]})),
+        (2, "location-switched", json!({"location":{"directory":"/new"}})),
+        (3, "shell", json!({"shellID":"sh_1","command":"ls","status":"exited","output":output})),
+        (4, "assistant", json!({"content":[],"error":{"message":"refused"}})),
+        (5, "idle", failed("refused")),
+        (6, "user", json!({"text":"again"})),
+        (7, "idle", failed("resume limit")),
+    ] {
+        sqlx::query("INSERT INTO session_message VALUES (?,'ses_new',?,?,?)")
+            .bind(format!("msg_new{seq}"))
+            .bind(kind)
+            .bind(seq)
+            .bind(data.to_string())
+            .execute(&mut db)
+            .await
+            .expect("2.x row");
+    }
+    db.close().await.expect("close");
+    let source = OpenCodeHistory::new(path).expect("source");
+    let list = source.list_sessions(None, 20).await.expect("list");
+    let ids: Vec<_> = list["sessions"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .map(|row| row["sessionId"].as_str())
+        .collect();
+    assert_eq!(ids, [Some("ses_new"), Some(SESSION)]);
+    assert!(source.read_page(SESSION, None, 20).await.is_ok(), "a 1.x-only session opens");
+    let page = source.read_page("ses_new", None, 20).await.expect("page");
+    let first = &page.turns[0].items;
+    assert_eq!(first[0].images, ["data:image/png;base64,AA=="], "a path's bytes stay unread");
+    assert!(first[0].omitted.contains(&"attachments".to_owned()));
+    assert_eq!((first[1].title.as_str(), first[1].text.as_str()), ("ls", "listing"));
+    assert_eq!(first[1].tool.as_ref().map(|t| t.status.as_str()), Some("completed"));
+    let texts = |items: &[crate::acp::fold::Item]| -> Vec<String> {
+        items[1..].iter().map(|item| item.text.clone()).collect()
+    };
+    assert_eq!(texts(first)[1..], ["refused"], "one error, not one per marker");
+    assert_eq!(texts(&page.turns[1].items), ["resume limit"]);
+}

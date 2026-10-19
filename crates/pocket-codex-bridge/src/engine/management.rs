@@ -152,7 +152,8 @@ pub struct DeviceView {
     pub restore_problem: Option<String>,
 }
 
-fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
+/// `custom`: the host's model service is a custom provider.
+fn resolve_runtime(name: &str, choice: RuntimeChoice, custom: bool) -> Result<Runtime> {
     match choice {
         RuntimeChoice::Codex {
             port,
@@ -184,6 +185,7 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
                 host_profiles::get(name)?.runtime.as_ref(),
                 super::serve_opencode::shared_history_host().as_deref(),
                 name,
+                || custom_beside_background_server(custom),
             ),
         }),
         RuntimeChoice::Claude {} => {
@@ -215,14 +217,29 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
 
 /// Where a remotely chosen OpenCode host keeps its sessions: as this name
 /// saved, else in a database of its own while `shared_holder` (another host)
-/// serves OpenCode's default one, which one host serves at a time.
-fn separate_history(saved: Option<&Runtime>, shared_holder: Option<&str>, name: &str) -> bool {
+/// serves OpenCode's default one, which one host serves at a time, or while
+/// `custom_beside_server` (asked only for a name with no saved history).
+fn separate_history(
+    saved: Option<&Runtime>,
+    shared_holder: Option<&str>,
+    name: &str,
+    custom_beside_server: impl FnOnce() -> bool,
+) -> bool {
     match saved {
         Some(Runtime::OpenCode {
             separate_history, ..
         }) => *separate_history,
-        _ => shared_holder.is_some_and(|holder| !super::host_names::same(holder, name)),
+        _ => {
+            shared_holder.is_some_and(|holder| !super::host_names::same(holder, name))
+                || custom_beside_server()
+        },
     }
+}
+
+/// A custom provider cannot reach OpenCode's background server, which serves
+/// the shared history: a new host with one keeps a history of its own.
+fn custom_beside_background_server(custom: bool) -> bool {
+    custom && super::serve_opencode::detect(None).is_ok_and(|found| found.background_server)
 }
 
 fn change(input: ProfileInput, key: KeyInput) -> Change {
@@ -377,9 +394,10 @@ fn save(name: &str, mut request: SaveRequest, token: AdmissionToken) -> Result<H
     if request.keep_base_url {
         request.input.base_url = saved.base_url.clone();
     }
+    let custom = request.input.source == host_profiles::Source::Custom;
     let mut change = change(request.input, request.key);
     let desired = match request.runtime {
-        Some(choice) => resolve_runtime(name, choice)?,
+        Some(choice) => resolve_runtime(name, choice, custom)?,
         None => saved
             .runtime
             .clone()
@@ -453,7 +471,8 @@ fn start_revision(
             .block_on(pocket_codex_api_proxy::check_auth())
             .map_err(|_| Fault::AuthenticationRequired)?;
     }
-    let runtime = resolve_runtime(&request.name, request.runtime)?;
+    let custom = request.input.source == host_profiles::Source::Custom;
+    let runtime = resolve_runtime(&request.name, request.runtime, custom)?;
     host_start::start_configured_checked(
         Some(&request.name),
         runtime,
@@ -585,14 +604,17 @@ mod tests {
             binary: None,
             separate_history: true,
         };
-        // A new name beside a host on OpenCode's default database gets its own.
-        assert!(separate_history(None, Some("opencode"), "work"));
-        assert!(!separate_history(None, None, "work"));
+        let no = || false;
+        // A new name beside a host on OpenCode's default database gets its own,
+        // and so does a new custom provider beside OpenCode's background server.
+        assert!(separate_history(None, Some("opencode"), "work", no));
+        assert!(!separate_history(None, None, "work", no));
+        assert!(separate_history(None, None, "work", || true));
         // The holder itself, under any spelling, is not "another" host.
-        assert!(!separate_history(None, Some("my-host"), "My Host"));
-        // An edit keeps what the name saved.
-        assert!(!separate_history(Some(&shared), Some("other"), "work"));
-        assert!(separate_history(Some(&own), None, "work"));
+        assert!(!separate_history(None, Some("my-host"), "My Host", no));
+        // An edit keeps what the name saved, a custom provider or not.
+        assert!(!separate_history(Some(&shared), Some("other"), "work", || true));
+        assert!(separate_history(Some(&own), None, "work", no));
     }
 
     #[test]

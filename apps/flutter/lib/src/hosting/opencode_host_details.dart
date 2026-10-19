@@ -164,6 +164,8 @@ class _OpenCodeHostDetailsState extends ConsumerState<OpenCodeHostDetails> {
                 ? l10n.openCodeNone
                 : status.agents.join(', '),
           ),
+          if (status.backgroundServer)
+            DetailRow(l10n.openCodeServer, l10n.openCodeBackgroundServer),
         ],
         const SizedBox(height: 12),
         DefaultProjectTile(serviceKey: host.appServiceKey, local: true),

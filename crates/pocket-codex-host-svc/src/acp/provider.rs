@@ -30,7 +30,7 @@ pub struct AcpProviderLaunch {
     pub env: Vec<(OsString, OsString)>,
     /// Inherited variables the child must not see (another account's
     /// credentials or endpoints); removed before `env` applies.
-    pub env_remove: Vec<OsString>,
+    pub env_remove: Vec<String>,
     /// Claude: `_meta` merged into every `session/new`, `session/load` and
     /// `session/resume` request (it holds the key; it travels only on the
     /// agent's own stdio pipe).

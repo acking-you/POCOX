@@ -74,6 +74,54 @@ void _openCodeHostTests() {
     expect(find.byType(HostingEditor), findsNothing);
   });
 
+  testWidgets('beside OpenCode 2\'s background server a new custom-provider '
+      'host takes its own history; a shared choice stays and says why', (
+    t,
+  ) async {
+    final detected = Completer<void>();
+    final api = FakeBridgeApi()
+      ..openCodeEnvironment = const OpenCodeEnvironment(
+        path: '/Users/me/.opencode/bin/opencode',
+        version: '2.0.32',
+        backgroundServer: true,
+      )
+      ..openCodeDetectGate = detected;
+    await _pumpEditor(t, api);
+    await _tapKeyPumped(t, 'agent-choice-opencode');
+    await _tapKeyPumped(t, 'host-source-custom');
+    for (final (key, value) in const [
+      ('host-base-url', 'https://gateway.example'),
+      ('host-model', 'gpt-test'),
+      ('host-api-key', 'sk-test'),
+    ]) {
+      await t.enterText(find.byKey(Key(key)), value);
+      await t.pump();
+    }
+    // The detection decides the history: nothing starts before it.
+    await _tapKeyPumped(t, 'start-hosting-btn');
+    expect(api.startConfiguredCalls, isEmpty);
+    detected.complete();
+    await t.pumpAndSettle();
+    final history = find.byKey(const Key('opencode-history'));
+    bool separate() => t.widget<SegmentedButton<bool>>(history).selected.single;
+    final why = find.byKey(const Key('opencode-history-background-server'));
+    expect(separate(), isTrue);
+    expect(why, findsNothing);
+    await _tapKey(t, 'host-source-inherited');
+    expect(separate(), isFalse, reason: 'its own configuration joins it');
+    await _tapKey(t, 'host-source-custom');
+    expect(separate(), isTrue);
+
+    await _tapKey(t, 'opencode-history-shared');
+    expect(why, findsOneWidget);
+    await _tapKey(t, 'host-source-inherited');
+    expect(separate(), isFalse);
+    expect(why, findsNothing);
+    await _tapKey(t, 'host-source-custom');
+    expect(separate(), isFalse, reason: 'the user chose it');
+    expect(why, findsOneWidget);
+  });
+
   testWidgets('a running OpenCode host keeps, replaces or removes its stored '
       'key; the key is never shown', (t) async {
     final api = FakeBridgeApi();

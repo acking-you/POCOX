@@ -3191,6 +3191,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get openCodeHistoryBackgroundServer =>
+      'OpenCode\'s background server serves the shared history, and a custom provider cannot use it: this host could only follow its sessions. Choose “This host only”.';
+
+  @override
   String get openCodePath => 'OpenCode executable';
 
   @override
@@ -3215,6 +3219,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openCodeNone => 'None';
+
+  @override
+  String get openCodeServer => 'Server';
+
+  @override
+  String get openCodeBackgroundServer =>
+      'OpenCode\'s background server (shared, without POCOX tools)';
 
   @override
   String get openCodeConfigNote =>
@@ -3355,6 +3366,22 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accessSourceOpenDetail =>
       'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.';
+
+  @override
+  String get accessOpenCodeServiceTitle =>
+      'OpenCode\'s background server has this history open';
+
+  @override
+  String get accessOpenCodeServiceDetail =>
+      'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.';
+
+  @override
+  String get accessOpenCodeClientTitle =>
+      'Another OpenCode client is connected';
+
+  @override
+  String get accessOpenCodeClientDetail =>
+      'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.';
 
   @override
   String accessPocketHostTitle(String client) {

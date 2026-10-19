@@ -5,10 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::{
-    client::{Client, ClientError},
-    schema::Model,
-};
+use super::schema::Model;
 
 /// One usable native model and only the controls it actually advertises.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -82,26 +79,18 @@ pub struct Catalog {
     pub providers_connected: usize,
 }
 
+/// The 1.x `/provider` answer.
 #[derive(Deserialize)]
-struct Providers {
+pub(crate) struct Providers {
     all: Vec<Value>,
     default: BTreeMap<String, String>,
     connected: Vec<String>,
 }
 
 impl Catalog {
-    /// Fetch the real native catalogs. Raw provider configuration is discarded
-    /// here, before anything is serialized for a controller.
-    pub async fn load(client: &Client, directory: Option<&str>) -> Result<Self, ClientError> {
-        let (providers, agents, commands) = tokio::try_join!(
-            client.get::<Providers>(&["provider"], directory, &[]),
-            client.get::<Vec<Value>>(&["agent"], directory, &[]),
-            client.get::<Vec<Value>>(&["command"], directory, &[]),
-        )?;
-        Ok(Self::public(providers, agents, commands))
-    }
-
-    fn public(providers: Providers, agents: Vec<Value>, commands: Vec<Value>) -> Self {
+    /// The public 1.x catalog. Raw provider configuration is discarded here,
+    /// before anything is serialized for a controller.
+    pub(crate) fn public(providers: Providers, agents: Vec<Value>, commands: Vec<Value>) -> Self {
         let connected: BTreeSet<_> = providers.connected.into_iter().collect();
         let mut models = Vec::new();
         for provider in providers.all {
@@ -129,17 +118,6 @@ impl Catalog {
                 });
             }
         }
-        models.sort_by_key(CatalogModel::key);
-        models.dedup_by(|a, b| a.provider == b.provider && a.id == b.id);
-        let defaults = providers
-            .default
-            .into_iter()
-            .filter(|(provider, id)| {
-                models
-                    .iter()
-                    .any(|model| &model.provider == provider && &model.id == id)
-            })
-            .collect();
         let agents = agents
             .into_iter()
             .filter(|a| a["hidden"] != true && a["mode"] != "subagent")
@@ -167,12 +145,33 @@ impl Catalog {
                 })
             })
             .collect();
+        Self::assemble(models, agents, commands, providers.default, connected.len())
+    }
+
+    /// Order and deduplicate models, keeping only defaults that name one.
+    pub(crate) fn assemble(
+        mut models: Vec<CatalogModel>,
+        agents: Vec<Agent>,
+        commands: Vec<Command>,
+        defaults: BTreeMap<String, String>,
+        providers_connected: usize,
+    ) -> Self {
+        models.sort_by_key(CatalogModel::key);
+        models.dedup_by(|a, b| a.provider == b.provider && a.id == b.id);
+        let defaults = defaults
+            .into_iter()
+            .filter(|(provider, id)| {
+                models
+                    .iter()
+                    .any(|model| &model.provider == provider && &model.id == id)
+            })
+            .collect();
         Self {
             models,
             agents,
             commands,
             defaults,
-            providers_connected: connected.len(),
+            providers_connected,
         }
     }
 

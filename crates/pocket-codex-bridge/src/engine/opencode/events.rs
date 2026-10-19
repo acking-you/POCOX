@@ -62,6 +62,36 @@ pub(super) fn announce(link: &Link, identity: &Identity, old: Option<&Snapshot>,
         ));
     }
     let prior_turn = old.and_then(|old| old.turn_id.as_ref());
+    // An admitted turn that began and ended between two refreshes: its prompt
+    // is in this window but no turn runs. A window read before the prompt
+    // cannot contain it, so the admission waits for a later one.
+    let skipped = link
+        .commit(identity, |view| {
+            let turn = view.admitted.remove(thread)?;
+            if next.turn_id.as_ref() == Some(&turn) || prior_turn == Some(&turn) {
+                return None;
+            }
+            if next
+                .window
+                .messages
+                .iter()
+                .any(|m| m.info["id"] == turn.as_str())
+            {
+                return Some(turn);
+            }
+            view.admitted.insert(thread.clone(), turn);
+            None
+        })
+        .ok()
+        .flatten();
+    if let Some(turn) = &skipped {
+        let _ = link.tx.send(projection::event(
+            "turn/started",
+            Some(thread),
+            json!({"threadId":thread,"turn":{"id":turn,"status":"inProgress"}}),
+        ));
+    }
+    let prior_turn = prior_turn.or(skipped.as_ref());
     let old_items = old.map(projection::items).unwrap_or_default();
     let ended = prior_turn.filter(|turn| next.turn_id.as_ref() != Some(*turn));
     let items = projection::items(next);

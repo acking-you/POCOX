@@ -3,14 +3,14 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use super::{Catalog, Entry, Error, Host, Identity, Session, SessionAccess, Status};
 use crate::opencode::{
     client::ClientError,
-    schema::{Message, Prompt},
+    schema::{CommandInput, Message, Prompt},
+    wire::Reply,
 };
 
 /// Selections for the next native prompt; absent values inherit OpenCode's
@@ -130,11 +130,7 @@ impl Host {
         options.validate(&catalog)?;
         self.reserve_session_slot(None).await?;
         self.writable_source(identity).await?;
-        let session: Session = self
-            .0
-            .client
-            .mutate(Method::POST, &["session"], Some(directory), &json!({}))
-            .await?;
+        let session = self.0.client.create_session(directory).await?;
         self.0
             .sessions
             .lock()
@@ -205,7 +201,7 @@ impl Host {
         let _guard = self.0.mutation.lock().await;
         let metadata = self.admitted(session, identity).await?;
         let status = self.status(&metadata).await?;
-        let options = {
+        let (options, select) = {
             let entries = self.0.sessions.lock().await;
             let entry = entries.get(session).ok_or(Error::ReadOnly)?;
             if let Some(expected) = expected_turn {
@@ -216,7 +212,7 @@ impl Host {
             {
                 return Err(Error::Busy);
             }
-            entry.options.clone()
+            (entry.options.clone(), entry.options_pending)
         };
         let catalog = self.catalog(Some(&metadata.directory)).await?;
         options.validate(&catalog)?;
@@ -246,10 +242,19 @@ impl Host {
             entry.operation_error = None;
         }
         if let Some((command, arguments)) = command {
-            let body = json!({"messageID":message_id,"command":command,"arguments":arguments,
-                "model":options.model,"agent":options.agent,"variant":options.variant,
-                "parts":parts.into_iter().filter(|part| part["type"] == "file").collect::<Vec<_>>()});
-            self.dispatch_command(session, &metadata.directory, body);
+            let input = CommandInput {
+                message_id,
+                command: command.into(),
+                arguments: arguments.into(),
+                model: options.model,
+                agent: options.agent,
+                variant: options.variant,
+                parts: parts
+                    .into_iter()
+                    .filter(|part| part["type"] == "file")
+                    .collect(),
+            };
+            self.dispatch_command(session, &metadata.directory, input, select);
         } else {
             let body = Prompt {
                 message_id: Some(message_id),
@@ -265,12 +270,7 @@ impl Host {
             let result = self
                 .0
                 .client
-                .mutate::<Value>(
-                    Method::POST,
-                    &["session", session, "prompt_async"],
-                    Some(&metadata.directory),
-                    &body,
-                )
+                .prompt(session, &metadata.directory, &body, select)
                 .await;
             if let Err(error) = result {
                 self.record_failure(session, &error, expected_turn.is_none())
@@ -285,21 +285,16 @@ impl Host {
         Ok(turn)
     }
 
-    fn dispatch_command(&self, session: &str, directory: &str, body: Value) {
+    fn dispatch_command(&self, session: &str, directory: &str, input: CommandInput, select: bool) {
         let weak = std::sync::Arc::downgrade(&self.0);
         let client = self.0.client.clone();
         let stop = self.0.stop.clone();
         let session = session.to_owned();
         let directory = directory.to_owned();
         tokio::spawn(async move {
-            // JSON null is not an omitted optional native field.
-            let mut body = body;
-            if let Some(fields) = body.as_object_mut() {
-                fields.retain(|_, value| !value.is_null());
-            }
             let result = tokio::select! {
                 _ = stop.cancelled() => return,
-                result = client.command(&session, &directory, &body) => result,
+                result = client.command(&session, &directory, &input, select) => result,
             };
             if let Some(inner) = weak.upgrade() {
                 let host = Host(inner);
@@ -316,8 +311,11 @@ impl Host {
             entry.operation_error = Some(error.to_string());
             // A transport failure can follow acceptance. Keep that turn
             // unconfirmed until a native idle transition or explicit abort.
-            if new_turn && matches!(error, ClientError::Http(code) if (400..500).contains(code)) {
+            if new_turn && error.not_sent() {
                 entry.turn = None;
+            }
+            if matches!(error, ClientError::Preflight { .. }) {
+                entry.options_pending = true;
             }
         }
         self.0.live.invalidate(session).await;
@@ -367,15 +365,9 @@ impl Host {
         }
         let _guard = self.0.mutation.lock().await;
         let metadata = self.admitted(session, identity).await?;
-        let _: Session = self
-            .0
+        self.0
             .client
-            .mutate(
-                Method::PATCH,
-                &["session", session],
-                Some(&metadata.directory),
-                &json!({"title":title}),
-            )
+            .rename(session, &metadata.directory, title)
             .await?;
         Ok(())
     }
@@ -391,22 +383,22 @@ impl Host {
     ) -> Result<(), Error> {
         let _guard = self.0.mutation.lock().await;
         let metadata = self.admitted(session, identity).await?;
-        let (kind, action, body) = answer.wire()?;
-        let pending: Vec<Value> = self
-            .0
-            .client
-            .get(&[kind], Some(&metadata.directory), &[])
-            .await?;
+        let reply = answer.reply()?;
+        let client = &self.0.client;
+        let pending = match reply {
+            Reply::Permission(_) => client.permissions(&metadata.directory).await?,
+            Reply::Question(_) | Reply::RejectQuestion => {
+                client.questions(&metadata.directory).await?
+            },
+        };
         if !pending
             .iter()
             .any(|p| p["id"] == request && p["sessionID"] == session)
         {
             return Err(Error::TurnChanged);
         }
-        let _: Value = self
-            .0
-            .client
-            .mutate(Method::POST, &[kind, request, action], Some(&metadata.directory), &body)
+        client
+            .reply(session, request, &metadata.directory, reply)
             .await?;
         self.0.live.invalidate(session).await;
         Ok(())
@@ -432,12 +424,12 @@ pub enum Answer {
 }
 
 impl Answer {
-    fn wire(self) -> Result<(&'static str, &'static str, Value), Error> {
+    fn reply(&self) -> Result<Reply<'_>, Error> {
         match self {
             Self::Permission {
                 reply,
             } if matches!(reply.as_str(), "once" | "always" | "reject") => {
-                Ok(("permission", "reply", json!({"reply":reply})))
+                Ok(Reply::Permission(reply))
             },
             Self::Question {
                 answers,
@@ -446,9 +438,9 @@ impl Answer {
                     .iter()
                     .all(|a| a.len() <= 64 && a.iter().all(|s| s.len() <= 16 * 1024)) =>
             {
-                Ok(("question", "reply", json!({"answers":answers})))
+                Ok(Reply::Question(answers))
             },
-            Self::RejectQuestion => Ok(("question", "reject", json!({}))),
+            Self::RejectQuestion => Ok(Reply::RejectQuestion),
             _ => Err(Error::InvalidInput),
         }
     }
@@ -469,22 +461,12 @@ fn message_id() -> String {
 }
 
 async fn abort_execution(client: &super::Client, session: &Session) -> Result<bool, Error> {
-    let cancelled = client
-        .mutate::<bool>(
-            Method::POST,
-            &["session", &session.id, "abort"],
-            Some(&session.directory),
-            &json!({}),
-        )
-        .await?;
-    if cancelled {
+    if client.abort(&session.id, &session.directory).await? {
         return Ok(true);
     }
     // A false acknowledgement alone says nothing about an uncertain prompt.
     // A fresh idle response after abort is required before permitting Retry.
-    let statuses: super::Statuses = client
-        .get(&["session", "status"], Some(&session.directory), &[])
-        .await?;
+    let statuses = client.statuses(&session.directory).await?;
     Ok(matches!(statuses.get(&session.id).unwrap_or(&Status::Idle), Status::Idle))
 }
 
@@ -541,6 +523,7 @@ mod tests {
             let client = super::super::Client::new(
                 &format!("http://{}/", listener.local_addr().expect("valid test fixture")),
                 None,
+                crate::opencode::wire::Dialect::V1,
             )
             .expect("valid test fixture");
             let task = tokio::spawn(async move {

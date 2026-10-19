@@ -65,6 +65,9 @@ struct Shared {
     bytes: HashMap<String, usize>,
     cursors: HashMap<String, Option<String>>,
     turn_pages: HashMap<(String, String), paging::Page>,
+    /// Turns this link admitted whose start no refresh has shown yet, by
+    /// session; one that also ends before a refresh still ends here.
+    admitted: HashMap<String, String>,
 }
 
 struct Conn {

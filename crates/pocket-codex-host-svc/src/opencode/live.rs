@@ -103,7 +103,7 @@ impl Live {
 }
 
 async fn connect(client: &Client) -> Result<(EventStream, Fold), ClientError> {
-    let mut stream = client.events(None).await?;
+    let mut stream = client.events().await?;
     let event = tokio::time::timeout(Duration::from_secs(10), stream.next())
         .await
         .map_err(|_| ClientError::Transport)?

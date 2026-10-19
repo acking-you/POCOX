@@ -66,6 +66,7 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
         bytes: HashMap::new(),
         cursors: HashMap::new(),
         turn_pages: HashMap::new(),
+        admitted: HashMap::new(),
     }));
     let (tx, _) = broadcast::channel(64);
     let link = Link {

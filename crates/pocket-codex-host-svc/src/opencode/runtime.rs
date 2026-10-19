@@ -9,13 +9,16 @@ use std::{
 
 use anyhow::{anyhow, ensure, Context, Result};
 use pocket_codex_core::{process::process_start_time, provider::Secret};
-use serde::Deserialize;
 use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, BufReader},
     task::JoinHandle,
 };
 
-use super::client::Client;
+use super::{
+    client::Client,
+    service::{self, Attachment},
+    wire::{Dialect, Version},
+};
 use crate::{
     native_history::{ClaimError, SessionClaim},
     process::{self, AgentProcess, Spawned},
@@ -37,44 +40,59 @@ pub struct Launch {
 /// Native executable facts; no credentials or provider configuration.
 #[derive(Debug, Clone)]
 pub struct Detection {
-    /// Version reported by the executable itself.
+    /// Version reported by the executable, without its name or leading `v`.
     pub version: String,
-    /// Canonical native database path, resolved by `opencode db path`.
+    /// Canonical native database path, as the executable reports it.
     pub database: PathBuf,
+    /// Shown when this version is outside the tested range; it still runs.
+    pub notice: Option<String>,
+    pub(crate) dialect: Dialect,
 }
 
 impl Launch {
-    /// Inspect this exact executable with this exact child environment.
-    /// It must implement the native 1.19 API; no ACP fallback is attempted.
+    /// Inspect this exact executable with this exact child environment and
+    /// choose the native wire its version speaks. No ACP fallback is tried.
     pub async fn detect(&self) -> Result<Detection> {
-        let version = self.text(&["--version"], 128).await?;
-        let numbers: Vec<_> = version
-            .trim_start_matches('v')
-            .split('.')
-            .take(2)
-            .map(str::parse::<u32>)
-            .collect::<std::result::Result<_, _>>()
+        let version = Version::parse(&self.text(&["--version"], 128).await?)
             .context("OpenCode reported an unrecognized version")?;
-        ensure!(
-            numbers.len() == 2 && (numbers[0], numbers[1]) >= (1, 19),
-            "OpenCode 1.19 or newer is required for native sessions"
-        );
-        let raw = self.text(&["db", "path"], 16 * 1024).await?;
+        let (dialect, notice) = Dialect::detect(&version);
+        // Ownership checks inspect this database, so a release that cannot
+        // report it cannot be hosted, whatever its version.
+        let raw = self
+            .text(dialect.database(), 16 * 1024)
+            .await
+            .with_context(|| format!("OpenCode {version} did not report its database path"))?;
         let database = canonical_database(Path::new(&raw))?;
+        if let Some(notice) = &notice {
+            tracing::warn!("{notice}");
+        }
         Ok(Detection {
-            version,
+            version: version.into_text(),
             database,
+            notice,
+            dialect,
         })
     }
 
     async fn text(&self, args: &[&str], limit: usize) -> Result<String> {
+        self.text_within(args, limit, PROBE_TIMEOUT).await
+    }
+
+    /// One line of output from this executable, run with this launch's
+    /// child environment.
+    pub(crate) async fn text_within(
+        &self,
+        args: &[&str],
+        limit: usize,
+        timeout: Duration,
+    ) -> Result<String> {
         let args = args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
         let bytes = process::inspect_output(
             &self.program,
             &args,
             self.path.as_ref(),
             &self.env,
-            PROBE_TIMEOUT,
+            timeout,
             limit,
         )
         .await
@@ -108,62 +126,83 @@ fn canonical_database(path: &Path) -> Result<PathBuf> {
     Ok(parent.join(name))
 }
 
-/// One native server. The password stays exclusively in its private client.
+/// One native server: owned, or OpenCode 2's background server attached to.
+/// The password stays exclusively in its private client.
 pub struct Server {
     process: Option<AgentProcess>,
     claim: Option<SessionClaim>,
     output: Option<JoinHandle<()>>,
+    service: Option<Attachment>,
     /// Private authenticated HTTP client, never serialize it to a controller.
     pub client: Client,
     /// Native version and canonical source identity.
     pub detection: Detection,
-    /// Unreaped leader PID; native children remain in its owned tree.
+    /// The server process: the owned leader (native children remain in its
+    /// tree), or the attached background server.
     pub pid: u32,
-    /// Leader's creation time, for read-only ancestry checks.
+    /// Its creation time, for read-only ancestry checks.
     pub started: u64,
 }
 
 impl Server {
+    /// Attach to OpenCode 2's background server, starting it when none runs,
+    /// for a host on the history that server serves. `None` where the version
+    /// has no such server or the user turned it off; the caller then starts
+    /// its own. The source claim is taken first, so a second Pocket host on
+    /// this source never starts the service.
+    pub async fn attach(launch: &Launch) -> Result<Option<Self>> {
+        let mut detection = launch.detect().await?;
+        if !service::enabled(launch, &detection).await? {
+            return Ok(None);
+        }
+        let claim = claim(&detection.database).await?;
+        let attached = service::attach(launch, &detection).await?;
+        detection.version = attached.version;
+        Ok(Some(Self {
+            process: None,
+            claim: Some(claim),
+            output: None,
+            pid: attached.attachment.pid(),
+            started: attached.attachment.started(),
+            service: Some(attached.attachment),
+            client: attached.client,
+            detection,
+        }))
+    }
+
+    /// The attached background server, when this server is not owned.
+    pub fn service(&self) -> Option<&Attachment> {
+        self.service.as_ref()
+    }
+
     /// Start a claimed native source on an automatically chosen loopback port.
     /// A second Pocket host cannot start against the same canonical source.
     pub async fn start(launch: &Launch) -> Result<Self> {
         let detection = launch.detect().await?;
-        let database = detection.database.clone();
-        let claim = tokio::task::spawn_blocking(move || {
-            let parent = database
-                .parent()
-                .ok_or_else(|| anyhow!("database has no parent"))?;
-            SessionClaim::acquire(parent, &format!("opencode-server:{}", database.display()))
-                .map_err(|error| match error {
-                    ClaimError::Busy => anyhow!(
-                        "opencode_already_hosted: this native source already has a Pocket host"
-                    ),
-                    ClaimError::Unavailable => {
-                        anyhow!("OpenCode source ownership cannot be verified")
-                    },
-                })
-        })
-        .await??;
+        let claim = claim(&detection.database).await?;
         let password = Secret::new(format!(
             "{}{}",
             uuid::Uuid::new_v4().simple(),
             uuid::Uuid::new_v4().simple()
         ));
+        // OpenCode 2 prefers OPENCODE_PASSWORD over OPENCODE_SERVER_PASSWORD,
+        // so an inherited one would replace the private password.
+        const PASSWORDS: [&str; 3] =
+            ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME", "OPENCODE_PASSWORD"];
         let mut env = launch.env.clone();
-        env.retain(|(key, _)| {
-            key != "OPENCODE_SERVER_PASSWORD" && key != "OPENCODE_SERVER_USERNAME"
-        });
+        env.retain(|(key, _)| !PASSWORDS.iter().any(|name| key == name));
         env.push(("OPENCODE_SERVER_PASSWORD".into(), password.expose().into()));
         env.push(("OPENCODE_SERVER_USERNAME".into(), "opencode".into()));
         let Spawned {
             mut process,
             stdin,
             stdout,
-        } = process::spawn(
+        } = process::spawn_without(
             &launch.program,
             &["serve".into(), "--hostname".into(), "127.0.0.1".into(), "--port".into(), "0".into()],
             launch.path.as_ref(),
             &env,
+            &PASSWORDS,
         )?;
         drop(stdin);
         let result = async {
@@ -171,24 +210,20 @@ impl Server {
             let started =
                 process_start_time(pid).context("OpenCode process identity is unavailable")?;
             let mut reader = BufReader::new(stdout);
-            let origin = tokio::time::timeout(Duration::from_secs(25), listening(&mut reader))
-                .await
-                .context("OpenCode server did not become ready")??;
-            let client = Client::new(&origin, Some(password))?;
-            #[derive(Deserialize)]
-            struct Health {
-                healthy: bool,
-                version: String,
-            }
-            let health: Health = client.get(&["global", "health"], None, &[]).await?;
+            let prefix = detection.dialect.listening();
+            let origin =
+                tokio::time::timeout(Duration::from_secs(25), listening(&mut reader, prefix))
+                    .await
+                    .context("OpenCode server did not become ready")??;
+            let client = Client::new(&origin, Some(password), detection.dialect)?;
+            let health = client.health().await?;
             ensure!(
                 health.healthy && health.version == detection.version,
                 "OpenCode readiness returned a different runtime"
             );
             // Initialize the native source before admission inspects its open
-            // database handles. This request never restores or prompts a session.
-            let _: Vec<super::schema::Session> =
-                client.get(&["session"], None, &[("limit", "1")]).await?;
+            // database handles.
+            client.open_source().await?;
             let output = tokio::spawn(async move {
                 let mut discard = [0u8; 8192];
                 while matches!(reader.read(&mut discard).await, Ok(n) if n > 0) {}
@@ -201,6 +236,7 @@ impl Server {
                 process: Some(process),
                 claim: Some(claim),
                 output: Some(output),
+                service: None,
                 client,
                 detection,
                 pid,
@@ -216,6 +252,7 @@ impl Server {
     }
 
     /// Stop this owned server only. Retain the claim when exit is uncertain.
+    /// An attached background server is left running: this only detaches.
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(process) = self.process.as_mut() {
             ensure!(
@@ -232,7 +269,29 @@ impl Server {
     }
 }
 
-async fn listening(reader: &mut BufReader<tokio::process::ChildStdout>) -> Result<String> {
+/// One Pocket host per canonical source, across Pocket processes.
+async fn claim(database: &Path) -> Result<SessionClaim> {
+    let database = database.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let parent = database
+            .parent()
+            .ok_or_else(|| anyhow!("database has no parent"))?;
+        SessionClaim::acquire(parent, &format!("opencode-server:{}", database.display())).map_err(
+            |error| match error {
+                ClaimError::Busy => {
+                    anyhow!("opencode_already_hosted: this native source already has a Pocket host")
+                },
+                ClaimError::Unavailable => anyhow!("OpenCode source ownership cannot be verified"),
+            },
+        )
+    })
+    .await?
+}
+
+async fn listening(
+    reader: &mut BufReader<tokio::process::ChildStdout>,
+    prefix: &str,
+) -> Result<String> {
     let mut total = 0usize;
     loop {
         let mut line = Vec::new();
@@ -247,7 +306,7 @@ async fn listening(reader: &mut BufReader<tokio::process::ChildStdout>) -> Resul
         );
         let Some(raw) = std::str::from_utf8(&line)
             .ok()
-            .and_then(|line| line.trim().strip_prefix("opencode server listening on "))
+            .and_then(|line| line.trim().strip_prefix(prefix))
         else {
             continue;
         };

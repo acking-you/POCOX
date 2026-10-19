@@ -75,6 +75,7 @@ mixin _RustHosting implements BridgeApi {
       path: e.path,
       version: e.version,
       problem: e.problem,
+      backgroundServer: e.backgroundServer,
     );
   }
 
@@ -404,6 +405,7 @@ AppServeStatus _serveStatus(frb.AppServeStatusDto s) => AppServeStatus(
           agents: s.opencode!.agents,
           problem: s.opencode!.problem,
           separateHistory: s.opencode!.separateHistory,
+          backgroundServer: s.opencode!.backgroundServer,
         ),
   configSource: s.configSource,
   configRevision: s.configRevision?.toInt(),

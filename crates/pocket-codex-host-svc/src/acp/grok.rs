@@ -111,8 +111,8 @@ pub fn account_launch() -> AcpProviderLaunch {
     }
 }
 
-fn names(list: &[&str]) -> Vec<OsString> {
-    list.iter().map(OsString::from).collect()
+fn names(list: &[&str]) -> Vec<String> {
+    list.iter().map(|name| (*name).to_string()).collect()
 }
 
 /// The custom-provider route: write `home/config.toml` for `endpoint` with
@@ -303,11 +303,7 @@ mod tests {
             .map(|(k, _)| k.to_str().expect("utf8"))
             .collect();
         assert_eq!(env, [HOME_ENV, KEY_ENV]);
-        let removed: Vec<_> = launch
-            .env_remove
-            .iter()
-            .map(|k| k.to_str().expect("utf8"))
-            .collect();
+        let removed: Vec<_> = launch.env_remove.iter().map(String::as_str).collect();
         for name in ["XAI_API_KEY", "GROK_AUTH_PATH", "GROK_CONFIG"] {
             assert!(removed.contains(&name), "{name} is not inherited");
         }

@@ -8388,12 +8388,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   OpenCodeEnvironmentDto dco_decode_open_code_environment_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return OpenCodeEnvironmentDto(
       path: dco_decode_opt_String(arr[0]),
       version: dco_decode_opt_String(arr[1]),
       problem: dco_decode_opt_String(arr[2]),
+      backgroundServer: dco_decode_bool(arr[3]),
     );
   }
 
@@ -8401,8 +8402,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   OpenCodeHostStatusDto dco_decode_open_code_host_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return OpenCodeHostStatusDto(
       version: dco_decode_String(arr[0]),
       providersConnected: dco_decode_u_32(arr[1]),
@@ -8411,6 +8412,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       agents: dco_decode_list_String(arr[4]),
       problem: dco_decode_opt_String(arr[5]),
       separateHistory: dco_decode_bool(arr[6]),
+      backgroundServer: dco_decode_bool(arr[7]),
     );
   }
 
@@ -10930,10 +10932,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_path = sse_decode_opt_String(deserializer);
     var var_version = sse_decode_opt_String(deserializer);
     var var_problem = sse_decode_opt_String(deserializer);
+    var var_backgroundServer = sse_decode_bool(deserializer);
     return OpenCodeEnvironmentDto(
       path: var_path,
       version: var_version,
       problem: var_problem,
+      backgroundServer: var_backgroundServer,
     );
   }
 
@@ -10949,6 +10953,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_agents = sse_decode_list_String(deserializer);
     var var_problem = sse_decode_opt_String(deserializer);
     var var_separateHistory = sse_decode_bool(deserializer);
+    var var_backgroundServer = sse_decode_bool(deserializer);
     return OpenCodeHostStatusDto(
       version: var_version,
       providersConnected: var_providersConnected,
@@ -10957,6 +10962,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       agents: var_agents,
       problem: var_problem,
       separateHistory: var_separateHistory,
+      backgroundServer: var_backgroundServer,
     );
   }
 
@@ -13336,6 +13342,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.path, serializer);
     sse_encode_opt_String(self.version, serializer);
     sse_encode_opt_String(self.problem, serializer);
+    sse_encode_bool(self.backgroundServer, serializer);
   }
 
   @protected
@@ -13351,6 +13358,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_list_String(self.agents, serializer);
     sse_encode_opt_String(self.problem, serializer);
     sse_encode_bool(self.separateHistory, serializer);
+    sse_encode_bool(self.backgroundServer, serializer);
   }
 
   @protected

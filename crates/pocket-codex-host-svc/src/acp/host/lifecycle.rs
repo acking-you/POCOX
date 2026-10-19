@@ -154,6 +154,7 @@ impl AgentHost {
             return Err(HostError::NotReady);
         }
         let generation = self.state().begin_generation();
+        let removed: Vec<&str> = self.inner.env_remove.iter().map(String::as_str).collect();
         let spawned = match process::spawn_without(
             &self.inner.program,
             self.inner
@@ -162,7 +163,7 @@ impl AgentHost {
                 .unwrap_or(&self.inner.spec.args),
             self.inner.path.as_ref(),
             &self.inner.env,
-            &self.inner.env_remove,
+            &removed,
         ) {
             Ok(spawned) => spawned,
             Err(error) => {

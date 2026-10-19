@@ -217,6 +217,7 @@ class OpenCodeHostStatus {
     this.agents = const [],
     this.problem,
     this.separateHistory = false,
+    this.backgroundServer = false,
   });
 
   /// The running `opencode` version.
@@ -241,12 +242,21 @@ class OpenCodeHostStatus {
   /// OpenCode's default one: this computer's other OpenCode sessions are
   /// not among them.
   final bool separateHistory;
+
+  /// The host uses OpenCode's background server, which OpenCode's other
+  /// clients share and which keeps running when the host stops.
+  final bool backgroundServer;
 }
 
 /// The OpenCode executable found on this device.
 class OpenCodeEnvironment {
   /// Creates a detection result.
-  const OpenCodeEnvironment({this.path, this.version, this.problem});
+  const OpenCodeEnvironment({
+    this.path,
+    this.version,
+    this.problem,
+    this.backgroundServer = false,
+  });
 
   /// The resolved executable.
   final String? path;
@@ -256,6 +266,10 @@ class OpenCodeEnvironment {
 
   /// Why it cannot be hosted (`not_found`, `unsupported_version`, …).
   final String? problem;
+
+  /// OpenCode's own clients share its background server (OpenCode 2, not
+  /// turned off), which serves the shared history.
+  final bool backgroundServer;
 }
 
 /// One ACP agent configuration: profile identity plus executable and the

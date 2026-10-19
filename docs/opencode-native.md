@@ -11,6 +11,55 @@ It replaces the former `opencode acp` preset, whose model-catalog plugin and
 custom provider routes are removed. Saved records of that preset are dropped
 when preferences load and are never relaunched as a generic ACP agent.
 
+## Versions
+
+Each OpenCode major version speaks its own native wire. The host reads
+`opencode --version` once and picks that version's `Wire` implementation
+(`opencode/wire/`), called through a closed `match`. The host, fold,
+gateway, bridge and Flutter read the 1.x shapes either way.
+
+| | 1.x (1.19.3 tested) | 2.x (2.0.32 tested) |
+| --- | --- | --- |
+| Database | `opencode db path` | `opencode debug paths db` |
+| Routes | `/…` with `?directory=` | `/api/…`; project reads take `location[directory]` |
+| Busy | `/session/status` | listed by `/api/session/active`; all others idle |
+| Model and agent | in every prompt | set on the session, only when changed |
+| Turn start and end | `session.status` | `session.execution.*`, mapped onto the same busy and idle status |
+| Live events | every event invalidates its session | step, tool, permission and form boundaries; token deltas are dropped |
+| Models | connected providers' models | `/api/model` (`/api/provider` lists only configured providers) |
+| Attachments | file parts | `files` with the image's data URI; OpenCode checks the base64 and detects the type from the bytes |
+| Image input | `capabilities.input.image` | `"image"` in the model's `capabilities.input` |
+| Custom provider | `provider` block in `OPENCODE_CONFIG_CONTENT` | the same block; 2.x runs each `@ai-sdk/*` package as its own built-in one |
+| Local sessions | `session` with `message`/`part` or `session_message` | `session_v2` with `session_message` |
+
+A version outside the tested range still starts, with a notice in its
+host's status. One that cannot report its database cannot be hosted.
+OpenCode 2 prefers `OPENCODE_PASSWORD` to `OPENCODE_SERVER_PASSWORD`, so the
+host removes both inherited names before injecting its private password.
+
+2.x has no `bash` tool and asks before reading `.env` by default; a message
+ID may be used only once. Configured commands appear shortly after the
+server starts. 2.x keeps a prompt's attachments as bytes (`data`, `mime`),
+not URLs; history turns them back into data URIs. It uses the same database
+file as 1.x and, on first open, copies every session into `session_v2` and
+`session_message`, leaving the 1.x tables frozen, so Local sessions reads
+`session_v2` whenever it exists.
+
+OpenCode 2's terminal app, `opencode run` and desktop app share one
+background server (`opencode serve --service`) that keeps running after they
+exit. A 2.x host on the shared history with OpenCode's own configuration
+attaches to that server instead of starting its own, and writes while no
+other client is connected to it
+([OpenCode 2's background server](#opencode-2s-background-server)). A host
+that keeps its own server beside it (a custom provider) follows read-only
+while it runs: the access names it (holder `opencode_service`, from its
+arguments) and says to stop it with `opencode service stop` or to give the
+host its own history.
+
+Not covered on 2.x yet: token-by-token text (replies appear at text and
+tool boundaries), and forms with number, boolean or external fields (they
+can only be rejected).
+
 ## Hosting
 
 - **Several hosts, one per history source.** Each host owns its own
@@ -35,9 +84,14 @@ when preferences load and are never relaunched as a generic ACP agent.
   (`opencode`, `opencode-2`, …) and, beside a host serving the shared
   history, *This host only*. Choosing *Shared* while another host serves it
   says so under the choice, and Start is refused with that reason before
-  anything starts. A remote add picks the same way on the host computer (a
-  remote edit keeps the saved choice). Changing the history of a running
-  host is a runtime edit: saved, then applied with a restart.
+  anything starts. A new host with a custom provider also gets *This host
+  only* while OpenCode 2's background server is on (`opencode_detect`
+  reports `backgroundServer`): a custom provider cannot use that server.
+  Until the detection answers, an unpicked history is undecided, so Start
+  waits for it. Choosing *Shared* there anyway is allowed, and a line under
+  the choice says the host could only follow. A remote add picks the same way on the
+  host computer (a remote edit keeps the saved choice). Changing the history
+  of a running host is a runtime edit: saved, then applied with a restart.
 - **Instance names are unique per device**, compared as the relay compares
   them (`My Host` and `my-host` are one instance). A new host's editor —
   Codex, OpenCode, ACP, and the remote editor — shows a taken name under
@@ -320,7 +374,258 @@ Desktop Local sessions reads OpenCode's database directly and read-only
 continued by opening it on the running OpenCode host (**Continue in
 <host>**), or by hosting OpenCode first.
 
+## OpenCode 2's background server
+
+Proposed 2026-10-19. The user chose option A (below), and it was implemented
+on 2026-10-20. Option B, takeover, stays deferred (AGENTS.md item 35).
+
+**What OpenCode 2 does.** From the 2.0.32 source
+(`packages/cli/src/server-process.ts`, `services/service-config.ts`,
+`packages/client/src/effect/service.ts`). The marked facts were also seen on
+the official build, with an isolated HOME and XDG root and a port of the
+probe's own:
+
+- The first client starts `opencode serve --service` (through
+  `Service.ensure`, detached). The service runs from the home directory and
+  keeps running until `opencode service stop`. It listens on 49374 (0xC0DE)
+  for release channels, unless `opencode service set port` changes that. It
+  holds the database. *Seen:* it was the database's only holder, and with no
+  client connected it held only its listening socket.
+- Discovery is one file, `<state>/service.json`. The state directory comes
+  from `opencode debug paths state`; other channels use
+  `service-<channel>.json`. The file holds `{id, version, url, pid,
+  password}` with mode 0600. Requests authenticate as Basic
+  `opencode:<password>`, and `/api/info` answers `{version, pid, urls}`.
+  *Seen:* the file had mode 0600, the pid matched, and a wrong password got
+  401. The password is also saved in `<config>/service.json`.
+- The service can be replaced. These stop it (SIGTERM, then SIGKILL) and
+  start a new one with a new id and pid: a TUI of another version
+  (`mismatch: "replace"`), `service restart`, and `service set` of port,
+  password, hostname, cors or env. `opencode service start` reuses any
+  compatible running service and never replaces one.
+- The service's environment is the one of the client that started it, plus
+  `service set env`. A later client's `OPENCODE_CONFIG_CONTENT` never
+  reaches it.
+- `opencode service set disabled true` stops the service. Clients then run a
+  private `serve --stdio`, which holds the database only while they are open,
+  as 1.x did. *Seen:* the TUI's private server held the database and exited
+  with the TUI.
+- Each session has one engine. Input goes through a per-session inbox
+  (`session.inbox.enqueued` / `delivered`), and only one execution per
+  session runs at a time. Every client sees every session's turns. *Seen:*
+  one client's `/api/event` received another client's `opencode run`, from
+  `session.execution.started` to `succeeded`.
+- The server keeps no list of its clients, and nothing tells which session a
+  client is showing. From outside, only process-level facts are visible.
+  *Seen:* an open TUI kept one established loopback connection to the
+  service (its event stream) after two idle minutes, and none once it
+  exited. With remote access (`opencode service set remote`, `pair
+  --remote`), remote clients are proxied inside the service's own process.
+  Its `/api/info` `urls` then list the remote address.
+
+**1. Attach instead of spawn.** This applies to a 2.x host on the shared
+history with the inherited model service:
+
+- If `opencode service get disabled` prints `true`, the host runs its own
+  server, as today. The user's clients then use private servers, and holder
+  evidence works unchanged.
+- Otherwise the host reads the registration. It attaches when `/api/info`,
+  asked with that password, answers the same pid and the host's major
+  version, and that pid is the only holder of the canonical database. If no
+  service is running, the host first runs `opencode service start`. It runs
+  it with the plain inherited environment: the child PATH only, and no POCOX
+  password, agent tools or configuration, since the service outlives POCOX
+  and serves every client.
+- A service of another major version, or one on another database, is refused
+  with that reason. The host does not fall back to a server of its own,
+  which would be a second engine on the history.
+- The POCOX source claim is still taken, so there is one Pocket host per
+  source.
+- This mirrors an adopted Codex app-server (AGENTS.md items 26 and 37). The
+  host joins a server it did not start and never signals it.
+
+**2. Lifecycle.** An attached host owns no process.
+
+- **Stop and quit** detach: they close the event stream, withdraw the relay
+  keys and release the claim. The service keeps running, as after any
+  OpenCode client exits. Nothing goes into the process ledger or
+  `pending_cleanup`, and a detach never fails a quit.
+- **Apply** to the same configuration detaches and attaches again, with no
+  restart. Apply to a custom provider or to its own history detaches, then
+  starts the host's own server, as today.
+- **Watchdog.** The event stream ends, or the registration changes (id, pid
+  or url): either way, it is a new engine generation. The host re-reads and
+  re-validates the registration as at attach and reports `transition`
+  meanwhile. Running turns become uncertain and are recovered from
+  `/api/session/active`, as on a reconnect. After the user's
+  `opencode service stop`, the host stays reconnecting and says so. Only an
+  explicit Start, Apply or restore starts the service again.
+- **Status** reports the service's pid. A new `OpenCodeStatus` field,
+  `backgroundServer` (serde default false), says the server is OpenCode's own
+  and that Stop detaches. `alive` means a healthy attachment, not that the
+  pid runs.
+- **Agent tools** are not given to an attached host. OpenCode's `mcp.add` is
+  server-wide, so it would hand the host's token to every client of the
+  service, remote ones included. The host's status says so.
+
+**3. Custom providers.** Their `OPENCODE_CONFIG_CONTENT` cannot reach a
+shared service, and `service set env` would change it for every client. So
+they keep a server of their own. On the shared history, that is a second
+engine beside the service, so the host follows read-only while the service
+runs, as today. So while the service is enabled, the editor selects *This
+host only* for a new custom-provider host and says why.
+
+**4. Session access.**
+
+What the server can show:
+
+- every session's running turn and its end;
+- queued and delivered input;
+- pending permissions and forms.
+
+Since one engine runs each session, a send from POCOX and a send from the TUI
+are queued in order. They are not two engines writing at once, as with 1.x
+servers.
+
+What it cannot show: which sessions a client has open. An idle TUI, desktop
+window or browser tab is not visible over HTTP. Only "a client process is
+connected" can be observed.
+
+- **A. Write only when no other client is connected** (recommended). This
+  keeps item 29's rule ("write only from a fresh no-owner admission"); only
+  the evidence changes. A session is writable only when a fresh inspection
+  finds all of these:
+  - the registration still names the attached instance;
+  - the service is the only holder of the database;
+  - every established connection to the service's port comes from this
+    process;
+  - `/api/info` lists only loopback URLs, so no remote access or wildcard
+    bind.
+
+  Another connected process reports `external_source_open` with its pid.
+  Unlike today, it also carries the session's real turn state from the
+  server. A remote or unattributable peer is `source_unknown`. Once the TUI,
+  desktop app and browser tabs close, the service stays, and sessions become
+  writable through the existing **Check now** and open flow.
+
+  Limits: a client that connects only per request, with no event stream, is
+  invisible between requests. This is evidence of possible writers, not a
+  lease, as today. A race between the check and a send is queued by the
+  server's inbox; it does not create a second engine.
+- **B. Continue while another client is connected.** This is the takeover
+  of AGENTS.md item 35. It would need all of these:
+  - per session, no running turn and no pending input, permission or form
+    on the server;
+  - an explicit confirmation that names the connected process, for example
+    "OpenCode (pid …) is connected and may be showing this session; what you
+    send appears there";
+  - an admission per session and per connection, revoked by any turn or
+    input from elsewhere;
+  - never automatic, and never stopping the other client.
+
+  Not proposed for implementation; item 35 stays deferred.
+
+**5. The password.**
+
+- It is read only from the registration file. Never from
+  `<config>/service.json`, never through `service get password`, and never
+  through a child's argv or environment.
+- It is read only after checking that the file is a regular file owned by
+  this user, with no group or other permission bits.
+- It is decoded straight into `Secret`. A decode failure gives a fixed
+  message, because serde errors can quote values.
+- It is used only in the private client's `Authorization` header. It never
+  appears in logs, status, `ServeStatus`, controller answers, records or
+  errors.
+- It is re-read only at attach and re-attach, and dropped at detach.
+- The URL must be loopback HTTP with no credentials, the same check
+  `listening` makes.
+
+**Verification, if approved.** The opt-in `opencode_native` live tests, on
+2.0.32 with an isolated root and the test's own `service set port`:
+
+- attach to a running service, and to none (the host starts it);
+- write with no other client;
+- follow with an idle TUI (run under a pty) connected, and become writable
+  once it exits;
+- attach again after `service restart`;
+- never stop the service on host stop or quit.
+
+1.19.3 keeps its own server, unchanged, and so does 2.x with `disabled`. The
+AGENTS.md §7 checks also apply.
+
+**Decision (2026-10-19):** option A, as above; B stays deferred.
+
+**As implemented** (`opencode/service.rs`, `Server::attach`, the
+`serve_opencode` watchdog):
+
+- Attaching refuses a service whose `/api/info` lists a non-loopback URL.
+  It does not check this again at each admission: OpenCode restarts the
+  service to change remote access or its hostname, and the host checks
+  the replacement when it attaches again.
+- A connected client is shown in one of two ways, both read-only. While
+  another client's turn runs: `external_running`, holder `opencode`.
+  Otherwise: `external_source_open`, holder `opencode_client`, with the
+  session's turn (a turn this host started stays this host's).
+- The watchdog reads the registration every 2 s.
+  - A replaced service is attached again under the host's lease. Controllers
+    reconnect to the new incarnation, as after Apply.
+  - A stopped service is reported in the host's status ("OpenCode's background
+    server stopped"). The host attaches again once a client starts a new one.
+- Host details show the server as "OpenCode's background server (shared,
+  without POCOX tools)" (`OpenCodeStatus.backgroundServer`).
+- Point 3 (2026-10-20): the local editor and a remote add both choose *This
+  host only* for a new custom-provider host while the service is on. The user's
+  own choice and a saved history are kept.
+
+**Verified (2026-10-20)** on official 1.19.3 and 2.0.32, with isolated roots
+and the test's own port. The new `opencode_native` live test, on 2.0.32:
+
+- `disabled` keeps an own server;
+- with none running, the host started the service and attached;
+- a second Pocket host on the source was refused;
+- a prompt was answered with no other client;
+- the idle terminal app under a pty made the session follow
+  (`opencode_client`, idle), refused a rename, and wrote again after the
+  app exited;
+- `service restart` was seen as a replacement and attached again;
+- stopping the host left the service running until `service stop`.
+
+On 1.19.3 the host keeps its own server. The other three live tests passed
+on both versions.
+
+The bridge acceptance test passed on both versions. On 2.0.32 it ran through
+the background server: start, source singleton, a prompt, release and
+reopen, and Apply keeping history and the service. After `service restart`
+the watchdog attached the host again by itself, with a new incarnation and
+service pid. Stop left the service running.
+
+Also passed: the Rust workspace (905 passed, 26 ignored), clippy, and the
+Flutter suite (1658 passed, 7 skipped). Not verified: the macOS app, a
+relay or second device, and other platforms.
+
 ## Verification
+
+OpenCode 2 (2026-10-19), against the official OpenCode 1.19.3 and 2.0.32
+builds on one Mac, with disposable data and a local deterministic model:
+the three real-server host tests (lifecycle and an outside database holder;
+gateway admission and closed routes; turns with a supplement, a permission,
+a question, a command and cancel) and the bridge hosting acceptance test
+(start, source singleton, local connect, a prompt to a completed turn,
+release and reopen, Apply keeping history, stop) passed on both. Unit tests
+cover 2.x frames, catalogs, history, forms and prompt selection.
+
+OpenCode 2 attachments, custom providers and Local sessions (2026-10-19),
+same builds and fixtures: the real-server and bridge acceptance tests passed
+again on both versions; the lifecycle test's prompt now carries a PNG, which
+the model received and history returned, and the catalog reported the
+model's image input. Through the bridge on 2.0.32, a custom-provider host
+for each of OpenAI Responses, Anthropic Messages and OpenAI Chat Completions,
+pointed at a local gateway, listed the gateway's models, offered images, and
+completed a turn whose image reached the gateway. The Local sessions reader
+read databases 2.0.32 created (an image prompt; a failed turn, its error
+shown once) and a 1.19.3 database after 2.0.32 upgraded it (sessions from
+both versions).
 
 Several hosts (2026-10-16): the real bridge lifecycle test also starts a
 second host with its own history beside the first, reads its status and
