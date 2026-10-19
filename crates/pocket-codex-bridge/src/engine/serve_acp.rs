@@ -380,6 +380,14 @@ pub(super) fn relaunch(name: &str) -> Option<AcpRelaunch> {
 }
 
 /// Status rows for every ACP host, in the shared [`ServeStatus`] shape.
+/// Loopback ports this process's ACP hosts listen on (gateway and meta).
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts()
+        .values()
+        .flat_map(|host| [host.gateway_local.port(), host.meta_local.port()])
+        .collect()
+}
+
 pub(super) fn status() -> Vec<ServeStatus> {
     hosts()
         .values()
@@ -637,6 +645,7 @@ pub(super) fn stop_all() {
 
 fn stop_host(host: AcpServe) {
     let name = host.name.clone();
+    crate::engine::agent_tools::inject::hosted_stopped(&name);
     runtime::runtime().block_on(async {
         // The owned process first (bounded), then the relay keys.
         host.gateway_task.abort();

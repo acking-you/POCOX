@@ -89,7 +89,8 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 | 模块                           | 状态                                    |
 | ------------------------------ | -------------------------------------- |
 | 工作区 / lints / CI            | 已搭好                                  |
-| `pocox` CLI                    | `login`、`logout`、`account`、`init`、`serve`、`connect`、`api {serve,connect}`、`services {list,default set}`、顶层 `status`/`stop`、`codex {start,stop,status}`、`pb {register,subscribe,status}`、`remote-hint`、`version` |
+| `pocox` CLI                    | `login`、`logout`、`account`、`init`、`serve`、`connect`、`api {serve,connect}`、`services {list,default set,share,unshare,connect,disconnect}`、`open`、`tools`、顶层 `status`/`stop`、`codex {start,stop,status}`、`pb {register,subscribe,status}`、`remote-hint`、`version` |
+| 智能体工具 + 星系              | 一个供所有智能体工具使用的 `pocox` MCP 服务：查看你的设备与服务，把开发服务器共享到手机（先征得你的同意），连接其他设备上的服务。托管的 Codex、Claude、OpenCode 默认可用，其他智能体复制一段配置即可。星系把所有设备与服务呈现为一幅流动的星图（[详情](docs/agent-tools.md)） |
 | `pb-mapper` 注册/订阅          | Git SDK 来自 `pocket-codex` 分支，由 `Cargo.lock` 固定版本 |
 | `codex app-server` 进程管理    | 通过 PID + state.toml 启动/停止/查状态 |
 | 外置 Codex 托管                | 所有桌面端均启动已安装的外置 `codex`，只直接依赖上游协议 crate；「内置引擎」暂未实现，按钮置灰。旧内嵌托管配置恢复为外置模式，需安装 Codex 或指定其路径。 |

@@ -44,6 +44,18 @@
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<!-- The in-app browser opens pages the user's other devices share at
+		     http://localhost:<port>, a tunnel this app holds on the phone. -->
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<key>NSAllowsLocalNetworking</key>
+			<true/>
+		</dict>
+		<!-- No route opens from a URL: the pocketcodex scheme is only the
+		     login callback, which ASWebAuthenticationSession receives itself,
+		     and pages such as /preview must not open on a link's say. -->
+		<key>FlutterDeepLinkingEnabled</key>
+		<false/>
 		<key>UIApplicationSceneManifest</key>
 		<dict>
 			<key>UIApplicationSupportsMultipleScenes</key>

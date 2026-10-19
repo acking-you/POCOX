@@ -51,9 +51,17 @@ pub enum Command {
     #[command(subcommand)]
     Api(ApiCmd),
 
-    /// Discover and configure relay-exposed POCOX services.
+    /// Discover, share and connect services across your devices.
     #[command(subcommand)]
     Services(ServicesCmd),
+
+    /// The agent tools: the MCP server harnesses use to reach your devices.
+    #[command(subcommand)]
+    Tools(ToolsCmd),
+
+    /// Open a shared service (a `pocox://open` link or a service key) in the
+    /// browser, connecting it to this computer first.
+    Open(OpenArgs),
 
     /// Show all POCOX managed runtime sessions.
     Status,
@@ -279,6 +287,16 @@ pub enum ServicesCmd {
     /// Manage local default service targets.
     #[command(subcommand)]
     Default(ServicesDefaultCmd),
+    /// Share local ports (a dev server, an API) with your other devices,
+    /// through the POCOX running on this computer.
+    Share(ServicesShareArgs),
+    /// Stop a share (its id, port or key).
+    Unshare(ServicesTargetArgs),
+    /// Make another device's shared port or API reachable on this computer,
+    /// at the same port number when it is free.
+    Connect(ServicesConnectArgs),
+    /// End a connection made with `services connect`.
+    Disconnect(ServicesTargetArgs),
 }
 
 /// Args for `pocox services list`.
@@ -288,8 +306,177 @@ pub struct ServicesListArgs {
     #[arg(long)]
     pub kind: Option<ServiceKindArg>,
 
+    /// Print JSON, with titles and owners when POCOX runs on this computer.
+    #[arg(long)]
+    pub json: bool,
+
     #[command(flatten)]
     pub relay: PbRelayArgs,
+}
+
+/// Args for `pocox services share`.
+#[derive(Debug, Args)]
+pub struct ServicesShareArgs {
+    /// Ports of this computer, the page's port first.
+    #[arg(required = true, num_args = 1..=4)]
+    pub ports: Vec<u16>,
+
+    /// What it is, shown on your devices.
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Path to open, `/` by default.
+    #[arg(long)]
+    pub path: Option<String>,
+
+    /// Print JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// Args naming one share or connection.
+#[derive(Debug, Args)]
+pub struct ServicesTargetArgs {
+    /// A share id, port or service key; a connection's key or local address.
+    pub target: String,
+}
+
+/// Args for `pocox services connect`.
+#[derive(Debug, Args)]
+pub struct ServicesConnectArgs {
+    /// A service key, `device:kind:name` or `device/port`.
+    pub service: String,
+
+    /// Local port to use instead of the service's own.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Print JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// Subcommands under `pocox tools …`.
+#[derive(Debug, Subcommand)]
+pub enum ToolsCmd {
+    /// Show the agent tools of this computer's POCOX installations.
+    Status(ToolsStatusArgs),
+    /// Let agents use the tools (the default).
+    Enable(ToolsTargetArgs),
+    /// Stop agents from using the tools; what agents shared ends.
+    Disable(ToolsTargetArgs),
+    /// Whether an agent's first share asks you first (on by default).
+    Ask(ToolsAskArgs),
+    /// List agents' share requests waiting for you, on every device.
+    Requests,
+    /// Let an agent share what it asked for (`--always`: and share again
+    /// in that conversation without asking).
+    Allow(ToolsAnswerArgs),
+    /// Refuse an agent's share request.
+    Deny(ToolsAnswerArgs),
+    /// Print a ready-to-paste entry for a harness POCOX does not launch
+    /// (Claude Code or Codex run in a terminal, OpenCode, any MCP client),
+    /// with a token issued to it.
+    Config(ToolsConfigArgs),
+}
+
+/// Args for `pocox tools allow` and `pocox tools deny`.
+#[derive(Debug, Args)]
+pub struct ToolsAnswerArgs {
+    /// The request id (from `pocox tools requests`).
+    pub id: String,
+
+    /// Also allow later shares of the same conversation without asking.
+    #[arg(long)]
+    pub always: bool,
+}
+
+/// Args for `pocox tools config`.
+#[derive(Debug, Args)]
+pub struct ToolsConfigArgs {
+    /// The harness the entry is for.
+    #[arg(long, value_enum, default_value = "generic")]
+    pub harness: HarnessArg,
+}
+
+/// A harness the tools can be configured for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum HarnessArg {
+    /// Codex (`~/.codex/config.toml`).
+    Codex,
+    /// Claude Code (`mcpServers` entry for ~/.claude.json).
+    Claude,
+    /// OpenCode (`opencode.json`).
+    Opencode,
+    /// Any MCP client (`mcpServers` JSON).
+    Generic,
+}
+
+impl HarnessArg {
+    /// The harness id.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Codex => "codex",
+            Self::Claude => "claude",
+            Self::Opencode => "opencode",
+            Self::Generic => "generic",
+        }
+    }
+}
+
+/// Args for `pocox tools status`.
+#[derive(Debug, Args)]
+pub struct ToolsStatusArgs {
+    /// Print JSON.
+    #[arg(long)]
+    pub json: bool,
+}
+
+/// Which installation a `tools` setting changes; every one that has hosted
+/// when neither is given.
+#[derive(Debug, Args)]
+pub struct ToolsTargetArgs {
+    /// Only the desktop app.
+    #[arg(long, conflicts_with = "cli_host")]
+    pub app: bool,
+
+    /// Only the CLI host (`pocox serve --allow-remote-management`).
+    #[arg(long)]
+    pub cli_host: bool,
+}
+
+/// Args for `pocox tools ask`.
+#[derive(Debug, Args)]
+pub struct ToolsAskArgs {
+    /// `on` or `off`.
+    pub value: OnOff,
+
+    #[command(flatten)]
+    pub target: ToolsTargetArgs,
+}
+
+/// A switch value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum OnOff {
+    /// Switched on.
+    On,
+    /// Switched off.
+    Off,
+}
+
+/// Args for `pocox open`.
+#[derive(Debug, Args)]
+pub struct OpenArgs {
+    /// A `pocox://open?service=…` link, a service key or `device/port`.
+    pub target: String,
+
+    /// Path to open (overrides the link's).
+    #[arg(long)]
+    pub path: Option<String>,
+
+    /// Print the local address instead of opening the browser.
+    #[arg(long)]
+    pub no_browser: bool,
 }
 
 /// Subcommands under `pocox services default …`.
@@ -322,6 +509,8 @@ pub enum ServiceKindArg {
     App,
     /// Responses API proxy service.
     Api,
+    /// A port shared from a device.
+    Port,
 }
 
 impl From<ServiceKindArg> for ServiceKind {
@@ -329,6 +518,7 @@ impl From<ServiceKindArg> for ServiceKind {
         match value {
             ServiceKindArg::App => Self::App,
             ServiceKindArg::Api => Self::Api,
+            ServiceKindArg::Port => Self::Port,
         }
     }
 }

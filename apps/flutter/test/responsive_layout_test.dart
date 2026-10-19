@@ -1,8 +1,8 @@
 // Phone layouts that used to squeeze or overflow, measured with the real
 // fonts on an iOS target at the narrowest width with the largest text:
 // the services capability rows, the composer's agent options and model
-// chip, the welcome guide's found host and the settings subscriptions. Set
-// PCX_UI_PREVIEW_DIR to write the previews (`responsive-*`).
+// chip, the welcome guide's found host, the settings subscriptions and the
+// share card. Set PCX_UI_PREVIEW_DIR to write the previews (`responsive-*`).
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -17,6 +17,7 @@ import 'package:pocket_codex/src/screens/services_screen.dart';
 import 'package:pocket_codex/src/screens/settings_screen.dart';
 import 'package:pocket_codex/src/screens/welcome_guide_screen.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/tools/share_card.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -740,6 +741,89 @@ void main() {
         if (size.width > size.height) {
           await capturePreview(t, 'responsive-sidebar-landscape-zh-2.0');
         }
+      }
+    });
+  });
+
+  testWidgets('a share card keeps its title, status and actions whole on a '
+      'phone, in either language, at any text size', (t) async {
+    await _onIos(t, () async {
+      const service = 'pcx:studio:port:5173';
+      final share = ToolsShare(
+        id: 's1',
+        title: 'Landing page',
+        path: '/',
+        ports: const [ToolsPort(port: 5173, key: service, status: 'online')],
+        owner: const ToolsOwner(
+          kind: 'agent',
+          label: 'Codex · default',
+          harness: 'codex',
+          host: 'default',
+          conversation: 'thread-1',
+        ),
+        createdMs: 0,
+        expiresMs: DateTime.now().millisecondsSinceEpoch + 3600000,
+      );
+      for (final (size, locale, scale) in _cases) {
+        final l10n = lookupAppLocalizations(locale);
+        final api = _api()
+          ..toolsOverviewValue = ToolsOverview(
+            thisDevice: _device,
+            devices: [
+              ToolsDevice(
+                name: 'studio',
+                online: true,
+                catalog: true,
+                shares: [share],
+              ),
+            ],
+          );
+        // Narrower than any place it appears: a conversation, Shared with
+        // you and the galaxy's panel.
+        await _mount(
+          t,
+          api,
+          Scaffold(
+            body: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              children: [
+                ShareCard(share: shareRefOf(share)),
+                const SizedBox(height: 8),
+                ShareCard(share: shareRefOf(share), dense: true),
+              ],
+            ),
+          ),
+          size: size,
+          scale: scale,
+          locale: locale,
+        );
+        final at = '$size ${locale.languageCode} ×$scale';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        for (var i = 0; i < 2; i++) {
+          final card = find.byKey(const Key('share-card-$service')).at(i);
+          await t.ensureVisible(card);
+          await t.pump();
+          final bounds = t.getRect(card);
+          _whole(t, card, 'Landing page', 'title $at');
+          _whole(t, card, l10n.toolsStatusOnline, 'status $at');
+          for (final key in [
+            'share-open-$service',
+            'share-copy-$service',
+            'share-menu-$service',
+          ]) {
+            _reachable(
+              t,
+              find.descendant(of: card, matching: find.byKey(Key(key))),
+              bounds,
+              '$key $at',
+            );
+          }
+        }
+        await capturePreview(
+          t,
+          'responsive-share-card-${size.width.toInt()}-'
+          '${locale.languageCode}-$scale',
+        );
       }
     });
   });

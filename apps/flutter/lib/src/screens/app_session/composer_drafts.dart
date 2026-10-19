@@ -51,6 +51,31 @@ class _ComposerDraft {
   final List<_Queued> queue = [];
 
   bool get hasDraft => value.text.isNotEmpty || attachments.isNotEmpty;
+
+  /// Moves when text joins this draft from outside its view (see
+  /// [addToConversationDraft]); an open view shows the draft again.
+  int outside = 0;
+}
+
+/// Hand [text] to conversation [threadId] on [service]: it joins that
+/// conversation's draft as a paragraph of its own and is never sent. An open
+/// view of the conversation shows it at once.
+void addToConversationDraft(
+  WidgetRef ref,
+  String service,
+  String threadId,
+  String text,
+) {
+  final drafts = ref.read(_composerDraftsProvider(service));
+  final draft = drafts.forThread(threadId);
+  final previous = draft.value.text;
+  final combined = previous.trim().isEmpty ? text : '$previous\n\n$text';
+  draft.value = TextEditingValue(
+    text: combined,
+    selection: TextSelection.collapsed(offset: combined.length),
+  );
+  draft.outside += 1;
+  drafts.save(draft, changed: true);
 }
 
 class _ComposerDrafts extends ChangeNotifier {

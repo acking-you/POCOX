@@ -26,6 +26,7 @@ import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
 import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
 import 'package:pocket_codex/src/realtime_delegation.dart';
 import 'package:pocket_codex/src/theme.dart';
+import 'package:pocket_codex/src/tools/share_card.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/markdown_view.dart';
 import 'package:pocket_codex/src/widgets/message_images.dart';
@@ -129,6 +130,18 @@ class _MessageViewState extends State<MessageView> {
     }
     if (item.type == 'reasoningOutput') {
       return ReasoningOutputView(text: item.text);
+    }
+    if (item.share case final share?) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: ShareCard(share: share),
+          ),
+        ),
+      );
     }
     if (item.type == 'imageGeneration') {
       return GeneratedImageCard(

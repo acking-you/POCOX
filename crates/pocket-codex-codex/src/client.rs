@@ -103,6 +103,18 @@ impl Drop for AppClient {
 }
 
 impl AppClient {
+    /// Finish a one-off connection with a WebSocket close handshake and await
+    /// its workers. Cancellation or an unresponsive peer still drops both
+    /// tasks.
+    pub async fn close(mut self) {
+        let closing = async {
+            let _ = self.sink.lock().await.close().await;
+            let _ = (&mut self.reader).await;
+            let _ = (&mut self.keepalive).await;
+        };
+        let _ = tokio::time::timeout(Duration::from_secs(1), closing).await;
+    }
+
     /// Connect to `ws_url` (e.g. `ws://127.0.0.1:28080`) and start the reader
     /// task. Returns the client plus the receiver of inbound notifications.
     pub async fn connect(ws_url: &str) -> Result<(Self, mpsc::UnboundedReceiver<Inbound>)> {

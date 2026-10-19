@@ -633,4 +633,31 @@ abstract final class AppIcons {
 
   /// `webhook_outlined`.
   static const IconData webhook_outlined = LucideIcons.webhook300;
+
+  /// The galaxy of devices and services.
+  static const IconData orbit = LucideIcons.orbit300;
+
+  /// A port shared from a device.
+  static const IconData share_port = LucideIcons.share2300;
+
+  /// A phone.
+  static const IconData smartphone = LucideIcons.smartphone300;
+
+  /// A laptop or desktop computer.
+  static const IconData laptop = LucideIcons.laptop300;
+
+  /// A server.
+  static const IconData server = LucideIcons.server300;
+
+  /// Connect a service here.
+  static const IconData plug = LucideIcons.plug300;
+
+  /// Send something to the agent.
+  static const IconData send = LucideIcons.send300;
+
+  /// A list view.
+  static const IconData list = LucideIcons.list300;
+
+  /// Stop sharing.
+  static const IconData circle_stop = LucideIcons.circleStop300;
 }

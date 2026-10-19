@@ -309,6 +309,15 @@ fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
 /// release `panic = "unwind"` that just errors the call, but recovering keeps
 /// hosting fully operational. Prefer this over `.lock().expect(...)`
 /// everywhere.
+/// Loopback ports this process's Codex hosts listen on (the app-server, API
+/// proxy and meta service), read from their records without probing.
+pub(crate) fn listen_ports() -> Vec<u16> {
+    hosts_locked()
+        .values()
+        .flat_map(|ls| [ls.app_local.port(), ls.api_local.port(), ls.meta_local.port()])
+        .collect()
+}
+
 fn hosts_locked() -> std::sync::MutexGuard<'static, HashMap<String, LocalServe>> {
     hosts().lock().unwrap_or_else(|poison| poison.into_inner())
 }
@@ -544,7 +553,13 @@ fn launch_codex(
     }
 
     // As child-only `-c` arguments and environment.
-    let launch = host_profiles::codex(&provider, &name)?;
+    let mut launch = host_profiles::codex(&provider, &name)?;
+    let tools = super::agent_tools::inject::hosted(&name, "codex", &format!("Codex · {name}"));
+    if let Some(grant) = &tools {
+        let (args, env) = super::agent_tools::inject::codex(grant);
+        launch.args.extend(args);
+        launch.env.push(env);
+    }
     let expected = launch.expected.clone();
     let incarnation = uuid::Uuid::new_v4().to_string();
 
@@ -786,6 +801,10 @@ fn launch_codex(
 
     // Recorded only while the app is not quitting; otherwise torn down here.
     commit_host(host)?;
+    // Only a committed host keeps its token; a failed start revoked it.
+    if let Some(grant) = tools {
+        super::agent_tools::inject::hosted_started(&name, grant, adopted);
+    }
 
     Ok(ServeReport {
         device,

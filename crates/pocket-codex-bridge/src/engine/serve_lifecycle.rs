@@ -114,6 +114,9 @@ pub(in crate::engine) fn serve_stop_remembered_checked(
     check: &dyn Fn() -> Result<()>,
 ) -> Result<()> {
     let lease = host_lease::acquire_checked(name, Op::Stop, check)?;
+    // A second app on the hosting state runs nothing, so its stop could only
+    // change the first app's restore choices.
+    super::super::host_owner::require()?;
     if let Some(expected) = expected {
         if super::super::host_apply::active(lease.name())
             .is_none_or(|active| active.incarnation != expected)
@@ -190,6 +193,7 @@ pub fn serve_stop_all() -> Result<()> {
     }
     host_lease::close_admission();
     super::super::management::stop();
+    super::super::agent_tools::stop();
     super::super::serve_opencode::close_admission();
     super::super::serve_acp::stop_all();
     let mut left = Vec::new();
@@ -235,6 +239,7 @@ pub fn serve_stop_all() -> Result<()> {
 /// then kept in [`NATIVE`]).
 pub(super) fn stop_host_tasks(ls: LocalServe) -> bool {
     let owned = owned_of(&ls);
+    super::super::agent_tools::inject::hosted_stopped(&ls.name);
     // Awaited rather than dropped, so the relay releases all three keys NOW: an
     // immediate re-host under the same name would otherwise race registrations
     // this one abandoned but the relay still held.

@@ -13,6 +13,7 @@ import 'package:pocket_codex/src/quit_status.dart';
 import 'package:pocket_codex/src/router.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
+import 'package:pocket_codex/src/tools/tools_host.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
 import 'package:pocket_codex/src/widgets/popover.dart';
 import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
@@ -202,8 +203,9 @@ class _PocketCodexAppState extends ConsumerState<PocketCodexApp>
           );
         }
         // The light/dark switch captures this subtree; see ThemeTransition.
+        // Agents' share requests and new shares appear above every page.
         final page = ThemeTransitionHost(
-          child: child ?? const SizedBox.shrink(),
+          child: ToolsHost(child: child ?? const SizedBox.shrink()),
         );
         if (!DesktopTray.supported) return page;
         // A quit in progress, or one that could not stop every hosted

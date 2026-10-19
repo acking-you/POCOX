@@ -2,6 +2,7 @@
 //! separate from `api/` so it is unit-testable without flutter_rust_bridge.
 pub mod account;
 pub mod acp;
+pub mod agent_tools;
 pub mod app_session;
 pub mod claude_setup;
 pub mod codex_login;
@@ -12,6 +13,7 @@ pub mod host_apply;
 mod host_lease;
 pub mod host_lifecycle;
 mod host_names;
+pub mod host_owner;
 pub mod host_profiles;
 mod host_services;
 pub mod host_start;

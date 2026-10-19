@@ -7,6 +7,7 @@
 // ignore_for_file: argument_type_not_assignable
 
 import 'api/bridge.dart';
+import 'api/bridge/agent_tools.dart';
 import 'api/bridge/codex_setup.dart';
 import 'api/bridge/connection.dart';
 import 'api/bridge/device_management.dart';
@@ -58,6 +59,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_StreamSink_session_follow_update_dto_Sse(dynamic raw);
 
   @protected
+  RustStreamSink<ToolsUpdateDto> dco_decode_StreamSink_tools_update_dto_Sse(
+    dynamic raw,
+  );
+
+  @protected
   String dco_decode_String(dynamic raw);
 
   @protected
@@ -89,6 +95,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentCommandDto dco_decode_agent_command_dto(dynamic raw);
+
+  @protected
+  AgentToolsStatusDto dco_decode_agent_tools_status_dto(dynamic raw);
 
   @protected
   AppCapabilitiesDto dco_decode_app_capabilities_dto(dynamic raw);
@@ -165,6 +174,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThreadRuntimeConfigDto dco_decode_box_autoadd_thread_runtime_config_dto(
     dynamic raw,
   );
+
+  @protected
+  int dco_decode_box_autoadd_u_16(dynamic raw);
 
   @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
@@ -298,6 +310,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<ModelInfoDto> dco_decode_list_model_info_dto(dynamic raw);
 
   @protected
+  List<int> dco_decode_list_prim_u_16_loose(dynamic raw);
+
+  @protected
+  Uint16List dco_decode_list_prim_u_16_strict(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
@@ -327,6 +345,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThreadMetaDto> dco_decode_list_thread_meta_dto(dynamic raw);
+
+  @protected
+  List<ToolsConnectionDto> dco_decode_list_tools_connection_dto(dynamic raw);
+
+  @protected
+  List<ToolsConsentDto> dco_decode_list_tools_consent_dto(dynamic raw);
+
+  @protected
+  List<ToolsDeviceDto> dco_decode_list_tools_device_dto(dynamic raw);
+
+  @protected
+  List<ToolsPortDto> dco_decode_list_tools_port_dto(dynamic raw);
+
+  @protected
+  List<ToolsRefDto> dco_decode_list_tools_ref_dto(dynamic raw);
+
+  @protected
+  List<ToolsServiceDto> dco_decode_list_tools_service_dto(dynamic raw);
+
+  @protected
+  List<ToolsShareDto> dco_decode_list_tools_share_dto(dynamic raw);
+
+  @protected
+  List<ToolsTokenDto> dco_decode_list_tools_token_dto(dynamic raw);
 
   @protected
   List<TurnItemsPageDto> dco_decode_list_turn_items_page_dto(dynamic raw);
@@ -436,6 +478,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -501,6 +546,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThreadRuntimeConfigDto dco_decode_thread_runtime_config_dto(dynamic raw);
 
   @protected
+  ToolsConnectionDto dco_decode_tools_connection_dto(dynamic raw);
+
+  @protected
+  ToolsConsentDto dco_decode_tools_consent_dto(dynamic raw);
+
+  @protected
+  ToolsDeviceDto dco_decode_tools_device_dto(dynamic raw);
+
+  @protected
+  ToolsOverviewDto dco_decode_tools_overview_dto(dynamic raw);
+
+  @protected
+  ToolsOwnerDto dco_decode_tools_owner_dto(dynamic raw);
+
+  @protected
+  ToolsPortDto dco_decode_tools_port_dto(dynamic raw);
+
+  @protected
+  ToolsRefDto dco_decode_tools_ref_dto(dynamic raw);
+
+  @protected
+  ToolsServiceDto dco_decode_tools_service_dto(dynamic raw);
+
+  @protected
+  ToolsShareDto dco_decode_tools_share_dto(dynamic raw);
+
+  @protected
+  ToolsSharedDto dco_decode_tools_shared_dto(dynamic raw);
+
+  @protected
+  ToolsTokenDto dco_decode_tools_token_dto(dynamic raw);
+
+  @protected
+  ToolsUpdateDto dco_decode_tools_update_dto(dynamic raw);
+
+  @protected
   TurnItemsPageDto dco_decode_turn_items_page_dto(dynamic raw);
 
   @protected
@@ -549,6 +630,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<ToolsUpdateDto> sse_decode_StreamSink_tools_update_dto_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   String sse_decode_String(SseDeserializer deserializer);
 
   @protected
@@ -586,6 +672,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentCommandDto sse_decode_agent_command_dto(SseDeserializer deserializer);
+
+  @protected
+  AgentToolsStatusDto sse_decode_agent_tools_status_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   AppCapabilitiesDto sse_decode_app_capabilities_dto(
@@ -696,6 +787,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ThreadRuntimeConfigDto sse_decode_box_autoadd_thread_runtime_config_dto(
     SseDeserializer deserializer,
   );
+
+  @protected
+  int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -875,6 +969,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<int> sse_decode_list_prim_u_16_loose(SseDeserializer deserializer);
+
+  @protected
+  Uint16List sse_decode_list_prim_u_16_strict(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
@@ -912,6 +1012,44 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ThreadMetaDto> sse_decode_list_thread_meta_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsConnectionDto> sse_decode_list_tools_connection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsConsentDto> sse_decode_list_tools_consent_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsDeviceDto> sse_decode_list_tools_device_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsPortDto> sse_decode_list_tools_port_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsRefDto> sse_decode_list_tools_ref_dto(SseDeserializer deserializer);
+
+  @protected
+  List<ToolsServiceDto> sse_decode_list_tools_service_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsShareDto> sse_decode_list_tools_share_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ToolsTokenDto> sse_decode_list_tools_token_dto(
     SseDeserializer deserializer,
   );
 
@@ -1053,6 +1191,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
@@ -1132,6 +1273,44 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ToolsConnectionDto sse_decode_tools_connection_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ToolsConsentDto sse_decode_tools_consent_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsDeviceDto sse_decode_tools_device_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsOverviewDto sse_decode_tools_overview_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsOwnerDto sse_decode_tools_owner_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsPortDto sse_decode_tools_port_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsRefDto sse_decode_tools_ref_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsServiceDto sse_decode_tools_service_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsShareDto sse_decode_tools_share_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsSharedDto sse_decode_tools_shared_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsTokenDto sse_decode_tools_token_dto(SseDeserializer deserializer);
+
+  @protected
+  ToolsUpdateDto sse_decode_tools_update_dto(SseDeserializer deserializer);
+
+  @protected
   TurnItemsPageDto sse_decode_turn_items_page_dto(SseDeserializer deserializer);
 
   @protected
@@ -1189,6 +1368,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_StreamSink_tools_update_dto_Sse(
+    RustStreamSink<ToolsUpdateDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_String(String self, SseSerializer serializer);
 
   @protected
@@ -1242,6 +1427,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_agent_command_dto(
     AgentCommandDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_agent_tools_status_dto(
+    AgentToolsStatusDto self,
     SseSerializer serializer,
   );
 
@@ -1376,6 +1567,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ThreadRuntimeConfigDto self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
@@ -1594,6 +1788,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_u_16_loose(
+    List<int> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_prim_u_16_strict(
+    Uint16List self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
@@ -1641,6 +1847,54 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_thread_meta_dto(
     List<ThreadMetaDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_connection_dto(
+    List<ToolsConnectionDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_consent_dto(
+    List<ToolsConsentDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_device_dto(
+    List<ToolsDeviceDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_port_dto(
+    List<ToolsPortDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_ref_dto(
+    List<ToolsRefDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_service_dto(
+    List<ToolsServiceDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_share_dto(
+    List<ToolsShareDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_tools_token_dto(
+    List<ToolsTokenDto> self,
     SseSerializer serializer,
   );
 
@@ -1816,6 +2070,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
@@ -1917,6 +2174,63 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_thread_runtime_config_dto(
     ThreadRuntimeConfigDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_connection_dto(
+    ToolsConnectionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_consent_dto(
+    ToolsConsentDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_device_dto(
+    ToolsDeviceDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_overview_dto(
+    ToolsOverviewDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_owner_dto(ToolsOwnerDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tools_port_dto(ToolsPortDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tools_ref_dto(ToolsRefDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tools_service_dto(
+    ToolsServiceDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_share_dto(ToolsShareDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tools_shared_dto(
+    ToolsSharedDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tools_token_dto(ToolsTokenDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tools_update_dto(
+    ToolsUpdateDto self,
     SseSerializer serializer,
   );
 

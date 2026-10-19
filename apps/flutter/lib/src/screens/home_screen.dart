@@ -9,6 +9,7 @@ import 'package:pocket_codex/src/dismissed_services.dart';
 import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/hosting/host_restore.dart';
+import 'package:pocket_codex/src/hosting/hosting_owner.dart';
 import 'package:pocket_codex/src/managed/managed_providers.dart';
 import 'package:pocket_codex/src/motion.dart';
 import 'package:pocket_codex/src/providers.dart';
@@ -407,13 +408,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// (see [planHostRestore]). The bridge's restore overrides decide first; if
   /// they cannot be read nothing is restored (stale preferences could bring
   /// back a host stopped from another device) and the reason is kept for the
-  /// services page. True when at least one restore succeeded (discovery is
-  /// stale).
+  /// services page. Nothing is restored while another POCOX app hosts from
+  /// this computer's state: its hosts are its own. True when at least one
+  /// restore succeeded (discovery is stale).
   Future<bool> _restoreHosting(
     BridgeApi api, {
     required int gen,
     required bool background,
   }) async {
+    if (api.hostingOwnedElsewhere()) return false;
     final prefs = await _prefs();
     if (!mounted || gen != _generation) return false;
     List<HostRestoreOverride> overrides;
@@ -766,9 +769,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _hero(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final discoverFailed = _phase == _Phase.discoverFailed;
-    // Hosting from the hero mirrors the manage page's gate: desktop only.
+    // Hosting from the hero mirrors the manage page's gate: desktop only,
+    // and not while another POCOX app hosts from this computer's state.
     // Self-host and account mode publish the same way.
-    final canHost = isDesktop;
+    final elsewhere = isDesktop && ref.watch(hostingElsewhereProvider);
+    final canHost = isDesktop && !elsewhere;
     if (discoverFailed) {
       // What is wrong with the relay, in words, with the raw error folded
       // away; a desktop can still host here (it publishes once the relay
@@ -796,7 +801,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       );
     }
-    final hint = canHost
+    final hint = elsewhere
+        ? l10n.hostingElsewhere
+        : canHost
         ? l10n.homeNoServiceDesktopHint
         : l10n.homeNoServiceMobileHint;
     return Scaffold(
@@ -820,6 +827,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const SizedBox(height: 10),
                 Text(
                   hint,
+                  key: elsewhere ? const Key('hosting-elsewhere') : null,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),

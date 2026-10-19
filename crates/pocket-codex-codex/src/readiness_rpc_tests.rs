@@ -52,7 +52,7 @@ async fn adopted_server(answer_list: bool, wildcard: bool) -> Result<(), Startup
                 continue;
             }
             if method == "thread/list" && !answer_list {
-                std::future::pending::<()>().await;
+                break;
             }
             ws.send(Message::text(
                 json!({"id": request["id"], "result": {"data": []}}).to_string(),
@@ -60,7 +60,11 @@ async fn adopted_server(answer_list: bool, wildcard: bool) -> Result<(), Startup
             .await
             .expect("RPC response");
         }
-        ws
+        assert!(
+            matches!(ws.next().await, Some(Ok(Message::Close(_)))),
+            "probe must close even after an RPC timeout"
+        );
+        ws.flush().await.expect("close reply");
     });
     let report = SpawnReport {
         info: CodexProcessInfo {
@@ -83,11 +87,10 @@ async fn adopted_server(answer_list: bool, wildcard: bool) -> Result<(), Startup
     let result = tokio::task::spawn_blocking(move || verify_ready(&report, budget))
         .await
         .expect("readiness task");
-    if answer_list {
-        peer.await.expect("fake server completed");
-    } else {
-        peer.abort();
-    }
+    tokio::time::timeout(Duration::from_secs(2), peer)
+        .await
+        .expect("probe released peer")
+        .expect("fake server completed");
     result
 }
 

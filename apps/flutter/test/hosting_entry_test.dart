@@ -159,7 +159,12 @@ AppServeStatus? _edited(WidgetTester t) {
 }
 
 Future<void> _tap(WidgetTester t, String key) async {
-  await t.ensureVisible(find.byKey(Key(key)));
+  // Centred, so a page's floating title bar never covers the target.
+  await Scrollable.ensureVisible(
+    t.element(find.byKey(Key(key))),
+    alignment: 0.5,
+  );
+  await t.pump();
   await t.tap(find.byKey(Key(key)));
   await _frames(t);
 }

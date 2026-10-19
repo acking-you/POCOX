@@ -159,6 +159,7 @@ fn drop_owned_locked() {
     super::acp::context_changed();
     super::opencode::context_changed();
     super::meta::context_changed();
+    super::agent_tools::context_changed();
 }
 
 /// A resolution that read a configuration which has changed since.

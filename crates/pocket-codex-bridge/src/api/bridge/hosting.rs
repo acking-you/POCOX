@@ -240,6 +240,14 @@ pub fn acp_hosting_supported() -> bool {
     serve_acp::hosting_supported()
 }
 
+/// Whether another POCOX app on this computer owned its hosting state when
+/// this one started: this one then starts, restores and publishes nothing for
+/// its whole run.
+#[frb(sync)]
+pub fn hosting_owned_elsewhere() -> bool {
+    crate::engine::host_owner::owned_elsewhere()
+}
+
 /// The executable `program` resolves to (explicit path, `PATH`, then the
 /// preset's install locations), or `None`.
 pub fn acp_locate(program: String, profile_id: Option<String>) -> Option<String> {

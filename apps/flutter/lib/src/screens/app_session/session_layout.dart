@@ -1,8 +1,20 @@
 part of '../app_session_screen.dart';
 
 extension _SessionLayout on _AppSessionState {
+  /// Text another page added to this draft (the in-app browser's Send to
+  /// agent) appears in the composer after this frame.
+  void _showOutsideDraft() {
+    final draft = _draft;
+    if (draft.outside == _outsideSeen) return;
+    _outsideSeen = draft.outside;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && identical(_draft, draft)) _input.value = draft.value;
+    });
+  }
+
   Widget _buildSession(BuildContext context) {
     ref.watch(_composerDraftsProvider(widget.serviceKey));
+    _showOutsideDraft();
     ref.listen(uiPrefsProvider, (_, next) => _restoreLayout(next.valueOrNull));
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
