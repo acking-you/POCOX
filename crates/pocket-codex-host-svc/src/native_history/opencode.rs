@@ -23,28 +23,43 @@ pub struct OpenCodeHistory {
     path: PathBuf,
 }
 
-/// Where sessions are kept. OpenCode 2 moves them to `session_v2` when it
-/// opens a database and leaves the 1.x table behind, frozen at that moment.
+/// Where sessions are kept. OpenCode 2 copies them into `session_v2` when it
+/// opens a database and leaves the 1.x table behind; a session 1.x writes
+/// after that exists only there.
 #[derive(Clone, Copy)]
 enum Sessions {
     V1,
     V2,
+    Both,
 }
 
-/// One session query over either table; the columns it reads have the same
-/// names in both.
+/// One session query over the tables in use; the columns it reads have the
+/// same names in both.
 macro_rules! sessions {
     ($head:literal, $table:ident, $tail:literal) => {
         match $table {
             Sessions::V1 => concat!($head, " FROM session ", $tail),
             Sessions::V2 => concat!($head, " FROM session_v2 ", $tail),
+            Sessions::Both => concat!(
+                $head,
+                " FROM (SELECT id,directory,title,parent_id,time_created,time_updated,revert FROM \
+                 session_v2 UNION ALL SELECT \
+                 id,directory,title,parent_id,time_created,time_updated,revert FROM session WHERE \
+                 id NOT IN (SELECT id FROM session_v2)) ",
+                $tail
+            ),
         }
     };
 }
 
 impl Sessions {
     async fn detect(connection: &mut SqliteConnection) -> Result<Self> {
-        Ok(if table_exists(connection, "session_v2").await? { Self::V2 } else { Self::V1 })
+        let current = table_exists(connection, "session_v2").await?;
+        Ok(match (current, table_exists(connection, "session").await?) {
+            (true, true) => Self::Both,
+            (true, false) => Self::V2,
+            (false, _) => Self::V1,
+        })
     }
 }
 

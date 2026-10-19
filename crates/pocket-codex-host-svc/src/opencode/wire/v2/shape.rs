@@ -336,8 +336,8 @@ impl Form {
     }
 }
 
-/// One history item. Selection, location, system, shell, skill, compaction
-/// and idle markers have no 1.x conversation form and are skipped.
+/// One history item. Selection, location, system, shell, skill and
+/// compaction markers have no 1.x conversation form and are skipped.
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 #[allow(
@@ -347,8 +347,18 @@ impl Form {
 pub(super) enum Message {
     User(User),
     Assistant(Assistant),
+    Idle(Idle),
     #[serde(other)]
     Other,
+}
+
+/// The end of a run, with the error that ended it.
+#[derive(Deserialize)]
+pub(super) struct Idle {
+    id: String,
+    outcome: String,
+    error: Option<Error>,
+    time: Value,
 }
 
 #[derive(Deserialize)]
@@ -456,16 +466,20 @@ enum ToolContent {
 /// One newest-first page as 1.x messages, oldest first. V2 assistant
 /// messages name neither their prompt nor, on the prompt, its selection: each
 /// assistant takes the nearest earlier user message as its parent, and that
-/// user message takes the first reply's model and agent.
+/// user message takes the first reply's model and agent. A failed run's
+/// error goes to its latest reply, or becomes one when the run failed before
+/// answering, as 1.x records it.
 pub(super) fn history(session: &str, page: Vec<Message>) -> Vec<schema::Message> {
     let mut native = Vec::with_capacity(page.len());
     let mut parent: Option<String> = None;
     let mut unanswered: Option<usize> = None;
+    let mut reply: Option<usize> = None;
     for message in page.into_iter().rev() {
         match message {
             Message::User(user) => {
                 parent = Some(user.id.clone());
                 unanswered = Some(native.len());
+                reply = None;
                 native.push(user.into_native(session));
             },
             Message::Assistant(assistant) => {
@@ -474,9 +488,39 @@ pub(super) fn history(session: &str, page: Vec<Message>) -> Vec<schema::Message>
                     info["agent"] = assistant.agent.as_str().into();
                     info["model"] = assistant.model.native();
                 }
+                reply = Some(native.len());
                 native.push(assistant.into_native(session, parent.as_deref()));
             },
-            Message::Other => {},
+            Message::Idle(Idle {
+                id,
+                outcome,
+                error: Some(error),
+                time,
+            }) if outcome == "failed" => match reply {
+                Some(index) if native[index].info["error"].is_null() => {
+                    native[index].info["error"] = error.into_native();
+                },
+                Some(_) => {},
+                None => {
+                    reply = Some(native.len());
+                    let completed = time["created"].clone();
+                    let mut info = object([
+                        ("id", id.into()),
+                        ("sessionID", session.into()),
+                        ("role", "assistant".into()),
+                        ("parentID", parent.as_deref().into()),
+                        ("finish", "error".into()),
+                        ("error", error.into_native()),
+                        ("time", time),
+                    ]);
+                    info["time"]["completed"] = completed;
+                    native.push(schema::Message {
+                        info,
+                        parts: Vec::new(),
+                    });
+                },
+            },
+            Message::Idle(_) | Message::Other => {},
         }
     }
     native

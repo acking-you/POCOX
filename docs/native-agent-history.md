@@ -27,7 +27,7 @@ cannot tell.
 | Provider | Source | Boundaries |
 | --- | --- | --- |
 | Claude | The official `claude-agent-sdk` installed beside the selected ACP adapter; only `listSessions`, `getSessionInfo` and `getSessionMessages` | No SDK download during browsing. Canonical branch reconstruction belongs to the SDK. A changed selected transcript is read again; this is not an incremental index. Sources over 64 MiB are rejected; the credential-free reader has a 256 MiB heap and bounded time/output. |
-| OpenCode | Existing SQLite database under `OPENCODE_DB`, or `XDG_DATA_HOME/opencode/opencode.db` / the normal HOME data directory | Read-only connections and transactions, no creation, migrations or runtime import. Recognized `session_message` v2 and legacy `message` + `part` schemas only; sessions come from OpenCode 2's `session_v2` when it exists, else `session`. No disk-wide search for custom/channel databases. |
+| OpenCode | Existing SQLite database under `OPENCODE_DB`, or `XDG_DATA_HOME/opencode/opencode.db` / the normal HOME data directory | Read-only connections and transactions, no creation, migrations or runtime import. Recognized `session_message` v2 and legacy `message` + `part` schemas only; sessions come from OpenCode 2's `session_v2` when it exists, plus any 1.x `session` rows it did not copy. No disk-wide search for custom/channel databases. |
 
 Claude uses the effective `CLAUDE_CONFIG_DIR` or HOME. The independent
 desktop reader resolves this device's environment; a hosted reader uses
@@ -82,7 +82,7 @@ and the view follows its answer.
 | --- | --- | --- |
 | `external_running` | the named client is running a turn here | follows live; opens by itself when the host reports it free |
 | `external_idle` | the named client still has the session open; no turn runs | close it there; an idle native Claude client still holds the session until it really closes or exits |
-| `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown) | close or release it there, then **Check now** |
+| `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown). The holder is `opencode_service` when it is OpenCode 2's background server | close or release it there (`opencode service stop` for the background server), then **Check now** |
 | `pocket_host` | another Pocket host writes it | **Open in <host>** only when that host's service key is known |
 | `transition` | the session is changing hands | wait; never taken as free; a later free answer opens by itself only where the host keeps an admission (see `not_opened`) |
 | `host_stopped` | this host is not running | **Open host** for a local host |

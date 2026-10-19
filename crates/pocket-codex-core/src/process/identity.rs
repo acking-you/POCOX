@@ -1,6 +1,6 @@
 //! Read-only identity checks for external session owners.
 
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System, UpdateKind};
 
@@ -40,6 +40,18 @@ pub fn process_identity(pid: u32) -> Option<ProcessIdentity> {
     })
 }
 
+/// One live process's argument list, to recognize a known server by how it
+/// was started. Never its environment.
+pub fn process_arguments(pid: u32) -> Option<Vec<OsString>> {
+    let mut system = System::new();
+    system.refresh_processes_specifics(
+        ProcessesToUpdate::Some(&[Pid::from_u32(pid)]),
+        true,
+        ProcessRefreshKind::new().with_cmd(UpdateKind::Always),
+    );
+    Some(system.process(Pid::from_u32(pid))?.cmd().to_vec())
+}
+
 /// Whether the same live process still belongs to an unreplaced supervisor's
 /// process tree. Missing parents or changed creation times fail closed. This
 /// is an observation, not a permission to signal an arbitrary process.
@@ -72,6 +84,7 @@ mod tests {
     fn own_identity_is_stable_and_resolves_the_actual_image() {
         let first = process_identity(std::process::id()).expect("own identity");
         assert_eq!(first, process_identity(std::process::id()).expect("same process"));
+        assert_eq!(process_arguments(std::process::id()), Some(std::env::args_os().collect()));
         assert_eq!(
             first.executable,
             std::env::current_exe()

@@ -3174,6 +3174,13 @@ class AppLocalizationsZh extends AppLocalizations {
       'Pocket 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。';
 
   @override
+  String get accessOpenCodeServiceTitle => 'OpenCode 的后台服务打开了这个历史来源';
+
+  @override
+  String get accessOpenCodeServiceDetail =>
+      'OpenCode 2 的终端应用或 opencode run 退出后，它仍在运行。请用 opencode service stop 停止它，或让这个主机使用自己的历史，然后立即检查。';
+
+  @override
   String accessPocketHostTitle(String client) {
     return '$client 正在写入这个会话';
   }

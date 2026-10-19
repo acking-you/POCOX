@@ -8,7 +8,9 @@ use std::{
 };
 
 use anyhow::{ensure, Context, Result};
-use pocket_codex_core::process::{is_process_descendant, process_identity, process_start_time};
+use pocket_codex_core::process::{
+    is_process_descendant, process_arguments, process_identity, process_start_time,
+};
 
 use crate::process;
 
@@ -19,6 +21,9 @@ pub struct Holder {
     pub pid: u32,
     /// Creation time in Unix milliseconds.
     pub started_at: u64,
+    /// OpenCode 2's background server (`opencode serve --service`), which its
+    /// own clients start and leave running. It changes only the explanation.
+    pub background_server: bool,
 }
 
 /// Fresh source admission. Neither an unfinished message nor quiet history
@@ -169,6 +174,8 @@ fn classify(pids: &BTreeSet<u32>, root: u32, started: u64) -> Evidence {
             external.push(Holder {
                 pid,
                 started_at: identity.started.saturating_mul(1000),
+                background_server: process_arguments(pid)
+                    .is_some_and(|args| background_server(&args)),
             });
         }
     }
@@ -179,6 +186,12 @@ fn classify(pids: &BTreeSet<u32>, root: u32, started: u64) -> Evidence {
     } else {
         Evidence::External(external)
     }
+}
+
+fn background_server(args: &[std::ffi::OsString]) -> bool {
+    args.windows(2)
+        .skip(1)
+        .any(|pair| pair[0] == "serve" && pair[1] == "--service")
 }
 
 /// Require an unchanged source before restoring previously retained windows.

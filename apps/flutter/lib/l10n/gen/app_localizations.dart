@@ -5882,6 +5882,18 @@ abstract class AppLocalizations {
   /// **'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.'**
   String get accessSourceOpenDetail;
 
+  /// No description provided for @accessOpenCodeServiceTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server has this history open'**
+  String get accessOpenCodeServiceTitle;
+
+  /// No description provided for @accessOpenCodeServiceDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.'**
+  String get accessOpenCodeServiceDetail;
+
   /// No description provided for @accessPocketHostTitle.
   ///
   /// In en, this message translates to:

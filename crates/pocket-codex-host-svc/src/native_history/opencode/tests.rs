@@ -215,10 +215,11 @@ async fn orphan_prefix_remains_pageable_and_revert_invalidates_windows() {
 }
 
 #[tokio::test]
-async fn opencode_2_sessions_and_rows_replace_the_frozen_1x_table() {
+async fn opencode_2_rows_and_sessions_beside_the_frozen_1x_table() {
     let temp = TempDir::new().expect("temp");
     let path = temp.path().join("opencode.db");
-    // An upgraded database: 2.x keeps the 1.x table, frozen at the upgrade.
+    // An upgraded database: 2.x copied what it found into `session_v2`; the
+    // fixture's session in the 1.x table was written by 1.x afterwards.
     let mut db = database(&path).await;
     sqlx::query(
         "CREATE TABLE session_v2 (id TEXT PRIMARY KEY,directory TEXT,title TEXT,parent_id \
@@ -231,14 +232,19 @@ async fn opencode_2_sessions_and_rows_replace_the_frozen_1x_table() {
         .execute(&mut db)
         .await
         .expect("2.x session");
-    let image = json!({"data":"AA==","mime":"image/png","source":{"type":"inline"}});
+    let inline = json!({"data":"AA==","mime":"image/png","source":{"type":"inline"}});
+    let path_file = json!({"data":"AA==","mime":"image/png",
+        "source":{"type":"uri","uri":"file:///private.png"}});
     let output = json!({"output":"listing","cursor":7,"size":7,"truncated":false});
+    let failed = |message: &str| json!({"outcome":"failed","error":{"message":message}});
     for (seq, kind, data) in [
-        (1, "user", json!({"text":"look","files":[image]})),
+        (1, "user", json!({"text":"look","files":[inline, path_file]})),
         (2, "location-switched", json!({"location":{"directory":"/new"}})),
         (3, "shell", json!({"shellID":"sh_1","command":"ls","status":"exited","output":output})),
-        (4, "assistant", json!({"content":[{"type":"text","text":"seen"}]})),
-        (5, "idle", json!({"outcome":"succeeded"})),
+        (4, "assistant", json!({"content":[],"error":{"message":"refused"}})),
+        (5, "idle", failed("refused")),
+        (6, "user", json!({"text":"again"})),
+        (7, "idle", failed("resume limit")),
     ] {
         sqlx::query("INSERT INTO session_message VALUES (?,'ses_new',?,?,?)")
             .bind(format!("msg_new{seq}"))
@@ -252,14 +258,23 @@ async fn opencode_2_sessions_and_rows_replace_the_frozen_1x_table() {
     db.close().await.expect("close");
     let source = OpenCodeHistory::new(path).expect("source");
     let list = source.list_sessions(None, 20).await.expect("list");
-    assert_eq!(list["sessions"].as_array().map(Vec::len), Some(1));
-    assert_eq!(list["sessions"][0]["sessionId"], "ses_new");
+    let ids: Vec<_> = list["sessions"]
+        .as_array()
+        .expect("rows")
+        .iter()
+        .map(|row| row["sessionId"].as_str())
+        .collect();
+    assert_eq!(ids, [Some("ses_new"), Some(SESSION)]);
+    assert!(source.read_page(SESSION, None, 20).await.is_ok(), "a 1.x-only session opens");
     let page = source.read_page("ses_new", None, 20).await.expect("page");
-    assert!(!page.truncated, "markers are not unsupported content");
-    let items = &page.turns[0].items;
-    assert_eq!(items[0].images, ["data:image/png;base64,AA=="]);
-    assert_eq!((items[1].title.as_str(), items[1].text.as_str()), ("ls", "listing"));
-    assert_eq!(items[1].tool.as_ref().map(|t| t.status.as_str()), Some("completed"));
-    assert_eq!(items[2].text, "seen");
-    assert_eq!(items.len(), 3);
+    let first = &page.turns[0].items;
+    assert_eq!(first[0].images, ["data:image/png;base64,AA=="], "a path's bytes stay unread");
+    assert!(first[0].omitted.contains(&"attachments".to_owned()));
+    assert_eq!((first[1].title.as_str(), first[1].text.as_str()), ("ls", "listing"));
+    assert_eq!(first[1].tool.as_ref().map(|t| t.status.as_str()), Some("completed"));
+    let texts = |items: &[crate::acp::fold::Item]| -> Vec<String> {
+        items[1..].iter().map(|item| item.text.clone()).collect()
+    };
+    assert_eq!(texts(first)[1..], ["refused"], "one error, not one per marker");
+    assert_eq!(texts(&page.turns[1].items), ["resume limit"]);
 }

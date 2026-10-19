@@ -195,13 +195,13 @@ async fn native_gateway_original_admission_and_closed_mutation_routes() {
         api,
         host::{Host, Snapshot},
     };
-    use tokio::io::AsyncReadExt;
+    use tokio::io::AsyncBufReadExt;
 
     let root = tempfile::tempdir().expect("disposable source");
-    let server = Server::start(&fixture(root.path()))
-        .await
-        .expect("native start");
+    let launch = fixture(root.path());
+    let server = Server::start(&launch).await.expect("native start");
     let database = server.detection.database.clone();
+    let v2 = server.detection.version.starts_with("2.");
     let host = Host::new(server).await.expect("host stream ready");
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
         .await
@@ -307,23 +307,34 @@ async fn native_gateway_original_admission_and_closed_mutation_routes() {
         .expect("access");
     assert_eq!(released["reason"], "released_here");
 
+    // 2.x's own clients leave its background server holding the history; its
+    // port is the fixture's own. 1.x has none, so an outside reader stands in.
+    let (program, args, ready) = if v2 {
+        let args = ["serve", "--service", "--port", "0"]
+            .map(String::from)
+            .to_vec();
+        (launch.program.clone(), args, "server listening on")
+    } else {
+        let args = vec!["-c".into(), OUTSIDE_READER.into(), database.display().to_string()];
+        (PathBuf::from("/usr/bin/python3"), args, "ready")
+    };
     let process::Spawned {
         mut process,
         stdin,
-        mut stdout,
-    } = process::spawn(
-        std::path::Path::new("/usr/bin/python3"),
-        &["-c".into(), OUTSIDE_READER.into(), database.display().to_string()],
-        None,
-        &[],
-    )
-    .expect("isolated outside reader");
+        stdout,
+    } = process::spawn(&program, &args, None, &launch.env).expect("isolated outside holder");
     drop(stdin);
-    let mut ready = [0; 6];
-    tokio::time::timeout(Duration::from_secs(10), stdout.read_exact(&mut ready))
-        .await
-        .expect("fixture deadline")
-        .expect("fixture ready");
+    let mut lines = tokio::io::BufReader::new(stdout).lines();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while let Some(line) = lines.next_line().await.expect("holder output") {
+            if line.contains(ready) {
+                return;
+            }
+        }
+        panic!("the outside holder exited before it was ready");
+    })
+    .await
+    .expect("fixture deadline");
     let followed: Snapshot = http
         .post(format!("{origin}/opencode/v1/open"))
         .json(&mutation)
@@ -336,6 +347,8 @@ async fn native_gateway_original_admission_and_closed_mutation_routes() {
         .await
         .expect("follow snapshot");
     assert_eq!(followed.access.reason, "external_source_open");
+    let holder = followed.access.holder.as_ref().map(|h| h.client.as_str());
+    assert_eq!(holder, Some(if v2 { "opencode_service" } else { "unknown" }));
     assert_eq!(followed.access.turn, "unknown");
     assert_eq!(followed.access.mode, "follow");
     let mut rename = mutation.clone();

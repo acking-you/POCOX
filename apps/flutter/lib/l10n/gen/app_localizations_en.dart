@@ -3357,6 +3357,14 @@ class AppLocalizationsEn extends AppLocalizations {
       'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.';
 
   @override
+  String get accessOpenCodeServiceTitle =>
+      'OpenCode\'s background server has this history open';
+
+  @override
+  String get accessOpenCodeServiceDetail =>
+      'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.';
+
+  @override
   String accessPocketHostTitle(String client) {
     return '$client is writing this session';
   }

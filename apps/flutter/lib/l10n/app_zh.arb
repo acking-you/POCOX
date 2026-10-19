@@ -1097,6 +1097,8 @@
   "accessExternalIdleDetail": "没有正在运行的回合。请在那里关闭会话，然后重新检查。",
   "accessSourceOpenTitle": "另一个 OpenCode 进程打开了这个历史来源",
   "accessSourceOpenDetail": "Pocket 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。",
+  "accessOpenCodeServiceTitle": "OpenCode 的后台服务打开了这个历史来源",
+  "accessOpenCodeServiceDetail": "OpenCode 2 的终端应用或 opencode run 退出后，它仍在运行。请用 opencode service stop 停止它，或让这个主机使用自己的历史，然后立即检查。",
   "accessPocketHostTitle": "{client} 正在写入这个会话",
   "accessPocketHostRunning": "它正在运行一个回合。",
   "accessPocketHostIdle": "那里没有正在运行的回合，但它仍持有这个会话。",

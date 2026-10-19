@@ -45,6 +45,15 @@ file as 1.x and, on first open, copies every session into `session_v2` and
 `session_message`, leaving the 1.x tables frozen, so Local sessions reads
 `session_v2` whenever it exists.
 
+OpenCode 2's terminal app, `opencode run` and desktop app share one
+background server (`opencode serve --service`) that keeps running after they
+exit. It holds the shared history open, so a host on that history follows
+its sessions read-only (`external_source_open`) while it runs. The access
+names it (holder `opencode_service`, from its arguments) and says to stop it
+with `opencode service stop` or to give the host its own history. Writing
+through that server instead would continue sessions its other clients may
+hold, which waits for session takeover (AGENTS.md item 35).
+
 Not covered on 2.x yet: token-by-token text (replies appear at text and
 tool boundaries), and forms with number, boolean or external fields (they
 can only be rejected).

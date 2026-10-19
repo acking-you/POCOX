@@ -109,8 +109,15 @@ fn history_is_oldest_first_with_turns_and_their_selection() {
                  "state":{"status":"completed","input":{"command":"ls"},
                     "content":[{"type":"text","text":"file"}]}}]})
     };
+    let failed = |id: &str, message: &str| {
+        json!({"type":"idle","id":id,"outcome":"failed","time":{"created":9},
+            "error":{"type":"unknown","message":message}})
+    };
     let mut page: shape::Page<shape::Message> = serde_json::from_value(json!({
         "data":[
+            failed("msg_8", "resume limit"),
+            {"type":"user","id":"msg_7","text":"Third","time":{"created":7}},
+            failed("msg_6", "boom"),
             assistant("msg_5", "plan"),
             {"type":"user","id":"msg_4","text":"Second","time":{"created":4}},
             {"type":"agent-switched","id":"msg_3","agent":"plan","time":{"created":3}},
@@ -128,7 +135,14 @@ fn history_is_oldest_first_with_turns_and_their_selection() {
         .map(public::message)
         .collect();
     let ids: Vec<_> = history.iter().map(|m| m.info["id"].as_str()).collect();
-    assert_eq!(ids, [Some("msg_1"), Some("msg_2"), Some("msg_4"), Some("msg_5")]);
+    assert_eq!(ids, ["msg_1", "msg_2", "msg_4", "msg_5", "msg_7", "msg_8"].map(Some));
+    // A failed run's error reaches its reply, or is one when nothing answered.
+    assert!(history[1].info["error"].is_null() && !history[3].info["error"].is_null());
+    assert_eq!(
+        (&history[5].info["role"], &history[5].info["parentID"]),
+        (&json!("assistant"), &json!("msg_7"))
+    );
+    assert!(!history[5].info["error"].is_null());
     assert_eq!(history[1].info["parentID"], "msg_1");
     assert_eq!(history[3].info["parentID"], "msg_4");
     assert_eq!(history[0].info["agent"], "build");

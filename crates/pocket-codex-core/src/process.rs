@@ -11,7 +11,7 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System,
 use tracing::warn;
 
 mod identity;
-pub use identity::{is_process_descendant, process_identity, ProcessIdentity};
+pub use identity::{is_process_descendant, process_arguments, process_identity, ProcessIdentity};
 
 /// Refresh and return the status of a single process, `None` when no such
 /// process exists. Shared lookup behind [`pid_alive`] / [`pid_running`] so

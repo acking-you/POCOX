@@ -59,6 +59,7 @@ AccessView accessView(
   final recheck = access?.recheck ?? false;
   final running = access?.running ?? false;
   final agent = providerName.isEmpty ? l10n.accessClientOther : providerName;
+  final service = access?.holder?.client == 'opencode_service';
   return switch (reason) {
     'owned' || 'released' => (
       status: l10n.accessStatusOpening,
@@ -118,8 +119,12 @@ AccessView accessView(
     ),
     'external_source_open' => (
       status: l10n.sessionInUseElsewhere,
-      title: l10n.accessSourceOpenTitle,
-      detail: l10n.accessSourceOpenDetail,
+      title: service
+          ? l10n.accessOpenCodeServiceTitle
+          : l10n.accessSourceOpenTitle,
+      detail: service
+          ? l10n.accessOpenCodeServiceDetail
+          : l10n.accessSourceOpenDetail,
       next: null,
       icon: AppIcons.folder_shared_outlined,
       tone: AccessTone.waiting,

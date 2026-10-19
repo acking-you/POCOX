@@ -1302,6 +1302,8 @@
   "accessExternalIdleDetail": "No turn is running. Close the session there, then check again.",
   "accessSourceOpenTitle": "Another OpenCode process has this history source open",
   "accessSourceOpenDetail": "Pocket cannot tell which session or turn it writes. Close or release it there, then check now.",
+  "accessOpenCodeServiceTitle": "OpenCode's background server has this history open",
+  "accessOpenCodeServiceDetail": "OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.",
   "accessPocketHostTitle": "{client} is writing this session",
   "@accessPocketHostTitle": {"placeholders": {"client": {"type": "String"}}},
   "accessPocketHostRunning": "It is running a turn now.",

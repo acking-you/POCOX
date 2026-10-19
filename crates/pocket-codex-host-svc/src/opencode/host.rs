@@ -365,8 +365,15 @@ impl Host {
             Evidence::External(holders) => {
                 access.reason = "external_source_open".into();
                 access.writer = "native_client".into();
-                access.holder = holders.first().map(|holder| AccessHolder {
-                    client: "unknown".into(),
+                // Name OpenCode 2's background server when it is one of them:
+                // it outlives the client that started it.
+                let holder = holders
+                    .iter()
+                    .find(|holder| holder.background_server)
+                    .or(holders.first());
+                access.holder = holder.map(|holder| AccessHolder {
+                    client: if holder.background_server { "opencode_service" } else { "unknown" }
+                        .into(),
                     pid: Some(holder.pid),
                     started_at: i64::try_from(holder.started_at).ok(),
                     host_name: None,

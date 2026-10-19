@@ -64,6 +64,7 @@ fn files(item: &mut Item, values: &Value) {
 }
 
 /// A stored image as a bounded data URL: 1.x keeps the URL, 2.x the bytes.
+/// 2.x also keeps the bytes of a path attachment, which stay unread.
 fn image(file: &Value) -> Option<String> {
     if let Some(url) = file["url"].as_str() {
         let mime = url.strip_prefix("data:")?.split_once(";base64,")?.0;
@@ -71,7 +72,9 @@ fn image(file: &Value) -> Option<String> {
     }
     let mime = file["mime"].as_str()?;
     let data = file["data"].as_str()?;
-    (IMAGES.contains(&mime) && data.len() + mime.len() + 13 <= MAX_IMAGE_URL)
+    (file["source"]["type"] == "inline"
+        && IMAGES.contains(&mime)
+        && data.len() + mime.len() + 13 <= MAX_IMAGE_URL)
         .then(|| format!("data:{mime};base64,{data}"))
 }
 
@@ -198,7 +201,14 @@ fn project(message: &Message) -> Vec<Item> {
         },
         "compaction" => vec![item(id, ItemKind::AgentMessage, "[Earlier context compacted]")],
         "system" | "synthetic" => vec![],
-        "agent-switched" | "model-switched" | "location-switched" | "idle" => vec![],
+        // A run can fail outside a reply; then only its end marker says why.
+        "idle" => match data["error"]["message"].as_str() {
+            Some(error) if data["outcome"] == "failed" => {
+                vec![item(id, ItemKind::AgentMessage, error)]
+            },
+            _ => vec![],
+        },
+        "agent-switched" | "model-switched" | "location-switched" => vec![],
         _ => {
             let mut result = item(id, ItemKind::AgentMessage, "");
             omit(&mut result, "unsupported message");
@@ -224,6 +234,11 @@ pub(super) fn turns(messages: Vec<Message>) -> (Vec<Turn>, bool) {
         }
         if let Some(turn) = turns.last_mut() {
             for item in items {
+                // A failed reply already shows the error its end marker repeats.
+                if message.kind == "idle" && turn.items.iter().any(|known| known.text == item.text)
+                {
+                    continue;
+                }
                 truncated |= item.truncated;
                 if turn.items.len() < 4000 {
                     turn.items.push(item);
