@@ -123,15 +123,19 @@ async fn resume_into(app_ws_addr: SocketAddr, thread_id: &str) -> Result<()> {
     let (client, _events) = AppClient::connect(&ws_url)
         .await
         .context("connecting colocated app-server")?;
-    client
-        .initialize("pocket-codex-host-svc", true)
-        .await
-        .context("app-server initialize")?;
-    client
-        .request("thread/resume", json!({ "threadId": thread_id, "excludeTurns": true }))
-        .await
-        .context("thread/resume")?;
-    Ok(())
+    let result = async {
+        client
+            .initialize("pocket-codex-host-svc", true)
+            .await
+            .context("app-server initialize")?;
+        client
+            .request("thread/resume", json!({ "threadId": thread_id, "excludeTurns": true }))
+            .await
+            .context("thread/resume")
+    }
+    .await;
+    client.close().await;
+    result.map(drop)
 }
 
 #[cfg(test)]

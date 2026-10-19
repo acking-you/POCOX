@@ -298,3 +298,59 @@ async fn rpc_errors_preserve_a_working_connection() {
     let _server = peer.await.expect("test operation");
     assert!(client.is_alive());
 }
+
+/// WARN events on the calling thread. The subscriber is process-wide because
+/// tracing caches callsite interest across threads: a scoped one misses events
+/// whose callsite another test thread registered first.
+fn warnings_here() -> usize {
+    use std::{collections::HashMap, sync::OnceLock, thread::ThreadId};
+
+    use tracing_subscriber::layer::SubscriberExt as _;
+
+    type Counts = StdMutex<HashMap<ThreadId, usize>>;
+    fn counts() -> std::sync::MutexGuard<'static, HashMap<ThreadId, usize>> {
+        static COUNTS: OnceLock<Counts> = OnceLock::new();
+        COUNTS.get_or_init(Default::default).lock().expect("counts")
+    }
+    struct CountWarnings;
+    impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for CountWarnings {
+        fn on_event(&self, _: &tracing::Event<'_>, _: tracing_subscriber::layer::Context<'_, S>) {
+            *counts().entry(std::thread::current().id()).or_default() += 1;
+        }
+    }
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let subscriber = tracing_subscriber::registry()
+            .with(tracing_subscriber::filter::LevelFilter::WARN)
+            .with(CountWarnings);
+        tracing::subscriber::set_global_default(subscriber).expect("test subscriber");
+    });
+    counts()
+        .get(&std::thread::current().id())
+        .copied()
+        .unwrap_or(0)
+}
+
+// The current-thread test runtime runs the client's reader on this thread.
+#[tokio::test]
+async fn own_close_answered_by_a_dropped_stream_is_not_a_failure() {
+    let before = warnings_here();
+    // Upstream app-server ends its connection on reading a Close frame without
+    // echoing one, so a probe's close completes with a bare end of stream.
+    let (client, _inbound, mut server) = connection().await;
+    let peer = tokio::spawn(async move {
+        assert!(matches!(server.next().await, Some(Ok(WsMessage::Close(_)))));
+    });
+    client.close().await;
+    peer.await.expect("peer");
+    assert_eq!(warnings_here(), before);
+
+    // A peer dropping a live connection is still reported.
+    let (_client, mut inbound, server) = connection().await;
+    drop(server);
+    assert!(tokio::time::timeout(Duration::from_secs(1), inbound.recv())
+        .await
+        .expect("reader ended")
+        .is_none());
+    assert_eq!(warnings_here(), before + 1);
+}

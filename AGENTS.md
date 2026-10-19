@@ -1497,7 +1497,9 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
   and [pagination state tests](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/packages/client-runtime/src/state/threads-pagination.test.ts).
 
 41. **Harness connection lifecycle (2026-10-18).** Temporary probes own and
-    await their SDK connections; Codex probes close their WebSocket handshake.
+    await their SDK connections; Codex probes close their WebSocket handshake
+    (the app-server ends the stream without echoing Close; that completes the
+    probe's own close and is not logged as a reset).
     Publishers reclaim idle app/OpenCode streams after 90s and ACP/meta/host
     streams after 180s, with activity in either direction renewing the deadline.
     Keep generic port and Responses API timeouts unchanged. Local descriptor

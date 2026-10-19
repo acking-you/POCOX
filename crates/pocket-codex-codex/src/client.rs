@@ -107,6 +107,14 @@ impl AppClient {
     /// its workers. Cancellation or an unresponsive peer still drops both
     /// tasks.
     pub async fn close(mut self) {
+        // The app-server answers a Close frame by ending the connection without
+        // echoing one (upstream `run_websocket_inbound_loop` stops on Close),
+        // which tungstenite reports as a reset. However the peer ends it now,
+        // the connection closed because this side asked, not because it failed.
+        self.close_reason
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get_or_insert_with(|| "closed by this client".into());
         let closing = async {
             let _ = self.sink.lock().await.close().await;
             let _ = (&mut self.reader).await;

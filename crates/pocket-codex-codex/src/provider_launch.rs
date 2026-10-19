@@ -290,14 +290,17 @@ pub async fn read_effective_config(
         tokio::time::timeout_at(deadline, crate::client::AppClient::connect(ws_url))
             .await
             .context("config check: websocket connect timed out")??;
-    tokio::time::timeout_at(deadline, client.initialize("pocket-codex", true))
-        .await
-        .context("config check: initialize timed out")??;
-    let mut response =
+    let response = async {
+        tokio::time::timeout_at(deadline, client.initialize("pocket-codex", true))
+            .await
+            .context("config check: initialize timed out")??;
         tokio::time::timeout_at(deadline, client.request("config/read", serde_json::json!({})))
             .await
-            .context("config check: config/read timed out")??;
-    Ok(response
+            .context("config check: config/read timed out")?
+    }
+    .await;
+    client.close().await;
+    Ok(response?
         .get_mut("config")
         .map(serde_json::Value::take)
         .unwrap_or_default())

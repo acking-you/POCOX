@@ -30,6 +30,11 @@ it on errors, and normal completion calls `stop()` and waits for its listener
 and streams. Probe handles never share ownership with live session tunnels.
 Codex probes send a WebSocket close frame on success and RPC failure and allow
 one additional second for the handshake. Drop remains the cancellation fallback.
+The app-server ends the connection on reading that frame without echoing one
+(upstream `run_websocket_inbound_loop`), which the WebSocket library reports as
+a reset. `AppClient::close` records the close as its own first, so the 15-second
+watchdog probes log nothing; a reset of a connection this side did not close is
+still reported.
 
 The publisher is also responsible for reclaiming abandoned streams, even when
 the controller has not been upgraded. `Client::register_with_idle_timeout` in
