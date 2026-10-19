@@ -13,6 +13,13 @@
 //! every item event names its turn, so a late completion can never end or
 //! regroup a newer turn.
 //!
+//! A user message — a turn's prompt, a supplement — is announced live with
+//! its sender as the host names it (`clientId`, see [`sender`]): the view
+//! that sent it keeps its own copy, and every other view (another device, a
+//! direct gateway call, a turn the agent started) shows the host's item. A
+//! recovery announces only a prompt whose sender it knows (a turn the agent
+//! started); the screen's history read shows the others.
+//!
 //! Content the host could not keep (an oversized image, diff or input) or
 //! that this controller could not read (`unavailable`) appears as a
 //! `contentOmitted` item next to where it belongs, never as silence. A
@@ -412,51 +419,45 @@ fn delta_event(thread: &str, item: &ThreadItem, delta: String) -> AppEvent {
 }
 
 /// Full-text events for a fold rebuilt from history while its turn runs:
-/// each replaces what the UI shows for that item.
-pub fn recovered(thread: &str, turn: &Turn, agent_started: bool) -> Vec<AppEvent> {
-    let mut out: Vec<AppEvent> = turn_items(turn)
-        .into_iter()
-        // A view holds its own copy of a prompt it sent; a turn the agent
-        // started has none, so its messages come from the fold.
-        .filter(|mapped| agent_started || mapped.item_type != "userMessage")
-        .map(|mapped| {
-            // A reasoning or reply that another item follows has ended.
-            let followed = |at: usize| at + 1 < turn.items.len();
-            let done = mapped.item_type == "historyGap"
-                || mapped.item_type == CONTENT_OMITTED
-                || turn
-                    .items
-                    .iter()
-                    .position(|item| item.id == mapped.id)
-                    .is_some_and(|at| {
-                        let item = &turn.items[at];
-                        item.kind == ItemKind::Plan
-                            || tool_done(item)
-                            || (is_message(item) && followed(at))
-                    });
-            let kind = if done || mapped.item_type == "userMessage" {
-                "item/completed"
-            } else {
-                "item/started"
-            };
-            item_event(kind, thread, &mapped, Some(mapped.text.clone()))
-        })
-        .collect();
+/// each replaces what the UI shows for that item. Its prompt comes too when
+/// its sender is known (`prompt_sender`, see [`sender`]); a recovery cannot
+/// tell who sent a supplement, so supplements are left to the screen's
+/// history read.
+pub fn recovered(thread: &str, turn: &Turn, prompt_sender: Option<&Value>) -> Vec<AppEvent> {
+    let prompt_id = format!("{}:u", turn.id);
+    let mut out = Vec::new();
+    if let (Some(sender), Some(prompt)) =
+        (prompt_sender, turn.items.iter().find(|item| item.id == prompt_id))
+    {
+        let item = app_item(prompt, &turn.id);
+        let shown = item_event("item/completed", thread, &item, Some(item.text.clone()));
+        out.extend(sent_by(vec![shown], sender));
+    }
+    out.extend(
+        turn_items(turn)
+            .into_iter()
+            .filter(|mapped| mapped.item_type != "userMessage")
+            .map(|mapped| {
+                // A reasoning or reply that another item follows has ended.
+                let followed = |at: usize| at + 1 < turn.items.len();
+                let done = mapped.item_type == "historyGap"
+                    || mapped.item_type == CONTENT_OMITTED
+                    || turn
+                        .items
+                        .iter()
+                        .position(|item| item.id == mapped.id)
+                        .is_some_and(|at| {
+                            let item = &turn.items[at];
+                            item.kind == ItemKind::Plan
+                                || tool_done(item)
+                                || (is_message(item) && followed(at))
+                        });
+                let kind = if done { "item/completed" } else { "item/started" };
+                item_event(kind, thread, &mapped, Some(mapped.text.clone()))
+            }),
+    );
     out.extend(cleared_notices(thread, turn));
-    if agent_started {
-        mark_agent_started(&mut out);
-    }
     out
-}
-
-/// Mark `events` as belonging to a turn the agent started by itself.
-fn mark_agent_started(events: &mut [AppEvent]) {
-    for event in events {
-        if let Ok(mut raw) = serde_json::from_str::<Value>(&event.raw) {
-            raw["agentStarted"] = Value::Bool(true);
-            event.raw = raw.to_string();
-        }
-    }
 }
 
 /// Completion events for a turn that ended: every retained item with its
@@ -505,7 +506,9 @@ pub fn finished(
     out
 }
 
-/// Install `turn`'s fold from a history answer and announce it.
+/// Install `turn`'s fold from a history answer and announce it: the
+/// message too, for a turn whose start named its sender but could not be
+/// folded (see [`gateway_event`]).
 pub fn install(shared: &mut Shared, thread: &str, turn: &str, history: &Value) -> Vec<AppEvent> {
     if !shared.live.install(thread, history) {
         return Vec::new();
@@ -515,10 +518,14 @@ pub fn install(shared: &mut Shared, thread: &str, turn: &str, history: &Value) -
     }
     let agent_started = history["session"]["runningTurnId"] == turn
         && history["session"]["runningAgentStarted"] == true;
+    let sender = shared
+        .senders
+        .remove(&(thread.to_string(), turn.to_string()))
+        .or_else(|| agent_started.then_some(Value::Null));
     shared
         .live
         .turn(thread, turn)
-        .map(|fold| recovered(thread, fold, agent_started))
+        .map(|fold| recovered(thread, fold, sender.as_ref()))
         .unwrap_or_default()
 }
 
@@ -589,13 +596,46 @@ fn settled(shared: &Shared, thread: &str, turn: &str, changes: &[Change]) -> Vec
         .collect()
 }
 
-fn turn_started(thread: &str, turn: &str, agent_started: bool) -> AppEvent {
-    event(
-        "turn/started",
-        Some(thread),
-        json!({"threadId": thread, "turnId": turn, "turn": {"id": turn, "status": "inProgress"},
-               "agentStarted": agent_started}),
-    )
+/// `turn/started`, naming who sent the turn's message when the host said
+/// (see [`sender`]).
+fn turn_started(thread: &str, turn: &str, sender: Option<&Value>) -> AppEvent {
+    let mut raw = json!({"threadId": thread, "turnId": turn,
+                         "turn": {"id": turn, "status": "inProgress"}});
+    if let Some(sender) = sender {
+        raw["clientId"] = sender.clone();
+    }
+    event("turn/started", Some(thread), raw)
+}
+
+/// Who sent the message of a `turn_started` or `supplement` body, as the
+/// host names it: the `clientId` its sending view chose, `null` when none
+/// did (another device's older bridge, or a turn the agent started by
+/// itself), or `None` when the host does not say (an older host). The
+/// view whose id it is shows its own copy; every other view shows the
+/// host's item. A host without the field leaves the message to the view
+/// that sent it (others see it on their next history read).
+fn sender(body: &Value) -> Option<Value> {
+    match body.get("clientId") {
+        Some(id) => Some(id.clone()),
+        // A host from before `clientId` still marked the turns no view
+        // sent.
+        None if body["agentStarted"] == true => Some(Value::Null),
+        None => None,
+    }
+}
+
+/// `events` (a message's items) naming its `sender`.
+fn sent_by(events: Vec<AppEvent>, sender: &Value) -> Vec<AppEvent> {
+    events
+        .into_iter()
+        .map(|mut event| {
+            if let Ok(mut raw) = serde_json::from_str::<Value>(&event.raw) {
+                raw["clientId"] = sender.clone();
+                event.raw = raw.to_string();
+            }
+            event
+        })
+        .collect()
 }
 
 /// The request event for a pending permission body.
@@ -685,23 +725,35 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
         "turn_started" => {
             shared.running.insert(thread.clone(), turn.clone());
             let folded = shared.live.apply(body);
-            let agent_started = body["agentStarted"] == true;
-            let mut out = vec![turn_started(&thread, &turn, agent_started)];
-            // No controller sent a turn the agent started (Grok's own), so
-            // no view holds its message yet: it comes from the host, marked
-            // like the turn's start.
-            if agent_started {
-                let mut message = changes(&thread, &turn, folded);
-                mark_agent_started(&mut message);
-                out.extend(message);
+            let sender = sender(body);
+            let mut out = vec![turn_started(&thread, &turn, sender.as_ref())];
+            if let Some(sender) = sender {
+                // A prompt with images begins only from the host's fold:
+                // its message comes when that is installed.
+                if shared.live.needs_fold(&thread, Some(&turn)) {
+                    shared
+                        .senders
+                        .insert((thread.clone(), turn.clone()), sender);
+                } else {
+                    out.extend(sent_by(changes(&thread, &turn, folded), &sender));
+                }
             }
             out
         },
-        "update" | "supplement" => {
+        "update" => {
             let folded = shared.live.apply(body);
-            let turn = body["turnId"].as_str().unwrap_or("");
-            let mut out = settled(shared, &thread, turn, &folded);
-            out.extend(changes(&thread, turn, folded));
+            let mut out = settled(shared, &thread, &turn, &folded);
+            out.extend(changes(&thread, &turn, folded));
+            out
+        },
+        "supplement" => {
+            let folded = shared.live.apply(body);
+            let mut out = settled(shared, &thread, &turn, &folded);
+            let events = changes(&thread, &turn, folded);
+            out.extend(match sender(body) {
+                Some(sender) => sent_by(events, &sender),
+                None => events,
+            });
             out
         },
         "turn_ended" => {
@@ -711,6 +763,7 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
             if shared.running.get(&thread) == Some(&turn) {
                 shared.running.remove(&thread);
             }
+            shared.senders.remove(&(thread.clone(), turn.clone()));
             let mut out = completion(
                 &thread,
                 &turn,
@@ -821,6 +874,7 @@ pub fn reconcile(shared: &mut Shared, snapshot: &Value) -> Plan {
     shared.info = snapshot["info"].clone();
     shared.live.clear();
     shared.unsynced.clear();
+    shared.senders.clear();
     if replaced {
         shared.oldest.clear();
         shared.history_epochs.clear();
@@ -920,7 +974,10 @@ pub fn reconcile(shared: &mut Shared, snapshot: &Value) -> Plan {
 
 /// `turn/started` for a running turn a recovery found.
 pub fn started(thread: &str, turn: &str, agent_started: bool) -> AppEvent {
-    turn_started(thread, turn, agent_started)
+    // A turn the agent started names no sender; its message comes with its
+    // fold (see [`install`]).
+    let nobody = Value::Null;
+    turn_started(thread, turn, agent_started.then_some(&nobody))
 }
 
 #[cfg(test)]

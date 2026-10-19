@@ -367,11 +367,23 @@ pub fn thread_turn_page(
 
 /// Send a prompt; it is admitted by the host and streams through events.
 /// It is refused when the host was replaced or moved to another generation
-/// than the one this controller shows.
-pub fn turn_start(service_key: &str, thread_id: &str, text: &str, images: &[String]) -> Result<()> {
+/// than the one this controller shows. `client_id`, the caller's name for
+/// the message, comes back on its turn's events (see
+/// [`translate::gateway_event`]).
+pub fn turn_start(
+    service_key: &str,
+    thread_id: &str,
+    text: &str,
+    images: &[String],
+    client_id: Option<&str>,
+) -> Result<()> {
     let link = conn(service_key)?;
     let identity = link.identity();
-    block(link.client.prompt(thread_id, text, images, Some(&identity))).map(|_| ())
+    block(
+        link.client
+            .prompt(thread_id, text, images, client_id, Some(&identity)),
+    )
+    .map(|_| ())
 }
 
 /// Add input to `turn_id` (the caller's turn; else the turn this controller
@@ -385,8 +397,9 @@ pub fn turn_supplement(
     turn_id: Option<&str>,
     text: &str,
     images: &[String],
+    client_id: Option<&str>,
 ) -> Result<Supplement> {
-    supplement(&conn(service_key)?, thread_id, turn_id, text, images)
+    supplement(&conn(service_key)?, thread_id, turn_id, text, images, client_id)
 }
 
 /// [`turn_supplement`] through `link`.
@@ -396,6 +409,7 @@ pub(super) fn supplement(
     turn_id: Option<&str>,
     text: &str,
     images: &[String],
+    client_id: Option<&str>,
 ) -> Result<Supplement> {
     let (turn, identity) = {
         let view = lock(&link.shared);
@@ -405,11 +419,14 @@ pub(super) fn supplement(
             .or_else(|| view.running.get(thread_id).cloned());
         (turn, view.identity())
     };
-    let (outcome, accepted) =
-        block(
-            link.client
-                .steer(thread_id, turn.as_deref(), text, images, Some(&identity)),
-        )?;
+    let (outcome, accepted) = block(link.client.steer(
+        thread_id,
+        turn.as_deref(),
+        text,
+        images,
+        client_id,
+        Some(&identity),
+    ))?;
     // The answer belongs to the connection and host that asked. A
     // replacement may already show another session state, so an answer
     // arriving after it is neither "added" nor "not consumed": the caller

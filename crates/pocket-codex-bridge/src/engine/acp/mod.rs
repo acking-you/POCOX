@@ -122,6 +122,10 @@ pub(crate) struct Shared {
     live: Replica,
     /// Running turns whose fold could not be read yet: `(session, turn)`.
     unsynced: HashMap<(String, String), Retry>,
+    /// Who sent the message of a running turn begun only from the host's
+    /// fold (a prompt with images), until that fold is installed: `(session,
+    /// turn)` → the host's `clientId`.
+    senders: HashMap<(String, String), Value>,
     /// Session → oldest loaded turn (paging cursor).
     oldest: HashMap<String, String>,
     /// Native source generation of each loaded window.

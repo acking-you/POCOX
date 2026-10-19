@@ -76,9 +76,17 @@ class _Queued {
 /// `_AppSessionState._awaitedStart`): the draft and thread it was sent from.
 /// The instance itself is the admission's token.
 class _AwaitedStart {
-  _AwaitedStart({required this.draft, required this.threadId});
+  _AwaitedStart({
+    required this.draft,
+    required this.threadId,
+    required this.clientId,
+  });
   final _ComposerDraft draft;
   final String threadId;
+
+  /// The sent message's client id: only the start that names it (or one
+  /// from a host that names no sender) is this admission's.
+  final String clientId;
 }
 
 /// The host connection a send began on was lost or replaced before the send
@@ -106,9 +114,13 @@ class _ModelWithdrawn extends _DraftOptionsRefused {
 /// The exact wire content of one send (text with file references, image
 /// data URLs), kept by its retry.
 class _Resend {
-  const _Resend({required this.text, required this.images});
+  const _Resend({required this.text, required this.images, this.clientId});
   final String text;
   final List<String> images;
+
+  /// The client id its first send gave it, so a retry shows in that copy;
+  /// null for a message not sent yet (it gets a new one).
+  final String? clientId;
 }
 
 /// One entry in an option-picker bottom sheet (model / permission / effort).

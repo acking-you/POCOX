@@ -68,10 +68,15 @@ async fn supplements_reach_the_running_turn_and_grok_turns_are_followed() {
     let generation = host.state().generation;
     eventually(|| host.grok_runs(generation, &session, &turn), "Grok running the turn").await;
     assert_eq!(
-        host.steer(&session, Some(&turn), "more", &[], None).await,
+        host.steer_as(&session, Some(&turn), "more", &[], Some("view-1"), None)
+            .await,
         Ok((SteerOutcome::Injected, Some(turn.clone())))
     );
     eventually(|| agent_said(&host, "interjected:more"), "the interjection").await;
+    // Recorded where Grok merged it, still naming the view that sent it.
+    assert!(bodies(&host)
+        .iter()
+        .any(|b| b["type"] == "supplement" && b["text"] == "more" && b["clientId"] == "view-1"));
     // Shown where Grok merged it: after the response it arrived during
     // (which kept streaming into the same message), before the next one.
     let texts: Vec<String> = host

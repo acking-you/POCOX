@@ -59,7 +59,26 @@ impl AgentHost {
         images: &[String],
         expected: Option<&Identity>,
     ) -> Result<String, HostError> {
+        self.prompt_as(session, text, images, None, expected).await
+    }
+
+    /// [`AgentHost::prompt`] for a caller that named its message with
+    /// `client_id`: the turn's `turn_started` event carries it (`null` when
+    /// none), so the controller that sent it knows the message as its own and
+    /// every other one shows it. It identifies the message to its sender
+    /// only, never as an idempotency key.
+    pub async fn prompt_as(
+        &self,
+        session: &str,
+        text: &str,
+        images: &[String],
+        client_id: Option<&str>,
+        expected: Option<&Identity>,
+    ) -> Result<String, HostError> {
         valid_id(session)?;
+        if let Some(client_id) = client_id {
+            valid_id(client_id)?;
+        }
         check_message(text, images)?;
         let (generation, peer, caps) = self.ready_for(expected)?;
         {
@@ -106,6 +125,7 @@ impl AgentHost {
             let body = json!({
                 "type": "turn_started", "sessionId": session, "turnId": turn,
                 "userText": clip(text, MAX_PROMPT_TEXT), "imageCount": images.len(),
+                "clientId": client_id,
             });
             state.event(body);
         }

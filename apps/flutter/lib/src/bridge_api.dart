@@ -523,7 +523,10 @@ abstract interface class BridgeApi {
   /// [collaborationMode] ("plan" / "default", or null to leave unchanged) is
   /// sticky on the thread, so pass "default" to leave plan mode.
   /// [reasoningEffort] ("low"/"medium"/"high", or null for the model default) is
-  /// the "thinking level" for this turn. The reply streams via [appEvents].
+  /// the "thinking level" for this turn. [clientId] is the caller's own name
+  /// for the message: an ACP host carries it back on the turn's live events,
+  /// so the view that sent it knows the message as its own. The reply streams
+  /// via [appEvents].
   Future<void> appTurnStart(
     String serviceKey,
     String threadId,
@@ -536,6 +539,7 @@ abstract interface class BridgeApi {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   });
 
   /// Send an asynchronous answer and return the accepted active turn ID.
@@ -551,13 +555,14 @@ abstract interface class BridgeApi {
   /// agent's negotiated steering). An ACP agent with no turn running
   /// consumes nothing and says so (Codex fails instead); an error means it
   /// was refused or its fate is unknown, and it must not be retried or
-  /// resent as a prompt.
+  /// resent as a prompt. [clientId] names the input as for [appTurnStart].
   Future<TurnSupplement> appTurnSupplement(
     String serviceKey,
     String threadId,
     String? turnId,
     String text, {
     List<String> images = const [],
+    String? clientId,
   });
 
   /// Interrupt the running turn. [turnId] (from the latest `turn/started`) is

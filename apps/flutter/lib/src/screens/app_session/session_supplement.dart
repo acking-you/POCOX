@@ -31,6 +31,8 @@ extension _SessionSupplement on _AppSessionState {
         if (!attachment.isFile) ?attachment.processed?.dataUrl,
     ];
     final turnId = _turnId;
+    // Its name for the host, which carries it back on the input's item.
+    final clientId = _newClientId();
     // The answer belongs to what asked: this service and host connection
     // (capabilities move with every host change or reconnect), this thread
     // view and its draft, and this request (leaving the conversation drops
@@ -67,7 +69,14 @@ extension _SessionSupplement on _AppSessionState {
       if (!owned()) return;
       final outcome = await ref
           .read(bridgeApiProvider)
-          .appTurnSupplement(serviceKey, tid, turnId, text, images: images);
+          .appTurnSupplement(
+            serviceKey,
+            tid,
+            turnId,
+            text,
+            images: images,
+            clientId: clientId,
+          );
       // Decided before anything is changed: an answer that no longer owns
       // its input leaves the draft, its attachments and the queue alone.
       if (!owned()) {
@@ -86,24 +95,29 @@ extension _SessionSupplement on _AppSessionState {
       final acceptedTurnId = outcome.turnId ?? turnId ?? '';
       _takeSupplemented(sendingDraft, draft, attachments, tools);
       // A history read since the request may already hold the input; a
-      // reload then shows it once instead of adding a second copy.
+      // reload then shows it once instead of adding a second copy. The
+      // host's item may also have arrived first (see [_handleItemEvent]).
       final reload =
           _historyGeneration != historyGeneration || _historyLoad != null;
+      final shown = _items.any((item) => item.clientId == clientId);
       _updateState(() {
         final item = TranscriptItem(
-          id: 'local-user-${_localSeq++}',
+          id: 'local-user-$clientId',
           type: 'userMessage',
           text: text,
           images: resolveImageUrls(images),
           imageUrls: images,
           turnId: acceptedTurnId,
+          clientId: clientId,
           // An ACP host shows where the agent merged it.
-          held: _caps.isAcp && !_placedSupplements.remove(text),
+          held: _caps.isAcp,
         );
         if (!reload) {
           if (_streaming && _turnId == turnId) _turnId = acceptedTurnId;
-          _itemIndex[item.id] = _items.length;
-          _items.add(item);
+          if (!shown) {
+            _itemIndex[item.id] = _items.length;
+            _items.add(item);
+          }
         }
         _supplement = false;
         _error = null;

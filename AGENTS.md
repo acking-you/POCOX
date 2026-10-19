@@ -610,6 +610,12 @@ this file's roadmap so the source of truth stays in sync.
       at most 32 transcripts, busy ones never evicted (refuse instead); item
       ordinals are never reused; agent ids are compared exactly (long ones
       by digest); gaps, truncation and dropped content are shown.
+    - Live user messages name their sender: a prompt or supplement carries
+      the sending view's random `clientId`, echoed on `turn_started` /
+      `supplement` (`null` when none). That view keeps its one copy (its
+      optimistic copy, or the host's item if that came first); every other
+      view shows the host's item live. Never an idempotency key; recoveries
+      and older hosts show user messages through history reads only.
     - Recovery completes ended turns before announcing successors; item
       events carry `turnId`; an unreadable running fold stays
       unsynchronized and is retried, never folded from a bare update; an

@@ -10,6 +10,7 @@
 // settles.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -177,13 +178,16 @@ void main() {
     // The host's copy marks the merge point; what follows comes after it.
     api.pushEvent(
       acp,
-      const AppEvent(
+      AppEvent(
         kind: 'item/completed',
         threadId: 'ses-1',
         itemId: 'ses-1:s1',
         itemType: 'userMessage',
         text: 'also the docs',
-        raw: '{"turnId":"t1"}',
+        raw: jsonEncode({
+          'turnId': 't1',
+          'clientId': api.lastSupplementClientId,
+        }),
       ),
     );
     api.pushEvent(acp, agent('ses-1:a2', 'docs updated'));
@@ -433,13 +437,14 @@ void main() {
       text: 'once only',
       turnId: 't1',
     );
-    final echo = AppEvent(
+    // The host's item, naming the client id this view sent it with.
+    AppEvent echo(FakeBridgeApi api) => AppEvent(
       kind: 'item/completed',
       threadId: 'ses-1',
       itemId: added.id,
       itemType: 'userMessage',
       text: added.text,
-      raw: '{"turnId":"t1"}',
+      raw: jsonEncode({'turnId': 't1', 'clientId': api.lastSupplementClientId}),
     );
 
     /// A supplement whose (injected) answer waits for the returned gate.
@@ -453,7 +458,7 @@ void main() {
 
     testWidgets('the event before the answer', (t) async {
       final (api, gate) = await held(t);
-      api.pushEvent(acp, echo);
+      api.pushEvent(acp, echo(api));
       await frames(t);
       gate.complete();
       await frames(t);
@@ -465,7 +470,7 @@ void main() {
       final (api, gate) = await held(t);
       gate.complete();
       await frames(t);
-      api.pushEvent(acp, echo);
+      api.pushEvent(acp, echo(api));
       await frames(t);
       expect(find.text('once only'), findsOneWidget);
     });
@@ -494,7 +499,7 @@ void main() {
       );
       double top(String text) => t.getTopLeft(find.text(text)).dy;
       final (api, gate) = await held(t);
-      api.pushEvent(acp, echo);
+      api.pushEvent(acp, echo(api));
       await frames(t);
       gate.complete();
       await frames(t);

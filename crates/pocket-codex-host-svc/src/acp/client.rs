@@ -218,18 +218,22 @@ impl GatewayClient {
 
     /// `POST sessions/prompt`; returns the admitted host turn id. A host
     /// that is not `expected` (replaced, or another generation) refuses it.
+    /// `client_id`, the caller's name for the message, comes back in its
+    /// `turn_started` event.
     pub async fn prompt(
         &self,
         session: &str,
         text: &str,
         images: &[String],
+        client_id: Option<&str>,
         expected: Option<&Identity>,
     ) -> Result<String, ClientError> {
         let answer = self
             .post(
                 "acp/v1/sessions/prompt",
                 with_identity(
-                    json!({"sessionId": session, "text": text, "images": images}),
+                    json!({"sessionId": session, "text": text, "images": images,
+                           "clientId": client_id}),
                     expected,
                 ),
             )
@@ -243,19 +247,22 @@ impl GatewayClient {
     /// `POST sessions/steer`: add to the running turn (`turn` only, when
     /// given). The answer names the outcome; an outcome this client does
     /// not know is a [`ClientError::Protocol`] (what happened is unknown).
+    /// `client_id` comes back in the `supplement` event.
     pub async fn steer(
         &self,
         session: &str,
         turn: Option<&str>,
         text: &str,
         images: &[String],
+        client_id: Option<&str>,
         expected: Option<&Identity>,
     ) -> Result<(SteerOutcome, Option<String>), ClientError> {
         let answer = self
             .post(
                 "acp/v1/sessions/steer",
                 with_identity(
-                    json!({"sessionId": session, "turnId": turn, "text": text, "images": images}),
+                    json!({"sessionId": session, "turnId": turn, "text": text, "images": images,
+                           "clientId": client_id}),
                     expected,
                 ),
             )

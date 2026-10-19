@@ -236,6 +236,8 @@ pub struct HeldSupplement {
     pub images: usize,
     /// The model response running when it was taken.
     pub stream: Option<u64>,
+    /// The sending view's name for it, echoed when it is recorded.
+    pub client_id: Option<String>,
 }
 
 /// One admitted session of the current generation.

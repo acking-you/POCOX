@@ -867,6 +867,10 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Every [appTurnSupplement] call as `(threadId, turnId, text, images)`.
   final List<(String, String?, String, List<String>)> supplementCalls = [];
 
+  /// The client id of the last [appTurnStart] / [appTurnSupplement].
+  String? lastTurnClientId;
+  String? lastSupplementClientId;
+
   /// Holds the next [appTurnSupplement] until completed (then cleared).
   Completer<void>? supplementGate;
 

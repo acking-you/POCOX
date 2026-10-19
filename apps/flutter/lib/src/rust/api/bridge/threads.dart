@@ -112,19 +112,22 @@ Future<String> appTurnSteer({
 /// agent's negotiated steering). An ACP agent that finds no turn running
 /// answers `promptRequired` (nothing consumed); Codex answers `injected` or
 /// fails, as [`app_turn_steer`] does. An error means the input was refused
-/// or its fate is unknown, and it is never retried.
+/// or its fate is unknown, and it is never retried. `client_id` is the
+/// caller's own name for the input, carried back on its live item (ACP).
 Future<AppTurnSupplementDto> appTurnSupplement({
   required String serviceKey,
   required String threadId,
   String? turnId,
   required String text,
   List<String>? images,
+  String? clientId,
 }) => RustLib.instance.api.crateApiBridgeThreadsAppTurnSupplement(
   serviceKey: serviceKey,
   threadId: threadId,
   turnId: turnId,
   text: text,
   images: images,
+  clientId: clientId,
 );
 
 /// Answer a server approval request. For Codex `decision` is
@@ -286,8 +289,10 @@ Future<void> appSetThreadName({
 /// `collaboration_mode` ("plan" / "default", or null to leave unchanged) is
 /// sticky on the thread, so pass "default" to leave plan mode.
 /// `reasoning_effort` ("low"/"medium"/"high", or null for the model default) is
-/// the "thinking level" for this turn. The reply streams via [`app_events`];
-/// this returns once the turn is accepted.
+/// the "thinking level" for this turn. `client_id` is the caller's own name
+/// for the message, carried back on its turn's live events (ACP), so the
+/// sending view knows the message as its own. The reply streams via
+/// [`app_events`]; this returns once the turn is accepted.
 Future<void> appTurnStart({
   required String serviceKey,
   required String threadId,
@@ -300,6 +305,7 @@ Future<void> appTurnStart({
   String? sandbox,
   String? collaborationMode,
   String? reasoningEffort,
+  String? clientId,
 }) => RustLib.instance.api.crateApiBridgeThreadsAppTurnStart(
   serviceKey: serviceKey,
   threadId: threadId,
@@ -312,6 +318,7 @@ Future<void> appTurnStart({
   sandbox: sandbox,
   collaborationMode: collaborationMode,
   reasoningEffort: reasoningEffort,
+  clientId: clientId,
 );
 
 /// Interrupt the running turn. `turn_id` (from the latest `turn/started`) is

@@ -66,6 +66,7 @@ class _StartingApi extends FakeBridgeApi {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   }) async {
     sentTo.add(threadId);
     await super.appTurnStart(
@@ -80,6 +81,7 @@ class _StartingApi extends FakeBridgeApi {
       sandbox: sandbox,
       collaborationMode: collaborationMode,
       reasoningEffort: reasoningEffort,
+      clientId: clientId,
     );
     if (turnAck != null) await turnAck!.future;
   }

@@ -441,10 +441,16 @@ async fn a_supplement_reaches_the_running_turn_and_is_recorded_once() {
     );
     let turn = dispatched_turn(&host, &session, "slow").await;
     assert_eq!(
-        host.steer(&session, Some(&turn), "more", &[], None).await,
+        host.steer_as(&session, Some(&turn), "more", &[], Some("pocox-view-2"), None)
+            .await,
         Ok((SteerOutcome::Injected, Some(turn.clone())))
     );
     assert_eq!(supplements(&host), 1);
+    let event = bodies(&host)
+        .into_iter()
+        .find(|body| body["type"] == "supplement")
+        .expect("event");
+    assert_eq!(event["clientId"], "pocox-view-2", "the sender's name for its message");
     let item = host
         .state()
         .transcript_ref(&session)

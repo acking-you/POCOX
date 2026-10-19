@@ -4,6 +4,7 @@
 // replace the model catalog.
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart'
@@ -515,37 +516,62 @@ void main() {
     expect(find.byKey(const Key('stop-btn')), findsNothing);
     await t.pumpWidget(const SizedBox.shrink());
   });
-  testWidgets('a turn the agent started shows its own message and can be '
-      'stopped', (t) async {
-    final api = AcpApi()..acpCapabilities[acp] = negotiated;
+  testWidgets('messages sent elsewhere show live once; one sent here shows '
+      'once', (t) async {
+    final api = AcpApi()
+      ..acpCapabilities[acp] = negotiated
+      ..autoCompleteTurn = false;
+    // Titled, so no message text doubles as its title.
+    api.appThreads.add(
+      const ThreadMeta(id: 'ses-1', preview: 'Work', cwd: '/w', updatedAt: 1),
+    );
     await open(t, api, acp, thread: 'ses-1');
-    const user =
-        '{"threadId":"ses-1","turnId":"F","itemId":"F:u",'
-        '"item":{"id":"F:u","type":"userMessage"},"agentStarted":true}';
+    AppEvent user(String id, String text, Object? sender) => AppEvent(
+      kind: 'item/completed',
+      threadId: 'ses-1',
+      itemId: id,
+      itemType: 'userMessage',
+      text: text,
+      raw: jsonEncode({'threadId': 'ses-1', 'turnId': 'F', 'clientId': sender}),
+    );
+    // Another device's prompt (sent without a client id) and supplement
+    // (with its own), and the same item again.
     for (final event in [
       const AppEvent(
         kind: 'turn/started',
         threadId: 'ses-1',
-        raw:
-            '{"threadId":"ses-1","turnId":"F","turn":{"id":"F"},'
-            '"agentStarted":true}',
+        raw: '{"threadId":"ses-1","turnId":"F","clientId":null}',
       ),
-      const AppEvent(
-        kind: 'item/completed',
-        threadId: 'ses-1',
-        itemId: 'F:u',
-        itemType: 'userMessage',
-        text: 'a late steer',
-        raw: user,
-      ),
+      user('F:u', 'from the phone', null),
+      user('F:s1', 'and one more', 'a-phone-id'),
+      user('F:s1', 'and one more', 'a-phone-id'),
     ]) {
       api.pushEvent(acp, event);
     }
     await frames(t);
-    expect(find.text('a late steer', findRichText: true), findsOneWidget);
+    expect(find.text('from the phone', findRichText: true), findsOneWidget);
+    expect(find.text('and one more', findRichText: true), findsOneWidget);
+    // Its turn runs here like any other: Stop names it.
     await t.tap(find.byKey(const Key('stop-btn')));
     await frames(t);
     expect(api.lastInterruptTurnId, 'F');
+    api.pushEvent(
+      acp,
+      const AppEvent(
+        kind: 'turn/completed',
+        threadId: 'ses-1',
+        raw: '{"turn":{"id":"F","status":"interrupted"}}',
+      ),
+    );
+    await frames(t);
+
+    // A message sent here: the host's item names it, so its own copy is it.
+    await t.enterText(find.byKey(const Key('composer-input')), 'from here');
+    await t.pump();
+    await t.tap(find.byKey(const Key('send-btn')));
+    await frames(t);
+    expect(api.lastTurnClientId, isNotNull);
+    expect(find.text('from here', findRichText: true), findsOneWidget);
     await t.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('a new command list from the agent replaces the shown one', (

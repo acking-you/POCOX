@@ -29,8 +29,9 @@ extension _SessionSend on _AppSessionState {
     // captured copy; the last-sent fields move with every later send). A
     // [failedTurn] is the input of a turn the host recorded and the model
     // failed: sent again as a new turn, exactly as recorded.
+    final resent = retry ? (resend ?? _lastSent) : null;
     final typed = retry
-        ? (resend?.text ?? _lastUserText ?? '')
+        ? (resent?.text ?? '')
         : (failedTurn?.text ??
               queued?.text.trim() ??
               overrideText ??
@@ -43,7 +44,7 @@ extension _SessionSend on _AppSessionState {
       queued?.attachments ?? _attachments,
     );
     final images = retry
-        ? (resend?.images ?? _lastUserImages)
+        ? (resent?.images ?? const <String>[])
         : failedTurn != null
         ? failedTurn.images
         : !ordinary
@@ -75,7 +76,10 @@ extension _SessionSend on _AppSessionState {
       ordinary ? sendTools : const [],
       summaries: _hostToolSummaries(),
     );
-    final again = _Resend(text: text, images: images);
+    // The message's name for its host (see [_sender]): a retry keeps its
+    // first send's, so it shows in that copy.
+    final clientId = resent?.clientId ?? _newClientId();
+    final again = _Resend(text: text, images: images, clientId: clientId);
     // Block sends while reconnecting — a reconnect reloads history and would
     // wipe an optimistic message added mid-flight.
     if (_externalWriterMode ||
@@ -199,10 +203,9 @@ extension _SessionSend on _AppSessionState {
     _updateState(() {
       _error = null;
       _retry = null;
-      _lastUserText = text;
-      _lastUserImages = images;
+      _lastSent = again;
       if (!retry) {
-        final id = 'local-user-${_localSeq++}';
+        final id = 'local-user-$clientId';
         bubble = id;
         _itemIndex[id] = _items.length;
         _items.add(
@@ -212,6 +215,7 @@ extension _SessionSend on _AppSessionState {
             text: text,
             images: resolveImageUrls(images),
             imageUrls: images,
+            clientId: clientId,
           ),
         );
         // Remember the just-sent draft so an Esc "undo" (before any output)
@@ -492,6 +496,7 @@ extension _SessionSend on _AppSessionState {
         // collaborationMode.settings, so toggling plan/permission never wipes the
         // thread's sticky effort. null only when no effort has ever been set.
         reasoningEffort: effort?.wire,
+        clientId: clientId,
       );
       // Accepted by a connection that is gone now: whether the turn lives on
       // is open, so nothing is adopted (no queue removal, no admission).
@@ -501,7 +506,7 @@ extension _SessionSend on _AppSessionState {
       // Admitted, but its start may not have arrived: until it does the
       // session is busy and the queue must not send the next message.
       if (current() && !_streaming && _turnStateRevision == turnRevision) {
-        _expectTurnStart(sendingDraft, targetThread);
+        _expectTurnStart(sendingDraft, targetThread, clientId);
       }
       if (current()) {
         _updateState(() {

@@ -32,9 +32,28 @@ impl AgentHost {
         images: &[String],
         expected: Option<&Identity>,
     ) -> Result<(SteerOutcome, Option<String>), HostError> {
+        self.steer_as(session, expected_turn, text, images, None, expected)
+            .await
+    }
+
+    /// [`AgentHost::steer`] for a caller that named its message with
+    /// `client_id`, which the `supplement` event carries (see
+    /// [`AgentHost::prompt_as`]).
+    pub async fn steer_as(
+        &self,
+        session: &str,
+        expected_turn: Option<&str>,
+        text: &str,
+        images: &[String],
+        client_id: Option<&str>,
+        expected: Option<&Identity>,
+    ) -> Result<(SteerOutcome, Option<String>), HostError> {
         valid_id(session)?;
         if let Some(turn) = expected_turn {
             valid_id(turn)?;
+        }
+        if let Some(client_id) = client_id {
+            valid_id(client_id)?;
         }
         check_message(text, images)?;
         // The control budget covers the lane and the write.
@@ -100,11 +119,11 @@ impl AgentHost {
         })?;
         match outcome {
             SteerOutcome::Injected if caps.grok => {
-                self.hold_supplement(generation, session, &turn, text, images.len());
+                self.hold_supplement(generation, session, &turn, text, images.len(), client_id);
                 Ok((outcome, Some(turn)))
             },
             SteerOutcome::Injected => {
-                self.record_supplement(generation, session, &turn, text, images.len());
+                self.record_supplement(generation, session, &turn, text, images.len(), client_id);
                 Ok((outcome, Some(turn)))
             },
             SteerOutcome::PromptRequired => Ok((outcome, None)),
@@ -145,7 +164,7 @@ impl AgentHost {
 
     /// Record an accepted supplement in `turn`'s transcript and tell the
     /// controllers, whose folds add the same item (see
-    /// `Transcript::supplement`).
+    /// `Transcript::supplement`), naming its sender's `client_id`.
     fn record_supplement(
         &self,
         generation: u64,
@@ -153,22 +172,25 @@ impl AgentHost {
         turn: &str,
         text: &str,
         images: usize,
+        client_id: Option<&str>,
     ) {
         let mut state = self.state();
         if state.generation == generation {
-            record_supplement(&mut state, session, turn, text, images);
+            record_supplement(&mut state, session, turn, text, images, client_id);
         }
     }
 }
 
 /// Fold an accepted supplement into `turn`'s transcript and tell the
-/// controllers, whose folds add the same item.
+/// controllers, whose folds add the same item, naming its sender's
+/// `client_id`.
 pub(super) fn record_supplement(
     state: &mut State,
     session: &str,
     turn: &str,
     text: &str,
     images: usize,
+    client_id: Option<&str>,
 ) {
     let text = clip(text, MAX_PROMPT_TEXT);
     if let Some(transcript) = state.transcript_mut(session) {
@@ -176,6 +198,6 @@ pub(super) fn record_supplement(
     }
     state.event(json!({
         "type": "supplement", "sessionId": session, "turnId": turn,
-        "text": text, "imageCount": images,
+        "text": text, "imageCount": images, "clientId": client_id,
     }));
 }

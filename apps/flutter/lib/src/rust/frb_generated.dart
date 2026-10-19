@@ -485,6 +485,7 @@ abstract class RustLibApi extends BaseApi {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   });
 
   Future<String> crateApiBridgeThreadsAppTurnSteer({
@@ -501,6 +502,7 @@ abstract class RustLibApi extends BaseApi {
     String? turnId,
     required String text,
     List<String>? images,
+    String? clientId,
   });
 
   String crateApiSimpleBridgeVersion();
@@ -3668,6 +3670,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -3684,6 +3687,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_String(sandbox, serializer);
           sse_encode_opt_String(collaborationMode, serializer);
           sse_encode_opt_String(reasoningEffort, serializer);
+          sse_encode_opt_String(clientId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -3708,6 +3712,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sandbox,
           collaborationMode,
           reasoningEffort,
+          clientId,
         ],
         apiImpl: this,
       ),
@@ -3729,6 +3734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "sandbox",
           "collaborationMode",
           "reasoningEffort",
+          "clientId",
         ],
       );
 
@@ -3780,6 +3786,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     String? turnId,
     required String text,
     List<String>? images,
+    String? clientId,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -3790,6 +3797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_opt_String(turnId, serializer);
           sse_encode_String(text, serializer);
           sse_encode_opt_list_String(images, serializer);
+          sse_encode_opt_String(clientId, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -3802,7 +3810,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiBridgeThreadsAppTurnSupplementConstMeta,
-        argValues: [serviceKey, threadId, turnId, text, images],
+        argValues: [serviceKey, threadId, turnId, text, images, clientId],
         apiImpl: this,
       ),
     );
@@ -3811,7 +3819,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgeThreadsAppTurnSupplementConstMeta =>
       const TaskConstMeta(
         debugName: "app_turn_supplement",
-        argNames: ["serviceKey", "threadId", "turnId", "text", "images"],
+        argNames: [
+          "serviceKey",
+          "threadId",
+          "turnId",
+          "text",
+          "images",
+          "clientId",
+        ],
       );
 
   @override

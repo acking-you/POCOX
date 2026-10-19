@@ -43,6 +43,7 @@ class TranscriptItem {
     this.turnCompletedAt,
     this.turnDurationMs,
     this.held = false,
+    this.clientId,
   });
 
   /// A supplement the agent took but merges only at its next response (an
@@ -53,6 +54,11 @@ class TranscriptItem {
   /// Stable row id: the server's item id, or a locally minted one for an
   /// optimistic user message.
   final String id;
+
+  /// For a user message: the client id its sending view gave it, on that
+  /// view's own copy and on a host's live item that named its sender. Lets
+  /// the view that sent a message show it exactly once.
+  final String? clientId;
 
   /// `userMessage` | `agentMessage` | `commandExecution` | `webSearch` | …
   String type;

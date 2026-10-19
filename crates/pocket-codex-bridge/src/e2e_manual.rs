@@ -172,6 +172,7 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
         None,
         None,
         Some("low".into()),
+        None,
     )
     .expect("app_turn_start");
 
@@ -264,6 +265,7 @@ fn run_image_turn(key: &str) {
         tid.clone(),
         prompt.to_string(),
         vec![image.clone()],
+        None,
         None,
         None,
         None,

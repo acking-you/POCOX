@@ -24,7 +24,7 @@ extension _SessionTitle on _AppSessionState {
       final preview = meta == null
           ? ''
           : previewWithoutFileRefs(meta.preview, l10n.fileOnlyMessage);
-      for (final candidate in [preview, _lastUserText ?? '']) {
+      for (final candidate in [preview, _lastSent?.text ?? '']) {
         final line = candidate.trim().split('\n').first.trim();
         if (line.isNotEmpty) return line;
       }

@@ -106,6 +106,9 @@ pub struct StartOptions {
 pub struct TurnOptions {
     /// Prompt text.
     pub text: String,
+    /// The sending view's own name for this message (ACP): the turn's live
+    /// events carry it back, so that view knows the message as its own.
+    pub client_id: Option<String>,
     /// Data-URL images.
     pub images: Vec<String>,
     /// Model id.
@@ -339,7 +342,8 @@ pub trait SessionEngine: Sync {
     /// Add input to the running turn, saying whether it was taken
     /// ([`Supplement::Injected`]) or, with no turn running, not consumed at
     /// all ([`Supplement::PromptRequired`]: send it as an ordinary prompt).
-    /// Natively that is [`SessionEngine::turn_steer`].
+    /// Natively that is [`SessionEngine::turn_steer`]. `client_id` names the
+    /// input as [`TurnOptions::client_id`] does.
     fn turn_supplement(
         &self,
         service_key: &str,
@@ -347,7 +351,9 @@ pub trait SessionEngine: Sync {
         turn_id: Option<&str>,
         text: &str,
         images: &[String],
+        client_id: Option<&str>,
     ) -> Result<Supplement> {
+        let _ = client_id;
         self.turn_steer(service_key, thread_id, turn_id, text, images)
             .map(Supplement::Injected)
     }
@@ -679,7 +685,13 @@ impl SessionEngine for AcpEngine {
     }
 
     fn turn_start(&self, service_key: &str, thread_id: &str, options: TurnOptions) -> Result<()> {
-        acp::turn_start(service_key, thread_id, &options.text, &options.images)
+        acp::turn_start(
+            service_key,
+            thread_id,
+            &options.text,
+            &options.images,
+            options.client_id.as_deref(),
+        )
     }
 
     fn turn_supplement(
@@ -689,8 +701,9 @@ impl SessionEngine for AcpEngine {
         turn_id: Option<&str>,
         text: &str,
         images: &[String],
+        client_id: Option<&str>,
     ) -> Result<Supplement> {
-        acp::turn_supplement(service_key, thread_id, turn_id, text, images)
+        acp::turn_supplement(service_key, thread_id, turn_id, text, images, client_id)
     }
 
     fn set_thread_name(&self, service_key: &str, thread_id: &str, name: &str) -> Result<()> {
@@ -706,7 +719,7 @@ impl SessionEngine for AcpEngine {
         {
             return Err(unsupported(self.protocol(), "manual compaction"));
         }
-        acp::turn_start(service_key, thread_id, "/compact", &[])
+        acp::turn_start(service_key, thread_id, "/compact", &[], None)
     }
 
     fn turn_interrupt(

@@ -214,6 +214,19 @@ it cannot leave a consumed request unresolved on a live generation.
   was reloaded since the request, the reloaded host history shows the input
   rather than a local copy. Cancelling and re-prompting is not steering and
   is never used for it.
+- A prompt or supplement may carry a `clientId`, the sending view's own
+  random name for the message; the host echoes it on the `turn_started` or
+  `supplement` event (`null` when none was sent, as for an older controller
+  or a turn the agent started). The view whose id it is shows its own copy
+  of the message (optimistic on send, or the host's item when that arrived
+  before the answer, never both); every other controller shows the host's
+  item live, so another device's prompt and supplements appear as they are
+  sent instead of on the next reload. A prompt with images is shown once its
+  fold is installed. A recovery shows no user messages until the screen's
+  history read, and an older host that echoes nothing leaves them to that
+  read as before. The id identifies a message to its sender only: it is
+  never an idempotency key, and the queue's delivery rules below are
+  unchanged.
 - Grok Build (from 1.0.45) supplements through its own `_x.ai/interject`
   instead, sent only while Grok reports the turn running, and its answer
   `{"status": "queued"}` is `injected`; turns Grok starts by itself are
@@ -238,8 +251,9 @@ it cannot leave a consumed request unresolved on a live generation.
   changed, unknown session, busy, loading, capacity, limit, invalid
   request) is definite: Retry sends it again. Any other failure is
   uncertain: the entry is marked and nothing resolves it by itself. The
-  prompt carries no request identity, and history is bounded and shared
-  with other writers, so neither a matching nor a missing history entry
+  prompt carries no request identity the host deduplicates by (its
+  `clientId` is not one), and history is bounded and shared with other
+  writers, so neither a matching nor a missing history entry
   proves what happened; it is sent again only by the user's explicit
   Retry (after a notice that it may already have arrived), and it can be
   edited or removed; a reload, reconnect or reopening that clears its

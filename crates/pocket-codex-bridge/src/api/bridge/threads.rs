@@ -346,13 +346,15 @@ pub struct AppTurnSupplementDto {
 /// agent's negotiated steering). An ACP agent that finds no turn running
 /// answers `promptRequired` (nothing consumed); Codex answers `injected` or
 /// fails, as [`app_turn_steer`] does. An error means the input was refused
-/// or its fate is unknown, and it is never retried.
+/// or its fate is unknown, and it is never retried. `client_id` is the
+/// caller's own name for the input, carried back on its live item (ACP).
 pub fn app_turn_supplement(
     service_key: String,
     thread_id: String,
     turn_id: Option<String>,
     text: String,
     images: Option<Vec<String>>,
+    client_id: Option<String>,
 ) -> Result<AppTurnSupplementDto> {
     let outcome = engine(&service_key).turn_supplement(
         &service_key,
@@ -360,6 +362,7 @@ pub fn app_turn_supplement(
         turn_id.as_deref(),
         &text,
         &images.unwrap_or_default(),
+        client_id.as_deref(),
     )?;
     Ok(match outcome {
         session_engine::Supplement::Injected(turn) => AppTurnSupplementDto {
@@ -584,8 +587,10 @@ pub fn app_set_thread_name(service_key: String, thread_id: String, name: String)
 /// `collaboration_mode` ("plan" / "default", or null to leave unchanged) is
 /// sticky on the thread, so pass "default" to leave plan mode.
 /// `reasoning_effort` ("low"/"medium"/"high", or null for the model default) is
-/// the "thinking level" for this turn. The reply streams via [`app_events`];
-/// this returns once the turn is accepted.
+/// the "thinking level" for this turn. `client_id` is the caller's own name
+/// for the message, carried back on its turn's live events (ACP), so the
+/// sending view knows the message as its own. The reply streams via
+/// [`app_events`]; this returns once the turn is accepted.
 #[allow(clippy::too_many_arguments)]
 pub fn app_turn_start(
     service_key: String,
@@ -599,9 +604,11 @@ pub fn app_turn_start(
     sandbox: Option<String>,
     collaboration_mode: Option<String>,
     reasoning_effort: Option<String>,
+    client_id: Option<String>,
 ) -> Result<()> {
     engine(&service_key).turn_start(&service_key, &thread_id, TurnOptions {
         text,
+        client_id,
         images,
         model,
         approval_policy,

@@ -33,7 +33,7 @@ async fn the_gateway_resumes_from_the_snapshot_watermark_and_resets_stale_stream
         .await
         .expect("events");
     let turn = client
-        .prompt(&session, "hello", &[], Some(&identity))
+        .prompt(&session, "hello", &[], Some("pocox-view-1"), Some(&identity))
         .await
         .expect("prompt");
     let mut seen = Vec::new();
@@ -43,6 +43,9 @@ async fn the_gateway_resumes_from_the_snapshot_watermark_and_resets_stale_stream
     {
         let event = event.expect("event");
         assert!(event["seq"].as_u64().expect("seq") > watermark, "strictly after the watermark");
+        if event["type"] == "turn_started" {
+            assert_eq!(event["clientId"], "pocox-view-1", "the sender's name for its message");
+        }
         seen.push(event["type"].as_str().unwrap_or("").to_string());
         if event["type"] == "turn_ended" {
             assert_eq!(event["turnId"], turn);
@@ -69,7 +72,7 @@ async fn the_gateway_resumes_from_the_snapshot_watermark_and_resets_stale_stream
         ..identity.clone()
     };
     match client
-        .prompt(&session, "hello", &[], Some(&next_generation))
+        .prompt(&session, "hello", &[], None, Some(&next_generation))
         .await
     {
         Err(ClientError::Host {
@@ -325,7 +328,11 @@ async fn a_replacement_host_behind_the_same_endpoint_refuses_the_old_identity() 
     assert_eq!(reused, session, "the new agent reuses the session id");
     assert_eq!(second.info()["generation"].as_u64(), old.generation, "and the generation");
     let client = GatewayClient::new(&origin).expect("client");
-    stale_host(client.prompt(&session, "hello", &[], Some(&old)).await);
+    stale_host(
+        client
+            .prompt(&session, "hello", &[], None, Some(&old))
+            .await,
+    );
     stale_host(client.open_session(&session, Some(&old)).await);
     stale_host(client.new_session(&cwd, Some(&old)).await);
     assert_eq!(client.cancel(&session, None, Some(&old)).await, Ok(false));
@@ -337,7 +344,7 @@ async fn a_replacement_host_behind_the_same_endpoint_refuses_the_old_identity() 
     };
     let mut events = Events::from(&second);
     client
-        .prompt(&session, "count", &[], Some(&fresh))
+        .prompt(&session, "count", &[], None, Some(&fresh))
         .await
         .expect("current identity");
     events.until(is("turn_ended")).await;

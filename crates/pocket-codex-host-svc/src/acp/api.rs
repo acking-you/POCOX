@@ -14,6 +14,11 @@
 //! on; a request for another host incarnation or generation is refused (`409
 //! stale_host`, or `{"cancelled": false}` for a cancel) before anything
 //! reaches the agent.
+//!
+//! A `prompt` or `steer` may name its message with a `clientId` the caller
+//! chose; the `turn_started` or `supplement` event carries it (`null` when
+//! none was given), so the sending controller recognizes its own message
+//! and every other one shows it. It is never an idempotency key.
 
 use std::{convert::Infallible, sync::Arc};
 
@@ -303,6 +308,10 @@ struct PromptBody {
     text: String,
     #[serde(default)]
     images: Vec<String>,
+    /// The caller's own name for this message, echoed in its event (see
+    /// [`AgentHost::prompt_as`]).
+    #[serde(default)]
+    client_id: Option<String>,
     /// The host and generation the caller believes are current; a stale
     /// one is refused rather than started in a replacement process.
     #[serde(flatten)]
@@ -312,7 +321,13 @@ struct PromptBody {
 async fn prompt(State(state): State<ApiState>, Json(body): Json<PromptBody>) -> ApiResult {
     state
         .host
-        .prompt(&body.session_id, &body.text, &body.images, expected(&body.identity))
+        .prompt_as(
+            &body.session_id,
+            &body.text,
+            &body.images,
+            body.client_id.as_deref(),
+            expected(&body.identity),
+        )
         .await
         .map(|turn| Json(json!({"turnId": turn})))
         .map_err(ApiError)
@@ -329,6 +344,9 @@ struct SteerBody {
     text: String,
     #[serde(default)]
     images: Vec<String>,
+    /// As for a prompt, echoed in the `supplement` event.
+    #[serde(default)]
+    client_id: Option<String>,
     #[serde(flatten)]
     identity: Identity,
 }
@@ -338,11 +356,12 @@ struct SteerBody {
 async fn steer(State(state): State<ApiState>, Json(body): Json<SteerBody>) -> ApiResult {
     state
         .host
-        .steer(
+        .steer_as(
             &body.session_id,
             body.turn_id.as_deref(),
             &body.text,
             &body.images,
+            body.client_id.as_deref(),
             expected(&body.identity),
         )
         .await

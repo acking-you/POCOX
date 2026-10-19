@@ -618,9 +618,10 @@ fn reconnect_reports_admission_released_while_the_controller_was_away() {
     assert!(shared.sessions.is_empty());
 }
 
-/// A turn the agent started that a recovery finds running keeps its mark
-/// and its message (no view holds a copy of it); a prompt turn's message
-/// stays the sending view's.
+/// A turn the agent started that a recovery finds running keeps its
+/// message, sent by no view (`clientId: null`, so every view shows it); a
+/// prompt turn's message, whose sender a recovery does not know, is left to
+/// the history read.
 #[test]
 fn a_recovered_agent_started_turn_keeps_its_mark_and_message() {
     let mut host = Transcript::default();
@@ -646,9 +647,10 @@ fn a_recovered_agent_started_turn_keeps_its_mark_and_message() {
         .find(|e| e.item_type.as_deref() == Some("userMessage"))
         .expect("its message");
     assert_eq!(message.text.as_deref(), Some("late"));
-    assert!(events
-        .iter()
-        .all(|e| e.raw.contains("\"agentStarted\":true")));
+    let raw: Value = serde_json::from_str(&message.raw).expect("raw");
+    assert_eq!(raw.get("clientId"), Some(&Value::Null), "no view sent it");
+    let start: Value = serde_json::from_str(&super::started("s", "F", true).raw).expect("raw");
+    assert_eq!(start.get("clientId"), Some(&Value::Null));
     let (_, events) = recover(false);
     assert!(events
         .iter()

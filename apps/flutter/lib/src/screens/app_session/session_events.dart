@@ -226,18 +226,24 @@ extension _SessionEvents on _AppSessionState {
     switch (e.kind) {
       case 'turn/started':
         _turnStateRevision++;
-        // A turn the agent started is not the start a send here awaits.
-        if (!_agentStarted(e.raw)) _turnStartSeen();
+        final sender = _sender(e.raw);
+        // A turn another view or the agent started is not the start a send
+        // here awaits.
+        if (sender == null || sender == _awaitedStart?.clientId) {
+          _turnStartSeen();
+        }
         // A fresh turn supersedes any prior plan: re-enable the implement
         // prompt so a new plan (if this turn produces one) can offer it again.
         // Capture the turn id so the stop button can interrupt this turn.
-        final agentStarted = _agentStarted(e.raw);
         _updateState(() {
           _streaming = true;
           _turnId = _parseTurnId(e.raw);
           final prompt = _items.lastOrNull;
-          // A message sent here is still waiting for its own turn.
-          if (!agentStarted &&
+          // The host names the message: its copy here, if any, is this
+          // turn's. A host that names no sender: the last message sent here
+          // waits for this turn.
+          final sentHere = sender == null || _claimSent(sender, _turnId);
+          if (sender == null &&
               _turnId != null &&
               prompt != null &&
               prompt.isUser &&
@@ -248,9 +254,10 @@ extension _SessionEvents on _AppSessionState {
           }
           _implementDismissed = false;
           _pendingInterrupt = false;
-          // A fresh turn hasn't produced output yet, so Esc undoes the send
-          // until the first item lands.
-          _outputStarted = false;
+          // A fresh turn of a message sent here hasn't produced output yet,
+          // so Esc undoes the send until the first item lands; a turn sent
+          // elsewhere has no send here to undo, only to stop.
+          _outputStarted = !sentHere;
           _elapsed.value = 0;
           // Stamp what this turn runs with. A server that notifies settings
           // does so BEFORE turn/started, so a confirmed runtime is already
@@ -293,7 +300,6 @@ extension _SessionEvents on _AppSessionState {
             it.streaming = false;
             it.held = false;
           }
-          _placedSupplements.clear();
           final stopped =
               _pendingInterrupt || modelFailure?.code == 'cancelled';
           if (!stopped && modelFailure != null) {
@@ -515,8 +521,14 @@ extension _SessionEvents on _AppSessionState {
 
   /// The admitted turn has not announced itself yet (see
   /// [_awaitingTurnStart]).
-  void _expectTurnStart(_ComposerDraft draft, String threadId) {
-    _armTurnStart(_AwaitedStart(draft: draft, threadId: threadId));
+  void _expectTurnStart(
+    _ComposerDraft draft,
+    String threadId,
+    String clientId,
+  ) {
+    _armTurnStart(
+      _AwaitedStart(draft: draft, threadId: threadId, clientId: clientId),
+    );
   }
 
   void _armTurnStart(_AwaitedStart awaited) {
@@ -626,15 +638,37 @@ extension _SessionEvents on _AppSessionState {
     return at == _items.length ? null : at;
   }
 
-  /// Whether a `turn/started` event, or an item of its turn, belongs to a turn
-  /// the agent started by itself (Grok's own; no view sent it).
-  bool _agentStarted(String raw) {
+  /// Who sent the message of a `turn/started` event or a user message, as an
+  /// ACP host names it: the client id the sending view gave it, `''` when no
+  /// view did (another device's older app, or a turn the agent started), or
+  /// null when the host does not say (an older host, a recovery, another
+  /// engine).
+  String? _sender(String raw) {
     try {
       final m = jsonDecode(raw);
-      return m is Map && m['agentStarted'] == true;
+      if (m is! Map || !m.containsKey('clientId')) return null;
+      final id = m['clientId'];
+      return id is String ? id : '';
     } catch (_) {
-      return false;
+      return null;
     }
+  }
+
+  /// Whether this view shows its own copy of the message it sent as
+  /// [clientId] (never for `''`); that copy is [turn]'s when it had none
+  /// yet. The host's item for it marks where the agent merged a held
+  /// supplement, so the copy stays where it now is. Call inside a
+  /// `_updateState`.
+  bool _claimSent(String clientId, String? turn) {
+    if (clientId.isEmpty) return false;
+    final index = _itemIndex['local-user-$clientId'];
+    if (index == null) return false;
+    final copy = _items[index]..held = false;
+    if (turn != null && turn.isNotEmpty && copy.turnId.isEmpty) {
+      copy.turnId = turn;
+      _cachedRows = null;
+    }
+    return true;
   }
 
   /// The turn an `item/*` event names by its explicit `turnId`; never an item's
@@ -652,22 +686,18 @@ extension _SessionEvents on _AppSessionState {
   void _handleItemEvent(AppEvent e) {
     final id = e.itemId, type = e.itemType;
     if (id == null || type == null) return;
-    // The user's own message is shown optimistically on send; ignore the
-    // server echo so it isn't duplicated. A turn the agent started by itself
-    // has no such copy: its message is the host's.
-    if (type == 'userMessage' && !_agentStarted(e.raw)) {
-      // The host's copy of a supplement marks where the agent merged it:
-      // the held copy shown here stays where it now is.
-      if (id.contains(':s')) {
-        final text = e.text ?? '';
-        final held = _items.where((it) => it.held && it.text == text);
-        if (held.firstOrNull case final copy?) {
-          copy.held = false;
-        } else if (_placedSupplements.length < 8) {
-          _placedSupplements.add(text);
-        }
+    // A user message shows once: a message sent here by its own copy
+    // (shown on send), every other one — another device's prompt or
+    // supplement, a turn the agent started — by the host's item. A host
+    // that does not say who sent it leaves it to the next history read.
+    final sender = type == 'userMessage' ? _sender(e.raw) : null;
+    if (type == 'userMessage') {
+      if (sender == null) return;
+      if (sender.isNotEmpty && !_itemIndex.containsKey(id)) {
+        var own = false;
+        _updateState(() => own = _claimSent(sender, _itemEventTurn(e.raw)));
+        if (own) return;
       }
-      return;
     }
     // An omission notice is state of the item it belongs to: re-sent empty,
     // the content fits again and the notice goes away (never added).
@@ -721,7 +751,7 @@ extension _SessionEvents on _AppSessionState {
       // Any agent-side item (reasoning, a tool call, or reply text) means the
       // turn has begun producing output: past this point Esc interrupts rather
       // than undoing the send.
-      _outputStarted = true;
+      if (type != 'userMessage') _outputStarted = true;
       final idx = _itemIndex[id];
       // A pre-existing row can also have missed deltas while disconnected.
       // Only a full snapshot received during this read establishes its prefix.
@@ -743,6 +773,7 @@ extension _SessionEvents on _AppSessionState {
           // The live turn this item belongs to, so a reply that streams in as
           // several items groups the same way it will after a reload.
           turnId: _parseTurnId(e.raw) ?? _turnId ?? '',
+          clientId: sender == null || sender.isEmpty ? null : sender,
         );
         final at = lateTurn == null
             ? _beforeHeldSupplements()
@@ -833,6 +864,16 @@ extension _SessionEvents on _AppSessionState {
     return '${p(t.hour)}:${p(t.minute)}:${p(t.second)}';
   }
 }
+
+/// A new client id for a message sent from a session view (see
+/// `_SessionEvents._sender`): random, so no other view or device names a
+/// message the same.
+String _newClientId() {
+  final bytes = List<int>.generate(16, (_) => _clientIds.nextInt(256));
+  return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+}
+
+final _clientIds = math.Random.secure();
 
 /// Parse a `thread/settings/updated` notification's raw params into a
 /// runtime config. The payload's `threadSettings` carries the full effective

@@ -50,7 +50,7 @@ extension _SessionLoading on _AppSessionState {
           local ??
               ThreadMeta(
                 id: tid,
-                preview: _lastUserText ?? '',
+                preview: _lastSent?.text ?? '',
                 cwd: cwd ?? '',
                 updatedAt: 0,
               ),
@@ -329,8 +329,7 @@ extension _SessionLoading on _AppSessionState {
       _outputStarted = false;
       _undoableDraft = null;
       _suppressStopMarker = false;
-      _lastUserText = null;
-      _lastUserImages = const [];
+      _lastSent = null;
       // A brand-new conversation inherits the user's last-chosen settings; an
       // existing one is restored from the server by _resumeAndLoad below.
       if (tid == null) _seedDefaults();

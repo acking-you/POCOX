@@ -308,6 +308,7 @@ mixin _RustThreads implements BridgeApi {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   }) => frb.appTurnStart(
     serviceKey: serviceKey,
     threadId: threadId,
@@ -320,6 +321,7 @@ mixin _RustThreads implements BridgeApi {
     sandbox: sandbox,
     collaborationMode: collaborationMode,
     reasoningEffort: reasoningEffort,
+    clientId: clientId,
   );
 
   @override
@@ -344,6 +346,7 @@ mixin _RustThreads implements BridgeApi {
     String? turnId,
     String text, {
     List<String> images = const [],
+    String? clientId,
   }) async {
     final outcome = await frb.appTurnSupplement(
       serviceKey: serviceKey,
@@ -351,6 +354,7 @@ mixin _RustThreads implements BridgeApi {
       turnId: turnId,
       text: text,
       images: images,
+      clientId: clientId,
     );
     // Only the two known outcomes mean anything; another is an unknown
     // fate, never "nothing was consumed".

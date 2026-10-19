@@ -154,6 +154,7 @@ impl SessionEngine for OpenCodeEngine {
         turn: Option<&str>,
         text: &str,
         images: &[String],
+        _client_id: Option<&str>,
     ) -> Result<Supplement> {
         ops::supplement(service, session, turn, text, images)
     }

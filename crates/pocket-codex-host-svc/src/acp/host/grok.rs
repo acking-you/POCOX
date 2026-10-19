@@ -301,6 +301,7 @@ impl AgentHost {
         turn: &str,
         text: &str,
         images: usize,
+        client_id: Option<&str>,
     ) {
         let mut state = self.state();
         if state.generation != generation {
@@ -313,6 +314,7 @@ impl AgentHost {
                 text: text.to_string(),
                 images,
                 stream,
+                client_id: client_id.map(str::to_string),
             });
         }
     }
@@ -494,7 +496,7 @@ pub(super) fn adopt_native_turn(state: &mut State, session: &str) {
     }
     state.event(json!({
         "type": "turn_started", "sessionId": session, "turnId": prompt,
-        "userText": text, "imageCount": 0, "agentStarted": true,
+        "userText": text, "imageCount": 0, "agentStarted": true, "clientId": null,
     }));
     state.session_event(session);
 }
@@ -522,6 +524,7 @@ pub(super) fn merge_held_supplements(state: &mut State, session: &str, stream: O
             &supplement.turn,
             &supplement.text,
             supplement.images,
+            supplement.client_id.as_deref(),
         );
     }
 }

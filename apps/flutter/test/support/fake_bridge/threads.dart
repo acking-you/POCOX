@@ -240,7 +240,9 @@ mixin _FakeThreads on _FakeBridgeState {
     String threadId,
   ) => runtimeConfig;
 
-  /// Echoes a streamed agent reply so widget tests can assert rendering.
+  /// Echoes a streamed agent reply so widget tests can assert rendering. An
+  /// ACP host names the message's sender on its start and echoes the
+  /// message, as the bridge does.
   @override
   Future<void> appTurnStart(
     String serviceKey,
@@ -254,9 +256,11 @@ mixin _FakeThreads on _FakeBridgeState {
     String? sandbox,
     String? collaborationMode,
     String? reasoningEffort,
+    String? clientId,
   }) async {
     turnStartCount++;
     turnStartCalls.add((serviceKey, threadId, text, images));
+    lastTurnClientId = clientId;
     final refusal = turnStartError;
     if (refusal != null) {
       turnStartError = null;
@@ -281,7 +285,26 @@ mixin _FakeThreads on _FakeBridgeState {
     final c = _appEvents[serviceKey];
     if (c == null) return;
     if (!announceTurnStart) return;
-    c.add(AppEvent(kind: 'turn/started', threadId: threadId, raw: '{}'));
+    final named = clientId != null && isAcpKey(serviceKey);
+    c.add(
+      AppEvent(
+        kind: 'turn/started',
+        threadId: threadId,
+        raw: named ? jsonEncode({'clientId': clientId}) : '{}',
+      ),
+    );
+    if (named) {
+      c.add(
+        AppEvent(
+          kind: 'item/completed',
+          threadId: threadId,
+          itemId: '$threadId:u$turnStartCount',
+          itemType: 'userMessage',
+          text: text,
+          raw: jsonEncode({'clientId': clientId}),
+        ),
+      );
+    }
     // Leave the turn running with no output when the test wants to drive the
     // reply/completion itself (Esc state-machine + queue tests).
     if (!autoCompleteTurn) return;
@@ -321,8 +344,10 @@ mixin _FakeThreads on _FakeBridgeState {
     String? turnId,
     String text, {
     List<String> images = const [],
+    String? clientId,
   }) async {
     supplementCalls.add((threadId, turnId, text, images));
+    lastSupplementClientId = clientId;
     final gate = supplementGate;
     if (gate != null) {
       supplementGate = null;

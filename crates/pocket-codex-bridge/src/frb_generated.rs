@@ -3156,6 +3156,7 @@ fn wire__crate__api__bridge__threads__app_turn_start_impl(
             let api_sandbox = <Option<String>>::sse_decode(&mut deserializer);
             let api_collaboration_mode = <Option<String>>::sse_decode(&mut deserializer);
             let api_reasoning_effort = <Option<String>>::sse_decode(&mut deserializer);
+            let api_client_id = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -3172,6 +3173,7 @@ fn wire__crate__api__bridge__threads__app_turn_start_impl(
                             api_sandbox,
                             api_collaboration_mode,
                             api_reasoning_effort,
+                            api_client_id,
                         )?;
                         Ok(output_ok)
                     })(),
@@ -3252,6 +3254,7 @@ fn wire__crate__api__bridge__threads__app_turn_supplement_impl(
             let api_turn_id = <Option<String>>::sse_decode(&mut deserializer);
             let api_text = <String>::sse_decode(&mut deserializer);
             let api_images = <Option<Vec<String>>>::sse_decode(&mut deserializer);
+            let api_client_id = <Option<String>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
@@ -3262,6 +3265,7 @@ fn wire__crate__api__bridge__threads__app_turn_supplement_impl(
                             api_turn_id,
                             api_text,
                             api_images,
+                            api_client_id,
                         )?;
                         Ok(output_ok)
                     })(),

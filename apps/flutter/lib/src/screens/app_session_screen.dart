@@ -262,10 +262,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // Ordered timeline + an id→index map for upserting streamed/updated items.
   final List<TranscriptItem> _items = [];
   final Map<String, int> _itemIndex = {};
-  int _localSeq = 0; // ids for optimistic local user messages
-  // Supplement texts the host placed before this view showed its own copy
-  // (its echo outran the answer); such a copy is not held.
-  final _placedSupplements = <String>[];
+  int _localSeq = 0; // ids for local markers (stops, turn durations)
   final Map<String, AsyncQuestionPrompt> _asyncQuestions = {};
 
   final List<AppEvent> _approvals = []; // pending command-approval prompts
@@ -681,11 +678,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _foreground = true;
   bool _restoringSettings = false;
   Timer? _healthTimer;
-  String? _lastUserText;
-  // Images (data URLs) sent with the last user message, kept alongside
-  // _lastUserText so a one-tap retry after a dropped send re-sends the same
-  // attachments.
-  List<String> _lastUserImages = const [];
+  // The last message sent here (its text, images and client id), so a
+  // one-tap retry after a dropped send re-sends it into the same copy.
+  _Resend? _lastSent;
   // True while a file is being dragged over the chat (desktop) — shows the
   // "drop to attach" overlay.
   bool _dragging = false;

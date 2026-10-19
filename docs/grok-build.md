@@ -92,8 +92,10 @@ model again with the message (`The user sent a message while you were
 working: …`). The response streaming when it arrived keeps going into the
 same message, so POCOX holds the supplement until Grok's next model
 response starts (a new `_meta.streamStartMs` on its updates) and records it
-in the turn there, before that response. The controller shows its copy
-below the streaming reply until the host's copy marks the merge point, and
+in the turn there, before that response, still naming its sender's
+`clientId`. The sending view shows its copy below the streaming reply until
+the host's item with that id marks the merge point (other views show the
+host's item there), and
 the reply in progress is completed when the next item begins, so it never
 splits or keeps spinning. Two cases leave it elsewhere, both as in Grok's
 terminal client:
@@ -109,8 +111,10 @@ merge), so a supplement is never retried. A reopened session's replay
 carries a merged one as a user chunk marked `_meta.interjection`, with the
 typed text as `content._meta.displayText`; the transcript shows it as its
 own message of that turn (`fold.rs`), not appended to the prompt. A turn
-Grok started shows its message as soon as it starts (`agentStarted` on
-`turn/started` and on its items), since no view sent it. Grok's `_x.ai/queue/interject`
+Grok started shows its message as soon as it starts: its `turn_started`
+names no sender (`clientId: null`), so every view shows the host's item, as
+for any message sent elsewhere ([ACP agents](acp-agents.md#turns-and-permissions)).
+Grok's `_x.ai/queue/interject`
 is not a supplement: it cancels the running turn and starts the queued
 prompt (send now).
 

@@ -660,34 +660,82 @@ fn commands_and_grok_extensions_follow_the_ready_agent() {
     assert!(capabilities_of(&shared.info, 1).compact, "a later list replaces the first");
 }
 
-/// A turn the agent started brings its message (no view sent it); a prompt
-/// turn's message stays the sending view's own copy.
+/// Every user message of a live turn — its prompt, a supplement, the prompt
+/// of a turn the agent started — comes with its sender as the host names it,
+/// so the view that sent it keeps its own copy and every other view shows
+/// the host's. A prompt with images comes once its fold is installed. A host
+/// that names no sender brings the turn's start alone, as before.
 #[test]
-fn only_an_agent_started_turn_brings_its_message() {
-    let kinds = |agent_started: bool| {
-        let mut shared = Shared::default();
-        translate::gateway_event(
-            &mut shared,
-            &json!({"type": "turn_started", "sessionId": "s", "turnId": "t", "userText": "late",
-                "imageCount": 0, "agentStarted": agent_started}),
+fn live_messages_name_their_sender() {
+    // (kind, item type, text, the raw's clientId; absent is `None`)
+    type Seen = (String, Option<String>, Option<String>, Option<Value>);
+    fn seen(events: Vec<AppEvent>) -> Vec<Seen> {
+        events
+            .into_iter()
+            .map(|event| {
+                let raw: Value = serde_json::from_str(&event.raw).expect("raw");
+                (event.kind, event.item_type, event.text, raw.get("clientId").cloned())
+            })
+            .collect()
+    }
+    let message = |text: &str, sender: Value| {
+        (
+            "item/completed".to_string(),
+            Some("userMessage".to_string()),
+            Some(text.to_string()),
+            Some(sender),
         )
-        .into_iter()
-        .map(|event| {
-            let marked = serde_json::from_str::<Value>(&event.raw)
-                .is_ok_and(|raw| raw["agentStarted"] == true);
-            (event.kind, event.item_type, event.text, marked)
-        })
-        .collect::<Vec<_>>()
     };
-    let started = kinds(true);
-    assert_eq!(started[0].0, "turn/started");
-    assert!(started.iter().all(|(.., marked)| *marked), "marked as the agent's");
-    assert!(started
-        .iter()
-        .any(|(kind, item, text, _)| kind == "item/completed"
-            && item.as_deref() == Some("userMessage")
-            && text.as_deref() == Some("late")));
-    assert_eq!(kinds(false).len(), 1, "a prompt turn's start alone");
+    let start = |sender: Option<Value>| ("turn/started".to_string(), None, None, sender);
+    let mut shared = Shared::default();
+    let mut apply = |body: Value| seen(translate::gateway_event(&mut shared, &body));
+    assert_eq!(
+        apply(json!({"type": "turn_started", "sessionId": "s", "turnId": "t", "userText": "hi",
+            "imageCount": 0, "clientId": "view-1", "seq": 1})),
+        vec![start(Some(json!("view-1"))), message("hi", json!("view-1"))]
+    );
+    assert_eq!(
+        apply(json!({"type": "supplement", "sessionId": "s", "turnId": "t", "text": "more",
+            "imageCount": 0, "clientId": null, "seq": 2})),
+        vec![message("more", Value::Null)],
+        "another device's"
+    );
+    assert_eq!(
+        apply(json!({"type": "turn_started", "sessionId": "g", "turnId": "f", "userText": "own",
+            "imageCount": 0, "agentStarted": true, "seq": 3})),
+        vec![start(Some(Value::Null)), message("own", Value::Null)],
+        "a turn the agent started, from a host before `clientId`"
+    );
+    assert_eq!(
+        apply(json!({"type": "turn_started", "sessionId": "o", "turnId": "x", "userText": "old",
+            "imageCount": 0, "seq": 4})),
+        vec![start(None)],
+        "a host that names no sender"
+    );
+
+    // A prompt with images: announced at once, its message with its fold.
+    assert_eq!(
+        apply(json!({"type": "turn_started", "sessionId": "p", "turnId": "i", "userText": "pic",
+            "imageCount": 1, "clientId": "phone", "seq": 5})),
+        vec![start(Some(json!("phone")))]
+    );
+    let mut host = Transcript::default();
+    host.begin_turn("i", "pic", &["data:image/png;base64,AA".to_string()]);
+    host.apply(Some("i"), &chunk("seen"));
+    let history = json!({"window": [host.turns[0]], "truncated": false, "seq": 6,
+        "session": {"runningTurnId": "i"}});
+    let messages = |events: &[Seen]| {
+        events
+            .iter()
+            .filter(|event| event.1.as_deref() == Some("userMessage"))
+            .count()
+    };
+    let installed = seen(translate::install(&mut shared, "p", "i", &history));
+    assert_eq!(installed[0], message("pic", json!("phone")));
+    assert_eq!(installed[1].2.as_deref(), Some("seen"));
+    assert_eq!(messages(&installed), 1);
+    let again = seen(translate::install(&mut shared, "p", "i", &history));
+    assert_eq!(messages(&again), 0, "once");
 }
 
 /// A host-held question becomes the app's structured question request,
@@ -730,35 +778,36 @@ fn a_supplement_names_its_turn_and_maps_only_known_outcomes() {
     let link = link_of(&key);
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "injected", "turnId": "t1"})));
     assert_eq!(
-        ops::supplement(&link, "s", None, "more", &[]).expect("injected"),
+        ops::supplement(&link, "s", None, "more", &[], Some("view-1")).expect("injected"),
         Supplement::Injected("t1".into())
     );
     let sent = script(&gateway).steered.pop().expect("sent");
     assert_eq!(sent["turnId"], "t1", "the running turn this view shows");
     assert_eq!((sent["hostId"].clone(), sent["generation"].clone()), (json!("h"), json!(4)));
     assert_eq!(sent["text"], "more");
+    assert_eq!(sent["clientId"], "view-1", "the view's own name for it");
 
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "promptRequired", "turnId": null})));
     assert_eq!(
-        ops::supplement(&link, "s", Some("t1"), "more", &[]).expect("idle"),
+        ops::supplement(&link, "s", Some("t1"), "more", &[], None).expect("idle"),
         Supplement::PromptRequired
     );
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "startedNewTurn"})));
-    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[]).is_err(), "unknown outcome");
+    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[], None).is_err(), "unknown outcome");
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "injected", "turnId": null})));
-    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[]).is_err(), "no turn named");
+    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[], None).is_err(), "no turn named");
     script(&gateway).steer = Some((
         "409 Conflict",
         json!({"code": "turn_changed", "message": "the turn changed before the message reached it; nothing was sent"}),
     ));
-    let refused = ops::supplement(&link, "s", Some("t1"), "more", &[]).expect_err("refused");
+    let refused = ops::supplement(&link, "s", Some("t1"), "more", &[], None).expect_err("refused");
     assert!(refused.to_string().contains("turn changed"), "{refused}");
     assert_eq!(script(&gateway).steered.len(), 4, "each was sent once, never retried");
     // The host confirms another turn than the one asked for.
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "injected", "turnId": "t2"})));
-    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[]).is_err(), "another turn");
+    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[], None).is_err(), "another turn");
     script(&gateway).steer = Some(("200 OK", json!({"outcome": "injected", "turnId": " "})));
-    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[]).is_err(), "a blank turn");
+    assert!(ops::supplement(&link, "s", Some("t1"), "more", &[], None).is_err(), "a blank turn");
     disconnect_inner(&key);
 }
 
@@ -805,7 +854,8 @@ fn a_late_supplement_answer_is_owned_by_the_connection_and_host_that_asked() {
                 script.steered.len()
             };
             let pending = std::thread::spawn(move || {
-                ops::supplement(&link, "s", Some("t1"), "more", &[]).map_err(|e| e.to_string())
+                ops::supplement(&link, "s", Some("t1"), "more", &[], None)
+                    .map_err(|e| e.to_string())
             });
             let deadline = Instant::now() + Duration::from_secs(10);
             while script(&gateway).steered.len() == sent_before {
