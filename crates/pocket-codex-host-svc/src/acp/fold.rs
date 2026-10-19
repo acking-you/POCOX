@@ -718,6 +718,7 @@ impl Transcript {
         self.bytes += weight(&item);
         self.items += 1;
         turn.items.push(item.clone());
+        self.enforce_bounds();
         vec![Change::Started(item)]
     }
 

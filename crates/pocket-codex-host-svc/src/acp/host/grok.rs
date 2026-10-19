@@ -10,8 +10,10 @@
 //! Grok started by itself: an interjection that arrived after the turn it
 //! was meant for had ended (`interject-fallback-…`), or a looped, scheduled
 //! or goal turn. Such a turn is opened here like a prompt turn — its
-//! updates, permission requests and cancellation work the same way — and it
-//! ends with its `turn_completed`, since it has no prompt answer.
+//! updates, permission requests and cancellation work the same way. Every
+//! turn ends with its `turn_completed` (a prompt turn's answer can follow
+//! later, after Grok already moved on), and a prompt the queue named while
+//! the previous turn was still open is opened when that turn ends.
 //!
 //! # Supplements
 //!
@@ -79,41 +81,25 @@ impl AgentHost {
         let running = params["runningPromptId"]
             .as_str()
             .filter(|id| !id.is_empty() && id.len() <= MAX_PROMPT_ID)
-            .map(str::to_string);
+            .map(|id| {
+                let text = params["runningText"].as_str().unwrap_or_default();
+                (id.to_string(), clip(text, MAX_PROMPT_TEXT))
+            });
         let mut state = self.state();
         if state.generation != generation {
             return;
         }
         let Some(entry) = state.sessions.get_mut(session) else { return };
-        if entry.native_running == running {
+        if entry.native_running.as_ref().map(|(id, _)| id) == running.as_ref().map(|(id, _)| id) {
             return;
         }
-        entry.native_running.clone_from(&running);
-        // A turn already open here is this host's prompt (or one opened
-        // before); a reopening session is not live yet.
-        let Some(prompt) = running else { return };
-        if entry.pending || entry.active.is_some() {
-            return;
-        }
-        entry.active = Some(ActiveTurn::agent_started(prompt.clone()));
-        let text = clip(params["runningText"].as_str().unwrap_or_default(), MAX_PROMPT_TEXT);
-        state.touch(session);
-        // Without transcript room the turn still runs (and is shown
-        // running), its content is dropped like any other.
-        if state.reserve_transcript(session, false) {
-            if let Some(transcript) = state.transcript_mut(session) {
-                transcript.begin_turn(&prompt, &text, &[]);
-            }
-        }
-        state.event(json!({
-            "type": "turn_started", "sessionId": session, "turnId": prompt,
-            "userText": text, "imageCount": 0, "agentStarted": true,
-        }));
-        state.session_event(session);
+        entry.native_running = running;
+        adopt_native_turn(&mut state, session);
     }
 
-    /// A Grok session notification: `turn_completed` ends a turn Grok
-    /// started (a prompt turn ends with its answer instead).
+    /// A Grok session notification: `turn_completed` ends the turn it
+    /// names, a prompt turn too (its answer may follow later, and Grok may
+    /// already run the next prompt meanwhile).
     pub(super) fn on_grok_notification(&self, generation: u64, params: Option<Value>) {
         let Some(params) = params else { return };
         let update = &params["update"];
@@ -128,21 +114,25 @@ impl AgentHost {
         ) else {
             return;
         };
-        let agent_started = {
+        let ends = {
             let mut state = self.state();
             if state.generation != generation {
                 return;
             }
             let Some(entry) = state.sessions.get_mut(session) else { return };
-            if entry.native_running.as_deref() == Some(prompt) {
+            if entry
+                .native_running
+                .as_ref()
+                .is_some_and(|(id, _)| id == prompt)
+            {
                 entry.native_running = None;
             }
             entry
                 .active
                 .as_ref()
-                .is_some_and(|active| active.agent_started && active.id == prompt)
+                .is_some_and(|active| active.id == prompt)
         };
-        if agent_started {
+        if ends {
             let stop = update["stop_reason"]
                 .as_str()
                 .or_else(|| update["stopReason"].as_str());
@@ -169,7 +159,12 @@ impl AgentHost {
             _ => question(&params),
         };
         let Some(request) = request else {
-            peer.respond_now(id, Err(RpcError::new(RpcError::INVALID_PARAMS, "malformed request")));
+            let refusal = if method == PLAN_APPROVAL {
+                "malformed plan approval"
+            } else {
+                "malformed questions, or more than this client shows at once"
+            };
+            peer.respond_now(id, Err(RpcError::new(RpcError::INVALID_PARAMS, refusal)));
             return;
         };
         self.admit_request(generation, peer, id, request);
@@ -180,10 +175,12 @@ impl AgentHost {
     pub(super) fn grok_runs(&self, generation: u64, session: &str, turn: &str) -> bool {
         let state = self.state();
         state.generation == generation
-            && state
-                .sessions
-                .get(session)
-                .is_some_and(|entry| entry.native_running.as_deref() == Some(turn))
+            && state.sessions.get(session).is_some_and(|entry| {
+                entry
+                    .native_running
+                    .as_ref()
+                    .is_some_and(|(id, _)| id == turn)
+            })
     }
 
     /// Rename `session` through Grok (`_x.ai/session/rename`); the title is
@@ -287,38 +284,70 @@ fn plan_approval(params: &Value) -> Option<Permission> {
 }
 
 /// `_x.ai/ask_user_question {sessionId, toolCallId, questions: [{question,
-/// options: [{label, description}], multiSelect?}]}`, bounded.
-fn question(params: &Value) -> Option<Permission> {
-    let questions: Vec<Value> = params["questions"]
-        .as_array()?
+/// options: [{label, description}], multiSelect?}]}`. The set is answered
+/// as a whole, so one that is malformed anywhere or exceeds the bounds is
+/// refused, never shown in part.
+pub(super) fn question(params: &Value) -> Option<Permission> {
+    let asked = params["questions"].as_array()?;
+    if asked.is_empty() || asked.len() > MAX_QUESTIONS {
+        return None;
+    }
+    let questions = asked
         .iter()
-        .take(MAX_QUESTIONS)
-        .filter_map(|question| {
-            let options: Vec<Value> = question["options"]
-                .as_array()?
+        .map(|question| {
+            let offered = question["options"].as_array()?;
+            if offered.is_empty() || offered.len() > MAX_QUESTION_OPTIONS {
+                return None;
+            }
+            let options = offered
                 .iter()
-                .take(MAX_QUESTION_OPTIONS)
-                .filter_map(|option| {
+                .map(|option| {
                     Some(json!({
                         "label": option["label"].as_str()?,
                         "description": text(&option["description"], 1024),
                     }))
                 })
-                .collect();
+                .collect::<Option<Vec<_>>>()?;
             Some(json!({
                 "question": question["question"].as_str()?,
                 "multiSelect": question["multiSelect"] == true,
                 "options": options,
             }))
         })
-        .collect();
-    if questions.is_empty() {
-        return None;
-    }
+        .collect::<Option<Vec<_>>>()?;
     let tool_call = json!({
         "toolCallId": text(&params["toolCallId"], MAX_ID),
         "title": "Question",
         "kind": "think",
     });
     pending(params, tool_call, RequestKind::Question(questions))
+}
+
+/// Open the prompt Grok's queue reports running in `session` as a turn Grok
+/// started by itself, unless a turn is already open here (this host's
+/// prompt, or one opened before), the session is reopening, or that prompt
+/// already ended here. Called when the queue moves and when a turn ends:
+/// Grok can run its next prompt before the previous one's answer arrives.
+pub(super) fn adopt_native_turn(state: &mut State, session: &str) {
+    let Some(entry) = state.sessions.get(session) else { return };
+    let Some((prompt, text)) = entry.native_running.clone() else { return };
+    if entry.pending || entry.active.is_some() || !state.outcomes_of(session, &prompt).is_empty() {
+        return;
+    }
+    if let Some(entry) = state.sessions.get_mut(session) {
+        entry.active = Some(ActiveTurn::agent_started(prompt.clone()));
+    }
+    state.touch(session);
+    // Without transcript room the turn still runs (and is shown running);
+    // its content is dropped like any other.
+    if state.reserve_transcript(session, false) {
+        if let Some(transcript) = state.transcript_mut(session) {
+            transcript.begin_turn(&prompt, &text, &[]);
+        }
+    }
+    state.event(json!({
+        "type": "turn_started", "sessionId": session, "turnId": prompt,
+        "userText": text, "imageCount": 0, "agentStarted": true,
+    }));
+    state.session_event(session);
 }

@@ -24,6 +24,8 @@ extension _SessionEvents on _AppSessionState {
     // Whatever the previous connection still answers is not this one's.
     if (moved) _linkEpoch++;
     _updateState(_invalidateCaps);
+    // The agent's command list arrives with its host state too.
+    ref.invalidate(agentCommandsProvider(_commandsKey));
     if (lost) {
       // The host attachments were granted for is gone (or another one
       // answers): nothing still being picked, read or uploaded may reach

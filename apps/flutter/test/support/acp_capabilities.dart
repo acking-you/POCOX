@@ -8,6 +8,7 @@ AppCapabilities negotiatedAcpCapabilities({
   bool imageInput = false,
   bool steer = false,
   bool nativeHistory = false,
+  bool commands = false,
 }) => AppCapabilities(
   provider: 'acp',
   fast: false,
@@ -30,6 +31,7 @@ AppCapabilities negotiatedAcpCapabilities({
   sessionReopen: 'load',
   sessionList: 'agent',
   runningInventory: 'engine',
+  commands: commands,
 );
 
 /// A connected native OpenCode host's capabilities, as the bridge reports

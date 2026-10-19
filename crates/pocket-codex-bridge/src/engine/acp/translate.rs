@@ -377,10 +377,12 @@ fn delta_event(thread: &str, item: &ThreadItem, delta: String) -> AppEvent {
 
 /// Full-text events for a fold rebuilt from history while its turn runs:
 /// each replaces what the UI shows for that item.
-pub fn recovered(thread: &str, turn: &Turn) -> Vec<AppEvent> {
+pub fn recovered(thread: &str, turn: &Turn, agent_started: bool) -> Vec<AppEvent> {
     let mut out: Vec<AppEvent> = turn_items(turn)
         .into_iter()
-        .filter(|mapped| mapped.item_type != "userMessage")
+        // A view holds its own copy of a prompt it sent; a turn the agent
+        // started has none, so its messages come from the fold.
+        .filter(|mapped| agent_started || mapped.item_type != "userMessage")
         .map(|mapped| {
             let done = mapped.item_type == "historyGap"
                 || mapped.item_type == CONTENT_OMITTED
@@ -389,12 +391,29 @@ pub fn recovered(thread: &str, turn: &Turn) -> Vec<AppEvent> {
                     .iter()
                     .find(|item| item.id == mapped.id)
                     .is_some_and(|item| item.kind == ItemKind::Plan || tool_done(item));
-            let kind = if done { "item/completed" } else { "item/started" };
+            let kind = if done || mapped.item_type == "userMessage" {
+                "item/completed"
+            } else {
+                "item/started"
+            };
             item_event(kind, thread, &mapped, Some(mapped.text.clone()))
         })
         .collect();
     out.extend(cleared_notices(thread, turn));
+    if agent_started {
+        mark_agent_started(&mut out);
+    }
     out
+}
+
+/// Mark `events` as belonging to a turn the agent started by itself.
+fn mark_agent_started(events: &mut [AppEvent]) {
+    for event in events {
+        if let Ok(mut raw) = serde_json::from_str::<Value>(&event.raw) {
+            raw["agentStarted"] = Value::Bool(true);
+            event.raw = raw.to_string();
+        }
+    }
 }
 
 /// Completion events for a turn that ended: every retained item with its
@@ -451,10 +470,12 @@ pub fn install(shared: &mut Shared, thread: &str, turn: &str, history: &Value) -
     if history["session"]["runningTurnId"] == turn {
         shared.running.insert(thread.to_string(), turn.to_string());
     }
+    let agent_started = history["session"]["runningTurnId"] == turn
+        && history["session"]["runningAgentStarted"] == true;
     shared
         .live
         .turn(thread, turn)
-        .map(|fold| recovered(thread, fold))
+        .map(|fold| recovered(thread, fold, agent_started))
         .unwrap_or_default()
 }
 
@@ -606,17 +627,9 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
             // no view holds its message yet: it comes from the host, marked
             // like the turn's start.
             if agent_started {
-                out.extend(
-                    changes(&thread, &turn, folded)
-                        .into_iter()
-                        .map(|mut event| {
-                            if let Ok(mut raw) = serde_json::from_str::<Value>(&event.raw) {
-                                raw["agentStarted"] = Value::Bool(true);
-                                event.raw = raw.to_string();
-                            }
-                            event
-                        }),
-                );
+                let mut message = changes(&thread, &turn, folded);
+                mark_agent_started(&mut message);
+                out.extend(message);
             }
             out
         },
@@ -718,8 +731,9 @@ pub struct Plan {
     pub generation: u64,
     /// Turns that ended meanwhile: `(thread, turn, recorded outcome)`.
     pub ended: Vec<(String, String, Option<Value>)>,
-    /// Running turns this view had not seen begin.
-    pub started: Vec<(String, String)>,
+    /// Running turns this view had not seen begin, and whether the agent
+    /// started them by itself.
+    pub started: Vec<(String, String, bool)>,
     /// Turns running now, whose folds must be rebuilt.
     pub running: Vec<(String, String)>,
 }
@@ -773,10 +787,15 @@ pub fn reconcile(shared: &mut Shared, snapshot: &Value) -> Plan {
             (thread.clone(), turn.clone(), outcome)
         })
         .collect();
-    let mut started: Vec<(String, String)> = running
+    let mut started: Vec<(String, String, bool)> = running
         .iter()
         .filter(|(thread, turn)| previous.get(*thread) != Some(*turn))
-        .map(|(thread, turn)| (thread.clone(), turn.clone()))
+        .map(|(thread, turn)| {
+            let agent = sessions
+                .get(thread)
+                .is_some_and(|session| session["runningAgentStarted"] == true);
+            (thread.clone(), turn.clone(), agent)
+        })
         .collect();
     started.sort();
     let mut running_list: Vec<(String, String)> = running
@@ -833,9 +852,8 @@ pub fn reconcile(shared: &mut Shared, snapshot: &Value) -> Plan {
 }
 
 /// `turn/started` for a running turn a recovery found.
-pub fn started(thread: &str, turn: &str) -> AppEvent {
-    // Its message, if any, comes with the history the recovery reads.
-    turn_started(thread, turn, false)
+pub fn started(thread: &str, turn: &str, agent_started: bool) -> AppEvent {
+    turn_started(thread, turn, agent_started)
 }
 
 #[cfg(test)]

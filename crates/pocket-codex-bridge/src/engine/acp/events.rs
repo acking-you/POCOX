@@ -90,8 +90,8 @@ pub(super) async fn recover(
         let history = read_turn(client, shared, thread, turn, generation).await;
         send_all(tx, translate::finished(thread, turn, history.as_ref(), outcome.as_ref()));
     }
-    for (thread, turn) in &plan.started {
-        send_all(tx, vec![translate::started(thread, turn)]);
+    for (thread, turn, agent_started) in &plan.started {
+        send_all(tx, vec![translate::started(thread, turn, *agent_started)]);
     }
     for (thread, turn) in &plan.running {
         sync_turn(client, tx, shared, thread, turn, generation).await;

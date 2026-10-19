@@ -230,6 +230,13 @@ impl AgentHost {
             // Controllers cache the session state, which named this turn as
             // running: tell them it no longer does.
             state.session_event(session);
+            if state
+                .negotiated
+                .as_ref()
+                .is_some_and(|negotiated| negotiated.capabilities.grok)
+            {
+                super::grok::adopt_native_turn(&mut state, session);
+            }
             (leftovers, state.peer.clone())
         };
         if let Some(peer) = peer {

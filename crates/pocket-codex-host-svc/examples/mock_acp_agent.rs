@@ -533,6 +533,22 @@ impl Agent {
                     turn_completed(&session, fallback, "end_turn");
                 });
             },
+            "chain" if self.grok => {
+                // Grok moves on to its own next prompt before this one's
+                // answer: the queue names it first, then this turn ends.
+                let prompt = params["_meta"]["promptId"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let next = "interject-fallback-3";
+                queue_changed(&session, Some((next, "next")));
+                turn_completed(&session, &prompt, "end_turn");
+                update(&session, text("agent_message_chunk", "chained:next"));
+                tokio::time::sleep(Duration::from_millis(80)).await;
+                respond(&id, json!({"stopReason": "end_turn"}));
+                tokio::time::sleep(Duration::from_millis(30)).await;
+                turn_completed(&session, next, "end_turn");
+            },
             "plan" if self.grok => {
                 let answer = self
                     .call(

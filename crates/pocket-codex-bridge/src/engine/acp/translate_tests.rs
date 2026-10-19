@@ -151,7 +151,7 @@ fn reconcile_plans_recorded_outcomes_and_restores_pending_requests() {
     assert_eq!(ended[0].2, Some(json!({"kind": "agentExited"})));
     assert_eq!(ended[1].2, None, "an unknown outcome is not assumed");
     assert_eq!(plan.running, vec![("v".to_string(), "n".to_string())]);
-    assert_eq!(plan.started, vec![("v".to_string(), "n".to_string())]);
+    assert_eq!(plan.started, vec![("v".to_string(), "n".to_string(), false)]);
     let events = &plan.events;
     assert!(
         events.iter().all(|e| e.kind != "turn/started"),
@@ -614,4 +614,41 @@ fn reconnect_reports_admission_released_while_the_controller_was_away() {
     let body: Value = serde_json::from_str(&event.raw).expect("event");
     assert_eq!(body["admitted"], false);
     assert!(shared.sessions.is_empty());
+}
+
+/// A turn the agent started that a recovery finds running keeps its mark
+/// and its message (no view holds a copy of it); a prompt turn's message
+/// stays the sending view's.
+#[test]
+fn a_recovered_agent_started_turn_keeps_its_mark_and_message() {
+    let mut host = Transcript::default();
+    host.begin_turn("F", "late", &[]);
+    host.apply(Some("F"), &chunk("ok"));
+    let recover = |agent_started: bool| {
+        let mut shared = Shared::default();
+        let session = json!({"sessionId": "s", "runningTurnId": "F",
+            "runningAgentStarted": agent_started});
+        let plan = reconcile(
+            &mut shared,
+            &json!({"generation": 1, "info": {"hostId": "h"}, "sessions": [session.clone()],
+                "permissions": [], "recentTurns": []}),
+        );
+        let history = json!({"window": [host.turns[0].clone()], "truncated": false,
+            "seq": 3, "generation": 1, "session": session});
+        (plan.started, install(&mut shared, "s", "F", &history))
+    };
+    let (started, events) = recover(true);
+    assert_eq!(started, vec![("s".to_string(), "F".to_string(), true)]);
+    let message = events
+        .iter()
+        .find(|e| e.item_type.as_deref() == Some("userMessage"))
+        .expect("its message");
+    assert_eq!(message.text.as_deref(), Some("late"));
+    assert!(events
+        .iter()
+        .all(|e| e.raw.contains("\"agentStarted\":true")));
+    let (_, events) = recover(false);
+    assert!(events
+        .iter()
+        .all(|e| e.item_type.as_deref() != Some("userMessage")));
 }

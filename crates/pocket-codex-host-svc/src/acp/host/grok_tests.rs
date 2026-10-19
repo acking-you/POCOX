@@ -118,8 +118,50 @@ async fn supplements_reach_the_running_turn_and_grok_turns_are_followed() {
     host.stop().await;
 }
 
+/// Grok can name its next prompt before this host's turn has ended and
+/// been answered: the turn ends with Grok's own event and the next one
+/// opens then, receiving its content.
+#[tokio::test]
+async fn grok_moving_on_before_the_answer_opens_its_next_turn() {
+    let (host, session, _cwd) = grok_host().await;
+    let turn = host
+        .prompt(&session, "chain", &[], None)
+        .await
+        .expect("turn");
+    let next = "interject-fallback-3";
+    eventually(|| agent_said(&host, "chained:next"), "the next prompt's output").await;
+    assert!(matches!(outcome_of(&host, &session, &turn), Some(TurnOutcome::Stopped { .. })));
+    let folded = host
+        .state()
+        .transcript_ref(&session)
+        .and_then(|t| t.turn(next).cloned())
+        .expect("its own turn");
+    assert!(folded.items.iter().any(|i| i.text == "chained:next"), "{folded:?}");
+    eventually(|| outcome_of(&host, &session, next).is_some(), "its end").await;
+    assert!(host.state().sessions[&session].active.is_none());
+    host.stop().await;
+}
+
 fn outcome_of(host: &AgentHost, session: &str, turn: &str) -> Option<TurnOutcome> {
     super::tests::outcome(host, session, turn)
+}
+
+/// A question set is shown whole or refused: too many questions or
+/// options, or one malformed entry, is never cut down to what fits.
+#[test]
+fn a_question_set_is_shown_whole_or_refused() {
+    let option = json!({"label": "A", "description": ""});
+    let set = |questions: usize, options: usize| {
+        json!({"sessionId": "s", "questions": (0..questions)
+            .map(|i| json!({"question": format!("q{i}"), "options": vec![option.clone(); options]}))
+            .collect::<Vec<_>>()})
+    };
+    assert!(super::grok::question(&set(8, 16)).is_some());
+    assert!(super::grok::question(&set(9, 1)).is_none(), "too many questions");
+    assert!(super::grok::question(&set(1, 17)).is_none(), "too many options");
+    let mut broken = set(2, 1);
+    broken["questions"][1]["options"][0] = json!({"description": "no label"});
+    assert!(super::grok::question(&broken).is_none(), "one malformed option");
 }
 
 /// Questions and plan approval are held for their turn and answered in

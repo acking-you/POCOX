@@ -219,8 +219,8 @@ pub struct Session {
     /// Updates are `session/load` history replay.
     pub replaying: bool,
     /// The prompt the agent's own queue reports running (Grok's
-    /// `_x.ai/queue/changed`), when it reports one.
-    pub native_running: Option<String>,
+    /// `_x.ai/queue/changed`), with its text, when it reports one.
+    pub native_running: Option<(String, String)>,
     touched: u64,
 }
 
@@ -681,6 +681,7 @@ impl State {
                 .filter(|(_, size)| *size > 0)
                 .map(|(used, size)| json!({"used": used, "size": size})),
             "runningTurnId": session.active.as_ref().map(|t| t.id.clone()),
+            "runningAgentStarted": session.active.as_ref().is_some_and(|t| t.agent_started),
             "turnDispatched": session.active.as_ref().is_some_and(|t| t.dispatched),
             "cancelRequested": session.active.as_ref().is_some_and(|t| t.cancel_requested),
         })

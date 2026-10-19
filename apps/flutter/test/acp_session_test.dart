@@ -548,6 +548,33 @@ void main() {
     expect(api.lastInterruptTurnId, 'F');
     await t.pumpWidget(const SizedBox.shrink());
   });
+  testWidgets('a new command list from the agent replaces the shown one', (
+    t,
+  ) async {
+    final api = AcpApi()
+      ..acpCapabilities[acp] = negotiatedAcpCapabilities(
+        providerName: 'Grok',
+        commands: true,
+      )
+      ..agentCommands = const [AgentCommand(name: 'old')];
+    await open(t, api, acp, thread: 'ses-1');
+    await t.enterText(find.byKey(const Key('composer-input')), '/');
+    await frames(t);
+    expect(find.byKey(const Key('command-old')), findsOneWidget);
+    // The host state that carries the agent's new list.
+    api.agentCommands = const [AgentCommand(name: 'compact')];
+    api.pushEvent(
+      acp,
+      const AppEvent(
+        kind: 'acp/host/state',
+        raw: '{"phase":{"state":"ready"}}',
+      ),
+    );
+    await frames(t);
+    expect(find.byKey(const Key('command-compact')), findsOneWidget);
+    expect(find.byKey(const Key('command-old')), findsNothing);
+    await t.pumpWidget(const SizedBox.shrink());
+  });
   _registerAttachments();
   _registerOmissions();
 

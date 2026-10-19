@@ -98,25 +98,14 @@ async fn failed_probe_remains_unknown_and_does_not_reuse_older_evidence() {
         .is_some_and(|value| value.records.is_empty()));
 }
 
-/// Writes an executable script from a child shell: a write descriptor held
-/// by this multithreaded test process could be inherited by another test's
-/// fork and make executing the script fail with `ETXTBSY`.
-#[cfg(unix)]
-fn write_script(path: &std::path::Path, body: &str) {
-    let status = std::process::Command::new("/bin/sh")
-        .args(["-c", "printf '%s' \"$1\" > \"$2\" && chmod 700 \"$2\"", "sh", body])
-        .arg(path)
-        .status()
-        .expect("sh");
-    assert!(status.success(), "script written");
-}
-
 #[cfg(unix)]
 #[tokio::test]
 async fn handoff_probe_bypasses_display_cache_and_distinguishes_failure_from_empty() {
+    use std::os::unix::fs::PermissionsExt;
     let root = tempfile::tempdir().expect("fixture");
     let program = root.path().join("inventory");
-    write_script(&program, "#!/bin/sh\ncat >/dev/null\nprintf '[]'\n");
+    std::fs::write(&program, "#!/bin/sh\ncat >/dev/null\nprintf '[]'\n").expect("script");
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).expect("mode");
     let probe = Probe::new(program.clone(), root.path().into(), root.path().into());
     let id = "a0000000-0000-4000-8000-000000000000";
     *probe.cache.lock().await = Some(Inventory {
@@ -134,7 +123,7 @@ async fn handoff_probe_bypasses_display_cache_and_distinguishes_failure_from_emp
         .await
         .expect("fresh empty inventory")
         .is_empty());
-    write_script(&program, "#!/bin/sh\ncat >/dev/null\nprintf 'not-json'\n");
+    std::fs::write(&program, "#!/bin/sh\ncat >/dev/null\nprintf 'not-json'\n").expect("failure");
     assert!(probe.idle_owners(id).await.is_err(), "parse failure is not a released session");
     assert!(probe.idle_owners("invalid").await.is_err());
 }
