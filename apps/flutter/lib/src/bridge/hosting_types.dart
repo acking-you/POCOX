@@ -217,6 +217,7 @@ class OpenCodeHostStatus {
     this.agents = const [],
     this.problem,
     this.separateHistory = false,
+    this.backgroundServer = false,
   });
 
   /// The running `opencode` version.
@@ -241,6 +242,10 @@ class OpenCodeHostStatus {
   /// OpenCode's default one: this computer's other OpenCode sessions are
   /// not among them.
   final bool separateHistory;
+
+  /// The host uses OpenCode's background server, which OpenCode's other
+  /// clients share and which keeps running when the host stops.
+  final bool backgroundServer;
 }
 
 /// The OpenCode executable found on this device.

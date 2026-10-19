@@ -5666,6 +5666,18 @@ abstract class AppLocalizations {
   /// **'None'**
   String get openCodeNone;
 
+  /// No description provided for @openCodeServer.
+  ///
+  /// In en, this message translates to:
+  /// **'Server'**
+  String get openCodeServer;
+
+  /// No description provided for @openCodeBackgroundServer.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server (shared, without POCOX tools)'**
+  String get openCodeBackgroundServer;
+
   /// No description provided for @openCodeConfigNote.
   ///
   /// In en, this message translates to:
@@ -5893,6 +5905,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.'**
   String get accessOpenCodeServiceDetail;
+
+  /// No description provided for @accessOpenCodeClientTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Another OpenCode client is connected'**
+  String get accessOpenCodeClientTitle;
+
+  /// No description provided for @accessOpenCodeClientDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.'**
+  String get accessOpenCodeClientDetail;
 
   /// No description provided for @accessPocketHostTitle.
   ///

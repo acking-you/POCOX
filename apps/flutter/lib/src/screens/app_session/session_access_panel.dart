@@ -60,6 +60,7 @@ AccessView accessView(
   final running = access?.running ?? false;
   final agent = providerName.isEmpty ? l10n.accessClientOther : providerName;
   final service = access?.holder?.client == 'opencode_service';
+  final serviceClient = access?.holder?.client == 'opencode_client';
   return switch (reason) {
     'owned' || 'released' => (
       status: l10n.accessStatusOpening,
@@ -121,9 +122,13 @@ AccessView accessView(
       status: l10n.sessionInUseElsewhere,
       title: service
           ? l10n.accessOpenCodeServiceTitle
+          : serviceClient
+          ? l10n.accessOpenCodeClientTitle
           : l10n.accessSourceOpenTitle,
       detail: service
           ? l10n.accessOpenCodeServiceDetail
+          : serviceClient
+          ? l10n.accessOpenCodeClientDetail
           : l10n.accessSourceOpenDetail,
       next: null,
       icon: AppIcons.folder_shared_outlined,

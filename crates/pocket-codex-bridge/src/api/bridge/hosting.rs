@@ -117,6 +117,9 @@ pub struct OpenCodeHostStatusDto {
     /// The host keeps its sessions in a database of its own, not in
     /// OpenCode's default one.
     pub separate_history: bool,
+    /// The host is attached to OpenCode's background server, which OpenCode's
+    /// other clients share and which keeps running when the host stops.
+    pub background_server: bool,
 }
 impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusDto {
     fn from(s: crate::engine::serve_opencode::OpenCodeStatus) -> Self {
@@ -128,6 +131,7 @@ impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusD
             agents: s.agents,
             problem: s.problem,
             separate_history: s.separate_history,
+            background_server: s.background_server,
         }
     }
 }

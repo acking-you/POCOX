@@ -32,6 +32,7 @@ impl Wire for V2 {
     const DATABASE: &'static [&'static str] = &["debug", "paths", "db"];
     const EVENTS: &'static [&'static str] = &["api", "event"];
     const LISTENING: &'static str = "server listening on ";
+    const BACKGROUND_SERVER: bool = true;
     const MIN: (u32, u32) = (2, 0);
 
     fn event(data: &[u8]) -> Result<Option<Event>, ClientError> {
@@ -43,6 +44,8 @@ impl Wire for V2 {
         Ok(Health {
             healthy: true,
             version: info.version,
+            pid: info.pid,
+            urls: info.urls,
         })
     }
 

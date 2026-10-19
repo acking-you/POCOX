@@ -750,6 +750,10 @@ class OpenCodeHostStatusDto {
   /// OpenCode's default one.
   final bool separateHistory;
 
+  /// The host is attached to OpenCode's background server, which OpenCode's
+  /// other clients share and which keeps running when the host stops.
+  final bool backgroundServer;
+
   const OpenCodeHostStatusDto({
     required this.version,
     required this.providersConnected,
@@ -758,6 +762,7 @@ class OpenCodeHostStatusDto {
     required this.agents,
     this.problem,
     required this.separateHistory,
+    required this.backgroundServer,
   });
 
   @override
@@ -768,7 +773,8 @@ class OpenCodeHostStatusDto {
       defaultModel.hashCode ^
       agents.hashCode ^
       problem.hashCode ^
-      separateHistory.hashCode;
+      separateHistory.hashCode ^
+      backgroundServer.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -781,5 +787,6 @@ class OpenCodeHostStatusDto {
           defaultModel == other.defaultModel &&
           agents == other.agents &&
           problem == other.problem &&
-          separateHistory == other.separateHistory;
+          separateHistory == other.separateHistory &&
+          backgroundServer == other.backgroundServer;
 }

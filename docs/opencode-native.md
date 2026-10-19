@@ -47,12 +47,14 @@ file as 1.x and, on first open, copies every session into `session_v2` and
 
 OpenCode 2's terminal app, `opencode run` and desktop app share one
 background server (`opencode serve --service`) that keeps running after they
-exit. It holds the shared history open, so a host on that history follows
-its sessions read-only (`external_source_open`) while it runs. The access
-names it (holder `opencode_service`, from its arguments) and says to stop it
-with `opencode service stop` or to give the host its own history. Hosting
-through that server instead is proposed in
-[OpenCode 2's background server](#opencode-2s-background-server-proposal).
+exit. A 2.x host on the shared history with OpenCode's own configuration
+attaches to that server instead of starting its own, and writes while no
+other client is connected to it
+([OpenCode 2's background server](#opencode-2s-background-server)). A host
+that keeps its own server beside it (a custom provider) follows read-only
+while it runs: the access names it (holder `opencode_service`, from its
+arguments) and says to stop it with `opencode service stop` or to give the
+host its own history.
 
 Not covered on 2.x yet: token-by-token text (replies appear at text and
 tool boundaries), and forms with number, boolean or external fields (they
@@ -367,10 +369,10 @@ Desktop Local sessions reads OpenCode's database directly and read-only
 continued by opening it on the running OpenCode host (**Continue in
 <host>**), or by hosting OpenCode first.
 
-## OpenCode 2's background server (proposal)
+## OpenCode 2's background server
 
-Proposed 2026-10-19, waiting for the user's decision. Nothing here is
-implemented.
+Proposed 2026-10-19. The user chose option A (below), and it was implemented
+on 2026-10-20. Option B, takeover, stays deferred (AGENTS.md item 35).
 
 **What OpenCode 2 does.** From the 2.0.32 source
 (`packages/cli/src/server-process.ts`, `services/service-config.ts`,
@@ -547,7 +549,54 @@ connected" can be observed.
 1.19.3 keeps its own server, unchanged, and so does 2.x with `disabled`. The
 AGENTS.md §7 checks also apply.
 
-**Decision:** pending.
+**Decision (2026-10-19):** option A, as above; B stays deferred.
+
+**As implemented** (`opencode/service.rs`, `Server::attach`, the
+`serve_opencode` watchdog):
+
+- Attaching refuses a service whose `/api/info` lists a non-loopback URL.
+  It does not check this again at each admission: OpenCode restarts the
+  service to change remote access or its hostname, and the host checks
+  the replacement when it attaches again.
+- A connected client is shown in one of two ways, both read-only. While
+  another client's turn runs: `external_running`, holder `opencode`.
+  Otherwise: `external_source_open`, holder `opencode_client`, with the
+  session's turn (a turn this host started stays this host's).
+- The watchdog reads the registration every 2 s.
+  - A replaced service is attached again under the host's lease. Controllers
+    reconnect to the new incarnation, as after Apply.
+  - A stopped service is reported in the host's status ("OpenCode's background
+    server stopped"). The host attaches again once a client starts a new one.
+- Host details show the server as "OpenCode's background server (shared,
+  without POCOX tools)" (`OpenCodeStatus.backgroundServer`).
+- Not done: the editor still lets a new custom-provider host choose the
+  shared history (point 3's recommendation).
+
+**Verified (2026-10-20)** on official 1.19.3 and 2.0.32, with isolated roots
+and the test's own port. The new `opencode_native` live test, on 2.0.32:
+
+- `disabled` keeps an own server;
+- with none running, the host started the service and attached;
+- a second Pocket host on the source was refused;
+- a prompt was answered with no other client;
+- the idle terminal app under a pty made the session follow
+  (`opencode_client`, idle), refused a rename, and wrote again after the
+  app exited;
+- `service restart` was seen as a replacement and attached again;
+- stopping the host left the service running until `service stop`.
+
+On 1.19.3 the host keeps its own server. The other three live tests passed
+on both versions.
+
+The bridge acceptance test passed on both versions. On 2.0.32 it ran through
+the background server: start, source singleton, a prompt, release and
+reopen, and Apply keeping history and the service. After `service restart`
+the watchdog attached the host again by itself, with a new incarnation and
+service pid. Stop left the service running.
+
+Also passed: the Rust workspace (905 passed, 26 ignored), clippy, and the
+Flutter suite (1658 passed, 7 skipped). Not verified: the macOS app, a
+relay or second device, and other platforms.
 
 ## Verification
 

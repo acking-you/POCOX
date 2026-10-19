@@ -42,6 +42,10 @@ impl<T> Page<T> {
 #[derive(Deserialize)]
 pub(super) struct Info {
     pub version: String,
+    #[serde(default)]
+    pub pid: Option<u32>,
+    #[serde(default)]
+    pub urls: Vec<String>,
 }
 
 #[derive(Deserialize)]

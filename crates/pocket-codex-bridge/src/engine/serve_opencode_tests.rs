@@ -25,11 +25,32 @@ fn change() -> Change {
         runtime: RuntimeChange::Keep,
     }
 }
-struct Cleanup;
+/// Stops what the test started, OpenCode 2's isolated background server
+/// included: stopping its host leaves that server running.
+struct Cleanup(Option<String>);
 impl Drop for Cleanup {
     fn drop(&mut self) {
         let _ = serve::serve_stop_all();
+        if let Some(binary) = &self.0 {
+            let _ = std::process::Command::new(binary)
+                .args(["service", "stop"])
+                .stdin(std::process::Stdio::null())
+                .output();
+        }
     }
+}
+
+fn opencode(binary: &str, args: &[&str]) -> String {
+    let output = std::process::Command::new(binary)
+        .args(args)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("isolated opencode");
+    assert!(output.status.success(), "opencode {args:?}");
+    String::from_utf8(output.stdout)
+        .expect("UTF-8")
+        .trim()
+        .to_owned()
 }
 
 #[test]
@@ -45,13 +66,31 @@ fn native_bridge_hosting_controller_and_original_resume() {
             "isolated {name}"
         );
     }
+    // OpenCode 2's background server is found through these.
+    for name in ["XDG_STATE_HOME", "XDG_CONFIG_HOME", "OPENCODE_CONFIG_DIR"] {
+        if let Some(path) = std::env::var_os(name) {
+            assert!(std::path::PathBuf::from(path).starts_with(&root), "isolated {name}");
+        }
+    }
     let binary = std::env::var("PCX_OPENCODE_BIN").expect("installed native binary");
+    // A 2.x host on the shared history attaches to the background server,
+    // here the fixture's own on a port of its own, never the default.
+    let v2 = !opencode(&binary, &["--version"])
+        .trim_start_matches('v')
+        .starts_with("1.");
+    if v2 {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .expect("free port")
+            .port();
+        opencode(&binary, &["service", "set", "port", &port.to_string()]);
+    }
     runtime::init(root.join("support")).expect("isolated support");
     let mut config = pocket_codex_core::config::Config::default();
     config.pb_mapper.relay = Some("127.0.0.1:9".into());
     config.pb_mapper.key = Some("f".repeat(32));
     config::save_config(&root.join("support"), &config).expect("isolated offline relay");
-    let _cleanup = Cleanup;
+    let _cleanup = Cleanup(v2.then(|| binary.clone()));
     let Started::OpenCode(report) = host_start::start_configured(
         Some("native-fixture"),
         Runtime::OpenCode {
@@ -71,8 +110,9 @@ fn native_bridge_hosting_controller_and_original_resume() {
         .expect("native status");
     assert_eq!(row.provider, "opencode");
     assert_eq!(row.protocol, "opencode-http");
-    assert!(row.alive && row.api_service_key.is_empty() && row.opencode.is_some());
-    let pid = row.pid.expect("owned process");
+    assert!(row.alive && row.api_service_key.is_empty());
+    assert_eq!(row.opencode.as_ref().map(|s| s.background_server), Some(v2));
+    let mut pid = row.pid.expect("owned process");
     let incarnation = row.incarnation.expect("incarnation");
     let owned = transport::resolve_owned_blocking().expect("self-host transport");
     assert!(local_gateway(key, &transport::Context::of(&owned.transport)).is_some());
@@ -253,7 +293,7 @@ fn native_bridge_hosting_controller_and_original_resume() {
     assert!(pocket_codex_core::process::pid_running(pid));
     let desired = Change {
         runtime: RuntimeChange::Set(Runtime::OpenCode {
-            binary: Some(binary),
+            binary: Some(binary.clone()),
             separate_history: false,
         }),
         ..change()
@@ -273,7 +313,11 @@ fn native_bridge_hosting_controller_and_original_resume() {
     .expect("apply native runtime");
     assert!(applied.applied);
     assert_ne!(relaunch(name).expect("valid test fixture").incarnation, incarnation);
-    assert!(!pocket_codex_core::process::pid_running(pid), "previous owned child exited");
+    assert_eq!(
+        pocket_codex_core::process::pid_running(pid),
+        v2,
+        "an owned child exited; the background server keeps running"
+    );
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     while controller::is_connected(key) && std::time::Instant::now() < deadline {
         std::thread::sleep(std::time::Duration::from_millis(20));
@@ -295,8 +339,28 @@ fn native_bridge_hosting_controller_and_original_resume() {
         .iter()
         .any(|item| item.text.contains("BRIDGE_NATIVE_REPLY")));
     engine.disconnect(key);
+    if v2 {
+        // Another client replaces the background server: the host attaches
+        // to the new one by itself.
+        let before = relaunch(name).expect("running").incarnation;
+        opencode(&binary, &["service", "restart"]);
+        let deadline = std::time::Instant::now() + Duration::from_secs(30);
+        let row = loop {
+            let row = serve::serve_status()
+                .into_iter()
+                .find(|row| &row.name == name && row.incarnation.as_ref() != Some(&before));
+            if let Some(row) = row.filter(|row| row.alive) {
+                break row;
+            }
+            assert!(std::time::Instant::now() < deadline, "attached again");
+            std::thread::sleep(Duration::from_millis(200));
+        };
+        assert_ne!(row.pid, Some(pid));
+        pid = row.pid.expect("background server");
+    }
     serve::serve_stop(name).expect("confirmed native stop");
     assert!(!is_hosting(name));
+    assert_eq!(pocket_codex_core::process::pid_running(pid), v2, "stopping only detaches");
     assert!(local_endpoints(key).is_none());
     serve::serve_stop_all().expect("quit drained all owned work");
     assert_eq!(opencode::runtime::pending_cleanup(), 0);

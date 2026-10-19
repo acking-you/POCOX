@@ -3217,6 +3217,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get openCodeNone => 'None';
 
   @override
+  String get openCodeServer => 'Server';
+
+  @override
+  String get openCodeBackgroundServer =>
+      'OpenCode\'s background server (shared, without POCOX tools)';
+
+  @override
   String get openCodeConfigNote =>
       'Providers, models and agents come from OpenCode\'s own configuration on this computer, plus the custom provider this host\'s model service may add. Change OpenCode\'s configuration there, then Refresh; restart this host if a change does not show.';
 
@@ -3363,6 +3370,14 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get accessOpenCodeServiceDetail =>
       'OpenCode 2 keeps it running after its terminal app or opencode run exits. Stop it with opencode service stop, or give this host its own history, then check now.';
+
+  @override
+  String get accessOpenCodeClientTitle =>
+      'Another OpenCode client is connected';
+
+  @override
+  String get accessOpenCodeClientDetail =>
+      'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.';
 
   @override
   String accessPocketHostTitle(String client) {

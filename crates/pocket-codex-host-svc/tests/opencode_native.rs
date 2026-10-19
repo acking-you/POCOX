@@ -603,3 +603,184 @@ async fn native_host_stream_options_permissions_questions_commands_and_cancel() 
     until(&host, &session.id, |s| s.access.turn == "idle").await;
     host.stop().await.expect("native cleanup");
 }
+
+/// Run the fixture's executable with its isolated environment.
+async fn cli(launch: &Launch, args: &[&str]) -> String {
+    let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
+    let output = process::inspect_output(
+        &launch.program,
+        &args,
+        launch.path.as_ref(),
+        &launch.env,
+        Duration::from_secs(60),
+        64 * 1024,
+    )
+    .await
+    .unwrap_or_else(|error| panic!("opencode {args:?}: {error}"));
+    String::from_utf8(output).expect("UTF-8").trim().to_owned()
+}
+
+/// Stops the fixture's own background server, whatever the test reached.
+struct ServiceStop(Launch);
+
+impl Drop for ServiceStop {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new(&self.0.program)
+            .args(["service", "stop"])
+            .envs(self.0.env.iter().cloned())
+            .stdin(std::process::Stdio::null())
+            .output();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires PCX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_background_server_attach_client_admission_and_replacement() {
+    use pocket_codex_host_svc::opencode::{
+        host::{Host, Input},
+        service::State,
+    };
+    async fn until<T>(what: &str, mut check: impl AsyncFnMut() -> Option<T>) -> T {
+        for _ in 0..300 {
+            if let Some(value) = check().await {
+                return value;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("timed out waiting for {what}");
+    }
+
+    let model = model_fixture::start().await;
+    let root = tempfile::tempdir().expect("disposable source");
+    let launch = fixture_with_model(root.path(), &model);
+    if cli(&launch, &["--version"])
+        .await
+        .trim_start_matches('v')
+        .starts_with("1.")
+    {
+        // 1.x has no background server: the host keeps its own.
+        assert!(Server::attach(&launch).await.expect("1.x").is_none());
+        return;
+    }
+    // The fixture's service listens on a port of its own, never the default.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|listener| listener.local_addr())
+        .expect("free port")
+        .port();
+    cli(&launch, &["service", "set", "port", &port.to_string()]).await;
+    let _stop = ServiceStop(launch.clone());
+    cli(&launch, &["service", "set", "disabled", "true"]).await;
+    assert!(Server::attach(&launch).await.expect("turned off").is_none());
+    cli(&launch, &["service", "set", "disabled", "false"]).await;
+
+    // None runs: the host starts it as OpenCode's clients do, then attaches.
+    let server = Server::attach(&launch)
+        .await
+        .expect("attach")
+        .expect("2.x has a background server");
+    let service = server.service().cloned().expect("attached");
+    assert_eq!(service.address().port(), port);
+    assert_eq!(service.pid(), server.pid);
+    assert!(Server::attach(&launch).await.is_err(), "one Pocket host per source");
+    let directory = root.path().join("project");
+    std::fs::create_dir(&directory).expect("project");
+    let directory = directory.to_str().expect("UTF-8");
+    let session = server
+        .client
+        .create_session(directory)
+        .await
+        .expect("session");
+    let host = Host::new(server).await.expect("attached host");
+    let identity = host.info().identity;
+    assert_eq!(
+        host.open(&session.id, &identity)
+            .await
+            .expect("open")
+            .access
+            .mode,
+        "write"
+    );
+    let input = Input {
+        text: "Through the background server".into(),
+        images: Vec::new(),
+    };
+    host.prompt(&session.id, input, None, &identity)
+        .await
+        .expect("write with no other client");
+    until("the reply", async || {
+        let snapshot = host.snapshot(&session.id, None).await.ok()?;
+        let parts = || snapshot.window.messages.iter().flat_map(|m| &m.parts);
+        (snapshot.access.turn == "idle" && parts().any(|p| p["text"] == "NATIVE_PREFIX COMPLETE"))
+            .then_some(())
+    })
+    .await;
+
+    // OpenCode's terminal app, idle, holds a connection to the server.
+    let mut env = launch.env.clone();
+    env.push(("TERM".into(), "xterm-256color".into()));
+    let program = launch.program.display().to_string();
+    #[cfg(target_os = "macos")]
+    let args = vec!["-q".into(), "/dev/null".into(), program, directory.into()];
+    #[cfg(not(target_os = "macos"))]
+    let args = vec!["-qec".into(), format!("'{program}' '{directory}'"), "/dev/null".into()];
+    let process::Spawned {
+        process: mut tui,
+        stdin: _keep,
+        stdout,
+    } = process::spawn(std::path::Path::new("/usr/bin/script"), &args, None, &env)
+        .expect("terminal app under a pty");
+    let drain = tokio::spawn(async move {
+        use tokio::io::AsyncReadExt;
+        let mut stdout = stdout;
+        let mut sink = [0u8; 8192];
+        while matches!(stdout.read(&mut sink).await, Ok(n) if n > 0) {}
+    });
+    let access = until("the connected client", async || {
+        let access = host.access(&session.id).await.ok()?;
+        (access.reason == "external_source_open").then_some(access)
+    })
+    .await;
+    let holder = access.holder.expect("named client");
+    assert_eq!(holder.client, "opencode_client");
+    assert_eq!((access.mode.as_str(), access.turn.as_str()), ("follow", "idle"));
+    assert!(host
+        .rename(&session.id, "MUST NOT CHANGE", &identity)
+        .await
+        .is_err());
+    assert!(tui.stop(Duration::from_millis(200)).await);
+    drain.abort();
+    until("writing once the client left", async || {
+        let opened = host.open(&session.id, &identity).await.ok()?;
+        (opened.access.mode == "write").then_some(())
+    })
+    .await;
+
+    // A client replaces the server: the host attaches to the new one.
+    cli(&launch, &["service", "restart"]).await;
+    until("the replacement", async || (service.state().await == State::Replaced).then_some(()))
+        .await;
+    assert_ne!(host.access(&session.id).await.expect("access").mode, "write");
+    host.stop().await.expect("detach");
+    let server = Server::attach(&launch)
+        .await
+        .expect("attach again")
+        .expect("replacement");
+    let replacement = server.service().cloned().expect("attached");
+    assert_ne!(replacement.pid(), service.pid());
+    let host = Host::new(server).await.expect("attached again");
+    let identity = host.info().identity;
+    assert_eq!(
+        host.open(&session.id, &identity)
+            .await
+            .expect("reopen")
+            .access
+            .mode,
+        "write"
+    );
+
+    // Stopping the host only detaches: the server keeps serving its clients.
+    host.stop().await.expect("detach");
+    assert_eq!(replacement.state().await, State::Current);
+    cli(&launch, &["service", "stop"]).await;
+    assert_eq!(replacement.state().await, State::Gone);
+}

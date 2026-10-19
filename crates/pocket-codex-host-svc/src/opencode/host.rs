@@ -13,7 +13,7 @@ use super::{
     client::{Client, ClientError},
     fold::Window,
     live::Live,
-    ownership::{Evidence, Source},
+    ownership::{Evidence, Role, Source},
     public,
     runtime::Server,
     schema::{Session, Status},
@@ -167,10 +167,15 @@ pub struct Snapshot {
 }
 
 impl Host {
-    /// Begin observing an already started owned native server before exposing
-    /// any mutation routes. Failure drops and stops only this server.
+    /// Begin observing an already started owned, or attached, native server
+    /// before exposing any mutation routes. Failure drops and stops only an
+    /// owned server.
     pub async fn new(server: Server) -> anyhow::Result<Self> {
-        let source = Source::new(server.detection.database.clone(), server.pid, server.started)?;
+        let mut source =
+            Source::new(server.detection.database.clone(), server.pid, server.started)?;
+        if let Some(service) = server.service() {
+            source = source.attached(service.address());
+        }
         let live = Live::start(server.client.clone()).await?;
         Ok(Self(Arc::new(Inner {
             identity: Identity {
@@ -362,6 +367,34 @@ impl Host {
             return Ok(access);
         }
         match self.0.source.inspect().await {
+            Evidence::External(holders) if holders.iter().all(|h| h.role == Role::Client) => {
+                // Clients of the attached background server: it reports the
+                // session's turn, never which sessions a client shows.
+                let status = self.status(session).await?;
+                if matches!(status, Status::Unknown) {
+                    return Ok(access);
+                }
+                // A turn this host dispatched is not the client's.
+                let ours = self
+                    .0
+                    .sessions
+                    .lock()
+                    .await
+                    .get(&session.id)
+                    .is_some_and(|entry| entry.turn.is_some());
+                let theirs = status.running() && !ours;
+                access.turn = if status.running() || ours { "running" } else { "idle" }.into();
+                access.writer = "native_client".into();
+                access.reason =
+                    if theirs { "external_running" } else { "external_source_open" }.into();
+                access.holder = holders.first().map(|holder| AccessHolder {
+                    client: if theirs { "opencode" } else { "opencode_client" }.into(),
+                    pid: Some(holder.pid),
+                    started_at: i64::try_from(holder.started_at).ok(),
+                    host_name: None,
+                    service_key: None,
+                });
+            },
             Evidence::External(holders) => {
                 access.reason = "external_source_open".into();
                 access.writer = "native_client".into();
@@ -369,11 +402,15 @@ impl Host {
                 // it outlives the client that started it.
                 let holder = holders
                     .iter()
-                    .find(|holder| holder.background_server)
+                    .find(|holder| holder.role == Role::BackgroundServer)
                     .or(holders.first());
                 access.holder = holder.map(|holder| AccessHolder {
-                    client: if holder.background_server { "opencode_service" } else { "unknown" }
-                        .into(),
+                    client: if holder.role == Role::BackgroundServer {
+                        "opencode_service"
+                    } else {
+                        "unknown"
+                    }
+                    .into(),
                     pid: Some(holder.pid),
                     started_at: i64::try_from(holder.started_at).ok(),
                     host_name: None,

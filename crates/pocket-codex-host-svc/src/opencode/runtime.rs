@@ -16,6 +16,7 @@ use tokio::{
 
 use super::{
     client::Client,
+    service::{self, Attachment},
     wire::{Dialect, Version},
 };
 use crate::{
@@ -74,13 +75,24 @@ impl Launch {
     }
 
     async fn text(&self, args: &[&str], limit: usize) -> Result<String> {
+        self.text_within(args, limit, PROBE_TIMEOUT).await
+    }
+
+    /// One line of output from this executable, run with this launch's
+    /// child environment.
+    pub(crate) async fn text_within(
+        &self,
+        args: &[&str],
+        limit: usize,
+        timeout: Duration,
+    ) -> Result<String> {
         let args = args.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>();
         let bytes = process::inspect_output(
             &self.program,
             &args,
             self.path.as_ref(),
             &self.env,
-            PROBE_TIMEOUT,
+            timeout,
             limit,
         )
         .await
@@ -114,42 +126,60 @@ fn canonical_database(path: &Path) -> Result<PathBuf> {
     Ok(parent.join(name))
 }
 
-/// One native server. The password stays exclusively in its private client.
+/// One native server: owned, or OpenCode 2's background server attached to.
+/// The password stays exclusively in its private client.
 pub struct Server {
     process: Option<AgentProcess>,
     claim: Option<SessionClaim>,
     output: Option<JoinHandle<()>>,
+    service: Option<Attachment>,
     /// Private authenticated HTTP client, never serialize it to a controller.
     pub client: Client,
     /// Native version and canonical source identity.
     pub detection: Detection,
-    /// Unreaped leader PID; native children remain in its owned tree.
+    /// The server process: the owned leader (native children remain in its
+    /// tree), or the attached background server.
     pub pid: u32,
-    /// Leader's creation time, for read-only ancestry checks.
+    /// Its creation time, for read-only ancestry checks.
     pub started: u64,
 }
 
 impl Server {
+    /// Attach to OpenCode 2's background server, starting it when none runs,
+    /// for a host on the history that server serves. `None` where the version
+    /// has no such server or the user turned it off; the caller then starts
+    /// its own. The source claim is taken first, so a second Pocket host on
+    /// this source never starts the service.
+    pub async fn attach(launch: &Launch) -> Result<Option<Self>> {
+        let mut detection = launch.detect().await?;
+        if !detection.dialect.background_server() || service::disabled(launch).await? {
+            return Ok(None);
+        }
+        let claim = claim(&detection.database).await?;
+        let attached = service::attach(launch, &detection).await?;
+        detection.version = attached.version;
+        Ok(Some(Self {
+            process: None,
+            claim: Some(claim),
+            output: None,
+            pid: attached.attachment.pid(),
+            started: attached.attachment.started(),
+            service: Some(attached.attachment),
+            client: attached.client,
+            detection,
+        }))
+    }
+
+    /// The attached background server, when this server is not owned.
+    pub fn service(&self) -> Option<&Attachment> {
+        self.service.as_ref()
+    }
+
     /// Start a claimed native source on an automatically chosen loopback port.
     /// A second Pocket host cannot start against the same canonical source.
     pub async fn start(launch: &Launch) -> Result<Self> {
         let detection = launch.detect().await?;
-        let database = detection.database.clone();
-        let claim = tokio::task::spawn_blocking(move || {
-            let parent = database
-                .parent()
-                .ok_or_else(|| anyhow!("database has no parent"))?;
-            SessionClaim::acquire(parent, &format!("opencode-server:{}", database.display()))
-                .map_err(|error| match error {
-                    ClaimError::Busy => anyhow!(
-                        "opencode_already_hosted: this native source already has a Pocket host"
-                    ),
-                    ClaimError::Unavailable => {
-                        anyhow!("OpenCode source ownership cannot be verified")
-                    },
-                })
-        })
-        .await??;
+        let claim = claim(&detection.database).await?;
         let password = Secret::new(format!(
             "{}{}",
             uuid::Uuid::new_v4().simple(),
@@ -206,6 +236,7 @@ impl Server {
                 process: Some(process),
                 claim: Some(claim),
                 output: Some(output),
+                service: None,
                 client,
                 detection,
                 pid,
@@ -221,6 +252,7 @@ impl Server {
     }
 
     /// Stop this owned server only. Retain the claim when exit is uncertain.
+    /// An attached background server is left running: this only detaches.
     pub async fn stop(&mut self) -> Result<()> {
         if let Some(process) = self.process.as_mut() {
             ensure!(
@@ -235,6 +267,25 @@ impl Server {
         self.claim = None;
         Ok(())
     }
+}
+
+/// One Pocket host per canonical source, across Pocket processes.
+async fn claim(database: &Path) -> Result<SessionClaim> {
+    let database = database.to_path_buf();
+    tokio::task::spawn_blocking(move || {
+        let parent = database
+            .parent()
+            .ok_or_else(|| anyhow!("database has no parent"))?;
+        SessionClaim::acquire(parent, &format!("opencode-server:{}", database.display())).map_err(
+            |error| match error {
+                ClaimError::Busy => {
+                    anyhow!("opencode_already_hosted: this native source already has a Pocket host")
+                },
+                ClaimError::Unavailable => anyhow!("OpenCode source ownership cannot be verified"),
+            },
+        )
+    })
+    .await?
 }
 
 async fn listening(

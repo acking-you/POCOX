@@ -30,6 +30,7 @@ impl Wire for V1 {
     const DATABASE: &'static [&'static str] = &["db", "path"];
     const EVENTS: &'static [&'static str] = &["global", "event"];
     const LISTENING: &'static str = "opencode server listening on ";
+    const BACKGROUND_SERVER: bool = false;
     const MIN: (u32, u32) = (1, 19);
 
     fn event(data: &[u8]) -> Result<Option<Event>, ClientError> {

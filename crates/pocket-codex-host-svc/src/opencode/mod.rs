@@ -19,3 +19,4 @@ pub mod host;
 pub mod live;
 pub mod ownership;
 pub mod public;
+pub mod service;

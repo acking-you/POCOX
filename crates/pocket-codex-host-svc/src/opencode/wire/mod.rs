@@ -76,6 +76,12 @@ impl std::fmt::Display for Version {
 pub(crate) struct Health {
     pub healthy: bool,
     pub version: String,
+    /// The answering process, where the server reports it (2.x).
+    #[serde(default)]
+    pub pid: Option<u32>,
+    /// Every address the server says it is reachable at (2.x).
+    #[serde(default)]
+    pub urls: Vec<String>,
 }
 
 /// A validated answer to one pending native request.
@@ -99,6 +105,8 @@ pub(crate) trait Wire {
     /// Startup output that precedes the listener URL.
     const LISTENING: &'static str;
     const EVENTS: &'static [&'static str];
+    /// This line's own clients share one per-user background server.
+    const BACKGROUND_SERVER: bool;
 
     /// Whether `version` is a tested release of this wire's line.
     fn tested(version: &Version) -> bool {
@@ -231,6 +239,10 @@ impl Dialect {
 
     pub(crate) fn database(self) -> &'static [&'static str] {
         dispatch!(self, W => W::DATABASE)
+    }
+
+    pub(crate) fn background_server(self) -> bool {
+        dispatch!(self, W => W::BACKGROUND_SERVER)
     }
 
     pub(crate) fn listening(self) -> &'static str {

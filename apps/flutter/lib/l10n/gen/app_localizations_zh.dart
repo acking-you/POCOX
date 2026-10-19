@@ -3050,6 +3050,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get openCodeNone => '无';
 
   @override
+  String get openCodeServer => '服务';
+
+  @override
+  String get openCodeBackgroundServer => 'OpenCode 的后台服务（共享，不提供 POCOX 工具）';
+
+  @override
   String get openCodeConfigNote =>
       '提供方、模型和智能体来自这台电脑上 OpenCode 自己的配置，以及此主机模型服务可能添加的自定义提供方。请在那里修改 OpenCode 的配置后点刷新；如果没有生效，请重启这个主机。';
 
@@ -3179,6 +3185,13 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get accessOpenCodeServiceDetail =>
       'OpenCode 2 的终端应用或 opencode run 退出后，它仍在运行。请用 opencode service stop 停止它，或让这个主机使用自己的历史，然后立即检查。';
+
+  @override
+  String get accessOpenCodeClientTitle => '另一个 OpenCode 客户端已连接';
+
+  @override
+  String get accessOpenCodeClientDetail =>
+      'OpenCode 无法知道它正在显示哪些会话。请在那里关闭它（终端应用、桌面应用或浏览器标签页），然后立即检查。';
 
   @override
   String accessPocketHostTitle(String client) {

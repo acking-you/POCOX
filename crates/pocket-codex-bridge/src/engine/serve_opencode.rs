@@ -1,6 +1,8 @@
-//! Owned native OpenCode hosting, independent of ACP and Codex. Every start,
-//! stop and apply holds the shared instance lease. Records and name claims
-//! survive a failed stop; only confirmed exit permits a replacement.
+//! Native OpenCode hosting, independent of ACP and Codex. Every start, stop
+//! and apply holds the shared instance lease. Records and name claims survive
+//! a failed stop; only confirmed exit permits a replacement. A 2.x host on the
+//! shared history with OpenCode's own configuration attaches to OpenCode's
+//! background server instead of owning a server: stopping it only detaches.
 
 use std::{
     collections::HashMap,
@@ -19,6 +21,7 @@ use pocket_codex_host_svc::{
         catalog::Catalog,
         host::Host,
         runtime::{Launch, Server},
+        service::{Attachment, State},
     },
     process,
 };
@@ -26,7 +29,10 @@ use pocket_codex_pb::Published;
 use tokio::task::JoinHandle;
 
 use super::{
-    agent_tools, host_lease, host_profiles, host_services, hosting, runtime, serve::ServeStatus,
+    agent_tools,
+    host_lease::{self, Op},
+    host_profiles, host_services, hosting, runtime,
+    serve::ServeStatus,
     transport,
 };
 
@@ -59,6 +65,9 @@ struct Serving {
     local: SocketAddr,
     meta: SocketAddr,
     tasks: [JoinHandle<()>; 2],
+    /// Follows the attached background server (none when owned).
+    watch: Option<JoinHandle<()>>,
+    background_server: bool,
     register: Slot,
     meta_register: Slot,
     context: transport::Context,
@@ -86,6 +95,10 @@ pub struct OpenCodeStatus {
     /// OpenCode's default one.
     #[serde(default)]
     pub separate_history: bool,
+    /// The host is attached to OpenCode's background server, which its other
+    /// clients share and which keeps running when the host stops.
+    #[serde(default)]
+    pub background_server: bool,
 }
 impl OpenCodeStatus {
     fn new(
@@ -101,6 +114,7 @@ impl OpenCodeStatus {
             agents: Vec::new(),
             problem: None,
             separate_history: false,
+            background_server: false,
         };
         match catalog {
             Ok(catalog) => {
@@ -276,13 +290,25 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let (gateway, local) = host_services::bind_loopback("OpenCode gateway")?;
     let (meta_listener, meta) = host_services::bind_loopback("OpenCode meta")?;
     let rt = runtime::runtime();
+    // OpenCode's own configuration on the history its background server
+    // serves: join that server rather than run a second engine on it.
+    let shared =
+        !prepared.separate_history && prepared.provider.source == host_profiles::Source::Inherited;
+    let attached = if shared { rt.block_on(Server::attach(&prepared.launch))? } else { None };
+    let service = attached
+        .as_ref()
+        .and_then(|server| server.service().cloned());
     // The tools are added at launch, not when the launch is prepared: an
     // apply prepares before it stops the previous host, which ends that
-    // host's tokens.
+    // host's tokens. A shared background server gets none: OpenCode adds MCP
+    // servers server-wide, so every client of it would hold this host's token.
     let mut launch = prepared.launch.clone();
     let name = &prepared.name;
     // Revoked when dropped uncommitted: any failure below.
-    let tools = agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}"))
+    let tools = attached
+        .is_none()
+        .then(|| agent_tools::inject::hosted(name, "opencode", &format!("OpenCode · {name}")))
+        .flatten()
         .and_then(|grant| {
             let inherited = std::env::var_os("OPENCODE_CONFIG_CONTENT");
             match agent_tools::inject::opencode(&grant, &mut launch.env, inherited.as_deref()) {
@@ -294,7 +320,10 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
             }
         });
     let (host, pid) = rt.block_on(async {
-        let server = Server::start(&launch).await?;
+        let server = match attached {
+            Some(server) => server,
+            None => Server::start(&launch).await?,
+        };
         let pid = server.pid;
         Ok::<_, anyhow::Error>((Host::new(server).await?, pid))
     })?;
@@ -322,6 +351,8 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
             }
         }));
     let name = prepared.name.clone();
+    let watch =
+        service.map(|service| rt.spawn(watch(name.clone(), host.info().identity.host_id, service)));
     let serving = Serving {
         key: ServiceId::new(&device, ServiceKind::OpenCode, &name).key(),
         meta_key: ServiceId::new(&device, ServiceKind::Meta, &name).key(),
@@ -332,6 +363,8 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
         local,
         meta,
         tasks: [gateway_task, meta_task],
+        background_server: watch.is_some(),
+        watch,
         register: Slot::default(),
         meta_register: Slot::default(),
         context: transport::Context::of(&owned.transport),
@@ -402,7 +435,7 @@ pub(super) fn retire(name: &str) -> Result<Option<Prepared>> {
     let Some(host) = removed else { return Ok(None) };
     agent_tools::inject::hosted_stopped(name);
     runtime::runtime().block_on(async {
-        for task in host.tasks {
+        for task in host.tasks.into_iter().chain(host.watch) {
             task.abort();
             let _ = task.await;
         }
@@ -511,11 +544,73 @@ pub(super) fn status() -> Vec<ServeStatus> {
             agent_error: host.status.problem.clone(),
             opencode: Some(OpenCodeStatus {
                 separate_history: host.prepared.separate_history,
+                background_server: host.background_server,
                 ..host.status.clone()
             }),
             ..ServeStatus::default()
         })
         .collect()
+}
+
+const SERVICE_STOPPED: &str = "OpenCode's background server stopped. Start OpenCode, or restart \
+                               this host, to start it again.";
+
+/// Follow the background server this host attached to. When a client
+/// replaced it (another version, `opencode service restart`, a changed
+/// setting), the host attaches to the new one under its lease; retiring this
+/// incarnation aborts this task. A stopped server is reported and left
+/// stopped: only an explicit start, apply or restore starts it again.
+async fn watch(name: String, incarnation: String, service: Attachment) {
+    let mut gone = false;
+    loop {
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        match service.state().await {
+            State::Replaced => {
+                let (host, run) = (name.clone(), incarnation.clone());
+                if let Ok(Err(error)) =
+                    tokio::task::spawn_blocking(move || reattach(&host, &run)).await
+                {
+                    tracing::warn!("OpenCode `{name}` did not attach again: {error:#}");
+                }
+                // Still here: this incarnation was not retired (its lease
+                // was busy, or it changed meanwhile).
+                if relaunch(&name).is_none_or(|running| running.incarnation != incarnation) {
+                    return;
+                }
+            },
+            state if (state == State::Gone) != gone => {
+                gone = !gone;
+                let mut registry = hosts();
+                let Some(host) = registry
+                    .hosts
+                    .get_mut(&name)
+                    .filter(|host| host.host.info().identity.host_id == incarnation)
+                else {
+                    return;
+                };
+                if gone {
+                    host.status.problem = Some(SERVICE_STOPPED.into());
+                } else if host.status.problem.as_deref() == Some(SERVICE_STOPPED) {
+                    host.status.problem = None;
+                }
+            },
+            _ => {},
+        }
+    }
+}
+
+/// Detach from a replaced background server and attach to its successor, as
+/// long as this incarnation still runs.
+fn reattach(name: &str, incarnation: &str) -> Result<()> {
+    let _lease = host_lease::acquire_within(name, Op::Restart, Duration::from_secs(5))?;
+    ensure!(
+        relaunch(name).is_some_and(|running| running.incarnation == incarnation),
+        "the host changed meanwhile"
+    );
+    match retire(name)? {
+        Some(prepared) => launch_prepared(prepared).map(drop),
+        None => Ok(()),
+    }
 }
 
 pub(super) fn local_gateway(logical: &str, context: &transport::Context) -> Option<String> {

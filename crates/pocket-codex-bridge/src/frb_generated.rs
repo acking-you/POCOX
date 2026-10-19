@@ -8350,6 +8350,7 @@ impl SseDecode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
         let mut var_agents = <Vec<String>>::sse_decode(deserializer);
         let mut var_problem = <Option<String>>::sse_decode(deserializer);
         let mut var_separateHistory = <bool>::sse_decode(deserializer);
+        let mut var_backgroundServer = <bool>::sse_decode(deserializer);
         return crate::api::bridge::hosting::OpenCodeHostStatusDto {
             version: var_version,
             providers_connected: var_providersConnected,
@@ -8358,6 +8359,7 @@ impl SseDecode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
             agents: var_agents,
             problem: var_problem,
             separate_history: var_separateHistory,
+            background_server: var_backgroundServer,
         };
     }
 }
@@ -11627,6 +11629,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::hosting::OpenCodeHost
             self.agents.into_into_dart().into_dart(),
             self.problem.into_into_dart().into_dart(),
             self.separate_history.into_into_dart().into_dart(),
+            self.background_server.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -13595,6 +13598,7 @@ impl SseEncode for crate::api::bridge::hosting::OpenCodeHostStatusDto {
         <Vec<String>>::sse_encode(self.agents, serializer);
         <Option<String>>::sse_encode(self.problem, serializer);
         <bool>::sse_encode(self.separate_history, serializer);
+        <bool>::sse_encode(self.background_server, serializer);
     }
 }
 
