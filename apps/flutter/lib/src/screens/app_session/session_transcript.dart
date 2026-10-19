@@ -87,15 +87,23 @@ extension _SessionTranscript on _AppSessionState {
           _turnSummaries.lastOrNull?.turnId ??
           _items.lastOrNull?.turnId;
       final running = _streaming || _externalWriterRunning;
+      final end = _itemIndex[row.items.last.id];
       return TurnWorkCard(
         key: _rowKey(row),
         work: row,
         turnRunning: running,
+        // Output shown after it (a share, an image) means the turn has moved
+        // past this segment even before its next step arrives; a plan is
+        // progress, updated in place, and does not.
         active:
             running &&
             identical(row, _lastWork) &&
             row.items.last.turnId == activeTurn &&
-            _items.lastOrNull?.isUser == false,
+            _items.lastOrNull?.isUser == false &&
+            (end == null ||
+                !_items
+                    .skip(end + 1)
+                    .any((it) => it.standsAlone && it.type != 'plan')),
       );
     }
     if (row is ActivityGroup) {

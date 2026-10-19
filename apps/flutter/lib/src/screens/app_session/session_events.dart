@@ -495,7 +495,7 @@ extension _SessionEvents on _AppSessionState {
     final ended = _parseTurnId(raw);
     if (ended != null && !_endedTurns.contains(ended)) {
       _endedTurns.add(ended);
-      if (_endedTurns.length > 16) _endedTurns.removeAt(0);
+      if (_endedTurns.length > 256) _endedTurns.removeAt(0);
     }
     _turnStartSeen();
     if (_caps.sessionConfig) _refreshAgentSettings();
@@ -580,12 +580,32 @@ extension _SessionEvents on _AppSessionState {
     return null;
   }
 
-  /// Whether [turn] ended as far as this view knows: named, and not the turn
-  /// running here.
-  bool _endedHere(String? turn) =>
-      turn != null &&
-      turn.isNotEmpty &&
-      (!_streaming || (_turnId != null && turn != _turnId));
+  /// Whether [turn] is known to have ended: it is not the turn running here,
+  /// and this view saw its end or holds history the server stamped with its
+  /// completion. A turn with neither may only not have announced its start.
+  bool _endedHere(String? turn) {
+    if (turn == null || turn.isEmpty) return false;
+    if (_streaming && (_turnId == null || _turnId == turn)) return false;
+    return _endedTurns.contains(turn) ||
+        _items.any((it) => it.turnId == turn && it.turnCompletedAt != null);
+  }
+
+  /// Where a step that completed after its [turn] ended belongs: after that
+  /// turn's last step, ahead of its answer and what is shown after it, so the
+  /// answer stays last. Null (append) for a message or a row that stands
+  /// alone, and when the view holds nothing of that turn.
+  int? _lateItemSlot(TranscriptItem item, String turn) {
+    if (item.isMessage || item.standsAlone) return null;
+    final last = _items.lastIndexWhere((it) => it.turnId == turn);
+    if (last < 0) return null;
+    var at = last + 1;
+    while (at > 0 &&
+        _items[at - 1].turnId == turn &&
+        (_items[at - 1].isAgent || _items[at - 1].standsAlone)) {
+      at--;
+    }
+    return at;
+  }
 
   /// The turn an `item/*` event names by its explicit `turnId`; never an item's
   /// own `id`, which [_parseTurnId] accepts for turn events.
@@ -628,15 +648,18 @@ extension _SessionEvents on _AppSessionState {
     }
     // A turn that ended can still report on its items: a process the agent
     // left running in the background streams its output, and finally ends,
-    // under the turn that started it, and history omits it until it ends. A
-    // row this view never held would be appended after that turn's answer,
-    // spinning for as long as the process lives; history shows it where it
-    // belongs. While a history read is in flight the view does not know yet
-    // what ended, so events then are kept for the read to merge.
+    // under the turn that started it, and history omits it until it ends.
+    // For a row this view never held, its output would only add a row after
+    // that turn's answer that spins for as long as the process lives; its
+    // completion is kept, inside that turn ([_lateItemSlot]). While a history
+    // read is in flight the view does not know yet what ended, so events then
+    // are kept for the read to merge.
+    String? lateTurn;
     if (!_itemIndex.containsKey(id) && _historyLiveItems == null) {
       final itemTurn = _itemEventTurn(e.raw);
-      if (_endedHere(itemTurn) && _items.any((it) => it.turnId == itemTurn)) {
-        return;
+      if (_endedHere(itemTurn)) {
+        if (e.kind != 'item/completed') return;
+        lateTurn = itemTurn;
       }
     }
     final kind = e.kind.toLowerCase();
@@ -665,21 +688,26 @@ extension _SessionEvents on _AppSessionState {
         _historyPartialItems?.remove(id);
       }
       if (idx == null) {
-        _items.add(
-          TranscriptItem(
-            id: id,
-            type: type,
-            title: e.title ?? '',
-            text: e.text ?? '',
-            images: resolveImageUrls(e.images),
-            imageUrls: e.images,
-            streaming: type == 'agentMessage' ? true : running,
-            // The live turn this item belongs to, so a reply that streams in as
-            // several items groups the same way it will after a reload.
-            turnId: _parseTurnId(e.raw) ?? _turnId ?? '',
-          ),
+        final item = TranscriptItem(
+          id: id,
+          type: type,
+          title: e.title ?? '',
+          text: e.text ?? '',
+          images: resolveImageUrls(e.images),
+          imageUrls: e.images,
+          streaming: type == 'agentMessage' ? true : running,
+          // The live turn this item belongs to, so a reply that streams in as
+          // several items groups the same way it will after a reload.
+          turnId: _parseTurnId(e.raw) ?? _turnId ?? '',
         );
-        _itemIndex[id] = _items.length - 1;
+        final at = lateTurn == null ? null : _lateItemSlot(item, lateTurn);
+        if (at == null) {
+          _items.add(item);
+          _itemIndex[id] = _items.length - 1;
+        } else {
+          _items.insert(at, item);
+          _rebuildItemIndex();
+        }
       } else {
         final it = _items[idx];
         it.type = type;

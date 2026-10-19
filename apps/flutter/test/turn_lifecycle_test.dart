@@ -572,11 +572,13 @@ void main() {
       'mcpToolCall',
       'Shared. pocox://open?service=pcx:host:port:8080&path=/',
     );
-    work(api, 'turn-1', 'check', 'curl -I http://127.0.0.1:8080');
     await frames(t);
     // The share splits the work: the segment before it folds although its
-    // server still streams; the running segment stays open.
+    // server still streams, before any later step arrives.
     expect(server, findsNothing);
+    work(api, 'turn-1', 'check', 'curl -I http://127.0.0.1:8080');
+    await frames(t);
+    // The running segment after it stays open.
     expect(find.textContaining('curl -I'), findsOneWidget);
 
     answer(api);
@@ -612,5 +614,38 @@ void main() {
     await t.tap(find.byKey(const Key('turn-work-toggle')).first);
     await frames(t);
     expect(server, findsOneWidget);
+    // When the unseen process ends, its step joins its turn's work, and the
+    // answer stays last.
+    item('item/completed', 'late', 'commandExecution', 'exited');
+    await frames(t);
+    expect(
+      t
+          .widgetList<TurnWorkCard>(find.byType(TurnWorkCard))
+          .any((card) => card.work.items.any((item) => item.id == 'late')),
+      isTrue,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(TurnWorkCard),
+        matching: find.text('The completed answer'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets('items of a turn that has not announced its start are kept', (
+    t,
+  ) async {
+    final api = FakeBridgeApi();
+    await mount(t, api);
+    // No turn/started yet: nothing says this turn ended.
+    work(api, 'turn-2', 'first', 'cargo build');
+    work(api, 'turn-2', 'second', 'cargo test');
+    await frames(t);
+    await openTurnWork(t);
+    final group = t.widget<GroupedActivityCard>(
+      find.byType(GroupedActivityCard),
+    );
+    expect(group.group.items.map((item) => item.id), ['first', 'second']);
   });
 }

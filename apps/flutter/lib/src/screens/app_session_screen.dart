@@ -615,7 +615,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   /// Turns this view saw end, newest last (bounded): a terminal event of one
   /// of them arriving again while the next turn is awaited is not that
-  /// turn's end.
+  /// turn's end, and their late item events add no rows.
   final List<String> _endedTurns = [];
   bool _atBottom = true; // is the list scrolled to the latest message?
 
