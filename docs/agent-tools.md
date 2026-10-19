@@ -62,9 +62,10 @@ sequenceDiagram
   the page's address and its recent console errors to the conversation's
   draft and opens that conversation; nothing is sent by itself. Opening a
   share makes its tunnel the user's, so it lasts while the page is open.
-  A page that does not load (a certificate the phone does not trust, nothing
-  answering on the port) shows why, with Retry and Open in browser, and Send
-  to agent then says it did not load; a failing frame or resource inside a
+  A page that does not load (nothing answering on the port, or on iOS a
+  certificate the phone does not trust; Android's declined certificates are
+  not yet reported) shows why, with Retry and Open in browser, and Send to
+  agent then says it did not load; a failing frame or resource inside a
   page leaves the page alone. The header follows the page's title, also when
   a script sets or changes it after the page loaded.
 

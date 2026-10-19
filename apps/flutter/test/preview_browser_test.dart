@@ -224,9 +224,11 @@ void main() {
     expect(find.text('Bank login'), findsNothing);
     expect(find.text('Vite App'), findsOneWidget);
 
-    // A page without a title goes back to the share's name.
-    report(JavaScriptMessage(message: jsonEncode([key, ''])));
+    // A page that fails is not named by the one before it.
+    web.delegate.started('https://localhost:8443/next');
+    web.delegate.failed(_error(-1004, url: 'https://localhost:8443/next'));
     await t.pump();
+    expect(find.text('Vite App'), findsNothing);
     expect(find.text('Landing page'), findsOneWidget);
   });
 }

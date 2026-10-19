@@ -137,25 +137,27 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
   }
 
   /// Reports `document.title` on [_titleChannel] at once and whenever it
-  /// changes, as single-page apps and scripts change it; once per document.
+  /// changes, as single-page apps and scripts change it; installed once per
+  /// document, and run again to report a document the back/forward cache
+  /// brought back with its watch.
   /// The report carries the title itself: WebKit hands a title to the web
   /// view in a later task, so reading it back on a report, or when a load
   /// finishes, can find the previous one.
   String get _titleWatch =>
       '''
 (() => {
-  if (window.__pocoxTitleWatch) return;
-  window.__pocoxTitleWatch = true;
+  if (window.__pocoxTitleWatch) return window.__pocoxTitleWatch(true);
   let last;
-  const report = () => {
-    if (document.title === last) return;
+  const report = (again) => {
+    if (!again && document.title === last) return;
     last = document.title;
     $_titleChannel.postMessage(JSON.stringify(['$_watchKey', last]));
   };
-  new MutationObserver(report).observe(
+  window.__pocoxTitleWatch = report;
+  new MutationObserver(() => report(false)).observe(
     document.head || document.documentElement,
     {subtree: true, childList: true, characterData: true});
-  report();
+  report(true);
 })();
 ''';
 
@@ -178,6 +180,10 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
   /// Whether Retry's load is under way.
   bool _retrying = false;
 
+  /// Whether setup finished; a Retry after a failed setup sets up again.
+  bool _ready = false;
+  bool _channelAdded = false;
+
   @override
   void initState() {
     super.initState();
@@ -194,10 +200,14 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
     try {
       await controller.setJavaScriptMode(JavaScriptMode.unrestricted);
       await controller.setOnConsoleMessage(_consoleMessage);
-      await controller.addJavaScriptChannel(
-        _titleChannel,
-        onMessageReceived: _titleReport,
-      );
+      // A channel can be added once; a setup run again keeps it.
+      if (!_channelAdded) {
+        await controller.addJavaScriptChannel(
+          _titleChannel,
+          onMessageReceived: _titleReport,
+        );
+        _channelAdded = true;
+      }
       await controller.setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: _navigation,
@@ -210,6 +220,7 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
           onWebResourceError: _loadError,
         ),
       );
+      _ready = true;
       if (mounted) await controller.loadRequest(origin);
     } catch (error) {
       if (mounted) _fail(_Failed(_Failure.other, _current, '', '$error'));
@@ -293,6 +304,8 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
       _failed = failed;
       _retrying = false;
       _current = failed.url;
+      // The page that failed is not the one the old title named.
+      _pageTitle = null;
     });
   }
 
@@ -303,7 +316,11 @@ class _PreviewBrowserScreenState extends ConsumerState<PreviewBrowserScreen> {
     if (controller == null || failed == null || _retrying) return;
     setState(() => _retrying = true);
     try {
-      await controller.loadRequest(Uri.parse(failed.url));
+      if (_ready) {
+        await controller.loadRequest(Uri.parse(failed.url));
+      } else {
+        await _open(controller, Uri.parse(failed.url));
+      }
     } catch (_) {
       if (mounted) setState(() => _retrying = false);
     }
