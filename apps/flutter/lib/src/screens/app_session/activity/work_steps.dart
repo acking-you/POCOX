@@ -12,10 +12,18 @@ part of '../activity_cards.dart';
 /// individual call's output.
 class TurnWorkCard extends StatefulWidget {
   /// Creates the fold for one turn's work.
-  const TurnWorkCard({super.key, required this.work, this.active = false});
+  const TurnWorkCard({
+    super.key,
+    required this.work,
+    this.active = false,
+    this.turnRunning = false,
+  });
 
   /// Whether this is the current segment of the running turn.
   final bool active;
+
+  /// Whether a turn runs in this conversation now.
+  final bool turnRunning;
 
   /// The activity to fold away.
   final TurnWork work;
@@ -29,7 +37,13 @@ class _TurnWorkCardState extends State<TurnWorkCard> {
   /// Null means "follow the turn" — open while it runs, shut once it settles.
   bool? _userExpanded;
 
-  bool get _expanded => _userExpanded ?? widget.work.streaming;
+  /// While a turn runs, only its current segment opens by itself: a step
+  /// that streams on in an earlier one (a server the agent left running in
+  /// the background) would hold it open for the rest of the turn, and a lazy
+  /// transcript would reopen it after every scroll.
+  bool get _expanded =>
+      _userExpanded ??
+      (widget.work.streaming && (widget.active || !widget.turnRunning));
 
   final _headerKey = GlobalKey();
 

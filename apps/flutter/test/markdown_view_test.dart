@@ -110,6 +110,23 @@ void main() {
     expect(weights, [FontWeight.w600]);
   });
 
+  testWidgets('a link alone in a list item shows its label once', (
+    tester,
+  ) async {
+    // The parser splits this label in two before the Latin word; the link
+    // builder once kept the second half beside its own copy.
+    await pumpMarkdown(
+      tester,
+      '- [通过 POCOX 在其他设备打开](pocox://open?service=pcx:a:port:8080&path=/)\n'
+      '- [**苹果**官网](https://www.apple.com/cn/)',
+    );
+
+    final text = renderedText(tester);
+    expect(text, contains('通过 POCOX 在其他设备打开'));
+    expect('POCOX'.allMatches(text), hasLength(1));
+    expect('官网'.allMatches(text), hasLength(1));
+  });
+
   testWidgets('a fenced block is syntax-highlighted, with its text intact', (
     tester,
   ) async {

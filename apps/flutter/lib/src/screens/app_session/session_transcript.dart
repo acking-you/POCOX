@@ -86,11 +86,13 @@ extension _SessionTranscript on _AppSessionState {
           _turnId ??
           _turnSummaries.lastOrNull?.turnId ??
           _items.lastOrNull?.turnId;
+      final running = _streaming || _externalWriterRunning;
       return TurnWorkCard(
         key: _rowKey(row),
         work: row,
+        turnRunning: running,
         active:
-            (_streaming || _externalWriterRunning) &&
+            running &&
             identical(row, _lastWork) &&
             row.items.last.turnId == activeTurn &&
             _items.lastOrNull?.isUser == false,

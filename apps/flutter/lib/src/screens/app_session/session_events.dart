@@ -580,6 +580,24 @@ extension _SessionEvents on _AppSessionState {
     return null;
   }
 
+  /// Whether [turn] ended as far as this view knows: named, and not the turn
+  /// running here.
+  bool _endedHere(String? turn) =>
+      turn != null &&
+      turn.isNotEmpty &&
+      (!_streaming || (_turnId != null && turn != _turnId));
+
+  /// The turn an `item/*` event names by its explicit `turnId`; never an item's
+  /// own `id`, which [_parseTurnId] accepts for turn events.
+  String? _itemEventTurn(String raw) {
+    try {
+      final m = jsonDecode(raw);
+      final turn = m is Map ? m['turnId'] : null;
+      if (turn is String && turn.isNotEmpty) return turn;
+    } catch (_) {}
+    return null;
+  }
+
   /// Upsert a tool/activity or message item from an `item/*` event.
   void _handleItemEvent(AppEvent e) {
     final id = e.itemId, type = e.itemType;
@@ -607,6 +625,19 @@ extension _SessionEvents on _AppSessionState {
         });
       }
       return;
+    }
+    // A turn that ended can still report on its items: a process the agent
+    // left running in the background streams its output, and finally ends,
+    // under the turn that started it, and history omits it until it ends. A
+    // row this view never held would be appended after that turn's answer,
+    // spinning for as long as the process lives; history shows it where it
+    // belongs. While a history read is in flight the view does not know yet
+    // what ended, so events then are kept for the read to merge.
+    if (!_itemIndex.containsKey(id) && _historyLiveItems == null) {
+      final itemTurn = _itemEventTurn(e.raw);
+      if (_endedHere(itemTurn) && _items.any((it) => it.turnId == itemTurn)) {
+        return;
+      }
     }
     final kind = e.kind.toLowerCase();
     // v2 mixes `.../delta` and `.../outputDelta` casing. Progress and patch
@@ -664,7 +695,9 @@ extension _SessionEvents on _AppSessionState {
           it.imageUrls = e.images;
           it.images = resolveImageUrls(e.images);
         }
-        if (!it.isAgent) it.streaming = running;
+        // Output after its turn ended updates the row without setting it
+        // spinning again; its completion settles it.
+        if (!it.isAgent) it.streaming = running && !_endedHere(it.turnId);
       }
       _historyLiveItems?[id] = _items[_itemIndex[id]!];
       if (type == 'interrupted') _dropHostedStops();

@@ -544,4 +544,73 @@ void main() {
       await t.pumpWidget(const SizedBox.shrink());
     },
   );
+
+  testWidgets('a process left running folds with its segment and keeps the '
+      'answer last', (t) async {
+    final api = FakeBridgeApi();
+    await mount(t, api);
+    void item(String kind, String id, String type, String text) =>
+        api.pushEvent(
+          service,
+          AppEvent(
+            kind: kind,
+            threadId: thread,
+            itemId: id,
+            itemType: type,
+            title: type == 'mcpToolCall' ? 'pocox.connect' : null,
+            text: text,
+            raw: '{"turnId":"turn-1"}',
+          ),
+        );
+    final server = find.textContaining('http.server 8080');
+    event(api, 'turn/started', 'turn-1');
+    // The agent starts a server it leaves running, then shares its port.
+    work(api, 'turn-1', 'server', 'python3 -m http.server 8080');
+    item(
+      'item/completed',
+      'share',
+      'mcpToolCall',
+      'Shared. pocox://open?service=pcx:host:port:8080&path=/',
+    );
+    work(api, 'turn-1', 'check', 'curl -I http://127.0.0.1:8080');
+    await frames(t);
+    // The share splits the work: the segment before it folds although its
+    // server still streams; the running segment stays open.
+    expect(server, findsNothing);
+    expect(find.textContaining('curl -I'), findsOneWidget);
+
+    answer(api);
+    event(api, 'turn/completed', 'turn-1');
+    await frames(t);
+    // The server keeps answering requests after the turn: output for the
+    // row this view holds, and for one it never held.
+    item(
+      'item/commandExecution/outputDelta',
+      'server',
+      'commandExecution',
+      'GET / 200\n',
+    );
+    item(
+      'item/commandExecution/outputDelta',
+      'late',
+      'commandExecution',
+      'GET /style.css 200\n',
+    );
+    await frames(t);
+    expect(server, findsNothing, reason: 'an ended turn stays folded');
+    expect(find.textContaining('GET /'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(TurnWorkCard),
+        matching: find.text('The completed answer'),
+      ),
+      findsNothing,
+      reason: 'the answer is not folded into its own work',
+    );
+    expect(find.text('The completed answer'), findsOneWidget);
+    // The fold still opens on request.
+    await t.tap(find.byKey(const Key('turn-work-toggle')).first);
+    await frames(t);
+    expect(server, findsOneWidget);
+  });
 }

@@ -42,8 +42,9 @@ dependencies:
   path_provider: ^2.1.5
   # Renders agent replies as Markdown documents (headings, code, lists,
   # tables) instead of plain chat bubbles. Maintained drop-in for the
-  # discontinued flutter_markdown (same `MarkdownBody` API).
-  flutter_markdown_plus: ^1.0.3
+  # discontinued flutter_markdown (same `MarkdownBody` API). 1.0.9 stops a
+  # custom link builder from repeating the tail of a label split in two.
+  flutter_markdown_plus: ^1.0.9
   # The CommonMark parser behind flutter_markdown_plus. Declared directly
   # because lib/src/markdown_cjk.dart registers a custom InlineSyntax with it
   # (CommonMark's emphasis rules can't bold CJK text next to full-width
