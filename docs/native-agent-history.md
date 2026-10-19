@@ -1,7 +1,7 @@
 # Provider-native session history
 
-Desktop **Local sessions** offers Codex, Claude and OpenCode. The independent
-Claude/OpenCode bridge is currently enabled on macOS and Linux; Windows
+Desktop **Local sessions** offers Codex, Claude, Grok and OpenCode. The independent
+Claude/Grok/OpenCode bridge is currently enabled on macOS and Linux; Windows
 returns an unsupported-platform error, and mobile omits these readers. On
 supported platforms the latter two read history independently of any host,
 including when their hosted agents are stopped. Visiting a session does not restore it through
@@ -17,7 +17,8 @@ write access: writing goes through a connected host's session access (below).
 A native session is continued, never forked or copied, by opening it on a
 running host that serves its provider: **Continue in <host>** in the viewer
 (a native OpenCode host on OpenCode's shared history for OpenCode, never
-one with a history of its own; a Claude ACP host for Claude), or
+one with a history of its own; a Claude ACP host for Claude; a Grok host on
+the user's own Grok home, never a custom provider's, for Grok), or
 **Host <provider> to continue** when none runs on this desktop. Rows show
 whether the reader saw the session free, held idle or running elsewhere, or
 cannot tell.
@@ -27,6 +28,7 @@ cannot tell.
 | Provider | Source | Boundaries |
 | --- | --- | --- |
 | Claude | The official `claude-agent-sdk` installed beside the selected ACP adapter; only `listSessions`, `getSessionInfo` and `getSessionMessages` | No SDK download during browsing. Canonical branch reconstruction belongs to the SDK. A changed selected transcript is read again; this is not an incremental index. Sources over 64 MiB are rejected; the credential-free reader has a 256 MiB heap and bounded time/output. |
+| Grok | `$GROK_HOME/sessions` (default `~/.grok`): `summary.json` and the ACP update log `updates.jsonl`, replayed with Grok's own rewind and turn rules ([Grok Build](grok-build.md#local-sessions)) | No agent started for browsing. Summaries over 256 KiB, lines over 8 MiB and logs over 500,000 lines are bounded; a page folds at most 32 MiB. Sessions can be renamed and deleted here, through Grok itself. |
 | OpenCode | Existing SQLite database under `OPENCODE_DB`, or `XDG_DATA_HOME/opencode/opencode.db` / the normal HOME data directory | Read-only connections and transactions, no creation, migrations or runtime import. Recognized `session_message` v2 and legacy `message` + `part` schemas only. No disk-wide search for custom/channel databases. |
 
 Claude uses the effective `CLAUDE_CONFIG_DIR` or HOME. The independent
@@ -59,7 +61,7 @@ continuity. Transient read failures keep already displayed messages.
 
 ## Session access
 
-Opening a conversation on a connected Claude ACP host or native OpenCode host
+Opening a conversation on a connected Claude or Grok ACP host or native OpenCode host
 asks that host for the session's access (`app_session_open`). There is no
 separate dialog and no Take Over step: the host decides from fresh evidence,
 and the view follows its answer.
@@ -82,6 +84,7 @@ and the view follows its answer.
 | --- | --- | --- |
 | `external_running` | the named client is running a turn here | follows live; opens by itself when the host reports it free |
 | `external_idle` | the named client still has the session open; no turn runs | close it there; an idle native Claude client still holds the session until it really closes or exits |
+| `external_open` | a Grok terminal client has the session open; whether a turn runs there is not recorded | close it there; opens by itself when it is no longer registered |
 | `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown) | close or release it there, then **Check now** |
 | `pocket_host` | another Pocket host writes it | **Open in <host>** only when that host's service key is known |
 | `transition` | the session is changing hands | wait; never taken as free; a later free answer opens by itself only where the host keeps an admission (see `not_opened`) |

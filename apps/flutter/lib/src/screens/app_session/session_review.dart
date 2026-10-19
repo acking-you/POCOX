@@ -405,7 +405,9 @@ extension _SessionReview on _AppSessionState {
   String? _agentErrorHint(AppLocalizations l10n, String error) {
     final caps = _caps;
     if (!caps.hostAccess) return null;
-    if (caps.authRequired) return l10n.agentAuthHint;
+    if (caps.authRequired) {
+      return caps.profileId == 'grok' ? l10n.grokAuthHint : l10n.agentAuthHint;
+    }
     final m = error.toLowerCase();
     return m.startsWith('the agent rejected the request') ||
             m.startsWith('the agent is not running')

@@ -104,6 +104,7 @@ String _agentName(AppLocalizations l10n, String? agent) => switch (agent) {
   'codex' => 'Codex',
   'claude' => 'Claude',
   'opencode' => 'OpenCode',
+  'grok' => 'Grok',
   null || '' || 'acp' => l10n.galaxyKindAgent,
   final other => other,
 };

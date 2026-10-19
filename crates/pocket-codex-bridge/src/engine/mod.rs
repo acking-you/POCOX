@@ -9,6 +9,7 @@ pub mod codex_login;
 pub mod config;
 pub mod daemon;
 pub mod discovery;
+pub mod grok_account;
 pub mod host_apply;
 mod host_lease;
 pub mod host_lifecycle;

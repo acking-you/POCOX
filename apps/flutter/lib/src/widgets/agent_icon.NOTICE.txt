@@ -55,3 +55,12 @@ Orca (stablyai/orca, MIT, Copyright (c) 2026 Lovecast Inc.) was a visual
 reference for the compact agent picker and for showing each agent by its
 mark. No Orca source code or asset files are included; the marks above come
 from their original sources.
+
+
+3. Grok
+-------
+
+No openly licensed Grok or xAI mark is available (Simple Icons 15 has none,
+and the Apache-2.0 Grok Build source grants no trademark rights), so Grok
+hosts show a plain "G" monogram drawn by agent_icon.dart. It is not a copy
+of any xAI artwork.

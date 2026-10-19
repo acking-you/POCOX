@@ -4203,4 +4203,76 @@ class AppLocalizationsEn extends AppLocalizations {
   ) {
     return 'Preview of \"$title\" ($url, shared from $device) did not load: $reason';
   }
+
+  @override
+  String get accessClientGrok => 'Grok';
+
+  @override
+  String accessExternalOpenTitle(String client) {
+    return '$client has this session open';
+  }
+
+  @override
+  String get accessExternalOpenDetail =>
+      'Whether a turn is running there cannot be told. Close the session there to continue here.';
+
+  @override
+  String get nativeSessionRenameTitle => 'Rename session';
+
+  @override
+  String get nativeSessionRenamed => 'Session renamed';
+
+  @override
+  String get nativeSessionDelete => 'Delete';
+
+  @override
+  String get nativeSessionDeleteTitle => 'Delete this session?';
+
+  @override
+  String nativeSessionDeleteBody(String agent) {
+    return '$agent removes the session and its history from this computer. This cannot be undone.';
+  }
+
+  @override
+  String get nativeSessionDeleted => 'Session deleted';
+
+  @override
+  String get grokSignedIn => 'Signed in to Grok';
+
+  @override
+  String grokSignedInAs(String email) {
+    return 'Signed in to Grok as $email';
+  }
+
+  @override
+  String get grokApiKeyInUse => 'Grok uses an API key it stored';
+
+  @override
+  String get grokNotSignedIn => 'Not signed in to Grok';
+
+  @override
+  String get grokSignIn => 'Sign in with Grok';
+
+  @override
+  String get grokOfficialNote =>
+      'Uses the Grok account signed in on this computer, shared with the grok CLI. API keys and custom endpoints from the environment are not used. Sign-in runs on a private local grok, so no host needs to be running; a running host picks it up when restarted.';
+
+  @override
+  String get grokOpenSignInPage => 'Open sign-in page';
+
+  @override
+  String get hostInheritedGrok =>
+      'Grok uses its own configuration in ~/.grok: its sign-in, API key or the models you defined there.';
+
+  @override
+  String get grokCustomHomeNote =>
+      'A custom provider runs this Grok host with a Grok home of its own: the sessions, sign-in and plugins of ~/.grok are not shared with it.';
+
+  @override
+  String get grokAuthRequired =>
+      'Grok says you need to sign in. Choose Official account in this host\'s model service and sign in with Grok, or use a custom provider; then restart it.';
+
+  @override
+  String get grokAuthHint =>
+      'Grok needs a sign-in. Open this host\'s settings, sign in with Grok under Official account (or choose a custom provider), then restart the host.';
 }

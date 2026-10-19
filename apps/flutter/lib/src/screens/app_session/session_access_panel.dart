@@ -42,6 +42,7 @@ String accessClientName(
 ) => switch (holder?.client) {
   'claude_code' => l10n.accessClientClaude,
   'opencode' => l10n.accessClientOpenCode,
+  'grok' => l10n.accessClientGrok,
   'pocket_host' => holder?.hostName ?? l10n.accessClientPocketHost,
   _ => providerName.isEmpty ? l10n.accessClientOther : providerName,
 };
@@ -112,6 +113,14 @@ AccessView accessView(
       status: l10n.sessionInUseElsewhere,
       title: l10n.accessExternalIdleTitle(client),
       detail: l10n.accessExternalIdleDetail,
+      next: recheck ? l10n.accessNextWhenClosed : null,
+      icon: AppIcons.lock_outline,
+      tone: AccessTone.waiting,
+    ),
+    'external_open' => (
+      status: l10n.sessionInUseElsewhere,
+      title: l10n.accessExternalOpenTitle(client),
+      detail: l10n.accessExternalOpenDetail,
       next: recheck ? l10n.accessNextWhenClosed : null,
       icon: AppIcons.lock_outline,
       tone: AccessTone.waiting,

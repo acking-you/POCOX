@@ -22,6 +22,7 @@ impl AgentHost {
             "loading" | "releasing" => ("follow", "this_host", "unknown", "transition"),
             "released" => ("follow", "none", "idle", "released"),
             "external_idle" => ("follow", "native_client", "idle", "external_idle"),
+            "external_open" => ("follow", "native_client", "unknown", "external_open"),
             "external_running" => ("follow", "native_client", "running", "external_running"),
             "stopped" => ("blocked", "unknown", "unknown", "host_stopped"),
             "unsupported" | "engine_required" => ("blocked", "unknown", "unknown", "unsupported"),
@@ -31,6 +32,20 @@ impl AgentHost {
         access.writer = writer.into();
         access.turn = turn.into();
         access.reason = reason.into();
+        if access.reason == "external_open" && self.inner.native_history.is_some() {
+            access.holder = Some(crate::session_access::AccessHolder {
+                client: self
+                    .inner
+                    .native_history
+                    .as_ref()
+                    .map(|reader| reader.access_provider().to_string())
+                    .unwrap_or_default(),
+                pid: None,
+                started_at: None,
+                host_name: None,
+                service_key: None,
+            });
+        }
         if let Some(reader) = &self.inner.native_history {
             access.source_generation = reader
                 .revision(session)

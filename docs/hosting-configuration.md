@@ -16,6 +16,7 @@ starting.
 | Codex (native app-server) | yes | yes | OpenAI Responses | base URL |
 | OpenCode (native `opencode serve`) | yes | no | OpenAI Responses, Anthropic Messages, OpenAI Chat Completions | base URL, model, key |
 | Claude preset (`profile_id` `claude`) | yes | no | Anthropic Messages | base URL, key |
+| Grok preset (`profile_id` `grok`) | yes | yes (Grok sign-in) | OpenAI Responses, Anthropic Messages, OpenAI Chat Completions, in a Grok home of the host's own | base URL, model, key |
 | Any other ACP agent | yes (only choice) | no | no | — |
 
 Only these mappings exist (`host_config_supported`, which takes the engine
@@ -34,7 +35,9 @@ until another one is chosen; the editor never swaps it for a supported one.
   saved record means this, so hosts and restore records from earlier versions
   are unchanged. For Codex the page reports what `CODEX_HOME` already provides,
   so reusing it is a visible, deliberate choice.
-- **Official account** (Codex only) launches with `-c model_provider="openai"
+- **Official account** for Grok removes the environment's API-key and
+  endpoint variables and signs in with Grok's own device flow in place; see
+  [Grok Build](grok-build.md#model-service). For Codex it launches with `-c model_provider="openai"
   -c openai_base_url="" -c chatgpt_base_url="https://chatgpt.com/backend-api/"`.
   Sign-in runs in place on a private loopback
   `codex app-server` (`crates/pocket-codex-bridge/src/engine/codex_login.rs`)

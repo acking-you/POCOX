@@ -8,6 +8,7 @@ import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
 import 'package:pocket_codex/src/hosting/claude_preparation_progress.dart';
 import 'package:pocket_codex/src/hosting/codex_runtime_section.dart';
 import 'package:pocket_codex/src/hosting/editor_block.dart';
+import 'package:pocket_codex/src/hosting/grok_login_panel.dart';
 import 'package:pocket_codex/src/hosting/host_editor_actions.dart';
 import 'package:pocket_codex/src/hosting/host_editor_drafts.dart';
 import 'package:pocket_codex/src/hosting/host_status_section.dart';
@@ -138,6 +139,12 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
         key: const Key('host-inherited-opencode'),
       );
     }
+    if (isGrokHost) {
+      return EditorNote(
+        l10n.hostInheritedGrok,
+        key: const Key('host-inherited-grok'),
+      );
+    }
     if (isAcpHost) return EditorNote(l10n.hostInheritedAcp);
     final s = setup;
     if (s == null) return const LinearProgressIndicator();
@@ -241,17 +248,21 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
         // sign-in whatever is chosen here.
         info: isCodexHost
             ? '${l10n.hostSectionModelHint}\n\n${l10n.hostApiProxyNote}'
+            : isGrokHost
+            ? '${l10n.hostSectionModelHint}\n\n${l10n.grokCustomHomeNote}'
             : null,
         inherited: _inherited(l10n),
-        official: !isCodexHost
-            ? null
-            : OfficialLoginPanel(
+        official: isCodexHost
+            ? OfficialLoginPanel(
                 status: setup,
                 enabled: !busy,
                 binary: officialBinary,
                 proxy: officialProxy,
                 onChanged: loadSetup,
-              ),
+              )
+            : isGrokHost
+            ? GrokLoginPanel(enabled: !busy, program: () => acp?.spec.program)
+            : null,
         footer: existing == null ? null : _configActions(l10n, live),
       );
 

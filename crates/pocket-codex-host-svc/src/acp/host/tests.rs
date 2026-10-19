@@ -40,6 +40,7 @@ pub(super) async fn start_mock(program: PathBuf, spec: AgentSpec) -> AgentHost {
         program,
         path: None,
         env: Vec::new(),
+        env_remove: Vec::new(),
         store,
     })
     .await;
@@ -593,6 +594,7 @@ async fn session_requests_carry_only_the_configured_meta() {
             program,
             path: None,
             env: Vec::new(),
+            env_remove: Vec::new(),
         }
     };
     let mut meta = serde_json::Map::new();

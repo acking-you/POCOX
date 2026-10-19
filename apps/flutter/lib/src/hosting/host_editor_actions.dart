@@ -375,7 +375,10 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
         toast,
         life,
         l10n,
-        notes: [if (full) l10n.acpSavedAgentsFull(UiPrefs.maxSavedAgents)],
+        notes: [
+          ?result.notice,
+          if (full) l10n.acpSavedAgentsFull(UiPrefs.maxSavedAgents),
+        ],
       );
     } catch (e) {
       if (_owns(op)) setState(() => error = hostingError(e, name: typed));

@@ -110,8 +110,54 @@ mixin _FakeHostSessions on _FakeBridgeState {
   }) async => NativeSessionList(
     sourceId: provider,
     location: '/fixture/$provider',
-    sessions: const [],
+    sessions: nativeSessions[provider] ?? const [],
+    manageable: provider == 'grok',
   );
+
+  @override
+  Future<void> appNativeSessionRename(
+    String provider,
+    String threadId,
+    String title, {
+    String? sourceId,
+  }) async {
+    final refused = nativeManageError;
+    if (refused != null) throw refused;
+    nativeRenames.add((provider, threadId, title));
+    final rows = nativeSessions[provider];
+    if (rows == null) return;
+    nativeSessions[provider] = [
+      for (final row in rows)
+        row.threadId == threadId
+            ? LocalSession(
+                threadId: row.threadId,
+                cwd: row.cwd,
+                preview: title,
+                source: row.source,
+                parentThreadId: row.parentThreadId,
+                updatedAt: row.updatedAt,
+                turnState: row.turnState,
+                heldOpen: row.heldOpen,
+                safety: row.safety,
+                allowsResume: row.allowsResume,
+                requiresTakeover: row.requiresTakeover,
+              )
+            : row,
+    ];
+  }
+
+  @override
+  Future<void> appNativeSessionDelete(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  }) async {
+    final refused = nativeManageError;
+    if (refused != null) throw refused;
+    nativeDeletes.add((provider, threadId));
+    nativeSessions[provider]?.removeWhere((row) => row.threadId == threadId);
+  }
+
   @override
   Future<NativeSessionPage> appNativeSessionPage(
     String provider,

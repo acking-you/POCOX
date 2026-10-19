@@ -2,3 +2,7 @@
 	path = deps/codex
 	url = git@github.com:acking-you/codex.git
 	branch = pocket-codex
+[submodule "deps/grok-build"]
+	path = deps/grok-build
+	url = git@github.com:acking-you/grok-build.git
+	branch = pocox

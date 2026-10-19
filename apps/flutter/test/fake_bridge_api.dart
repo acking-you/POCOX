@@ -12,6 +12,7 @@ part 'support/fake_bridge/hosting.dart';
 part 'support/fake_bridge/threads.dart';
 part 'support/fake_bridge/management.dart';
 part 'support/fake_bridge/tools.dart';
+part 'support/fake_bridge/grok.dart';
 
 /// In-memory bridge with shared, inspectable state for widget tests.
 class FakeBridgeApi extends _FakeBridgeState
@@ -21,7 +22,8 @@ class FakeBridgeApi extends _FakeBridgeState
         _FakeHosting,
         _FakeThreads,
         _FakeManagement,
-        _FakeTools {
+        _FakeTools,
+        _FakeGrok {
   /// Creates a fake seeded with optional configuration and services.
   FakeBridgeApi({super.config, super.services});
 

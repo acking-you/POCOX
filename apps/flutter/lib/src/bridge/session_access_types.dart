@@ -55,6 +55,7 @@ class SessionAccess {
 
   /// Stable reason code: `owned`, `released`, `released_here`,
   /// `transition`, `host_stopped`, `external_idle`, `external_running`,
+  /// `external_open` (a client has it open; turn unknown),
   /// `external_source_open`, `source_unknown`, `pocket_host`, `unsupported`
   /// or `not_found`.
   final String reason;

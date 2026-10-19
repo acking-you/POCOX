@@ -7258,6 +7258,126 @@ abstract class AppLocalizations {
     String device,
     String reason,
   );
+
+  /// No description provided for @accessClientGrok.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok'**
+  String get accessClientGrok;
+
+  /// No description provided for @accessExternalOpenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{client} has this session open'**
+  String accessExternalOpenTitle(String client);
+
+  /// No description provided for @accessExternalOpenDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'Whether a turn is running there cannot be told. Close the session there to continue here.'**
+  String get accessExternalOpenDetail;
+
+  /// No description provided for @nativeSessionRenameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename session'**
+  String get nativeSessionRenameTitle;
+
+  /// No description provided for @nativeSessionRenamed.
+  ///
+  /// In en, this message translates to:
+  /// **'Session renamed'**
+  String get nativeSessionRenamed;
+
+  /// No description provided for @nativeSessionDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get nativeSessionDelete;
+
+  /// No description provided for @nativeSessionDeleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this session?'**
+  String get nativeSessionDeleteTitle;
+
+  /// No description provided for @nativeSessionDeleteBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{agent} removes the session and its history from this computer. This cannot be undone.'**
+  String nativeSessionDeleteBody(String agent);
+
+  /// No description provided for @nativeSessionDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Session deleted'**
+  String get nativeSessionDeleted;
+
+  /// No description provided for @grokSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in to Grok'**
+  String get grokSignedIn;
+
+  /// No description provided for @grokSignedInAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in to Grok as {email}'**
+  String grokSignedInAs(String email);
+
+  /// No description provided for @grokApiKeyInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok uses an API key it stored'**
+  String get grokApiKeyInUse;
+
+  /// No description provided for @grokNotSignedIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Not signed in to Grok'**
+  String get grokNotSignedIn;
+
+  /// No description provided for @grokSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with Grok'**
+  String get grokSignIn;
+
+  /// No description provided for @grokOfficialNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the Grok account signed in on this computer, shared with the grok CLI. API keys and custom endpoints from the environment are not used. Sign-in runs on a private local grok, so no host needs to be running; a running host picks it up when restarted.'**
+  String get grokOfficialNote;
+
+  /// No description provided for @grokOpenSignInPage.
+  ///
+  /// In en, this message translates to:
+  /// **'Open sign-in page'**
+  String get grokOpenSignInPage;
+
+  /// No description provided for @hostInheritedGrok.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok uses its own configuration in ~/.grok: its sign-in, API key or the models you defined there.'**
+  String get hostInheritedGrok;
+
+  /// No description provided for @grokCustomHomeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'A custom provider runs this Grok host with a Grok home of its own: the sessions, sign-in and plugins of ~/.grok are not shared with it.'**
+  String get grokCustomHomeNote;
+
+  /// No description provided for @grokAuthRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok says you need to sign in. Choose Official account in this host\'s model service and sign in with Grok, or use a custom provider; then restart it.'**
+  String get grokAuthRequired;
+
+  /// No description provided for @grokAuthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Grok needs a sign-in. Open this host\'s settings, sign in with Grok under Official account (or choose a custom provider), then restart the host.'**
+  String get grokAuthHint;
 }
 
 class _AppLocalizationsDelegate

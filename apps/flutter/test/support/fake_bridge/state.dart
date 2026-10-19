@@ -161,6 +161,18 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// Running session ids per ACP service key.
   final Map<String, List<String>> runningThreads = {};
 
+  /// Provider-native Local sessions per provider (`claude`, `grok`, ...).
+  final Map<String, List<LocalSession>> nativeSessions = {};
+
+  /// Every native rename as `(provider, session, title)`.
+  final List<(String, String, String)> nativeRenames = [];
+
+  /// Every native delete as `(provider, session)`.
+  final List<(String, String)> nativeDeletes = [];
+
+  /// Refuses native renames and deletes with this error while set.
+  Object? nativeManageError;
+
   /// Presets the fake reports: one generic ACP preset, so preset handling
   /// is tested apart from any real agent's own rules.
   List<AcpPreset> presets = const [fixturePreset];

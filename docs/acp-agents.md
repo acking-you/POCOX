@@ -3,7 +3,9 @@
 POCOX can host any agent that speaks the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP) v1 over stdio.
 An agent is configured as a program plus an argument list; it is never run
-through a shell. Claude is the built-in preset; it runs the
+through a shell. Grok Build's own CLI is a built-in preset
+(`grok agent --no-leader stdio`, see [Grok Build](grok-build.md)), and so is
+Claude, which runs the
 [`@agentclientprotocol/claude-agent-acp`](https://www.npmjs.com/package/@agentclientprotocol/claude-agent-acp)
 adapter (`claude-agent-acp`, no arguments), found on this computer or
 prepared on request (see [Claude](#claude)). Codex
@@ -159,8 +161,10 @@ reopened after an agent restart.
 `auth_required` (`-32000`) is surfaced as an `authRequired` host state with
 the agent's auth methods, whether it comes from `session/new`, a reopen or
 `session/prompt`; a prompt rejected this way ends its turn once as *failed*
-with a sign-in message. POCOX does not perform agent sign-in. Sign in
-with the agent's own CLI on the host and restart hosting.
+with a sign-in message. Hosts do not run an agent's sign-in. Sign in with
+the agent's own CLI on the host and restart hosting; for Grok, the hosting
+editor's Official account signs in in place through a private `grok`
+([Grok Build](grok-build.md#sign-in)).
 
 Queued frames retain their delivery deadline in a bounded table owned by the
 peer, with one watchdog for the connection. Automatic permission replies have
@@ -407,7 +411,7 @@ stores (`sessions.json`) are not read.
    unavailable).
 2. Click the agent's tile. **Built-in presets** hold **Codex**, native
    **OpenCode** (see [Native OpenCode](opencode-native.md)) and the ACP
-   preset **Claude**: launch templates with default settings, run from the
+   presets **Claude** and **Grok** ([Grok Build](grok-build.md)): launch templates with default settings, run from the
    agent's own installation. **Saved
    configurations** hold the launch settings you saved, then **Custom**,
    which creates a new one (with nothing saved yet, that section is
@@ -444,7 +448,8 @@ Agent marks are bundled vector glyphs (OpenAI and Claude from Simple Icons 15,
 CC0-1.0; OpenCode from its v1.18.35 favicon, MIT — full notices in
 `apps/flutter/lib/src/widgets/agent_icon.NOTICE.txt`). They are chosen by the
 host's engine (`codex`, `opencode`) or reported ACP profile id (`claude`),
-never by the instance name the user typed. Any other agent shows a letter tile. A remote host's mark is
+never by the instance name the user typed. Grok shows a plain "G" monogram
+(profile `grok`; no openly licensed mark exists). Any other agent shows a letter tile. A remote host's mark is
 known once connected (its profile is part of the host info).
 
 ### Claude

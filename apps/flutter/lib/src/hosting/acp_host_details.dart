@@ -109,7 +109,9 @@ class _AcpHostDetailsState extends ConsumerState<AcpHostDetails> {
         if (host.authRequired) ...[
           const SizedBox(height: 6),
           Text(
-            l10n.acpAuthRequired,
+            host.profileId == 'grok'
+                ? l10n.grokAuthRequired
+                : l10n.acpAuthRequired,
             key: const Key('acp-auth-required'),
             style: small?.copyWith(color: cautionColor(scheme)),
           ),

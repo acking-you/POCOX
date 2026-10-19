@@ -8,8 +8,9 @@ use serde_json::{json, Map, Value};
 
 use super::{host_names, Engine, Resolved, Source};
 
+/// The configured gateway's advertised models (also listed for Grok).
 #[path = "host_profiles_opencode_models.rs"]
-mod models;
+pub(super) mod models;
 
 fn literal(value: &str) -> bool {
     // Native config expands these before parsing JSON; provider URLs also

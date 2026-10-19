@@ -7,11 +7,15 @@ class NativeSessionList {
     required this.location,
     required this.sessions,
     this.nextCursor,
+    this.manageable = false,
   });
   final String sourceId;
   final String location;
   final List<LocalSession> sessions;
   final String? nextCursor;
+
+  /// Sessions of this source can be renamed and deleted here (Grok).
+  final bool manageable;
 }
 
 /// Public transcript window; generation changes invalidate retained pages.

@@ -44,6 +44,32 @@ Future<NativeSessionRevisionDto> appNativeSessionRevision({
   sourceId: sourceId,
 );
 
+/// Rename a session of this computer's Grok home through Grok itself.
+/// Refused while a Grok terminal client or a POCOX host holds it.
+Future<void> appNativeSessionRename({
+  required String provider,
+  required String threadId,
+  required String title,
+  String? sourceId,
+}) => RustLib.instance.api.crateApiBridgeNativeSessionsAppNativeSessionRename(
+  provider: provider,
+  threadId: threadId,
+  title: title,
+  sourceId: sourceId,
+);
+
+/// Delete a session of this computer's Grok home permanently, through Grok
+/// itself. Refused while a Grok terminal client or a POCOX host holds it.
+Future<void> appNativeSessionDelete({
+  required String provider,
+  required String threadId,
+  String? sourceId,
+}) => RustLib.instance.api.crateApiBridgeNativeSessionsAppNativeSessionDelete(
+  provider: provider,
+  threadId: threadId,
+  sourceId: sourceId,
+);
+
 /// A provider-scoped inventory page on this computer.
 class NativeSessionListDto {
   /// Opaque root selection identity.
@@ -58,11 +84,15 @@ class NativeSessionListDto {
   /// Opaque next inventory page cursor.
   final String? nextCursor;
 
+  /// Sessions of this source can be renamed and deleted here (Grok).
+  final bool manageable;
+
   const NativeSessionListDto({
     required this.sourceId,
     required this.location,
     required this.sessions,
     this.nextCursor,
+    required this.manageable,
   });
 
   @override
@@ -70,7 +100,8 @@ class NativeSessionListDto {
       sourceId.hashCode ^
       location.hashCode ^
       sessions.hashCode ^
-      nextCursor.hashCode;
+      nextCursor.hashCode ^
+      manageable.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -80,7 +111,8 @@ class NativeSessionListDto {
           sourceId == other.sourceId &&
           location == other.location &&
           sessions == other.sessions &&
-          nextCursor == other.nextCursor;
+          nextCursor == other.nextCursor &&
+          manageable == other.manageable;
 }
 
 /// One bounded oldest-first transcript window.

@@ -30,6 +30,7 @@ import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/widgets/app_dialog.dart';
 export 'session_source.dart';
 part 'local_sessions/native_inventory.dart';
+part 'local_sessions/native_manage.dart';
 
 /// Lists codex sessions under a host's `CODEX_HOME` — including ones created by
 /// the desktop app / CLI / VS Code extension — annotated with whether each is
@@ -67,6 +68,9 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
   String? _sourceId, _nextCursor, _location, _moreError;
   bool _loadingMore = false;
   bool _resuming = false;
+
+  /// The listed native source renames and deletes its sessions here.
+  bool _manageable = false;
   SessionSource get _source => widget.source.isRemote
       ? widget.source
       : SessionSource.local(provider: _provider);
@@ -105,6 +109,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
     final source = _source;
     _sourceId = _nextCursor = _location = _moreError = null;
     _loadingMore = false;
+    _manageable = false;
     // Mobile controllers do not share a desktop Codex home. Their cached chats
     // and remote host sessions remain available through their own routes.
     if (_localUnavailable) {
@@ -125,6 +130,7 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
       _sourceId = page?.sourceId;
       _nextCursor = page?.nextCursor;
       _location = page?.location;
+      _manageable = page?.manageable ?? false;
       setState(() {
         _sessions = sessions;
         _loading = false;
@@ -409,6 +415,9 @@ class _LocalSessionsState extends ConsumerState<LocalSessionsScreen> {
               serviceKey: _source.serviceKey,
               provider: _source.provider,
               titleInset: inset,
+              onManage: _manageable && !s.isGuardian
+                  ? (action) => _manage(s, action)
+                  : null,
             ),
           );
         }),
@@ -533,6 +542,7 @@ class _SessionRow extends StatelessWidget {
     this.serviceKey,
     this.provider = 'codex',
     this.titleInset = inset,
+    this.onManage,
   });
 
   /// Space between the list's edge and the row's ink.
@@ -552,6 +562,9 @@ class _SessionRow extends StatelessWidget {
 
   /// Space before the title inside the ink; wider for a fold control.
   final double titleInset;
+
+  /// Rename or delete this session (a manageable native source only).
+  final void Function(_NativeAction)? onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -675,6 +688,8 @@ class _SessionRow extends StatelessWidget {
                           : l10n.resumeSession,
                     ),
                   ),
+                if (onManage case final manage?)
+                  _NativeManageMenu(session: session, onSelected: manage),
               ],
             ),
           ),
@@ -748,10 +763,8 @@ class _SessionRow extends StatelessWidget {
               scheme.error,
               l10n.sessionRunningElsewhere,
             ),
-            'nativeOwnedIdle' => (
-              cautionColor(scheme),
-              l10n.sessionInUseElsewhere,
-            ),
+            'nativeOwnedIdle' ||
+            'nativeOwned' => (cautionColor(scheme), l10n.sessionInUseElsewhere),
             'nativeUnowned' => (successColor(scheme), l10n.nativeSessionFree),
             _ => (
               scheme.outline,

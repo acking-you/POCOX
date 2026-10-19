@@ -237,6 +237,7 @@ async fn stopping_during_a_slow_handshake_cuts_the_launch_short_and_ends_the_age
         program,
         path: None,
         env: Vec::new(),
+        env_remove: Vec::new(),
     });
     let launching = tokio::spawn({
         let host = host.clone();

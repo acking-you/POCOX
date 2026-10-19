@@ -56,8 +56,33 @@ mixin _RustHostSessions implements BridgeApi {
       location: v.location,
       sessions: v.sessions.map(_localSession).toList(),
       nextCursor: v.nextCursor,
+      manageable: v.manageable,
     );
   }
+
+  @override
+  Future<void> appNativeSessionRename(
+    String provider,
+    String threadId,
+    String title, {
+    String? sourceId,
+  }) => frb.appNativeSessionRename(
+    provider: provider,
+    threadId: threadId,
+    title: title,
+    sourceId: sourceId,
+  );
+
+  @override
+  Future<void> appNativeSessionDelete(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  }) => frb.appNativeSessionDelete(
+    provider: provider,
+    threadId: threadId,
+    sourceId: sourceId,
+  );
 
   @override
   Future<NativeSessionPage> appNativeSessionPage(

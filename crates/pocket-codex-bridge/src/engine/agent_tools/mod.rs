@@ -333,6 +333,7 @@ fn harness_label(harness: &str) -> &str {
     match harness {
         "codex" => "Codex",
         "claude" => "Claude Code",
+        "grok" => "Grok",
         "opencode" => "OpenCode",
         _ => "MCP client",
     }

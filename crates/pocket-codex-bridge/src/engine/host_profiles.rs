@@ -71,6 +71,8 @@ use super::host_names;
 pub mod environment;
 #[path = "host_profiles_files.rs"]
 pub(super) mod files;
+#[path = "host_profiles_grok.rs"]
+pub(super) mod grok;
 #[path = "host_profiles_opencode.rs"]
 pub(super) mod opencode;
 #[path = "host_profiles_secrets.rs"]
@@ -759,12 +761,15 @@ pub fn codex(resolved: &Resolved, name: &str) -> Result<CodexLaunch> {
 
 /// The ACP provider launch of `resolved` for `spec` under the instance
 /// `name`, and the authority its session source is keyed by; `None` when it
-/// inherits.
+/// inherits. The Grok preset's routes are [`grok::launch`].
 pub fn acp(
     resolved: &Resolved,
     spec: &AgentSpec,
     name: &str,
 ) -> Result<Option<(acp_provider::AcpProviderLaunch, String)>> {
+    if pocket_codex_host_svc::acp::grok::applies(spec) {
+        bail!("the Grok preset's model service is prepared by its own route");
+    }
     match (resolved.source, &resolved.endpoint) {
         (Source::Inherited, _) => Ok(None),
         (Source::Official, _) => bail!("only native Codex offers an official-account sign-in here"),

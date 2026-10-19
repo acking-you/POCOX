@@ -1,5 +1,6 @@
-//! Explicit provider routing for the Claude ACP adapter. Generic agents
-//! retain their own provider configuration.
+//! Explicit provider routing for the Claude ACP adapter and the Grok
+//! preset (whose route lives in [`super::grok`]: it needs a Grok home of its
+//! own). Generic agents retain their own provider configuration.
 //!
 //! - **The Claude adapter** passes its process environment to Claude Code
 //!   (`claude-agent-acp` 0.89.1 `dist/acp-agent.js`, the query's `env` is
@@ -20,13 +21,16 @@ use std::ffi::OsString;
 use pocket_codex_core::provider::{ApiProtocol, ProviderEndpoint};
 use serde_json::{json, Map, Value};
 
-use super::{claude, spec::AgentSpec};
+use super::{claude, grok, spec::AgentSpec};
 
 /// What an agent's launch gets for its provider.
 #[derive(Clone, Default)]
 pub struct AcpProviderLaunch {
     /// Child-only environment (it may hold the key).
     pub env: Vec<(OsString, OsString)>,
+    /// Inherited variables the child must not see (another account's
+    /// credentials or endpoints); removed before `env` applies.
+    pub env_remove: Vec<OsString>,
     /// Claude: `_meta` merged into every `session/new`, `session/load` and
     /// `session/resume` request (it holds the key; it travels only on the
     /// agent's own stdio pipe).
@@ -40,6 +44,7 @@ impl std::fmt::Debug for AcpProviderLaunch {
         let names: Vec<_> = self.env.iter().map(|(k, _)| k).collect();
         f.debug_struct("AcpProviderLaunch")
             .field("env", &names)
+            .field("env_remove", &self.env_remove)
             .field("session_meta", &self.session_meta.as_ref().map(|_| "[redacted]"))
             .finish()
     }
@@ -87,6 +92,9 @@ pub fn supported_protocols(spec: &AgentSpec) -> &'static [ApiProtocol] {
     if spec.profile_id == claude::PROFILE_ID {
         // The Claude preset, with its bare adapter or an explicit path to it.
         &[ApiProtocol::AnthropicMessages]
+    } else if grok::applies(spec) {
+        // Grok's `api_backend`: `chat_completions`, `responses`, `messages`.
+        &ApiProtocol::ALL
     } else {
         &[]
     }
@@ -94,6 +102,11 @@ pub fn supported_protocols(spec: &AgentSpec) -> &'static [ApiProtocol] {
 
 /// Whether this adapter requires a default model and a provider key.
 pub fn requirements(spec: &AgentSpec) -> (bool, bool) {
+    if grok::applies(spec) {
+        // A `[model.*]` entry names its model; without its own key grok
+        // would fall back to the user's sign-in.
+        return (true, true);
+    }
     (false, spec.profile_id == claude::PROFILE_ID)
 }
 
@@ -105,13 +118,14 @@ fn unsafe_text(value: &str) -> bool {
         .any(|c| matches!(c, '{' | '}' | '$') || c.is_control())
 }
 
-/// The Claude provider launch of `spec` for `endpoint`.
+/// The Claude provider launch of `spec` for `endpoint`. Grok's route is
+/// [`grok::provider_launch`] (it writes the host's Grok home).
 pub fn launch(
     spec: &AgentSpec,
     endpoint: &ProviderEndpoint,
 ) -> Result<AcpProviderLaunch, ProviderError> {
     let supported = supported_protocols(spec);
-    if supported.is_empty() {
+    if supported.is_empty() || spec.profile_id != claude::PROFILE_ID {
         return Err(ProviderError::Unsupported);
     }
     if !supported.contains(&endpoint.protocol) {
@@ -164,6 +178,7 @@ fn claude_route(endpoint: &ProviderEndpoint, model: Option<&str>, key: &str) -> 
     meta.insert("claudeCode".into(), json!({ "options": options }));
     AcpProviderLaunch {
         env,
+        env_remove: Vec::new(),
         session_meta: Some(meta),
     }
 }

@@ -22,10 +22,9 @@ impl AgentHost {
             host_id: self.host_id().into(),
             generation,
             source_generation: None,
-            provider: if self.inner.native_history.is_some() {
-                "claude".into()
-            } else {
-                self.inner.spec.profile_id.clone()
+            provider: match &self.inner.native_history {
+                Some(reader) => reader.access_provider().into(),
+                None => self.inner.spec.profile_id.clone(),
             },
             status: "unsupported".into(),
             can_continue: false,
@@ -35,7 +34,6 @@ impl AgentHost {
         let admitted = self.state().sessions.contains_key(session);
         if !admitted {
             if let Some(reader) = &self.inner.native_history {
-                view.provider = "claude".into();
                 view.status = "unknown".into();
                 if let Ok(stamp) = reader.revision(session).await {
                     view.source_generation = stamp["generation"].as_str().map(str::to_owned);
@@ -44,6 +42,7 @@ impl AgentHost {
                         "nativeUnowned" => "released",
                         "nativeOwnedIdle" => "external_idle",
                         "nativeOwnedRunning" => "external_running",
+                        "nativeOwned" => "external_open",
                         _ => "unknown",
                     }
                     .into();

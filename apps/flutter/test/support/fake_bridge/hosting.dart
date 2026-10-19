@@ -433,6 +433,13 @@ mixin _FakeHosting on _FakeBridgeState {
         protocols: ['anthropic-messages'],
         keyRequired: true,
       ),
+      // Grok: its own sign-in, or a custom provider in a home of its own.
+      'grok' => const HostConfigSupport(
+        sources: ['inherited', 'official', 'custom'],
+        protocols: ['responses', 'anthropic-messages', 'chat-completions'],
+        modelRequired: true,
+        keyRequired: true,
+      ),
       _ => const HostConfigSupport(),
     };
   }

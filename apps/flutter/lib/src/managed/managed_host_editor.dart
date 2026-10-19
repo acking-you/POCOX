@@ -131,6 +131,7 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
   HostConfigSupport _support(String kind) => switch (kind) {
     'opencode' => _api.hostConfigSupported(engine: 'opencode'),
     'claude' => _api.hostConfigSupported(spec: _claudeSpec),
+    'grok' => _api.hostConfigSupported(spec: _grokSpec),
     // The saved agent's profile decides; without one, an unknown profile
     // (existing configuration only).
     'acp' => _api.hostConfigSupported(
@@ -151,6 +152,13 @@ class _ManagedHostEditorState extends ConsumerState<ManagedHostEditor> {
     profileId: 'claude',
     displayName: 'Claude',
     program: 'claude-agent-acp',
+  );
+
+  static const _grokSpec = AcpAgentSpec(
+    profileId: 'grok',
+    displayName: 'Grok',
+    program: 'grok',
+    args: ['agent', '--no-leader', 'stdio'],
   );
 
   String _defaultName(String kind) => uniqueHostName(kind, widget.takenNames);
@@ -740,22 +748,22 @@ String managedKindLabel(
 }) => switch (kind) {
   'opencode' => 'OpenCode',
   'claude' => 'Claude',
+  'grok' => 'Grok',
   'codex' => 'Codex',
   'acp' when agentName != null && agentName.isNotEmpty => agentName,
   _ => l10n.managedKindUnknown,
 };
 
-/// The agent mark of runtime [kind] (the Claude preset is an ACP agent);
-/// [profileId] names a saved agent's own.
-Widget managedKindIcon(
-  String kind, {
-  String? profileId,
-  required double size,
-}) => AgentIcon.of(
-  provider: kind == 'claude' ? 'acp' : kind,
-  profileId: profileId ?? (kind == 'claude' ? 'claude' : null),
-  size: size,
-);
+/// The agent mark of runtime [kind] (the Claude and Grok presets are ACP
+/// agents); [profileId] names a saved agent's own.
+Widget managedKindIcon(String kind, {String? profileId, required double size}) {
+  final preset = kind == 'claude' || kind == 'grok';
+  return AgentIcon.of(
+    provider: preset ? 'acp' : kind,
+    profileId: profileId ?? (preset ? kind : null),
+    size: size,
+  );
+}
 
 /// The saved (else running) ACP agent of [host]; its argv is never sent
 /// remotely, only its profile and display name matter here.
@@ -766,10 +774,13 @@ AcpAgentSpec? managedAgent(ManagedHost host) =>
 String? managedProfile(ManagedHost host) =>
     managedAgent(host)?.profileId ?? host.status?.profileId;
 
-/// The runtime kind of an existing [host]: `claude` only for the Claude
-/// profile, `acp` for any other agent.
+/// The runtime kind of an existing [host]: `claude` / `grok` only for those
+/// presets' profiles, `acp` for any other agent.
 String managedHostKind(ManagedHost host) => switch (host.engine) {
-  'acp' => managedProfile(host) == 'claude' ? 'claude' : 'acp',
+  'acp' => switch (managedProfile(host)) {
+    final profile? when profile == 'claude' || profile == 'grok' => profile,
+    _ => 'acp',
+  },
   final engine => engine,
 };
 

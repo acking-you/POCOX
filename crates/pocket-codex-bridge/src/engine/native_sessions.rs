@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, ensure, Context, Result};
-use pocket_codex_host_svc::native_history::{ClaudeHistory, NativeHistory};
+use pocket_codex_host_svc::native_history::{ClaudeHistory, GrokHistory, NativeHistory};
 
 /// One immutable local source selection, retained across bounded page reads.
 pub struct Selected {
@@ -28,7 +28,10 @@ static SOURCES: Mutex<VecDeque<Cached>> = Mutex::new(VecDeque::new());
 /// An explicit refresh discovers newly prepared readers without downloading.
 pub fn source(provider: &str, expected: Option<&str>, refresh: bool) -> Result<Arc<Selected>> {
     ensure!(super::serve_acp::hosting_supported(), "native history is available on desktop only");
-    ensure!(matches!(provider, "claude" | "opencode"), "unsupported native history provider");
+    ensure!(
+        matches!(provider, "claude" | "grok" | "opencode"),
+        "unsupported native history provider"
+    );
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .map(PathBuf::from)
@@ -37,6 +40,9 @@ pub fn source(provider: &str, expected: Option<&str>, refresh: bool) -> Result<A
         "claude" => std::env::var_os("CLAUDE_CONFIG_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| home.join(".claude")),
+        // This computer's own Grok home, the one its `grok` uses.
+        "grok" => pocket_codex_host_svc::acp::grok::effective_home(&[])
+            .context("Grok's home directory is unavailable")?,
         _ => opencode_path(&home)?,
     };
     ensure!(root.is_absolute(), "native history requires an absolute local path");
@@ -77,6 +83,7 @@ pub fn source(provider: &str, expected: Option<&str>, refresh: bool) -> Result<A
             }
             NativeHistory::Claude(Arc::new(reader))
         },
+        "grok" => NativeHistory::Grok(Arc::new(GrokHistory::new(root.clone())?.with_owner_probe())),
         _ => open_code(root.clone())?,
     };
     let source = Arc::new(Selected {

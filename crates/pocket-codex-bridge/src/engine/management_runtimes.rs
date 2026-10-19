@@ -73,6 +73,23 @@ pub fn detect() -> Result<Vec<Availability>> {
             ),
         },
     });
+    let grok = super::serve_acp::locate(
+        pocket_codex_host_svc::acp::grok::PROGRAM,
+        Some(pocket_codex_host_svc::acp::grok::PROFILE_ID),
+    );
+    rows.push(Availability {
+        kind: "grok".into(),
+        ready: grok.is_some(),
+        path: grok.as_ref().map(|p| p.to_string_lossy().into_owned()),
+        version: None,
+        // Grok's own sign-in happens on this computer; existing configuration
+        // may already work through an API key or custom models.
+        needs_host_login: false,
+        can_prepare: false,
+        problem: grok
+            .is_none()
+            .then(|| "Install Grok Build on this computer first.".into()),
+    });
     Ok(rows)
 }
 

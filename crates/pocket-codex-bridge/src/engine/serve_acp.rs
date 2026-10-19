@@ -48,8 +48,9 @@ use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::OnceCell;
 use pocket_codex_core::service::{ServiceId, ServiceKind};
 use pocket_codex_host_svc::{
-    acp::{self, claude, spec, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId},
+    acp::{self, claude, grok, spec, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId},
     file_links::SessionDirResolver,
+    native_history::{GrokHistory, NativeHistory},
     process,
 };
 use pocket_codex_pb::Published;
@@ -143,6 +144,8 @@ pub struct AcpServeReport {
     pub display_name: String,
     /// Whether an existing host was reused.
     pub reused: bool,
+    /// What the start should tell the user, if anything.
+    pub notice: Option<String>,
 }
 
 /// How long quitting waits for relay keys to be withdrawn.
@@ -295,6 +298,7 @@ fn report(host: &AcpServe, reused: bool) -> AcpServeReport {
         profile_id: profile.profile_id.clone(),
         display_name: profile.display_name.clone(),
         reused,
+        notice: None,
     }
 }
 

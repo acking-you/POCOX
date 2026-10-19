@@ -135,6 +135,10 @@ mixin HostEditorDrafts<T extends ConsumerStatefulWidget> on ConsumerState<T> {
   /// Whether the edited host (or the new host) is a native Codex host.
   bool get isCodexHost => !isAcpHost && !isOpenCodeHost;
 
+  /// Whether the edited host (or the new host's agent) is the Grok preset.
+  bool get isGrokHost =>
+      isAcpHost && (acp?.spec.profileId ?? existing?.profileId) == 'grok';
+
   /// The running host as last reported, or null once it is gone. Never a
   /// stale snapshot: a stopped host is not operated on by name.
   /// Watches the host list: call from `build` only ([currentHost] elsewhere).

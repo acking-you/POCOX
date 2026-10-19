@@ -13,6 +13,7 @@ import 'api/bridge/connection.dart';
 import 'api/bridge/device_management.dart';
 import 'api/bridge/device_metadata.dart';
 import 'api/bridge/events.dart';
+import 'api/bridge/grok.dart';
 import 'api/bridge/host_config.dart';
 import 'api/bridge/host_sessions.dart';
 import 'api/bridge/hosted_account.dart';
@@ -222,6 +223,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ForceResumeReportDto dco_decode_force_resume_report_dto(dynamic raw);
+
+  @protected
+  GrokAccountDto dco_decode_grok_account_dto(dynamic raw);
+
+  @protected
+  GrokSignInDto dco_decode_grok_sign_in_dto(dynamic raw);
 
   @protected
   HistoryCacheStatusDto dco_decode_history_cache_status_dto(dynamic raw);
@@ -857,6 +864,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ForceResumeReportDto sse_decode_force_resume_report_dto(
     SseDeserializer deserializer,
   );
+
+  @protected
+  GrokAccountDto sse_decode_grok_account_dto(SseDeserializer deserializer);
+
+  @protected
+  GrokSignInDto sse_decode_grok_sign_in_dto(SseDeserializer deserializer);
 
   @protected
   HistoryCacheStatusDto sse_decode_history_cache_status_dto(
@@ -1656,6 +1669,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_force_resume_report_dto(
     ForceResumeReportDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_grok_account_dto(
+    GrokAccountDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_grok_sign_in_dto(
+    GrokSignInDto self,
     SseSerializer serializer,
   );
 

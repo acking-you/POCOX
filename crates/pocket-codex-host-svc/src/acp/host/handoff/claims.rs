@@ -86,7 +86,14 @@ impl AgentHost {
         }
         .map_err(|_| HostError::ReadOnly)?;
         let checked = owners.clone();
+        let unregistered = reader.agent_writes_unregistered();
         let owns = tokio::task::spawn_blocking(move || {
+            if unregistered {
+                // The agent itself is the writer: no registered client may
+                // hold the session, and the agent must still be the one
+                // this host launched.
+                return checked.is_empty() && process_start_time(root.0) == Some(root.1);
+            }
             checked.len() == 1
                 && checked[0].pid != root.0
                 && is_process_descendant(checked[0].pid, checked[0].started, root.0, root.1)

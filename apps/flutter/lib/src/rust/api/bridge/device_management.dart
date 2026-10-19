@@ -430,7 +430,7 @@ class ManagedRuntimeAvailabilityDto {
 
 /// Restricted host-side runtime selection. No path/argv can cross this API.
 class ManagedRuntimeDto {
-  /// `codex`, `opencode`, `claude`, or `saved`.
+  /// `codex`, `opencode`, `claude`, `grok`, or `saved`.
   final String kind;
 
   /// Codex port, zero for automatic.

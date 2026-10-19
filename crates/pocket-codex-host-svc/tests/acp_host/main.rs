@@ -90,6 +90,7 @@ async fn host_named(
         program,
         path: None,
         env: Vec::new(),
+        env_remove: Vec::new(),
     })
     .await
 }

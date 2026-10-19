@@ -82,13 +82,14 @@ impl AgentHost {
         Self::create_parts(options, launch_args, session_meta, None)
     }
 
-    /// Create a host with an independent native reader. Unadmitted sessions
-    /// are browsed read-only rather than implicitly loaded into the agent.
-    pub fn create_with_claude_history(
+    /// Create a host with an independent native reader (Claude or Grok).
+    /// Unadmitted sessions are browsed read-only rather than implicitly
+    /// loaded into the agent.
+    pub fn create_with_native_history(
         options: HostOptions,
         launch_args: Option<Vec<String>>,
         session_meta: Option<serde_json::Map<String, Value>>,
-        history: Option<Arc<crate::native_history::ClaudeHistory>>,
+        history: Option<crate::native_history::NativeHistory>,
     ) -> Self {
         Self::create_parts(options, launch_args, session_meta, history)
     }
@@ -97,7 +98,7 @@ impl AgentHost {
         options: HostOptions,
         launch_args: Option<Vec<String>>,
         session_meta: Option<serde_json::Map<String, Value>>,
-        native_history: Option<Arc<crate::native_history::ClaudeHistory>>,
+        native_history: Option<crate::native_history::NativeHistory>,
     ) -> Self {
         let (closed, closures) = mpsc::unbounded_channel();
         let store = Arc::new(options.store);
@@ -115,6 +116,7 @@ impl AgentHost {
                 session_mcp: Mutex::new(None),
                 path: options.path,
                 env: options.env,
+                env_remove: options.env_remove,
                 store,
                 native_history,
                 native_claims: Mutex::new(HashMap::new()),
@@ -152,7 +154,7 @@ impl AgentHost {
             return Err(HostError::NotReady);
         }
         let generation = self.state().begin_generation();
-        let spawned = match process::spawn(
+        let spawned = match process::spawn_without(
             &self.inner.program,
             self.inner
                 .launch_args
@@ -160,6 +162,7 @@ impl AgentHost {
                 .unwrap_or(&self.inner.spec.args),
             self.inner.path.as_ref(),
             &self.inner.env,
+            &self.inner.env_remove,
         ) {
             Ok(spawned) => spawned,
             Err(error) => {

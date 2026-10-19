@@ -925,5 +925,33 @@ impl Transcript {
     }
 }
 
+/// Fold the persisted `session/update` payloads of one turn, as replayed,
+/// into a single turn named `id`. A reader of an agent's own stored history
+/// folds each turn alone, so ids stay stable across pages. A user message
+/// after agent output (an interjection) stays in this turn as its own item.
+pub fn replay_turn(id: &str, updates: &[Value]) -> Turn {
+    let mut folded = Transcript::new(false);
+    for update in updates {
+        folded.apply(None, update);
+    }
+    let mut turn = Turn::new(id.to_string(), true);
+    if folded.truncated {
+        // Whole earlier parts were dropped to stay within the bounds.
+        turn.omitted += 1;
+    }
+    for (index, part) in folded.turns.into_iter().enumerate() {
+        let prefix = if index == 0 { id.to_string() } else { format!("{id}.{index}") };
+        turn.omitted += part.omitted;
+        for mut item in part.items {
+            if let Some(rest) = item.id.strip_prefix(part.id.as_str()) {
+                item.id = format!("{prefix}{rest}");
+            }
+            turn.items.push(item);
+        }
+    }
+    turn.next_item = turn.items.len() as u64;
+    turn
+}
+
 #[cfg(test)]
 mod tests;

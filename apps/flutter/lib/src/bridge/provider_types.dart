@@ -294,6 +294,7 @@ class HostStartResult {
     required this.provider,
     required this.serviceKey,
     this.reused = false,
+    this.notice,
   });
 
   /// Instance name as hosted.
@@ -308,6 +309,10 @@ class HostStartResult {
 
   /// An already-running host was reused.
   final bool reused;
+
+  /// What the user should know beside success (a gateway's models could not
+  /// be listed), if anything.
+  final String? notice;
 }
 
 /// A started ChatGPT login on the external Codex. [mode] is `browser` (open

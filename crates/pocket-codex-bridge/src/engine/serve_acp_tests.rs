@@ -83,6 +83,7 @@ fn fixture_host(name: &str, context: transport::Context) -> AcpServe {
         program: program.clone(),
         path: None,
         env: Vec::new(),
+        env_remove: Vec::new(),
         store: SessionStore::memory(SourceId::with_key("fixture", &program, &[])),
     });
     let id = owners().begin(host.clone()).expect("the barrier is open");

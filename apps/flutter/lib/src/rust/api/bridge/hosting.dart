@@ -17,7 +17,8 @@ Future<void> opencodeRefresh({required String name}) =>
 Future<OpenCodeEnvironmentDto> opencodeDetect({String? binary}) =>
     RustLib.instance.api.crateApiBridgeHostingOpencodeDetect(binary: binary);
 
-/// Built-in ACP agent presets (Claude through its external stdio adapter).
+/// Built-in ACP agent presets (Claude through its external stdio adapter,
+/// Grok Build's own CLI).
 List<AcpPresetDto> acpPresets() =>
     RustLib.instance.api.crateApiBridgeHostingAcpPresets();
 
@@ -389,6 +390,10 @@ class AcpServeDto {
   /// Whether an existing host was reused.
   final bool reused;
 
+  /// What the start should tell the user (e.g. a gateway's models could
+  /// not be listed), if anything.
+  final String? notice;
+
   const AcpServeDto({
     required this.device,
     required this.name,
@@ -398,6 +403,7 @@ class AcpServeDto {
     required this.profileId,
     required this.displayName,
     required this.reused,
+    this.notice,
   });
 
   @override
@@ -409,7 +415,8 @@ class AcpServeDto {
       metaServiceKey.hashCode ^
       profileId.hashCode ^
       displayName.hashCode ^
-      reused.hashCode;
+      reused.hashCode ^
+      notice.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -423,7 +430,8 @@ class AcpServeDto {
           metaServiceKey == other.metaServiceKey &&
           profileId == other.profileId &&
           displayName == other.displayName &&
-          reused == other.reused;
+          reused == other.reused &&
+          notice == other.notice;
 }
 
 /// Result of starting local hosting, mirrored for Dart. One host publishes two

@@ -9,7 +9,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
     as fsel;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
-import 'package:flutter/services.dart' show LogicalKeyboardKey;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, MethodChannel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
@@ -28,6 +28,7 @@ import 'fake_bridge_api.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
 part 'acp_hosting/claude_preparation.dart';
+part 'acp_hosting/grok.dart';
 part 'acp_hosting/lifecycle.dart';
 part 'acp_hosting/presets.dart';
 part 'acp_hosting/restore.dart';
@@ -204,4 +205,5 @@ void main() {
   _registerRestore();
   _registerSelectionOwnership();
   _registerLifecycle();
+  _registerGrok();
 }

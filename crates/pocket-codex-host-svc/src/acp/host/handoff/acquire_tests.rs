@@ -39,7 +39,7 @@ async fn fixture(delay: &str) -> (AgentHost, Identity, tempfile::TempDir) {
         .with_owner_probe(probe, root.clone());
     let program = mock_binary();
     let args = vec!["--profile".into(), "beta".into(), "--open-delay-ms".into(), delay.into()];
-    let host = AgentHost::create_with_claude_history(
+    let host = AgentHost::create_with_native_history(
         HostOptions {
             spec: AgentSpec {
                 profile_id: "claude".into(),
@@ -51,10 +51,11 @@ async fn fixture(delay: &str) -> (AgentHost, Identity, tempfile::TempDir) {
             program,
             path: None,
             env: Vec::new(),
+            env_remove: Vec::new(),
         },
         None,
         None,
-        Some(Arc::new(history)),
+        Some(crate::native_history::NativeHistory::Claude(Arc::new(history))),
     );
     host.launch().await.expect("launch");
     let identity = Identity {

@@ -39,6 +39,9 @@ bytes = { workspace = true }
 # Decodes a rollout's inline copy of a deleted attachment (already linked by
 # the bridge).
 base64 = { workspace = true }
+# Grok Build session summaries carry RFC 3339 times; its launch config is TOML.
+chrono = { workspace = true }
+toml = { workspace = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { workspace = true, features = ["user"] }

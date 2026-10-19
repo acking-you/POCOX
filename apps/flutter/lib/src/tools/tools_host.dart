@@ -31,6 +31,7 @@ Widget ownerMark(ToolsOwner owner, {double size = 18}) {
     'codex' => AgentKind.codex,
     'claude' => AgentKind.claude,
     'opencode' => AgentKind.opencode,
+    'grok' => AgentKind.grok,
     _ => AgentKind.other,
   };
   return AgentIcon(kind: kind, name: owner.label, size: size);

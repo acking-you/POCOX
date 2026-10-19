@@ -44,6 +44,8 @@ pub enum RuntimeChoice {
     Opencode {},
     /// Use the built-in Claude preset, after explicit adapter preparation.
     Claude {},
+    /// Use the built-in Grok preset with this computer's installed `grok`.
+    Grok {},
     /// Reuse this name's previously saved runtime unchanged.
     Saved {},
 }
@@ -194,6 +196,16 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
                 program: "claude-agent-acp".into(),
                 args: Vec::new(),
             }))
+        },
+        RuntimeChoice::Grok {} => {
+            use pocket_codex_host_svc::acp::{grok, spec};
+            super::serve_acp::locate(grok::PROGRAM, Some(grok::PROFILE_ID))
+                .ok_or_else(|| anyhow!("Install Grok on this computer first."))?;
+            Ok(Runtime::Acp(
+                spec::preset(grok::PROFILE_ID)
+                    .ok_or_else(|| anyhow!("the Grok preset is unavailable"))?
+                    .spec(),
+            ))
         },
         RuntimeChoice::Saved {} => host_profiles::get(name)?
             .runtime

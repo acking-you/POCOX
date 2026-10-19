@@ -138,7 +138,7 @@ pub fn managed_host(service_key: String, name: String) -> Result<ManagedHostDto>
 
 /// Restricted host-side runtime selection. No path/argv can cross this API.
 pub struct ManagedRuntimeDto {
-    /// `codex`, `opencode`, `claude`, or `saved`.
+    /// `codex`, `opencode`, `claude`, `grok`, or `saved`.
     pub kind: String,
     /// Codex port, zero for automatic.
     pub port: u16,
@@ -161,6 +161,7 @@ impl ManagedRuntimeDto {
             },
             "opencode" => management::RuntimeChoice::Opencode {},
             "claude" => management::RuntimeChoice::Claude {},
+            "grok" => management::RuntimeChoice::Grok {},
             "saved" => management::RuntimeChoice::Saved {},
             _ => anyhow::bail!("unknown runtime choice"),
         })

@@ -552,7 +552,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   Widget _nativeContinue(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final provider = widget.provider;
-    final name = provider == 'claude' ? 'Claude' : 'OpenCode';
+    final name = nativeProviderName(provider);
     final host = nativeContinueHost(
       ref.watch(localServeListProvider).valueOrNull ?? const [],
       provider,
@@ -579,7 +579,9 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
         key: const Key('view-host-native'),
         onPressed: () => showHostingEditor(
           context,
-          initialChoice: provider == 'claude' ? 'preset:claude' : 'opencode',
+          initialChoice: provider == 'opencode'
+              ? 'opencode'
+              : 'preset:$provider',
         ),
         icon: const Icon(AppIcons.dns_outlined),
         label: Text(l10n.nativeHostToContinue(name)),

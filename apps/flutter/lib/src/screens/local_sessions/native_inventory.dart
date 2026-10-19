@@ -10,14 +10,15 @@ extension _NativeInventory on _LocalSessionsState {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final provider in const ['codex', 'claude', 'opencode'])
+            for (final provider in const [
+              'codex',
+              'claude',
+              'grok',
+              'opencode',
+            ])
               ChoiceChip(
                 key: Key('local-provider-$provider'),
-                label: Text(switch (provider) {
-                  'codex' => 'Codex',
-                  'claude' => 'Claude',
-                  _ => 'OpenCode',
-                }),
+                label: Text(nativeProviderName(provider)),
                 selected: _provider == provider,
                 onSelected: (_) {
                   if (_provider == provider) return;

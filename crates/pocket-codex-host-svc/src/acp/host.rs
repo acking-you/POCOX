@@ -286,6 +286,9 @@ pub struct HostOptions {
     pub path: Option<OsString>,
     /// Extra environment for the owned child.
     pub env: Vec<(OsString, OsString)>,
+    /// Inherited variables removed from the owned child's environment
+    /// before `env` applies (credentials an instance provider replaces).
+    pub env_remove: Vec<OsString>,
     /// Admitted-session record of this agent source.
     pub store: SessionStore,
 }
@@ -311,8 +314,9 @@ struct Inner {
     session_mcp: Mutex<Option<Arc<dyn crate::acp::SessionMcp>>>,
     path: Option<OsString>,
     env: Vec<(OsString, OsString)>,
+    env_remove: Vec<OsString>,
     store: Arc<SessionStore>,
-    native_history: Option<Arc<crate::native_history::ClaudeHistory>>,
+    native_history: Option<crate::native_history::NativeHistory>,
     persist: Persist,
     state: Mutex<State>,
     lifecycle: tokio::sync::Mutex<Option<Running>>,

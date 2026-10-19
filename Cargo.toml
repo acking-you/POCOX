@@ -22,8 +22,12 @@ members = [
 # `deps/uni-stream` forks it pulled in transitively. All three are gone:
 # pb-mapper is fetched by Cargo from its dedicated Git branch; its transitive
 # dependencies are locked here without vendoring additional submodules.
+#
+# `deps/grok-build` (Grok Build, its own Cargo workspace) is likewise a
+# source reference only: nothing here links its crates.
 exclude = [
     "deps/codex",
+    "deps/grok-build",
     "apps/flutter",
     "vendor/pagable",
 ]

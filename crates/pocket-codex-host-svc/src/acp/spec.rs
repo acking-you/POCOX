@@ -85,15 +85,26 @@ pub struct Preset {
     pub fallback_dirs: &'static [&'static str],
 }
 
-/// Built-in ACP presets. Claude uses its stdio ACP adapter; capabilities
-/// are negotiated with the external executable.
-pub const PRESETS: &[Preset] = &[Preset {
-    id: "claude",
-    display_name: "Claude",
-    program: "claude-agent-acp",
-    args: &[],
-    fallback_dirs: &[],
-}];
+/// Built-in ACP presets. Claude uses its stdio ACP adapter; Grok Build's
+/// own CLI speaks ACP (see [`super::grok`]). Capabilities are negotiated
+/// with the external executable.
+pub const PRESETS: &[Preset] = &[
+    Preset {
+        id: "claude",
+        display_name: "Claude",
+        program: "claude-agent-acp",
+        args: &[],
+        fallback_dirs: &[],
+    },
+    Preset {
+        id: super::grok::PROFILE_ID,
+        display_name: "Grok",
+        program: super::grok::PROGRAM,
+        args: super::grok::ARGS,
+        // The official installer's link (`~/.grok/bin/grok`).
+        fallback_dirs: &[".grok/bin"],
+    },
+];
 
 /// The preset with `id`.
 pub fn preset(id: &str) -> Option<&'static Preset> {
@@ -252,11 +263,16 @@ mod tests {
     }
 
     #[test]
-    fn the_claude_preset_runs_the_acp_adapter_without_arguments() {
+    fn presets_run_their_acp_entry_points() {
         let spec = preset("claude").expect("preset").spec();
         assert_eq!(spec.program, "claude-agent-acp");
         assert!(spec.args.is_empty());
         assert!(spec.validate().is_ok());
+        // Grok's own CLI, kept in one process (no shared leader).
+        let grok = preset("grok").expect("preset");
+        assert_eq!(grok.spec().args, ["agent", "--no-leader", "stdio"]);
+        assert_eq!(grok.fallback_dirs, [".grok/bin"]);
+        assert!(grok.spec().validate().is_ok());
         let mut ids: Vec<_> = PRESETS.iter().map(|p| p.id).collect();
         ids.sort_unstable();
         ids.dedup();

@@ -17,6 +17,9 @@ pub(crate) struct Prepared {
     pub(super) source: SourceId,
     pub(super) provider: host_profiles::Resolved,
     pub(super) state: PathBuf,
+    /// Something the start should tell the user (a custom Grok provider's
+    /// gateway models could not be listed).
+    pub(super) notice: Option<String>,
 }
 
 /// What a running agent was launched with, kept with its host so it can
@@ -48,6 +51,7 @@ impl Prepared {
             source: captured.source,
             provider,
             state: captured.state,
+            notice: None,
         }
     }
 }
@@ -105,7 +109,12 @@ pub(crate) fn prepare(
         Some(provider) => provider,
         None => host_profiles::resolve_in(profiles, name)?,
     };
-    let (mut provider_launch, authority) = match host_profiles::acp(&provider, &spec, name)? {
+    let (routed, notice) = if grok::applies(&spec) {
+        host_profiles::grok::launch(&provider, &spec, name)?
+    } else {
+        (host_profiles::acp(&provider, &spec, name)?, None)
+    };
+    let (mut provider_launch, authority) = match routed {
         Some((launch, authority)) => (launch, Some(authority)),
         None => (Default::default(), None),
     };
@@ -130,6 +139,7 @@ pub(crate) fn prepare(
         source,
         provider,
         state,
+        notice,
     })
 }
 
@@ -150,6 +160,7 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
         source,
         provider,
         state,
+        notice,
     } = prepared;
     let captured = Captured {
         program: program.clone(),
@@ -197,10 +208,18 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
                 if let (Some(cli), Some(home)) = (cli, std::env::var_os("HOME")) {
                     history = history.with_owner_probe(cli, home.into());
                 }
-                Some(Arc::new(history))
+                Some(NativeHistory::Claude(Arc::new(history)))
+            },
+            None if grok::applies(&spec) => {
+                // The home this launch's agent uses: the host's own for a
+                // custom provider, else the user's.
+                let home = grok::effective_home(&provider_launch.env)
+                    .ok_or_else(|| anyhow!("Grok's home directory is unavailable"))?;
+                Some(NativeHistory::Grok(Arc::new(GrokHistory::new(home)?.with_owner_probe())))
             },
             None => None,
         };
+        let env_remove = provider_launch.env_remove;
         let session_meta = provider_launch.session_meta;
         let (program, launch_args) = match claude {
             Some(launch) => {
@@ -211,12 +230,13 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
         };
         // Last, so the instance's provider wins over inherited values.
         env.extend(provider_launch.env);
-        AgentHost::create_with_claude_history(
+        AgentHost::create_with_native_history(
             HostOptions {
                 spec: spec.clone(),
                 program,
                 path,
                 env,
+                env_remove,
                 store,
             },
             launch_args,
@@ -254,7 +274,11 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
             return Err(error);
         },
     };
-    let out = report(&serving, false);
+    let mut out = report(&serving, false);
+    if let Some(notice) = &notice {
+        tracing::warn!(host = %name, "{notice}");
+    }
+    out.notice = notice;
     let refused = {
         let mut barrier = owners();
         if barrier.commit(id) {

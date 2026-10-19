@@ -3968,4 +3968,75 @@ class AppLocalizationsZh extends AppLocalizations {
   ) {
     return '预览“$title”（$url，由 $device 共享）没有加载出来：$reason';
   }
+
+  @override
+  String get accessClientGrok => 'Grok';
+
+  @override
+  String accessExternalOpenTitle(String client) {
+    return '$client 打开着这个会话';
+  }
+
+  @override
+  String get accessExternalOpenDetail => '无法判断那里是否有回合正在运行。请在那里关闭会话，然后在这里继续。';
+
+  @override
+  String get nativeSessionRenameTitle => '重命名会话';
+
+  @override
+  String get nativeSessionRenamed => '会话已重命名';
+
+  @override
+  String get nativeSessionDelete => '删除';
+
+  @override
+  String get nativeSessionDeleteTitle => '删除这个会话？';
+
+  @override
+  String nativeSessionDeleteBody(String agent) {
+    return '$agent 会从这台电脑上删除这个会话及其历史记录。此操作无法撤销。';
+  }
+
+  @override
+  String get nativeSessionDeleted => '会话已删除';
+
+  @override
+  String get grokSignedIn => '已登录 Grok';
+
+  @override
+  String grokSignedInAs(String email) {
+    return '已用 $email 登录 Grok';
+  }
+
+  @override
+  String get grokApiKeyInUse => 'Grok 使用它保存的 API 密钥';
+
+  @override
+  String get grokNotSignedIn => '未登录 Grok';
+
+  @override
+  String get grokSignIn => '使用 Grok 登录';
+
+  @override
+  String get grokOfficialNote =>
+      '使用这台电脑上登录的 Grok 账号，与 grok 命令行共用。不使用环境中的 API 密钥和自定义端点。登录在一个私有的本地 grok 上进行，无需运行任何主机；正在运行的主机重启后才会使用新的登录。';
+
+  @override
+  String get grokOpenSignInPage => '打开登录页面';
+
+  @override
+  String get hostInheritedGrok =>
+      'Grok 使用它在 ~/.grok 中的自有配置：它的登录、API 密钥或你在那里定义的模型。';
+
+  @override
+  String get grokCustomHomeNote =>
+      '自定义服务商会让这个 Grok 主机使用一个独立的 Grok 目录：不与它共享 ~/.grok 的会话、登录和插件。';
+
+  @override
+  String get grokAuthRequired =>
+      'Grok 提示需要登录。请在这个主机的模型服务中选择官方账号并使用 Grok 登录，或改用自定义服务商，然后重启它。';
+
+  @override
+  String get grokAuthHint =>
+      'Grok 需要登录。请打开这个主机的设置，在官方账号下使用 Grok 登录（或选择自定义服务商），然后重启主机。';
 }

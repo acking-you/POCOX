@@ -547,6 +547,30 @@ fn only_real_mappings_are_accepted() {
         Engine::Acp(&claude_spec),
     )
     .expect("claude messages");
+    // Grok: its own sign-in, or any API in a home of its own; a generic
+    // agent has neither.
+    let grok_spec = spec(pocket_codex_host_svc::acp::grok::PROFILE_ID);
+    save(dir.path(), "grok-o", &official, KeyChange::Keep, None, Engine::Acp(&grok_spec))
+        .expect("grok account");
+    refused("g-o", official.clone(), Engine::Acp(&generic));
+    for protocol in ApiProtocol::ALL {
+        save(
+            dir.path(),
+            "grok-c",
+            &custom(protocol, url),
+            KeyChange::Replace(Secret::new("k")),
+            None,
+            Engine::Acp(&grok_spec),
+        )
+        .expect("grok supports each custom API");
+    }
+    let resolved = resolve_in(dir.path(), "grok-o").expect("resolve");
+    assert!(acp(&resolved, &grok_spec, "grok-o").is_err(), "Grok has a route of its own");
+    let (launch, _) = grok::launch(&resolved, &grok_spec, "grok-o").expect("route");
+    let (launch, authority) = launch.expect("account route");
+    assert!(!authority.is_empty());
+    assert!(launch.env.is_empty(), "the user's own Grok home");
+    assert!(launch.env_remove.iter().any(|name| name == "XAI_API_KEY"));
 }
 
 #[test]

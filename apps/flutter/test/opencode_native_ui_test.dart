@@ -240,6 +240,30 @@ void main() {
       expect(nativeContinueHost(hosts, 'codex'), isNull);
     });
 
+    test("a Grok host continues only from the user's own Grok home", () {
+      AppServeStatus grok(String name, String source) => AppServeStatus(
+        name: name,
+        device: 'local',
+        alive: true,
+        appServiceKey: 'pcx:local:acp:$name',
+        provider: 'acp',
+        profileId: 'grok',
+        configSource: source,
+      );
+      // A custom provider's host keeps sessions in a Grok home of its own.
+      final custom = grok('gateway', 'custom');
+      expect(nativeContinueHost([custom], 'grok'), isNull);
+      expect(
+        nativeContinueHost([custom, grok('grok', 'official')], 'grok')!.name,
+        'grok',
+      );
+      expect(
+        nativeContinueHost([grok('mine', 'inherited')], 'grok'),
+        isNotNull,
+      );
+      expect(nativeContinueHost([_acp('claude', 'claude')], 'grok'), isNull);
+    });
+
     test('a stopped or unregistered host continues nothing', () {
       expect(
         nativeContinueHost([

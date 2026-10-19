@@ -221,6 +221,9 @@ pub struct HostStartedDto {
     pub service_key: String,
     /// An already-running host was reused.
     pub reused: bool,
+    /// What the start should tell the user beside success (a custom Grok
+    /// provider's gateway models could not be listed), if anything.
+    pub notice: Option<String>,
 }
 
 pub(super) fn dto(
@@ -364,7 +367,10 @@ pub fn host_config_supported(
             Some(spec) => {
                 let spec = spec.into_spec();
                 let protocols = provider::supported_protocols(&spec);
-                let sources: &[Source] = if protocols.is_empty() {
+                let sources: &[Source] = if pocket_codex_host_svc::acp::grok::applies(&spec) {
+                    // Grok's own sign-in, or a provider in a home of its own.
+                    &[Source::Inherited, Source::Official, Source::Custom]
+                } else if protocols.is_empty() {
                     &[Source::Inherited]
                 } else {
                     &[Source::Inherited, Source::Custom]
@@ -472,18 +478,21 @@ pub fn app_serve_start_configured(
             provider: "codex".into(),
             service_key: r.app_service_key,
             reused: r.reused,
+            notice: None,
         },
         Started::OpenCode(r) => HostStartedDto {
             name: r.name,
             provider: "opencode".into(),
             service_key: r.service_key,
             reused: false,
+            notice: None,
         },
         Started::Acp(r) => HostStartedDto {
             name: r.name,
             provider: "acp".into(),
             service_key: r.service_key,
             reused: r.reused,
+            notice: r.notice,
         },
     })
 }
@@ -579,6 +588,10 @@ mod tests {
         assert_eq!(claude.protocols, ["anthropic-messages"]);
         assert!(claude.key_required && !claude.model_required);
         assert!(!codex.model_required && !codex.key_required);
+        let grok = host_config_supported(Some(spec("grok")), None);
+        assert_eq!(grok.sources, ["inherited", "official", "custom"]);
+        assert_eq!(grok.protocols, ["responses", "anthropic-messages", "chat-completions"]);
+        assert!(grok.model_required && grok.key_required && grok.claude_variables.is_empty());
         let generic = host_config_supported(Some(spec("custom-x-1")), None);
         assert_eq!(generic.sources, ["inherited"]);
         assert!(generic.protocols.is_empty());

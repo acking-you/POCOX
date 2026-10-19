@@ -17,6 +17,8 @@ pub struct NativeSessionListDto {
     pub sessions: Vec<LocalSessionDto>,
     /// Opaque next inventory page cursor.
     pub next_cursor: Option<String>,
+    /// Sessions of this source can be renamed and deleted here (Grok).
+    pub manageable: bool,
 }
 /// One bounded oldest-first transcript window.
 pub struct NativeSessionPageDto {
@@ -89,6 +91,7 @@ pub fn app_native_sessions(
         location: source.location.clone(),
         sessions,
         next_cursor: value["nextCursor"].as_str().map(str::to_owned),
+        manageable: provider == "grok",
     })
 }
 /// Read one bounded native transcript page. Never resumes an external session.
@@ -142,4 +145,27 @@ pub fn app_native_session_revision(
             liveness: meta_liveness_dto(liveness),
         })
     })
+}
+
+/// Rename a session of this computer's Grok home through Grok itself.
+/// Refused while a Grok terminal client or a POCOX host holds it.
+pub fn app_native_session_rename(
+    provider: String,
+    thread_id: String,
+    title: String,
+    source_id: Option<String>,
+) -> Result<()> {
+    anyhow::ensure!(provider == "grok", "this provider's sessions cannot be renamed here");
+    crate::engine::grok_account::manage_session(&thread_id, Some(&title), source_id.as_deref())
+}
+
+/// Delete a session of this computer's Grok home permanently, through Grok
+/// itself. Refused while a Grok terminal client or a POCOX host holds it.
+pub fn app_native_session_delete(
+    provider: String,
+    thread_id: String,
+    source_id: Option<String>,
+) -> Result<()> {
+    anyhow::ensure!(provider == "grok", "this provider's sessions cannot be deleted here");
+    crate::engine::grok_account::manage_session(&thread_id, None, source_id.as_deref())
 }

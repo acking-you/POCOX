@@ -253,6 +253,7 @@ void _registerPresets() {
       findsOneWidget,
     );
     expect(agentKindOf(provider: 'acp', profileId: 'claude'), AgentKind.claude);
+    expect(agentKindOf(provider: 'acp', profileId: 'grok'), AgentKind.grok);
     expect(agentKindOf(provider: 'opencode'), AgentKind.opencode);
     expect(agentKindOf(provider: 'acp'), AgentKind.other);
   });

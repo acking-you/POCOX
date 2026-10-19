@@ -60,6 +60,9 @@ deps/
   codex/                   # acking-you/codex fork, branch `pocket-codex`
                            # (git submodule) = upstream openai/codex main +
                            # our adaptations; see §8
+  grok-build/              # acking-you/grok-build, branch `pocox` (git
+                           # submodule) = the fork's pristine `upstream`
+                           # mirror of Grok Build; a source reference, see §8.3
 docs/                      # design notes, protocol references, CLI verification
 scripts/                   # install scripts, local CI, CI affected-surface gate
 vendor/pagable/             # registry source with a 32-bit size-assertion fix
@@ -245,14 +248,14 @@ git checkout -- apps/flutter/pubspec.yaml   # restore before committing
 
 ## 8. Working with submodules
 
-`deps/codex` is a git submodule pinned to a specific commit — the only one
-left. `deps/pb-mapper` (plus the `deps/kanal` and `deps/uni-stream` forks it
+`deps/codex` and `deps/grok-build` are git submodules pinned to specific
+commits. `deps/pb-mapper` (plus the `deps/kanal` and `deps/uni-stream` forks it
 pulled in transitively) is gone. pb-mapper is a Cargo Git dependency on
 `https://github.com/acking-you/pb-mapper`, branch `pocket-codex`; `Cargo.lock`
 pins its exact commit. Push SDK fixes to that branch, then run
 `cargo update -p pb-mapper` here and commit the resulting lockfile after
 verification. Normal builds use `--locked` and do not automatically follow
-branch updates. After pulling this repo, materialise the Codex submodule with:
+branch updates. After pulling this repo, materialise the submodules with:
 
 ```bash
 git submodule update --init --recursive
@@ -316,6 +319,24 @@ After a protocol bump:
 5. Run the full first-party verification in §7 and build the desktop UI.
    Never run formatting or lint rewrites inside `deps/codex` for a routine
    application change.
+
+
+### 8.3 Grok Build reference source
+
+`deps/grok-build` tracks the `pocox` branch of
+`git@github.com:acking-you/grok-build.git`, cut from that fork's `upstream`
+branch (pure `Synced from monorepo` commits; its root `SOURCE_REV` names the
+SpaceXAI monorepo commit). Keep `pocox` for POCOX's maintenance; bring
+upstream syncs in by merging `upstream` into it, never by rebasing
+published history. It is a reference, not a dependency: it is excluded from
+the Cargo workspace, nothing links its crates, and Grok runs only as the
+user's installed `grok` (§8.1 applies to it as to Codex). First-party code
+mirrors the rules it needs (the session store layout and replay in
+`host-svc/src/native_history/grok/`, the model configuration in
+`host-svc/src/acp/grok.rs`) and cites the upstream files. When the pin
+moves, re-read those files and the ACP surface (`xai-grok-shell/src/agent/
+mvp_agent/acp_agent.rs`), then run the opt-in `grok_live` tests. Never run
+formatting or lint rewrites inside `deps/grok-build`.
 
 ## 9. Roadmap (rough)
 
@@ -1479,6 +1500,26 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     exhaustion is not proof of a dead harness or revoked management grant;
     preserve healthy services and report inspection failures accurately.
     See `docs/harness-connection-lifecycle.md`.
+
+42. **Grok Build (2026-10-20).** `grok agent --no-leader stdio` is a built-in
+    ACP preset (profile `grok`, a plain "G" monogram since no openly
+    licensed mark exists), located on the child PATH then `~/.grok/bin`.
+    Model services: existing configuration; Grok account (the user's Grok
+    home with API-key and endpoint variables removed, never blanked; device
+    sign-in, status and sign-out in place through a private, short-lived
+    `grok` that opens no session); or a custom provider (Responses,
+    Anthropic Messages, Chat Completions) in a Grok home of the host's own,
+    whose `config.toml` POCOX rewrites each start with `[model.*]` tables
+    naming `POCOX_GROK_PROVIDER_KEY` as `env_key` (the key is never written)
+    and only the provider's models allowed. Local sessions reads
+    `$GROK_HOME/sessions` with Grok's own listing, rewind and turn rules, and
+    renames or deletes through Grok while no Grok terminal client or POCOX
+    host holds the session. Terminal clients registered in
+    `active_sessions.json` are owners (turn unknown: access reason
+    `external_open`); `grok agent stdio` registers nowhere, so an editor's
+    ACP Grok must be closed by the user. A POCOX Grok host is its session's
+    own writer and re-verifies before each prompt. See
+    [Grok Build](docs/grok-build.md).
 
 ## 10. Communication conventions
 

@@ -25,6 +25,8 @@ pub mod claude;
 pub mod claude_setup;
 pub mod client;
 pub mod fold;
+pub mod grok;
+pub mod grok_control;
 pub mod host;
 pub mod jsonrpc;
 pub mod mcp;

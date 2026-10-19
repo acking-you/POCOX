@@ -558,16 +558,25 @@ class HostStartedDto {
   /// An already-running host was reused.
   final bool reused;
 
+  /// What the start should tell the user beside success (a custom Grok
+  /// provider's gateway models could not be listed), if anything.
+  final String? notice;
+
   const HostStartedDto({
     required this.name,
     required this.provider,
     required this.serviceKey,
     required this.reused,
+    this.notice,
   });
 
   @override
   int get hashCode =>
-      name.hashCode ^ provider.hashCode ^ serviceKey.hashCode ^ reused.hashCode;
+      name.hashCode ^
+      provider.hashCode ^
+      serviceKey.hashCode ^
+      reused.hashCode ^
+      notice.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -577,5 +586,6 @@ class HostStartedDto {
           name == other.name &&
           provider == other.provider &&
           serviceKey == other.serviceKey &&
-          reused == other.reused;
+          reused == other.reused &&
+          notice == other.notice;
 }

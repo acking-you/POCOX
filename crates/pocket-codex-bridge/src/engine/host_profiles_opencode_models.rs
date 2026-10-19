@@ -12,7 +12,9 @@ const MAX_MODELS: usize = 4096;
 const MAX_PAGES: usize = 32;
 const TIMEOUT: Duration = Duration::from_secs(15);
 
-pub(super) async fn discover(endpoint: &ProviderEndpoint) -> Result<Map<String, Value>> {
+/// The models `endpoint`'s `/models` lists (id → `{"name"}`), bounded in
+/// time, bytes, pages and count, never following redirects.
+pub(in crate::engine) async fn discover(endpoint: &ProviderEndpoint) -> Result<Map<String, Value>> {
     tokio::time::timeout(TIMEOUT, load(endpoint))
         .await
         .map_err(|_| anyhow!("model discovery timed out"))?

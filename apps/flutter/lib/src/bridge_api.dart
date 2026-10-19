@@ -17,6 +17,7 @@ part 'bridge/session_access_types.dart';
 part 'bridge/management_types.dart';
 part 'bridge/device_metadata.dart';
 part 'bridge/tools_types.dart';
+part 'bridge/grok_types.dart';
 
 abstract interface class BridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
@@ -295,6 +296,25 @@ abstract interface class BridgeApi {
 
   /// Sign codex out through the private sign-in codex.
   Future<void> codexLocalLogout(String sessionId);
+
+  // --- Grok Build account (a Grok host's "Grok account" model service) ---
+
+  /// The Grok account a Grok-account host on this computer would use, read
+  /// through [program] (null: the installed `grok`) without starting a host.
+  Future<GrokAccount> grokAccountStatus({String? program});
+
+  /// Sign out of Grok on this computer.
+  Future<GrokAccount> grokSignOut({String? program});
+
+  /// Begin Grok's device sign-in; returns the attempt to poll with
+  /// [grokSignInState].
+  Future<String> grokSignInStart({String? program});
+
+  /// Where sign-in [attempt] is.
+  GrokSignIn grokSignInState(String attempt);
+
+  /// Cancel sign-in [attempt] and stop its `grok`.
+  Future<void> grokSignInCancel(String attempt);
 
   /// The ACP agent's latest per-session state (no network), or `null`.
   SessionSettings? appSessionSettings(String serviceKey, String threadId);
@@ -587,6 +607,23 @@ abstract interface class BridgeApi {
     String? sourceId,
   });
   Future<NativeSessionRevision> appNativeSessionRevision(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  });
+
+  /// Rename a session of a [NativeSessionList.manageable] source through
+  /// its agent (Grok). Refused while another client or host holds it.
+  Future<void> appNativeSessionRename(
+    String provider,
+    String threadId,
+    String title, {
+    String? sourceId,
+  });
+
+  /// Delete a session of a [NativeSessionList.manageable] source
+  /// permanently, through its agent (Grok). Refused while held elsewhere.
+  Future<void> appNativeSessionDelete(
     String provider,
     String threadId, {
     String? sourceId,

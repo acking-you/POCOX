@@ -27,6 +27,7 @@ pub mod connection;
 pub mod device_management;
 pub mod device_metadata;
 pub mod events;
+pub mod grok;
 pub mod host_config;
 pub mod host_sessions;
 pub mod hosted_account;
@@ -68,6 +69,10 @@ pub use self::{
     events::{
         app_events, log_events, meta_retry_events, AppEventDto, LogLineDto, RetryProgressDto,
     },
+    grok::{
+        grok_account_status, grok_sign_in_cancel, grok_sign_in_start, grok_sign_in_state,
+        grok_sign_out, GrokAccountDto, GrokSignInDto,
+    },
     host_config::{
         app_serve_apply, app_serve_start_configured, codex_local_auth_status,
         codex_local_login_cancel, codex_local_login_start, codex_local_logout,
@@ -102,8 +107,9 @@ pub use self::{
         AcpServeDto, AppServeDto, AppServeStatusDto, OpenCodeEnvironmentDto, OpenCodeHostStatusDto,
     },
     native_sessions::{
-        app_native_session_page, app_native_session_revision, app_native_sessions,
-        NativeSessionListDto, NativeSessionPageDto, NativeSessionRevisionDto,
+        app_native_session_delete, app_native_session_page, app_native_session_rename,
+        app_native_session_revision, app_native_sessions, NativeSessionListDto,
+        NativeSessionPageDto, NativeSessionRevisionDto,
     },
     services::{
         api_subscribe, api_unsubscribe, discover_services, subscriptions, ServiceIdDto,

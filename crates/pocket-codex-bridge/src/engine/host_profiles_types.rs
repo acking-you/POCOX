@@ -8,7 +8,8 @@ use super::*;
 pub enum Source {
     /// The agent's own existing configuration.
     Inherited,
-    /// The official account (native Codex only).
+    /// The official account: native Codex's ChatGPT sign-in, or the Grok
+    /// preset's Grok sign-in.
     Official,
     /// An instance-owned provider.
     Custom,
@@ -68,8 +69,13 @@ impl Engine<'_> {
         match (self, source) {
             (_, Source::Inherited) => Ok(()),
             (Engine::Codex, Source::Official) => Ok(()),
+            (Engine::Acp(spec), Source::Official)
+                if pocket_codex_host_svc::acp::grok::applies(spec) =>
+            {
+                Ok(())
+            },
             (Engine::Acp(_) | Engine::OpenCode, Source::Official) => {
-                bail!("only native Codex offers an official-account sign-in here")
+                bail!("only native Codex and Grok offer an official-account sign-in here")
             },
             (engine, Source::Custom) => {
                 let protocol = protocol.ok_or_else(|| anyhow!("choose the provider's API"))?;

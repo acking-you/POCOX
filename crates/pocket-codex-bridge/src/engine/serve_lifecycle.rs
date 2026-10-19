@@ -200,6 +200,7 @@ pub fn serve_stop_all() -> Result<()> {
     if let Err(error) = super::super::codex_login::close_all() {
         left.push(format!("{error:#}"));
     }
+    super::super::grok_account::close_all();
     // Held past the wait: those operations still own their processes (a
     // start records or tears down its host itself, behind the fence).
     let drained = host_lease::drain(QUIT_WAIT);

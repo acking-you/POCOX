@@ -217,9 +217,13 @@ pub struct AcpServeDto {
     pub display_name: String,
     /// Whether an existing host was reused.
     pub reused: bool,
+    /// What the start should tell the user (e.g. a gateway's models could
+    /// not be listed), if anything.
+    pub notice: Option<String>,
 }
 
-/// Built-in ACP agent presets (Claude through its external stdio adapter).
+/// Built-in ACP agent presets (Claude through its external stdio adapter,
+/// Grok Build's own CLI).
 #[frb(sync)]
 pub fn acp_presets() -> Vec<AcpPresetDto> {
     pocket_codex_host_svc::acp::PRESETS
@@ -378,6 +382,7 @@ pub fn app_serve_start_acp(name: Option<String>, spec: AcpAgentSpecDto) -> Resul
         profile_id: r.profile_id,
         display_name: r.display_name,
         reused: r.reused,
+        notice: r.notice,
     })
 }
 

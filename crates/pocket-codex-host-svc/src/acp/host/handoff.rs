@@ -121,11 +121,11 @@ impl AgentHost {
                 Ok(Ok(())) => {},
                 Ok(Err(error)) => return Err(error),
                 Err(_) => {
-                    return Err(HostError::Agent(
-                        "Claude acknowledged close but a native writer remains; the session stays \
-                         read-only. Release it in its owning application and retry"
-                            .into(),
-                    ))
+                    return Err(HostError::Agent(format!(
+                        "{} acknowledged close but a native writer remains; the session stays \
+                         read-only. Release it in its owning application and retry",
+                        reader.display_name()
+                    )))
                 },
             }
         }

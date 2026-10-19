@@ -44,7 +44,7 @@ fn fixture_host(root: &Path) -> AgentHost {
         ("CLAUDE_CODE_SIMPLE".into(), "1".into()),
         ("CLAUDE_CODE_SAFE_MODE".into(), "1".into()),
     ];
-    AgentHost::create_with_claude_history(
+    AgentHost::create_with_native_history(
         HostOptions {
             spec: AgentSpec {
                 profile_id: "claude".into(),
@@ -55,11 +55,12 @@ fn fixture_host(root: &Path) -> AgentHost {
             program: node,
             path: Some("/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin".into()),
             env,
+            env_remove: Vec::new(),
             store,
         },
         None,
         None,
-        Some(Arc::new(reader)),
+        Some(crate::native_history::NativeHistory::Claude(Arc::new(reader))),
     )
 }
 
