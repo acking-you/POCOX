@@ -50,9 +50,9 @@ background server (`opencode serve --service`) that keeps running after they
 exit. It holds the shared history open, so a host on that history follows
 its sessions read-only (`external_source_open`) while it runs. The access
 names it (holder `opencode_service`, from its arguments) and says to stop it
-with `opencode service stop` or to give the host its own history. Writing
-through that server instead would continue sessions its other clients may
-hold, which waits for session takeover (AGENTS.md item 35).
+with `opencode service stop` or to give the host its own history. Hosting
+through that server instead is proposed in
+[OpenCode 2's background server](#opencode-2s-background-server-proposal).
 
 Not covered on 2.x yet: token-by-token text (replies appear at text and
 tool boundaries), and forms with number, boolean or external fields (they
@@ -366,6 +366,188 @@ Desktop Local sessions reads OpenCode's database directly and read-only
 ([provider-native history](native-agent-history.md)). A session there is
 continued by opening it on the running OpenCode host (**Continue in
 <host>**), or by hosting OpenCode first.
+
+## OpenCode 2's background server (proposal)
+
+Proposed 2026-10-19, waiting for the user's decision. Nothing here is
+implemented.
+
+**What OpenCode 2 does.** From the 2.0.32 source
+(`packages/cli/src/server-process.ts`, `services/service-config.ts`,
+`packages/client/src/effect/service.ts`). The marked facts were also seen on
+the official build, with an isolated HOME and XDG root and a port of the
+probe's own:
+
+- The first client starts `opencode serve --service` (through
+  `Service.ensure`, detached). The service runs from the home directory and
+  keeps running until `opencode service stop`. It listens on 49374 (0xC0DE)
+  for release channels, unless `opencode service set port` changes that. It
+  holds the database. *Seen:* it was the database's only holder, and with no
+  client connected it held only its listening socket.
+- Discovery is one file, `<state>/service.json`. The state directory comes
+  from `opencode debug paths state`; other channels use
+  `service-<channel>.json`. The file holds `{id, version, url, pid,
+  password}` with mode 0600. Requests authenticate as Basic
+  `opencode:<password>`, and `/api/info` answers `{version, pid, urls}`.
+  *Seen:* the file had mode 0600, the pid matched, and a wrong password got
+  401. The password is also saved in `<config>/service.json`.
+- The service can be replaced. These stop it (SIGTERM, then SIGKILL) and
+  start a new one with a new id and pid: a TUI of another version
+  (`mismatch: "replace"`), `service restart`, and `service set` of port,
+  password, hostname, cors or env. `opencode service start` reuses any
+  compatible running service and never replaces one.
+- The service's environment is the one of the client that started it, plus
+  `service set env`. A later client's `OPENCODE_CONFIG_CONTENT` never
+  reaches it.
+- `opencode service set disabled true` stops the service. Clients then run a
+  private `serve --stdio`, which holds the database only while they are open,
+  as 1.x did. *Seen:* the TUI's private server held the database and exited
+  with the TUI.
+- Each session has one engine. Input goes through a per-session inbox
+  (`session.inbox.enqueued` / `delivered`), and only one execution per
+  session runs at a time. Every client sees every session's turns. *Seen:*
+  one client's `/api/event` received another client's `opencode run`, from
+  `session.execution.started` to `succeeded`.
+- The server keeps no list of its clients, and nothing tells which session a
+  client is showing. From outside, only process-level facts are visible.
+  *Seen:* an open TUI kept one established loopback connection to the
+  service (its event stream) after two idle minutes, and none once it
+  exited. With remote access (`opencode service set remote`, `pair
+  --remote`), remote clients are proxied inside the service's own process.
+  Its `/api/info` `urls` then list the remote address.
+
+**1. Attach instead of spawn.** This applies to a 2.x host on the shared
+history with the inherited model service:
+
+- If `opencode service get disabled` prints `true`, the host runs its own
+  server, as today. The user's clients then use private servers, and holder
+  evidence works unchanged.
+- Otherwise the host reads the registration. It attaches when `/api/info`,
+  asked with that password, answers the same pid and the host's major
+  version, and that pid is the only holder of the canonical database. If no
+  service is running, the host first runs `opencode service start`. It runs
+  it with the plain inherited environment: the child PATH only, and no POCOX
+  password, agent tools or configuration, since the service outlives POCOX
+  and serves every client.
+- A service of another major version, or one on another database, is refused
+  with that reason. The host does not fall back to a server of its own,
+  which would be a second engine on the history.
+- The POCOX source claim is still taken, so there is one Pocket host per
+  source.
+- This mirrors an adopted Codex app-server (AGENTS.md items 26 and 37). The
+  host joins a server it did not start and never signals it.
+
+**2. Lifecycle.** An attached host owns no process.
+
+- **Stop and quit** detach: they close the event stream, withdraw the relay
+  keys and release the claim. The service keeps running, as after any
+  OpenCode client exits. Nothing goes into the process ledger or
+  `pending_cleanup`, and a detach never fails a quit.
+- **Apply** to the same configuration detaches and attaches again, with no
+  restart. Apply to a custom provider or to its own history detaches, then
+  starts the host's own server, as today.
+- **Watchdog.** The event stream ends, or the registration changes (id, pid
+  or url): either way, it is a new engine generation. The host re-reads and
+  re-validates the registration as at attach and reports `transition`
+  meanwhile. Running turns become uncertain and are recovered from
+  `/api/session/active`, as on a reconnect. After the user's
+  `opencode service stop`, the host stays reconnecting and says so. Only an
+  explicit Start, Apply or restore starts the service again.
+- **Status** reports the service's pid. A new `OpenCodeStatus` field,
+  `backgroundServer` (serde default false), says the server is OpenCode's own
+  and that Stop detaches. `alive` means a healthy attachment, not that the
+  pid runs.
+- **Agent tools** are not given to an attached host. OpenCode's `mcp.add` is
+  server-wide, so it would hand the host's token to every client of the
+  service, remote ones included. The host's status says so.
+
+**3. Custom providers.** Their `OPENCODE_CONFIG_CONTENT` cannot reach a
+shared service, and `service set env` would change it for every client. So
+they keep a server of their own. On the shared history, that is a second
+engine beside the service, so the host follows read-only while the service
+runs, as today. Recommendation: while the service is enabled, the editor
+selects *This host only* for a new custom-provider host and says why.
+
+**4. Session access.**
+
+What the server can show:
+
+- every session's running turn and its end;
+- queued and delivered input;
+- pending permissions and forms.
+
+Since one engine runs each session, a send from POCOX and a send from the TUI
+are queued in order. They are not two engines writing at once, as with 1.x
+servers.
+
+What it cannot show: which sessions a client has open. An idle TUI, desktop
+window or browser tab is not visible over HTTP. Only "a client process is
+connected" can be observed.
+
+- **A. Write only when no other client is connected** (recommended). This
+  keeps item 29's rule ("write only from a fresh no-owner admission"); only
+  the evidence changes. A session is writable only when a fresh inspection
+  finds all of these:
+  - the registration still names the attached instance;
+  - the service is the only holder of the database;
+  - every established connection to the service's port comes from this
+    process;
+  - `/api/info` lists only loopback URLs, so no remote access or wildcard
+    bind.
+
+  Another connected process reports `external_source_open` with its pid.
+  Unlike today, it also carries the session's real turn state from the
+  server. A remote or unattributable peer is `source_unknown`. Once the TUI,
+  desktop app and browser tabs close, the service stays, and sessions become
+  writable through the existing **Check now** and open flow.
+
+  Limits: a client that connects only per request, with no event stream, is
+  invisible between requests. This is evidence of possible writers, not a
+  lease, as today. A race between the check and a send is queued by the
+  server's inbox; it does not create a second engine.
+- **B. Continue while another client is connected.** This is the takeover
+  of AGENTS.md item 35. It would need all of these:
+  - per session, no running turn and no pending input, permission or form
+    on the server;
+  - an explicit confirmation that names the connected process, for example
+    "OpenCode (pid …) is connected and may be showing this session; what you
+    send appears there";
+  - an admission per session and per connection, revoked by any turn or
+    input from elsewhere;
+  - never automatic, and never stopping the other client.
+
+  Not proposed for implementation; item 35 stays deferred.
+
+**5. The password.**
+
+- It is read only from the registration file. Never from
+  `<config>/service.json`, never through `service get password`, and never
+  through a child's argv or environment.
+- It is read only after checking that the file is a regular file owned by
+  this user, with no group or other permission bits.
+- It is decoded straight into `Secret`. A decode failure gives a fixed
+  message, because serde errors can quote values.
+- It is used only in the private client's `Authorization` header. It never
+  appears in logs, status, `ServeStatus`, controller answers, records or
+  errors.
+- It is re-read only at attach and re-attach, and dropped at detach.
+- The URL must be loopback HTTP with no credentials, the same check
+  `listening` makes.
+
+**Verification, if approved.** The opt-in `opencode_native` live tests, on
+2.0.32 with an isolated root and the test's own `service set port`:
+
+- attach to a running service, and to none (the host starts it);
+- write with no other client;
+- follow with an idle TUI (run under a pty) connected, and become writable
+  once it exits;
+- attach again after `service restart`;
+- never stop the service on host stop or quit.
+
+1.19.3 keeps its own server, unchanged, and so does 2.x with `disabled`. The
+AGENTS.md §7 checks also apply.
+
+**Decision:** pending.
 
 ## Verification
 
