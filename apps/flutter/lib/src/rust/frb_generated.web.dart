@@ -51,6 +51,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RustStreamSink<NativeSessionRevisionDto>
+  dco_decode_StreamSink_native_session_revision_dto_Sse(dynamic raw);
+
+  @protected
   RustStreamSink<RetryProgressDto> dco_decode_StreamSink_retry_progress_dto_Sse(
     dynamic raw,
   );
@@ -628,6 +632,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<LogLineDto> sse_decode_StreamSink_log_line_dto_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<NativeSessionRevisionDto>
+  sse_decode_StreamSink_native_session_revision_dto_Sse(
     SseDeserializer deserializer,
   );
 
@@ -1381,6 +1391,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_log_line_dto_Sse(
     RustStreamSink<LogLineDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_native_session_revision_dto_Sse(
+    RustStreamSink<NativeSessionRevisionDto> self,
     SseSerializer serializer,
   );
 

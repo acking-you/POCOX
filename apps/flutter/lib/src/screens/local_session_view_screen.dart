@@ -97,7 +97,8 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     with WidgetsBindingObserver {
   /// How often to re-read the rollout + re-probe liveness while viewing, so a
   /// session another client is driving updates live and flips to resumable the
-  /// moment its turn finishes.
+  /// moment its turn finishes. Native sources follow the bridge's stream
+  /// instead, which also pushes live changes.
   static const _pollInterval = Duration(seconds: 3);
 
   List<ThreadItem> _items = const [];
@@ -107,6 +108,8 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   bool _loading = true;
   String? _error;
   Timer? _poll;
+  StreamSubscription<NativeSessionRevision>? _follow;
+  NativeSessionRevision? _pendingRevision;
   final _scroll = ScrollController();
   late HostImageLoader _imageLoader;
   int _loadEpoch = 0;
@@ -138,6 +141,8 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       _live = null;
       _setImageLoader();
       _load(initial: true);
+      _stopPoll();
+      _startPoll();
     }
   }
 
@@ -194,7 +199,21 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     _startPoll();
   }
 
-  void _startPoll() => _poll = Timer.periodic(_pollInterval, (_) => _load());
+  void _startPoll() {
+    if (_source.isNative) {
+      _startNativeFollow();
+    } else {
+      _poll = Timer.periodic(_pollInterval, (_) => _load());
+    }
+  }
+
+  void _stopPoll() {
+    _poll?.cancel();
+    _poll = null;
+    unawaited(_follow?.cancel());
+    _follow = null;
+    _pendingRevision = null;
+  }
 
   /// Whether this viewer is the visible route.
   bool get _onTop => ModalRoute.of(context)?.isCurrent ?? true;
@@ -216,7 +235,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _poll?.cancel();
+    _stopPoll();
     _scroll.dispose();
     super.dispose();
   }

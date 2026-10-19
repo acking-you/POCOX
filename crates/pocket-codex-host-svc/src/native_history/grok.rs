@@ -8,6 +8,11 @@
 //! log of the ACP `session/update` notifications the agent sent. Replay
 //! drops rewound branches the way Grok's own `session/load` does, so the
 //! read-only view shows what reopening the session would show.
+//!
+//! With [`GrokHistory::with_leader_follow`], a session that a Grok terminal
+//! client runs through Grok's leader is also followed live, read-only
+//! ([`leader`]): its streamed updates past the log extend the last turn,
+//! and the leader's queue and roster say whether a turn runs.
 
 use std::{collections::HashMap, path::PathBuf};
 
@@ -18,10 +23,13 @@ use tokio::sync::Mutex;
 use super::{ownership, NativePage};
 
 mod inventory;
+mod leader;
 mod owners;
 mod transcript;
 
+pub use leader::NativeFollow;
 use owners::Probe;
+use pocket_codex_core::history_sync::digest_bytes;
 
 /// Read Grok Build's local sessions without an ACP process.
 ///
@@ -31,7 +39,8 @@ use owners::Probe;
 pub struct GrokHistory {
     home: PathBuf,
     indexes: Mutex<HashMap<PathBuf, transcript::Index>>,
-    ownership: Option<Probe>,
+    ownership: Option<std::sync::Arc<Probe>>,
+    follows: Option<leader::Follows>,
 }
 
 impl GrokHistory {
@@ -43,6 +52,7 @@ impl GrokHistory {
             home,
             indexes: Mutex::new(HashMap::new()),
             ownership: None,
+            follows: None,
         })
     }
 
@@ -51,8 +61,32 @@ impl GrokHistory {
     /// ACP agents (`grok agent stdio`) do not register, so a missing entry is
     /// never proof that no editor holds a session.
     pub fn with_owner_probe(mut self) -> Self {
-        self.ownership = Some(Probe::new(self.home.clone()));
+        self.ownership = Some(std::sync::Arc::new(Probe::new(self.home.clone())));
         self
+    }
+
+    /// Follow sessions live through Grok's leader while a terminal client
+    /// that registers them runs there ([`Self::follow`]). Needs the owner
+    /// probe; never starts a leader, never writes to a session.
+    pub fn with_leader_follow(mut self) -> Self {
+        if let Some(probe) = &self.ownership {
+            self.follows = Some(leader::Follows::new(&self.home, probe.clone()));
+        }
+        self
+    }
+
+    /// Follow `session` live for as long as the returned interest is held:
+    /// while a verified Grok terminal client runs it through this home's
+    /// leader, pages and revisions carry its streamed updates, and
+    /// [`NativeFollow::changed`] wakes on each. `None` without leader
+    /// following. Call it within a Tokio runtime.
+    pub fn follow(&self, session: &str) -> Option<NativeFollow> {
+        let session = valid_session(session).ok()?;
+        Some(self.follows.as_ref()?.follow(session))
+    }
+
+    fn live(&self, session: &str) -> Option<leader::Snapshot> {
+        self.follows.as_ref()?.snapshot(session)
     }
 
     /// The Grok home this source reads.
@@ -106,10 +140,12 @@ impl GrokHistory {
     pub async fn revision(&self, session: &str) -> Result<Value> {
         let root = self.sessions_root();
         let session = valid_session(session)?.to_owned();
+        let live = self.live(&session).map(|snapshot| snapshot.version);
         tokio::task::spawn_blocking(move || {
             let dir = inventory::locate(&root, &session)?;
             let stamp = transcript::Stamp::read(&dir)?;
-            Ok(json!({"generation": stamp.generation(), "revision": stamp.revision()}))
+            Ok(json!({"generation": stamp.generation(),
+                "revision": with_live(stamp.revision(), live)}))
         })
         .await
         .context("native revision task failed")?
@@ -148,16 +184,34 @@ impl GrokHistory {
                 .context("native history task failed")??
         };
         let mut index = indexes.remove(&dir).unwrap_or_default();
+        let (version, tail) = match self.live(&session) {
+            Some(snapshot) => (Some(snapshot.version), Some(snapshot.tail)),
+            None => (None, None),
+        };
         let read = {
             let dir = dir.clone();
+            let session = session.clone();
             tokio::task::spawn_blocking(move || {
-                let page = transcript::read(&dir, &session, &mut index, before.as_deref(), limit);
+                let page = transcript::read(
+                    &dir,
+                    &session,
+                    &mut index,
+                    before.as_deref(),
+                    limit,
+                    tail.as_ref(),
+                );
                 (page, index)
             })
             .await
             .context("native history task failed")?
         };
-        let (page, index) = read;
+        let (mut page, index) = read;
+        if let (Ok(page), Some(_)) = (page.as_mut(), version) {
+            page.revision = with_live(std::mem::take(&mut page.revision), version);
+        }
+        if let Some(follows) = &self.follows {
+            follows.prune(&session, index.max_seq());
+        }
         // A failed read keeps no index, so a retry starts from the log
         // itself and never serves a partial one as complete.
         if page.is_ok() {
@@ -169,12 +223,30 @@ impl GrokHistory {
         page
     }
 
-    /// Verified native ownership; anything unverifiable is unknown.
+    /// Verified native ownership; anything unverifiable is unknown. A
+    /// session followed live through the leader also says whether a turn
+    /// runs there.
     pub async fn liveness(&self, session: &str) -> crate::sessions::SessionLiveness {
-        match &self.ownership {
+        let view = match &self.ownership {
             Some(probe) => probe.inspect(session).await,
             None => ownership::unknown(session),
+        };
+        self.with_turn(session, view)
+    }
+
+    /// A held session's turn state, while the leader reports it live: still
+    /// owned either way, so nothing here grants a write.
+    fn with_turn(
+        &self,
+        session: &str,
+        mut view: crate::sessions::SessionLiveness,
+    ) -> crate::sessions::SessionLiveness {
+        let running = self.live(session).and_then(|snapshot| snapshot.running);
+        if let (true, Some(running)) = (view.held_open, running) {
+            view.turn_state = if running { "running" } else { "idle" }.into();
+            view.safety = if running { "nativeOwnedRunning" } else { "nativeOwnedIdle" }.into();
         }
+        view
     }
 
     /// Fresh evidence that no Grok terminal client holds `session`, for an
@@ -204,10 +276,11 @@ impl GrokHistory {
     }
 
     pub(crate) async fn handoff_liveness(&self, session: &str) -> crate::sessions::SessionLiveness {
-        match &self.ownership {
+        let view = match &self.ownership {
             Some(probe) => probe.inspect_fresh(session).await,
             None => ownership::unknown(session),
-        }
+        };
+        self.with_turn(session, view)
     }
 
     pub(crate) fn claim_session(
@@ -228,6 +301,14 @@ impl GrokHistory {
 
 /// Most update-log indexes kept per source (one per recently read session).
 const MAX_INDEXES: usize = 32;
+
+/// A log revision, distinct for every live version on top of it.
+fn with_live(revision: String, live: Option<u64>) -> String {
+    match live {
+        Some(version) => digest_bytes(format!("{revision}:live:{version}").as_bytes()),
+        None => revision,
+    }
+}
 
 /// Grok session ids are UUIDs (v7 since 1.0); the id is also a directory
 /// name, so anything else is refused before it reaches a path.

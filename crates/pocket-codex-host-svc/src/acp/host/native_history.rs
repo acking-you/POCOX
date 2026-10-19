@@ -61,6 +61,12 @@ impl AgentHost {
         }))
     }
 
+    /// Live interest in an unadmitted native session, for a follow stream:
+    /// held, it keeps the provider's live follow (Grok's leader) open.
+    pub fn native_follow(&self, session: &str) -> Option<crate::native_history::NativeFollow> {
+        self.inner.native_history.as_ref()?.follow(session)
+    }
+
     /// Revision and verified native ownership for a read-only follow stream.
     /// Missing evidence never grants permission to resume.
     pub async fn native_status(&self, session: &str) -> Result<Value, HostError> {

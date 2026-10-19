@@ -617,6 +617,16 @@ abstract interface class BridgeApi {
     String? sourceId,
   });
 
+  /// [appNativeSessionRevision] now, then on every live change and at least
+  /// every few seconds, while listened to. A Grok session a Grok terminal
+  /// client runs through Grok's leader changes live, read-only; cancelling
+  /// ends that follow.
+  Stream<NativeSessionRevision> appNativeSessionFollow(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  });
+
   /// Rename a session of a [NativeSessionList.manageable] source through
   /// its agent (Grok). Refused while another client or host holds it.
   Future<void> appNativeSessionRename(

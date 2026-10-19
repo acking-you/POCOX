@@ -53,8 +53,9 @@ serve` carries that protocol over a WebSocket, and Grok's leader
 Unix socket, which lets a second client join a session the terminal
 client is running. POCOX keeps `--no-leader`: the host owns its agent
 process (its lifecycle, environment and model service), which a leader
-shared by every client on the computer would not be. Following a terminal
-client's live session through the leader is not implemented.
+shared by every client on the computer would not be. A terminal client's
+session that runs through a leader is followed live, read-only, from Local
+sessions and hosted views ([below](#following-a-terminal-client-live)).
 
 A host with no sign-in and no key reports `authRequired` when a session is
 created. Its host details and chat hint point at the Grok-account sign-in
@@ -251,7 +252,9 @@ live process that cannot be shown to be that client makes the answer
 unknown. Grok records no turn state, so a held session reads **In use
 elsewhere** in Local sessions. In a host it is followed read-only with the
 access reason `external_open`: the client has it open and whether a turn
-runs there is unknown. It opens by itself once that client closes it.
+runs there is unknown, unless the session is followed live through Grok's
+leader ([below](#following-a-terminal-client-live)). It opens by itself once
+that client closes it.
 
 `grok agent stdio` never registers, whether it runs in an editor or in
 POCOX's own host. POCOX cannot see an editor's ACP Grok on the same
@@ -263,6 +266,61 @@ registered and that its agent is still the process it launched. Grok's
 agent is the session's writer itself, unlike the Claude adapter's
 registered native child. Hand back (`session/close`) and Continue here work
 as for Claude.
+
+### Following a terminal client live
+
+Grok writes `updates.jsonl` as updates arrive, except a streaming text run,
+which it keeps in memory until the run ends. A terminal client in leader
+mode (`[cli] use_leader`, or Grok's remote setting) is a stdio client of
+the leader process that hosts the agent, on `$GROK_HOME/leader.sock`. While a
+view shows such a session, POCOX follows it there, read-only
+(`native_history/grok/leader.rs`, after `xai-grok-shell/src/leader/`):
+
+- It only connects to a leader that already runs, never starts one, and only
+  while a verified terminal client registers the session (above). It follows
+  the home's default `leader.sock`; a leader of another relay URL
+  (`leader-<hash>.sock`) or at `GROK_LEADER_SOCKET` is not followed, and on
+  Windows (named pipes) nothing connects.
+- It registers as a stdio client with no capabilities (a headless client
+  would make the leader connect to Grok's web relay). The leader must answer
+  with protocol version 1; any other version, or none, is not followed.
+- It sends exactly two read-only requests: `_x.ai/session/info` naming the
+  session, which subscribes it (an empty answer means the leader does not
+  hold the session, and it leaves), then `_x.ai/sessions/list` for the
+  session's activity. It never sends `initialize`, `session/load` or a
+  prompt: a load re-applies the loading client's MCP servers, model, status
+  line and echo flags to the shared session.
+- Every subscriber receives the session's permission, question,
+  plan-approval and MCP elicitation requests, and the first answer wins.
+  POCOX never answers one, so the user's own client always does. A request
+  only a session's driver receives means the terminal client has left; the
+  follower leaves at once.
+- Streamed updates past the log's highest `eventId` extend the last turn.
+  Ids have gaps (some are neither written nor sent), and a merged text run is
+  written with its last chunk's id. So a follower that subscribed while the
+  session was idle shows every update at once; one that subscribed mid-turn
+  waits until the log reaches the first update it received, since a run
+  begun earlier may still be buffered. A live rewind, or an update over
+  4 MiB, waits for the log too. A next prompt appears once its first line is
+  written, which gives the turn its id. At most 4,096 updates or 16 MiB are
+  kept, and updates the log holds are dropped.
+- Running state comes from the roster's activity, `_x.ai/queue/changed`
+  (`runningPromptId`), `turn_completed`, and the roster's
+  `x.ai/sessions/changed` broadcasts. Local sessions then shows **Running
+  elsewhere**, and a host's access reason becomes `external_running` or
+  `external_idle` instead of `external_open`; the session stays read-only.
+- Local sessions follows through `app_native_session_follow`, a stream that
+  pushes a revision on each live change and every three seconds, ending
+  when the view closes. A host's native follow stream wakes on live
+  changes as well as every two seconds.
+
+Two effects on the leader remain. A subscriber keeps the session loaded
+there, so the follower checks the registration every second and leaves when
+it ends; the leader then unloads the session as it would have when the
+client left. And the last stdio client to send a message receives the
+leader's notifications that name no session (`x.ai/settings/update`, for
+example) until the terminal client sends its next one; the follower's two
+requests make it that client briefly.
 
 ### Rename and delete
 
@@ -362,10 +420,28 @@ Native rows, modes, limits and images (2026-10-20, Grok 1.0.62):
   and back; the permission menu (每次询问 / 替我审批 / 完全放行) and the
   mode menu (标准 / 计划) opened without a change.
 
+Following through the leader, with Grok 1.0.62 (2026-10-20):
+
+- `native_history/grok/leader/tests.rs` runs a fake leader on the home's
+  socket: the registration (stdio, no capabilities), the two read-only
+  requests, the protocol gate, an empty info answer, live text past an
+  `eventId` gap, running state, a permission request left unanswered, and
+  leaving on a driver-only request, when the registration ends and when the
+  view closes. `grok/tests.rs` covers the overlay rules.
+- The opt-in `a_terminal_clients_leader_session_is_followed_live_read_only`
+  in `tests/grok_live.rs` runs Grok's own `grok agent --leader stdio` as the
+  terminal client in a throwaway home; it starts the real leader. The
+  follower went live, the reader showed the streamed `slow ` before Grok's
+  log held it and the turn as running, then idle with the whole reply; the
+  client's next prompts still answered, and the follower left when the
+  registration was removed. Grok starts its leader with
+  `--no-exit-on-disconnect`, so the test stops it.
+
 Not verified: a stranded interjection or a looped, scheduled or goal turn
 on the real Grok, and Grok's real questions and plan approval (the mock
 only); a turn in plan mode or under Auto or Full access on the real Grok;
 an image sent from the app's picker (the live test sent one through the
-host); a Grok terminal client holding a session live (covered by a real
-stand-in process); Linux; remote management against a real second
-device.
+host); the TUI itself in leader mode (its stand-in is Grok's stdio client,
+the same kind of leader client), a real permission request reaching the
+follower, and the Local sessions view in the app; Linux; remote management
+against a real second device.

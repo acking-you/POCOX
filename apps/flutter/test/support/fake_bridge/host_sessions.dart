@@ -172,6 +172,16 @@ mixin _FakeHostSessions on _FakeBridgeState {
     String? sourceId,
   }) => throw UnimplementedError('Native fixture required');
 
+  /// The bridge's poll without live changes: a revision every three seconds.
+  @override
+  Stream<NativeSessionRevision> appNativeSessionFollow(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  }) => Stream<void>.periodic(const Duration(seconds: 3)).asyncMap(
+    (_) => appNativeSessionRevision(provider, threadId, sourceId: sourceId),
+  );
+
   @override
   Future<ForceResumeReport> appForceResume(
     String serviceKey,

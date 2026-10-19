@@ -10,16 +10,16 @@ use tempfile::TempDir;
 use super::*;
 use crate::acp::{fold::ItemKind, schema::TurnOutcome};
 
-const ID: &str = "01a15501-b678-7db0-b062-a1f5b1edc8d1";
+pub(super) const ID: &str = "01a15501-b678-7db0-b062-a1f5b1edc8d1";
 
-fn session(home: &Path, bucket: &str, id: &str, summary: Value) -> PathBuf {
+pub(super) fn session(home: &Path, bucket: &str, id: &str, summary: Value) -> PathBuf {
     let dir = home.join("sessions").join(bucket).join(id);
     fs::create_dir_all(&dir).expect("session dir");
     fs::write(dir.join("summary.json"), summary.to_string()).expect("summary");
     dir
 }
 
-fn summary(id: &str, title: &str, active: &str) -> Value {
+pub(super) fn summary(id: &str, title: &str, active: &str) -> Value {
     json!({
         "info": {"id": id, "cwd": "/work/project"},
         "session_summary": "fallback summary",
@@ -31,7 +31,7 @@ fn summary(id: &str, title: &str, active: &str) -> Value {
     })
 }
 
-fn acp(update: Value) -> String {
+pub(super) fn acp(update: Value) -> String {
     json!({"timestamp": 1, "method": "session/update", "params": {"sessionId": ID, "update": update}})
         .to_string()
 }
@@ -41,12 +41,12 @@ fn xai(update: Value) -> String {
         .to_string()
 }
 
-fn prompt(index: u64, text: &str) -> String {
+pub(super) fn prompt(index: u64, text: &str) -> String {
     acp(json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": text},
         "_meta": {"promptIndex": index}}))
 }
 
-fn reply(text: &str) -> String {
+pub(super) fn reply(text: &str) -> String {
     acp(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}}))
 }
 
@@ -54,7 +54,7 @@ fn done() -> String {
     xai(json!({"sessionUpdate": "turn_completed", "prompt_id": "p", "stop_reason": "end_turn"}))
 }
 
-fn append(dir: &Path, lines: &[String]) {
+pub(super) fn append(dir: &Path, lines: &[String]) {
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -65,7 +65,14 @@ fn append(dir: &Path, lines: &[String]) {
     }
 }
 
-fn texts(page: &NativePage) -> Vec<Vec<String>> {
+/// `line` as Grok persists it, with the session's `eventId` sequence `seq`.
+pub(super) fn stamped(line: String, seq: u64) -> String {
+    let mut value: Value = serde_json::from_str(&line).expect("line");
+    value["params"]["_meta"] = json!({"eventId": format!("{ID}-{seq}")});
+    value.to_string()
+}
+
+pub(super) fn texts(page: &NativePage) -> Vec<Vec<String>> {
     page.turns
         .iter()
         .map(|turn| turn.items.iter().map(|item| item.text.clone()).collect())
@@ -227,7 +234,55 @@ async fn interjections_show_their_typed_text_and_partial_lines_wait() {
     assert_eq!(ids.iter().collect::<std::collections::HashSet<_>>().len(), 4, "unique ids");
 }
 
-fn registry(home: &Path, pid: u32, opened_at: &str) {
+#[test]
+fn a_live_tail_extends_the_last_turn_only_while_nothing_is_missing() {
+    use transcript::{read, Index, LiveTail};
+    let home = TempDir::new().expect("home");
+    let dir = session(home.path(), "%2Fwork", ID, summary(ID, "Live", "2026-10-19T10:00:00Z"));
+    append(&dir, &[
+        stamped(prompt(0, "first"), 1),
+        stamped(reply("one"), 3),
+        stamped(done(), 4),
+        stamped(prompt(1, "second"), 6),
+        stamped(reply("Hel"), 7),
+    ]);
+    let update = |line: String| -> Value {
+        serde_json::from_str::<Value>(&line).expect("update")["params"]["update"].clone()
+    };
+    let live = LiveTail {
+        through: 0,
+        updates: vec![
+            // Already in the log; then the rest of the streamed reply, and a
+            // next prompt that waits for its own first line in the log.
+            (7, update(reply("Hel"))),
+            (8, update(reply("lo"))),
+            (10, update(prompt(2, "third"))),
+            (11, update(reply("not yet"))),
+        ],
+    };
+    let page = |index: &mut Index, live: &LiveTail| {
+        read(&dir, ID, index, None, 20, Some(live)).expect("page")
+    };
+    let mut index = Index::default();
+    let shown = page(&mut index, &live);
+    assert_eq!(index.max_seq(), 7);
+    assert_eq!(texts(&shown), [vec!["first", "one"], vec!["second", "Hello"]]);
+    assert_eq!(shown.total_turns, Some(2), "the next prompt is not a turn yet");
+
+    // Until the log reaches what the follower waits for (an update buffered
+    // before it subscribed, a live rewind), the log alone is shown.
+    let waiting = LiveTail {
+        through: 9,
+        ..live.clone()
+    };
+    assert_eq!(texts(&page(&mut index, &waiting))[1], ["second", "Hel"]);
+    // An older page is never extended.
+    let older =
+        read(&dir, ID, &mut index, Some(&shown.turns[1].id), 20, Some(&live)).expect("older");
+    assert_eq!(texts(&older), [vec!["first", "one"]]);
+}
+
+pub(super) fn registry(home: &Path, pid: u32, opened_at: &str) {
     fs::write(
         home.join("active_sessions.json"),
         json!([{"session_id": ID, "pid": pid, "cwd": "/work", "opened_at": opened_at}]).to_string(),
@@ -250,19 +305,8 @@ async fn terminal_clients_are_owners_only_when_verified() {
     assert_eq!(reader.handoff_liveness(ID).await.safety, "nativeUnknown");
     assert!(reader.owners(ID).await.is_err());
 
-    // A Grok client that registered after it started holds the session. The
-    // test executable, linked under Grok's name, stands in for the client.
-    let grok = home.path().join("grok");
-    fs::hard_link(std::env::current_exe().expect("test executable"), &grok).expect("client");
-    let mut client = std::process::Command::new(&grok)
-        .args(["--exact", "native_history::grok::tests::grok_client_child", "--test-threads=1"])
-        .env("PCX_GROK_CLIENT", "1")
-        .stdout(std::process::Stdio::null())
-        .spawn()
-        .expect("client");
-    std::thread::sleep(std::time::Duration::from_millis(300));
-    let opened = chrono::Utc::now().to_rfc3339();
-    registry(home.path(), client.id(), &opened);
+    // A Grok client that registered after it started holds the session.
+    let mut client = grok_client(home.path());
     let live = reader.handoff_liveness(ID).await;
     assert_eq!(live.safety, "nativeOwned");
     assert!(live.held_open);
@@ -277,6 +321,23 @@ async fn terminal_clients_are_owners_only_when_verified() {
 
     fs::write(home.path().join("active_sessions.json"), "not json").expect("corrupt");
     assert_eq!(reader.handoff_liveness(ID).await.safety, "nativeUnknown");
+}
+
+/// A running Grok terminal client registered for [`ID`]: the test
+/// executable, linked under Grok's name, stands in for the client.
+#[cfg(unix)]
+pub(super) fn grok_client(home: &Path) -> std::process::Child {
+    let grok = home.join("grok");
+    fs::hard_link(std::env::current_exe().expect("test executable"), &grok).expect("client");
+    let client = std::process::Command::new(&grok)
+        .args(["--exact", "native_history::grok::tests::grok_client_child", "--test-threads=1"])
+        .env("PCX_GROK_CLIENT", "1")
+        .stdout(std::process::Stdio::null())
+        .spawn()
+        .expect("client");
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    registry(home, client.id(), &chrono::Utc::now().to_rfc3339());
+    client
 }
 
 #[test]

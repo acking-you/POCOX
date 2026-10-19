@@ -83,7 +83,11 @@ pub fn source(provider: &str, expected: Option<&str>, refresh: bool) -> Result<A
             }
             NativeHistory::Claude(Arc::new(reader))
         },
-        "grok" => NativeHistory::Grok(Arc::new(GrokHistory::new(root.clone())?.with_owner_probe())),
+        "grok" => NativeHistory::Grok(Arc::new(
+            GrokHistory::new(root.clone())?
+                .with_owner_probe()
+                .with_leader_follow(),
+        )),
         _ => open_code(root.clone())?,
     };
     let source = Arc::new(Selected {

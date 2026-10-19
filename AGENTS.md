@@ -1572,9 +1572,21 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     `_x.ai/yolo_mode_changed` and in every session request's `_meta`; Auto
     falls back to asking where Grok's auto gate is off. Images are sent
     though Grok advertises none; `_x.ai/billing` feeds the usage window;
-    Fast pairs a model with its `<name> Fast` partner. The
-    leader socket (joining a terminal client's live session) is not used:
-    the host owns its agent process. See [Grok Build](docs/grok-build.md).
+    Fast pairs a model with its `<name> Fast` partner. Hosts keep
+    `--no-leader` (the host owns its agent process). A terminal client's
+    session that runs through Grok's leader is followed live, read-only
+    (`native_history/grok/leader.rs`): connect only to the home's running
+    `leader.sock` (never start one) while a verified registration exists;
+    stdio, no capabilities, leader protocol 1 only; only `_x.ai/session/info`
+    (subscribes) and `_x.ai/sessions/list`, never `initialize`,
+    `session/load`, a prompt or any answer (interactions are the user's
+    client's; a driver-only request means it left: leave); leave within a
+    second of the registration ending. Live updates past the log's highest
+    `eventId` extend the last turn (at once if subscribed idle, else once the
+    log reaches the first one received); running state from the roster,
+    `queue/changed` and `turn_completed` gives `external_running` /
+    `external_idle`. Local sessions follows through
+    `app_native_session_follow`. See [Grok Build](docs/grok-build.md).
 
 ## 10. Communication conventions
 

@@ -215,7 +215,11 @@ fn run(prepared: Prepared) -> Result<AcpServeReport> {
                 // custom provider, else the user's.
                 let home = grok::effective_home(&provider_launch.env)
                     .ok_or_else(|| anyhow!("Grok's home directory is unavailable"))?;
-                Some(NativeHistory::Grok(Arc::new(GrokHistory::new(home)?.with_owner_probe())))
+                Some(NativeHistory::Grok(Arc::new(
+                    GrokHistory::new(home)?
+                        .with_owner_probe()
+                        .with_leader_follow(),
+                )))
             },
             None => None,
         };

@@ -14,6 +14,13 @@
 //! The log is append-only, so the index keeps its filter state and later
 //! reads examine only appended, complete lines. Turn ids are the byte offset
 //! of the turn's first line: a rewound and rewritten turn gets a new id.
+//!
+//! A tail read can also fold a live overlay ([`LiveTail`]): updates Grok's
+//! leader delivered that the log does not hold yet. Every persisted line and
+//! live notification carries the session's numeric `eventId` (with gaps:
+//! some ids are neither persisted nor sent), and a merged text run is
+//! written with its last chunk's id, so the overlay is the live updates past
+//! the log's highest id, once the log is known to hold everything else.
 
 use std::{
     fs::{self, File},
@@ -62,6 +69,20 @@ pub(in crate::native_history) struct Index {
     /// Indices into `spans` where a counted turn starts.
     prompts: Vec<usize>,
     tracker: Tracker,
+    /// Highest `eventId` sequence of any complete line, rewound ones included.
+    max_seq: u64,
+}
+
+/// Live updates of one session that may not be in its log yet.
+#[derive(Clone, Debug, Default)]
+pub(in crate::native_history) struct LiveTail {
+    /// The overlay holds once the log reaches this `eventId` sequence: past
+    /// it, every update the log lacks was received. Before, an update sent
+    /// before the follower subscribed may still wait in Grok's write buffer,
+    /// or a live rewind or an update too large to keep must reach the log.
+    pub through: u64,
+    /// `(sequence, update)` in arrival order.
+    pub updates: Vec<(u64, Value)>,
 }
 
 /// `UserRunTurnTracker`, verbatim in behaviour.
@@ -119,6 +140,19 @@ struct Envelope<'a> {
 struct ParamsPeek<'a> {
     #[serde(borrow, default)]
     update: Option<UpdatePeek<'a>>,
+    #[serde(borrow, default, rename = "_meta")]
+    meta: Option<LineMeta<'a>>,
+}
+
+#[derive(Deserialize)]
+struct LineMeta<'a> {
+    #[serde(borrow, default, rename = "eventId")]
+    event_id: Option<&'a str>,
+}
+
+/// The counter of an `eventId` (`<session-id>-<n>`, `util/event_id.rs`).
+pub(in crate::native_history) fn event_seq(event_id: &str) -> Option<u64> {
+    event_id.rsplit_once('-')?.1.parse().ok()
 }
 
 #[derive(Deserialize)]
@@ -151,27 +185,35 @@ fn params_of(line: &str) -> (&str, bool) {
     }
 }
 
-fn classify(line: &str) -> (Step, u8) {
+fn classify(line: &str) -> (Step, u8, Option<u64>) {
     let (params, xai) = params_of(line);
-    let Some(update) = serde_json::from_str::<ParamsPeek<'_>>(params)
-        .ok()
-        .and_then(|p| p.update)
-    else {
-        return (Step::Other, OTHER);
+    let Ok(peek) = serde_json::from_str::<ParamsPeek<'_>>(params) else {
+        return (Step::Other, OTHER, None);
     };
+    let seq = peek.meta.and_then(|m| m.event_id).and_then(event_seq);
+    let Some(update) = peek.update else { return (Step::Other, OTHER, seq) };
     if xai {
         return match (update.session_update, update.target_prompt_index) {
-            ("rewind_marker", Some(target)) => (Step::Rewind(target), OTHER),
-            ("turn_completed", _) => (Step::Other, TURN_END),
-            _ => (Step::Other, OTHER),
+            ("rewind_marker", Some(target)) => (Step::Rewind(target), OTHER, seq),
+            ("turn_completed", _) => (Step::Other, TURN_END, seq),
+            _ => (Step::Other, OTHER, seq),
         };
     }
     let host_turn = update.meta.as_ref().and_then(|m| m.host_turn) == Some(true);
     if !host_turn && update.session_update == "user_message_chunk" {
         let index = update.meta.and_then(|m| m.prompt_index).map(|v| v as usize);
-        return (Step::UserChunk(index), ACP);
+        return (Step::UserChunk(index), ACP, seq);
     }
-    (Step::Other, ACP)
+    (Step::Other, ACP, seq)
+}
+
+/// A live ACP update's step for the turn tracker.
+fn live_step(update: &Value) -> Step {
+    let meta = &update["_meta"];
+    if update["sessionUpdate"] == "user_message_chunk" && meta["hostTurn"] != true {
+        return Step::UserChunk(meta["promptIndex"].as_u64().map(|v| v as usize));
+    }
+    Step::Other
 }
 
 impl Index {
@@ -251,10 +293,11 @@ impl Index {
                 self.scanned += read as u64;
                 continue;
             }
-            let (step, kind) = match std::str::from_utf8(text) {
+            let (step, kind, seq) = match std::str::from_utf8(text) {
                 Ok(text) => classify(text),
-                Err(_) => (Step::Other, OTHER),
+                Err(_) => (Step::Other, OTHER, None),
             };
+            self.max_seq = self.max_seq.max(seq.unwrap_or(0));
             self.push(
                 Span {
                     offset,
@@ -288,6 +331,35 @@ impl Index {
             .map(|(i, &start)| (start, starts.get(i + 1).copied().unwrap_or(self.spans.len())))
             .filter(|(start, end)| start < end)
             .collect()
+    }
+
+    /// The log's highest `eventId` sequence.
+    pub(in crate::native_history) fn max_seq(&self) -> u64 {
+        self.max_seq
+    }
+
+    /// What of `live` extends the log's last turn: the updates past the
+    /// log's highest id, up to one that would open a new counted turn (that
+    /// turn is shown once its first line is in the log, which gives it its
+    /// id). Nothing until the log reaches `live.through`.
+    fn overlay(&self, live: &LiveTail) -> Vec<Value> {
+        let disk = self.max_seq;
+        if self.spans.is_empty() || disk < live.through {
+            return Vec::new();
+        }
+        let mut tracker = self.tracker;
+        let mut out = Vec::new();
+        for (_, update) in live.updates.iter().filter(|(seq, _)| *seq > disk) {
+            match live_step(update) {
+                Step::UserChunk(index) if tracker.on_user_chunk(index) => break,
+                Step::UserChunk(_) => {},
+                _ => tracker.on_non_user(),
+            }
+            if update["sessionUpdate"] != "available_commands_update" {
+                out.push(displayed(update.clone()));
+            }
+        }
+        out
     }
 }
 
@@ -391,13 +463,15 @@ impl Stamp {
 }
 
 /// Read the `limit` turns before `before` (a turn id, or `turn:<id>` for
-/// exactly that turn), or the newest ones.
+/// exactly that turn), or the newest ones; a page holding the last turn
+/// folds `live` into it.
 pub(in crate::native_history) fn read(
     dir: &Path,
     session: &str,
     index: &mut Index,
     before: Option<&str>,
     limit: usize,
+    live: Option<&LiveTail>,
 ) -> Result<NativePage> {
     let stamp = Stamp::read(dir)?;
     let path = dir.join(UPDATES_FILE);
@@ -430,9 +504,14 @@ pub(in crate::native_history) fn read(
     let mut budget = MAX_PAGE_BYTES;
     let mut truncated = false;
     let mut page_turns = Vec::with_capacity(end - first);
-    for (turn, id) in turns[first..end].iter().zip(&ids[first..end]) {
+    let overlay = match live {
+        Some(live) if end == turns.len() => index.overlay(live),
+        _ => Vec::new(),
+    };
+    for (n, (turn, id)) in turns[first..end].iter().zip(&ids[first..end]).enumerate() {
         let spans = &index.spans[turn.0..turn.1];
-        let (folded, cut) = fold_turn(file.as_mut(), id, spans, &mut budget)?;
+        let extra = if first + n + 1 == turns.len() { &overlay[..] } else { &[] };
+        let (folded, cut) = fold_turn(file.as_mut(), id, spans, &mut budget, extra)?;
         truncated |= cut;
         page_turns.push(folded);
     }
@@ -458,6 +537,7 @@ fn fold_turn(
     id: &str,
     spans: &[Span],
     budget: &mut u64,
+    extra: &[Value],
 ) -> Result<(Turn, bool)> {
     let mut updates = Vec::new();
     let mut outcome = None;
@@ -502,6 +582,7 @@ fn fold_turn(
     } else if !spans.is_empty() {
         bail!("the Grok session log is unavailable");
     }
+    updates.extend_from_slice(extra);
     let mut turn = replay_turn(id, &updates);
     turn.outcome = outcome;
     turn.omitted += omitted;

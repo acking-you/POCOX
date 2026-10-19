@@ -84,7 +84,7 @@ and the view follows its answer.
 | --- | --- | --- |
 | `external_running` | the named client is running a turn here | follows live; opens by itself when the host reports it free |
 | `external_idle` | the named client still has the session open; no turn runs | close it there; an idle native Claude client still holds the session until it really closes or exits |
-| `external_open` | a Grok terminal client has the session open; whether a turn runs there is not recorded | close it there; opens by itself when it is no longer registered |
+| `external_open` | a Grok terminal client has the session open; whether a turn runs there is not recorded (`external_running` or `external_idle` while it is followed live through Grok's leader) | close it there; opens by itself when it is no longer registered |
 | `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown). The holder is `opencode_service` when it is OpenCode 2's background server beside this host's own server, and `opencode_client` when another client is connected to the background server this host attached to (the turn is then known) | close or release it there (`opencode service stop` for the background server; for a client, its terminal app, desktop app or browser tab), then **Check now** |
 | `pocket_host` | another Pocket host writes it | **Open in <host>** only when that host's service key is known |
 | `transition` | the session is changing hands | wait; never taken as free; a later free answer opens by itself only where the host keeps an admission (see `not_opened`) |

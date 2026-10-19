@@ -13,7 +13,8 @@
 //! running turn, rename, context usage, `/compact` listed), the native
 //! reader over what Grok stored, handing the session back and reopening it
 //! (Grok's agent is its own, unregistered writer), and renaming and deleting
-//! it through Grok itself.
+//! it through Grok itself. A second test follows, read-only and live, a
+//! session that Grok's own stdio client runs through a leader it started.
 #![cfg(unix)]
 
 use std::{
@@ -499,4 +500,245 @@ async fn grok_preset_hosts_reads_and_manages_real_sessions() {
     control.stop().await;
     let listed = fresh.list_sessions(None, 10).await.expect("list");
     assert!(listed["sessions"].as_array().is_some_and(Vec::is_empty), "{listed}");
+}
+
+/// Grok's own stdio client in leader mode (`grok agent --leader stdio`),
+/// standing in for a terminal client: it starts the home's leader and
+/// drives the session through it. It refuses every agent request.
+struct LeaderClient {
+    child: tokio::process::Child,
+    stdin: Arc<tokio::sync::Mutex<tokio::process::ChildStdin>>,
+    waiting: Arc<Mutex<std::collections::HashMap<u64, tokio::sync::oneshot::Sender<Value>>>>,
+    next: std::sync::atomic::AtomicU64,
+}
+
+impl LeaderClient {
+    fn spawn(
+        program: &Path,
+        launch: &pocket_codex_host_svc::acp::provider::AcpProviderLaunch,
+        cwd: &Path,
+    ) -> Self {
+        let mut command = tokio::process::Command::new(program);
+        command
+            .args(["agent", "--leader", "stdio"])
+            .envs(launch.env.iter().cloned())
+            .env("GROK_DISABLE_AUTOUPDATER", "1")
+            .current_dir(cwd)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .kill_on_drop(true);
+        for name in &launch.env_remove {
+            command.env_remove(name);
+        }
+        let mut child = command.spawn().expect("grok agent --leader stdio");
+        let stdin = Arc::new(tokio::sync::Mutex::new(child.stdin.take().expect("stdin")));
+        let waiting: Arc<
+            Mutex<std::collections::HashMap<u64, tokio::sync::oneshot::Sender<Value>>>,
+        > = Arc::default();
+        let (reader, answers, refusals) =
+            (child.stdout.take().expect("stdout"), waiting.clone(), stdin.clone());
+        tokio::spawn(async move {
+            use tokio::io::AsyncBufReadExt;
+            let mut lines = tokio::io::BufReader::new(reader).lines();
+            while let Ok(Some(line)) = lines.next_line().await {
+                let Ok(message) = serde_json::from_str::<Value>(&line) else { continue };
+                match (message["id"].as_u64(), message.get("method")) {
+                    (Some(id), None) => {
+                        if let Some(answer) = answers.lock().expect("waiting").remove(&id) {
+                            let _ = answer.send(message);
+                        }
+                    },
+                    (_, Some(_)) if message.get("id").is_some() => {
+                        let refusal = json!({"jsonrpc": "2.0", "id": message["id"],
+                            "error": {"code": -32601, "message": "not available"}});
+                        let mut stdin = refusals.lock().await;
+                        let _ = stdin.write_all(format!("{refusal}\n").as_bytes()).await;
+                        let _ = stdin.flush().await;
+                    },
+                    _ => {},
+                }
+            }
+        });
+        Self {
+            child,
+            stdin,
+            waiting,
+            next: 1.into(),
+        }
+    }
+
+    fn pid(&self) -> u32 {
+        self.child.id().expect("running")
+    }
+
+    /// Send a request; the answer arrives on the returned receiver.
+    async fn send(&self, method: &str, params: Value) -> tokio::sync::oneshot::Receiver<Value> {
+        let id = self.next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let (answer, receiver) = tokio::sync::oneshot::channel();
+        self.waiting.lock().expect("waiting").insert(id, answer);
+        let request = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params});
+        let mut stdin = self.stdin.lock().await;
+        stdin
+            .write_all(format!("{request}\n").as_bytes())
+            .await
+            .expect("write");
+        stdin.flush().await.expect("flush");
+        receiver
+    }
+
+    async fn call(&self, method: &str, params: Value) -> Value {
+        let answer = tokio::time::timeout(WAIT, self.send(method, params).await)
+            .await
+            .unwrap_or_else(|_| panic!("{method} timed out"))
+            .expect("answer");
+        assert!(answer.get("error").is_none(), "{method}: {answer}");
+        answer["result"].clone()
+    }
+}
+
+/// The test's leader, stopped when the test ends however it ends.
+struct Leader(i32);
+
+impl Drop for Leader {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new("kill")
+            .arg(self.0.to_string())
+            .status();
+    }
+}
+
+fn updates_log(home: &Path, session: &str) -> String {
+    let Ok(buckets) = std::fs::read_dir(home.join("sessions")) else { return String::new() };
+    buckets
+        .flatten()
+        .map(|bucket| bucket.path().join(session).join("updates.jsonl"))
+        .find_map(|path| std::fs::read_to_string(path).ok())
+        .unwrap_or_default()
+}
+
+fn page_text(page: &pocket_codex_host_svc::native_history::NativePage) -> String {
+    page.turns
+        .iter()
+        .flat_map(|turn| turn.items.iter().map(|item| item.text.clone()))
+        .collect::<Vec<_>>()
+        .join("|")
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "needs an installed Grok Build: set PCX_TEST_GROK"]
+async fn a_terminal_clients_leader_session_is_followed_live_read_only() {
+    let program = PathBuf::from(std::env::var_os("PCX_TEST_GROK").expect("PCX_TEST_GROK"));
+    let home = tempfile::TempDir::new().expect("home");
+    let project = tempfile::TempDir::new().expect("project");
+    let (port, _) = model().await;
+    let endpoint = ProviderEndpoint {
+        protocol: ApiProtocol::ChatCompletions,
+        base_url: format!("http://127.0.0.1:{port}/v1"),
+        key: Some(Secret::new(KEY)),
+        model: Some("fake-1".into()),
+    };
+    let grok_home = home.path().join("grok-home");
+    let launch = grok::provider_launch(&grok_home, &endpoint, &[]).expect("provider home");
+    let cwd = project.path().canonicalize().expect("cwd");
+
+    let client = LeaderClient::spawn(&program, &launch, &cwd);
+    client
+        .call("initialize", json!({"protocolVersion": 1, "clientCapabilities": {}}))
+        .await;
+    let opened = client
+        .call("session/new", json!({"cwd": cwd, "mcpServers": []}))
+        .await;
+    let session = opened["sessionId"]
+        .as_str()
+        .expect("session id")
+        .to_string();
+    assert!(grok_home.join("leader.sock").exists(), "the client started a leader");
+    // Grok starts its leader with `--no-exit-on-disconnect`: stop it here.
+    let leader = Leader(
+        std::fs::read_to_string(grok_home.join("leader.lock"))
+            .expect("leader lock")
+            .trim()
+            .parse()
+            .expect("leader pid"),
+    );
+    // It registers the session as Grok's terminal client does.
+    let registry = grok_home.join("active_sessions.json");
+    std::fs::write(
+        &registry,
+        json!([{"session_id": session, "pid": client.pid(), "cwd": cwd,
+            "opened_at": chrono::Utc::now().to_rfc3339()}])
+        .to_string(),
+    )
+    .expect("registry");
+
+    let reader = GrokHistory::new(grok_home.clone())
+        .expect("reader")
+        .with_owner_probe()
+        .with_leader_follow();
+    let follow = reader.follow(&session).expect("follow");
+    until("the live follow", async || reader.liveness(&session).await.turn_state == "idle").await;
+
+    // A slow reply streams: the view shows it, and that the turn runs,
+    // before Grok's log holds the text (Grok writes a text run when it ends).
+    let answer = client
+        .send(
+            "session/prompt",
+            json!({"sessionId": session,
+            "prompt": [{"type": "text", "text": SLOW}]}),
+        )
+        .await;
+    let mut ran = false;
+    until("streamed text the log does not hold yet", async || {
+        ran |= reader.liveness(&session).await.turn_state == "running";
+        let page = reader.read_page(&session, None, 20).await.expect("page");
+        page_text(&page).contains("slow") && !updates_log(&grok_home, &session).contains("slow")
+    })
+    .await;
+    assert!(ran, "the turn showed as running");
+    let answered = tokio::time::timeout(WAIT, answer)
+        .await
+        .expect("prompt")
+        .expect("answer");
+    assert_eq!(answered["result"]["stopReason"], "end_turn", "{answered}");
+    until("the finished turn", async || {
+        reader.liveness(&session).await.turn_state == "idle"
+            && page_text(&reader.read_page(&session, None, 20).await.expect("page"))
+                .contains("slow but steady")
+    })
+    .await;
+
+    // The client's session works on after being followed (the loopback
+    // model answers slowly again: the history holds the slow prompt).
+    client
+        .call(
+            "session/prompt",
+            json!({"sessionId": session,
+            "prompt": [{"type": "text", "text": "ping"}]}),
+        )
+        .await;
+    until("the next reply", async || {
+        page_text(&reader.read_page(&session, None, 20).await.expect("page"))
+            .ends_with("ping|slow but steady")
+    })
+    .await;
+
+    // The registration ends: the follower leaves, the client's session stays.
+    std::fs::write(&registry, "[]").expect("registry");
+    until("the follower left", async || {
+        tokio::time::sleep(Duration::from_secs(6)).await; // past the probe's display cache
+        reader.liveness(&session).await.turn_state == "unknown"
+    })
+    .await;
+    client
+        .call(
+            "session/prompt",
+            json!({"sessionId": session,
+            "prompt": [{"type": "text", "text": "ping"}]}),
+        )
+        .await;
+    drop(follow);
+
+    drop(client);
+    drop(leader);
 }

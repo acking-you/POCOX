@@ -53,6 +53,7 @@ const live = SessionLiveness(
 class NativeFake extends FakeBridgeApi {
   Completer<NativeSessionList>? claudeList;
   Completer<NativeSessionPage>? olderGate;
+  StreamController<NativeSessionRevision>? follow;
   String generation = 'g1', revision = 'r1';
   final calls = <String>[];
   @override
@@ -84,6 +85,15 @@ class NativeFake extends FakeBridgeApi {
       liveness: live,
     );
   }
+
+  @override
+  Stream<NativeSessionRevision> appNativeSessionFollow(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  }) =>
+      follow?.stream ??
+      super.appNativeSessionFollow(provider, threadId, sourceId: sourceId);
 
   @override
   Future<NativeSessionPage> appNativeSessionPage(
@@ -243,6 +253,49 @@ void main() {
       expect(find.byKey(const Key('view-continue-native')), findsNothing);
       expect(find.byKey(const Key('view-native-elsewhere')), findsOneWidget);
       await t.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets(
+    'a live change re-reads the tail at once and ends with the view',
+    (t) async {
+      final api = NativeFake()..follow = StreamController();
+      await t.pumpWidget(
+        host(
+          const LocalSessionViewScreen(threadId: 's', provider: 'grok'),
+          api,
+        ),
+      );
+      await settle(t);
+      expect(find.text('grok s r1'), findsOneWidget);
+      expect(api.follow!.hasListener, isTrue);
+      // A Grok terminal client's turn streams through the leader.
+      api.revision = 'r2';
+      api.follow!.add(
+        NativeSessionRevision(
+          sourceId: 'root',
+          generation: 'g1',
+          revision: 'r2',
+          liveness: const SessionLiveness(
+            threadId: 's',
+            turnState: 'running',
+            heldOpen: true,
+            safety: 'nativeOwnedRunning',
+            allowsResume: false,
+            requiresTakeover: false,
+            holders: [],
+          ),
+        ),
+      );
+      await t.pump();
+      await t.pump();
+      expect(find.text('grok s r2'), findsOneWidget);
+      expect(find.textContaining('Running elsewhere'), findsOneWidget);
+      await t.pumpWidget(const SizedBox.shrink());
+      expect(
+        api.follow!.hasListener,
+        isFalse,
+        reason: 'closing ends the follow',
+      );
     },
   );
   testWidgets('a running OpenCode host continues the native session there', (

@@ -107,9 +107,9 @@ pub use self::{
         AcpServeDto, AppServeDto, AppServeStatusDto, OpenCodeEnvironmentDto, OpenCodeHostStatusDto,
     },
     native_sessions::{
-        app_native_session_delete, app_native_session_page, app_native_session_rename,
-        app_native_session_revision, app_native_sessions, NativeSessionListDto,
-        NativeSessionPageDto, NativeSessionRevisionDto,
+        app_native_session_delete, app_native_session_follow, app_native_session_page,
+        app_native_session_rename, app_native_session_revision, app_native_sessions,
+        NativeSessionListDto, NativeSessionPageDto, NativeSessionRevisionDto,
     },
     services::{
         api_subscribe, api_unsubscribe, discover_services, subscriptions, ServiceIdDto,

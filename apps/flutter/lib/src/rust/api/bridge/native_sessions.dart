@@ -8,6 +8,8 @@ import 'host_sessions.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'threads.dart';
 
+// These functions are ignored because they are not marked as `pub`: `revision`
+
 /// Read a bounded native inventory, without connecting to or launching an
 /// agent.
 Future<NativeSessionListDto> appNativeSessions({
@@ -39,6 +41,21 @@ Future<NativeSessionRevisionDto> appNativeSessionRevision({
   required String threadId,
   String? sourceId,
 }) => RustLib.instance.api.crateApiBridgeNativeSessionsAppNativeSessionRevision(
+  provider: provider,
+  threadId: threadId,
+  sourceId: sourceId,
+);
+
+/// Follow a visible local view: its revision and ownership now, then on
+/// every live change and at least every three seconds. A Grok session that
+/// a Grok terminal client runs through Grok's leader changes live, read-only
+/// (it is never loaded, prompted or answered); other sources are polled.
+/// Cancelling the Dart stream ends the follow and any live subscription.
+Stream<NativeSessionRevisionDto> appNativeSessionFollow({
+  required String provider,
+  required String threadId,
+  String? sourceId,
+}) => RustLib.instance.api.crateApiBridgeNativeSessionsAppNativeSessionFollow(
   provider: provider,
   threadId: threadId,
   sourceId: sourceId,

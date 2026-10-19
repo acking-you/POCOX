@@ -1,7 +1,43 @@
 part of '../local_session_view_screen.dart';
 
 extension _NativeFollow on _LocalSessionViewState {
-  Future<void> _loadNative({required bool initial}) async {
+  /// Follow the native source through the bridge: a revision on every live
+  /// change (a Grok terminal client's session through Grok's leader) and at
+  /// least every few seconds.
+  void _startNativeFollow() {
+    unawaited(_follow?.cancel());
+    _follow = ref
+        .read(bridgeApiProvider)
+        .appNativeSessionFollow(
+          _source.provider,
+          widget.threadId,
+          sourceId: _native.sourceId,
+        )
+        .listen(_onNativeRevision, onError: _onNativeFollowError);
+  }
+
+  void _onNativeRevision(NativeSessionRevision revision) {
+    if (!mounted || !_foreground || !_onTop) return;
+    // A change during a read is applied right after it.
+    if (_reading) {
+      _pendingRevision = revision;
+      return;
+    }
+    _loadNative(initial: false, known: revision);
+  }
+
+  void _onNativeFollowError(Object e) {
+    if (!mounted || _reading) return;
+    _update(() {
+      _loading = false;
+      _error = friendlyError(e);
+    });
+  }
+
+  Future<void> _loadNative({
+    required bool initial,
+    NativeSessionRevision? known,
+  }) async {
     if (_reading && !initial) return;
     _reading = true;
     final epoch = ++_loadEpoch;
@@ -19,11 +55,13 @@ extension _NativeFollow on _LocalSessionViewState {
       });
     }
     try {
-      final revision = await api.appNativeSessionRevision(
-        provider,
-        thread,
-        sourceId: _native.sourceId,
-      );
+      final revision =
+          known ??
+          await api.appNativeSessionRevision(
+            provider,
+            thread,
+            sourceId: _native.sourceId,
+          );
       if (!current()) return;
       final changed =
           revision.generation != _native.generation ||
@@ -56,7 +94,10 @@ extension _NativeFollow on _LocalSessionViewState {
         });
       }
     } finally {
-      if (epoch == _loadEpoch) _reading = false;
+      if (epoch == _loadEpoch) {
+        _reading = false;
+        _applyPending();
+      }
     }
   }
 
@@ -106,8 +147,16 @@ extension _NativeFollow on _LocalSessionViewState {
           _reading = false;
           _loadingOlder = false;
         });
+        _applyPending();
       }
     }
+  }
+
+  /// Apply a revision that arrived during the read that just ended.
+  void _applyPending() {
+    final pending = _pendingRevision;
+    _pendingRevision = null;
+    if (pending != null) _onNativeRevision(pending);
   }
 
   /// Show the native window's items, keeping only their resolved images.

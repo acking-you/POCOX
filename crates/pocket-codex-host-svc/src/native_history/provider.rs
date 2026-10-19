@@ -3,7 +3,7 @@ use anyhow::{bail, Result};
 use pocket_codex_core::process::ProcessIdentity;
 use serde_json::Value;
 
-use super::{ClaimError, ClaudeHistory, GrokHistory, NativePage, SessionClaim};
+use super::{ClaimError, ClaudeHistory, GrokHistory, NativeFollow, NativePage, SessionClaim};
 use crate::sessions::SessionLiveness;
 
 /// An explicitly selected native source. No variant admits or resumes sessions.
@@ -96,6 +96,15 @@ impl NativeHistory {
             Self::OpenCode(reader) => reader.read_turn(session, turn).await,
         }
     }
+    /// Follow `session` live while the returned interest is held, where the
+    /// provider can (Grok, through its leader); others are polled.
+    pub fn follow(&self, session: &str) -> Option<NativeFollow> {
+        match self {
+            Self::Grok(reader) => reader.follow(session),
+            _ => None,
+        }
+    }
+
     /// Reading a file or database never proves that an external writer is idle.
     pub async fn liveness(&self, session: &str) -> SessionLiveness {
         match self {

@@ -1,11 +1,18 @@
 //! Bounded local provider views, independent of ACP connections.
 use anyhow::{Context, Result};
+use pocket_codex_host_svc::native_history::NativeFollow;
 
 use super::{
     host_sessions::{meta_liveness_dto, LocalSessionDto, SessionLivenessDto},
     threads::{item_dto, ThreadItemDto},
+    StreamSink,
 };
 use crate::engine::{native_sessions, runtime};
+
+/// How often a followed view's revision is re-read without a live change.
+const FOLLOW_POLL: std::time::Duration = std::time::Duration::from_secs(3);
+/// How long a live change waits for the rest of its burst.
+const FOLLOW_COALESCE: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// A provider-scoped inventory page on this computer.
 pub struct NativeSessionListDto {
@@ -129,21 +136,60 @@ pub fn app_native_session_revision(
     source_id: Option<String>,
 ) -> Result<NativeSessionRevisionDto> {
     let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
-    runtime::runtime().block_on(async {
-        let revision = source.reader.revision(&thread_id).await?;
-        let liveness = source.reader.liveness(&thread_id).await;
-        Ok(NativeSessionRevisionDto {
-            source_id: source.id.clone(),
-            generation: revision["generation"]
-                .as_str()
-                .context("missing native generation")?
-                .into(),
-            revision: revision["revision"]
-                .as_str()
-                .context("missing native revision")?
-                .into(),
-            liveness: meta_liveness_dto(liveness),
-        })
+    runtime::runtime().block_on(revision(&source, &thread_id))
+}
+
+/// Follow a visible local view: its revision and ownership now, then on
+/// every live change and at least every three seconds. A Grok session that
+/// a Grok terminal client runs through Grok's leader changes live, read-only
+/// (it is never loaded, prompted or answered); other sources are polled.
+/// Cancelling the Dart stream ends the follow and any live subscription.
+pub fn app_native_session_follow(
+    provider: String,
+    thread_id: String,
+    source_id: Option<String>,
+    sink: StreamSink<NativeSessionRevisionDto>,
+) -> Result<()> {
+    let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
+    runtime::runtime().spawn(async move {
+        let mut live = source.reader.follow(&thread_id);
+        loop {
+            let delivered = match revision(&source, &thread_id).await {
+                Ok(dto) => sink.add(dto).is_ok(),
+                Err(error) => sink.add_error(error.to_string()).is_ok(),
+            };
+            if !delivered {
+                return;
+            }
+            let woke = tokio::select! {
+                () = tokio::time::sleep(FOLLOW_POLL) => false,
+                changed = NativeFollow::next(&mut live) => changed,
+            };
+            if woke {
+                tokio::time::sleep(FOLLOW_COALESCE).await;
+            }
+        }
+    });
+    Ok(())
+}
+
+async fn revision(
+    source: &native_sessions::Selected,
+    thread_id: &str,
+) -> Result<NativeSessionRevisionDto> {
+    let revision = source.reader.revision(thread_id).await?;
+    let liveness = source.reader.liveness(thread_id).await;
+    Ok(NativeSessionRevisionDto {
+        source_id: source.id.clone(),
+        generation: revision["generation"]
+            .as_str()
+            .context("missing native generation")?
+            .into(),
+        revision: revision["revision"]
+            .as_str()
+            .context("missing native revision")?
+            .into(),
+        liveness: meta_liveness_dto(liveness),
     })
 }
 

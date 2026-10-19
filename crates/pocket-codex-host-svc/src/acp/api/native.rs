@@ -137,6 +137,9 @@ pub(super) async fn follow(
     let (tx, rx) = mpsc::channel::<std::result::Result<Event, Infallible>>(4);
     tokio::spawn(async move {
         let _permit = permit;
+        // A live source (Grok's leader) wakes the stream at once; others,
+        // and file-only changes, are seen by the 2-second poll.
+        let mut live = state.host.native_follow(&query.session_id);
         loop {
             let result = tokio::select! {
                 () = tx.closed() => return,
@@ -155,11 +158,22 @@ pub(super) async fn follow(
             {
                 return;
             }
-            tokio::select! {
+            let woke = tokio::select! {
                 () = tx.closed() => return,
-                () = tokio::time::sleep(std::time::Duration::from_secs(2)) => {},
+                () = tokio::time::sleep(std::time::Duration::from_secs(2)) => false,
+                changed = crate::native_history::NativeFollow::next(&mut live) => changed,
+            };
+            if woke {
+                // Coalesce a streamed burst into one re-read.
+                tokio::select! {
+                    () = tx.closed() => return,
+                    () = tokio::time::sleep(LIVE_COALESCE) => {},
+                }
             }
         }
     });
     Sse::new(ReceiverStream::new(rx)).into_response()
 }
+
+/// How long a live change waits for the rest of its burst.
+const LIVE_COALESCE: std::time::Duration = std::time::Duration::from_millis(200);

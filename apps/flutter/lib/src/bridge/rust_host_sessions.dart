@@ -112,19 +112,26 @@ mixin _RustHostSessions implements BridgeApi {
     String provider,
     String threadId, {
     String? sourceId,
-  }) async {
-    final v = await frb.appNativeSessionRevision(
+  }) async => _nativeRevision(
+    await frb.appNativeSessionRevision(
       provider: provider,
       threadId: threadId,
       sourceId: sourceId,
-    );
-    return NativeSessionRevision(
-      sourceId: v.sourceId,
-      generation: v.generation,
-      revision: v.revision,
-      liveness: _liveness(v.liveness),
-    );
-  }
+    ),
+  );
+
+  @override
+  Stream<NativeSessionRevision> appNativeSessionFollow(
+    String provider,
+    String threadId, {
+    String? sourceId,
+  }) => frb
+      .appNativeSessionFollow(
+        provider: provider,
+        threadId: threadId,
+        sourceId: sourceId,
+      )
+      .map(_nativeRevision);
 
   // --- Local session takeover ---
 
@@ -378,6 +385,14 @@ mixin _RustHostSessions implements BridgeApi {
     bytes: bytes,
   );
 }
+
+NativeSessionRevision _nativeRevision(frb.NativeSessionRevisionDto v) =>
+    NativeSessionRevision(
+      sourceId: v.sourceId,
+      generation: v.generation,
+      revision: v.revision,
+      liveness: _liveness(v.liveness),
+    );
 
 AgentCommand _command(frb.AgentCommandDto c) => AgentCommand(
   name: c.name,

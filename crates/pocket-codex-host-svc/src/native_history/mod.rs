@@ -17,7 +17,7 @@ mod source;
 
 pub use claim::{ClaimError, SessionClaim};
 pub use claude::ClaudeHistory;
-pub use grok::GrokHistory;
+pub use grok::{GrokHistory, NativeFollow};
 #[cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))]
 pub use opencode::OpenCodeHistory;
 pub use provider::NativeHistory;
