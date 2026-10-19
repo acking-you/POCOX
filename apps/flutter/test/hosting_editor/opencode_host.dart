@@ -74,6 +74,36 @@ void _openCodeHostTests() {
     expect(find.byType(HostingEditor), findsNothing);
   });
 
+  testWidgets('beside OpenCode 2\'s background server a new custom-provider '
+      'host takes its own history; a shared choice stays and says why', (
+    t,
+  ) async {
+    final api = FakeBridgeApi()
+      ..openCodeEnvironment = const OpenCodeEnvironment(
+        path: '/Users/me/.opencode/bin/opencode',
+        version: '2.0.32',
+        backgroundServer: true,
+      );
+    await _pumpEditor(t, api);
+    await _tapKey(t, 'agent-choice-opencode');
+    final history = find.byKey(const Key('opencode-history'));
+    bool separate() => t.widget<SegmentedButton<bool>>(history).selected.single;
+    final why = find.byKey(const Key('opencode-history-background-server'));
+    expect(separate(), isFalse, reason: 'its own configuration joins it');
+    await _tapKey(t, 'host-source-custom');
+    expect(separate(), isTrue);
+    expect(why, findsNothing);
+
+    await _tapKey(t, 'opencode-history-shared');
+    expect(why, findsOneWidget);
+    await _tapKey(t, 'host-source-inherited');
+    expect(separate(), isFalse);
+    expect(why, findsNothing);
+    await _tapKey(t, 'host-source-custom');
+    expect(separate(), isFalse, reason: 'the user chose it');
+    expect(why, findsOneWidget);
+  });
+
   testWidgets('a running OpenCode host keeps, replaces or removes its stored '
       'key; the key is never shown', (t) async {
     final api = FakeBridgeApi();

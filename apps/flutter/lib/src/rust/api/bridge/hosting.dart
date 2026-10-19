@@ -711,10 +711,23 @@ class OpenCodeEnvironmentDto {
   /// Installation or inspection failure, safe to show.
   final String? problem;
 
-  const OpenCodeEnvironmentDto({this.path, this.version, this.problem});
+  /// OpenCode's own clients share its background server, which serves the
+  /// shared history (2.x, not turned off).
+  final bool backgroundServer;
+
+  const OpenCodeEnvironmentDto({
+    this.path,
+    this.version,
+    this.problem,
+    required this.backgroundServer,
+  });
 
   @override
-  int get hashCode => path.hashCode ^ version.hashCode ^ problem.hashCode;
+  int get hashCode =>
+      path.hashCode ^
+      version.hashCode ^
+      problem.hashCode ^
+      backgroundServer.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -723,7 +736,8 @@ class OpenCodeEnvironmentDto {
           runtimeType == other.runtimeType &&
           path == other.path &&
           version == other.version &&
-          problem == other.problem;
+          problem == other.problem &&
+          backgroundServer == other.backgroundServer;
 }
 
 /// Native OpenCode runtime and sanitized service-default catalog summary.

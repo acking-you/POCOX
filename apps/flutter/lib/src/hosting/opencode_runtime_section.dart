@@ -50,6 +50,11 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
   // The user picked the history; suggestions no longer replace it.
   bool _historyChosen = false;
 
+  // Another host serves OpenCode's default database.
+  bool _besideShared = false;
+
+  bool _customProvider = false;
+
   /// The last detection, or null before it finished.
   OpenCodeEnvironment? found;
 
@@ -116,10 +121,30 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
     if (!_nameEdited) {
       name.text = uniqueHostName('opencode', {for (final h in hosts) h.name});
     }
-    if (!_historyChosen) {
-      separateHistory = hosts.any((h) => h.servesOpenCodeHistory);
-    }
+    _besideShared = hosts.any((h) => h.servesOpenCodeHistory);
+    _suggestHistory();
     _notify();
+  }
+
+  /// The host's model service is a custom provider, which OpenCode's
+  /// background server cannot use: an unpicked history becomes its own.
+  set customProvider(bool value) {
+    if (value == _customProvider) return;
+    _customProvider = value;
+    _suggestHistory();
+    _notify();
+  }
+
+  /// The shared history is served by OpenCode's background server, which a
+  /// custom provider cannot use: this host could only follow it.
+  bool get sharedNeedsBackgroundServer =>
+      _customProvider && !separateHistory && (found?.backgroundServer ?? false);
+
+  void _suggestHistory() {
+    if (_historyChosen) return;
+    separateHistory =
+        _besideShared ||
+        (_customProvider && (found?.backgroundServer ?? false));
   }
 
   /// The executable the fields name: an explicit path, else null (the
@@ -165,6 +190,7 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
     }
     if (_disposed || seq != _detectSeq) return;
     found = result;
+    _suggestHistory();
     _notify();
   }
 
@@ -313,6 +339,13 @@ class OpenCodeRuntimeSection extends StatelessWidget {
           EditorNote(
             l10n.openCodeHistoryTaken(holder),
             key: const Key('opencode-history-taken'),
+            color: cautionColor(theme.colorScheme),
+          ),
+        ] else if (form.sharedNeedsBackgroundServer) ...[
+          const SizedBox(height: 8),
+          EditorNote(
+            l10n.openCodeHistoryBackgroundServer,
+            key: const Key('opencode-history-background-server'),
             color: cautionColor(theme.colorScheme),
           ),
         ],

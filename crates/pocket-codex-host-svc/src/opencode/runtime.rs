@@ -152,7 +152,7 @@ impl Server {
     /// this source never starts the service.
     pub async fn attach(launch: &Launch) -> Result<Option<Self>> {
         let mut detection = launch.detect().await?;
-        if !detection.dialect.background_server() || service::disabled(launch).await? {
+        if !service::enabled(launch, &detection).await? {
             return Ok(None);
         }
         let claim = claim(&detection.database).await?;

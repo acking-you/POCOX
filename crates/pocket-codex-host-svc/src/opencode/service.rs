@@ -151,18 +151,22 @@ impl Attachment {
     }
 }
 
-/// Whether the user turned the service off (`opencode service set disabled
-/// true`). Its clients then run private servers, which hold the database only
-/// while they are open, as 1.x does.
-pub(crate) async fn disabled(launch: &Launch) -> Result<bool> {
+/// Whether this version's own clients use the background server: a 2.x
+/// release the user did not turn it off for (`opencode service set disabled
+/// true`, after which they run private servers that hold the database only
+/// while they are open, as 1.x does).
+pub async fn enabled(launch: &Launch, detection: &Detection) -> Result<bool> {
+    if !detection.dialect.background_server() {
+        return Ok(false);
+    }
     match launch
         .text_within(&["service", "get", "disabled"], 16, Duration::from_secs(15))
         .await
         .context("OpenCode did not report its background server setting")?
         .as_str()
     {
-        "true" => Ok(true),
-        "false" => Ok(false),
+        "true" => Ok(false),
+        "false" => Ok(true),
         _ => bail!("OpenCode reported an unexpected background server setting"),
     }
 }

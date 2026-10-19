@@ -149,20 +149,25 @@ pub struct OpenCodeEnvironmentDto {
     pub version: Option<String>,
     /// Installation or inspection failure, safe to show.
     pub problem: Option<String>,
+    /// OpenCode's own clients share its background server, which serves the
+    /// shared history (2.x, not turned off).
+    pub background_server: bool,
 }
 
 /// Inspect an explicit OpenCode executable or the host's child PATH.
 pub fn opencode_detect(binary: Option<String>) -> OpenCodeEnvironmentDto {
     match crate::engine::serve_opencode::detect(binary.as_deref()) {
-        Ok((path, version)) => OpenCodeEnvironmentDto {
-            path: Some(path),
-            version: Some(version),
+        Ok(found) => OpenCodeEnvironmentDto {
+            path: Some(found.path),
+            version: Some(found.version),
             problem: None,
+            background_server: found.background_server,
         },
         Err(error) => OpenCodeEnvironmentDto {
             path: None,
             version: None,
             problem: Some(error.to_string()),
+            background_server: false,
         },
     }
 }

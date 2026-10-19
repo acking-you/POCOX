@@ -150,7 +150,8 @@ pub struct DeviceView {
     pub restore_problem: Option<String>,
 }
 
-fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
+/// `custom`: the host's model service is a custom provider.
+fn resolve_runtime(name: &str, choice: RuntimeChoice, custom: bool) -> Result<Runtime> {
     match choice {
         RuntimeChoice::Codex {
             port,
@@ -182,7 +183,7 @@ fn resolve_runtime(name: &str, choice: RuntimeChoice) -> Result<Runtime> {
                 host_profiles::get(name)?.runtime.as_ref(),
                 super::serve_opencode::shared_history_host().as_deref(),
                 name,
-            ),
+            ) || custom_beside_background_server(custom),
         }),
         RuntimeChoice::Claude {} => {
             if !super::claude_setup::status()?.ready {
@@ -211,6 +212,12 @@ fn separate_history(saved: Option<&Runtime>, shared_holder: Option<&str>, name: 
         }) => *separate_history,
         _ => shared_holder.is_some_and(|holder| !super::host_names::same(holder, name)),
     }
+}
+
+/// A custom provider cannot reach OpenCode's background server, which serves
+/// the shared history: a new host with one keeps a history of its own.
+fn custom_beside_background_server(custom: bool) -> bool {
+    custom && super::serve_opencode::detect(None).is_ok_and(|found| found.background_server)
 }
 
 fn change(input: ProfileInput, key: KeyInput) -> Change {
@@ -365,9 +372,10 @@ fn save(name: &str, mut request: SaveRequest, token: AdmissionToken) -> Result<H
     if request.keep_base_url {
         request.input.base_url = saved.base_url.clone();
     }
+    let custom = request.input.source == host_profiles::Source::Custom;
     let mut change = change(request.input, request.key);
     let desired = match request.runtime {
-        Some(choice) => resolve_runtime(name, choice)?,
+        Some(choice) => resolve_runtime(name, choice, custom)?,
         None => saved
             .runtime
             .clone()
@@ -441,7 +449,8 @@ fn start_revision(
             .block_on(pocket_codex_api_proxy::check_auth())
             .map_err(|_| Fault::AuthenticationRequired)?;
     }
-    let runtime = resolve_runtime(&request.name, request.runtime)?;
+    let custom = request.input.source == host_profiles::Source::Custom;
+    let runtime = resolve_runtime(&request.name, request.runtime, custom)?;
     host_start::start_configured_checked(
         Some(&request.name),
         runtime,

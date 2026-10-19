@@ -84,9 +84,13 @@ can only be rejected).
   (`opencode`, `opencode-2`, …) and, beside a host serving the shared
   history, *This host only*. Choosing *Shared* while another host serves it
   says so under the choice, and Start is refused with that reason before
-  anything starts. A remote add picks the same way on the host computer (a
-  remote edit keeps the saved choice). Changing the history of a running
-  host is a runtime edit: saved, then applied with a restart.
+  anything starts. A new host with a custom provider also gets *This host
+  only* while OpenCode 2's background server is on (`opencode_detect`
+  reports `backgroundServer`): a custom provider cannot use that server.
+  Choosing *Shared* there anyway is allowed, and a line under the choice
+  says the host could only follow. A remote add picks the same way on the
+  host computer (a remote edit keeps the saved choice). Changing the history
+  of a running host is a runtime edit: saved, then applied with a restart.
 - **Instance names are unique per device**, compared as the relay compares
   them (`My Host` and `my-host` are one instance). A new host's editor —
   Codex, OpenCode, ACP, and the remote editor — shows a taken name under
@@ -467,8 +471,8 @@ history with the inherited model service:
 shared service, and `service set env` would change it for every client. So
 they keep a server of their own. On the shared history, that is a second
 engine beside the service, so the host follows read-only while the service
-runs, as today. Recommendation: while the service is enabled, the editor
-selects *This host only* for a new custom-provider host and says why.
+runs, as today. So while the service is enabled, the editor selects *This
+host only* for a new custom-provider host and says why.
 
 **4. Session access.**
 
@@ -569,8 +573,9 @@ AGENTS.md §7 checks also apply.
     server stopped"). The host attaches again once a client starts a new one.
 - Host details show the server as "OpenCode's background server (shared,
   without POCOX tools)" (`OpenCodeStatus.backgroundServer`).
-- Not done: the editor still lets a new custom-provider host choose the
-  shared history (point 3's recommendation).
+- Point 3 (2026-10-20): the local editor and a remote add both choose *This
+  host only* for a new custom-provider host while the service is on. The user's
+  own choice and a saved history are kept.
 
 **Verified (2026-10-20)** on official 1.19.3 and 2.0.32, with isolated roots
 and the test's own port. The new `opencode_native` live test, on 2.0.32:

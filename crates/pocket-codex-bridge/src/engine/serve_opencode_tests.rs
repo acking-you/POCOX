@@ -86,6 +86,8 @@ fn native_bridge_hosting_controller_and_original_resume() {
         opencode(&binary, &["service", "set", "port", &port.to_string()]);
     }
     runtime::init(root.join("support")).expect("isolated support");
+    // The editor steers a custom provider away from that server's history.
+    assert_eq!(detect(Some(&binary)).expect("detected").background_server, v2);
     let mut config = pocket_codex_core::config::Config::default();
     config.pb_mapper.relay = Some("127.0.0.1:9".into());
     config.pb_mapper.key = Some("f".repeat(32));

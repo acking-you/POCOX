@@ -1493,8 +1493,10 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     than this one is connected to that server (item 29's rule; takeover
     stays item 35). It gets no agent tools. A replaced server is attached
     again, a stopped one is reported, and `service set disabled true` keeps
-    an own server. Its password is read only from the private registration
-    file, into `Secret`. See `docs/opencode-native.md#versions`.
+    an own server. The server's password is read only from its private
+    registration file, into `Secret`. A new custom-provider host, which
+    cannot use that server, defaults to its own history while the server is
+    on (editor and remote add). See `docs/opencode-native.md#versions`.
 
 ## 10. Communication conventions
 

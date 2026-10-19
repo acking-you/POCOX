@@ -5618,6 +5618,12 @@ abstract class AppLocalizations {
   /// **'“{name}” is using the shared history, and only one host can at a time. Choose “This host only”.'**
   String openCodeHistoryTaken(String name);
 
+  /// No description provided for @openCodeHistoryBackgroundServer.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenCode\'s background server serves the shared history, and a custom provider cannot use it: this host could only follow its sessions. Choose “This host only”.'**
+  String get openCodeHistoryBackgroundServer;
+
   /// No description provided for @openCodePath.
   ///
   /// In en, this message translates to:

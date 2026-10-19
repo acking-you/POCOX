@@ -221,12 +221,32 @@ pub(super) fn shared_history_host() -> Option<String> {
         .map(|host| host.prepared.name.clone())
 }
 
+/// The installed executable, as detection found it.
+pub struct Detected {
+    /// Resolved executable path.
+    pub path: String,
+    /// Reported version.
+    pub version: String,
+    /// OpenCode's own clients share its background server (2.x, not turned
+    /// off); unknown counts as no.
+    pub background_server: bool,
+}
+
 /// Resolve and inspect the installed external executable without starting a
 /// host.
-pub fn detect(binary: Option<&str>) -> Result<(String, String)> {
+pub fn detect(binary: Option<&str>) -> Result<Detected> {
     let launch = launch_for(binary)?;
-    let detection = runtime::runtime().block_on(launch.detect())?;
-    Ok((launch.program.display().to_string(), detection.version))
+    runtime::runtime().block_on(async {
+        let detection = launch.detect().await?;
+        let background_server = opencode::service::enabled(&launch, &detection)
+            .await
+            .unwrap_or(false);
+        Ok(Detected {
+            path: launch.program.display().to_string(),
+            version: detection.version,
+            background_server,
+        })
+    })
 }
 
 pub(super) fn prepare(

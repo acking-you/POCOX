@@ -251,7 +251,12 @@ class OpenCodeHostStatus {
 /// The OpenCode executable found on this device.
 class OpenCodeEnvironment {
   /// Creates a detection result.
-  const OpenCodeEnvironment({this.path, this.version, this.problem});
+  const OpenCodeEnvironment({
+    this.path,
+    this.version,
+    this.problem,
+    this.backgroundServer = false,
+  });
 
   /// The resolved executable.
   final String? path;
@@ -261,6 +266,10 @@ class OpenCodeEnvironment {
 
   /// Why it cannot be hosted (`not_found`, `unsupported_version`, …).
   final String? problem;
+
+  /// OpenCode's own clients share its background server (OpenCode 2, not
+  /// turned off), which serves the shared history.
+  final bool backgroundServer;
 }
 
 /// One ACP agent configuration: profile identity plus executable and the

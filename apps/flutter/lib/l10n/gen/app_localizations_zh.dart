@@ -3024,6 +3024,10 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get openCodeHistoryBackgroundServer =>
+      'OpenCode 的后台服务正在服务共用历史记录，自定义提供方无法使用它，这个主机只能跟随查看其中的会话。请选择“仅此主机”。';
+
+  @override
   String get openCodePath => 'OpenCode 可执行文件';
 
   @override

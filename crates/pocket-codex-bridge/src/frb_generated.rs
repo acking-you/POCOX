@@ -8332,10 +8332,12 @@ impl SseDecode for crate::api::bridge::hosting::OpenCodeEnvironmentDto {
         let mut var_path = <Option<String>>::sse_decode(deserializer);
         let mut var_version = <Option<String>>::sse_decode(deserializer);
         let mut var_problem = <Option<String>>::sse_decode(deserializer);
+        let mut var_backgroundServer = <bool>::sse_decode(deserializer);
         return crate::api::bridge::hosting::OpenCodeEnvironmentDto {
             path: var_path,
             version: var_version,
             problem: var_problem,
+            background_server: var_backgroundServer,
         };
     }
 }
@@ -11603,6 +11605,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::hosting::OpenCodeEnvi
             self.path.into_into_dart().into_dart(),
             self.version.into_into_dart().into_dart(),
             self.problem.into_into_dart().into_dart(),
+            self.background_server.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -13585,6 +13588,7 @@ impl SseEncode for crate::api::bridge::hosting::OpenCodeEnvironmentDto {
         <Option<String>>::sse_encode(self.path, serializer);
         <Option<String>>::sse_encode(self.version, serializer);
         <Option<String>>::sse_encode(self.problem, serializer);
+        <bool>::sse_encode(self.background_server, serializer);
     }
 }
 

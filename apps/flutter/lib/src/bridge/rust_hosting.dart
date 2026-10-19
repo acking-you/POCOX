@@ -75,6 +75,7 @@ mixin _RustHosting implements BridgeApi {
       path: e.path,
       version: e.version,
       problem: e.problem,
+      backgroundServer: e.backgroundServer,
     );
   }
 

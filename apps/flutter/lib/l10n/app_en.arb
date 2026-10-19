@@ -1250,6 +1250,7 @@
   "openCodeHistoryInfo": "Shared: this computer's own OpenCode sessions, the same ones the OpenCode terminal app shows. One host can use them at a time.\n\nThis host only: sessions are kept in this host's own database, apart from other hosts and the OpenCode terminal app.",
   "openCodeHistoryTaken": "“{name}” is using the shared history, and only one host can at a time. Choose “This host only”.",
   "@openCodeHistoryTaken": {"placeholders": {"name": {"type": "String"}}},
+  "openCodeHistoryBackgroundServer": "OpenCode's background server serves the shared history, and a custom provider cannot use it: this host could only follow its sessions. Choose “This host only”.",
   "openCodePath": "OpenCode executable",
   "openCodePathRequired": "Enter the OpenCode executable.",
   "openCodeRunning": "OpenCode {version} is running",

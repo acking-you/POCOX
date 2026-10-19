@@ -3191,6 +3191,10 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get openCodeHistoryBackgroundServer =>
+      'OpenCode\'s background server serves the shared history, and a custom provider cannot use it: this host could only follow its sessions. Choose “This host only”.';
+
+  @override
   String get openCodePath => 'OpenCode executable';
 
   @override

@@ -1052,6 +1052,7 @@
   "openCodeHistoryInfo": "共用：显示这台电脑上 OpenCode 自己的会话，与终端里的 OpenCode 相同；同一时间只能有一个主机使用。\n\n仅此主机：会话保存在这个主机自己的数据库中，与其他主机和终端里的 OpenCode 分开。",
   "openCodeHistoryTaken": "“{name}”正在使用共用历史记录，同一时间只能有一个主机使用。请选择“仅此主机”。",
   "@openCodeHistoryTaken": {"placeholders": {"name": {"type": "String"}}},
+  "openCodeHistoryBackgroundServer": "OpenCode 的后台服务正在服务共用历史记录，自定义提供方无法使用它，这个主机只能跟随查看其中的会话。请选择“仅此主机”。",
   "openCodePath": "OpenCode 可执行文件",
   "openCodePathRequired": "请填写 OpenCode 可执行文件。",
   "openCodeRunning": "OpenCode {version} 运行中",
