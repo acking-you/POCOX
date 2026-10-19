@@ -82,6 +82,24 @@ fn grok_account_and_local_sessions_through_grok_itself() {
     sign_in_cancel(attempt).expect("cancel");
     assert!(!status(None).expect("status").signed_in, "nothing was signed in");
 
+    // The Grok-account route refuses a default model the user defined.
+    let preset = pocket_codex_host_svc::acp::spec::preset(grok::PROFILE_ID)
+        .expect("preset")
+        .spec();
+    let route = grok::account_launch();
+    super::super::host_profiles::grok::account_preflight(&preset, &route)
+        .expect("Grok's own default model");
+    std::fs::write(
+        home.path().join("config.toml"),
+        "[models]\ndefault = \"mine\"\n[model.mine]\nmodel = \"m\"\nbase_url = \
+         \"http://127.0.0.1:9/v1\"\n",
+    )
+    .expect("config");
+    let refused = super::super::host_profiles::grok::account_preflight(&preset, &route)
+        .expect_err("a user-defined default");
+    assert!(format!("{refused:#}").contains("would not use the Grok account"), "{refused:#}");
+    std::fs::remove_file(home.path().join("config.toml")).expect("restore");
+
     assert_eq!(titles(), ["ping"]);
     manage_session(SESSION, Some("Renamed here"), None).expect("rename");
     assert_eq!(titles(), ["Renamed here"]);

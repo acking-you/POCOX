@@ -59,6 +59,8 @@ pub struct GrokControl {
     /// The interactive sign-in method `initialize` advertised (`grok.com`,
     /// or `oidc` for an enterprise identity provider).
     sign_in_method: Option<String>,
+    /// The model new sessions would use (`_meta.modelState.currentModelId`).
+    current_model: Option<String>,
 }
 
 /// Answers every agent request with "method not found": the control agent
@@ -115,11 +117,20 @@ impl GrokControl {
             .filter_map(|method| method["id"].as_str())
             .find(|id| matches!(*id, "grok.com" | "oidc"))
             .map(str::to_owned);
+        let current_model = initialized["_meta"]["modelState"]["currentModelId"]
+            .as_str()
+            .map(str::to_owned);
         Ok(Arc::new(Self {
             peer,
             process,
             sign_in_method,
+            current_model,
         }))
+    }
+
+    /// The model new sessions would use, when Grok reports it.
+    pub fn current_model(&self) -> Option<&str> {
+        self.current_model.as_deref()
     }
 
     /// The interactive sign-in method, when Grok offers one.

@@ -47,7 +47,7 @@ below rather than "sign in with the agent's CLI".
 | Source | What the agent gets |
 | --- | --- |
 | Existing configuration | the user's own `$GROK_HOME` (`~/.grok`) and environment, unchanged: its sign-in, `XAI_API_KEY`, or models defined in its `config.toml` |
-| Official account | the same home, with `XAI_API_KEY`, `GROK_CODE_XAI_API_KEY`, `GROK_MODELS_BASE_URL`, `GROK_MODELS_LIST_URL` and `GROK_XAI_API_BASE_URL` removed from the child's environment, so it uses the Grok account signed in on this computer |
+| Official account | the same home, with `XAI_API_KEY`, `GROK_CODE_XAI_API_KEY`, the endpoint overrides (`GROK_MODELS_BASE_URL`, `GROK_MODELS_LIST_URL`, `GROK_XAI_API_BASE_URL`, `GROK_CLI_CHAT_PROXY_BASE_URL`), the `GROK_CONFIG` / `GROK_CONFIG_PATH` overlays and `GROK_DEFAULT_MODEL` removed from the child's environment, so it uses the Grok account signed in on this computer. Before it starts (or is applied), a private `grok` on that route reports the default model it would use; the start is refused when that model is one the user defined in the home's `config.toml` (a `[model.*]` table by key, `id` or `model`, including one that overrides a built-in model's endpoint), and an unreadable `config.toml` cannot be checked and is refused too |
 | Custom provider | Responses, Anthropic Messages or Chat Completions, with a required default model and key, in a Grok home of the host's own |
 
 Variables are **removed**, not blanked: Grok reads the legacy
@@ -77,7 +77,9 @@ start POCOX rewrites that home's `config.toml` (0600, atomically):
   `models.allowed_models` (only the provider's models, so Grok's built-in
   models that would need a sign-in are not offered).
 
-Everything else Grok writes into that file is kept. The models are what the
+Everything else Grok writes into that file is kept; a file that cannot be
+read is left as it is and the start fails, rather than being replaced. The
+models are what the
 gateway's `/models` lists at start and Apply (the same bounded reader native
 OpenCode uses). When the list cannot be read, only the default model is
 configured and the start's toast says so; applying again retries. Text that
@@ -116,7 +118,8 @@ every sign-in's process group.
 
 Desktop **Local sessions** lists Grok beside Codex, Claude and OpenCode
 (`native_history/grok.rs`). The source is this computer's `$GROK_HOME`
-(or `~/.grok`). A Grok host on that home (existing configuration or Grok
+(or `~/.grok`); a home that does not exist is reported as unavailable, not
+as an empty history, while an existing home may have no sessions yet. A Grok host on that home (existing configuration or Grok
 account, never a custom provider's own home) continues a session.
 
 ### Listing
@@ -151,7 +154,9 @@ notifications it sent. The reader replays it the way Grok's own
   `displayText`.
 
 The index keeps that filter state, so a later read examines only appended,
-complete lines (an unfinished last line waits). Turn ids are the byte offset
+complete lines (an unfinished last line waits). A read that fails keeps no
+index, so a retry starts from the log again and never serves a partial index
+as complete. Turn ids are the byte offset
 of the turn's first line, so a rewound and rewritten turn never reuses an id.
 Pages hold 20 turns by default, and the exact turn count is reported. A line
 over 8 MiB is indexed but shown as omitted. A page folds at most 32 MiB,
@@ -197,7 +202,10 @@ sources stay read-only (`NativeSessionList.manageable`).
 
 A desktop that allows remote management offers Grok in another device's Add
 service list when `grok` is installed there (`management::RuntimeChoice::Grok`,
-kind `grok`). Like Codex, its Grok sign-in happens on that computer.
+kind `grok`). Like Codex, its Grok sign-in happens on that computer. A
+remote start on the Official account first checks that account there:
+Codex's ChatGPT sign-in for Codex, Grok's own sign-in (not a stored API key)
+for Grok.
 
 ## Verification
 

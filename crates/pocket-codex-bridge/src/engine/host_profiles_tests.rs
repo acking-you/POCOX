@@ -549,7 +549,12 @@ fn only_real_mappings_are_accepted() {
     .expect("claude messages");
     // Grok: its own sign-in, or any API in a home of its own; a generic
     // agent has neither.
-    let grok_spec = spec(pocket_codex_host_svc::acp::grok::PROFILE_ID);
+    // An executable that does not exist: the account preflight is left to
+    // the start, and no `grok` is spawned here.
+    let grok_spec = AgentSpec {
+        program: "/nonexistent/grok".into(),
+        ..spec(pocket_codex_host_svc::acp::grok::PROFILE_ID)
+    };
     save(dir.path(), "grok-o", &official, KeyChange::Keep, None, Engine::Acp(&grok_spec))
         .expect("grok account");
     refused("g-o", official.clone(), Engine::Acp(&generic));

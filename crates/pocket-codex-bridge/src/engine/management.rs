@@ -466,13 +466,11 @@ fn start_revision(
 ) -> Result<HostView> {
     request.name =
         super::host_names::canonical(&request.name).map_err(|_| Fault::InvalidConfiguration)?;
-    if request.input.source == host_profiles::Source::Official {
-        runtime::runtime()
-            .block_on(pocket_codex_api_proxy::check_auth())
-            .map_err(|_| Fault::AuthenticationRequired)?;
-    }
     let custom = request.input.source == host_profiles::Source::Custom;
     let runtime = resolve_runtime(&request.name, request.runtime, custom)?;
+    if request.input.source == host_profiles::Source::Official {
+        official_signed_in(&runtime)?;
+    }
     host_start::start_configured_checked(
         Some(&request.name),
         runtime,
@@ -487,6 +485,29 @@ fn start_revision(
         },
     )?;
     host(&request.name)
+}
+
+/// The official account `runtime` would use is signed in on this computer:
+/// Codex's ChatGPT sign-in for Codex, Grok's own account for the Grok
+/// preset. Other runtimes have no official account (the save refuses them).
+fn official_signed_in(runtime: &Runtime) -> Result<()> {
+    match runtime {
+        Runtime::Acp(spec) if pocket_codex_host_svc::acp::grok::applies(spec) => {
+            let account = super::grok_account::status(Some(&spec.program))
+                .map_err(|_| Fault::AuthenticationRequired)?;
+            if !account.signed_in || account.method.as_deref() == Some("xai.api_key") {
+                return Err(Fault::AuthenticationRequired.into());
+            }
+            Ok(())
+        },
+        Runtime::Codex {
+            ..
+        } => runtime::runtime()
+            .block_on(pocket_codex_api_proxy::check_auth())
+            .map(|_| ())
+            .map_err(|_| Fault::AuthenticationRequired.into()),
+        _ => Ok(()),
+    }
 }
 
 /// Apply a reviewed revision and incarnation using the ordinary lifecycle

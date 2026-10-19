@@ -73,6 +73,13 @@ impl GrokHistory {
             .context("invalid cursor")?
             .unwrap_or(0);
         ensure!(offset <= 100_000, "invalid cursor");
+        // A Grok home that does not exist is an unavailable source, not an
+        // empty history; an existing home may simply have no sessions yet.
+        ensure!(
+            self.home.is_dir(),
+            "Grok's home {} does not exist on this computer",
+            self.home.display()
+        );
         let root = self.sessions_root();
         let summaries = tokio::task::spawn_blocking(move || inventory::summaries(&root))
             .await
@@ -151,10 +158,14 @@ impl GrokHistory {
             .context("native history task failed")?
         };
         let (page, index) = read;
-        if indexes.len() >= MAX_INDEXES {
-            indexes.clear();
+        // A failed read keeps no index, so a retry starts from the log
+        // itself and never serves a partial one as complete.
+        if page.is_ok() {
+            if indexes.len() >= MAX_INDEXES {
+                indexes.clear();
+            }
+            indexes.insert(dir, index);
         }
-        indexes.insert(dir, index);
         page
     }
 

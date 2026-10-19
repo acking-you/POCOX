@@ -48,15 +48,20 @@ pub const KEY_ENV: &str = "POCOX_GROK_PROVIDER_KEY";
 /// own Messages client does not send one.
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 
-/// Inherited variables that would route a Grok-account host to an API key
-/// or another endpoint (`xai-grok-login` `auth_method.rs`,
-/// `xai-grok-config` `endpoints.rs`).
+/// Inherited variables that would route a Grok-account host to an API key,
+/// another endpoint or another default model (`xai-grok-login`
+/// `auth_method.rs`, `xai-grok-config` `endpoints.rs` and its `GROK_CONFIG`
+/// overlays, which may set `models.default`).
 const ACCOUNT_REMOVE: &[&str] = &[
     "XAI_API_KEY",
     "GROK_CODE_XAI_API_KEY",
     "GROK_MODELS_BASE_URL",
     "GROK_MODELS_LIST_URL",
     "GROK_XAI_API_BASE_URL",
+    "GROK_CLI_CHAT_PROXY_BASE_URL",
+    "GROK_CONFIG",
+    "GROK_CONFIG_PATH",
+    "GROK_DEFAULT_MODEL",
 ];
 
 /// Inherited variables a custom-provider host must not see: the user's
@@ -111,6 +116,41 @@ pub fn account_launch() -> AcpProviderLaunch {
     }
 }
 
+/// Whether `model`, the default the Grok-account route would run, is one the
+/// user defined in `home/config.toml` (a `[model.*]` table matched by its
+/// key, `id` or `model`): such a model has its own endpoint and credential,
+/// so that host would not use the Grok account. With `model` unknown, the
+/// file's own `models.default` is checked. An unreadable file cannot be
+/// verified and is an error.
+pub fn account_default_is_user_model(home: &Path, model: Option<&str>) -> Result<bool> {
+    let path = home.join("config.toml");
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error).context("reading Grok's configuration"),
+    };
+    let config: toml::Table = text.parse().with_context(|| {
+        format!("{} cannot be read, so Grok's default model cannot be checked", path.display())
+    })?;
+    let default = model.map(str::to_owned).or_else(|| {
+        config
+            .get("models")
+            .and_then(|models| models.get("default"))
+            .and_then(toml::Value::as_str)
+            .map(str::to_owned)
+    });
+    let Some(default) = default else { return Ok(false) };
+    let Some(models) = config.get("model").and_then(toml::Value::as_table) else {
+        return Ok(false);
+    };
+    Ok(models.iter().any(|(key, entry)| {
+        key == &default
+            || ["id", "model"]
+                .iter()
+                .any(|field| entry.get(*field).and_then(toml::Value::as_str) == Some(&default))
+    }))
+}
+
 fn names(list: &[&str]) -> Vec<String> {
     list.iter().map(|name| (*name).to_string()).collect()
 }
@@ -140,8 +180,12 @@ pub fn provider_launch(
          expand; remove it"
     );
     let path = home.join("config.toml");
+    // An unreadable file is left as it is: rewriting it would drop every
+    // setting Grok keeps there.
     let existing = match fs::read_to_string(&path) {
-        Ok(text) => text.parse::<toml::Table>().unwrap_or_default(),
+        Ok(text) => text.parse::<toml::Table>().with_context(|| {
+            format!("{} cannot be read; fix or remove it, then start again", path.display())
+        })?,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => toml::Table::new(),
         Err(error) => return Err(error).context("reading the host's Grok configuration"),
     };
@@ -316,6 +360,38 @@ mod tests {
                 .mode();
             assert_eq!(mode & 0o077, 0, "private file");
         }
+    }
+
+    #[test]
+    fn an_unreadable_host_configuration_is_left_intact() {
+        let home = tempfile::TempDir::new().expect("home");
+        fs::write(home.path().join("config.toml"), "[models\nbroken").expect("seed");
+        let error = provider_launch(home.path(), &endpoint(ApiProtocol::Responses), &[])
+            .expect_err("refused");
+        assert!(format!("{error:#}").contains("cannot be read"));
+        assert_eq!(
+            fs::read_to_string(home.path().join("config.toml")).expect("kept"),
+            "[models\nbroken"
+        );
+    }
+
+    #[test]
+    fn a_user_defined_default_is_not_the_grok_account() {
+        let home = tempfile::TempDir::new().expect("home");
+        let check = |model: Option<&str>| account_default_is_user_model(home.path(), model);
+        assert!(!check(Some("grok-4.6")).expect("no file"));
+        fs::write(
+            home.path().join("config.toml"),
+            "[models]\ndefault = \"my-gw\"\n[model.my-gw]\nmodel = \"gpt-x\"\nbase_url =              \"https://gw\"\n[model.\"grok-4.6\"]\nbase_url = \"https://other\"\n",
+        )
+        .expect("config");
+        assert!(check(None).expect("models.default"));
+        assert!(check(Some("gpt-x")).expect("by model"));
+        // Overriding a built-in model's endpoint makes it user-defined too.
+        assert!(check(Some("grok-4.6")).expect("override"));
+        assert!(!check(Some("grok-4.5")).expect("built-in"));
+        fs::write(home.path().join("config.toml"), "not = [toml").expect("broken");
+        assert!(check(Some("grok-4.5")).is_err(), "cannot be verified");
     }
 
     #[test]

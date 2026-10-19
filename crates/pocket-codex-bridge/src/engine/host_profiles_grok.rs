@@ -4,8 +4,10 @@
 
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Context, Result};
-use pocket_codex_host_svc::acp::{grok, provider::AcpProviderLaunch, AgentSpec};
+use anyhow::{anyhow, bail, Context, Result};
+use pocket_codex_host_svc::acp::{
+    grok, grok_control::GrokControl, provider::AcpProviderLaunch, AgentSpec,
+};
 
 use super::{host_names, opencode::models, Engine, Resolved, Source};
 
@@ -43,7 +45,11 @@ pub(in crate::engine) fn launch(
     };
     match (resolved.source, &resolved.endpoint) {
         (Source::Inherited, _) => Ok((None, None)),
-        (Source::Official, _) => Ok((Some((grok::account_launch(), authority()?)), None)),
+        (Source::Official, _) => {
+            let route = grok::account_launch();
+            account_preflight(spec, &route)?;
+            Ok((Some((route, authority()?)), None))
+        },
         (Source::Custom, None) => Err(anyhow!("the saved provider is incomplete; edit the host")),
         (Source::Custom, Some(endpoint)) => {
             let authority = authority()?;
@@ -71,4 +77,44 @@ pub(in crate::engine) fn launch(
             Ok((Some((launch, authority)), notice))
         },
     }
+}
+
+/// A Grok-account host must run on a Grok model. Grok's own configuration
+/// may make a model the user defined (with its own endpoint and key) the
+/// default, which removing environment variables cannot undo, so the model
+/// Grok would start with is read from a private `grok` on the same route and
+/// the start is refused when the user defined it. An executable that cannot
+/// be found is left to the start itself to report.
+pub(in crate::engine) fn account_preflight(
+    spec: &AgentSpec,
+    route: &AcpProviderLaunch,
+) -> Result<()> {
+    let Some(program) = super::super::serve_acp::locate(&spec.program, Some(&spec.profile_id))
+    else {
+        return Ok(());
+    };
+    let home = grok::effective_home(&route.env).context("Grok's home directory is unavailable")?;
+    let model = super::super::runtime::runtime().block_on(async {
+        let control = GrokControl::start(
+            &program,
+            pocket_codex_codex::external_tool_path().as_ref(),
+            &route.env,
+            &route.env_remove,
+        )
+        .await
+        .map_err(|error| anyhow!("{error}"))?;
+        let model = control.current_model().map(str::to_owned);
+        control.stop().await;
+        Ok::<_, anyhow::Error>(model)
+    })?;
+    if grok::account_default_is_user_model(&home, model.as_deref())? {
+        bail!(
+            "Grok's default model{} is defined in {}, with its own endpoint and key, so this host \
+             would not use the Grok account. Choose Existing configuration, or make a Grok model \
+             the default there.",
+            model.map(|m| format!(" `{m}`")).unwrap_or_default(),
+            home.join("config.toml").display()
+        );
+    }
+    Ok(())
 }

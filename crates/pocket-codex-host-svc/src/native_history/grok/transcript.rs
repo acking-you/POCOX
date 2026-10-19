@@ -233,9 +233,9 @@ impl Index {
                 // A partial last line is read again once it is finished.
                 break;
             }
-            self.scanned += read as u64;
             let text = trim_line(&line);
             if text.is_empty() {
+                self.scanned += read as u64;
                 continue;
             }
             let span_len = u32::try_from(read).unwrap_or(u32::MAX);
@@ -248,6 +248,7 @@ impl Index {
                     },
                     Step::Other,
                 )?;
+                self.scanned += read as u64;
                 continue;
             }
             let (step, kind) = match std::str::from_utf8(text) {
@@ -262,6 +263,8 @@ impl Index {
                 },
                 step,
             )?;
+            // Only a line the index took is behind the scan offset.
+            self.scanned += read as u64;
         }
         Ok(())
     }

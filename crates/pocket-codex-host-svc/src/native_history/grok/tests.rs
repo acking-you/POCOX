@@ -117,6 +117,17 @@ async fn listing_follows_groks_own_recent_session_rules() {
 }
 
 #[tokio::test]
+async fn a_missing_grok_home_is_unavailable_not_empty() {
+    let parent = TempDir::new().expect("parent");
+    let missing = GrokHistory::new(parent.path().join("never-used")).expect("reader");
+    assert!(missing.list_sessions(None, 10).await.is_err());
+    // A home without sessions yet is an empty history.
+    let empty = GrokHistory::new(parent.path().into()).expect("reader");
+    let listed = empty.list_sessions(None, 10).await.expect("empty");
+    assert!(listed["sessions"].as_array().is_some_and(Vec::is_empty));
+}
+
+#[tokio::test]
 async fn pages_fold_turns_with_stable_ids_and_outcomes() {
     let home = TempDir::new().expect("home");
     let dir = session(home.path(), "%2Fwork", ID, summary(ID, "Pages", "2026-10-19T10:00:00Z"));
