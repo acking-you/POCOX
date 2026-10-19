@@ -6,14 +6,13 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use host_owner::{HeldElsewhere, OwnerLock, LOCK_FILE};
 use host_profiles::files::write_private;
 use pocket_codex_pb::{RelaySession, Transport};
 use serde::{Deserialize, Serialize};
 
-use super::{host_lifecycle, host_profiles, management, runtime, serve};
+use super::{host_lifecycle, host_owner, host_profiles, management, runtime, serve};
 
-/// Held for the supervisor's lifetime; its holder is the live supervisor.
-const OWNER_LOCK: &str = "owner.lock";
 const STATUS: &str = "status.json";
 
 /// Startup configuration for one native managed-host supervisor.
@@ -72,41 +71,37 @@ pub struct Manager {
     written: Vec<u8>,
     /// Whether the last save failed, so a lasting failure is logged once.
     save_failed: bool,
-    _lock: File,
+    /// Held for the supervisor's lifetime; its holder is the live supervisor.
+    _lock: OwnerLock,
 }
 
-fn lock(state: &Path) -> Result<File> {
+fn lock(state: &Path) -> Result<OwnerLock> {
     std::fs::create_dir_all(state).context("creating managed-host state")?;
-    let mut options = std::fs::OpenOptions::new();
-    options.create(true).read(true).write(true).truncate(false);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-        std::fs::set_permissions(state, std::fs::Permissions::from_mode(0o700))?;
-        options.mode(0o600);
-    }
-    let file = options.open(state.join(OWNER_LOCK))?;
     // A `pocox status` probe holds the lock for an instant; only a
     // holder that outlasts it is another supervisor.
-    for attempt in 0.. {
-        match file.try_lock() {
-            Ok(()) => break,
-            Err(TryLockError::WouldBlock) if attempt < 10 => {
+    let mut attempt = 0;
+    let lock = loop {
+        match OwnerLock::try_acquire(state) {
+            Ok(lock) => break lock,
+            Err(error) if error.is::<HeldElsewhere>() && attempt < 10 => {
+                attempt += 1;
                 std::thread::sleep(std::time::Duration::from_millis(20));
             },
-            Err(error) => {
-                return Err(error)
-                    .context("another managed-host supervisor owns this state directory");
+            Err(error) if error.is::<HeldElsewhere>() => {
+                return Err(
+                    error.context("another managed-host supervisor owns this state directory")
+                );
             },
+            Err(error) => return Err(error),
         }
-    }
+    };
     // A report left by a supervisor that did not exit cleanly is not ours.
     match std::fs::remove_file(state.join(STATUS)) {
         Ok(()) => {},
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
         Err(error) => return Err(error).context("removing a stale managed-host status"),
     }
-    Ok(file)
+    Ok(lock)
 }
 
 impl Manager {
@@ -234,7 +229,7 @@ impl Drop for Manager {
 /// The running supervisor's last report, or `None` when no supervisor holds
 /// this state directory (or it has not reported yet).
 pub fn read_status(state_dir: &Path) -> Result<Option<Status>> {
-    let owner = match File::open(state_dir.join(OWNER_LOCK)) {
+    let owner = match File::open(state_dir.join(LOCK_FILE)) {
         Ok(file) => file,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error).context("opening the managed-host lock"),

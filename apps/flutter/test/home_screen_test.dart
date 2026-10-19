@@ -473,6 +473,31 @@ void main() {
     }
   });
 
+  testWidgets('A second app on the same hosting state restores nothing and '
+      'says why instead of offering hosting', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final api = FakeBridgeApi(config: _accountConfig)
+        ..hostingElsewhere = true;
+      await _pumpHome(
+        t,
+        api,
+        prefs: _MemoryPrefs(
+          const UiPrefs(autoHostCodex: [AutoHostPrefs(port: 0, name: 'work')]),
+        ),
+        memoryDismissed: true,
+      );
+      await t.pumpAndSettle();
+      expect(api.restoreServiceCalls, isEmpty);
+      expect(api.serveHosts, isEmpty);
+      expect(find.byKey(const Key('hosting-elsewhere')), findsOneWidget);
+      expect(find.byKey(const Key('home-start-hosting-btn')), findsNothing);
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   // The idle hero offers one-tap hosting wherever the platform can host, in
   // either mode; a phone has no hosting to offer.
   for (final (platform, mode, config) in const [

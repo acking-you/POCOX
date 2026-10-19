@@ -9,6 +9,7 @@ import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocket_codex/src/hosting/hosting_owner.dart';
 import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/tools_providers.dart';
@@ -78,6 +79,9 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final status = ref.watch(toolsStatusProvider);
+    // Another POCOX app on this computer serves the tools: their settings
+    // are its own (the status problem says so).
+    final elsewhere = ref.watch(hostingElsewhereProvider);
     final tokens = [
       for (final token in ref.read(bridgeApiProvider).toolsTokens())
         if (token.kind == 'installed') token,
@@ -134,7 +138,7 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
           trailing: Switch(
             key: const Key('tools-switch'),
             value: status.enabled,
-            onChanged: _busy
+            onChanged: _busy || elsewhere
                 ? null
                 : (on) => _set((api) => api.toolsSetEnabled(on)),
           ),
@@ -145,7 +149,7 @@ class _AgentToolsSettingsState extends ConsumerState<AgentToolsSettings> {
           trailing: Switch(
             key: const Key('tools-ask'),
             value: status.askBeforeSharing,
-            onChanged: _busy || !status.enabled
+            onChanged: _busy || elsewhere || !status.enabled
                 ? null
                 : (ask) => _set((api) => api.toolsSetAskBeforeSharing(ask)),
           ),

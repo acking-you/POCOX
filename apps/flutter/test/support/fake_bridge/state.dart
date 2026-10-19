@@ -199,6 +199,9 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// How many times [acpHostingSupported] was asked.
   int acpHostingSupportedCalls = 0;
 
+  /// Another app owns this fake computer's hosting state.
+  bool hostingElsewhere = false;
+
   /// Programs [acpLocate] resolves, by program text.
   final Map<String, String> acpPrograms = {
     'fixture-agent': '/Users/me/.local/bin/fixture-agent',

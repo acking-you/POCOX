@@ -97,9 +97,9 @@ pub use self::{
         acp_claude_prepare_state, acp_claude_status, acp_hosting_supported, acp_locate,
         acp_presets, app_serve_deregister, app_serve_reregister, app_serve_restart_acp,
         app_serve_start, app_serve_start_acp, app_serve_status, app_serve_stop, app_serve_stop_all,
-        codex_locate, embedded_codex_version, opencode_detect, opencode_refresh, AcpAgentSpecDto,
-        AcpClaudeSetupDto, AcpClaudeStatusDto, AcpPresetDto, AcpServeDto, AppServeDto,
-        AppServeStatusDto, OpenCodeEnvironmentDto, OpenCodeHostStatusDto,
+        codex_locate, embedded_codex_version, hosting_owned_elsewhere, opencode_detect,
+        opencode_refresh, AcpAgentSpecDto, AcpClaudeSetupDto, AcpClaudeStatusDto, AcpPresetDto,
+        AcpServeDto, AppServeDto, AppServeStatusDto, OpenCodeEnvironmentDto, OpenCodeHostStatusDto,
     },
     native_sessions::{
         app_native_session_page, app_native_session_revision, app_native_sessions,
@@ -158,6 +158,9 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // after the fact instead of only in a viewer that was open at the time.
     logging::init_file(&support_dir);
     runtime::init(support_dir)?;
+    // Before anything can host or publish: an app started while another one
+    // runs on the same hosting state hosts nothing for its whole run.
+    crate::engine::host_owner::claim_desktop();
     crate::engine::management::initialize();
     crate::engine::agent_tools::initialize();
     Ok(())

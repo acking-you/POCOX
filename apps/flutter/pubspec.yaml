@@ -110,10 +110,12 @@ dev_dependencies:
   integration_test:
     sdk: flutter
   # Widget tests swap ImagePickerPlatform.instance / FileSelectorPlatform.instance
-  # for fakes (the real pickers are platform channels that can't run headless).
-  # All are already in the dependency graph; declared so tests may import them.
+  # / WebViewPlatform.instance for fakes (the real ones are platform channels
+  # or views that can't run headless). All are already in the dependency
+  # graph; declared so tests may import them.
   image_picker_platform_interface: ^2.11.0
   file_selector_platform_interface: ^2.6.0
+  webview_flutter_platform_interface: ^2.15.1
   plugin_platform_interface: ^2.1.8
   flutter_launcher_icons: ^0.14.2
   flutter_native_splash: ^2.4.3

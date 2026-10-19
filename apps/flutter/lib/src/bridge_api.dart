@@ -193,6 +193,11 @@ abstract interface class BridgeApi {
   /// Whether this device can host ACP agents (Unix desktops).
   bool acpHostingSupported();
 
+  /// Whether another POCOX app on this computer owned its hosting state when
+  /// this one started: this one then starts, restores and publishes nothing
+  /// for its whole run.
+  bool hostingOwnedElsewhere();
+
   /// The executable [program] resolves to on this device, or `null`.
   Future<String?> acpLocate(String program, {String? profileId});
 

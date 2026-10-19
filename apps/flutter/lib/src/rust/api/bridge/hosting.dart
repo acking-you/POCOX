@@ -26,6 +26,12 @@ List<AcpPresetDto> acpPresets() =>
 bool acpHostingSupported() =>
     RustLib.instance.api.crateApiBridgeHostingAcpHostingSupported();
 
+/// Whether another POCOX app on this computer owned its hosting state when
+/// this one started: this one then starts, restores and publishes nothing for
+/// its whole run.
+bool hostingOwnedElsewhere() =>
+    RustLib.instance.api.crateApiBridgeHostingHostingOwnedElsewhere();
+
 /// The executable `program` resolves to (explicit path, `PATH`, then the
 /// preset's install locations), or `None`.
 Future<String?> acpLocate({required String program, String? profileId}) =>

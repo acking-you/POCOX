@@ -114,6 +114,9 @@ pub(in crate::engine) fn serve_stop_remembered_checked(
     check: &dyn Fn() -> Result<()>,
 ) -> Result<()> {
     let lease = host_lease::acquire_checked(name, Op::Stop, check)?;
+    // A second app on the hosting state runs nothing, so its stop could only
+    // change the first app's restore choices.
+    super::super::host_owner::require()?;
     if let Some(expected) = expected {
         if super::super::host_apply::active(lease.name())
             .is_none_or(|active| active.incarnation != expected)

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use tokio::task::JoinHandle;
 
 use crate::engine::{
+    host_owner,
     host_profiles::{
         self,
         files::{write_private, Committed, FileLock},
@@ -69,6 +70,8 @@ fn update(enabled: bool, only_unset: bool) -> Result<()> {
     if !supported() {
         bail!("this device cannot host services");
     }
+    // The setting belongs to the app that hosts from this state.
+    host_owner::require()?;
     let root = host_profiles::root()?;
     let _lock = FileLock::acquire(&root)?;
     if only_unset && preference()?.enabled.is_some() {
@@ -85,9 +88,10 @@ fn update(enabled: bool, only_unset: bool) -> Result<()> {
     Ok(())
 }
 
-/// Start the supervisor once. Mobile never opens a management listener.
+/// Start the supervisor once. Mobile never opens a management listener,
+/// and a second app on the hosting state leaves the entry to the first.
 pub fn initialize() {
-    if !supported() || is_stopping() {
+    if !supported() || is_stopping() || host_owner::require().is_err() {
         return;
     }
     let mut task = LOOP.lock().unwrap_or_else(|p| p.into_inner());

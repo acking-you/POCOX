@@ -86,6 +86,9 @@ mixin _RustHosting implements BridgeApi {
   bool acpHostingSupported() => frb.acpHostingSupported();
 
   @override
+  bool hostingOwnedElsewhere() => frb.hostingOwnedElsewhere();
+
+  @override
   Future<String?> acpLocate(String program, {String? profileId}) =>
       frb.acpLocate(program: program, profileId: profileId);
 

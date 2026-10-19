@@ -415,6 +415,9 @@ class _DeviceFirstServices extends ConsumerWidget {
     // Hosting on this computer lists its own hosts once: a host's chat
     // service is its card, not a second row repeating it under capabilities.
     final hostingShown = _hostingSupported && activeDevice == _thisDevice;
+    // Another POCOX app on this computer hosts from the same state: this one
+    // adds no host and changes no management setting.
+    final elsewhere = hostingShown && ref.watch(hostingElsewhereProvider);
     final hostOfService = <String, AppServeStatus>{
       if (hostingShown)
         for (final host in localHosts) host.appServiceKey: host,
@@ -689,9 +692,16 @@ class _DeviceFirstServices extends ConsumerWidget {
                           null => null,
                         },
                       ),
-                    const _AddLocalHostCard(),
-                    const SizedBox(height: 8),
-                    const DeviceManagementSwitch(),
+                    if (elsewhere)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: HostingElsewhereNote(),
+                      )
+                    else ...[
+                      const _AddLocalHostCard(),
+                      const SizedBox(height: 8),
+                      const DeviceManagementSwitch(),
+                    ],
                   ],
                 ),
               ),

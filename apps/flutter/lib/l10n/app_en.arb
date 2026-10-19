@@ -1421,6 +1421,7 @@
   "managedSwitchInfo": "When on, your other signed-in devices can add, configure, start and stop services here while this computer is online. When off, only this computer can change them.",
   "managedSwitchConnecting": "On, not reachable yet.",
   "managedSwitchUnavailable": "Management status could not be read.",
+  "hostingElsewhere": "POCOX is already running on this computer and hosts its services. This window cannot host, restore or allow remote management; quit it and use the POCOX already running (it may be in the menu bar or system tray).",
   "hostRestoreBlocked": "Automatic restore was skipped because its saved choices cannot be read: {problem}",
   "@hostRestoreBlocked": {"placeholders": {"problem": {"type": "String"}}},
   "managedRuntimeReady": "Ready",
@@ -1572,5 +1573,13 @@
   "builtinToolConnect": "Connect a service",
   "builtinToolConnectSummary": "The agent can reach a service on another of your devices, a Responses API included, without asking first in this conversation.",
   "builtinToolRemove": "Remove {tool}",
-  "@builtinToolRemove": {"placeholders": {"tool": {"type": "String"}}}
+  "@builtinToolRemove": {"placeholders": {"tool": {"type": "String"}}},
+  "browserFailed": "Couldn't open the page",
+  "browserFailedCertificate": "This device doesn't trust the page's certificate.",
+  "browserFailedNoAnswer": "The page's server didn't answer. The share may have ended, or the server isn't running.",
+  "browserFailedStopped": "The page stopped unexpectedly.",
+  "browserFailedOther": "The page didn't load.",
+  "browserRetrying": "Retrying…",
+  "browserNoteFailed": "Preview of \"{title}\" ({url}, shared from {device}) did not load: {reason}",
+  "@browserNoteFailed": {"placeholders": {"title": {"type": "String"}, "url": {"type": "String"}, "device": {"type": "String"}, "reason": {"type": "String"}}}
 }

@@ -6470,6 +6470,12 @@ abstract class AppLocalizations {
   /// **'Management status could not be read.'**
   String get managedSwitchUnavailable;
 
+  /// No description provided for @hostingElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX is already running on this computer and hosts its services. This window cannot host, restore or allow remote management; quit it and use the POCOX already running (it may be in the menu bar or system tray).'**
+  String get hostingElsewhere;
+
   /// No description provided for @hostRestoreBlocked.
   ///
   /// In en, this message translates to:
@@ -7205,6 +7211,53 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Remove {tool}'**
   String builtinToolRemove(String tool);
+
+  /// No description provided for @browserFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open the page'**
+  String get browserFailed;
+
+  /// No description provided for @browserFailedCertificate.
+  ///
+  /// In en, this message translates to:
+  /// **'This device doesn\'t trust the page\'s certificate.'**
+  String get browserFailedCertificate;
+
+  /// No description provided for @browserFailedNoAnswer.
+  ///
+  /// In en, this message translates to:
+  /// **'The page\'s server didn\'t answer. The share may have ended, or the server isn\'t running.'**
+  String get browserFailedNoAnswer;
+
+  /// No description provided for @browserFailedStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'The page stopped unexpectedly.'**
+  String get browserFailedStopped;
+
+  /// No description provided for @browserFailedOther.
+  ///
+  /// In en, this message translates to:
+  /// **'The page didn\'t load.'**
+  String get browserFailedOther;
+
+  /// No description provided for @browserRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying…'**
+  String get browserRetrying;
+
+  /// No description provided for @browserNoteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview of \"{title}\" ({url}, shared from {device}) did not load: {reason}'**
+  String browserNoteFailed(
+    String title,
+    String url,
+    String device,
+    String reason,
+  );
 }
 
 class _AppLocalizationsDelegate

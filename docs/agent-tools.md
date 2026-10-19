@@ -62,6 +62,12 @@ sequenceDiagram
   the page's address and its recent console errors to the conversation's
   draft and opens that conversation; nothing is sent by itself. Opening a
   share makes its tunnel the user's, so it lasts while the page is open.
+  A page that does not load (nothing answering on the port, or on iOS a
+  certificate the phone does not trust; Android's declined certificates are
+  not yet reported) shows why, with Retry and Open in browser, and Send to
+  agent then says it did not load; a failing frame or resource inside a
+  page leaves the page alone. The header follows the page's title, also when
+  a script sets or changes it after the page loaded.
 
 ### Use a service on another device
 
@@ -103,6 +109,9 @@ flowchart LR
 
 - **Who serves it.** The process that owns the machine's relay registrations:
   the desktop app, or the CLI host (`pocox serve --allow-remote-management`).
+  A second desktop app started on the same hosting state serves nothing and
+  cannot change the tools' switch or tokens
+  ([one desktop app per hosting state](remote-device-management.md#one-desktop-app-per-hosting-state)).
   Code: `crates/pocket-codex-bridge/src/engine/agent_tools/`.
 - **Endpoint.** Streamable HTTP on 127.0.0.1, built on the official Rust MCP
   SDK (`rmcp`), stateless (a harness keeps working across POCOX restarts). Its
