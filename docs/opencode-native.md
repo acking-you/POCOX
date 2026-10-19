@@ -27,7 +27,10 @@ gateway, bridge and Flutter read the 1.x shapes either way.
 | Turn start and end | `session.status` | `session.execution.*`, mapped onto the same busy and idle status |
 | Live events | every event invalidates its session | step, tool, permission and form boundaries; token deltas are dropped |
 | Models | connected providers' models | `/api/model` (`/api/provider` lists only configured providers) |
-| Attachments | sent | refused before sending; models report no image input |
+| Attachments | file parts | `files` with the image's data URI; OpenCode checks the base64 and detects the type from the bytes |
+| Image input | `capabilities.input.image` | `"image"` in the model's `capabilities.input` |
+| Custom provider | `provider` block in `OPENCODE_CONFIG_CONTENT` | the same block; 2.x runs each `@ai-sdk/*` package as its own built-in one |
+| Local sessions | `session` with `message`/`part` or `session_message` | `session_v2` with `session_message` |
 
 A version outside the tested range still starts, with a notice in its
 host's status. One that cannot report its database cannot be hosted.
@@ -36,12 +39,15 @@ host removes both inherited names before injecting its private password.
 
 2.x has no `bash` tool and asks before reading `.env` by default; a message
 ID may be used only once. Configured commands appear shortly after the
-server starts.
+server starts. 2.x keeps a prompt's attachments as bytes (`data`, `mime`),
+not URLs; history turns them back into data URIs. It uses the same database
+file as 1.x and, on first open, copies every session into `session_v2` and
+`session_message`, leaving the 1.x tables frozen, so Local sessions reads
+`session_v2` whenever it exists.
 
-Not covered on 2.x yet: attachments, token-by-token text (replies appear at
-text and tool boundaries), forms with number, boolean or external fields
-(they can only be rejected), and custom-provider hosts and Local sessions,
-which are unverified.
+Not covered on 2.x yet: token-by-token text (replies appear at text and
+tool boundaries), and forms with number, boolean or external fields (they
+can only be rejected).
 
 ## Hosting
 
@@ -362,6 +368,18 @@ a question, a command and cancel) and the bridge hosting acceptance test
 (start, source singleton, local connect, a prompt to a completed turn,
 release and reopen, Apply keeping history, stop) passed on both. Unit tests
 cover 2.x frames, catalogs, history, forms and prompt selection.
+
+OpenCode 2 attachments, custom providers and Local sessions (2026-10-19),
+same builds and fixtures: the real-server and bridge acceptance tests passed
+again on both versions; the lifecycle test's prompt now carries a PNG, which
+the model received and history returned, and the catalog reported the
+model's image input. Through the bridge on 2.0.32, a custom-provider host
+for each of OpenAI Responses, Anthropic Messages and OpenAI Chat Completions,
+pointed at a local gateway, listed the gateway's models, offered images, and
+completed a turn whose image reached the gateway. The Local sessions reader
+read databases 2.0.32 created (an image prompt; a failed turn, its error
+shown once) and a 1.19.3 database after 2.0.32 upgraded it (sessions from
+both versions).
 
 Several hosts (2026-10-16): the real bridge lifecycle test also starts a
 second host with its own history beside the first, reads its status and

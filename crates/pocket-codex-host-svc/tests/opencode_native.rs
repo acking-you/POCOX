@@ -61,10 +61,16 @@ fn fixture_with_model(root: &std::path::Path, model: &model_fixture::Fixture) ->
         "plugin":[],"model":"fixture/test","permission":{"bash":"ask"},
         "command":{"fixture":{"template":"COMMAND_FIXTURE $ARGUMENTS","description":"Isolated command"}},
         "provider":{"fixture":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":model.address,"apiKey":"fixture-only"},
-            "models":{"test":{"name":"Fixture test","limit":{"context":32000,"output":1024},"variants":{"careful":{"temperature":0.1}}}}}}
+            "models":{"test":{"name":"Fixture test","limit":{"context":32000,"output":1024},
+                "modalities":{"input":["text","image"],"output":["text"]},"variants":{"careful":{"temperature":0.1}}}}}}
     }).to_string().into()));
     launch
 }
+
+/// A real 1x1 PNG: OpenCode 2 sniffs the type from the bytes.
+const PIXEL: &str = "data:image/png;base64,\
+                     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/\
+                     pLvAAAAAElFTkSuQmCC";
 
 /// An outside reader that only opens the database, whatever its schema.
 const OUTSIDE_READER: &str = "import sqlite3,sys,time; \
@@ -104,7 +110,10 @@ async fn native_lifecycle_original_session_and_external_database_holder() {
         model: None,
         agent: None,
         variant: None,
-        parts: vec![json!({"type":"text","text":"Original session fixture"})],
+        parts: vec![
+            json!({"type":"text","text":"Original session fixture"}),
+            json!({"type":"file","mime":"image/png","url":PIXEL}),
+        ],
     };
     server
         .client
@@ -121,7 +130,8 @@ async fn native_lifecycle_original_session_and_external_database_holder() {
             .expect("native history");
         let parts = || read.messages.iter().flat_map(|m| &m.parts);
         if parts().any(|p| p["text"] == "Original session fixture")
-            && parts().any(|p| p["text"] == "NATIVE_PREFIX COMPLETE")
+            && parts().any(|p| p["type"] == "file" && p["url"] == PIXEL)
+            && parts().any(|p| p["text"] == "NATIVE_PREFIX IMAGE COMPLETE")
         {
             page = Some(read);
             break;
@@ -438,11 +448,8 @@ async fn native_host_stream_options_permissions_questions_commands_and_cancel() 
         tokio::time::sleep(Duration::from_millis(100)).await;
         catalog = host.catalog(Some(directory)).await.expect("catalog");
     }
-    assert!(catalog
-        .model("fixture/test")
-        .expect("native model")
-        .variants
-        .contains(&"careful".into()));
+    let model = catalog.model("fixture/test").expect("native model");
+    assert!(model.variants.contains(&"careful".into()) && model.images);
     assert!(catalog
         .commands
         .iter()

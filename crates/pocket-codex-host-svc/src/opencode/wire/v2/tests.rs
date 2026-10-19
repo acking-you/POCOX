@@ -1,4 +1,4 @@
-//! V2 frames, catalogs, history and prompts against the 2.0.21 wire shapes.
+//! V2 frames, catalogs, history and prompts against the 2.0.32 wire shapes.
 
 use std::sync::{Arc, Mutex};
 
@@ -57,7 +57,7 @@ fn frames_keep_status_and_step_boundaries_and_drop_token_deltas() {
 }
 
 #[test]
-fn catalog_keeps_usable_models_and_offers_no_attachments() {
+fn catalog_keeps_usable_models_and_their_image_input() {
     let catalog = |default: Value| {
         shape::catalog(
             // Only configured providers are listed; `a` is not.
@@ -68,6 +68,8 @@ fn catalog_keeps_usable_models_and_offers_no_attachments() {
             serde_json::from_value(json!([
                 {"id":"m/1","providerID":"a","name":"One","variants":[{"id":"high"}],
                  "status":"active","enabled":true,"capabilities":{"input":["text","image"]}},
+                {"id":"text","providerID":"a","name":"Text","variants":[],"status":"beta","enabled":true,
+                 "capabilities":{"input":["text"]}},
                 {"id":"old","providerID":"a","name":"Old","variants":[],"status":"deprecated","enabled":true},
                 {"id":"off","providerID":"b","name":"Off","variants":[],"status":"active","enabled":true}
             ]))
@@ -84,11 +86,11 @@ fn catalog_keeps_usable_models_and_offers_no_attachments() {
         )
     };
     let without_default = catalog(json!({"location":{"directory":"/p"}}));
-    assert_eq!(without_default.models.len(), 1);
-    assert_eq!(without_default.models[0].key(), "a/m/1");
+    let keys: Vec<_> = without_default.models.iter().map(|m| m.key()).collect();
+    assert_eq!(keys, ["a/m/1", "a/text"]);
     assert_eq!(without_default.models[0].provider_name, "a");
     assert_eq!(without_default.models[0].variants, ["high"]);
-    assert!(!without_default.models[0].images);
+    assert!(without_default.models[0].images && !without_default.models[1].images);
     assert!(without_default.defaults.is_empty());
     assert_eq!(without_default.agents.len(), 1);
     assert_eq!(without_default.agents[0].name, "build");
@@ -113,7 +115,9 @@ fn history_is_oldest_first_with_turns_and_their_selection() {
             {"type":"user","id":"msg_4","text":"Second","time":{"created":4}},
             {"type":"agent-switched","id":"msg_3","agent":"plan","time":{"created":3}},
             assistant("msg_2", "build"),
-            {"type":"user","id":"msg_1","text":"First","time":{"created":1}}
+            {"type":"user","id":"msg_1","text":"First","time":{"created":1},"files":[
+                {"data":"AA==","mime":"image/png","source":{"type":"inline"},"name":"a.png"},
+                {"data":"eA==","mime":"text/plain","source":{"type":"uri","uri":"file:///p/x.txt"}}]}
         ],
         "cursor":{"next":"older"}
     }))
@@ -131,6 +135,8 @@ fn history_is_oldest_first_with_turns_and_their_selection() {
     assert_eq!(history[2].info["agent"], "plan");
     assert_eq!(history[2].info["model"]["modelID"], "m/1");
     assert_eq!(history[0].parts[0]["text"], "First");
+    let urls: Vec<_> = history[0].parts[1..].iter().map(|p| &p["url"]).collect();
+    assert_eq!(urls, [&json!("data:image/png;base64,AA=="), &json!("file:///p/x.txt")]);
     let tool = &history[1].parts[1];
     assert_eq!((&tool["tool"], &tool["state"]["output"]), (&json!("bash"), &json!("file")));
 }
@@ -204,7 +210,7 @@ async fn prompt(
 }
 
 #[tokio::test]
-async fn a_changed_selection_precedes_the_prompt_and_any_refusal_sends_nothing() {
+async fn a_changed_selection_precedes_the_prompt_and_a_refusal_sends_nothing() {
     let mut input = Prompt {
         message_id: Some("msg_x".into()),
         model: Some(Model {
@@ -244,7 +250,10 @@ async fn a_changed_selection_precedes_the_prompt_and_any_refusal_sends_nothing()
     input
         .parts
         .push(json!({"type":"file","mime":"image/png","url":"data:image/png;base64,AA=="}));
-    let (result, log) = prompt(StatusCode::NO_CONTENT, &input, true).await;
-    assert!(matches!(result, Err(ClientError::UnsupportedAttachment)));
-    assert!(actions(&log).is_empty());
+    let (result, log) = prompt(StatusCode::NO_CONTENT, &input, false).await;
+    result.expect("image prompt");
+    assert_eq!(
+        log.lock().expect("log")[0].1,
+        json!({"text":"Hello","files":[{"uri":"data:image/png;base64,AA=="}],"id":"msg_x"})
+    );
 }

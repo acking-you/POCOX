@@ -27,7 +27,7 @@ cannot tell.
 | Provider | Source | Boundaries |
 | --- | --- | --- |
 | Claude | The official `claude-agent-sdk` installed beside the selected ACP adapter; only `listSessions`, `getSessionInfo` and `getSessionMessages` | No SDK download during browsing. Canonical branch reconstruction belongs to the SDK. A changed selected transcript is read again; this is not an incremental index. Sources over 64 MiB are rejected; the credential-free reader has a 256 MiB heap and bounded time/output. |
-| OpenCode | Existing SQLite database under `OPENCODE_DB`, or `XDG_DATA_HOME/opencode/opencode.db` / the normal HOME data directory | Read-only connections and transactions, no creation, migrations or runtime import. Recognized `session_message` v2 and legacy `message` + `part` schemas only. No disk-wide search for custom/channel databases. |
+| OpenCode | Existing SQLite database under `OPENCODE_DB`, or `XDG_DATA_HOME/opencode/opencode.db` / the normal HOME data directory | Read-only connections and transactions, no creation, migrations or runtime import. Recognized `session_message` v2 and legacy `message` + `part` schemas only; sessions come from OpenCode 2's `session_v2` when it exists, else `session`. No disk-wide search for custom/channel databases. |
 
 Claude uses the effective `CLAUDE_CONFIG_DIR` or HOME. The independent
 desktop reader resolves this device's environment; a hosted reader uses

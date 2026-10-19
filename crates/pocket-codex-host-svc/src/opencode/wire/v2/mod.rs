@@ -207,12 +207,13 @@ impl Wire for V2 {
     ) -> Result<(), ClientError> {
         #[derive(Serialize)]
         struct Body<'a> {
-            text: Cow<'a, str>,
+            #[serde(flatten)]
+            input: Input<'a>,
             #[serde(skip_serializing_if = "Option::is_none")]
             id: Option<&'a str>,
         }
         let body = Body {
-            text: text(&prompt.parts)?,
+            input: Input::new(&prompt.parts, None),
             id: prompt.message_id.as_deref(),
         };
         if select {
@@ -239,10 +240,8 @@ impl Wire for V2 {
         #[derive(Serialize)]
         struct Body<'a> {
             name: &'a str,
-            text: &'a str,
-        }
-        if !command.parts.is_empty() {
-            return Err(ClientError::UnsupportedAttachment);
+            #[serde(flatten)]
+            input: Input<'a>,
         }
         if select {
             let model = command
@@ -267,7 +266,7 @@ impl Wire for V2 {
             .request(Method::POST, &["api", "session", session, "command"], None)?
             .json(&Body {
                 name: &command.command,
-                text: &command.arguments,
+                input: Input::new(&command.parts, Some(&command.arguments)),
             });
         let _: IgnoredAny = http.call(request, MAX_BODY).await?;
         Ok(())
@@ -343,15 +342,42 @@ fn located(
     Ok(request.timeout(REQUEST_TIMEOUT))
 }
 
-/// The prompt's text. Attachments are refused before any request is made,
-/// because their V2 file form has not been verified.
-fn text(parts: &[Value]) -> Result<Cow<'_, str>, ClientError> {
-    if parts.iter().any(|part| part["type"] == "file") {
-        return Err(ClientError::UnsupportedAttachment);
+/// Prompt text and attachments. The host admits only inline image data URLs,
+/// which V2 decodes and sniffs itself.
+#[derive(Serialize)]
+struct Input<'a> {
+    text: Cow<'a, str>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    files: Vec<File<'a>>,
+}
+
+#[derive(Serialize)]
+struct File<'a> {
+    uri: &'a str,
+}
+
+impl<'a> Input<'a> {
+    /// `text` replaces the parts' own text, as a command's arguments do.
+    fn new(parts: &'a [Value], text: Option<&'a str>) -> Self {
+        let files = parts
+            .iter()
+            .filter(|part| part["type"] == "file")
+            .filter_map(|part| part["url"].as_str())
+            .map(|uri| File {
+                uri,
+            })
+            .collect();
+        Self {
+            text: text.map_or_else(|| joined(parts), Cow::Borrowed),
+            files,
+        }
     }
+}
+
+fn joined(parts: &[Value]) -> Cow<'_, str> {
     let mut texts = parts.iter().filter_map(|part| part["text"].as_str());
     let first = texts.next().unwrap_or_default();
-    Ok(match texts.next() {
+    match texts.next() {
         None => Cow::Borrowed(first),
         Some(second) => Cow::Owned(
             [first, second]
@@ -360,7 +386,7 @@ fn text(parts: &[Value]) -> Result<Cow<'_, str>, ClientError> {
                 .collect::<Vec<_>>()
                 .join("\n"),
         ),
-    })
+    }
 }
 
 #[derive(Serialize)]

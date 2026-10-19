@@ -23,6 +23,31 @@ pub struct OpenCodeHistory {
     path: PathBuf,
 }
 
+/// Where sessions are kept. OpenCode 2 moves them to `session_v2` when it
+/// opens a database and leaves the 1.x table behind, frozen at that moment.
+#[derive(Clone, Copy)]
+enum Sessions {
+    V1,
+    V2,
+}
+
+/// One session query over either table; the columns it reads have the same
+/// names in both.
+macro_rules! sessions {
+    ($head:literal, $table:ident, $tail:literal) => {
+        match $table {
+            Sessions::V1 => concat!($head, " FROM session ", $tail),
+            Sessions::V2 => concat!($head, " FROM session_v2 ", $tail),
+        }
+    };
+}
+
+impl Sessions {
+    async fn detect(connection: &mut SqliteConnection) -> Result<Self> {
+        Ok(if table_exists(connection, "session_v2").await? { Self::V2 } else { Self::V1 })
+    }
+}
+
 struct Session {
     cwd: String,
     title: String,
@@ -92,12 +117,14 @@ impl OpenCodeHistory {
             .unwrap_or(0);
         ensure!(offset <= 100_000, "invalid cursor");
         let (mut connection, identity) = self.connect().await?;
-        let rows = sqlx::query(
+        let table = Sessions::detect(&mut connection).await?;
+        let rows = sqlx::query(sessions!(
             "SELECT id,CASE WHEN length(CAST(directory AS BLOB))<=16384 THEN directory END AS \
              directory, substr(title,1,4096) AS title,parent_id, \
-             strftime('%Y-%m-%dT%H:%M:%fZ',time_updated/1000.0,'unixepoch') AS updated FROM \
-             session ORDER BY time_updated DESC,id DESC LIMIT ? OFFSET ?",
-        )
+             strftime('%Y-%m-%dT%H:%M:%fZ',time_updated/1000.0,'unixepoch') AS updated",
+            table,
+            "ORDER BY time_updated DESC,id DESC LIMIT ? OFFSET ?"
+        ))
         .bind((limit + 1) as i64)
         .bind(i64::from(offset))
         .fetch_all(&mut connection)
@@ -218,12 +245,14 @@ impl OpenCodeHistory {
 }
 
 async fn load_session(connection: &mut SqliteConnection, id: &str) -> Result<Session> {
-    let row = sqlx::query(
+    let table = Sessions::detect(connection).await?;
+    let row = sqlx::query(sessions!(
         "SELECT CASE WHEN length(CAST(directory AS BLOB))<=16384 THEN directory END AS directory, \
          substr(title,1,4096) AS title,time_created,time_updated, CASE WHEN revert IS NULL OR \
-         length(CAST(revert AS BLOB))<=16384 THEN revert ELSE 'oversized revert' END AS revert \
-         FROM session WHERE id=?",
-    )
+         length(CAST(revert AS BLOB))<=16384 THEN revert ELSE 'oversized revert' END AS revert",
+        table,
+        "WHERE id=?"
+    ))
     .bind(id)
     .fetch_optional(connection)
     .await?

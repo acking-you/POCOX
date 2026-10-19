@@ -87,9 +87,12 @@ async fn answer(
     let (sender, stream) = mpsc::channel(8);
     tokio::spawn(async move {
         let held = user.contains("HOLD_FIXTURE");
+        // An image reaches the model as an `image_url` content part.
+        let prefix =
+            if user.contains("image_url") { "NATIVE_PREFIX IMAGE " } else { "NATIVE_PREFIX " };
         let delta = match &tool {
             Some(tool) => json!({"role":"assistant","tool_calls":[tool]}),
-            None => json!({"role":"assistant","content":"NATIVE_PREFIX "}),
+            None => json!({"role":"assistant","content":prefix}),
         };
         if sender.send(Ok(chunk(delta, None))).await.is_err() {
             return;

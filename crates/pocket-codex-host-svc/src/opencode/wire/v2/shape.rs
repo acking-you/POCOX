@@ -92,11 +92,18 @@ pub(super) struct Model {
     variants: Vec<Variant>,
     status: String,
     enabled: bool,
+    #[serde(default)]
+    capabilities: Capabilities,
 }
 
 #[derive(Deserialize)]
 struct Variant {
     id: String,
+}
+
+#[derive(Default, Deserialize)]
+struct Capabilities {
+    input: Vec<String>,
 }
 
 /// `data` is absent, not null, when no default model is configured.
@@ -151,9 +158,7 @@ pub(super) fn catalog(
                 id: model.id,
                 name: model.name,
                 variants: model.variants.into_iter().map(|v| v.id).collect(),
-                // Attachments are not translated for this wire yet, so the
-                // composer must not offer them.
-                images: false,
+                images: model.capabilities.input.iter().any(|kind| kind == "image"),
             })
         })
         .collect();
@@ -351,10 +356,28 @@ pub(super) struct User {
     id: String,
     text: String,
     #[serde(default)]
-    files: Vec<File>,
+    files: Vec<Attached>,
     time: Value,
 }
 
+/// A prompt attachment. V2 keeps its bytes; only a path attachment names a
+/// URI.
+#[derive(Deserialize)]
+struct Attached {
+    data: String,
+    mime: String,
+    source: Source,
+    name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+enum Source {
+    Inline,
+    Uri { uri: String },
+}
+
+/// Tool output content.
 #[derive(Deserialize)]
 struct File {
     uri: String,
@@ -499,7 +522,11 @@ impl User {
             ("text", self.text.into()),
         ]));
         for (index, file) in self.files.into_iter().enumerate() {
-            parts.push(file.into_native(format!("{}:file:{index}", self.id), session, &self.id));
+            parts.push(file.into_file().into_native(
+                format!("{}:file:{index}", self.id),
+                session,
+                &self.id,
+            ));
         }
         schema::Message {
             info: object([
@@ -509,6 +536,24 @@ impl User {
                 ("time", self.time),
             ]),
             parts,
+        }
+    }
+}
+
+impl Attached {
+    /// The 1.x file part: an inline attachment as a data URL, a path
+    /// attachment by its URI, as 1.x keeps it.
+    fn into_file(self) -> File {
+        let uri = match self.source {
+            Source::Inline => format!("data:{};base64,{}", self.mime, self.data),
+            Source::Uri {
+                uri,
+            } => uri,
+        };
+        File {
+            uri,
+            mime: Some(self.mime),
+            name: self.name,
         }
     }
 }

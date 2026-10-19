@@ -50,26 +50,29 @@ fn omit(item: &mut Item, reason: &str) {
     }
 }
 
+const IMAGES: [&str; 4] = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+const MAX_IMAGE_URL: usize = 512 * 1024;
+
 fn files(item: &mut Item, values: &Value) {
     for file in values.as_array().into_iter().flatten() {
-        let url = file["url"].as_str().unwrap_or_default();
-        if [
-            "data:image/png;base64,",
-            "data:image/jpeg;base64,",
-            "data:image/gif;base64,",
-            "data:image/webp;base64,",
-        ]
-        .iter()
-        .any(|prefix| url.starts_with(prefix))
-            && url.len() <= 512 * 1024
-            && item.images.len() < 4
-        {
-            item.images.push(url.into());
-        } else {
+        match image(file) {
+            Some(url) if item.images.len() < 4 => item.images.push(url),
             // File paths and remote URLs are not automatic read authority.
-            omit(item, "attachments");
+            _ => omit(item, "attachments"),
         }
     }
+}
+
+/// A stored image as a bounded data URL: 1.x keeps the URL, 2.x the bytes.
+fn image(file: &Value) -> Option<String> {
+    if let Some(url) = file["url"].as_str() {
+        let mime = url.strip_prefix("data:")?.split_once(";base64,")?.0;
+        return (IMAGES.contains(&mime) && url.len() <= MAX_IMAGE_URL).then(|| url.into());
+    }
+    let mime = file["mime"].as_str()?;
+    let data = file["data"].as_str()?;
+    (IMAGES.contains(&mime) && data.len() + mime.len() + 13 <= MAX_IMAGE_URL)
+        .then(|| format!("data:{mime};base64,{data}"))
 }
 
 fn tool(id: String, block: &Value) -> Item {
@@ -169,24 +172,33 @@ fn project(message: &Message) -> Vec<Item> {
             items
         },
         "shell" => {
-            let mut result = item(id.clone(), ItemKind::ToolCall, &text(data, "output"));
+            // 2.x keeps the output page and status in objects of its own.
+            let output = data["output"]["output"]
+                .as_str()
+                .or_else(|| data["output"].as_str())
+                .unwrap_or_default();
+            let mut result = item(id.clone(), ItemKind::ToolCall, output);
             result.title = clip(&text(data, "command"), 4096).0;
+            let status = match (data["status"].as_str(), data["time"]["completed"].is_null()) {
+                (Some("running"), _) | (None, true) => "in_progress",
+                (Some("timeout" | "killed"), _) => "failed",
+                _ => "completed",
+            };
             result.tool = Some(Tool {
-                call_id: text(data, "callID"),
+                call_id: data["callID"]
+                    .as_str()
+                    .or_else(|| data["shellID"].as_str())
+                    .unwrap_or_default()
+                    .into(),
                 kind: "execute".into(),
-                status: if data["time"]["completed"].is_null() {
-                    "in_progress"
-                } else {
-                    "completed"
-                }
-                .into(),
+                status: status.into(),
                 ..Tool::default()
             });
             vec![result]
         },
         "compaction" => vec![item(id, ItemKind::AgentMessage, "[Earlier context compacted]")],
         "system" | "synthetic" => vec![],
-        "agent-switched" | "model-switched" => vec![],
+        "agent-switched" | "model-switched" | "location-switched" | "idle" => vec![],
         _ => {
             let mut result = item(id, ItemKind::AgentMessage, "");
             omit(&mut result, "unsupported message");

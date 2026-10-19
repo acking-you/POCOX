@@ -49,11 +49,6 @@ pub enum ClientError {
     /// An event connection ended and requires fresh reconciliation.
     #[error("the OpenCode event stream ended; reconnect to refresh session state")]
     EventStreamEnded,
-    /// This OpenCode version's attachments are not translated yet.
-    #[error(
-        "this OpenCode version cannot receive attachments here yet; remove them and send again"
-    )]
-    UnsupportedAttachment,
     /// The model or agent selection failed, so the message was never sent.
     #[error("the OpenCode {selection} selection failed; the message was not sent")]
     Preflight {
@@ -70,7 +65,7 @@ pub enum ClientError {
 impl ClientError {
     /// Whether the native server certainly did not admit the request.
     pub fn not_sent(&self) -> bool {
-        matches!(self, Self::Http(400..=499) | Self::Preflight { .. } | Self::UnsupportedAttachment)
+        matches!(self, Self::Http(400..=499) | Self::Preflight { .. })
     }
 }
 
