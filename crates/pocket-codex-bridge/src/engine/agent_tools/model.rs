@@ -14,6 +14,9 @@ pub const PROTOCOL: u32 = 1;
 /// Longest title or label kept from any source.
 pub const MAX_LABEL: usize = 80;
 
+/// Longest ACP session id the host admits, in bytes; kept exactly.
+pub const MAX_SESSION_ID: usize = 1024;
+
 /// Most ports one device shares at a time.
 pub const MAX_SHARED_PORTS: usize = 8;
 

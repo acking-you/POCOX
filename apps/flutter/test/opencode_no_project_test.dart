@@ -11,7 +11,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocket_codex/src/tools/builtin_tags.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -96,8 +98,36 @@ void main() {
   });
 
   testWidgets('choosing the folder creates the session there and sends the '
-      'message once', (t) async {
-    final api = await _open(t);
+      'message once, with the tools picked for it', (t) async {
+    final api = FakeBridgeApi()
+      ..acpCapabilities[_svc] = negotiatedOpenCodeCapabilities()
+      ..toolsOverviewValue = const ToolsOverview(
+        thisDevice: 'local',
+        devices: [
+          ToolsDevice(
+            name: 'local',
+            online: true,
+            catalog: true,
+            toolsEnabled: true,
+            builtinTools: [
+              ToolsBuiltinTool(
+                id: 'share',
+                title: 'Share a port',
+                summary: '',
+                gated: true,
+              ),
+            ],
+          ),
+        ],
+      );
+    await mountChat(t, api);
+    await t.tap(find.byKey(const Key('attach-menu-btn')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('builtin-tools-btn')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const ValueKey('choice-share')));
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
     await typeMessage(t, 'hi');
     await _send(t);
     await _useTypedFolder(t, '/srv/new');
@@ -105,7 +135,10 @@ void main() {
     expect(api.threadStartCalls, [_svc]);
     expect(api.lastCwd, '/srv/new');
     expect(api.turnStartCount, 1);
-    expect(api.lastTurnText, 'hi');
+    final sent = splitBuiltinTools(api.lastTurnText!);
+    expect(sent.text, 'hi');
+    expect(sent.ids, ['share']);
+    expect(api.toolsGrants.single.$3, ['share']);
     expect(composerText(t), '');
     expect(_bubble('hi'), findsOneWidget);
   });

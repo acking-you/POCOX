@@ -18,6 +18,11 @@ extension _SessionBuiltinTools on _AppSessionState {
     widget.serviceKey,
   );
 
+  /// The host's words for its tools, by id, for the block the agent reads.
+  Map<String, String> _hostToolSummaries() => {
+    for (final tool in _hostTools()) tool.id: tool.summary,
+  };
+
   Future<void> _pickBuiltinTools() async {
     final tools = _hostTools();
     if (tools.isEmpty) return;

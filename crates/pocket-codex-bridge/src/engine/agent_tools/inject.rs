@@ -45,21 +45,30 @@ impl Drop for Grant {
     }
 }
 
-/// Revoke the tokens `which` selects and end what they made. A revocation
-/// that cannot be saved now still ends them in this process at once (their
-/// holder is gone or failed to start) and reaches the disk as soon as it can.
+/// Revoke the tokens `which` selects. A revocation that cannot be saved now
+/// still ends them in this process at once (their holder is gone or never
+/// got them) and reaches the disk as soon as it can.
+fn revoke(which: impl Fn(&Principal) -> bool) -> Vec<Principal> {
+    let mut state = state::lock();
+    match state.tokens.revoke_where(&which) {
+        Ok(revoked) => revoked,
+        Err(error) => {
+            tracing::warn!("agent tool tokens not saved: {error:#}");
+            state.tokens.forget_where(&which)
+        },
+    }
+}
+
+/// Withdraw tokens that were never put to use, and end what they made: the
+/// instance or session they were minted for keeps its grants.
 fn retract(which: impl Fn(&Principal) -> bool) {
-    let revoked = {
-        let mut state = state::lock();
-        match state.tokens.revoke_where(&which) {
-            Ok(revoked) => revoked,
-            Err(error) => {
-                tracing::warn!("agent tool tokens not saved: {error:#}");
-                state.tokens.forget_where(&which)
-            },
-        }
-    };
-    super::ended(&revoked);
+    super::ended(&revoke(which));
+}
+
+/// Revoke the tokens of holders that are gone, with what the user granted
+/// them.
+fn retire(which: impl Fn(&Principal) -> bool) {
+    super::retired(&revoke(which));
 }
 
 fn endpoint() -> Option<String> {
@@ -95,22 +104,22 @@ pub fn hosted(host: &str, harness: &str, label: &str) -> Option<Grant> {
 }
 
 /// A hosted launch is committed (recorded as running): an adopted process
-/// kept its earlier token, so the new one is withdrawn; a fresh one replaces
-/// the earlier tokens of `host`.
+/// kept its earlier token, so the new one is withdrawn and the running
+/// instance keeps its grants; a fresh one replaces the earlier instance.
 pub fn hosted_started(host: &str, mut grant: Grant, reused: bool) {
     grant.committed = true;
     let id = grant.token_id.clone();
-    retract(|p| {
-        p.kind == Kind::Hosted
-            && p.host.as_deref() == Some(host)
-            && if reused { p.id == id } else { p.id != id }
-    });
+    if reused {
+        retract(|p| p.id == id);
+    } else {
+        retire(|p| p.kind == Kind::Hosted && p.host.as_deref() == Some(host) && p.id != id);
+    }
 }
 
 /// A hosted instance stopped: its tokens are revoked and what its harness
-/// shared or connected ends.
+/// shared or connected ends, with what the user granted it.
 pub fn hosted_stopped(host: &str) {
-    retract(|p| matches!(p.kind, Kind::Hosted | Kind::Session) && p.host.as_deref() == Some(host));
+    retire(|p| matches!(p.kind, Kind::Hosted | Kind::Session) && p.host.as_deref() == Some(host));
 }
 
 /// Codex launch overrides for `grant`, with the token's environment entry.
@@ -315,7 +324,7 @@ impl SessionMcp for AcpTools {
     }
 
     fn closed(&self, session: &str) {
-        retract(|p| {
+        retire(|p| {
             p.kind == Kind::Session
                 && p.host.as_deref() == Some(self.host.as_str())
                 && p.session.as_deref() == Some(session)
@@ -345,6 +354,42 @@ mod tests {
             token_id: "t".into(),
             committed: true,
         }
+    }
+
+    #[test]
+    fn a_launch_that_adopts_the_running_instance_keeps_its_grants() {
+        // The process-wide state: a host name no other test uses.
+        let host = "adopted-keeps-grants";
+        let mint = || {
+            state::lock()
+                .tokens
+                .mint(Kind::Hosted, host, Some("codex"), Some(host))
+                .expect("mint")
+                .0
+                .id
+        };
+        let granted = state::Granted {
+            host: host.into(),
+            conversation: Some("t1".into()),
+            tool: super::super::builtin::SHARE.into(),
+        };
+        let running = mint();
+        state::lock().granted.insert(granted.clone());
+        let launch = Grant {
+            url: String::new(),
+            token: Secret::new("pcxt_unused"),
+            token_id: mint(),
+            committed: false,
+        };
+        let unused = launch.token_id.clone();
+        hosted_started(host, launch, true);
+        {
+            let state = state::lock();
+            assert!(state.tokens.contains(&running) && !state.tokens.contains(&unused));
+            assert!(state.granted.contains(&granted), "the running instance keeps its grant");
+        }
+        hosted_stopped(host);
+        assert!(!state::lock().granted.contains(&granted), "a stopped instance loses it");
     }
 
     #[test]

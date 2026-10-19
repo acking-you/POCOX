@@ -63,17 +63,19 @@ extension _SessionSend on _AppSessionState {
           ]
         : const <String>[];
     // Built-in tools ride an ordinary send too, named for the agent at the
-    // end of the text; a retry grants again the ones its text already names.
+    // end of the text. A message sent again (a retry, a failed turn) carries
+    // that block in its own text: the tools it names are granted again.
     final sendTools = ordinary
         ? List<String>.of(queued?.tools ?? _tools)
-        : retry
-        ? (resend?.tools ?? const <String>[])
+        : retry || failedTurn != null
+        ? splitBuiltinTools(typed).ids
         : const <String>[];
     final text = appendBuiltinTools(
       appendFileRefs(typed, filePaths),
       ordinary ? sendTools : const [],
+      summaries: _hostToolSummaries(),
     );
-    final again = _Resend(text: text, images: images, tools: sendTools);
+    final again = _Resend(text: text, images: images);
     // Block sends while reconnecting — a reconnect reloads history and would
     // wipe an optimistic message added mid-flight.
     if (_externalWriterMode ||

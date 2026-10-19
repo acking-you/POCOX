@@ -124,7 +124,7 @@ String previewWithoutFileRefs(String preview, String placeholder) {
   // An automation's run reads as the task it set.
   final automation = AutomationPrompt.parse(preview);
   if (automation != null) return automation.instructions;
-  final text = splitBuiltinTools(splitIdeContext(preview).text).text;
+  final text = previewWithoutBuiltinTools(splitIdeContext(preview).text);
   final split = splitFileRefs(text);
   return split.paths.isEmpty ? text : split.text;
 }

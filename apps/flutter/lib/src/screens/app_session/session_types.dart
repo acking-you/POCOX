@@ -106,17 +106,9 @@ class _ModelWithdrawn extends _DraftOptionsRefused {
 /// The exact wire content of one send (text with file references, image
 /// data URLs), kept by its retry.
 class _Resend {
-  const _Resend({
-    required this.text,
-    required this.images,
-    this.tools = const [],
-  });
+  const _Resend({required this.text, required this.images});
   final String text;
   final List<String> images;
-
-  /// Built-in tools its first attempt picked: granted again on a retry (the
-  /// text already names them).
-  final List<String> tools;
 }
 
 /// One entry in an option-picker bottom sheet (model / permission / effort).

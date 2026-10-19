@@ -15,11 +15,17 @@ extension _SessionSupplement on _AppSessionState {
     final sendingDraft = _draft;
     final draft = _input.text;
     final attachments = List<_Attachment>.of(_attachments);
+    // Built-in tools picked for it ride the supplement as they would a turn.
+    final tools = List<String>.of(_tools);
     if (draft.trim().isEmpty && attachments.isEmpty) return;
-    final text = appendFileRefs(draft.trim(), [
-      for (final attachment in attachments)
-        if (attachment.isFile) ?attachment.hostPath,
-    ]);
+    final text = appendBuiltinTools(
+      appendFileRefs(draft.trim(), [
+        for (final attachment in attachments)
+          if (attachment.isFile) ?attachment.hostPath,
+      ]),
+      tools,
+      summaries: _hostToolSummaries(),
+    );
     final images = <String>[
       for (final attachment in attachments)
         if (!attachment.isFile) ?attachment.processed?.dataUrl,
@@ -55,6 +61,10 @@ extension _SessionSupplement on _AppSessionState {
         !_connectionLost &&
         !_reconnecting;
     try {
+      // Granted before the agent reads the input; a view that moved on
+      // meanwhile sends nothing and keeps its draft.
+      await _grantBuiltinTools(serviceKey, tid, tools);
+      if (!owned()) return;
       final outcome = await ref
           .read(bridgeApiProvider)
           .appTurnSupplement(serviceKey, tid, turnId, text, images: images);
@@ -70,11 +80,11 @@ extension _SessionSupplement on _AppSessionState {
         return;
       }
       if (!outcome.injected) {
-        _supplementNotConsumed(sendingDraft, draft, attachments);
+        _supplementNotConsumed(sendingDraft, draft, attachments, tools);
         return;
       }
       final acceptedTurnId = outcome.turnId ?? turnId ?? '';
-      _takeSupplemented(sendingDraft, draft, attachments);
+      _takeSupplemented(sendingDraft, draft, attachments, tools);
       // A history read since the request may already hold the input; a
       // reload then shows it once instead of adding a second copy.
       final reload =
@@ -179,12 +189,13 @@ extension _SessionSupplement on _AppSessionState {
   }
 
   /// The input reached the host: take exactly what was sent out of its
-  /// draft (the shown one) — the text only if it is unchanged, and the sent
-  /// attachments — leaving anything added or edited since in place.
+  /// draft (the shown one) — the text only if it is unchanged, the sent
+  /// attachments and tools — leaving anything added or edited since in place.
   void _takeSupplemented(
     _ComposerDraft sendingDraft,
     String draft,
     List<_Attachment> attachments,
+    List<String> tools,
   ) {
     if (_input.text == draft) {
       sendingDraft.value = TextEditingValue.empty;
@@ -193,6 +204,7 @@ extension _SessionSupplement on _AppSessionState {
     sendingDraft.attachments.removeWhere(
       (a) => attachments.any((sent) => sent.id == a.id),
     );
+    sendingDraft.tools.removeWhere(tools.contains);
     _drafts.save(sendingDraft, changed: true);
   }
 
@@ -200,17 +212,19 @@ extension _SessionSupplement on _AppSessionState {
   /// consumed: the input becomes the next turn, ahead of anything already
   /// queued, and is sent once that turn's end is confirmed. Called only for
   /// an owned answer (see [_sendSupplement]); only an exactly unchanged
-  /// input — the same text and the same attachments, none added, removed or
+  /// input — the same text, attachments and tools, none added, removed or
   /// replaced — is queued; anything else stays in the composer, untouched.
   void _supplementNotConsumed(
     _ComposerDraft sendingDraft,
     String draft,
     List<_Attachment> attachments,
+    List<String> tools,
   ) {
     final unchanged =
         _input.text == draft &&
         sendingDraft.attachments.length == attachments.length &&
-        attachments.every(sendingDraft.attachments.contains);
+        attachments.every(sendingDraft.attachments.contains) &&
+        listEquals(sendingDraft.tools, tools);
     if (!unchanged) {
       _updateState(() {
         _supplement = false;
@@ -221,10 +235,16 @@ extension _SessionSupplement on _AppSessionState {
     }
     sendingDraft.queue.insert(
       0,
-      _Queued(id: _drafts.nextQueueId++, text: draft, attachments: attachments),
+      _Queued(
+        id: _drafts.nextQueueId++,
+        text: draft,
+        attachments: attachments,
+        tools: tools,
+      ),
     );
     sendingDraft.value = TextEditingValue.empty;
     sendingDraft.attachments.removeWhere(attachments.contains);
+    sendingDraft.tools.clear();
     _drafts.save(sendingDraft, changed: true);
     _input.value = sendingDraft.value;
     _updateState(() => _supplement = false);

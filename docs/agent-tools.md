@@ -211,20 +211,28 @@ picked tools show as chips above the field and go with the next message, like
 attachments:
 
 - the message ends with a block naming them for the agent
-  (`<pocox_tools ids="share,services">…</pocox_tools>`); transcripts and list
-  previews show chips instead;
+  (`<pocox_tools ids="share,services">…</pocox_tools>`; a tool this app does
+  not know is described in the host's own words); transcripts and list
+  previews, truncated ones included, show chips instead;
 - before the turn starts, a tool that needs consent (Share a port, and
   Connect a service for a Responses API) is granted to that conversation, as
-  if the user had answered **Allow in this conversation** in advance, on the host itself or through its management
-  entry (`POST /services/v1/grants`, bound to the account or relay like every
-  answer). A request already waiting there goes ahead.
+  if the user had answered **Allow in this conversation** in advance, on the
+  host itself or through its management entry (`POST /services/v1/grants`,
+  bound to the account or relay like every answer). A request already waiting
+  there goes ahead.
 
-A grant names the hosted instance and the conversation its harness reports
-(native OpenCode names none, so there it covers the instance, as its consent
-does). It ends with the instance or the session, when the switch or **Ask
-before agents share or connect an API** goes off, and when the account or
-relay changes. A
-host that cannot be reached keeps its consent prompt.
+The tools go wherever the message goes: to the project chosen for a new
+conversation's first message, into a supplement to a running turn (granted
+before it is sent, and queued with it when the turn ended first), and into a
+retry, which grants again the tools its text names.
+
+A grant names the hosted instance and the conversation its harness reports,
+exactly as its calls carry it (native OpenCode names none, so there it covers
+the instance, as its consent does). It ends with the instance or the session
+(a launch that adopts the running instance keeps it), when the switch or
+**Ask before agents share or connect an API** goes off, and when the account
+or relay changes. While asking is off nothing is recorded, so switching it on
+again asks as before. A host that cannot be reached keeps its consent prompt.
 
 ## Ownership and lifetimes
 

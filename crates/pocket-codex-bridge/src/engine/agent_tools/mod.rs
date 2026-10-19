@@ -102,17 +102,35 @@ pub fn status() -> Status {
 }
 
 /// End what the `revoked` callers shared or connected, and their requests
-/// waiting for the user.
+/// waiting for the user. A token withdrawn unused (a launch that adopted a
+/// running instance, a session request the agent refused) ends only this:
+/// the instance or session it was minted for may still run.
 fn ended(revoked: &[Principal]) {
     if revoked.is_empty() {
         return;
     }
     let ids: Vec<&str> = revoked.iter().map(|p| p.id.as_str()).collect();
     let gone = |key: &OwnerKey| ids.contains(&key.token.as_str());
-    // An instance that stopped (or started afresh) and a closed session
-    // lose what the user handed them from the composer.
-    state::lock().granted.retain(|granted| {
-        !revoked.iter().any(|p| {
+    consent::withdraw(gone);
+    shares::end_owned(gone);
+    connections::end_owned(gone);
+}
+
+/// The holders of `revoked` are gone: an instance stopped or started afresh,
+/// a session closed, or the user revoked the token. Besides [`ended`], what
+/// the user handed them from the composer ends.
+fn retired(revoked: &[Principal]) {
+    if revoked.is_empty() {
+        return;
+    }
+    ungrant(&mut state::lock().granted, revoked);
+    ended(revoked);
+}
+
+/// Drop the grants of a hosted instance among `gone`, and of a session.
+fn ungrant(granted: &mut std::collections::HashSet<state::Granted>, gone: &[Principal]) {
+    granted.retain(|granted| {
+        !gone.iter().any(|p| {
             p.host.as_deref() == Some(granted.host.as_str())
                 && match p.kind {
                     tokens::Kind::Hosted => true,
@@ -123,9 +141,6 @@ fn ended(revoked: &[Principal]) {
                 }
         })
     });
-    consent::withdraw(gone);
-    shares::end_owned(gone);
-    connections::end_owned(gone);
 }
 
 /// End everything agents made, their waiting requests and the user's
@@ -347,7 +362,7 @@ pub fn issue(harness: &str, label: Option<&str>) -> Result<Issued> {
 pub fn revoke(id: &str) -> Result<()> {
     host_owner::require()?;
     let revoked = state::lock().tokens.revoke_where(|p| p.id == id)?;
-    ended(&revoked);
+    retired(&revoked);
     Ok(())
 }
 
@@ -378,9 +393,10 @@ fn on_device(device: &str, segments: &[&str], body: serde_json::Value) -> Result
 /// the agent service `service` hosted here: the gated ones are granted to
 /// that conversation, as if the user had answered Allow in this conversation
 /// (to the whole instance for a harness that names no conversation, native
-/// OpenCode), and its requests waiting for an answer go ahead. `epoch`
-/// binds a request from another device to the account or relay it was made
-/// for.
+/// OpenCode), and its requests waiting for an answer go ahead. Nothing is
+/// recorded while agents share without asking: switching asking on again
+/// must not find an earlier pick standing in for an answer. `epoch` binds a
+/// request from another device to the account or relay it was made for.
 pub fn grant(
     service: &str,
     conversation: &str,
@@ -406,7 +422,7 @@ pub fn grant(
     if epoch.is_some_and(|epoch| !crate::engine::transport::is_current(epoch)) {
         return Err(error::ToolError::ContextChanged);
     }
-    if gated.is_empty() {
+    if gated.is_empty() || !state.settings.ask_before_sharing {
         return Ok(());
     }
     for tool in &gated {
@@ -426,8 +442,9 @@ pub fn grant(
 }
 
 /// Where a grant for `conversation` of `service` applies: the device, the
-/// hosted instance, and the conversation its agents name (none for native
-/// OpenCode, whose instance is the owner). Only agent hosts take grants.
+/// hosted instance, and the conversation its agents name, in the form their
+/// calls carry it (none for native OpenCode, whose instance is the owner).
+/// Only agent hosts take grants.
 fn grant_target(
     service: &str,
     conversation: &str,
@@ -439,7 +456,13 @@ fn grant_target(
         .ok_or_else(|| error::ToolError::Invalid("Not a service key.".into()))?;
     let conversation = match id.kind {
         ServiceKind::OpenCode => None,
-        ServiceKind::App | ServiceKind::Acp => Some(model::bounded(conversation)),
+        // Codex names its thread in each call's `_meta`, read bounded.
+        ServiceKind::App => Some(model::bounded(conversation)),
+        // An ACP session's token is bound to its exact id.
+        ServiceKind::Acp if conversation.len() <= model::MAX_SESSION_ID => {
+            Some(conversation.to_string())
+        },
+        ServiceKind::Acp => return Err(error::ToolError::Invalid("Not a session id.".into())),
         _ => return Err(error::ToolError::Invalid("Not an agent host.".into())),
     };
     if conversation.as_deref().is_some_and(str::is_empty) {
@@ -694,5 +717,10 @@ mod tests {
         assert_eq!(conversation("pcx:studio:opencode:oc", "ses_1"), Some(None));
         assert_eq!(conversation("pcx:studio:port:5173", "t1"), None, "not an agent host");
         assert_eq!(conversation("pcx:studio:app:live", ""), None, "no conversation");
+        // An ACP session's token holds its id exactly, however long.
+        let long = format!("ses_{}", "x".repeat(600));
+        assert_eq!(conversation("pcx:studio:acp:claude", &long), Some(Some(long.clone())));
+        let too_long = "x".repeat(model::MAX_SESSION_ID + 1);
+        assert_eq!(conversation("pcx:studio:acp:claude", &too_long), None);
     }
 }

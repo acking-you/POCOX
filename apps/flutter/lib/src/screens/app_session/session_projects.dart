@@ -87,7 +87,7 @@ extension _SessionProjects on _AppSessionState {
 
   /// A send without the project it needs: ask for the folder first. The
   /// draft stays as it is until a folder is chosen (cancelling changes
-  /// nothing); then its text and attachments move to that project's new
+  /// nothing); then its text, attachments and tools move to that project's new
   /// conversation, which is sent once, as the user asked. When that project
   /// already holds an unsent draft, both stay in the composer unsent.
   Future<void> _chooseProjectThenSend() async {
@@ -111,6 +111,7 @@ extension _SessionProjects on _AppSessionState {
     final value = from.value;
     final attachments = List<_Attachment>.of(from.attachments);
     final options = Map<String, String>.of(from.options);
+    final tools = List<String>.of(from.tools);
     _selectProject(project);
     final into = _draft;
     if (!mounted || _cwd != project || identical(into, from)) return;
@@ -121,12 +122,13 @@ extension _SessionProjects on _AppSessionState {
     from
       ..value = TextEditingValue.empty
       ..attachments.clear()
-      ..options.clear();
+      ..options.clear()
+      ..tools.clear();
     _drafts.save(from, changed: true);
     // Options chosen for this message go with it, unless the project's
     // draft already holds its own.
     if (into.options.isEmpty) into.options.addAll(options);
-    _restoreDraft(value.text, attachments);
+    _restoreDraft(value.text, attachments, tools: tools);
     if (!merging) _submit();
   }
 
