@@ -62,6 +62,29 @@ Future<void> main() async {
   // history from boot even when opened later.
   LogManager.instance.initialize(const RustBridgeApi());
 
+  // Framework errors also go to the exportable log. One failure can leave
+  // framework state broken so that every later frame fails the same way; only
+  // the first report names the cause, and an attached tool's structured
+  // errors are the console's only other copy.
+  final present = FlutterError.onError;
+  FlutterError.onError = (details) {
+    // The innermost frames say what failed, ours which widget got there.
+    final frames = (details.stack?.toString() ?? '').split('\n');
+    final mine = frames
+        .skip(4)
+        .where((l) => l.contains('package:pocket_codex/'));
+    LogManager.instance.record(
+      'flutter',
+      [
+        details.exceptionAsString().split('\n').first,
+        ...frames.take(4),
+        ...mine.take(6),
+      ].join('\n'),
+      level: 'ERROR',
+    );
+    present?.call(details);
+  };
+
   // Desktop only: bring up the system tray and make the window close-to-tray.
   // No-op on mobile (DesktopTray.init guards on the platform). The menu labels
   // are filled in once the app builds (see the MaterialApp.router builder).

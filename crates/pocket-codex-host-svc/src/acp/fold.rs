@@ -43,7 +43,7 @@ use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use super::schema::{select_options, TurnOutcome};
+use super::schema::{available_commands, select_options, TurnOutcome};
 
 /// Largest text retained per item (a truncation marker follows when cut).
 pub const MAX_ITEM_TEXT: usize = 512 * 1024;
@@ -285,6 +285,8 @@ pub enum SessionSignal {
     Mode(String),
     /// Title metadata: `Some(None)` clears it, `None` leaves it unchanged.
     Title(Option<Option<String>>),
+    /// The slash commands the agent offers (full replacement).
+    Commands(Vec<Value>),
     /// Context window usage.
     Usage {
         /// Tokens in context.
@@ -311,6 +313,9 @@ pub fn session_signal(update: &Value) -> Option<SessionSignal> {
                 Some(_) => return None,
             };
             Some(SessionSignal::Title(title))
+        },
+        "available_commands_update" => {
+            Some(SessionSignal::Commands(available_commands(&update["availableCommands"])))
         },
         "usage_update" => Some(SessionSignal::Usage {
             used: update["used"].as_u64()?,
@@ -683,6 +688,39 @@ impl Transcript {
         vec![Change::Started(item)]
     }
 
+    /// A replayed message the user added to a running turn (Grok marks it
+    /// `_meta.interjection` and keeps the typed text as
+    /// `content._meta.displayText`): its own item of the replayed turn, like
+    /// a live supplement, never part of the prompt.
+    fn replayed_interjection(&mut self, update: &Value) -> Vec<Change> {
+        let content = &update["content"];
+        let text = match content["_meta"]["displayText"].as_str() {
+            Some(typed) => typed.to_string(),
+            None => {
+                let raw = content["text"].as_str().unwrap_or_default();
+                raw.split_once("<user_query>")
+                    .and_then(|(_, rest)| rest.split_once("</user_query>"))
+                    .map_or(raw, |(query, _)| query)
+                    .trim()
+                    .to_string()
+            },
+        };
+        if text.trim().is_empty() {
+            return Vec::new();
+        }
+        let index = self.target_turn(None, false);
+        let turn = &mut self.turns[index];
+        let ordinal = turn.next_ordinal();
+        let mut item = new_item(format!("{}:s{ordinal}", turn.id), ItemKind::UserMessage);
+        item.text = text;
+        item.text_full = clip(&mut item.text, MAX_ITEM_TEXT);
+        item.truncated = item.text_full;
+        self.bytes += weight(&item);
+        self.items += 1;
+        turn.items.push(item.clone());
+        vec![Change::Started(item)]
+    }
+
     /// Record how a live turn ended.
     pub fn end_turn(&mut self, id: &str, outcome: TurnOutcome) {
         if let Some(turn) = self.turns.iter_mut().rev().find(|turn| turn.id == id) {
@@ -729,6 +767,9 @@ impl Transcript {
             // user chunk would duplicate it.
             if kind == ItemKind::UserMessage && turn.is_some() {
                 return Vec::new();
+            }
+            if kind == ItemKind::UserMessage && update["_meta"]["interjection"] == true {
+                return self.replayed_interjection(update);
             }
             self.chunk(turn, kind, update)
         } else {

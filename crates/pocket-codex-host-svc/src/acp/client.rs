@@ -317,6 +317,20 @@ impl GatewayClient {
         .await
     }
 
+    /// `POST sessions/rename`, refused when the host is not `expected`.
+    pub async fn rename(
+        &self,
+        session: &str,
+        title: &str,
+        expected: Option<&Identity>,
+    ) -> Result<Value, ClientError> {
+        self.post(
+            "acp/v1/sessions/rename",
+            with_identity(json!({"sessionId": session, "title": title}), expected),
+        )
+        .await
+    }
+
     /// Close an idle session on the host that currently admits it. Requires
     /// a complete identity and does not stop or resume any external process.
     pub async fn release_session(
@@ -416,6 +430,14 @@ impl GatewayClient {
             ),
         )
         .await
+    }
+
+    /// `POST questions/answer`: answer a held agent question with
+    /// `{"q<i>": [labels]}` (or `{}` to skip it).
+    pub async fn answer_question(&self, handle: &str, answers: &Value) -> Result<(), ClientError> {
+        self.post("acp/v1/questions/answer", json!({"handle": handle, "answers": answers}))
+            .await
+            .map(|_| ())
     }
 
     /// `POST permissions/answer`.

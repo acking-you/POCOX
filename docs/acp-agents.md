@@ -214,6 +214,16 @@ it cannot leave a consumed request unresolved on a live generation.
   was reloaded since the request, the reloaded host history shows the input
   rather than a local copy. Cancelling and re-prompting is not steering and
   is never used for it.
+- Grok Build (from 1.0.45) supplements through its own `_x.ai/interject`
+  instead, sent only while Grok reports the turn running, and its answer
+  `{"status": "queued"}` is `injected`; turns Grok starts by itself are
+  opened and followed like prompt turns. See
+  [Grok Build › Grok's own extensions](grok-build.md#groks-own-extensions).
+- An agent's slash commands are its standard `available_commands_update`
+  (the latest list of any session, also in the host info and its
+  `host_state` events): the composer's `/` list offers them, and an agent
+  that lists `compact` gets Compact conversation, sent as the `/compact`
+  turn. Rename and Compact are offered only where the engine has them.
 - The queue sends a message only once the host admits it: it stays first
   in line, with its text and attachments, while it is being sent and after
   any failure, and the queue pauses. Only a failure before `turn/start` was
@@ -448,8 +458,8 @@ Agent marks are bundled vector glyphs (OpenAI and Claude from Simple Icons 15,
 CC0-1.0; OpenCode from its v1.18.35 favicon, MIT — full notices in
 `apps/flutter/lib/src/widgets/agent_icon.NOTICE.txt`). They are chosen by the
 host's engine (`codex`, `opencode`) or reported ACP profile id (`claude`),
-never by the instance name the user typed. Grok shows a plain "G" monogram
-(profile `grok`; no openly licensed mark exists). Any other agent shows a letter tile. A remote host's mark is
+never by the instance name the user typed. Grok shows Grok's mark (profile
+`grok`; from lobe-icons, MIT). Any other agent shows a letter tile. A remote host's mark is
 known once connected (its profile is part of the host info).
 
 ### Claude

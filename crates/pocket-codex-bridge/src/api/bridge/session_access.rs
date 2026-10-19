@@ -171,19 +171,26 @@ pub fn app_command_list_for_project(
     service_key: String,
     directory: Option<String>,
 ) -> Result<Vec<AgentCommandDto>> {
-    if session_engine::protocol_of(&service_key) != Protocol::OpenCode {
-        return Err(session_engine::unsupported(
-            session_engine::protocol_of(&service_key),
-            "commands",
-        ));
+    match session_engine::protocol_of(&service_key) {
+        Protocol::OpenCode => Ok(opencode::commands(&service_key, directory.as_deref())?
+            .into_iter()
+            .map(|c| AgentCommandDto {
+                name: c.name,
+                description: c.description,
+                source: c.source,
+                hints: c.hints,
+            })
+            .collect()),
+        // An ACP agent's commands are its own, the same in every project.
+        Protocol::Acp => Ok(acp::commands(&service_key)?
+            .into_iter()
+            .map(|c| AgentCommandDto {
+                name: c.name,
+                description: (!c.description.is_empty()).then_some(c.description),
+                source: "command".into(),
+                hints: c.hint.into_iter().collect(),
+            })
+            .collect()),
+        other => Err(session_engine::unsupported(other, "commands")),
     }
-    Ok(opencode::commands(&service_key, directory.as_deref())?
-        .into_iter()
-        .map(|c| AgentCommandDto {
-            name: c.name,
-            description: c.description,
-            source: c.source,
-            hints: c.hints,
-        })
-        .collect())
 }

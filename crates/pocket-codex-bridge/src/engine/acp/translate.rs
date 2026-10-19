@@ -504,17 +504,21 @@ pub fn turn_completed(thread: &str, turn: &str, outcome: Option<&Value>) -> AppE
     event("turn/completed", Some(thread), json!({"threadId": thread, "turn": turn_raw}))
 }
 
-fn turn_started(thread: &str, turn: &str) -> AppEvent {
+fn turn_started(thread: &str, turn: &str, agent_started: bool) -> AppEvent {
     event(
         "turn/started",
         Some(thread),
-        json!({"threadId": thread, "turnId": turn, "turn": {"id": turn, "status": "inProgress"}}),
+        json!({"threadId": thread, "turnId": turn, "turn": {"id": turn, "status": "inProgress"},
+               "agentStarted": agent_started}),
     )
 }
 
 /// The request event for a pending permission body.
 pub fn permission_event(body: &Value) -> AppEvent {
     let thread = str_of(body, "sessionId");
+    if let Some(questions) = body["questions"].as_array() {
+        return question_event(body, thread, questions);
+    }
     let title = body["toolCall"]["title"].as_str().unwrap_or("").to_string();
     let raw = json!({
         "threadId": thread,
@@ -533,6 +537,34 @@ pub fn permission_event(body: &Value) -> AppEvent {
         request_id: body["handle"].as_str().map(str::to_string),
         raw: raw.to_string(),
     }
+}
+
+/// A host-held agent question (Grok's `ask_user_question`), as the app's
+/// structured question request; answered through
+/// [`super::respond_question`] with `{"q<i>": [labels]}`.
+fn question_event(body: &Value, thread: &str, questions: &[Value]) -> AppEvent {
+    let questions: Vec<Value> = questions
+        .iter()
+        .enumerate()
+        .map(|(index, question)| {
+            json!({
+                "id": format!("q{index}"),
+                "header": "",
+                "question": question["question"],
+                "multiple": question["multiSelect"] == true,
+                "isOther": false,
+                "isSecret": false,
+                "options": question["options"],
+            })
+        })
+        .collect();
+    let mut out = event(
+        "item/tool/requestUserInput",
+        Some(thread),
+        json!({"threadId": thread, "turnId": body["turnId"], "questions": questions}),
+    );
+    out.request_id = body["handle"].as_str().map(str::to_string);
+    out
 }
 
 fn resolved(thread: &str, handle: &str) -> AppEvent {
@@ -567,8 +599,26 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
     match str_of(body, "type") {
         "turn_started" => {
             shared.running.insert(thread.clone(), turn.clone());
-            shared.live.apply(body);
-            vec![turn_started(&thread, &turn)]
+            let folded = shared.live.apply(body);
+            let agent_started = body["agentStarted"] == true;
+            let mut out = vec![turn_started(&thread, &turn, agent_started)];
+            // No controller sent a turn the agent started (Grok's own), so
+            // no view holds its message yet: it comes from the host, marked
+            // like the turn's start.
+            if agent_started {
+                out.extend(
+                    changes(&thread, &turn, folded)
+                        .into_iter()
+                        .map(|mut event| {
+                            if let Ok(mut raw) = serde_json::from_str::<Value>(&event.raw) {
+                                raw["agentStarted"] = Value::Bool(true);
+                                event.raw = raw.to_string();
+                            }
+                            event
+                        }),
+                );
+            }
+            out
         },
         "update" | "supplement" => {
             let folded = shared.live.apply(body);
@@ -609,6 +659,10 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
         "host_state" => {
             shared.info["phase"] = body["phase"].clone();
             shared.info["authRequired"] = body["authRequired"].clone();
+            // Older hosts send no commands: keep what their info said.
+            if let Some(commands) = body.get("commands") {
+                shared.info["commands"] = commands.clone();
+            }
             vec![event(
                 HOST_STATE,
                 None,
@@ -780,7 +834,8 @@ pub fn reconcile(shared: &mut Shared, snapshot: &Value) -> Plan {
 
 /// `turn/started` for a running turn a recovery found.
 pub fn started(thread: &str, turn: &str) -> AppEvent {
-    turn_started(thread, turn)
+    // Its message, if any, comes with the history the recovery reads.
+    turn_started(thread, turn, false)
 }
 
 #[cfg(test)]

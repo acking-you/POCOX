@@ -634,6 +634,81 @@ fn steering_is_offered_only_when_negotiated() {
     assert!(!capabilities_of(&json!({}), 1).steer, "unnegotiated");
 }
 
+/// The agent's own commands enable the palette (and `/compact` the menu
+/// item), and Grok's extensions renaming and multi-answer questions, only
+/// once ready; later lists arrive with the host state.
+#[test]
+fn commands_and_grok_extensions_follow_the_ready_agent() {
+    let info = |phase: &str, caps: Value, commands: Value| json!({"phase": {"state": phase}, "capabilities": caps, "commands": commands});
+    let compact = json!([{"name": "compact", "description": "Compress"}]);
+    let caps = capabilities_of(&info("ready", json!({"grok": true}), compact.clone()), 1);
+    assert!(caps.commands && caps.compact && caps.rename && caps.question_multiple);
+    let plain = capabilities_of(&info("ready", json!({}), json!([{"name": "review"}])), 1);
+    assert!(plain.commands && !plain.compact && !plain.rename && !plain.question_multiple);
+    let starting = capabilities_of(&info("starting", json!({"grok": true}), compact), 1);
+    assert!(!starting.commands && !starting.rename);
+
+    let mut shared = Shared {
+        info: info("ready", json!({}), json!([])),
+        ..Shared::default()
+    };
+    translate::gateway_event(
+        &mut shared,
+        &json!({"type": "host_state", "phase": {"state": "ready"},
+        "authRequired": false, "commands": [{"name": "compact", "description": ""}]}),
+    );
+    assert!(capabilities_of(&shared.info, 1).compact, "a later list replaces the first");
+}
+
+/// A turn the agent started brings its message (no view sent it); a prompt
+/// turn's message stays the sending view's own copy.
+#[test]
+fn only_an_agent_started_turn_brings_its_message() {
+    let kinds = |agent_started: bool| {
+        let mut shared = Shared::default();
+        translate::gateway_event(
+            &mut shared,
+            &json!({"type": "turn_started", "sessionId": "s", "turnId": "t", "userText": "late",
+                "imageCount": 0, "agentStarted": agent_started}),
+        )
+        .into_iter()
+        .map(|event| {
+            let marked = serde_json::from_str::<Value>(&event.raw)
+                .is_ok_and(|raw| raw["agentStarted"] == true);
+            (event.kind, event.item_type, event.text, marked)
+        })
+        .collect::<Vec<_>>()
+    };
+    let started = kinds(true);
+    assert_eq!(started[0].0, "turn/started");
+    assert!(started.iter().all(|(.., marked)| *marked), "marked as the agent's");
+    assert!(started
+        .iter()
+        .any(|(kind, item, text, _)| kind == "item/completed"
+            && item.as_deref() == Some("userMessage")
+            && text.as_deref() == Some("late")));
+    assert_eq!(kinds(false).len(), 1, "a prompt turn's start alone");
+}
+
+/// A host-held question becomes the app's structured question request,
+/// numbered in order and keeping each question's own options.
+#[test]
+fn a_held_question_is_a_structured_question_request() {
+    let event = translate::permission_event(&json!({
+        "type": "permission", "handle": "h1", "sessionId": "s", "turnId": "t",
+        "toolCall": {"title": "Question"}, "options": [],
+        "questions": [{"question": "Pick one", "multiSelect": true,
+            "options": [{"label": "A", "description": "first"}]}],
+    }));
+    assert_eq!(event.kind, "item/tool/requestUserInput");
+    assert_eq!(event.request_id.as_deref(), Some("h1"));
+    let raw: Value = serde_json::from_str(&event.raw).expect("raw");
+    assert_eq!(raw["questions"][0]["id"], "q0");
+    assert_eq!(raw["questions"][0]["question"], "Pick one");
+    assert_eq!(raw["questions"][0]["multiple"], true);
+    assert_eq!(raw["questions"][0]["options"][0]["label"], "A");
+}
+
 /// A supplement names the caller's turn (else the running one this view
 /// shows) and identity, and its outcome maps exactly; anything else is an
 /// error, never a prompt.

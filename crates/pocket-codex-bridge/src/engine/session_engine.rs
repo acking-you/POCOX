@@ -693,6 +693,22 @@ impl SessionEngine for AcpEngine {
         acp::turn_supplement(service_key, thread_id, turn_id, text, images)
     }
 
+    fn set_thread_name(&self, service_key: &str, thread_id: &str, name: &str) -> Result<()> {
+        acp::rename(service_key, thread_id, name)
+    }
+
+    /// The agent's own `/compact`, as a turn of its own; offered only when
+    /// the agent lists that command ([`acp::capabilities_of`]).
+    fn compact(&self, service_key: &str, thread_id: &str) -> Result<()> {
+        if !acp::commands(service_key)?
+            .iter()
+            .any(|command| command.name == "compact")
+        {
+            return Err(unsupported(self.protocol(), "manual compaction"));
+        }
+        acp::turn_start(service_key, thread_id, "/compact", &[])
+    }
+
     fn turn_interrupt(
         &self,
         service_key: &str,
@@ -704,6 +720,15 @@ impl SessionEngine for AcpEngine {
 
     fn respond_approval(&self, service_key: &str, request_id: &str, decision: &str) -> Result<()> {
         acp::respond_permission(service_key, request_id, decision)
+    }
+
+    fn respond_user_input(
+        &self,
+        service_key: &str,
+        request_id: &str,
+        answers_json: &str,
+    ) -> Result<()> {
+        acp::respond_question(service_key, request_id, answers_json)
     }
 
     fn running_threads(&self, service_key: &str) -> Result<Vec<String>> {

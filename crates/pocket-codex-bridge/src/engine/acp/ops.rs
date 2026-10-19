@@ -466,6 +466,14 @@ pub fn respond_permission(service_key: &str, handle: &str, option_id: &str) -> R
     block(client.answer(handle, option_id))
 }
 
+/// Answer an agent question held by the host: `answers_json` is
+/// `{"q<i>": [labels]}` for every question, or `{}` to skip them.
+pub fn respond_question(service_key: &str, handle: &str, answers_json: &str) -> Result<()> {
+    let answers: Value = serde_json::from_str(answers_json)?;
+    let client = conn(service_key)?.client;
+    block(client.answer_question(handle, &answers))
+}
+
 /// The latest session state (configuration options, modes, usage, title)
 /// this controller has seen for `thread_id`.
 pub fn session_settings(service_key: &str, thread_id: &str) -> Option<Value> {
@@ -503,6 +511,14 @@ pub fn set_session_config(
         link.client
             .set_config(thread_id, config_id, value, Some(&identity)),
     )?;
+    store_settings(&link, &identity, thread_id, body)
+}
+
+/// Rename a session through the agent (Grok's own rename).
+pub fn rename(service_key: &str, thread_id: &str, title: &str) -> Result<()> {
+    let link = conn(service_key)?;
+    let identity = link.identity();
+    let body = block(link.client.rename(thread_id, title, Some(&identity)))?;
     store_settings(&link, &identity, thread_id, body)
 }
 

@@ -234,7 +234,7 @@ extension _SessionTitle on _AppSessionState {
               // one frequently-used control that moved (or vanished) with the
               // sidebar.
               const ThemeToggle(),
-              if (_threadId != null)
+              if (_threadId != null && _moreActions)
                 PopupMenuButton<String>(
                   tooltip: l10n.moreActions,
                   icon: Icon(
@@ -259,11 +259,16 @@ extension _SessionTitle on _AppSessionState {
                         value: 'session-release',
                         child: Text(l10n.sessionHandBack),
                       ),
-                    PopupMenuItem(
-                      value: 'rename',
-                      child: Text(l10n.renameConversation),
-                    ),
-                    PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
+                    if (_caps.rename)
+                      PopupMenuItem(
+                        value: 'rename',
+                        child: Text(l10n.renameConversation),
+                      ),
+                    if (_canCompact)
+                      PopupMenuItem(
+                        value: 'compact',
+                        child: Text(l10n.compact),
+                      ),
                   ],
                 ),
               if (isFramelessDesktop && !isMac) ...[

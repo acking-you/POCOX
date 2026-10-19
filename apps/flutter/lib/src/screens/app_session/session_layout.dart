@@ -245,7 +245,7 @@ extension _SessionLayout on _AppSessionState {
           // Same place as on desktop. It has to be here rather than in the
           // sessions pane, which on a phone lies under the conversation.
           const ThemeToggle(),
-          if (_threadId != null)
+          if (_threadId != null && (_canReleaseSession || _canCompact))
             PopupMenuButton<String>(
               tooltip: l10n.moreActions,
               onSelected: (v) {
@@ -259,7 +259,8 @@ extension _SessionLayout on _AppSessionState {
                     value: 'session-release',
                     child: Text(l10n.sessionHandBack),
                   ),
-                PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
+                if (_canCompact)
+                  PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
               ],
             ),
           const SizedBox(width: 4),

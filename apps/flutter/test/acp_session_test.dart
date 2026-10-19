@@ -287,6 +287,12 @@ void main() {
     expect(mixed.title, 'Edit a.txt');
     expect(mixed.detail, startsWith('/w/a.txt\n{'));
     expect(mixed.detail, contains('"path": "/w/a.txt"'));
+    // Text content is shown (Grok's plan to approve); other blocks are not.
+    final plan = parse(
+      '{"title":"Plan","content":[{"type":"content","content":'
+      '{"type":"text","text":"1. do it"}},{"type":"diff","path":"/w"},7]}',
+    );
+    expect(plan.detail, '1. do it');
     // Malformed option lists or entries are left out, never repaired.
     for (final options in ['7', '{"optionId":"x"}', 'null']) {
       expect(parse('{}', options: options).options, isEmpty, reason: options);
@@ -507,6 +513,39 @@ void main() {
     );
     await frames(t);
     expect(find.byKey(const Key('stop-btn')), findsNothing);
+    await t.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('a turn the agent started shows its own message and can be '
+      'stopped', (t) async {
+    final api = AcpApi()..acpCapabilities[acp] = negotiated;
+    await open(t, api, acp, thread: 'ses-1');
+    const user =
+        '{"threadId":"ses-1","turnId":"F","itemId":"F:u",'
+        '"item":{"id":"F:u","type":"userMessage"},"agentStarted":true}';
+    for (final event in [
+      const AppEvent(
+        kind: 'turn/started',
+        threadId: 'ses-1',
+        raw:
+            '{"threadId":"ses-1","turnId":"F","turn":{"id":"F"},'
+            '"agentStarted":true}',
+      ),
+      const AppEvent(
+        kind: 'item/completed',
+        threadId: 'ses-1',
+        itemId: 'F:u',
+        itemType: 'userMessage',
+        text: 'a late steer',
+        raw: user,
+      ),
+    ]) {
+      api.pushEvent(acp, event);
+    }
+    await frames(t);
+    expect(find.text('a late steer', findRichText: true), findsOneWidget);
+    await t.tap(find.byKey(const Key('stop-btn')));
+    await frames(t);
+    expect(api.lastInterruptTurnId, 'F');
     await t.pumpWidget(const SizedBox.shrink());
   });
   _registerAttachments();

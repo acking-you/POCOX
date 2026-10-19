@@ -1524,8 +1524,8 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     on (editor and remote add). See `docs/opencode-native.md#versions`.
 
 43. **Grok Build (2026-10-20).** `grok agent --no-leader stdio` is a built-in
-    ACP preset (profile `grok`, a plain "G" monogram since no openly
-    licensed mark exists), located on the child PATH then `~/.grok/bin`.
+    ACP preset (profile `grok`, Grok's mark from lobe-icons, MIT),
+    located on the child PATH then `~/.grok/bin`.
     Model services: existing configuration; Grok account (the user's Grok
     home with API-key and endpoint variables removed, never blanked; device
     sign-in, status and sign-out in place through a private, short-lived
@@ -1540,8 +1540,21 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     `active_sessions.json` are owners (turn unknown: access reason
     `external_open`); `grok agent stdio` registers nowhere, so an editor's
     ACP Grok must be closed by the user. A POCOX Grok host is its session's
-    own writer and re-verifies before each prompt. See
-    [Grok Build](docs/grok-build.md).
+    own writer and re-verifies before each prompt. From Grok 1.0.45
+    (`_meta.grokShell` + `agentVersion`) the host uses Grok's own
+    extensions (`acp/host/grok.rs`): prompts carry `_meta.promptId`, Grok's
+    `_x.ai/queue/changed` and `turn_completed` name running and ended
+    turns, and a turn Grok starts by itself (stranded interjection, loop,
+    schedule, goal) is opened and followed like a prompt turn. Supplements
+    are `_x.ai/interject`, sent only while Grok reports the turn running;
+    as in Grok's own client a stop discards an unmerged one and a turn
+    ending first runs it as Grok's own turn; it is never retried.
+    `_x.ai/queue/interject` (send now) is not steering. Rename, context use,
+    questions (`ask_user_question`, the question card) and plan approval
+    (`exit_plan_mode`) map to POCOX's controls; any ACP agent's
+    `available_commands_update` feeds the `/` list and `/compact`. The
+    leader socket (joining a terminal client's live session) is not used:
+    the host owns its agent process. See [Grok Build](docs/grok-build.md).
 
 ## 10. Communication conventions
 

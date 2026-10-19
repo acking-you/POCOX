@@ -414,3 +414,26 @@ fn a_supplement_joins_its_live_turn_with_a_fresh_id() {
     // Another (or an evicted) turn is left alone.
     assert!(transcript.supplement("gone", "x", 0).is_empty());
 }
+
+/// A replayed interjection (Grok's `_meta.interjection`) is its own item of
+/// the replayed turn, with the text the user typed, never part of the
+/// prompt it followed.
+#[test]
+fn a_replayed_interjection_is_its_own_message_of_the_turn() {
+    let mut transcript = Transcript::default();
+    transcript.apply(None, &chunk("user_message_chunk", "run the tests"));
+    transcript.apply(
+        None,
+        &json!({"sessionUpdate": "user_message_chunk",
+        "content": {"type": "text", "text": "The user sent a message while you were working:\n\
+            <user_query>\nalso lint\n</user_query>\nIf the user is asking …",
+            "_meta": {"displayText": "also lint"}},
+        "_meta": {"interjection": true}}),
+    );
+    transcript.apply(None, &chunk("agent_message_chunk", "done"));
+    let turn = transcript.turns.back().expect("turn");
+    assert_eq!(transcript.turns.len(), 1, "one replayed turn");
+    let texts: Vec<&str> = turn.items.iter().map(|item| item.text.as_str()).collect();
+    assert_eq!(texts, ["run the tests", "also lint", "done"]);
+    assert!(turn.items[1].id.contains(":s"), "numbered like a supplement");
+}

@@ -109,6 +109,15 @@ class AgentPermissionRequest {
     for (final location in _list(tool['locations'])) {
       if (location case {'path': final String path}) lines.add(path);
     }
+    // Text the agent put in the request (Grok's plan to approve).
+    for (final block in _list(tool['content'])) {
+      if (block case {
+        'type': 'content',
+        'content': {'type': 'text', 'text': final String text},
+      } when text.isNotEmpty) {
+        lines.add(text);
+      }
+    }
     final input = tool['rawInput'];
     if (input is Map && input.isNotEmpty) {
       lines.add(const JsonEncoder.withIndent('  ').convert(input));

@@ -12,15 +12,41 @@ impl AgentHost {
         if state.generation != generation {
             return;
         }
+        let signal = session_signal(update);
+        if let Some(SessionSignal::Commands(commands)) = &signal {
+            // The agent's commands, even for a session not admitted here
+            // yet: a new session's list can arrive before its answer.
+            if let Some(negotiated) = state.negotiated.as_mut() {
+                if negotiated.commands != *commands {
+                    negotiated.commands.clone_from(commands);
+                    state.host_event();
+                }
+            }
+        }
+        let grok = state
+            .negotiated
+            .as_ref()
+            .is_some_and(|negotiated| negotiated.capabilities.grok);
         let Some(entry) = state.sessions.get_mut(&session) else { return };
+        if grok {
+            // Grok names the context in use on every update; the session
+            // state carries it when the turn ends.
+            // A replay arrives before the reopen's answer names the window,
+            // which `State::confirm` then fills in.
+            if let Some(used) = params["_meta"]["totalTokens"].as_u64() {
+                let size = entry.settings.context_window().unwrap_or_default();
+                entry.usage = Some((used, size));
+            }
+        }
         let (pending, replaying) = (entry.pending, entry.replaying);
         let turn = if pending { None } else { entry.active.as_ref().map(|t| t.id.clone()) };
-        if let Some(signal) = session_signal(update) {
+        if let Some(signal) = signal {
             match signal {
                 SessionSignal::ConfigOptions(options) => {
                     entry.settings.config_options = options;
                 },
                 SessionSignal::Mode(mode) => entry.settings.set_current_mode(&mode),
+                SessionSignal::Commands(commands) => entry.settings.commands = commands,
                 SessionSignal::Title(Some(title)) => {
                     entry.title.clone_from(&title);
                     entry.title_reported = true;
@@ -83,14 +109,32 @@ impl AgentHost {
             );
             return;
         };
+        self.admit_request(generation, peer, id, Permission {
+            session,
+            turn: String::new(),
+            acp_id: RequestId::Number(0),
+            options,
+            tool_call,
+            kind: RequestKind::Permission,
+        });
+    }
+
+    /// Hold `request` (of the agent's request `id`) for the turn it arrived
+    /// during; outside a live turn, or past the bound, it is answered
+    /// withdrawn at once.
+    pub(super) fn admit_request(
+        &self,
+        generation: u64,
+        peer: &Peer,
+        id: RequestId,
+        request: Permission,
+    ) {
+        let session = request.session.clone();
+        let refused = request.withdrawn();
         let mut state = self.state();
         if state.generation != generation {
             drop(state);
-            peer.respond_now_until(
-                id,
-                Ok(cancelled_outcome()),
-                Instant::now() + self.budgets().control,
-            );
+            peer.respond_now_until(id, Ok(refused), Instant::now() + self.budgets().control);
             return;
         }
         let known = state
@@ -106,29 +150,19 @@ impl AgentHost {
             drop(state);
             // Outside a live turn, or after cancellation: the spec requires
             // `cancelled` for a cancelled turn.
-            peer.respond_now_until(
-                id,
-                Ok(cancelled_outcome()),
-                Instant::now() + self.budgets().control,
-            );
+            peer.respond_now_until(id, Ok(refused), Instant::now() + self.budgets().control);
             return;
         };
         if state.permissions.len() >= MAX_PERMISSIONS {
             drop(state);
-            peer.respond_now_until(
-                id,
-                Ok(cancelled_outcome()),
-                Instant::now() + self.budgets().control,
-            );
+            peer.respond_now_until(id, Ok(refused), Instant::now() + self.budgets().control);
             return;
         }
         let handle = uuid::Uuid::new_v4().to_string();
         let permission = Permission {
-            session,
             turn: turn.id,
             acp_id: id,
-            options,
-            tool_call,
+            ..request
         };
         let body = State::permission_body(&handle, &permission);
         state.permissions.insert(handle, permission);
@@ -154,10 +188,16 @@ impl AgentInbound {
 
 impl Inbound for AgentInbound {
     fn notification(&self, _peer: &Peer, method: &str, params: Option<Value>) {
-        if method == "session/update" {
-            if let Some(host) = self.host() {
-                host.on_update(self.generation, params);
-            }
+        let Some(host) = self.host() else { return };
+        match method {
+            "session/update" => host.on_update(self.generation, params),
+            super::grok::QUEUE_CHANGED if host.negotiated_grok() => {
+                host.on_grok_queue(self.generation, params);
+            },
+            super::grok::SESSION_NOTIFICATION if host.negotiated_grok() => {
+                host.on_grok_notification(self.generation, params);
+            },
+            _ => {},
         }
     }
 
@@ -165,6 +205,11 @@ impl Inbound for AgentInbound {
         match (method, self.host()) {
             ("session/request_permission", Some(host)) => {
                 host.on_permission(self.generation, peer, id, params);
+            },
+            (super::grok::PLAN_APPROVAL | super::grok::QUESTION, Some(host))
+                if host.negotiated_grok() =>
+            {
+                host.on_grok_request(self.generation, peer, id, method, params);
             },
             // File system, terminal and elicitation methods are not
             // advertised and not implemented; nothing is read or run.

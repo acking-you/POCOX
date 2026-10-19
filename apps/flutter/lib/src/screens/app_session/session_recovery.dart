@@ -438,9 +438,18 @@ extension _SessionRecovery on _AppSessionState {
     });
   }
 
+  /// Whether the more-actions menu offers compaction: only where the engine
+  /// has it (an ACP agent's own `/compact` runs as a turn, so not while one
+  /// runs), so the item never does nothing.
+  bool get _canCompact =>
+      _caps.compact && !_guardianReadOnly && !(_caps.isAcp && _streaming);
+
+  /// Whether the desktop more-actions menu has any item.
+  bool get _moreActions => _canReleaseSession || _caps.rename || _canCompact;
+
   /// Manually compact the conversation after a confirm.
   Future<void> _compact() async {
-    if (_guardianReadOnly || !_caps.compact) return;
+    if (!_canCompact) return;
     final tid = _threadId;
     if (tid == null) return;
     final l10n = AppLocalizations.of(context);

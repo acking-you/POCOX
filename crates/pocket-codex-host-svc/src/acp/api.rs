@@ -119,7 +119,9 @@ pub fn router(host: AgentHost) -> Router {
         .route("/acp/v1/sessions/cancel", post(cancel))
         .route("/acp/v1/sessions/config", post(set_config))
         .route("/acp/v1/sessions/mode", post(set_mode))
+        .route("/acp/v1/sessions/rename", post(rename))
         .route("/acp/v1/permissions/answer", post(answer))
+        .route("/acp/v1/questions/answer", post(answer_question))
         .with_state(state)
 }
 
@@ -407,9 +409,46 @@ async fn set_mode(State(state): State<ApiState>, Json(body): Json<ModeBody>) -> 
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct RenameBody {
+    session_id: String,
+    title: String,
+    #[serde(flatten)]
+    identity: Identity,
+}
+
+async fn rename(State(state): State<ApiState>, Json(body): Json<RenameBody>) -> ApiResult {
+    state
+        .host
+        .rename(&body.session_id, &body.title, expected(&body.identity))
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AnswerBody {
     handle: String,
     option_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QuestionBody {
+    handle: String,
+    answers: Value,
+}
+
+async fn answer_question(
+    State(state): State<ApiState>,
+    Json(body): Json<QuestionBody>,
+) -> ApiResult {
+    state
+        .host
+        .answer_question(&body.handle, &body.answers)
+        .await
+        .map(|()| Json(json!({})))
+        .map_err(ApiError)
 }
 
 async fn answer(State(state): State<ApiState>, Json(body): Json<AnswerBody>) -> ApiResult {

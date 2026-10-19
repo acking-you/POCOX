@@ -1,5 +1,6 @@
 //! Supplements: user input added to the running turn through the
-//! `_session/steering` extension, when the agent advertised it.
+//! `_session/steering` extension, when the agent advertised it, or Grok's
+//! own `_x.ai/interject` (see `grok.rs` for what Grok does with it).
 //!
 //! The request opts into the `promptRequired` idle behaviour, so an idle
 //! agent answers that it consumed nothing instead of starting a turn by
@@ -12,6 +13,7 @@
 //! a prompt.
 
 use super::{
+    grok,
     schema::{steering_params, SteerOutcome, STEERING_METHOD},
     turns::{check_message, content_blocks},
     *,
@@ -61,8 +63,23 @@ impl AgentHost {
             // It ended while this waited for the lane.
             return Ok((SteerOutcome::PromptRequired, None));
         }
+        // Grok takes an interjection only for the turn it reports running:
+        // one it has finished (or not started) would run it as a turn of
+        // its own instead (see `grok.rs`).
+        if caps.grok && !self.grok_runs(generation, session, &turn) {
+            return Ok((SteerOutcome::PromptRequired, None));
+        }
+        let (method, params) = if caps.grok {
+            (
+                grok::INTERJECT,
+                json!({"sessionId": session, "text": text, "content": blocks,
+                       "interjectionId": uuid::Uuid::new_v4().to_string()}),
+            )
+        } else {
+            (STEERING_METHOD, steering_params(session, blocks))
+        };
         let call = peer
-            .send_request(STEERING_METHOD, steering_params(session, blocks), Some(deadline))
+            .send_request(method, params, Some(deadline))
             .await
             .map_err(|error| self.call_error(generation, error))?;
         drop(lane);
@@ -70,7 +87,12 @@ impl AgentHost {
             .wait(Some(self.budgets().answer))
             .await
             .map_err(|error| self.call_error(generation, error))?;
-        let outcome = SteerOutcome::from_result(&answer).ok_or_else(|| {
+        let outcome = if caps.grok {
+            grok::interject_accepted(&answer).then_some(SteerOutcome::Injected)
+        } else {
+            SteerOutcome::from_result(&answer)
+        }
+        .ok_or_else(|| {
             HostError::Agent(
                 "it answered in an unrecognized way, so the message may or may not have been added"
                     .into(),

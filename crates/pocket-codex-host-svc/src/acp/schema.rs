@@ -57,6 +57,36 @@ pub struct AgentCapabilities {
     /// HTTP MCP servers in `mcpServers` — `mcpCapabilities.http`.
     #[serde(default)]
     pub mcp_http: bool,
+    /// Grok Build's own extensions — `InitializeResponse._meta.grokShell`
+    /// from [`GROK_NATIVE_FROM`] on (`_meta.agentVersion`): prompts carry a
+    /// `_meta.promptId` the queue and turn events report back, turns Grok
+    /// starts by itself are announced, `_x.ai/interject` adds to a running
+    /// turn and `_x.ai/session/rename` renames. See `docs/grok-build.md`.
+    #[serde(default)]
+    pub grok: bool,
+}
+
+/// The first Grok Build version whose extensions this client relies on:
+/// the reference source in `deps/grok-build` (1.0.4 sends neither prompt
+/// ids nor queue events).
+pub const GROK_NATIVE_FROM: (u64, u64, u64) = (1, 0, 45);
+
+/// Whether `initialize._meta` describes a Grok Build agent from
+/// [`GROK_NATIVE_FROM`] on.
+fn grok_native(meta: &Value) -> bool {
+    if meta["grokShell"] != true {
+        return false;
+    }
+    let Some(version) = meta["agentVersion"].as_str() else { return false };
+    let mut parts = version
+        .split(|c: char| !c.is_ascii_digit())
+        .map(|part| part.parse::<u64>().ok());
+    match (parts.next(), parts.next(), parts.next()) {
+        (Some(Some(major)), Some(Some(minor)), Some(Some(patch))) => {
+            (major, minor, patch) >= GROK_NATIVE_FROM
+        },
+        _ => false,
+    }
 }
 
 /// The `_session/steering` extension request.
@@ -140,6 +170,12 @@ pub struct Negotiated {
     pub agent: AgentInfo,
     /// Advertised authentication methods.
     pub auth_methods: Vec<AuthMethod>,
+    /// The agent's slash commands: the latest `available_commands_update`
+    /// of any session, seeded from Grok's `initialize._meta.availableCommands`
+    /// (commands are the agent's, so a new session or draft offers them
+    /// before its own update arrives).
+    #[serde(default)]
+    pub commands: Vec<Value>,
 }
 
 /// Why `initialize` could not be accepted.
@@ -183,8 +219,10 @@ pub fn negotiate(result: &Value) -> Result<Negotiated, NegotiationError> {
         image: prompt["image"] == true,
         audio: prompt["audio"] == true,
         embedded_context: prompt["embeddedContext"] == true,
-        steering: result["_meta"]["steering"]["supported"] == true,
+        // Grok's interjection is its steering (see `host/grok.rs`).
+        steering: result["_meta"]["steering"]["supported"] == true || grok_native(&result["_meta"]),
         mcp_http: agent["mcpCapabilities"]["http"] == true,
+        grok: grok_native(&result["_meta"]),
     };
     let info = &result["agentInfo"];
     let auth_methods = result["authMethods"]
@@ -208,6 +246,7 @@ pub fn negotiate(result: &Value) -> Result<Negotiated, NegotiationError> {
             version: short(&info["version"], 128),
         },
         auth_methods,
+        commands: available_commands(&result["_meta"]["availableCommands"]),
     })
 }
 
@@ -266,6 +305,41 @@ pub struct SessionSettings {
     pub config_options: Vec<Value>,
     /// Legacy mode state (`availableModes` / `currentModeId`), verbatim.
     pub modes: Option<Value>,
+    /// The slash commands of the last `available_commands_update`, as
+    /// [`available_commands`] keeps them.
+    #[serde(default)]
+    pub commands: Vec<Value>,
+    /// Context window per model id, where the setup answer's model list
+    /// names one (Grok's `models.availableModels[]._meta.totalContextTokens`).
+    #[serde(default)]
+    pub context_windows: Vec<(String, u64)>,
+}
+
+/// The well-formed entries of an `availableCommands` list, without their
+/// `_meta`: `{name, description, input?: {hint}}`, bounded.
+pub fn available_commands(raw: &Value) -> Vec<Value> {
+    raw.as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|command| {
+            let name = command["name"].as_str()?;
+            if name.is_empty() || name.len() > 64 || name.chars().any(char::is_whitespace) {
+                return None;
+            }
+            let description: String = command["description"]
+                .as_str()
+                .unwrap_or_default()
+                .chars()
+                .take(512)
+                .collect();
+            let mut entry = json!({"name": name, "description": description});
+            if let Some(hint) = command["input"]["hint"].as_str() {
+                entry["input"] = json!({"hint": hint.chars().take(256).collect::<String>()});
+            }
+            Some(entry)
+        })
+        .take(128)
+        .collect()
 }
 
 /// Keep only well-formed select options.
@@ -294,10 +368,38 @@ impl SessionSettings {
                 modes["availableModes"].is_array() && modes["currentModeId"].is_string()
             })
             .cloned();
+        let context_windows = result["models"]["availableModels"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|model| {
+                Some((
+                    model["modelId"].as_str()?.chars().take(256).collect(),
+                    model["_meta"]["totalContextTokens"].as_u64()?,
+                ))
+            })
+            .take(64)
+            .collect();
         Self {
             config_options: select_options(&result["configOptions"]),
             modes,
+            commands: Vec::new(),
+            context_windows,
         }
+    }
+
+    /// The context window of the model the `model` option selects, when the
+    /// setup answer named it.
+    pub fn context_window(&self) -> Option<u64> {
+        let current = self
+            .config_options
+            .iter()
+            .find(|option| option["category"] == "model")?["currentValue"]
+            .as_str()?;
+        self.context_windows
+            .iter()
+            .find(|(model, _)| model == current)
+            .map(|(_, size)| *size)
     }
 
     /// Whether `value` is one of the advertised values of select `config`.

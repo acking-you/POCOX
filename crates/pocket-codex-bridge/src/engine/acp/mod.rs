@@ -313,6 +313,45 @@ pub fn capabilities(service_key: &str) -> Capabilities {
     capabilities_of(&shared.info, shared.generation)
 }
 
+/// One slash command the agent offers: name, description and input hint.
+pub struct AgentCommand {
+    /// Exact name without the slash.
+    pub name: String,
+    /// What it does.
+    pub description: String,
+    /// What it takes after the name, when anything.
+    pub hint: Option<String>,
+}
+
+/// The agent's slash commands, as its host last reported them (empty until
+/// it is connected and ready).
+pub fn commands(service_key: &str) -> Result<Vec<AgentCommand>> {
+    let link = conn(service_key)?;
+    let shared = lock(&link.shared);
+    Ok(commands_of(&shared.info))
+}
+
+fn commands_of(info: &Value) -> Vec<AgentCommand> {
+    if info["phase"]["state"] != "ready" {
+        return Vec::new();
+    }
+    info["commands"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|command| {
+            Some(AgentCommand {
+                name: command["name"].as_str()?.to_string(),
+                description: command["description"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                hint: command["input"]["hint"].as_str().map(str::to_string),
+            })
+        })
+        .collect()
+}
+
 /// Capabilities from a host info body.
 pub fn capabilities_of(info: &Value, generation: u64) -> Capabilities {
     let mut caps = Capabilities::acp_unnegotiated();
@@ -332,6 +371,10 @@ pub fn capabilities_of(info: &Value, generation: u64) -> Capabilities {
         // Only an agent that advertised the steering extension can add to a
         // running turn; others queue the input for the next turn.
         caps.steer = negotiated["steering"] == true;
+        // Grok renames its own sessions (`_x.ai/session/rename`).
+        caps.rename = negotiated["grok"] == true;
+        // Grok's questions may each take several answers.
+        caps.question_multiple = negotiated["grok"] == true;
         caps.session_config = true;
         caps.session_reopen = if negotiated["loadSession"] == true {
             "load"
@@ -343,6 +386,10 @@ pub fn capabilities_of(info: &Value, generation: u64) -> Capabilities {
         .to_string();
         caps.session_list =
             if negotiated["listSessions"] == true { "agent" } else { "host" }.to_string();
+        let commands = commands_of(info);
+        caps.commands = !commands.is_empty();
+        // Compaction is the agent's own `/compact`, sent as a turn.
+        caps.compact = commands.iter().any(|command| command.name == "compact");
     }
     caps
 }

@@ -384,7 +384,7 @@ async fn steering_host(mode: &str) -> (AgentHost, String, tempfile::TempDir) {
 }
 
 /// Every retained event body.
-fn bodies(host: &AgentHost) -> Vec<Value> {
+pub(super) fn bodies(host: &AgentHost) -> Vec<Value> {
     host.state()
         .log
         .since(0)
@@ -394,7 +394,7 @@ fn bodies(host: &AgentHost) -> Vec<Value> {
         .collect()
 }
 
-async fn dispatched_turn(host: &AgentHost, session: &str, script: &str) -> String {
+pub(super) async fn dispatched_turn(host: &AgentHost, session: &str, script: &str) -> String {
     let turn = host.prompt(session, script, &[], None).await.expect("turn");
     eventually(
         || {

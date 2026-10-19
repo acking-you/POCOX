@@ -114,6 +114,7 @@ impl AgentHost {
         let deadline = Instant::now() + self.budgets().dispatch;
         let host = self.clone();
         let (session_id, turn_id) = (session.to_string(), turn.clone());
+        let grok = caps.grok;
         tokio::spawn(async move {
             let call = {
                 let Ok(_lane) = tokio::time::timeout_at(deadline, host.inner.dispatch.lock()).await
@@ -144,12 +145,13 @@ impl AgentHost {
                     host.finish_turn(generation, &session_id, &turn_id, TurnOutcome::Cancelled);
                     return;
                 }
-                peer.send_request(
-                    "session/prompt",
-                    json!({"sessionId": session_id, "prompt": blocks}),
-                    Some(deadline),
-                )
-                .await
+                let mut params = json!({"sessionId": session_id, "prompt": blocks});
+                if grok {
+                    // Grok's queue and turn events then name this turn.
+                    params["_meta"] = json!({"promptId": turn_id});
+                }
+                peer.send_request("session/prompt", params, Some(deadline))
+                    .await
             };
             // Only a prompt the agent received in full waits for its answer
             // without limit.
@@ -210,7 +212,13 @@ impl AgentHost {
         true
     }
 
-    fn finish_turn(&self, generation: u64, session: &str, turn: &str, outcome: TurnOutcome) {
+    pub(super) fn finish_turn(
+        &self,
+        generation: u64,
+        session: &str,
+        turn: &str,
+        outcome: TurnOutcome,
+    ) {
         let (leftovers, peer) = {
             let mut state = self.state();
             if state.generation != generation {
@@ -226,9 +234,10 @@ impl AgentHost {
         };
         if let Some(peer) = peer {
             for permission in leftovers {
+                let answer = permission.withdrawn();
                 peer.respond_now_until(
                     permission.acp_id,
-                    Ok(cancelled_outcome()),
+                    Ok(answer),
                     Instant::now() + self.budgets().control,
                 );
             }
@@ -322,7 +331,7 @@ impl AgentHost {
         };
         for permission in withdrawn {
             let delivered = peer
-                .respond(permission.acp_id, Ok(cancelled_outcome()), deadline)
+                .respond(permission.acp_id.clone(), Ok(permission.withdrawn()), deadline)
                 .await;
             self.control_outcome(generation, &peer, delivered)?;
         }
@@ -383,16 +392,101 @@ impl AgentHost {
                 .ok_or(HostError::AlreadyResolved)?;
             (permission, peer, generation)
         };
+        let answer = match permission.kind {
+            RequestKind::PlanApproval => json!({"outcome": option_id}),
+            _ => json!({"outcome": {"outcome": "selected", "optionId": option_id}}),
+        };
+        self.deliver_answer(generation, &peer, permission, answer, deadline)
+            .await
+    }
+
+    /// Answer Grok question `handle` with `answers`: `{"q<i>": [labels]}`
+    /// for every question in order, each label one of its options; an
+    /// empty object skips them all. The first valid answer wins, as for a
+    /// permission.
+    pub async fn answer_question(&self, handle: &str, answers: &Value) -> Result<(), HostError> {
+        valid_id(handle)?;
+        let deadline = Instant::now() + self.budgets().control;
+        let (permission, peer, generation, answer) = {
+            let mut state = self.state();
+            let Some(pending) = state.permissions.get(handle) else {
+                return Err(if state.was_resolved(handle) {
+                    HostError::AlreadyResolved
+                } else {
+                    HostError::UnknownPermission
+                });
+            };
+            let RequestKind::Question(questions) = &pending.kind else {
+                return Err(HostError::InvalidOption);
+            };
+            let answer = question_answer(questions, answers)?;
+            let peer = state.peer.clone().ok_or(HostError::NotReady)?;
+            let generation = state.generation;
+            let permission = state
+                .resolve(handle, "selected")
+                .ok_or(HostError::AlreadyResolved)?;
+            (permission, peer, generation, answer)
+        };
+        self.deliver_answer(generation, &peer, permission, answer, deadline)
+            .await
+    }
+
+    /// Deliver the answer of a request already resolved here.
+    async fn deliver_answer(
+        &self,
+        generation: u64,
+        peer: &Peer,
+        permission: Permission,
+        answer: Value,
+        deadline: Instant,
+    ) -> Result<(), HostError> {
         let mut incomplete = peer.abandon_on_drop();
-        let delivered = peer
-            .respond(
-                permission.acp_id,
-                Ok(json!({"outcome": {"outcome": "selected", "optionId": option_id}})),
-                deadline,
-            )
-            .await;
-        let result = self.control_outcome(generation, &peer, delivered);
+        let delivered = peer.respond(permission.acp_id, Ok(answer), deadline).await;
+        let result = self.control_outcome(generation, peer, delivered);
         incomplete.disarm();
         result
     }
+}
+
+/// Grok's `ask_user_question` answer for `answers` (see
+/// [`AgentHost::answer_question`]).
+fn question_answer(questions: &[Value], answers: &Value) -> Result<Value, HostError> {
+    let invalid =
+        || HostError::InvalidInput("answer every question with its offered options".into());
+    let given = answers.as_object().ok_or_else(invalid)?;
+    if given.is_empty() {
+        return Ok(json!({"outcome": "cancelled"}));
+    }
+    if given.len() != questions.len() {
+        return Err(invalid());
+    }
+    let mut chosen = serde_json::Map::new();
+    for (index, question) in questions.iter().enumerate() {
+        let labels = given
+            .get(&format!("q{index}"))
+            .and_then(Value::as_array)
+            .ok_or_else(invalid)?;
+        let offered = |label: &str| {
+            question["options"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|option| option["label"] == label)
+        };
+        let multiple = question["multiSelect"] == true;
+        if labels.is_empty() || (!multiple && labels.len() > 1) {
+            return Err(invalid());
+        }
+        let mut picked = Vec::with_capacity(labels.len());
+        for label in labels {
+            let label = label
+                .as_str()
+                .filter(|label| offered(label))
+                .ok_or_else(invalid)?;
+            picked.push(Value::from(label));
+        }
+        let text = question["question"].as_str().ok_or_else(invalid)?;
+        chosen.insert(text.to_string(), Value::Array(picked));
+    }
+    Ok(json!({"outcome": "accepted", "answers": chosen}))
 }

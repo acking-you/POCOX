@@ -21,6 +21,16 @@
 //!   top-level `_meta`: `ok` injects into a running prompt (and streams
 //!   `steered:<text>`) or answers `promptRequired` when none runs, `odd`
 //!   answers `startedNewTurn`, `silent` never answers.
+//! - `--grok` speaks like Grok Build 1.0.62 (`_meta.grokShell`): its queue
+//!   names the running `_meta.promptId`, every turn ends with `turn_completed`,
+//!   `_x.ai/interject` streams `interjected:<text>` into a running prompt or
+//!   runs the text as a turn of its own (`interject-fallback-1`, streaming
+//!   `fallback:<text>`) when idle, updates carry `_meta.totalTokens`,
+//!   `_x.ai/session/rename` succeeds, and the prompts `ask` and `plan` send
+//!   `_x.ai/ask_user_question` / `_x.ai/exit_plan_mode` and report the answer
+//!   (`asked:<json>` / `plan:<outcome>`); `strand` ends at once and then runs
+//!   `interject-fallback-2` (`fallback:late`), which asks for a permission and
+//!   reports `chosen:<option>`.
 //!
 //! The agent title echoes the raw argument vector so tests can verify it
 //! arrived verbatim.
@@ -69,6 +79,7 @@ struct Agent {
     init_delay: Duration,
     clear_title: bool,
     steering: Option<String>,
+    grok: bool,
     /// Sessions whose prompt is still unanswered.
     running: Arc<Mutex<HashSet<String>>>,
     next_id: Arc<Mutex<i64>>,
@@ -102,6 +113,25 @@ fn text(kind: &str, text: &str) -> Value {
     json!({"sessionUpdate": kind, "content": {"type": "text", "text": text}})
 }
 
+/// Grok's queue state: `running` is the prompt it runs, if any.
+fn queue_changed(session: &str, running: Option<(&str, &str)>) {
+    let mut params = json!({"sessionId": session, "entries": []});
+    if let Some((prompt, text)) = running {
+        params["runningPromptId"] = json!(prompt);
+        params["runningText"] = json!(text);
+        params["runningKind"] = json!("prompt");
+    }
+    emit(&json!({"jsonrpc": "2.0", "method": "_x.ai/queue/changed", "params": params}));
+}
+
+/// Grok's end of a turn.
+fn turn_completed(session: &str, prompt: &str, stop: &str) {
+    emit(&json!({"jsonrpc": "2.0", "method": "_x.ai/session_notification", "params": {
+        "sessionId": session,
+        "update": {"sessionUpdate": "turn_completed", "prompt_id": prompt, "stop_reason": stop},
+    }}));
+}
+
 impl Agent {
     fn has_load(&self) -> bool {
         self.profile == "beta"
@@ -133,6 +163,17 @@ impl Agent {
     }
 
     fn settings(&self) -> Value {
+        if self.grok {
+            return json!({
+                "configOptions": [{
+                    "id": "model", "name": "Model", "category": "model", "type": "select",
+                    "currentValue": "grok-m", "options": [{"value": "grok-m", "name": "Grok M"}],
+                }],
+                "models": {"currentModelId": "grok-m", "availableModels": [
+                    {"modelId": "grok-m", "name": "Grok M", "_meta": {"totalContextTokens": 1000}},
+                ]},
+            });
+        }
         if self.profile != "beta" {
             return json!({});
         }
@@ -182,7 +223,12 @@ impl Agent {
                             "version": "0.0.1",
                         },
                         "authMethods": [{"id": "agent-login", "name": "Agent login"}],
-                        "_meta": if self.steering.is_some() {
+                        "_meta": if self.grok {
+                            json!({"grokShell": true, "agentVersion": "1.0.62",
+                                   "availableCommands": [
+                                       {"name": "compact", "description": "Compress", "input": null},
+                                   ]})
+                        } else if self.steering.is_some() {
                             json!({"ignored": true, "steering": {"supported": true}})
                         } else {
                             json!({"ignored": true})
@@ -257,13 +303,47 @@ impl Agent {
             "session/prompt" => {
                 let cancelled = cancelled.unwrap_or_else(|| Arc::new(Notify::new()));
                 let session = params["sessionId"].as_str().unwrap_or("").to_string();
-                let running = self.running.clone();
+                let prompt = params["_meta"]["promptId"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                let text = params["prompt"][0]["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .to_string();
+                if self.grok {
+                    queue_changed(&session, Some((&prompt, &text)));
+                }
+                let (running, grok) = (self.running.clone(), self.grok);
                 self.prompt(id, params, cancelled).await;
                 running.lock().expect("lock").remove(&session);
+                if grok {
+                    queue_changed(&session, None);
+                    turn_completed(&session, &prompt, "end_turn");
+                }
             },
             "_session/steering" if self.steering.is_some() => self.steer(&id, &params),
+            "_x.ai/interject" if self.grok => self.interject(&id, &params).await,
+            "_x.ai/session/rename" if self.grok => respond(&id, json!({"result": null})),
             _ => fail(&id, -32601, "unknown method"),
         }
+    }
+
+    /// Grok's interjection: into the running prompt, or a turn of its own.
+    async fn interject(&self, id: &Value, params: &Value) {
+        let session = params["sessionId"].as_str().unwrap_or("").to_string();
+        let added = params["text"].as_str().unwrap_or("").to_string();
+        respond(id, json!({"result": {"status": "queued"}}));
+        if self.running.lock().expect("lock").contains(&session) {
+            update(&session, text("agent_message_chunk", &format!("interjected:{added}")));
+            return;
+        }
+        let fallback = "interject-fallback-1";
+        queue_changed(&session, Some((fallback, &added)));
+        update(&session, text("agent_message_chunk", &format!("fallback:{added}")));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        queue_changed(&session, None);
+        turn_completed(&session, fallback, "end_turn");
     }
 
     fn steer(&self, id: &Value, params: &Value) {
@@ -412,6 +492,63 @@ impl Agent {
                 let stop = if hit { "cancelled" } else { "end_turn" };
                 respond(&id, json!({"stopReason": stop}));
             },
+            "ask" if self.grok => {
+                let answer = self
+                    .call("_x.ai/ask_user_question", json!({
+                        "sessionId": session, "toolCallId": "q1", "mode": "default",
+                        "questions": [{"question": "Pick one", "multiSelect": false, "options": [
+                            {"label": "A", "description": "first"},
+                            {"label": "B", "description": "second"},
+                        ]}],
+                    }))
+                    .await;
+                update(
+                    &session,
+                    text("agent_message_chunk", &format!("asked:{}", answer["result"])),
+                );
+                respond(&id, json!({"stopReason": "end_turn"}));
+            },
+            "strand" if self.grok => {
+                // The turn ends, then Grok runs a stranded interjection as a
+                // turn of its own, which asks for a permission.
+                respond(&id, json!({"stopReason": "end_turn"}));
+                let agent = self.clone();
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_millis(30)).await;
+                    let fallback = "interject-fallback-2";
+                    queue_changed(&session, Some((fallback, "late")));
+                    update(&session, text("agent_message_chunk", "fallback:late"));
+                    let answer = agent
+                        .call("session/request_permission", json!({
+                            "sessionId": session,
+                            "toolCall": {"toolCallId": "call-9", "title": "Run ls"},
+                            "options": [{"optionId": "allow", "name": "Allow", "kind": "allow_once"}],
+                        }))
+                        .await;
+                    let chosen = answer["result"]["outcome"]["optionId"]
+                        .as_str()
+                        .unwrap_or("none");
+                    update(&session, text("agent_message_chunk", &format!("chosen:{chosen}")));
+                    queue_changed(&session, None);
+                    turn_completed(&session, fallback, "end_turn");
+                });
+            },
+            "plan" if self.grok => {
+                let answer = self
+                    .call(
+                        "_x.ai/exit_plan_mode",
+                        json!({
+                            "sessionId": session, "toolCallId": "p1", "planContent": "1. do it",
+                        }),
+                    )
+                    .await;
+                let outcome = answer["result"]["outcome"]
+                    .as_str()
+                    .unwrap_or("?")
+                    .to_string();
+                update(&session, text("agent_message_chunk", &format!("plan:{outcome}")));
+                respond(&id, json!({"stopReason": "end_turn"}));
+            },
             "count" => {
                 let count = self.prompts.load(Ordering::SeqCst);
                 update(&session, text("agent_message_chunk", &format!("prompts:{count}")));
@@ -426,9 +563,20 @@ impl Agent {
                 respond(&id, json!({"stopReason": "end_turn"}));
             },
             _ => {
+                if self.grok {
+                    emit(&json!({"jsonrpc": "2.0", "method": "session/update", "params": {
+                        "sessionId": session, "update": text("agent_message_chunk", "Hello"),
+                        "_meta": {"totalTokens": 250},
+                    }}));
+                }
                 update(&session, text("agent_message_chunk", "Hi"));
                 update(&session, text("agent_message_chunk", " there"));
-                update(&session, json!({"sessionUpdate": "usage_update", "used": 10, "size": 100}));
+                if !self.grok {
+                    update(
+                        &session,
+                        json!({"sessionUpdate": "usage_update", "used": 10, "size": 100}),
+                    );
+                }
                 update(&session, json!({"sessionUpdate": "future_update_kind", "x": 1}));
                 respond(&id, json!({"stopReason": "end_turn"}));
             },
@@ -471,6 +619,7 @@ async fn main() {
         ),
         clear_title: has("--clear-title"),
         steering: flag("--steering"),
+        grok: has("--grok"),
         running: Arc::new(Mutex::new(HashSet::new())),
         args: args.clone(),
         next_id: Arc::new(Mutex::new(0)),

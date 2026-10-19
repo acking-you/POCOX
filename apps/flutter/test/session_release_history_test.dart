@@ -73,6 +73,9 @@ Future<FakeBridgeApi> _openWritable(WidgetTester t, ThreadHistory history) {
 Future<void> _release(WidgetTester t) async {
   await t.tap(find.byTooltip('More').first);
   await frames(t);
+  // Only what the engine has: OpenCode renames but has no manual compaction.
+  expect(find.text('Rename'), findsOneWidget);
+  expect(find.text('Compact conversation'), findsNothing);
   await t.tap(find.byKey(const Key('session-release')));
   await frames(t, 40);
   expect(find.byKey(const Key('access-panel-released_here')), findsOneWidget);
