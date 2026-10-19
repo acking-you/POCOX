@@ -157,6 +157,11 @@ class OpenCodeRuntimeForm extends ChangeNotifier {
 
   /// The runtime the fields describe, or why they cannot be used.
   (HostRuntime?, String?) read(AppLocalizations l10n) {
+    // An unpicked history follows the detection (OpenCode 2's background
+    // server), so it is not decided before the detection is.
+    if (found == null && !_historyChosen) {
+      return (null, l10n.openCodeDetecting);
+    }
     if (overridePath && path.text.trim().isEmpty) {
       return (null, l10n.openCodePathRequired);
     }

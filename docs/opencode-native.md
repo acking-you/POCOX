@@ -87,8 +87,9 @@ can only be rejected).
   anything starts. A new host with a custom provider also gets *This host
   only* while OpenCode 2's background server is on (`opencode_detect`
   reports `backgroundServer`): a custom provider cannot use that server.
-  Choosing *Shared* there anyway is allowed, and a line under the choice
-  says the host could only follow. A remote add picks the same way on the
+  Until the detection answers, an unpicked history is undecided, so Start
+  waits for it. Choosing *Shared* there anyway is allowed, and a line under
+  the choice says the host could only follow. A remote add picks the same way on the
   host computer (a remote edit keeps the saved choice). Changing the history
   of a running host is a runtime edit: saved, then applied with a restart.
 - **Instance names are unique per device**, compared as the relay compares
