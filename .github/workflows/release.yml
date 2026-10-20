@@ -728,10 +728,12 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$UPDATE_SIGNING_KEY" || { echo "UPDATE_SIGNING_KEY is not set"; exit 1; }
-          mkdir assets
+          # Not `assets/`: the repository has one.
+          files="$RUNNER_TEMP/release-files"
+          mkdir -p "$files"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --dir assets --pattern 'pocket-codex-*'
-          python3 scripts/release_manifest.py collect assets "$RELEASE_TAG" "$GITHUB_SHA" \
+            --dir "$files" --pattern 'pocket-codex-*'
+          python3 scripts/release_manifest.py collect "$files" "$RELEASE_TAG" "$GITHUB_SHA" \
             --out release-manifest.json
           key="$(mktemp)"
           trap 'rm -f "$key"' EXIT
