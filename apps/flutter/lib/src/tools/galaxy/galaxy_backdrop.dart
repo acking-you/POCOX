@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 
 /// The nebula program, loaded once; null where shaders are unavailable.
 Future<ui.FragmentProgram?> _program = ui.FragmentProgram.fromAsset(
@@ -181,13 +182,14 @@ class _StarLayer {
   final List<double> phases;
 }
 
-/// Three layers of stars, far to near, with a slow twinkle.
+/// Three layers of stars, far to near, with a slow twinkle. Where each star
+/// is this frame is computed with the rest of the frame
+/// (`galaxy_frame.dart`); this draws the result.
 class Starfield {
   /// Generates the layers from a fixed seed.
   Starfield() : _layers = _generate();
 
   final List<_StarLayer> _layers;
-  final Float32List _scratch = Float32List(2 * 400);
 
   static List<_StarLayer> _generate() {
     final random = math.Random(4242);
@@ -209,41 +211,31 @@ class Starfield {
     return [layer(320, 0.12, 0.9), layer(150, 0.3, 1.35), layer(56, 0.62, 2.0)];
   }
 
-  /// Paint every layer, shifted by the camera's [yaw] and [tilt].
-  void paint(
-    Canvas canvas,
-    Size size,
-    double yaw,
-    double tilt,
-    double time, {
-    required bool dark,
-    required bool still,
-  }) {
+  /// The layers as the frame computation takes them.
+  List<StarLayerData> get data => [
+    for (final layer in _layers)
+      (
+        parallax: layer.parallax,
+        buckets: [
+          for (var b = 0; b < layer.points.length; b++)
+            (phase: layer.phases[b], points: layer.points[b]),
+        ],
+      ),
+  ];
+
+  /// Paint every layer from the frame at [frame]'s position.
+  void paint(Canvas canvas, FrameReader frame, {required bool dark}) {
     final base = dark ? Colors.white : const Color(0xFF2A2A2C);
     for (final layer in _layers) {
-      final shiftX = (yaw / (math.pi * 2)) * size.width * layer.parallax * 2.2;
-      final shiftY = (tilt - 0.52) * size.height * layer.parallax * 0.6;
+      final strength = (dark
+          ? 0.32 + layer.parallax * 0.75
+          : 0.10 + layer.parallax * 0.32);
       for (var b = 0; b < layer.points.length; b++) {
-        final source = layer.points[b];
-        final count = source.length ~/ 2;
-        final out = count * 2 <= _scratch.length
-            ? Float32List.sublistView(_scratch, 0, count * 2)
-            : Float32List(count * 2);
-        for (var i = 0; i < count; i++) {
-          final x = (source[i * 2] * size.width + shiftX) % size.width;
-          final y = (source[i * 2 + 1] * size.height + shiftY) % size.height;
-          out[i * 2] = x < 0 ? x + size.width : x;
-          out[i * 2 + 1] = y < 0 ? y + size.height : y;
-        }
-        final twinkle = still
-            ? 0.8
-            : 0.7 + 0.3 * math.sin(time * (0.6 + b * 0.23) + layer.phases[b]);
-        final strength = (dark
-            ? 0.32 + layer.parallax * 0.75
-            : 0.10 + layer.parallax * 0.32);
+        final twinkle = frame.next();
+        final points = frame.points(frame.count());
         canvas.drawRawPoints(
           ui.PointMode.points,
-          out,
+          points,
           Paint()
             ..color = base.withValues(alpha: (strength * twinkle).clamp(0, 1))
             ..strokeWidth = layer.size

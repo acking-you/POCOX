@@ -87,6 +87,19 @@ class GalaxyView extends ChangeNotifier {
   /// Bodies drawn in the last frame, front last.
   List<Hit> hits = const [];
 
+  /// Moves on whenever the scene or a body's motion ([appeared],
+  /// [rippled]) changes, so the encoded scene is redone only then.
+  int revision = 0;
+
+  /// A still scene has no entrances, ripples or fading ghosts.
+  void stopMotion() {
+    if (appeared.isEmpty && rippled.isEmpty && ghosts.isEmpty) return;
+    appeared.clear();
+    rippled.clear();
+    ghosts.clear();
+    revision++;
+  }
+
   /// Repaint.
   void tick() => notifyListeners();
 
@@ -122,6 +135,7 @@ class GalaxyView extends ChangeNotifier {
       }
     }
     scene = next;
+    revision++;
     notifyListeners();
   }
 

@@ -17,6 +17,7 @@ import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_list.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_painter.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_panel.dart';
@@ -41,6 +42,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     with SingleTickerProviderStateMixin {
   final GalaxyView _view = GalaxyView();
   final LabelCache _labels = LabelCache();
+  final GalaxyGeometry _geometry = GalaxyGeometry();
   final Starfield _stars = Starfield();
   final FocusNode _focus = FocusNode(debugLabel: 'galaxy');
   final TextEditingController _search = TextEditingController();
@@ -65,6 +67,8 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   @override
   void initState() {
     super.initState();
+    // Frames are computed in Rust once the bridge's export is found.
+    GalaxyNative.load();
     _ticker.start();
   }
 
@@ -75,6 +79,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     _focus.dispose();
     _search.dispose();
     _view.dispose();
+    _geometry.dispose();
     super.dispose();
   }
 
@@ -337,6 +342,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                           palette: palette,
                           l10n: l10n,
                           labels: _labels,
+                          geometry: _geometry,
                           starfield: _stars,
                           onBackdrop: _backdropReady,
                         ),

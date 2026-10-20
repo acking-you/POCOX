@@ -1,0 +1,889 @@
+//! The galaxy's per-frame geometry (`/galaxy` in the app): the camera's
+//! projection, every orbit, planet and star of the scene, the plane's guides,
+//! the links, the background stars, depth order and label placement, computed
+//! here so the Dart painter only issues draw calls.
+//!
+//! The app calls [`ffi::pocox_galaxy_frame_v1`] once per frame through a
+//! leaf `dart:ffi` call with buffers it owns: the scene (encoded when it
+//! changes, [`Scene`]), the frame (camera, clock, selection, [`Frame`]) and
+//! the output ([`Out`]). The arithmetic mirrors the app's Dart geometry
+//! (`apps/flutter/lib/src/tools/galaxy/galaxy_frame.dart`) step for step, so
+//! either draws the same picture; `galaxy_frame_parity_test.dart` compares
+//! them on the built library.
+pub mod ffi;
+#[cfg(test)]
+mod tests;
+
+use std::f64::consts::PI;
+
+/// The buffer layouts' version; both ends name it.
+pub const VERSION: f64 = 1.0;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct V3 {
+    x: f64,
+    y: f64,
+    z: f64,
+}
+
+impl V3 {
+    const fn new(x: f64, y: f64, z: f64) -> Self {
+        Self {
+            x,
+            y,
+            z,
+        }
+    }
+    fn add(self, o: Self) -> Self {
+        Self::new(self.x + o.x, self.y + o.y, self.z + o.z)
+    }
+    fn sub(self, o: Self) -> Self {
+        Self::new(self.x - o.x, self.y - o.y, self.z - o.z)
+    }
+    fn mul(self, k: f64) -> Self {
+        Self::new(self.x * k, self.y * k, self.z * k)
+    }
+    fn dot(self, o: Self) -> f64 {
+        self.x * o.x + self.y * o.y + self.z * o.z
+    }
+    fn cross(self, o: Self) -> Self {
+        Self::new(
+            self.y * o.z - self.z * o.y,
+            self.z * o.x - self.x * o.z,
+            self.x * o.y - self.y * o.x,
+        )
+    }
+    fn length(self) -> f64 {
+        self.dot(self).sqrt()
+    }
+    fn unit(self) -> Self {
+        let l = self.length();
+        if l == 0.0 {
+            self
+        } else {
+            self.mul(1.0 / l)
+        }
+    }
+    fn lerp(self, o: Self, t: f64) -> Self {
+        self.add(o.sub(self).mul(t))
+    }
+}
+
+/// [p] rotated by [tilt] around the in-plane axis at angle [axis]
+/// (Rodrigues' rotation around k = (cos axis, 0, sin axis)).
+fn tilt_around(p: V3, axis: f64, tilt: f64) -> V3 {
+    let k = V3::new(axis.cos(), 0.0, axis.sin());
+    let (cos, sin) = (tilt.cos(), tilt.sin());
+    p.mul(cos)
+        .add(k.cross(p).mul(sin))
+        .add(k.mul(k.dot(p) * (1.0 - cos)))
+}
+
+/// [p] turned by [angle] around the disk's axis.
+fn turned(p: V3, angle: f64) -> V3 {
+    let (c, s) = (angle.cos(), angle.sin());
+    V3::new(p.x * c - p.z * s, p.y, p.x * s + p.z * c)
+}
+
+fn ease_out(t: f64) -> f64 {
+    1.0 - (1.0 - t.clamp(0.0, 1.0)).powi(3)
+}
+
+/// One projected point.
+#[derive(Clone, Copy, Debug)]
+struct Projected {
+    x: f64,
+    y: f64,
+    scale: f64,
+    depth: f64,
+}
+
+/// The view of one frame: world points to screen points.
+struct Camera {
+    eye: V3,
+    forward: V3,
+    right: V3,
+    up: V3,
+    cx: f64,
+    cy: f64,
+    focal: f64,
+}
+
+impl Camera {
+    fn new(frame: &Frame) -> Self {
+        let dir = V3::new(
+            frame.tilt.cos() * frame.yaw.sin(),
+            frame.tilt.sin(),
+            frame.tilt.cos() * frame.yaw.cos(),
+        );
+        let eye = frame.target.add(dir.mul(frame.distance));
+        let forward = frame.target.sub(eye).unit();
+        let right = forward.cross(V3::new(0.0, 1.0, 0.0)).unit();
+        let up = right.cross(forward);
+        Self {
+            eye,
+            forward,
+            right,
+            up,
+            cx: frame.width / 2.0,
+            cy: frame.height * 0.52,
+            focal: frame.width.min(frame.height) * 0.92,
+        }
+    }
+
+    /// [p] on screen, or nothing behind the camera.
+    fn at(&self, p: V3) -> Option<Projected> {
+        let v = p.sub(self.eye);
+        let depth = v.dot(self.forward);
+        if depth < 0.2 {
+            return None;
+        }
+        let s = self.focal / depth;
+        Some(Projected {
+            x: self.cx + v.dot(self.right) * s,
+            y: self.cy - v.dot(self.up) * s,
+            scale: s,
+            depth,
+        })
+    }
+}
+
+/// One device's star.
+#[derive(Clone, Copy, Debug)]
+struct System {
+    position: V3,
+    home: bool,
+    online: bool,
+    first: usize,
+    count: usize,
+    /// Its label's size (always the strong style).
+    label: (f64, f64),
+}
+
+/// One service orbiting its device.
+#[derive(Clone, Copy, Debug)]
+struct Planet {
+    system: usize,
+    ring: i64,
+    radius: f64,
+    phase: f64,
+    period: f64,
+    size: f64,
+    tilt_axis: f64,
+    tilt: f64,
+    /// When it appeared (it spirals out of its star), or NaN.
+    appeared: f64,
+    /// When its status last changed (a ripple crosses it), or NaN.
+    rippled: f64,
+    /// Its label's size in the base and the strong style.
+    label: (f64, f64),
+    strong: (f64, f64),
+}
+
+impl Planet {
+    fn offset_at(&self, t: f64) -> V3 {
+        let angle = self.phase + (t / self.period) * PI * 2.0;
+        let flat = V3::new(angle.cos() * self.radius, 0.0, angle.sin() * self.radius);
+        tilt_around(flat, self.tilt_axis, self.tilt)
+    }
+}
+
+/// One layer of background stars.
+#[derive(Clone, Debug)]
+struct StarLayer {
+    parallax: f64,
+    /// Per bucket: its twinkle phase and interleaved unit x, y.
+    buckets: Vec<(f64, std::ops::Range<usize>)>,
+}
+
+/// The decoded scene. Layout (all f64): version, systems, planets, links,
+/// star layers; per system x, y, z, home, online, first planet, planet
+/// count, label width, label height; per planet system, ring, radius,
+/// phase, period, size, tilt axis, tilt, appeared, rippled, label width and
+/// height, strong label width and height; per link planet, system; per star
+/// layer parallax, buckets, then per bucket phase, count and the unit
+/// coordinates.
+pub struct Scene<'a> {
+    systems: Vec<System>,
+    planets: Vec<Planet>,
+    links: Vec<(usize, usize)>,
+    layers: Vec<StarLayer>,
+    stars: &'a [f64],
+}
+
+const SYSTEM_FIELDS: usize = 9;
+const PLANET_FIELDS: usize = 14;
+
+fn count(value: f64, limit: usize) -> Option<usize> {
+    (value.is_finite() && value >= 0.0 && value.fract() == 0.0 && value <= limit as f64)
+        .then_some(value as usize)
+}
+
+/// Reads a buffer's fields in order.
+struct Fields<'a> {
+    raw: &'a [f64],
+    at: usize,
+}
+
+impl<'a> Fields<'a> {
+    fn take(&mut self, n: usize) -> Option<&'a [f64]> {
+        let slice = self.raw.get(self.at..self.at.checked_add(n)?)?;
+        self.at += n;
+        Some(slice)
+    }
+}
+
+impl<'a> Scene<'a> {
+    /// Decodes `raw`, or nothing when it is malformed.
+    pub fn decode(raw: &'a [f64]) -> Option<Self> {
+        if raw.len() < 5 || raw[0] != VERSION {
+            return None;
+        }
+        let limit = raw.len();
+        let (n_systems, n_planets) = (count(raw[1], limit)?, count(raw[2], limit)?);
+        let (n_links, n_layers) = (count(raw[3], limit)?, count(raw[4], limit)?);
+        let mut fields = Fields {
+            raw,
+            at: 5,
+        };
+        let mut systems = Vec::with_capacity(n_systems);
+        for _ in 0..n_systems {
+            let f = fields.take(SYSTEM_FIELDS)?;
+            systems.push(System {
+                position: V3::new(f[0], f[1], f[2]),
+                home: f[3] != 0.0,
+                online: f[4] != 0.0,
+                first: count(f[5], n_planets)?,
+                count: count(f[6], n_planets)?,
+                label: (f[7], f[8]),
+            });
+        }
+        let mut planets = Vec::with_capacity(n_planets);
+        for _ in 0..n_planets {
+            let f = fields.take(PLANET_FIELDS)?;
+            planets.push(Planet {
+                system: count(f[0], n_systems.checked_sub(1)?)?,
+                ring: f[1] as i64,
+                radius: f[2],
+                phase: f[3],
+                period: f[4],
+                size: f[5],
+                tilt_axis: f[6],
+                tilt: f[7],
+                appeared: f[8],
+                rippled: f[9],
+                label: (f[10], f[11]),
+                strong: (f[12], f[13]),
+            });
+        }
+        if systems.iter().any(|s| s.first + s.count > n_planets) {
+            return None;
+        }
+        let mut links = Vec::with_capacity(n_links);
+        for _ in 0..n_links {
+            let f = fields.take(2)?;
+            links.push((
+                count(f[0], n_planets.checked_sub(1)?)?,
+                count(f[1], n_systems.checked_sub(1)?)?,
+            ));
+        }
+        let mut layers = Vec::with_capacity(n_layers);
+        for _ in 0..n_layers {
+            let head = fields.take(2)?;
+            let (parallax, n_buckets) = (head[0], count(head[1], limit)?);
+            let mut buckets = Vec::with_capacity(n_buckets);
+            for _ in 0..n_buckets {
+                let bucket = fields.take(2)?;
+                let points = count(bucket[1], limit)?;
+                let start = fields.at;
+                fields.take(points.checked_mul(2)?)?;
+                buckets.push((bucket[0], start..fields.at));
+            }
+            layers.push(StarLayer {
+                parallax,
+                buckets,
+            });
+        }
+        Some(Self {
+            systems,
+            planets,
+            links,
+            layers,
+            stars: raw,
+        })
+    }
+}
+
+/// The frame. Layout (all f64): width, height, yaw, tilt, distance, target
+/// x, y, z, time, still, then the selected, hovered and focused bodies
+/// (systems first, then planets; -1 none, -2 one this scene does not hold).
+#[derive(Clone, Copy, Debug)]
+pub struct Frame {
+    width: f64,
+    height: f64,
+    yaw: f64,
+    tilt: f64,
+    distance: f64,
+    target: V3,
+    time: f64,
+    still: bool,
+    selected: i64,
+    hovered: i64,
+    focused: i64,
+}
+
+/// The frame layout's length.
+pub const FRAME_FIELDS: usize = 13;
+
+impl Frame {
+    /// Decodes `raw`, or nothing when it is malformed.
+    pub fn decode(raw: &[f64]) -> Option<Self> {
+        let f: &[f64; FRAME_FIELDS] = raw.try_into().ok()?;
+        let frame = Self {
+            width: f[0],
+            height: f[1],
+            yaw: f[2],
+            tilt: f[3],
+            distance: f[4],
+            target: V3::new(f[5], f[6], f[7]),
+            time: f[8],
+            still: f[9] != 0.0,
+            selected: f[10] as i64,
+            hovered: f[11] as i64,
+            focused: f[12] as i64,
+        };
+        let usable = frame.width > 0.0
+            && frame.height > 0.0
+            && f[..10].iter().all(|v| v.is_finite())
+            && frame.distance > 0.0;
+        usable.then_some(frame)
+    }
+
+    fn orbit_time(&self) -> f64 {
+        if self.still {
+            0.0
+        } else {
+            self.time
+        }
+    }
+}
+
+/// Writes into the caller's buffer and keeps counting past its end, so a
+/// short buffer learns the length it needs.
+pub struct Out<'a> {
+    buf: &'a mut [f32],
+    len: usize,
+}
+
+impl<'a> Out<'a> {
+    /// A writer into `buf`.
+    pub fn new(buf: &'a mut [f32]) -> Self {
+        Self {
+            buf,
+            len: 0,
+        }
+    }
+
+    /// Everything written (or that would have been).
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Whether it all fit.
+    pub fn fits(&self) -> bool {
+        self.len <= self.buf.len()
+    }
+
+    fn push(&mut self, value: f64) {
+        if let Some(slot) = self.buf.get_mut(self.len) {
+            *slot = value as f32;
+        }
+        self.len += 1;
+    }
+
+    /// A slot to fill in later (a count known only afterwards).
+    fn hole(&mut self) -> usize {
+        self.push(0.0);
+        self.len - 1
+    }
+
+    fn fill(&mut self, at: usize, value: f64) {
+        if let Some(slot) = self.buf.get_mut(at) {
+            *slot = value as f32;
+        }
+    }
+
+    fn points(&mut self, points: &[(f64, f64)]) {
+        self.push(points.len() as f64);
+        for &(x, y) in points {
+            self.push(x);
+            self.push(y);
+        }
+    }
+}
+
+/// A body drawn this frame, in drawing order, for the labels.
+struct Hit {
+    body: usize,
+    x: f64,
+    y: f64,
+    radius: f64,
+}
+
+/// Computes one frame of `scene` into `out`, in drawing order. Layout
+/// (all f32):
+///
+/// - background stars: per layer and bucket its twinkle and points (count, then
+///   x, y each);
+/// - the plane's glow: drawn (0/1), left, top, right, bottom, blur sigma;
+/// - guides: count, then per guide its fade and runs (count, then per run its
+///   points: count, then x, y each);
+/// - systems far to near: count, then per system its index, centre x, y, star
+///   radius, depth, opacity, back runs, front runs (each: count, then runs),
+///   and its planets: count, then per planet index, x, y, radius, depth,
+///   opacity, ripple progress (-1 none) and behind its star (0/1);
+/// - links: count, then per link its curve's points and its particles' points;
+/// - labels: count, then per label the body, strong (0/1), x, y.
+pub fn frame(scene: &Scene, frame: &Frame, out: &mut Out) {
+    let camera = Camera::new(frame);
+    stars(scene, frame, out);
+    plane(scene, &camera, out);
+    let hits = systems(scene, frame, &camera, out);
+    links(scene, frame, &camera, out);
+    labels(scene, frame, &hits, out);
+}
+
+fn extent(scene: &Scene, system: &System) -> f64 {
+    let planets = &scene.planets[system.first..system.first + system.count];
+    if planets.is_empty() {
+        0.4
+    } else {
+        planets
+            .iter()
+            .map(|p| p.radius)
+            .fold(f64::NEG_INFINITY, f64::max)
+            + 0.2
+    }
+}
+
+/// Runs of projected points along `point(i)` for `i` in `0..=steps`,
+/// broken where a point falls behind the camera.
+fn runs(camera: &Camera, steps: usize, point: impl Fn(usize) -> V3) -> Vec<Vec<(f64, f64)>> {
+    let mut runs: Vec<Vec<(f64, f64)>> = Vec::new();
+    let mut open = false;
+    for i in 0..=steps {
+        match camera.at(point(i)) {
+            None => open = false,
+            Some(p) if open => runs.last_mut().into_iter().for_each(|r| r.push((p.x, p.y))),
+            Some(p) => {
+                runs.push(vec![(p.x, p.y)]);
+                open = true;
+            },
+        }
+    }
+    runs
+}
+
+fn plane(scene: &Scene, camera: &Camera, out: &mut Out) {
+    if scene.systems.is_empty() {
+        for _ in 0..6 {
+            out.push(0.0);
+        }
+        out.push(0.0);
+        return;
+    }
+    let mut reach: f64 = 3.0;
+    for system in &scene.systems {
+        reach = reach.max(system.position.length() + extent(scene, system));
+    }
+    // A soft glow over the plane.
+    let mut rim = Vec::with_capacity(48);
+    for i in 0..48 {
+        let a = i as f64 / 48.0 * PI * 2.0;
+        if let Some(p) = camera.at(V3::new(a.cos() * reach, 0.0, a.sin() * reach)) {
+            rim.push((p.x, p.y));
+        }
+    }
+    if rim.len() > 8 {
+        let (mut l, mut t, mut r, mut b) = (rim[0].0, rim[0].1, rim[0].0, rim[0].1);
+        for &(x, y) in &rim {
+            l = l.min(x);
+            t = t.min(y);
+            r = r.max(x);
+            b = b.max(y);
+        }
+        let shortest = (r - l).min(b - t);
+        let inset = shortest * 0.12;
+        for value in [1.0, l + inset, t + inset, r - inset, b - inset, shortest * 0.22] {
+            out.push(value);
+        }
+    } else {
+        for _ in 0..6 {
+            out.push(0.0);
+        }
+    }
+    // Guide circles fading outwards.
+    let guides = out.hole();
+    let mut n = 0;
+    let mut r = 2.6;
+    while r < reach {
+        out.push(1.0 - r / (reach * 1.15));
+        let runs = runs(camera, 96, |i| {
+            let a = i as f64 / 96.0 * PI * 2.0;
+            V3::new(a.cos() * r, 0.0, a.sin() * r)
+        });
+        out.push(runs.len() as f64);
+        for run in &runs {
+            out.points(run);
+        }
+        n += 1;
+        r += 2.6;
+    }
+    out.fill(guides, n as f64);
+}
+
+/// Whether body `body` (of system `system`) stays bright while something is
+/// selected.
+fn lit(scene: &Scene, frame: &Frame, body: usize, system: usize) -> bool {
+    let selected = frame.selected;
+    if selected == -1 {
+        return true;
+    }
+    if selected == body as i64 || selected == system as i64 {
+        return true;
+    }
+    let s = &scene.systems[system];
+    let n = scene.systems.len() as i64;
+    body == system && selected >= n + s.first as i64 && selected < n + (s.first + s.count) as i64
+}
+
+fn fade(frame: &Frame, depth: f64) -> f64 {
+    let reference = frame.distance;
+    (1.25 - (depth - reference) / (reference * 1.6)).clamp(0.42, 1.0)
+}
+
+fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<Hit> {
+    let mut ordered: Vec<(usize, Projected)> = scene
+        .systems
+        .iter()
+        .enumerate()
+        .filter_map(|(i, s)| camera.at(s.position).map(|p| (i, p)))
+        .collect();
+    ordered.sort_by(|a, b| b.1.depth.total_cmp(&a.1.depth));
+    let n_systems = scene.systems.len();
+    let mut hits = Vec::new();
+    out.push(ordered.len() as f64);
+    for (index, core) in ordered {
+        let system = &scene.systems[index];
+        let online = system.online;
+        let base = (if online { 1.0 } else { 0.45 })
+            * (if lit(scene, frame, index, index) { 1.0 } else { 0.3 })
+            * fade(frame, core.depth);
+        let breath = if frame.still {
+            1.0
+        } else {
+            1.0 + 0.04 * (frame.time * 0.9 + system.position.x).sin()
+        };
+        let ceiling = if system.home {
+            26.0
+        } else if online {
+            15.0
+        } else {
+            11.0
+        };
+        let radius =
+            ((if system.home { 0.22 } else { 0.15 }) * core.scale).clamp(3.0, ceiling) * breath;
+        for value in [index as f64, core.x, core.y, radius, core.depth, base] {
+            out.push(value);
+        }
+        // One orbit per ring, split at the star so the front half covers it.
+        let planets = &scene.planets[system.first..system.first + system.count];
+        let mut rings: Vec<&Planet> = Vec::new();
+        for planet in planets {
+            if !rings.iter().any(|r| r.ring == planet.ring) {
+                rings.push(planet);
+            }
+        }
+        let mut back: Vec<Vec<(f64, f64)>> = Vec::new();
+        let mut front: Vec<Vec<(f64, f64)>> = Vec::new();
+        // Runs are filled after they are filed, so keep (side, index).
+        for ring in rings {
+            let mut run: Option<(bool, usize)> = None;
+            for i in 0..=96 {
+                let a = i as f64 / 96.0 * PI * 2.0;
+                let local = tilt_around(
+                    V3::new(a.cos() * ring.radius, 0.0, a.sin() * ring.radius),
+                    ring.tilt_axis,
+                    ring.tilt,
+                );
+                let Some(p) = camera.at(system.position.add(local)) else {
+                    run = None;
+                    continue;
+                };
+                let behind = p.depth > core.depth;
+                match run {
+                    Some((side, at)) if side == behind => {
+                        let list = if side { &mut back } else { &mut front };
+                        list[at].push((p.x, p.y));
+                    },
+                    _ => {
+                        let previous = run.and_then(|(side, at)| {
+                            let list = if side { &back } else { &front };
+                            list[at].last().copied()
+                        });
+                        let list = if behind { &mut back } else { &mut front };
+                        list.push(previous.into_iter().chain([(p.x, p.y)]).collect());
+                        run = Some((behind, list.len() - 1));
+                    },
+                }
+            }
+        }
+        for side in [&back, &front] {
+            out.push(side.len() as f64);
+            for run in side.iter() {
+                out.points(run);
+            }
+        }
+        // Planets where they are drawn now.
+        let count = out.hole();
+        let mut placed = Vec::new();
+        for (offset, planet) in planets.iter().enumerate() {
+            let p = system.first + offset;
+            let appear = if frame.still || planet.appeared.is_nan() {
+                1.0
+            } else {
+                ease_out((frame.time - planet.appeared) / 1.6)
+            };
+            let orbit = planet.offset_at(frame.orbit_time());
+            // A new body spirals out of its star.
+            let local = if appear >= 1.0 {
+                orbit
+            } else {
+                turned(orbit, (1.0 - appear) * PI).mul(appear).add(V3::new(
+                    0.0,
+                    0.25 * (1.0 - appear),
+                    0.0,
+                ))
+            };
+            let Some(at) = camera.at(system.position.add(local)) else {
+                continue;
+            };
+            let opacity = (if online { 1.0 } else { 0.45 })
+                * (if lit(scene, frame, n_systems + p, index) { 1.0 } else { 0.3 })
+                * fade(frame, at.depth)
+                * appear;
+            let radius = (planet.size * at.scale).clamp(2.5, 13.0) * (0.4 + 0.6 * appear);
+            let ripple = if frame.still || planet.rippled.is_nan() {
+                -1.0
+            } else {
+                let t = (frame.time - planet.rippled) / 1.4;
+                if t >= 1.0 {
+                    -1.0
+                } else {
+                    t
+                }
+            };
+            let behind = at.depth > core.depth;
+            for value in [
+                p as f64,
+                at.x,
+                at.y,
+                radius,
+                at.depth,
+                opacity,
+                ripple,
+                f64::from(u8::from(behind)),
+            ] {
+                out.push(value);
+            }
+            placed.push((n_systems + p, at, radius, behind));
+        }
+        out.fill(count, placed.len() as f64);
+        // Hits in drawing order: planets behind, the star, planets in front.
+        for &(body, at, radius, behind) in &placed {
+            if behind {
+                hits.push(Hit {
+                    body,
+                    x: at.x,
+                    y: at.y,
+                    radius,
+                });
+            }
+        }
+        hits.push(Hit {
+            body: index,
+            x: core.x,
+            y: core.y,
+            radius: radius * 1.6,
+        });
+        for &(body, at, radius, behind) in &placed {
+            if !behind {
+                hits.push(Hit {
+                    body,
+                    x: at.x,
+                    y: at.y,
+                    radius,
+                });
+            }
+        }
+    }
+    hits
+}
+
+fn links(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) {
+    let count = out.hole();
+    let mut n = 0;
+    for &(planet, to) in &scene.links {
+        let p = &scene.planets[planet];
+        let from = scene.systems[p.system]
+            .position
+            .add(p.offset_at(frame.orbit_time()));
+        let to = scene.systems[to].position;
+        let rise = to.sub(from).length() * 0.42 + 0.4;
+        let control = from.lerp(to, 0.5).add(V3::new(0.0, rise, 0.0));
+        let at = |t: f64| {
+            from.mul((1.0 - t) * (1.0 - t))
+                .add(control.mul(2.0 * (1.0 - t) * t))
+                .add(to.mul(t * t))
+        };
+        let points: Vec<(f64, f64)> = (0..=32)
+            .filter_map(|i| camera.at(at(i as f64 / 32.0)).map(|p| (p.x, p.y)))
+            .collect();
+        if points.len() < 2 {
+            continue;
+        }
+        out.points(&points);
+        // Particles flow from the service to the device using it.
+        let particles: Vec<(f64, f64)> = (0..3)
+            .filter_map(|k| {
+                let t = if frame.still {
+                    (k + 1) as f64 / 4.0
+                } else {
+                    (frame.time * 0.22 + k as f64 / 3.0).rem_euclid(1.0)
+                };
+                camera.at(at(t)).map(|p| (p.x, p.y))
+            })
+            .collect();
+        out.points(&particles);
+        n += 1;
+    }
+    out.fill(count, n as f64);
+}
+
+fn stars(scene: &Scene, frame: &Frame, out: &mut Out) {
+    let (w, h) = (frame.width, frame.height);
+    for layer in &scene.layers {
+        let shift_x = (frame.yaw / (PI * 2.0)) * w * layer.parallax * 2.2;
+        let shift_y = (frame.tilt - 0.52) * h * layer.parallax * 0.6;
+        for (b, (phase, range)) in layer.buckets.iter().enumerate() {
+            let twinkle = if frame.still {
+                0.8
+            } else {
+                0.7 + 0.3 * (frame.time * (0.6 + b as f64 * 0.23) + phase).sin()
+            };
+            out.push(twinkle);
+            let units = &scene.stars[range.clone()];
+            out.push((units.len() / 2) as f64);
+            for unit in units.chunks_exact(2) {
+                out.push((unit[0] * w + shift_x).rem_euclid(w));
+                out.push((unit[1] * h + shift_y).rem_euclid(h));
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Rect {
+    l: f64,
+    t: f64,
+    r: f64,
+    b: f64,
+}
+
+impl Rect {
+    fn overlaps(&self, o: &Rect) -> bool {
+        !(self.r <= o.l || o.r <= self.l || self.b <= o.t || o.b <= self.t)
+    }
+}
+
+fn labels(scene: &Scene, frame: &Frame, hits: &[Hit], out: &mut Out) {
+    let n_systems = scene.systems.len();
+    let emphasized =
+        |body: usize| [frame.selected, frame.hovered, frame.focused].contains(&(body as i64));
+    let rank = |hit: &Hit| {
+        if emphasized(hit.body) {
+            3
+        } else if hit.body < n_systems {
+            2
+        } else {
+            1
+        }
+    };
+    let mut order: Vec<usize> = (0..hits.len()).collect();
+    // Stable: equals keep their drawing order.
+    order.sort_by(|&a, &b| {
+        rank(&hits[b])
+            .cmp(&rank(&hits[a]))
+            .then(hits[b].radius.total_cmp(&hits[a].radius))
+    });
+    // Stars are obstacles: a planet's label never lies over one.
+    let stars: Vec<Rect> = hits
+        .iter()
+        .filter(|h| h.body < n_systems)
+        .map(|h| Rect {
+            l: h.x - h.radius * 0.7,
+            t: h.y - h.radius * 0.7,
+            r: h.x + h.radius * 0.7,
+            b: h.y + h.radius * 0.7,
+        })
+        .collect();
+    let mut placed: Vec<Rect> = Vec::new();
+    let count = out.hole();
+    let mut shown = 0;
+    let mut n = 0;
+    for i in order {
+        let hit = &hits[i];
+        let device = hit.body < n_systems;
+        let emphasis = emphasized(hit.body);
+        if !emphasis && !device && hit.radius < 5.0 {
+            continue;
+        }
+        if shown >= 28 && !emphasis {
+            break;
+        }
+        let strong = device || emphasis;
+        let (w, h) = if device {
+            scene.systems[hit.body].label
+        } else {
+            let planet = &scene.planets[hit.body - n_systems];
+            if strong {
+                planet.strong
+            } else {
+                planet.label
+            }
+        };
+        let (x, y) = (hit.x - w / 2.0, hit.y + hit.radius + if device { 8.0 } else { 5.0 });
+        let rect = Rect {
+            l: x - 3.0,
+            t: y - 3.0,
+            r: x + w + 3.0,
+            b: y + h + 3.0,
+        };
+        if !emphasis
+            && (placed.iter().any(|p| rect.overlaps(p))
+                || (!device && stars.iter().any(|s| rect.overlaps(s))))
+        {
+            continue;
+        }
+        if rect.r < 0.0 || rect.l > frame.width || rect.t > frame.height {
+            continue;
+        }
+        placed.push(rect);
+        for value in [hit.body as f64, f64::from(u8::from(strong)), x, y] {
+            out.push(value);
+        }
+        shown += 1;
+        n += 1;
+    }
+    out.fill(count, n as f64);
+}

@@ -1606,6 +1606,19 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     set. The CLI keeps updating through its install scripts. See
     `docs/app-updates.md`.
 
+45. **Galaxy geometry in Rust (2026-10-20).** The galaxy's per-frame geometry
+    (stars, plane, projections, depth order, orbit runs, planet positions and
+    sizes, links, label placement) comes from the bridge's `engine::galaxy`
+    through one leaf `dart:ffi` call, `pocox_galaxy_frame_v1`, on native
+    buffers the app owns (`galaxy_frame.dart`); the painter only draws. The scene
+    is re-encoded only when it, a body's motion (`GalaxyView.revision`) or the
+    label styles change. `computeFrameInDart` is the step-for-step Dart port used
+    where the library is not loaded (`flutter test`); change both together, and
+    keep `test/galaxy_frame_parity_test.dart` (opt-in, built library) passing.
+    Measured on one Mac in profile mode: UI-thread time per frame down about a
+    quarter (typical) to a third (busy scene), raster unchanged and still the
+    larger cost. See `docs/galaxy-geometry.md`.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.

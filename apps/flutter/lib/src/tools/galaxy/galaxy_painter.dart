@@ -1,15 +1,18 @@
 /// Paints one frame of the galaxy: sky, the disk's plane, star systems far
 /// to near with their orbits split around each star, connections as arcs of
-/// light, and labels that keep out of each other's way.
+/// light, and labels that keep out of each other's way. Where everything
+/// goes is computed in Rust ([GalaxyGeometry], `galaxy_frame.dart`); this
+/// only draws it.
 library;
 
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:pocket_codex/l10n/gen/app_localizations.dart';
 import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_camera.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
 import 'package:pocket_codex/src/tools/planet_glyph.dart';
@@ -74,14 +77,6 @@ class LabelCache {
   }
 }
 
-double _easeOut(double t) => 1 - math.pow(1 - t.clamp(0, 1), 3).toDouble();
-
-/// [p] turned by [angle] around the disk's axis.
-Vec3 _turned(Vec3 p, double angle) {
-  final c = math.cos(angle), s = math.sin(angle);
-  return Vec3(p.x * c - p.z * s, p.y, p.x * s + p.z * c);
-}
-
 /// What a planet is called on its label.
 String planetLabel(AppLocalizations l10n, Planet planet) {
   final service = planet.service;
@@ -115,6 +110,49 @@ Color _moonColor(GalaxyPalette palette, String? harness) => switch (harness) {
   _ => palette.ink.withValues(alpha: 0.85),
 };
 
+/// The scene's buffers, re-encoded only when the scene, the bodies'
+/// motions or the labels change; owned by the page with its [LabelCache].
+class GalaxyGeometry {
+  /// The computed frames.
+  final GalaxyFrameBuffer frames = GalaxyFrameBuffer();
+
+  /// The bodies of the encoded scene.
+  GalaxyBodies? bodies;
+
+  /// Frees the native buffers.
+  void dispose() => frames.dispose();
+
+  Float64List? _scene;
+  Object? _key;
+
+  /// The scene buffer for [view], encoded when something it holds changed.
+  Float64List prepare(
+    GalaxyView view, {
+    required AppLocalizations l10n,
+    required LabelCache labels,
+    required GalaxyLabelStyles styles,
+    required Starfield starfield,
+  }) {
+    final key = (view.scene, view.revision, l10n, styles.base, styles.strong);
+    final cached = _scene;
+    if (cached != null && key == _key) return cached;
+    final bodies = this.bodies = GalaxyBodies(view.scene);
+    _key = key;
+    return _scene = encodeScene(
+      bodies,
+      stars: starfield.data,
+      // A device's label is always in the strong style.
+      deviceLabel: (system) =>
+          labels.of(deviceLabel(system.device.name), styles.strong).size,
+      planetLabel: (planet, {required strong}) => labels
+          .of(planetLabel(l10n, planet), strong ? styles.strong : styles.base)
+          .size,
+      appeared: view.appeared,
+      rippled: view.rippled,
+    );
+  }
+}
+
 /// The painter. Repaints whenever [view] ticks.
 class GalaxyPainter extends CustomPainter {
   /// Paints [view] in [palette].
@@ -123,6 +161,7 @@ class GalaxyPainter extends CustomPainter {
     required this.palette,
     required this.l10n,
     required this.labels,
+    required this.geometry,
     required this.starfield,
     required this.onBackdrop,
   }) : super(repaint: view);
@@ -139,6 +178,9 @@ class GalaxyPainter extends CustomPainter {
   /// Label layout cache.
   final LabelCache labels;
 
+  /// The scene's buffers and the frame computation.
+  final GalaxyGeometry geometry;
+
   /// The stars.
   final Starfield starfield;
 
@@ -148,34 +190,38 @@ class GalaxyPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
-    if (view.still) {
-      // A still scene has no entrances, ripples or fading ghosts.
-      view.appeared.clear();
-      view.rippled.clear();
-      view.ghosts.clear();
-    }
+    if (view.still) view.stopMotion();
     final dark = palette.dark;
     final camera = view.camera;
-    Backdrop.of(size, dark, palette.ratio, onBackdrop).paint(canvas);
-    starfield.paint(
-      canvas,
-      size,
-      camera.yaw,
-      camera.tilt,
-      view.time,
-      dark: dark,
-      still: view.still,
+    final styles = GalaxyLabelStyles(palette);
+    final scene = geometry.prepare(
+      view,
+      l10n: l10n,
+      labels: labels,
+      styles: styles,
+      starfield: starfield,
     );
-    final projection = camera.project(size);
-    final frame = _Frame(this, canvas, projection, size);
+    encodeFrame(
+      geometry.frames.frame,
+      size: size,
+      yaw: camera.yaw,
+      tilt: camera.tilt,
+      distance: camera.distance,
+      target: camera.target,
+      time: view.time,
+      still: view.still,
+      selected: geometry.bodies!.indexOf(view.selected),
+      hovered: geometry.bodies!.indexOf(view.hovered),
+      focused: geometry.bodies!.indexOf(view.focused),
+    );
+    Backdrop.of(size, dark, palette.ratio, onBackdrop).paint(canvas);
+    final values = geometry.frames.compute(scene);
+    if (values == null) return;
+    final reader = FrameReader(values);
+    starfield.paint(canvas, reader, dark: dark);
+    final frame = _Frame(this, canvas, reader, geometry.bodies!, styles, size);
     frame.plane();
-    final ordered = [
-      for (final system in view.scene.systems)
-        if (projection.at(system.position) case final core?) (system, core),
-    ]..sort((a, b) => b.$2.depth.compareTo(a.$2.depth));
-    for (final (system, core) in ordered) {
-      frame.system(system, core);
-    }
+    frame.systems();
     frame.links();
     frame.ghosts();
     frame.labels();
@@ -187,13 +233,57 @@ class GalaxyPainter extends CustomPainter {
       old.view != view || !old.palette.same(palette) || old.l10n != l10n;
 }
 
-/// One frame's drawing state.
+/// The labels' two styles: a planet's, and a device's or an emphasized
+/// body's.
+class GalaxyLabelStyles {
+  GalaxyLabelStyles(GalaxyPalette palette) {
+    final dark = palette.dark;
+    // A soft halo of the sky's own colour keeps a label legible over light.
+    final halo = [
+      Shadow(
+        color: (dark ? Colors.black : Colors.white).withValues(
+          alpha: dark ? 0.85 : 0.95,
+        ),
+        blurRadius: 6,
+      ),
+    ];
+    base = palette.text.copyWith(
+      fontSize: 11.5,
+      color: palette.ink.withValues(alpha: dark ? 0.82 : 0.78),
+      letterSpacing: 0.1,
+      height: 1.2,
+      shadows: halo,
+    );
+    strong = base.copyWith(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: palette.ink.withValues(alpha: dark ? 0.92 : 0.88),
+    );
+  }
+
+  /// A planet's label.
+  late final TextStyle base;
+
+  /// A device's, or an emphasized body's, label.
+  late final TextStyle strong;
+}
+
+/// One frame's drawing, reading the computed frame in order.
 class _Frame {
-  _Frame(this.painter, this.canvas, this.projection, this.size);
+  _Frame(
+    this.painter,
+    this.canvas,
+    this.reader,
+    this.bodies,
+    this.styles,
+    this.size,
+  );
 
   final GalaxyPainter painter;
   final Canvas canvas;
-  final Projection projection;
+  final FrameReader reader;
+  final GalaxyBodies bodies;
+  final GalaxyLabelStyles styles;
   final Size size;
   final List<Hit> hits = [];
 
@@ -201,191 +291,114 @@ class _Frame {
   GalaxyPalette get palette => painter.palette;
   bool get dark => palette.dark;
 
-  /// Whether [id] (of [system]) stays bright while something is selected.
-  bool _lit(String id, StarSystem system) {
-    final selected = view.selected;
-    if (selected == null) return true;
-    if (selected == id || selected == system.id) return true;
-    return system.planets.any((p) => p.id == selected) && id == system.id;
-  }
+  /// Runs of points (count, then each run's points) as views of the frame.
+  List<Float32List> _runs() => [
+    for (var n = reader.count(); n > 0; n--) reader.points(reader.count()),
+  ];
 
-  /// Fainter with distance, so depth reads without blur.
-  double _fade(double depth) {
-    final reference = view.camera.distance;
-    return (1.25 - (depth - reference) / (reference * 1.6)).clamp(0.42, 1.0);
+  static Path _path(Float32List run, [Path? into]) {
+    final path = into ?? Path();
+    path.moveTo(run[0], run[1]);
+    for (var i = 2; i < run.length; i += 2) {
+      path.lineTo(run[i], run[i + 1]);
+    }
+    return path;
   }
 
   void plane() {
-    final systems = view.scene.systems;
-    if (systems.isEmpty) return;
-    var reach = 3.0;
-    for (final system in systems) {
-      reach = math.max(reach, system.position.length + system.extent);
-    }
+    final glow = reader.next() != 0;
+    final oval = Rect.fromLTRB(
+      reader.next(),
+      reader.next(),
+      reader.next(),
+      reader.next(),
+    );
+    final blur = reader.next();
     // A soft glow over the plane, with no edge to it.
-    final rim = <Offset>[];
-    for (var i = 0; i < 48; i++) {
-      final a = i / 48 * math.pi * 2;
-      final p = projection.at(
-        Vec3(math.cos(a) * reach, 0, math.sin(a) * reach),
-      );
-      if (p != null) rim.add(p.point);
-    }
-    if (rim.length > 8) {
-      var bounds = Rect.fromPoints(rim.first, rim.first);
-      for (final point in rim) {
-        bounds = bounds.expandToInclude(Rect.fromPoints(point, point));
-      }
+    if (glow) {
       canvas.drawOval(
-        bounds.deflate(bounds.shortestSide * 0.12),
+        oval,
         Paint()
           ..color = palette.ink.withValues(alpha: dark ? 0.035 : 0.03)
-          ..maskFilter = MaskFilter.blur(
-            BlurStyle.normal,
-            bounds.shortestSide * 0.22,
-          ),
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
       );
     }
     // Faint guide circles give the plane its perspective, fading outwards.
-    for (var r = 2.6; r < reach; r += 2.6) {
-      final guide = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = palette.ink.withValues(
-          alpha: (dark ? 0.06 : 0.07) * (1 - r / (reach * 1.15)),
-        );
+    for (var guides = reader.count(); guides > 0; guides--) {
+      final fade = reader.next();
       final path = Path();
-      var started = false;
-      for (var i = 0; i <= 96; i++) {
-        final a = i / 96 * math.pi * 2;
-        final p = projection.at(Vec3(math.cos(a) * r, 0, math.sin(a) * r));
-        if (p == null) {
-          started = false;
-          continue;
-        }
-        if (started) {
-          path.lineTo(p.point.dx, p.point.dy);
-        } else {
-          path.moveTo(p.point.dx, p.point.dy);
-          started = true;
-        }
+      for (final run in _runs()) {
+        if (run.isNotEmpty) _path(run, path);
       }
-      canvas.drawPath(path, guide);
-    }
-  }
-
-  void system(StarSystem system, Projected core) {
-    final online = system.device.online;
-    final lit = _lit(system.id, system);
-    final base = (online ? 1.0 : 0.45) * (lit ? 1.0 : 0.3) * _fade(core.depth);
-    // One orbit per ring, split at the star so the front half covers it.
-    final rings = <int, Planet>{};
-    for (final planet in system.planets) {
-      rings.putIfAbsent(planet.ring, () => planet);
-    }
-    final back = <List<Offset>>[];
-    final front = <List<Offset>>[];
-    for (final planet in rings.values) {
-      _ring(system, planet, core.depth, back, front);
-    }
-    final placed = [
-      for (final planet in system.planets)
-        if (_place(system, planet) case final p?) (planet, p.$1, p.$2),
-    ];
-    _strokeRuns(back, base * 0.55);
-    for (final (planet, projected, appear) in placed) {
-      if (projected.depth > core.depth) {
-        _planet(system, planet, projected, appear, base);
-      }
-    }
-    _core(system, core, base);
-    _strokeRuns(front, base);
-    for (final (planet, projected, appear) in placed) {
-      if (projected.depth <= core.depth) {
-        _planet(system, planet, projected, appear, base);
-      }
-    }
-  }
-
-  void _ring(
-    StarSystem system,
-    Planet planet,
-    double coreDepth,
-    List<List<Offset>> back,
-    List<List<Offset>> front,
-  ) {
-    List<Offset>? run;
-    bool? behind;
-    for (var i = 0; i <= 96; i++) {
-      final a = i / 96 * math.pi * 2;
-      final local = tiltAround(
-        Vec3(math.cos(a) * planet.radius, 0, math.sin(a) * planet.radius),
-        planet.tiltAxis,
-        planet.tilt,
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8
+          ..color = palette.ink.withValues(alpha: (dark ? 0.06 : 0.07) * fade),
       );
-      final p = projection.at(system.position + local);
-      if (p == null) {
-        run = null;
-        continue;
+    }
+  }
+
+  void systems() {
+    for (var n = reader.count(); n > 0; n--) {
+      final system = bodies.systems[reader.count()];
+      final c = Offset(reader.next(), reader.next());
+      final radius = reader.next();
+      final depth = reader.next();
+      final base = reader.next();
+      final back = _runs();
+      final front = _runs();
+      final planets = [
+        for (var p = reader.count(); p > 0; p--)
+          (
+            planet: bodies.planets[reader.count()],
+            center: Offset(reader.next(), reader.next()),
+            radius: reader.next(),
+            depth: reader.next(),
+            opacity: reader.next(),
+            ripple: reader.next(),
+            behind: reader.next() != 0,
+          ),
+      ];
+      // One orbit per ring, split at the star so the front half covers it.
+      _strokeRuns(back, base * 0.55);
+      for (final planet in planets) {
+        if (planet.behind) _planet(planet);
       }
-      final isBehind = p.depth > coreDepth;
-      if (run == null || isBehind != behind) {
-        final previous = run?.last;
-        run = [?previous, p.point];
-        (isBehind ? back : front).add(run);
-        behind = isBehind;
-      } else {
-        run.add(p.point);
+      _core(system, c, radius, depth, base);
+      _strokeRuns(front, base);
+      for (final planet in planets) {
+        if (!planet.behind) _planet(planet);
       }
     }
   }
 
-  void _strokeRuns(List<List<Offset>> runs, double opacity) {
+  void _strokeRuns(List<Float32List> runs, double opacity) {
     if (runs.isEmpty || opacity <= 0) return;
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = dark ? 0.9 : 0.8
       ..color = palette.ink.withValues(alpha: (dark ? 0.16 : 0.22) * opacity);
     for (final run in runs) {
-      if (run.length < 2) continue;
-      canvas.drawPath(Path()..addPolygon(run, false), paint);
+      if (run.length < 4) continue;
+      canvas.drawPath(_path(run), paint);
     }
   }
 
-  /// Where [planet] is drawn now, and how far it has come out of its star.
-  (Projected, double)? _place(StarSystem system, Planet planet) {
-    final since = view.appeared[planet.id];
-    final appear = since == null ? 1.0 : _easeOut((view.time - since) / 1.6);
-    if (since != null && appear >= 1) view.appeared.remove(planet.id);
-    final orbit = planet.offsetAt(view.orbitTime);
-    // A new body spirals out of its star: it turns half a revolution while
-    // its distance grows.
-    final local = appear >= 1
-        ? orbit
-        : _turned(orbit, (1 - appear) * math.pi) * appear +
-              Vec3(0, 0.25 * (1 - appear), 0);
-    final projected = projection.at(system.position + local);
-    return projected == null ? null : (projected, appear);
-  }
-
-  void _core(StarSystem system, Projected core, double opacity) {
-    final breath = view.still
-        ? 1.0
-        : 1 + 0.04 * math.sin(view.time * 0.9 + system.position.x);
+  void _core(
+    StarSystem system,
+    Offset c,
+    double radius,
+    double depth,
+    double opacity,
+  ) {
     final online = system.device.online;
-    // Up close a star keeps a modest size, so the scene stays legible.
-    final radius =
-        ((system.home ? 0.22 : 0.15) * core.scale).clamp(
-          3.0,
-          system.home ? 26.0 : (online ? 15.0 : 11.0),
-        ) *
-        breath;
     final color = system.home
         ? palette.signal
         : online
         ? palette.star
         : palette.scheme.outline;
-    final c = core.point;
     if (dark && !online) {
       // An offline device is a dim ember: no light of its own.
       paintPlanet(
@@ -449,50 +462,37 @@ class _Frame {
     }
     _focusRings(system.id, c, radius);
     hits.add(
-      Hit(
-        system.id,
-        c,
-        radius * 1.6,
-        core.depth,
-        deviceLabel(system.device.name),
-      ),
+      Hit(system.id, c, radius * 1.6, depth, deviceLabel(system.device.name)),
     );
   }
 
   void _planet(
-    StarSystem system,
-    Planet planet,
-    Projected projected,
-    double appear,
-    double base,
+    ({
+      Planet planet,
+      Offset center,
+      double radius,
+      double depth,
+      double opacity,
+      double ripple,
+      bool behind,
+    })
+    body,
   ) {
-    final lit = _lit(planet.id, system);
-    final opacity =
-        (system.device.online ? 1.0 : 0.45) *
-        (lit ? 1.0 : 0.3) *
-        _fade(projected.depth) *
-        appear;
-    final radius =
-        (planet.size * projected.scale).clamp(2.5, 13.0) * (0.4 + 0.6 * appear);
-    final c = projected.point;
+    final planet = body.planet;
+    final (c, radius, opacity) = (body.center, body.radius, body.opacity);
     final color = palette.status(planet.service.status);
     final share = planet.share;
     // A ripple crosses the ring when the status changes.
-    final rippled = view.rippled[planet.id];
-    if (rippled != null) {
-      final t = (view.time - rippled) / 1.4;
-      if (t >= 1) {
-        view.rippled.remove(planet.id);
-      } else {
-        canvas.drawCircle(
-          c,
-          radius * (1.2 + t * 3.2),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.4
-            ..color = color.withValues(alpha: (1 - t) * 0.7 * opacity),
-        );
-      }
+    final t = body.ripple;
+    if (t >= 0) {
+      canvas.drawCircle(
+        c,
+        radius * (1.2 + t * 3.2),
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.4
+          ..color = color.withValues(alpha: (1 - t) * 0.7 * opacity),
+      );
     }
     paintPlanet(
       canvas,
@@ -508,13 +508,7 @@ class _Frame {
     }
     _focusRings(planet.id, c, radius);
     hits.add(
-      Hit(
-        planet.id,
-        c,
-        radius,
-        projected.depth,
-        planetLabel(painter.l10n, planet),
-      ),
+      Hit(planet.id, c, radius, body.depth, planetLabel(painter.l10n, planet)),
     );
   }
 
@@ -595,26 +589,17 @@ class _Frame {
   }
 
   void links() {
-    for (final link in view.scene.links) {
-      final from =
-          link.from.system.position + link.from.planet.offsetAt(view.orbitTime);
-      final to = link.to.position;
-      final rise = (to - from).length * 0.42 + 0.4;
-      final control = from.lerp(to, 0.5) + Vec3(0, rise, 0);
-      Vec3 at(double t) =>
-          from * ((1 - t) * (1 - t)) +
-          control * (2 * (1 - t) * t) +
-          to * (t * t);
-      final points = <Offset>[];
-      for (var i = 0; i <= 32; i++) {
-        final p = projection.at(at(i / 32));
-        if (p != null) points.add(p.point);
-      }
-      if (points.length < 2) continue;
-      final light = palette.signal;
-      final bounds = Rect.fromPoints(points.first, points.last).inflate(1);
+    final light = palette.signal;
+    for (var n = reader.count(); n > 0; n--) {
+      final curve = reader.points(reader.count());
+      final particles = reader.points(reader.count());
+      final last = curve.length - 2;
+      final bounds = Rect.fromPoints(
+        Offset(curve[0], curve[1]),
+        Offset(curve[last], curve[last + 1]),
+      ).inflate(1);
       canvas.drawPath(
-        Path()..addPolygon(points, false),
+        _path(curve),
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.6
@@ -627,12 +612,9 @@ class _Frame {
           ).createShader(bounds),
       );
       // Particles flow from the service to the device using it.
-      for (var k = 0; k < 3; k++) {
-        final t = view.still ? (k + 1) / 4 : (view.time * 0.22 + k / 3) % 1.0;
-        final p = projection.at(at(t));
-        if (p == null) continue;
+      for (var i = 0; i < particles.length; i += 2) {
         canvas.drawCircle(
-          p.point,
+          Offset(particles[i], particles[i + 1]),
           dark ? 2.2 : 1.8,
           Paint()
             ..color = light.withValues(alpha: 0.9)
@@ -644,6 +626,8 @@ class _Frame {
 
   void ghosts() {
     view.ghosts.removeWhere((g) => view.time - g.since > 1.0);
+    if (view.ghosts.isEmpty) return;
+    final projection = view.camera.project(size);
     for (final ghost in view.ghosts) {
       final p = projection.at(ghost.position);
       if (p == null) continue;
@@ -660,72 +644,19 @@ class _Frame {
   }
 
   void labels() {
-    // A soft halo of the sky's own colour keeps a label legible over light.
-    final halo = [
-      Shadow(
-        color: (dark ? Colors.black : Colors.white).withValues(
-          alpha: dark ? 0.85 : 0.95,
-        ),
-        blurRadius: 6,
-      ),
-    ];
-    final base = palette.text.copyWith(
-      fontSize: 11.5,
-      color: palette.ink.withValues(alpha: dark ? 0.82 : 0.78),
-      letterSpacing: 0.1,
-      height: 1.2,
-      shadows: halo,
-    );
-    final strong = base.copyWith(
-      fontSize: 12.5,
-      fontWeight: FontWeight.w600,
-      color: palette.ink.withValues(alpha: dark ? 0.92 : 0.88),
-    );
-    final emphasized = {view.selected, view.hovered, view.focused}
-      ..remove(null);
-    final candidates = [...hits]
-      ..sort((a, b) {
-        int rank(Hit h) => emphasized.contains(h.id)
-            ? 3
-            : h.id.startsWith('device:')
-            ? 2
-            : 1;
-        final byRank = rank(b).compareTo(rank(a));
-        return byRank != 0 ? byRank : b.radius.compareTo(a.radius);
-      });
-    // Stars are obstacles: a planet's label never lies over one.
-    final stars = [
-      for (final hit in hits)
-        if (hit.id.startsWith('device:'))
-          Rect.fromCircle(center: hit.center, radius: hit.radius * 0.7),
-    ];
-    final placed = <Rect>[];
-    var shown = 0;
-    for (final hit in candidates) {
-      final device = hit.id.startsWith('device:');
-      final emphasis = emphasized.contains(hit.id);
-      if (!emphasis && !device && hit.radius < 5) continue;
-      if (shown >= 28 && !emphasis) break;
-      final painter = _text(hit.label, device || emphasis ? strong : base);
-      final offset = Offset(
-        hit.center.dx - painter.width / 2,
-        hit.center.dy + hit.radius + (device ? 8 : 5),
-      );
-      final rect = (offset & painter.size).inflate(3);
-      if (!emphasis &&
-          (placed.any(rect.overlaps) ||
-              (!device && stars.any(rect.overlaps)))) {
-        continue;
-      }
-      if (rect.right < 0 || rect.left > size.width || rect.top > size.height) {
-        continue;
-      }
-      placed.add(rect);
-      painter.paint(canvas, offset);
-      shown++;
+    for (var n = reader.count(); n > 0; n--) {
+      final body = reader.count();
+      final strong = reader.next() != 0;
+      final offset = Offset(reader.next(), reader.next());
+      final text = body < bodies.systems.length
+          ? deviceLabel(bodies.systems[body].device.name)
+          : planetLabel(
+              painter.l10n,
+              bodies.planets[body - bodies.systems.length],
+            );
+      painter.labels
+          .of(text, strong ? styles.strong : styles.base)
+          .paint(canvas, offset);
     }
   }
-
-  TextPainter _text(String text, TextStyle style) =>
-      painter.labels.of(text, style);
 }

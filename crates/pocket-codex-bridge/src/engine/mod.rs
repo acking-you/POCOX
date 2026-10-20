@@ -9,6 +9,9 @@ pub mod codex_login;
 pub mod config;
 pub mod daemon;
 pub mod discovery;
+// The galaxy's frame geometry, called by the app through `dart:ffi`.
+#[cfg(feature = "flutter")]
+pub mod galaxy;
 pub mod grok_account;
 pub mod host_apply;
 mod host_lease;

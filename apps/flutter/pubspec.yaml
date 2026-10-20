@@ -31,6 +31,8 @@ dependencies:
   flutter_webrtc: 1.6.2+hotfix.3
   go_router: ^14.6.2
   path_provider: ^2.1.5
+  # Native buffers for the galaxy's per-frame call into the Rust bridge.
+  ffi: ^2.2.0
   # Renders agent replies as Markdown documents (headings, code, lists,
   # tables) instead of plain chat bubbles. Maintained drop-in for the
   # discontinued flutter_markdown (same `MarkdownBody` API). 1.0.9 stops a
