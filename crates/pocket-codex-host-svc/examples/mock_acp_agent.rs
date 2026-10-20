@@ -24,17 +24,18 @@
 //! - `--grok` speaks like Grok Build 1.0.62 (`_meta.grokShell`): its queue
 //!   names the running `_meta.promptId`, every turn ends with `turn_completed`,
 //!   `_x.ai/interject` streams ` still` and, in the next model response,
-//!   `interjected:<text>` into a running prompt or runs the text as a turn of
-//!   its own (`interject-fallback-1`, streaming `fallback:<text>`) when idle,
-//!   updates carry `_meta.totalTokens` and the model response's
-//!   `_meta.streamStartMs`, `_x.ai/session/rename` succeeds, `_x.ai/billing`
-//!   reports a weekly window, and the prompts `ask` and `plan` send
-//!   `_x.ai/ask_user_question` / `_x.ai/exit_plan_mode` and report the answer
-//!   (`asked:<json>` / `plan:<outcome>`); `perm` reports the permission mode
-//!   (`perm:<mode>`, from `session/new` `_meta` or `_x.ai/yolo_mode_changed`);
-//!   `chain` names its next prompt before answering; `strand` ends at once and
-//!   then runs `interject-fallback-2` (`fallback:late`), which asks for a
-//!   permission and reports `chosen:<option>`.
+//!   `interjected:<text>` into a running prompt (before it answers) or runs the
+//!   text as a turn of its own (`interject-fallback-1`, streaming
+//!   `fallback:<text>`) when idle, updates carry `_meta.totalTokens` and the
+//!   model response's `_meta.streamStartMs`, `_x.ai/session/rename` succeeds,
+//!   `_x.ai/billing` reports a weekly window, and the prompts `ask` and `plan`
+//!   send `_x.ai/ask_user_question` / `_x.ai/exit_plan_mode` and report the
+//!   answer (`asked:<json>` / `plan:<outcome>`); `perm` reports the permission
+//!   mode (`perm:<mode>`, from `session/new` `_meta` or
+//!   `_x.ai/yolo_mode_changed`); `chain` names its next prompt before
+//!   answering; `strand` ends at once and then runs `interject-fallback-2`
+//!   (`fallback:late`), which asks for a permission and reports
+//!   `chosen:<option>`.
 //!
 //! The agent title echoes the raw argument vector so tests can verify it
 //! arrived verbatim.
@@ -364,14 +365,16 @@ impl Agent {
     async fn interject(&self, id: &Value, params: &Value) {
         let session = params["sessionId"].as_str().unwrap_or("").to_string();
         let added = params["text"].as_str().unwrap_or("").to_string();
-        respond(id, json!({"result": {"status": "queued"}}));
         if self.running.lock().expect("lock").contains(&session) {
-            // Grok merges it into its next model response.
+            // Grok merges it into its next model response, here before the
+            // answer is written (the order hardest on the host).
             update(&session, text("agent_message_chunk", " still"));
             STREAM.fetch_add(1, Ordering::SeqCst);
             update(&session, text("agent_message_chunk", &format!("interjected:{added}")));
+            respond(id, json!({"result": {"status": "queued"}}));
             return;
         }
+        respond(id, json!({"result": {"status": "queued"}}));
         let fallback = "interject-fallback-1";
         queue_changed(&session, Some((fallback, &added)));
         update(&session, text("agent_message_chunk", &format!("fallback:{added}")));

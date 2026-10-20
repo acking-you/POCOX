@@ -292,30 +292,29 @@ impl AgentHost {
         }))
     }
 
-    /// Hold a supplement Grok took for `turn` until its next model response,
-    /// where Grok merges it ([`merge_held_supplements`]).
-    pub(super) fn hold_supplement(
-        &self,
-        generation: u64,
-        session: &str,
-        turn: &str,
-        text: &str,
-        images: usize,
-        client_id: Option<&str>,
-    ) {
+    /// Hold a supplement sent to Grok until its next model response, where
+    /// Grok merges it ([`merge_held_supplements`]); `held.stream` is the
+    /// response running now.
+    pub(super) fn hold_supplement(&self, generation: u64, session: &str, mut held: HeldSupplement) {
         let mut state = self.state();
         if state.generation != generation {
             return;
         }
         if let Some(entry) = state.sessions.get_mut(session) {
-            let stream = entry.native_stream;
-            entry.held_supplements.push(HeldSupplement {
-                turn: turn.to_string(),
-                text: text.to_string(),
-                images,
-                stream,
-                client_id: client_id.map(str::to_string),
-            });
+            held.stream = entry.native_stream;
+            entry.held_supplements.push(held);
+        }
+    }
+
+    /// Withdraw held interjection `id`, which Grok did not take (or whose
+    /// answer is unknown); one already merged stays recorded.
+    pub(super) fn withdraw_supplement(&self, generation: u64, session: &str, id: &str) {
+        let mut state = self.state();
+        if state.generation != generation {
+            return;
+        }
+        if let Some(entry) = state.sessions.get_mut(session) {
+            entry.held_supplements.retain(|held| held.id != id);
         }
     }
 

@@ -91,9 +91,11 @@ Grok merges an interjection into the running turn at its next safe point:
 after a tool batch, or before the turn would return, when it asks the
 model again with the message (`The user sent a message while you were
 working: …`). The response streaming when it arrived keeps going into the
-same message, so POCOX holds the supplement until Grok's next model
-response starts (a new `_meta.streamStartMs` on its updates) and records it
-in the turn there, before that response, still naming its sender's
+same message, so POCOX holds the supplement from the moment it sends it
+(Grok may merge it before its answer arrives; one Grok does not take is
+withdrawn) until Grok's next model response starts (a new
+`_meta.streamStartMs` on its updates), and records it in the turn there,
+before that response, still naming its sender's
 `clientId`. The sending view shows its copy below the streaming reply until
 the host's item with that id marks the merge point (other views show the
 host's item there), and

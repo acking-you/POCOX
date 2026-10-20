@@ -284,10 +284,16 @@ impl Index {
                 continue;
             }
             let span_len = u32::try_from(read).unwrap_or(u32::MAX);
-            if oversized {
+            if oversized && continues_turn(&line) {
                 // Its id still counts: reaching it in the log releases an
                 // overlay waiting for it (a live update too large to keep).
-                self.max_seq = self.max_seq.max(tail_seq(trim_line(&tail)).unwrap_or(0));
+                // A line that may open a turn the index cannot see (a
+                // prompt, or an xAI update such as a rewind) leaves the
+                // overlay to a later line.
+                let window = line_window(&line, &tail);
+                self.max_seq = self.max_seq.max(tail_seq(trim_line(&window)).unwrap_or(0));
+            }
+            if oversized {
                 self.push(
                     Span {
                         offset,
@@ -409,6 +415,30 @@ fn read_line(
             return Ok((consumed, true, oversized));
         }
     }
+}
+
+/// The last [`LINE_TAIL`] bytes of an oversized line: the end of its kept
+/// prefix `line`, then what was read past it (`tail`).
+fn line_window(line: &[u8], tail: &[u8]) -> Vec<u8> {
+    let from_line = LINE_TAIL.saturating_sub(tail.len());
+    let mut window = line[line.len().saturating_sub(from_line)..].to_vec();
+    window.extend_from_slice(tail);
+    window
+}
+
+/// Whether an oversized line can only continue its turn: an ACP update
+/// other than a user message chunk. Its kind is the first `sessionUpdate`
+/// of the kept prefix `head` (the envelope and `sessionId` come before the
+/// update); unknown counts as no.
+fn continues_turn(head: &[u8]) -> bool {
+    fn value_of<'a>(head: &'a [u8], key: &[u8]) -> Option<&'a [u8]> {
+        let at = head.windows(key.len()).position(|w| w == key)? + key.len();
+        let len = head[at..].iter().position(|&b| b == b'"')?;
+        Some(&head[at..at + len])
+    }
+    let xai = value_of(head, br#""method":""#) == Some(XAI_UPDATE.as_bytes());
+    let kind = value_of(head, br#""sessionUpdate":""#);
+    !xai && kind.is_some_and(|kind| kind != b"user_message_chunk")
 }
 
 /// The `eventId` sequence in the last `_meta` object of a line's `tail`:

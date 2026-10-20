@@ -282,33 +282,64 @@ fn a_live_tail_extends_the_last_turn_only_while_nothing_is_missing() {
     assert_eq!(texts(&older), [vec!["first", "one"]]);
 }
 
+/// A persisted line in Grok's field order (`_meta` after the update) whose
+/// whole line, newline included, is `len` bytes, with update `kind` and
+/// a text that ends with a quoted decoy `_meta`.
+fn big_line(kind: &str, len: usize, seq: u64) -> String {
+    let decoy = format!("\\\"_meta\\\":{{\\\"eventId\\\":\\\"{ID}-99\\\"}}");
+    let line = |fill: usize| {
+        format!(
+            r#"{{"timestamp":1,"method":"session/update","params":{{"sessionId":"{ID}","update":{{"sessionUpdate":"{kind}","content":{{"type":"text","text":"{}{decoy}"}}}},"_meta":{{"eventId":"{ID}-{seq}"}}}}}}"#,
+            "x".repeat(fill)
+        )
+    };
+    let fill = len - line(0).len() - 1;
+    let line = line(fill);
+    assert_eq!(line.len() + 1, len);
+    line
+}
+
 /// A line over the parse limit is shown as omitted, but its `eventId` (in
 /// `params._meta`, after the update) still counts, so an overlay waiting
-/// for it is released once it is in the log.
+/// for it is released once it is in the log, also when the line is barely
+/// over the limit and its `_meta` lies in the kept part. One that may open
+/// a turn (a prompt) leaves the overlay waiting for a later line.
 #[test]
 fn an_oversized_lines_event_id_releases_the_overlay() {
     use transcript::{read, Index, LiveTail};
-    let home = TempDir::new().expect("home");
-    let dir = session(home.path(), "%2Fwork", ID, summary(ID, "Big", "2026-10-19T10:00:00Z"));
-    // Grok's field order; the text ends with a quoted decoy `_meta`.
-    let text = format!("{}\"_meta\":{{\"eventId\":\"{ID}-99\"}}", "x".repeat(9 << 20));
-    let big = format!(
-        r#"{{"timestamp":1,"method":"session/update","params":{{"sessionId":"{ID}","update":{{"sessionUpdate":"agent_message_chunk","content":{{"type":"text","text":"{text}"}}}},"_meta":{{"eventId":"{ID}-5"}}}}}}"#
-    );
-    append(&dir, &[stamped(prompt(0, "first"), 1), stamped(reply("one"), 2), big]);
-    let update =
+    const LIMIT: usize = 8 << 20;
+    let after =
         serde_json::from_str::<Value>(&reply("after")).expect("update")["params"]["update"].clone();
     // The follower dropped the live copy of the large update and waits for
     // the log to reach it.
     let live = LiveTail {
         through: 5,
-        updates: vec![(6, update)],
+        updates: vec![(6, after)],
     };
-    let mut index = Index::default();
-    let shown = read(&dir, ID, &mut index, None, 20, Some(&live)).expect("page");
-    assert_eq!(index.max_seq(), 5);
-    // The streamed text continues the reply the large line belongs to.
-    assert_eq!(texts(&shown), [vec!["first", "oneafter"]]);
+    for (len, kind, released) in [
+        (9 << 20, "agent_message_chunk", true),
+        (LIMIT + 6, "agent_message_chunk", true),
+        (9 << 20, "user_message_chunk", false),
+    ] {
+        let home = TempDir::new().expect("home");
+        let dir = session(home.path(), "%2Fwork", ID, summary(ID, "Big", "2026-10-19T10:00:00Z"));
+        append(&dir, &[
+            stamped(prompt(0, "first"), 1),
+            stamped(reply("one"), 2),
+            big_line(kind, len, 5),
+        ]);
+        let mut index = Index::default();
+        let shown = read(&dir, ID, &mut index, None, 20, Some(&live)).expect("page");
+        let what = format!("{kind} of {len} bytes");
+        if released {
+            assert_eq!(index.max_seq(), 5, "{what}");
+            // The streamed text continues the reply the large line is in.
+            assert_eq!(texts(&shown), [vec!["first", "oneafter"]], "{what}");
+        } else {
+            assert_eq!(index.max_seq(), 2, "{what}");
+            assert_eq!(texts(&shown), [vec!["first", "one"]], "{what}");
+        }
+    }
 }
 
 pub(super) fn registry(home: &Path, pid: u32, opened_at: &str) {

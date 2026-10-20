@@ -18,6 +18,7 @@ use super::{
     turns::{check_message, content_blocks},
     *,
 };
+use crate::acp::state::HeldSupplement;
 
 impl AgentHost {
     /// Add `text` / `images` to the running turn of `session` (to
@@ -88,45 +89,63 @@ impl AgentHost {
         if caps.grok && !self.grok_runs(generation, session, &turn) {
             return Ok((SteerOutcome::PromptRequired, None));
         }
-        let (method, params) = if caps.grok {
-            (
+        let interjection = caps.grok.then(|| uuid::Uuid::new_v4().to_string());
+        let (method, params) = match &interjection {
+            Some(id) => (
                 grok::INTERJECT,
                 json!({"sessionId": session, "text": text, "content": blocks,
-                       "interjectionId": uuid::Uuid::new_v4().to_string()}),
-            )
-        } else {
-            (STEERING_METHOD, steering_params(session, blocks))
+                       "interjectionId": id}),
+            ),
+            None => (STEERING_METHOD, steering_params(session, blocks)),
         };
-        let call = peer
-            .send_request(method, params, Some(deadline))
-            .await
-            .map_err(|error| self.call_error(generation, error))?;
-        drop(lane);
-        let answer = call
-            .wait(Some(self.budgets().answer))
-            .await
-            .map_err(|error| self.call_error(generation, error))?;
-        let outcome = if caps.grok {
-            grok::interject_accepted(&answer).then_some(SteerOutcome::Injected)
-        } else {
-            SteerOutcome::from_result(&answer)
+        // Held before it is written: Grok may merge it at its next model
+        // response before its answer is seen here.
+        if let Some(id) = &interjection {
+            self.hold_supplement(generation, session, HeldSupplement {
+                id: id.clone(),
+                turn: turn.clone(),
+                text: text.to_string(),
+                images: images.len(),
+                stream: None,
+                client_id: client_id.map(str::to_string),
+            });
         }
-        .ok_or_else(|| {
-            HostError::Agent(
-                "it answered in an unrecognized way, so the message may or may not have been added"
-                    .into(),
-            )
-        })?;
-        match outcome {
-            SteerOutcome::Injected if caps.grok => {
-                self.hold_supplement(generation, session, &turn, text, images.len(), client_id);
-                Ok((outcome, Some(turn)))
-            },
-            SteerOutcome::Injected => {
+        let answered = async {
+            let call = peer
+                .send_request(method, params, Some(deadline))
+                .await
+                .map_err(|error| self.call_error(generation, error))?;
+            drop(lane);
+            let answer = call
+                .wait(Some(self.budgets().answer))
+                .await
+                .map_err(|error| self.call_error(generation, error))?;
+            if caps.grok {
+                grok::interject_accepted(&answer).then_some(SteerOutcome::Injected)
+            } else {
+                SteerOutcome::from_result(&answer)
+            }
+            .ok_or_else(|| {
+                HostError::Agent(
+                    "it answered in an unrecognized way, so the message may or may not have been \
+                     added"
+                        .into(),
+                )
+            })
+        }
+        .await;
+        if let Some(id) = &interjection {
+            if !matches!(answered, Ok(SteerOutcome::Injected)) {
+                self.withdraw_supplement(generation, session, id);
+            }
+        }
+        match answered? {
+            outcome @ SteerOutcome::Injected if caps.grok => Ok((outcome, Some(turn))),
+            outcome @ SteerOutcome::Injected => {
                 self.record_supplement(generation, session, &turn, text, images.len(), client_id);
                 Ok((outcome, Some(turn)))
             },
-            SteerOutcome::PromptRequired => Ok((outcome, None)),
+            outcome @ SteerOutcome::PromptRequired => Ok((outcome, None)),
         }
     }
 

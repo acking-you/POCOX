@@ -228,6 +228,8 @@ impl GrokPermission {
 /// A supplement the agent took but has not merged yet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeldSupplement {
+    /// Its interjection id.
+    pub id: String,
     /// The turn it was sent to.
     pub turn: String,
     /// Its text.

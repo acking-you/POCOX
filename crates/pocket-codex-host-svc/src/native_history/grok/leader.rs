@@ -87,8 +87,6 @@ impl NativeFollow {
 pub(super) struct Snapshot {
     /// Changes with every live update and state change.
     pub version: u64,
-    /// Whether a turn runs there; `None` when the leader has not said.
-    pub running: Option<bool>,
     pub tail: LiveTail,
 }
 
@@ -184,6 +182,14 @@ impl Follows {
             .map(|interest| interest.state.clone())
     }
 
+    /// Whether a turn runs in `session` (`None` when the leader has not
+    /// said), while a follow is connected to it; nothing is copied.
+    pub(super) fn running(&self, session: &str) -> Option<Option<bool>> {
+        let state = self.state(session)?;
+        let live = state.live.lock().unwrap_or_else(|p| p.into_inner());
+        live.connected.then_some(live.running)
+    }
+
     /// The live state of `session`, while a follow is connected to it.
     pub(super) fn snapshot(&self, session: &str) -> Option<Snapshot> {
         let state = self.state(session)?;
@@ -191,7 +197,6 @@ impl Follows {
         let live = state.live.lock().unwrap_or_else(|p| p.into_inner());
         live.connected.then(|| Snapshot {
             version,
-            running: live.running,
             tail: LiveTail {
                 through: live.through.unwrap_or(u64::MAX),
                 updates: live
