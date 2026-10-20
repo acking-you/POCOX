@@ -35,6 +35,9 @@ jobs:
       RELEASE_TAG: ${{ inputs.release_tag || 'v0.6.0' }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Download and verify the released Linux bundle
         run: |
           set -euo pipefail
