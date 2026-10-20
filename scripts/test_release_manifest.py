@@ -38,6 +38,28 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertRegex(version, r'^\d+\.\d+\.\d+$')
         self.assertGreater(build, 0)
 
+    def test_repackaging_keeps_other_assets_and_source_identity(self):
+        with tempfile.TemporaryDirectory() as work:
+            work = Path(work)
+            image = work / 'pocket-codex-app-v1.2.3-linux-x86_64.AppImage'
+            image.write_bytes(b'old')
+            other = work / 'pocket-codex-app-v1.2.3-macos-arm64.dmg'
+            other.write_bytes(b'unchanged')
+            with mock.patch.object(release_manifest, 'versions', return_value=('1.2.3', 40)):
+                original = release_manifest.collect(work, 'v1.2.3', 'source-commit')
+            path = work / 'release-manifest.json'
+            path.write_text(json.dumps(original))
+            image.write_bytes(b'new dependencies')
+            release_manifest.refresh_asset(path, image)
+            updated = json.loads(path.read_text())
+            self.assertEqual(updated['assets'][0]['sha256'], release_manifest.digest(image))
+            self.assertEqual(updated['assets'][0]['size'], image.stat().st_size)
+            self.assertEqual(updated['assets'][1], original['assets'][1])
+            self.assertEqual({k: v for k, v in updated.items() if k != 'assets'},
+                             {k: v for k, v in original.items() if k != 'assets'})
+            with self.assertRaises(ValueError):
+                release_manifest.refresh_asset(path, work / 'unlisted.AppImage')
+
 
 if __name__ == '__main__':
     unittest.main()

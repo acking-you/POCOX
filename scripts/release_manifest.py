@@ -80,6 +80,18 @@ def sign(manifest, key):
     return output
 
 
+def refresh_asset(manifest, asset):
+    """Replace one existing artifact, retaining the release's source identity."""
+    data = json.loads(manifest.read_text())
+    entries = [entry for entry in data['assets'] if entry['name'] == asset.name]
+    if len(entries) != 1:
+        raise ValueError(f'{asset.name} must name exactly one existing release asset')
+    entries[0].update(size=asset.stat().st_size, sha256=digest(asset))
+    manifest.write_text(json.dumps(data, indent=2) + '\n')
+    (manifest.parent / 'SHA256SUMS').write_text(
+        ''.join(f"{a['sha256']}  {a['name']}\n" for a in data['assets']))
+
+
 def verify(manifest, public_key):
     signature = manifest.with_name(manifest.name + '.sig')
     with tempfile.TemporaryDirectory() as work:
@@ -104,6 +116,10 @@ def main():
     checking = commands.add_parser('verify')
     checking.add_argument('manifest', type=Path)
     checking.add_argument('--public', type=Path, required=True)
+    refresh = commands.add_parser('refresh-asset')
+    refresh.add_argument('manifest', type=Path)
+    refresh.add_argument('asset', type=Path)
+    refresh.add_argument('--public', type=Path, required=True)
     args = parser.parse_args()
     if args.command == 'collect':
         manifest = collect(args.assets, args.tag, args.commit)
@@ -113,6 +129,9 @@ def main():
         print(args.out)
     elif args.command == 'sign':
         print(sign(args.manifest, args.key))
+    elif args.command == 'refresh-asset':
+        verify(args.manifest, args.public)
+        refresh_asset(args.manifest, args.asset)
     else:
         verify(args.manifest, args.public)
 

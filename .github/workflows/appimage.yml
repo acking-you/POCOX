@@ -1,0 +1,110 @@
+name: AppImage packaging
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/appimage.yml'
+      - '.github/workflows/release.yml'
+      - 'scripts/*appimage*'
+      - 'scripts/*release_manifest*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing release whose Linux bundle should be repackaged'
+        required: true
+        default: 'v0.6.0'
+      publish:
+        description: 'Replace the AppImage and re-sign its release manifest after testing'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: appimage-${{ inputs.release_tag || github.head_ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Offline AppImage startup
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag || 'v0.6.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify the released Linux bundle
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          mkdir input
+          gh release download "$RELEASE_TAG" --dir input \
+            --pattern "pocket-codex-app-$RELEASE_TAG-linux-x64.zip" \
+            --pattern 'release-manifest.json*'
+          python3 scripts/release_manifest.py verify input/release-manifest.json \
+            --public scripts/update_signing_key.pub.pem
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          manifest = json.loads(Path('input/release-manifest.json').read_text())
+          assert manifest['tag'] == os.environ['RELEASE_TAG']
+          archive = Path('input') / f"pocket-codex-app-{manifest['tag']}-linux-x64.zip"
+          entry, = [a for a in manifest['assets'] if a['name'] == archive.name]
+          assert archive.stat().st_size == entry['size']
+          assert hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest() == entry['sha256']
+          PY
+          unzip -q "input/pocket-codex-app-$RELEASE_TAG-linux-x64.zip" -d bundle
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
+            libayatana-appindicator3-dev librsvg2-dev libgirepository1.0-dev \
+            imagemagick patchelf desktop-file-utils
+      - name: Package
+        run: |
+          bash scripts/package_appimage.sh bundle apps/flutter/icon/icon_glyph.png \
+            "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
+      - name: Verify dependencies and offline startup in a clean desktop
+        run: bash scripts/test_appimage.sh "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage
+          path: dist/*.AppImage
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish && github.ref == 'refs/heads/main'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: appimage
+          path: dist
+      - name: Refresh the signed manifest and publish the tested AppImage
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$UPDATE_SIGNING_KEY"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq '.draft == false and .prerelease == false and .immutable != true')" = true
+          # Read the current manifest, not an earlier snapshot from the build.
+          gh release download "$RELEASE_TAG" --dir dist --pattern 'release-manifest.json*'
+          python3 scripts/release_manifest.py refresh-asset dist/release-manifest.json \
+            "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage" \
+            --public scripts/update_signing_key.pub.pem
+          key=$(mktemp)
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+          python3 scripts/release_manifest.py sign dist/release-manifest.json --key "$key"
+          python3 scripts/release_manifest.py verify dist/release-manifest.json \
+            --public scripts/update_signing_key.pub.pem
+          gh release upload "$RELEASE_TAG" --clobber dist/*

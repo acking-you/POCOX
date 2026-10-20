@@ -1644,6 +1644,17 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     collapses. iOS/Android (Impeller) not measured. See
     `docs/galaxy-geometry.md`.
 
+47. **Linux AppImage packaging (2026-10-21).** `scripts/package_appimage.sh`
+    collects the Flutter bundle's native dependencies with pinned linuxdeploy
+    and its GTK resource plugin, then uses a static AppImage runtime. Web auth
+    uses the system browser but its native plugin still links WebKit; bundle
+    that dependency too. Release packaging and the AppImage regression workflow
+    share the script and a clean, offline Ubuntu 22.04 startup check. Keep the
+    existing artifact name for installed updaters. A packaging-only refresh
+    reuses the signed release's portable bundle, replaces only its AppImage and
+    re-signs the manifest while preserving all other assets and source identity.
+    See `docs/linux-appimage.md`.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.
