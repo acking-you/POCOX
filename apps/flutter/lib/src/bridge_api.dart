@@ -177,6 +177,9 @@ abstract interface class BridgeApi implements UpdateApi {
   /// is conservative until connected.
   AppCapabilities appCapabilities(String serviceKey);
 
+  /// Display identity from the host's read-only info, without connecting.
+  Future<AgentIdentity> appAgentIdentity(String serviceKey);
+
   /// Ids of sessions executing now, from the engine itself (ACP).
   Future<List<String>> appRunningThreads(String serviceKey);
 

@@ -257,18 +257,7 @@ pub fn probe_reason(service_key: &str, owned: &Owned) -> Option<String> {
     if is_current(&key, &context) {
         return None;
     }
-    let origin = match origin(&key, &context, 0, owned, true) {
-        Ok(found) => found,
-        Err(error) => return Some(format!("{error:#}")),
-    };
-    let reason = GatewayClient::new(&origin.url)
-        .map_err(|error| anyhow!("{error}"))
-        .and_then(|client| {
-            runtime::runtime()
-                .block_on(async { tokio::time::timeout(CONNECT_TIMEOUT, client.info()).await })
-                .context("the agent host did not answer in time")?
-                .map_err(|error| anyhow!("{error}"))
-        })
+    host_info(service_key, owned)
         .map(|info| match info["phase"]["state"].as_str() {
             Some("ready") => None,
             Some("failed") => Some(
@@ -280,9 +269,95 @@ pub fn probe_reason(service_key: &str, owned: &Owned) -> Option<String> {
             Some("stopped") => Some("the agent is stopped on its host".to_string()),
             _ => Some("the agent is starting".to_string()),
         })
-        .unwrap_or_else(|error| Some(format!("{error:#}")));
+        .unwrap_or_else(|error| Some(format!("{error:#}")))
+}
+
+/// Read the host's declared profile without opening a session or event stream.
+/// The temporary tunnel is closed even on failure; stale context answers fail.
+pub fn host_info(service_key: &str, owned: &Owned) -> Result<Value> {
+    let context = Context::of(&owned.transport);
+    let key = key_in(&context, service_key)?;
+    let origin = origin(&key, &context, 0, owned, true)?;
+    read_info(origin, owned.epoch)
+}
+
+fn read_info(origin: Origin, epoch: u64) -> Result<Value> {
+    let result = GatewayClient::new(&origin.url)
+        .map_err(|error| anyhow!("{error}"))
+        .and_then(|client| {
+            runtime::runtime()
+                .block_on(async { tokio::time::timeout(CONNECT_TIMEOUT, client.info()).await })
+                .context("the agent host did not answer in time")?
+                .map_err(|error| anyhow!("{error}"))
+        });
     if let Some(handle) = origin.transient {
         handle.close();
     }
-    reason
+    if !transport::is_current(epoch) {
+        bail!("the account or relay changed while reading the agent identity");
+    }
+    result
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        io::{BufRead, BufReader, Write},
+        net::TcpListener,
+        thread,
+    };
+
+    use super::*;
+
+    #[test]
+    fn identity_reads_only_info_and_rejects_a_changed_transport() {
+        let _serial = transport::test_serial();
+        runtime::init(std::env::temp_dir()).expect("runtime");
+        for change_context in [false, true] {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+            let address = listener.local_addr().expect("address");
+            let epoch = transport::epoch();
+            let server = thread::spawn(move || {
+                let (mut socket, _) = listener.accept().expect("request");
+                socket
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .expect("timeout");
+                let mut request = String::new();
+                BufReader::new(&socket)
+                    .read_line(&mut request)
+                    .expect("request line");
+                assert_eq!(request.trim(), "GET /acp/v1/info HTTP/1.1");
+                if change_context {
+                    transport::context_changed();
+                }
+                let body = r#"{"api":1,"profile":{"id":"grok","displayName":"Grok Build"}}"#;
+                write!(
+                    socket,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: \
+                     {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .expect("response");
+            });
+            let connections = conns().len();
+            let result = read_info(
+                Origin {
+                    url: format!("http://{address}/"),
+                    subscription: None,
+                    local: None,
+                    transient: None,
+                },
+                epoch,
+            );
+            server.join().expect("server");
+            if change_context {
+                assert!(result.is_err(), "a previous account's identity is discarded");
+            } else {
+                let info = result.expect("identity");
+                assert_eq!(info["profile"]["id"], "grok");
+                assert_eq!(info["profile"]["displayName"], "Grok Build");
+                assert_eq!(conns().len(), connections, "no live session registered");
+            }
+        }
+    }
 }

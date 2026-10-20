@@ -54,9 +54,9 @@ pub use self::{
         CodexAuthStatusDto, CodexLoginStartDto, CodexSetupStatusDto,
     },
     connection::{
-        api_probe, api_probe_local, app_capabilities, app_connect, app_disconnect,
-        app_is_connected, app_probe, app_probe_local, app_probe_reason, app_running_threads,
-        AppCapabilitiesDto,
+        api_probe, api_probe_local, app_agent_identity, app_capabilities, app_connect,
+        app_disconnect, app_is_connected, app_probe, app_probe_local, app_probe_reason,
+        app_running_threads, AgentIdentityDto, AppCapabilitiesDto,
     },
     device_management::{
         device_management_set_enabled, device_management_status, host_restore_overrides,

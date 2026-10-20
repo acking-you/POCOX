@@ -2,6 +2,35 @@
 
 use super::*;
 
+/// Display identity only; does not grant capabilities or establish a session.
+pub struct AgentIdentityDto {
+    /// Engine family (`codex`, `opencode` or `acp`).
+    pub provider: String,
+    /// Explicit profile id reported by the host; empty when unknown.
+    pub profile_id: String,
+    /// Agent display name reported by the host; empty when unknown.
+    pub name: String,
+}
+
+/// Read an agent's display identity before connecting. ACP uses its existing
+/// read-only info route over a temporary tunnel; native engines need no
+/// request.
+pub fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto> {
+    let caps = match session_engine::protocol_of(&service_key) {
+        Protocol::Acp => {
+            let owned = transport::resolve_owned_blocking()?;
+            let info = crate::engine::acp::host_info(&service_key, &owned)?;
+            crate::engine::acp::capabilities_of(&info, 0)
+        },
+        _ => engine(&service_key).capabilities(&service_key),
+    };
+    Ok(AgentIdentityDto {
+        provider: caps.provider,
+        profile_id: caps.profile_id,
+        name: caps.provider_name,
+    })
+}
+
 /// Connect to a session service, dispatched by its key's protocol: a Codex
 /// app-server (subscribe on `127.0.0.1:<local_port>`, open the JSON-RPC
 /// websocket, run `initialize`) or an ACP gateway (`/acp/v1` snapshot, then

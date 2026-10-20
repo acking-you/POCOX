@@ -108,6 +108,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AgentCommandDto dco_decode_agent_command_dto(dynamic raw);
 
   @protected
+  AgentIdentityDto dco_decode_agent_identity_dto(dynamic raw);
+
+  @protected
   AgentToolsStatusDto dco_decode_agent_tools_status_dto(dynamic raw);
 
   @protected
@@ -709,6 +712,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   AgentCommandDto sse_decode_agent_command_dto(SseDeserializer deserializer);
+
+  @protected
+  AgentIdentityDto sse_decode_agent_identity_dto(SseDeserializer deserializer);
 
   @protected
   AgentToolsStatusDto sse_decode_agent_tools_status_dto(
@@ -1495,6 +1501,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_agent_command_dto(
     AgentCommandDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_agent_identity_dto(
+    AgentIdentityDto self,
     SseSerializer serializer,
   );
 

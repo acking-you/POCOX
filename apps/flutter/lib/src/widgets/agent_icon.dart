@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+export 'package:pocket_codex/src/bridge_api.dart' show AgentIdentity;
+
 /// Which bundled mark an agent shows.
 ///
 /// Derived only from explicit identity — the provider family and the ACP
@@ -160,25 +162,4 @@ class AgentIcon extends StatelessWidget {
       ),
     );
   }
-}
-
-/// What is known about the agent behind one service: its provider family,
-/// profile id and display name. Built from a local host's status or a
-/// connected host's reported profile; empty fields mean "not known yet".
-@immutable
-class AgentIdentity {
-  /// An identity for [provider] (`codex`, `opencode` or `acp`).
-  const AgentIdentity({required this.provider, this.profileId, this.name});
-
-  /// `codex`, `opencode` or `acp`.
-  final String provider;
-
-  /// ACP profile id, when the host reported one.
-  final String? profileId;
-
-  /// Agent display name, when known.
-  final String? name;
-
-  /// The mark this identity shows.
-  AgentKind get kind => agentKindOf(provider: provider, profileId: profileId);
 }

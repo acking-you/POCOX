@@ -3,6 +3,91 @@ part of '../home_screen_test.dart';
 /// The host switcher, its refresh and switch feedback, and the sidebar
 /// footer on desktop and phone.
 void _registerHostSwitching() {
+  testWidgets('Phone host sheet discovers ACP identities before connecting '
+      'and updates while open', (t) async {
+    t.view.physicalSize = const Size(400, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    const grok = ServiceEntry(
+      device: 'laptop',
+      kind: 'acp',
+      name: 'work',
+      key: 'pcx:laptop:acp:work',
+    );
+    const claude = ServiceEntry(
+      device: 'laptop',
+      kind: 'acp',
+      name: 'review',
+      key: 'pcx:laptop:acp:review',
+    );
+    // An instance name is not evidence of an agent's identity.
+    const unknown = ServiceEntry(
+      device: 'laptop',
+      kind: 'acp',
+      name: 'claude',
+      key: 'pcx:laptop:acp:claude',
+    );
+    final api = FakeBridgeApi(
+      config: _accountConfig,
+      services: [_app1, grok, claude, unknown],
+    );
+    final lateGrok = Completer<AgentIdentity>();
+    final unavailable = Completer<AgentIdentity>();
+    api.agentIdentityReplies[grok.key] = lateGrok.future;
+    api.agentIdentityReplies[unknown.key] = unavailable.future;
+    api.agentIdentities[claude.key] = const AgentIdentity(
+      provider: 'acp',
+      profileId: 'claude',
+      name: 'Claude Code',
+    );
+    await _pumpHome(t, api);
+    await t.pumpAndSettle();
+    await t.enterText(find.byKey(const Key('composer-input')), 'draft');
+    await t.tap(find.byIcon(AppIcons.menu));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+    await t.pumpAndSettle();
+    Finder icon(ServiceEntry service, String kind) => find.descendant(
+      of: find.byKey(Key('host-switch-item-${service.key}')),
+      matching: find.byKey(Key('agent-icon-$kind')),
+    );
+    expect(icon(grok, 'letter'), findsOneWidget);
+    expect(icon(claude, 'claude'), findsOneWidget);
+    lateGrok.complete(
+      const AgentIdentity(
+        provider: 'acp',
+        profileId: 'grok',
+        name: 'Grok Build',
+      ),
+    );
+    unavailable.completeError(StateError('offline'));
+    await t.pumpAndSettle();
+    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(icon(grok, 'grok'), findsOneWidget);
+    expect(find.text('Grok Build'), findsOneWidget);
+    expect(icon(unknown, 'letter'), findsOneWidget);
+    for (final service in [grok, claude, unknown]) {
+      expect(
+        api.agentIdentityCalls.where((key) => key == service.key),
+        hasLength(1),
+      );
+      expect(api.appIsConnected(service.key), isFalse);
+    }
+    expect(api.appIsConnected(_app1.key), isTrue);
+    // The same service key can now advertise a different profile.
+    api.agentIdentityReplies.remove(grok.key);
+    api.agentIdentities[grok.key] = const AgentIdentity(
+      provider: 'acp',
+      profileId: 'claude',
+      name: 'Claude Code',
+    );
+    await t.tap(find.byKey(const Key('host-switch-refresh')));
+    await t.pumpAndSettle();
+    expect(icon(grok, 'claude'), findsOneWidget);
+    expect(api.appIsConnected(grok.key), isFalse);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('Refresh services in the host switcher lists a host started '
       'elsewhere, in place, keeping the draft', (t) async {
     final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);

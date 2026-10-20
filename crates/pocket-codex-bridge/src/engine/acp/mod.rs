@@ -73,7 +73,9 @@ use serde_json::Value;
 use tokio::{sync::broadcast, task::JoinHandle, time::Instant};
 pub use translate::app_item as native_item;
 
-pub use self::connection::{connect, context_changed, disconnect, is_connected, probe_reason};
+pub use self::connection::{
+    connect, context_changed, disconnect, host_info, is_connected, probe_reason,
+};
 #[cfg(test)]
 use self::connection::{disconnect_inner, is_current, register};
 #[cfg(test)]

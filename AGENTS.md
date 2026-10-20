@@ -658,7 +658,11 @@ this file's roadmap so the source of truth stays in sync.
     native OpenCode, Claude adapter; launch templates, not bundled runtimes) and
     saved configurations (saved, then custom, which creates one);
     marks are bundled glyphs chosen by the engine or the explicit ACP profile
-    id (`Capabilities.profile_id`), never by a host's instance name. Hosting is
+    id (`Capabilities.profile_id`), never by a host's instance name. Remote
+    ACP entries also read the existing `/acp/v1/info` profile before connecting
+    (2026-10-21), through a temporary tunnel closed after the read. Discovery
+    identities grant no capabilities; refresh and transport changes invalidate
+    them, and an open phone host sheet updates as identities arrive. Hosting is
     platform-gated only (desktop), in self-host and account mode; the
     manage page, home hero and host switcher always offer it, for zero, one
     or many hosts. Several Codex and ACP hosts coexist with unique default

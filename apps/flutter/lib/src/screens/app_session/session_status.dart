@@ -420,8 +420,7 @@ extension _SessionStatus on _AppSessionState {
   }
 
   /// Agent identity per service key, from explicit sources only: this
-  /// device's hosts report their provider and profile, and the connected
-  /// ACP host reports its profile. Other remote hosts stay generic.
+  /// device's hosts, the current connection and read-only remote discovery.
   Map<String, AgentIdentity> _hostIdentities() {
     final out = <String, AgentIdentity>{};
     for (final host
@@ -446,6 +445,18 @@ extension _SessionStatus on _AppSessionState {
         profileId: caps.profileId,
         name: caps.providerName,
       );
+    }
+    for (final service in widget.services) {
+      if (sessionProtocolOf(service.key) != SessionProtocol.acp ||
+          out.containsKey(service.key)) {
+        continue;
+      }
+      // Loading/error values may retain an identity from an old account.
+      final identity = ref.watch(agentIdentityProvider(service.key));
+      if (!identity.isLoading && !identity.hasError) {
+        final known = identity.valueOrNull;
+        if (known != null) out[service.key] = known;
+      }
     }
     return out;
   }

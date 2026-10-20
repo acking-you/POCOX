@@ -1,6 +1,11 @@
 part of '../../fake_bridge_api.dart';
 
 mixin _FakeHosting on _FakeBridgeState {
+  /// Read-only identity requests, independent of session connections.
+  final List<String> agentIdentityCalls = [];
+  final Map<String, AgentIdentity> agentIdentities = {};
+  final Map<String, Future<AgentIdentity>> agentIdentityReplies = {};
+
   @override
   Future<AppServeResult> appServeStart({
     required int port,
@@ -132,6 +137,14 @@ mixin _FakeHosting on _FakeBridgeState {
       await gate.future;
     }
     return codexPath;
+  }
+
+  @override
+  Future<AgentIdentity> appAgentIdentity(String serviceKey) async {
+    agentIdentityCalls.add(serviceKey);
+    return await agentIdentityReplies[serviceKey] ??
+        agentIdentities[serviceKey] ??
+        const AgentIdentity(provider: 'acp');
   }
 
   @override

@@ -1,5 +1,21 @@
 part of '../bridge_api.dart';
 
+/// Display identity declared by a local host or read from a remote host.
+/// This never selects a transport or grants negotiated capabilities.
+class AgentIdentity {
+  /// An identity for [provider] (`codex`, `opencode` or `acp`).
+  const AgentIdentity({required this.provider, this.profileId, this.name});
+
+  /// Engine family.
+  final String provider;
+
+  /// Explicit ACP profile id, when known.
+  final String? profileId;
+
+  /// Agent display name, when known.
+  final String? name;
+}
+
 /// What became of [BridgeApi.appTurnSupplement].
 class TurnSupplement {
   /// Creates an outcome.

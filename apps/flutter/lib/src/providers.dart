@@ -88,6 +88,20 @@ final servicesProvider = FutureProvider<List<ServiceEntry>>((ref) async {
   return ref.watch(bridgeApiProvider).discoverServices();
 });
 
+/// Display metadata for an unconnected host. Re-read on discovery refresh and
+/// discard on account/relay changes. Failure leaves the protocol's generic icon.
+final agentIdentityProvider = FutureProvider.family<AgentIdentity, String>((
+  ref,
+  key,
+) async {
+  final api = ref.watch(bridgeApiProvider);
+  final config = ref.watch(configProvider.future);
+  final services = ref.watch(servicesProvider.future);
+  await config;
+  await services;
+  return api.appAgentIdentity(key);
+});
+
 /// This app's own publisher identity, known before its first host starts.
 final localDeviceMetadataProvider = Provider<DeviceMetadata>(
   (ref) => ref.watch(bridgeApiProvider).localDeviceMetadata(),

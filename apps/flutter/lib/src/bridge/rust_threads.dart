@@ -2,6 +2,16 @@ part of '../bridge_api_rust.dart';
 
 mixin _RustThreads implements BridgeApi {
   @override
+  Future<AgentIdentity> appAgentIdentity(String serviceKey) async {
+    final identity = await frb.appAgentIdentity(serviceKey: serviceKey);
+    return AgentIdentity(
+      provider: identity.provider,
+      profileId: identity.profileId,
+      name: identity.name,
+    );
+  }
+
+  @override
   Future<ThreadHistory?> appHistoryCached(
     String serviceKey,
     String threadId,

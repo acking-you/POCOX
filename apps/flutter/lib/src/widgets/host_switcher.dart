@@ -104,23 +104,22 @@ class HostSwitcher extends StatefulWidget {
 class _HostSwitcherState extends State<HostSwitcher> {
   final MenuController _menu = MenuController();
 
-  /// The services an open sheet shows: it follows discovery while open, so
-  /// a refresh updates the list in place.
-  late final _services = ValueNotifier(widget.services);
+  /// A sheet is another route: forward all inputs, including identities
+  /// arriving after discovery, so it stays current while open.
+  late final _sheetState = ValueNotifier(widget);
 
   @override
   void didUpdateWidget(HostSwitcher old) {
     super.didUpdateWidget(old);
-    if (identical(old.services, widget.services)) return;
     // The open sheet is another route; it is told after this build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _services.value = widget.services;
+      if (mounted) _sheetState.value = widget;
     });
   }
 
   @override
   void dispose() {
-    _services.dispose();
+    _sheetState.dispose();
     super.dispose();
   }
 
@@ -166,24 +165,24 @@ class _HostSwitcherState extends State<HostSwitcher> {
     context: context,
     anchored: true,
     builder: (c) => ValueListenableBuilder(
-      valueListenable: _services,
-      builder: (_, services, _) => _HostList(
-        services: services,
-        current: widget.current,
-        pending: widget.pending,
-        identities: widget.identities,
+      valueListenable: _sheetState,
+      builder: (_, state, _) => _HostList(
+        services: state.services,
+        current: state.current,
+        pending: state.pending,
+        identities: state.identities,
         touch: true,
         onPick: (key) {
           Navigator.of(c).pop();
           _pick(key);
         },
-        onManage: widget.onManage == null
+        onManage: state.onManage == null
             ? null
             : () {
                 Navigator.of(c).pop();
                 _manage();
               },
-        onRefresh: widget.onRefresh,
+        onRefresh: state.onRefresh,
       ),
     ),
   );

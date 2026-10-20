@@ -6,6 +6,13 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+/// Read an agent's display identity before connecting. ACP uses its existing
+/// read-only info route over a temporary tunnel; native engines need no request.
+Future<AgentIdentityDto> appAgentIdentity({required String serviceKey}) =>
+    RustLib.instance.api.crateApiBridgeConnectionAppAgentIdentity(
+      serviceKey: serviceKey,
+    );
+
 /// Connect to a session service, dispatched by its key's protocol: a Codex
 /// app-server (subscribe on `127.0.0.1:<local_port>`, open the JSON-RPC
 /// websocket, run `initialize`) or an ACP gateway (`/acp/v1` snapshot, then
@@ -89,6 +96,36 @@ Future<List<String>> appRunningThreads({required String serviceKey}) => RustLib
     .instance
     .api
     .crateApiBridgeConnectionAppRunningThreads(serviceKey: serviceKey);
+
+/// Display identity only; does not grant capabilities or establish a session.
+class AgentIdentityDto {
+  /// Engine family (`codex`, `opencode` or `acp`).
+  final String provider;
+
+  /// Explicit profile id reported by the host; empty when unknown.
+  final String profileId;
+
+  /// Agent display name reported by the host; empty when unknown.
+  final String name;
+
+  const AgentIdentityDto({
+    required this.provider,
+    required this.profileId,
+    required this.name,
+  });
+
+  @override
+  int get hashCode => provider.hashCode ^ profileId.hashCode ^ name.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AgentIdentityDto &&
+          runtimeType == other.runtimeType &&
+          provider == other.provider &&
+          profileId == other.profileId &&
+          name == other.name;
+}
 
 /// What a session service's provider supports, so the shared session UI can
 /// hide controls that do not apply. Optional ACP capabilities remain
