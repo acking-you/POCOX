@@ -95,6 +95,7 @@ use super::{
 use crate::process::{self, AgentProcess};
 
 mod grok;
+pub(crate) use self::grok::grok_permission_option;
 mod handoff;
 mod inbound;
 mod lifecycle;

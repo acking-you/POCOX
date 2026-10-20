@@ -529,6 +529,9 @@ pub fn app_thread_runtime_config(
 /// Read the account rate-limit / quota snapshot as raw JSON (5h + weekly
 /// windows). Parsed on the Dart side since the shape is nested and volatile.
 pub fn app_rate_limits(service_key: String) -> Result<String> {
+    if session_engine::protocol_of(&service_key) == session_engine::Protocol::Acp {
+        return crate::engine::acp::rate_limits(&service_key);
+    }
     require_native(&service_key, "rate limits")?;
     app_session::rate_limits(&service_key)
 }

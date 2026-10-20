@@ -120,6 +120,7 @@ pub fn router(host: AgentHost) -> Router {
         .route("/acp/v1/sessions/config", post(set_config))
         .route("/acp/v1/sessions/mode", post(set_mode))
         .route("/acp/v1/sessions/rename", post(rename))
+        .route("/acp/v1/rate-limits", get(rate_limits))
         .route("/acp/v1/permissions/answer", post(answer))
         .route("/acp/v1/questions/answer", post(answer_question))
         .with_state(state)
@@ -405,6 +406,10 @@ async fn set_mode(State(state): State<ApiState>, Json(body): Json<ModeBody>) -> 
         .await
         .map(Json)
         .map_err(ApiError)
+}
+
+async fn rate_limits(State(state): State<ApiState>) -> ApiResult {
+    state.host.rate_limits().await.map(Json).map_err(ApiError)
 }
 
 #[derive(Deserialize)]

@@ -514,6 +514,12 @@ pub fn set_session_config(
     store_settings(&link, &identity, thread_id, body)
 }
 
+/// The agent account's usage window (Grok's), as the app's rate-limit JSON.
+pub fn rate_limits(service_key: &str) -> Result<String> {
+    let client = conn(service_key)?.client;
+    Ok(block(client.rate_limits())?.to_string())
+}
+
 /// Rename a session through the agent (Grok's own rename).
 pub fn rename(service_key: &str, thread_id: &str, title: &str) -> Result<()> {
     let link = conn(service_key)?;

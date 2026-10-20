@@ -43,6 +43,10 @@ const REPLY: &str = "pong from the loopback model";
 const SLOW: &str = "please wait";
 /// The supplement's text; the log notes every request that carries it.
 const STEER: &str = "STEER-42";
+/// A 32×32 PNG (Grok drops images under 8×8 or 512 pixels).
+const IMAGE: &str = "data:image/png;base64,\
+                     iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKUlEQVR42u3NsQkAAAgDsB7W//\
+                     Esr3AQAtmTaU9FIBAIBAKBQCAQfAkWAwwATPGfc7wAAAAASUVORK5CYII=";
 const WAIT: Duration = Duration::from_secs(60);
 
 /// A loopback model: `GET /v1/models` and streamed `POST
@@ -93,12 +97,13 @@ async fn model() -> (u16, Arc<Mutex<Vec<String>>>) {
                 let model = body["model"].as_str().unwrap_or("-");
                 let text = body["messages"].to_string();
                 let steered = text.contains(STEER);
+                let image = text.contains("data:image/png;base64,");
                 // Only the turn's first request is slow: the one after an
                 // interjection answers at once.
                 let slow = text.contains(SLOW) && !steered;
-                log.lock()
-                    .expect("log")
-                    .push(format!("{line} keyed={keyed} steer={steered} model={model}"));
+                log.lock().expect("log").push(format!(
+                    "{line} keyed={keyed} steer={steered} image={image} model={model}"
+                ));
                 if slow && line.contains("/chat/completions") {
                     let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\nconnection: \
                                 close\r\n\r\n";
@@ -398,6 +403,25 @@ async fn grok_preset_hosts_reads_and_manages_real_sessions() {
                 .is_some_and(|commands| commands.iter().any(|c| c["name"] == "compact")),
             "Grok lists /compact"
         );
+        // Grok takes image prompts though it advertises none, and passes the
+        // image on to the model.
+        assert_eq!(caps["image"], true);
+        host.prompt(&session, "what is this", &[IMAGE.into()], None)
+            .await
+            .expect("image prompt");
+        until("a model request carrying the image", async || {
+            seen.lock()
+                .expect("log")
+                .iter()
+                .any(|c| c.contains("/chat/completions") && c.contains("image=true"))
+        })
+        .await;
+        until("the image turn's end", async || {
+            host.session_access(&session, &identity(&host))
+                .await
+                .is_ok_and(|access| access.can_release)
+        })
+        .await;
     }
 
     // Handed back, then reopened: Grok's agent is the session's only writer.

@@ -157,6 +157,41 @@ void main() {
     expect(api.turnStartCount, 0);
   });
 
+  testWidgets('a supplement stays below the reply it arrived during until '
+      'the agent merges it', (t) async {
+    final api = await running(t);
+    await supplement(t, 'also the docs');
+    AppEvent agent(String id, String text) => AppEvent(
+      kind: 'item/completed',
+      threadId: 'ses-1',
+      itemId: id,
+      itemType: 'agentMessage',
+      text: text,
+      raw: '{"turnId":"t1"}',
+    );
+    double top(String text) => t.getTopLeft(find.text(text)).dy;
+    // The reply streaming when it was sent keeps going above it.
+    api.pushEvent(acp, agent('ses-1:a1', 'still reading'));
+    await frames(t);
+    expect(top('still reading'), lessThan(top('also the docs')));
+    // The host's copy marks the merge point; what follows comes after it.
+    api.pushEvent(
+      acp,
+      const AppEvent(
+        kind: 'item/completed',
+        threadId: 'ses-1',
+        itemId: 'ses-1:s1',
+        itemType: 'userMessage',
+        text: 'also the docs',
+        raw: '{"turnId":"t1"}',
+      ),
+    );
+    api.pushEvent(acp, agent('ses-1:a2', 'docs updated'));
+    await frames(t);
+    expect(find.text('also the docs'), findsOneWidget);
+    expect(top('also the docs'), lessThan(top('docs updated')));
+  });
+
   for (final platform in [TargetPlatform.android, TargetPlatform.macOS]) {
     testWidgets(
       'supplement stays usable after normal send on $platform',
@@ -444,6 +479,43 @@ void main() {
       expect(find.text('once only'), findsOneWidget);
       expect(composerText(t), '', reason: 'the host took it');
       expect(api.turnStartCount, 0, reason: 'never a second prompt');
+    });
+
+    testWidgets('what follows comes after it, whichever arrives first', (
+      t,
+    ) async {
+      AppEvent agent(String turn, String id, String text) => AppEvent(
+        kind: 'item/completed',
+        threadId: 'ses-1',
+        itemId: id,
+        itemType: 'agentMessage',
+        text: text,
+        raw: '{"turnId":"$turn"}',
+      );
+      double top(String text) => t.getTopLeft(find.text(text)).dy;
+      final (api, gate) = await held(t);
+      api.pushEvent(acp, echo);
+      await frames(t);
+      gate.complete();
+      await frames(t);
+      api.pushEvent(acp, agent('t1', 'ses-1:a1', 'after it'));
+      await frames(t);
+      expect(top('once only'), lessThan(top('after it')));
+      // A turn that ends before the agent merged one releases it in place.
+      await supplement(t, 'never merged');
+      ended(api, 't1');
+      await frames(t);
+      api.pushEvent(
+        acp,
+        const AppEvent(
+          kind: 'turn/started',
+          threadId: 'ses-1',
+          raw: '{"turnId":"t2"}',
+        ),
+      );
+      api.pushEvent(acp, agent('t2', 'ses-1:a2', 'next turn'));
+      await frames(t);
+      expect(top('never merged'), lessThan(top('next turn')));
     });
 
     testWidgets('a reload after it', (t) async {

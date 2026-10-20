@@ -109,6 +109,10 @@ class ActivityGroup {
   return switch (type) {
     'webSearch' => (icon: AppIcons.travel_explore, label: l10n.toolSearched),
     'commandExecution' => (icon: AppIcons.terminal, label: l10n.toolRan),
+    'fileRead' => (icon: AppIcons.description_outlined, label: l10n.toolRead),
+    'fileList' => (icon: AppIcons.folder_open, label: l10n.toolListed),
+    'fileSearch' => (icon: AppIcons.search, label: l10n.toolSearchedFiles),
+    'planUpdate' => (icon: AppIcons.checklist, label: l10n.toolPlan),
     'fileChange' => (icon: AppIcons.edit_document, label: l10n.toolEdited),
     'mcpToolCall' ||
     'dynamicToolCall' => (icon: AppIcons.extension, label: l10n.toolCalled),
@@ -153,8 +157,14 @@ Color activityTint(String type, ColorScheme scheme) {
   return switch (type) {
     'commandExecution' => scheme.tertiary,
     'reasoning' || 'plan' => cautionColor(scheme),
-    'webSearch' || 'imageView' || 'imageGeneration' =>
+    'webSearch' ||
+    'fileRead' ||
+    'fileList' ||
+    'fileSearch' ||
+    'imageView' ||
+    'imageGeneration' =>
       light ? const Color(0xFF0E7C86) : const Color(0xFF4FC4CC),
+    'planUpdate' => cautionColor(scheme),
     'fileChange' => additionColor(scheme),
     'mcpToolCall' ||
     'dynamicToolCall' ||

@@ -48,7 +48,9 @@ class ShareRef {
   int? get port => int.tryParse(parseServiceKey(service).name);
 }
 
-final _openLink = RegExp(r'pocox://open\?[^\s)\]"<>`]+');
+// A link ends where a URL could not go on, including a backslash: one
+// quoted in a JSON tool output is followed by its escapes (`\n`).
+final _openLink = RegExp(r'pocox://open\?[^\s)\]"<>`\\]+');
 
 /// The share a `pocox://open?service=…&path=…[&scheme=https]` link names.
 ShareRef? parseOpenLink(String link) {

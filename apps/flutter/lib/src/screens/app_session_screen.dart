@@ -263,6 +263,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   final List<TranscriptItem> _items = [];
   final Map<String, int> _itemIndex = {};
   int _localSeq = 0; // ids for optimistic local user messages
+  // Supplement texts the host placed before this view showed its own copy
+  // (its echo outran the answer); such a copy is not held.
+  final _placedSupplements = <String>[];
   final Map<String, AsyncQuestionPrompt> _asyncQuestions = {};
 
   final List<AppEvent> _approvals = []; // pending command-approval prompts

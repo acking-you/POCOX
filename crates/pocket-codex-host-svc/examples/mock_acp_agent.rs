@@ -23,14 +23,18 @@
 //!   answers `startedNewTurn`, `silent` never answers.
 //! - `--grok` speaks like Grok Build 1.0.62 (`_meta.grokShell`): its queue
 //!   names the running `_meta.promptId`, every turn ends with `turn_completed`,
-//!   `_x.ai/interject` streams `interjected:<text>` into a running prompt or
-//!   runs the text as a turn of its own (`interject-fallback-1`, streaming
-//!   `fallback:<text>`) when idle, updates carry `_meta.totalTokens`,
-//!   `_x.ai/session/rename` succeeds, and the prompts `ask` and `plan` send
+//!   `_x.ai/interject` streams ` still` and, in the next model response,
+//!   `interjected:<text>` into a running prompt or runs the text as a turn of
+//!   its own (`interject-fallback-1`, streaming `fallback:<text>`) when idle,
+//!   updates carry `_meta.totalTokens` and the model response's
+//!   `_meta.streamStartMs`, `_x.ai/session/rename` succeeds, `_x.ai/billing`
+//!   reports a weekly window, and the prompts `ask` and `plan` send
 //!   `_x.ai/ask_user_question` / `_x.ai/exit_plan_mode` and report the answer
-//!   (`asked:<json>` / `plan:<outcome>`); `strand` ends at once and then runs
-//!   `interject-fallback-2` (`fallback:late`), which asks for a permission and
-//!   reports `chosen:<option>`.
+//!   (`asked:<json>` / `plan:<outcome>`); `perm` reports the permission mode
+//!   (`perm:<mode>`, from `session/new` `_meta` or `_x.ai/yolo_mode_changed`);
+//!   `chain` names its next prompt before answering; `strand` ends at once and
+//!   then runs `interject-fallback-2` (`fallback:late`), which asks for a
+//!   permission and reports `chosen:<option>`.
 //!
 //! The agent title echoes the raw argument vector so tests can verify it
 //! arrived verbatim.
@@ -80,6 +84,8 @@ struct Agent {
     clear_title: bool,
     steering: Option<String>,
     grok: bool,
+    /// Grok's permission mode, as `_meta` and `_x.ai/yolo_mode_changed` set it.
+    permission: Arc<Mutex<String>>,
     /// Sessions whose prompt is still unanswered.
     running: Arc<Mutex<HashSet<String>>>,
     next_id: Arc<Mutex<i64>>,
@@ -104,9 +110,15 @@ fn fail(id: &Value, code: i64, message: &str) {
     emit(&json!({"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}));
 }
 
+/// The model response the next updates belong to (Grok's
+/// `_meta.streamStartMs`).
+static STREAM: AtomicU64 = AtomicU64::new(1);
+
 fn update(session: &str, update: Value) {
+    let stream = STREAM.load(Ordering::SeqCst);
     emit(&json!({"jsonrpc": "2.0", "method": "session/update",
-        "params": {"sessionId": session, "update": update}}));
+        "params": {"sessionId": session, "update": update,
+            "_meta": {"streamStartMs": stream}}}));
 }
 
 fn text(kind: &str, text: &str) -> Value {
@@ -246,6 +258,17 @@ impl Agent {
                     *sessions += 1;
                     *sessions
                 };
+                if self.grok {
+                    let meta = &params["_meta"];
+                    let mode = if meta["yoloMode"] == true {
+                        "always-approve"
+                    } else if meta["autoMode"] == true {
+                        "auto"
+                    } else {
+                        "ask"
+                    };
+                    *self.permission.lock().expect("lock") = mode.into();
+                }
                 let mut result = self.settings();
                 result["sessionId"] = json!(format!("{}-s{n}", self.profile));
                 respond(&id, result);
@@ -324,7 +347,15 @@ impl Agent {
             },
             "_session/steering" if self.steering.is_some() => self.steer(&id, &params),
             "_x.ai/interject" if self.grok => self.interject(&id, &params).await,
-            "_x.ai/session/rename" if self.grok => respond(&id, json!({"result": null})),
+            "_x.ai/session/rename" if self.grok => respond(&id, json!({"success": true})),
+            "_x.ai/billing" if self.grok => respond(
+                &id,
+                json!({
+                    "config": {"creditUsagePercent": 12.0, "currentPeriod": {
+                        "type": "USAGE_PERIOD_TYPE_WEEKLY", "end": "2026-10-25T17:33:23Z"}},
+                    "subscription_tier": "SuperGrok Heavy",
+                }),
+            ),
             _ => fail(&id, -32601, "unknown method"),
         }
     }
@@ -335,6 +366,9 @@ impl Agent {
         let added = params["text"].as_str().unwrap_or("").to_string();
         respond(id, json!({"result": {"status": "queued"}}));
         if self.running.lock().expect("lock").contains(&session) {
+            // Grok merges it into its next model response.
+            update(&session, text("agent_message_chunk", " still"));
+            STREAM.fetch_add(1, Ordering::SeqCst);
             update(&session, text("agent_message_chunk", &format!("interjected:{added}")));
             return;
         }
@@ -565,6 +599,11 @@ impl Agent {
                 update(&session, text("agent_message_chunk", &format!("plan:{outcome}")));
                 respond(&id, json!({"stopReason": "end_turn"}));
             },
+            "perm" if self.grok => {
+                let mode = self.permission.lock().expect("lock").clone();
+                update(&session, text("agent_message_chunk", &format!("perm:{mode}")));
+                respond(&id, json!({"stopReason": "end_turn"}));
+            },
             "count" => {
                 let count = self.prompts.load(Ordering::SeqCst);
                 update(&session, text("agent_message_chunk", &format!("prompts:{count}")));
@@ -636,6 +675,7 @@ async fn main() {
         clear_title: has("--clear-title"),
         steering: flag("--steering"),
         grok: has("--grok"),
+        permission: Arc::new(Mutex::new("ask".into())),
         running: Arc::new(Mutex::new(HashSet::new())),
         args: args.clone(),
         next_id: Arc::new(Mutex::new(0)),
@@ -680,6 +720,11 @@ async fn main() {
                 if method == "session/prompt" && frame["params"]["prompt"][0]["text"] == "deaf" {
                     // Alive, but never reading again.
                     std::future::pending::<()>().await;
+                }
+            },
+            (None, Some("_x.ai/yolo_mode_changed")) if agent.grok => {
+                if let Some(mode) = frame["params"]["permission_mode"].as_str() {
+                    *agent.permission.lock().expect("lock") = mode.into();
                 }
             },
             (None, Some("session/cancel")) => {

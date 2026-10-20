@@ -193,6 +193,51 @@ impl ActiveTurn {
     }
 }
 
+/// Grok's permission mode: when it asks before acting.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum GrokPermission {
+    /// Asks for every action that needs approval.
+    #[default]
+    Ask,
+    /// Grok's classifier decides; it asks only when unsure (an account
+    /// without Grok's auto mode stays at asking).
+    Auto,
+    /// Never asks.
+    AlwaysApprove,
+}
+
+impl GrokPermission {
+    /// Every mode, in the order offered.
+    pub const ALL: [Self; 3] = [Self::Ask, Self::Auto, Self::AlwaysApprove];
+
+    /// Grok's name for the mode (`permission_mode`).
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Auto => "auto",
+            Self::AlwaysApprove => "always-approve",
+        }
+    }
+
+    /// The mode named `id`.
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|mode| mode.id() == id)
+    }
+}
+
+/// A supplement the agent took but has not merged yet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeldSupplement {
+    /// The turn it was sent to.
+    pub turn: String,
+    /// Its text.
+    pub text: String,
+    /// How many images it carried.
+    pub images: usize,
+    /// The model response running when it was taken.
+    pub stream: Option<u64>,
+}
+
 /// One admitted session of the current generation.
 #[derive(Debug, Clone)]
 pub struct Session {
@@ -221,6 +266,12 @@ pub struct Session {
     /// The prompt the agent's own queue reports running (Grok's
     /// `_x.ai/queue/changed`), with its text, when it reports one.
     pub native_running: Option<(String, String)>,
+    /// The model response the latest update came from (Grok's
+    /// `_meta.streamStartMs`), within the running turn.
+    pub native_stream: Option<u64>,
+    /// Supplements Grok took for the running turn but merges only at its
+    /// next model response (see `host/grok.rs`).
+    pub held_supplements: Vec<HeldSupplement>,
     touched: u64,
 }
 
@@ -278,6 +329,9 @@ struct Recent {
 pub struct State {
     /// Current generation.
     pub generation: u64,
+    /// Grok's permission mode for this host's sessions (`ask`, `auto` or
+    /// `always-approve`); kept across generations (see `host/grok.rs`).
+    pub grok_permission: GrokPermission,
     /// Current phase.
     pub phase: Phase,
     /// Negotiation result of the running generation.
@@ -376,6 +430,8 @@ impl State {
             releasing: false,
             release_owners: Vec::new(),
             native_running: None,
+            native_stream: None,
+            held_supplements: Vec::new(),
             replaying,
             touched,
         });
@@ -570,6 +626,10 @@ impl State {
         }
         if let Some(entry) = self.sessions.get_mut(session) {
             entry.active = None;
+            entry.native_stream = None;
+            // Never merged into this turn: Grok runs a stranded one as a
+            // turn of its own (opened with its text), and a stop drops it.
+            entry.held_supplements.retain(|held| held.turn != turn);
         }
         if let Some(transcript) = self.transcript_mut(session) {
             transcript.end_turn(turn, outcome.clone());
@@ -672,7 +732,7 @@ impl State {
             "cwd": session.cwd,
             "pending": session.pending,
             "releasing": session.releasing,
-            "configOptions": session.settings.config_options,
+            "configOptions": self.offered_options(session),
             "modes": session.settings.modes,
             "commands": session.settings.commands,
             "title": session.title,
@@ -685,6 +745,20 @@ impl State {
             "turnDispatched": session.active.as_ref().is_some_and(|t| t.dispatched),
             "cancelRequested": session.active.as_ref().is_some_and(|t| t.cancel_requested),
         })
+    }
+
+    /// The options a controller is offered for `session`: the agent's, plus
+    /// Grok's permission mode, which this host sets for it.
+    fn offered_options(&self, session: &Session) -> Vec<Value> {
+        let mut options = session.settings.config_options.clone();
+        if self
+            .negotiated
+            .as_ref()
+            .is_some_and(|negotiated| negotiated.capabilities.grok)
+        {
+            options.push(crate::acp::host::grok_permission_option(self.grok_permission));
+        }
+        options
     }
 
     /// Emit the state of session `id`.

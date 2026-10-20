@@ -26,6 +26,84 @@ import 'package:pocket_codex/src/screens/app_session/option_picker.dart';
 import 'package:pocket_codex/src/text_measure.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
+/// [settings] with the labels of the control the host adds for Grok (its
+/// permission mode, category `x.ai/permission`) and the plan-mode names it
+/// offers for Grok, in the app's language. Other labels are the agent's.
+SessionSettings localizedSettings(
+  SessionSettings settings,
+  AppLocalizations l10n,
+) {
+  SessionConfigOption localized(SessionConfigOption option) {
+    if (option.category != 'x.ai/permission') return option;
+    String label(SessionConfigValue value) => switch (value.value) {
+      'ask' => l10n.agentPermissionAsk,
+      'auto' => l10n.modeAuto,
+      'always-approve' => l10n.modeFull,
+      _ => value.name,
+    };
+    return SessionConfigOption(
+      id: option.id,
+      name: l10n.permissionMode,
+      category: option.category,
+      description: option.description,
+      currentValue: option.currentValue,
+      values: [
+        for (final value in option.values)
+          SessionConfigValue(
+            value: value.value,
+            name: label(value),
+            group: value.group,
+            description: value.description,
+          ),
+      ],
+    );
+  }
+
+  SessionMode mode(SessionMode mode) => switch ((mode.id, mode.name)) {
+    ('plan', 'Plan') => SessionMode(id: mode.id, name: l10n.planMode),
+    ('default', 'Default') => SessionMode(id: mode.id, name: l10n.modeStandard),
+    _ => mode,
+  };
+  return SessionSettings(
+    configOptions: [
+      for (final option in settings.configOptions) localized(option),
+    ],
+    currentMode: settings.currentMode,
+    modes: [for (final m in settings.modes) mode(m)],
+    usageUsed: settings.usageUsed,
+    usageSize: settings.usageSize,
+    running: settings.running,
+    cancelRequested: settings.cancelRequested,
+  );
+}
+
+/// The agent's Fast switch: its model option and the other member of the
+/// pair the current model belongs to, where the agent offers a model and its
+/// Fast variant side by side (Grok's "Grok 4.7" and "Grok 4.7 Fast"). Null
+/// when the current model has no such pair.
+({String option, String other, bool fast})? agentFastPair(
+  SessionSettings? settings,
+) {
+  final model = settings?.configOptions
+      .where((option) => option.category == 'model')
+      .firstOrNull;
+  if (model == null) return null;
+  final current = model.values
+      .where((value) => value.value == model.currentValue)
+      .firstOrNull;
+  if (current == null) return null;
+  const suffix = ' Fast';
+  final fast = current.name.endsWith(suffix);
+  final partner = fast
+      ? current.name.substring(0, current.name.length - suffix.length)
+      : '${current.name}$suffix';
+  final other = model.values
+      .where((value) => value.name == partner)
+      .firstOrNull;
+  if (other == null) return null;
+  return (option: model.id, other: other.value, fast: fast);
+}
+
 /// [options] in display order: model, thought level, mode, then the others,
 /// each group in agent order.
 List<SessionConfigOption> orderedOptions(List<SessionConfigOption> options) {
@@ -294,9 +372,10 @@ class AgentSessionOptions extends StatefulWidget {
     BuildContext context,
     SessionSettings? settings,
   ) {
+    final l10n = AppLocalizations.of(context);
     final segments = _segments(
-      settings,
-      AppLocalizations.of(context).agentMode,
+      settings == null ? null : localizedSettings(settings, l10n),
+      l10n.agentMode,
     );
     if (segments.isEmpty) return 0;
     return _capsuleChrome +
@@ -319,7 +398,10 @@ class AgentSessionOptions extends StatefulWidget {
     GlobalKey Function(Object id) segmentKey,
   ) {
     final l10n = AppLocalizations.of(context);
-    final settings = this.settings;
+    final settings = switch (this.settings) {
+      final settings? => localizedSettings(settings, l10n),
+      null => null,
+    };
     final segments = _segments(settings, l10n.agentMode);
     final natural = [
       for (final s in segments) _naturalWidth(context, s.label, s.cap),
@@ -384,6 +466,7 @@ class AgentSessionOptions extends StatefulWidget {
                 'model' => AppIcons.auto_awesome,
                 'thought_level' => AppIcons.psychology_outlined,
                 'mode' => AppIcons.swap_horiz,
+                'x.ai/permission' => AppIcons.shield_outlined,
                 _ => AppIcons.tune,
               },
               maxWidth: fit(_capOf(option.category)),

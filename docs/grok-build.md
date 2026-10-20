@@ -27,8 +27,13 @@ runtime dependencies. File references below are relative to
 
 Grok's own CLI speaks ACP v1, so no adapter is involved. Grok negotiates
 `session/load`, `session/list`, `session/resume`, `session/close` and HTTP
-MCP servers; it advertises no image or audio prompts, so attachments stay
-off. Its `initialize` lists the `grok.com` auth method. POCOX answers
+MCP servers. It advertises no image prompts but takes them (its terminal
+client sends them; `session/prompt_parser.rs`,
+`session/acp_session_impl/prompt_queue.rs`), so a Grok with its extensions
+([below](#groks-own-extensions)) accepts images; 1.0.4 stays without. Grok
+drops an image smaller than 8×8 or 512 pixels before sending, and tells
+the model so. Its
+`initialize` lists the `grok.com` auth method. POCOX answers
 permission requests with Grok's exact option ids (`allow-once`,
 `always-allow`, ...). Model and effort chips appear when Grok sends ACP
 `configOptions` (a `model` select, plus `reasoning_effort` in the
@@ -72,15 +77,26 @@ Grok's wire; the files are in `xai-grok-shell/src`.
 | Context in use | `_meta.totalTokens` of every update against the model's `models.availableModels[]._meta.totalContextTokens`; the session state carries it when a turn ends |
 | Questions | Grok's `_x.ai/ask_user_question` request (`questions: [{question, options: [{label, description}], multiSelect}]`, at most 8 questions of 16 options; a larger or malformed set is refused whole, never shown in part) is held like a permission request and shown as the composer's question card; the answer is `{"outcome": "accepted", "answers": {<question>: [labels]}}`, a skip or a withdrawal `{"outcome": "cancelled"}` (`session/acp_session_impl/spawn.rs`) |
 | Plan approval | Grok's `_x.ai/exit_plan_mode {planContent}` request is an approval card with the plan: Approve plan answers `{"outcome": "approved"}`, Keep planning `{"outcome": "cancelled"}` (`session/acp_session_impl/tool_calls.rs`) |
+| Tool rows | Each tool call's `_meta["x.ai/tool"].kind` (Grok's `ToolKind`, finer than ACP's kind) picks the app's native row: `execute`/`monitor` a command, `read`/`memory_get` a file read, `list`/`list_dir` a listing, `search`/`memory_search`/`lsp` a code search, `web_search`/`web_fetch` a web search, `task` a sub-agent, `plan` the plan, `image_gen`/`video_gen` a generation, `use_tool` an MCP call named `<server>.<tool>` from its `tool_name`, and an edit with diffs a file change. Anything else stays a generic tool row |
+| Plan mode | The standard `session/set_mode` with `default` and `plan`; Grok 1.0.62 lists no modes, so POCOX offers those two (`grok_modes`) as the mode chip |
+| Permission mode | An option of its own, Permission (`x.ai/permission_mode`: Ask first, Auto, Full access), sent as Grok's own `_x.ai/yolo_mode_changed {yolo_mode, auto_mode, permission_mode}` and as `_meta.{yoloMode, autoMode}` of every `session/new`, `load` and `resume`. It is the agent process's setting, so it changes every session of the host at once. Auto is Grok's auto gate: where the account or configuration has it off, Grok keeps asking |
+| Usage window | `_x.ai/billing` answers the account's `creditUsagePercent`, its period (weekly or monthly) and the period's end; the usage panel shows it as the period's limit with the subscription tier. A custom provider has no such window |
+| Fast | Grok lists its fast model as its own model (`Grok 4.7 Fast` beside `Grok 4.7`). The Fast chip switches between a model and its `<name> Fast` partner, and appears only when the current model has one |
+| Tool results | Grok reports an MCP call's result (and some text results) only as `rawOutput`, its `ToolOutput` (`{"type": "MCP", "output": {"OkayOutput": …}}`, `xai-grok-tools/src/types/output.rs`), never as content; that text becomes the call's output, as Grok's own client reads it. A `pocox.connect` share therefore shows its share card from the link in its result |
 
 ### Supplements
 
 Grok merges an interjection into the running turn at its next safe point:
 after a tool batch, or before the turn would return, when it asks the
 model again with the message (`The user sent a message while you were
-working: …`). POCOX records it in that turn as soon as Grok takes it, the
-way Codex's own steering works. Two cases leave it elsewhere, both as in
-Grok's terminal client:
+working: …`). The response streaming when it arrived keeps going into the
+same message, so POCOX holds the supplement until Grok's next model
+response starts (a new `_meta.streamStartMs` on its updates) and records it
+in the turn there, before that response. The controller shows its copy
+below the streaming reply until the host's copy marks the merge point, and
+the reply in progress is completed when the next item begins, so it never
+splits or keeps spinning. Two cases leave it elsewhere, both as in Grok's
+terminal client:
 
 - When the turn ends before the merge, Grok runs the message as a turn of
   its own (`interject-fallback-…`), which POCOX opens as above; the
@@ -319,8 +335,33 @@ With Grok 1.0.62 (2026-10-20):
   interjection of that turn and the reply followed it ("ok2 插话已收到").
   The transcript shows it inside that turn after a history read.
 
+Native rows, modes, limits and images (2026-10-20, Grok 1.0.62):
+
+- `acp/host/grok_tests.rs` covers a supplement held until Grok's next
+  model response, the plan and permission modes (a later session starting
+  in the mode set), the usage window and image prompts; the bridge tests
+  cover the native tool rows, completing a message the agent moved past,
+  and a result reported only as `rawOutput`; Flutter tests cover the held
+  copy's place (whichever of the host's copy and the answer arrives first,
+  and a turn ending before the merge), the Fast pairing, the permission
+  labels and a share link quoted in a JSON tool output.
+- `tests/grok_live.rs` also sent a 32×32 image prompt; the loopback model
+  received it as a data URL (a 1×1 and a 16×16 image were dropped by Grok
+  with a notice to the model).
+- In the macOS app on the Grok account (Grok 4.7): thinking, commands and
+  `pocox.services` / `pocox.connect` calls showed as native rows, and each
+  `pocox.connect` share showed its share card; the sidebar showed the
+  weekly window (88 % left, its reset time) and the header the context in
+  use. A supplement sent while Grok was still thinking stayed below the
+  running work, and the reply that merged it followed ("补充已收到"), with
+  one finished thinking section. Fast switched the session to Grok 4.7 Fast
+  and back; the permission menu (每次询问 / 替我审批 / 完全放行) and the
+  mode menu (标准 / 计划) opened without a change.
+
 Not verified: a stranded interjection or a looped, scheduled or goal turn
 on the real Grok, and Grok's real questions and plan approval (the mock
-only); a Grok terminal client holding a session live (covered by a real
+only); a turn in plan mode or under Auto or Full access on the real Grok;
+an image sent from the app's picker (the live test sent one through the
+host); a Grok terminal client holding a session live (covered by a real
 stand-in process); Linux; remote management against a real second
 device.

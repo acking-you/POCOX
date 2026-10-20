@@ -99,6 +99,10 @@ impl AgentHost {
             )
         })?;
         match outcome {
+            SteerOutcome::Injected if caps.grok => {
+                self.hold_supplement(generation, session, &turn, text, images.len());
+                Ok((outcome, Some(turn)))
+            },
             SteerOutcome::Injected => {
                 self.record_supplement(generation, session, &turn, text, images.len());
                 Ok((outcome, Some(turn)))
@@ -151,16 +155,27 @@ impl AgentHost {
         images: usize,
     ) {
         let mut state = self.state();
-        if state.generation != generation {
-            return;
+        if state.generation == generation {
+            record_supplement(&mut state, session, turn, text, images);
         }
-        let text = clip(text, MAX_PROMPT_TEXT);
-        if let Some(transcript) = state.transcript_mut(session) {
-            transcript.supplement(turn, &text, images);
-        }
-        state.event(json!({
-            "type": "supplement", "sessionId": session, "turnId": turn,
-            "text": text, "imageCount": images,
-        }));
     }
+}
+
+/// Fold an accepted supplement into `turn`'s transcript and tell the
+/// controllers, whose folds add the same item.
+pub(super) fn record_supplement(
+    state: &mut State,
+    session: &str,
+    turn: &str,
+    text: &str,
+    images: usize,
+) {
+    let text = clip(text, MAX_PROMPT_TEXT);
+    if let Some(transcript) = state.transcript_mut(session) {
+        transcript.supplement(turn, &text, images);
+    }
+    state.event(json!({
+        "type": "supplement", "sessionId": session, "turnId": turn,
+        "text": text, "imageCount": images,
+    }));
 }

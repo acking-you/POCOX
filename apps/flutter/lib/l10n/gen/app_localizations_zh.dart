@@ -358,6 +358,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modeReadOnlyDesc => '执行前询问；不写文件';
 
   @override
+  String get agentPermissionAsk => '每次询问';
+
+  @override
+  String get modeStandard => '标准';
+
+  @override
   String get modeAuto => '替我审批';
 
   @override
@@ -758,6 +764,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolRan => '执行命令';
+
+  @override
+  String get toolRead => '读取文件';
+
+  @override
+  String get toolListed => '列出文件';
+
+  @override
+  String get toolSearchedFiles => '搜索代码';
 
   @override
   String get toolEdited => '修改文件';
@@ -1854,6 +1869,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get fastMode => 'Fast';
+
+  @override
+  String get agentFastHint => '使用这个模型的 Fast 版本。';
 
   @override
   String get fastModeHint => '后续轮次使用模型支持的 Fast 服务档位。';

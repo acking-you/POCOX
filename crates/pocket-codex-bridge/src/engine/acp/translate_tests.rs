@@ -71,8 +71,10 @@ fn a_live_turn_maps_to_shared_item_events() {
         &json!({"type": "update", "sessionId": "s", "turnId": "t", "seq": 3,
         "update": {"sessionUpdate": "tool_call", "toolCallId": "c", "title": "ls", "kind": "execute", "status": "in_progress"}}),
     );
-    assert_eq!(tool[0].kind, "item/started");
-    assert_eq!(tool[0].item_type.as_deref(), Some("commandExecution"));
+    // The reply the tool call follows has ended.
+    assert_eq!(kinds(&tool), vec!["item/completed", "item/started"]);
+    assert_eq!(tool[0].item_id.as_deref(), Some("t:m1"));
+    assert_eq!(tool[1].item_type.as_deref(), Some("commandExecution"));
     let done = gateway_event(
         &mut shared,
         &json!({"type": "update", "sessionId": "s", "turnId": "t", "seq": 4,
@@ -363,7 +365,7 @@ fn notices_never_collide_with_agent_ids_and_clear_when_content_fits() {
     };
     assert_eq!(typed(&x, "#omitted:tool:x"), vec![CONTENT_OMITTED]);
     assert_eq!(screen.items["#omitted:tool:x"], "diffs");
-    assert_eq!(typed(&other, "tool:x:omitted"), vec!["dynamicToolCall"]);
+    assert_eq!(typed(&other, "tool:x:omitted"), vec!["fileRead"]);
     assert!(other
         .iter()
         .all(|e| e.item_id.as_deref() != Some("#omitted:tool:x")));
@@ -403,7 +405,7 @@ fn notices_never_collide_with_agent_ids_and_clear_when_content_fits() {
         .iter()
         .all(|e| e.item_id.as_deref() != Some("tool:x")
             && e.item_id.as_deref() != Some("#omitted:tool:x")));
-    assert_eq!(typed(&touched, "tool:x:omitted"), vec!["dynamicToolCall"]);
+    assert_eq!(typed(&touched, "tool:x:omitted"), vec!["fileRead"]);
 }
 
 #[test]
@@ -651,4 +653,116 @@ fn a_recovered_agent_started_turn_keeps_its_mark_and_message() {
     assert!(events
         .iter()
         .all(|e| e.item_type.as_deref() != Some("userMessage")));
+}
+
+/// Each tool call takes the native row its kind names: the agent's own
+/// finer kind first (Grok's `x.ai/tool`), then ACP's; Grok's MCP calls
+/// through `use_tool` read as `<server>.<tool>`.
+#[test]
+fn tool_calls_take_the_native_row_their_kind_names() {
+    let call = |id: &str, kind: &str, canonical: Option<&str>, input: Value| {
+        let mut update = json!({"sessionUpdate": "tool_call", "toolCallId": id, "title": id,
+            "kind": kind, "status": "completed", "rawInput": input});
+        if let Some(canonical) = canonical {
+            update["_meta"] = json!({"x.ai/tool": {"kind": canonical, "name": id}});
+        }
+        update
+    };
+    let mut host = Transcript::default();
+    host.begin_turn("t", "q", &[]);
+    for update in [
+        call("list", "other", Some("list_dir"), json!({})),
+        call("read", "read", None, json!({})),
+        call("grep", "search", None, json!({})),
+        call("web", "search", Some("web_search"), json!({})),
+        call("run", "execute", None, json!({})),
+        call("todo", "think", Some("plan"), json!({})),
+        call("use", "other", Some("use_tool"), json!({"tool_name": "pocox__connect"})),
+        call("other", "other", None, json!({})),
+    ] {
+        host.apply(Some("t"), &update);
+    }
+    let rows: Vec<(String, String)> = host.turns[0]
+        .items
+        .iter()
+        .filter(|item| item.kind == ItemKind::ToolCall)
+        .map(|item| {
+            let mapped = app_item(item, "t");
+            (mapped.item_type, mapped.title)
+        })
+        .collect();
+    let types: Vec<&str> = rows.iter().map(|(t, _)| t.as_str()).collect();
+    assert_eq!(types, [
+        "fileList",
+        "fileRead",
+        "fileSearch",
+        "webSearch",
+        "commandExecution",
+        "planUpdate",
+        "mcpToolCall",
+        "dynamicToolCall"
+    ]);
+    assert_eq!(rows[6].1, "pocox.connect");
+}
+
+/// Grok reports an MCP call's result only as `rawOutput` (its `ToolOutput`),
+/// which becomes the call's output, so a share's link reaches its card.
+#[test]
+fn a_result_reported_only_as_raw_output_is_the_calls_output() {
+    let mut host = Transcript::default();
+    host.begin_turn("t", "q", &[]);
+    host.apply(
+        Some("t"),
+        &json!({"sessionUpdate": "tool_call", "toolCallId": "c",
+        "title": "use_tool", "kind": "other", "status": "pending",
+        "rawInput": {"tool_name": "pocox__connect", "tool_input": {"action": "share"}},
+        "_meta": {"x.ai/tool": {"kind": "use_tool", "name": "use_tool"}}}),
+    );
+    host.apply(
+        Some("t"),
+        &json!({"sessionUpdate": "tool_call_update", "toolCallId": "c",
+        "status": "completed", "rawOutput": {"type": "MCP", "tool_name": "connect",
+            "server_name": "pocox",
+            "output": {"OkayOutput": "Shared: pocox://open?service=pcx:mac:port:8737&path=/"}}}),
+    );
+    let call = host.turns[0]
+        .items
+        .iter()
+        .find(|item| item.kind == ItemKind::ToolCall)
+        .expect("call");
+    let mapped = app_item(call, "t");
+    assert_eq!(mapped.title, "pocox.connect");
+    let detail: Value = serde_json::from_str(&mapped.text).expect("detail");
+    assert_eq!(detail["output"], "Shared: pocox://open?service=pcx:mac:port:8737&path=/");
+}
+
+/// A reasoning that the agent moved on from (a new item began) stops
+/// showing as in progress: its completion comes with the new item.
+#[test]
+fn a_message_another_item_follows_is_completed() {
+    let mut shared = Shared::default();
+    gateway_event(
+        &mut shared,
+        &json!({"type": "turn_started", "sessionId": "s",
+        "turnId": "t", "userText": "q", "seq": 1}),
+    );
+    let thought = json!({"sessionUpdate": "agent_thought_chunk",
+        "content": {"type": "text", "text": "hmm"}});
+    gateway_event(
+        &mut shared,
+        &json!({"type": "update", "sessionId": "s", "turnId": "t",
+        "update": thought, "seq": 2}),
+    );
+    let events = gateway_event(
+        &mut shared,
+        &json!({"type": "update", "sessionId": "s",
+        "turnId": "t", "seq": 3, "update": {"sessionUpdate": "tool_call",
+        "toolCallId": "c", "title": "ls", "kind": "execute", "status": "pending"}}),
+    );
+    let completed = events
+        .iter()
+        .find(|e| e.kind == "item/completed")
+        .expect("the thought's completion");
+    assert_eq!(completed.item_type.as_deref(), Some("reasoning"));
+    assert_eq!(completed.text.as_deref(), Some("hmm"));
 }

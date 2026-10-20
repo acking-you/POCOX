@@ -28,6 +28,11 @@ impl AgentHost {
         caps: &AgentCapabilities,
     ) -> (Value, Option<crate::acp::mcp::Adopt>) {
         let mut params = self.session_params(params);
+        if caps.grok {
+            // Grok starts each session in the permission mode set here.
+            let mode = self.state().grok_permission;
+            crate::acp::mcp::merge(&mut params["_meta"], grok::permission_meta(mode));
+        }
         let mcp = lock(&self.inner.session_mcp).clone();
         let grant = mcp
             .filter(|_| caps.mcp_http)
@@ -87,7 +92,10 @@ impl AgentHost {
             .inspect_err(|_| {
                 self.close_session(Some(id.clone()), &peer, &caps);
             })?;
-        let settings = SessionSettings::from_response(&result);
+        let mut settings = SessionSettings::from_response(&result);
+        if caps.grok {
+            grok::grok_modes(&mut settings);
+        }
         let evicted = {
             let mut state = self.state();
             if state.generation != generation {
@@ -276,7 +284,13 @@ impl AgentHost {
         {
             let mut state = self.state();
             if state.generation != generation
-                || !state.confirm(id, SessionSettings::from_response(&result))
+                || !state.confirm(id, {
+                    let mut settings = SessionSettings::from_response(&result);
+                    if caps.grok {
+                        grok::grok_modes(&mut settings);
+                    }
+                    settings
+                })
             {
                 return Err(HostError::NotReady);
             }
@@ -524,7 +538,12 @@ impl AgentHost {
     ) -> Result<Value, HostError> {
         let _control = self.inner.session_control.lock().await;
         valid_id(session)?;
-        let (generation, peer, _) = self.ready_for(expected)?;
+        let (generation, peer, caps) = self.ready_for(expected)?;
+        if caps.grok && config == grok::PERMISSION_OPTION {
+            return self
+                .set_grok_permission(generation, &peer, session, value)
+                .await;
+        }
         if !self.settings_allow(session, |settings| settings.allows_config_value(config, value))? {
             return Err(HostError::InvalidInput("that value is not offered".into()));
         }

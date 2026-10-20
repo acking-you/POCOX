@@ -27,17 +27,17 @@ impl AgentHost {
             .negotiated
             .as_ref()
             .is_some_and(|negotiated| negotiated.capabilities.grok);
-        let Some(entry) = state.sessions.get_mut(&session) else { return };
         if grok {
-            // Grok names the context in use on every update; the session
-            // state carries it when the turn ends.
-            // A replay arrives before the reopen's answer names the window,
-            // which `State::confirm` then fills in.
-            if let Some(used) = params["_meta"]["totalTokens"].as_u64() {
-                let size = entry.settings.context_window().unwrap_or_default();
-                entry.usage = Some((used, size));
-            }
+            super::grok::merge_held_supplements(
+                &mut state,
+                &session,
+                params["_meta"]["streamStartMs"].as_u64(),
+            );
         }
+        if grok && super::grok::note_usage(&mut state, &session, &params) {
+            state.session_event(&session);
+        }
+        let Some(entry) = state.sessions.get_mut(&session) else { return };
         let (pending, replaying) = (entry.pending, entry.replaying);
         let turn = if pending { None } else { entry.active.as_ref().map(|t| t.id.clone()) };
         if let Some(signal) = signal {

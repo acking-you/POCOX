@@ -1552,7 +1552,19 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     `_x.ai/queue/interject` (send now) is not steering. Rename, context use,
     questions (`ask_user_question`, the question card) and plan approval
     (`exit_plan_mode`) map to POCOX's controls; any ACP agent's
-    `available_commands_update` feeds the `/` list and `/compact`. The
+    `available_commands_update` feeds the `/` list and `/compact`. A
+    supplement is held until Grok's next model response (`streamStartMs`
+    changes) and recorded there, so the reply it arrived during never
+    splits; a message the agent moved past is completed when the next item
+    begins. Tool rows follow `_meta["x.ai/tool"].kind`; a result Grok
+    reports only as `rawOutput` (MCP calls) is the call's output, so a
+    `pocox.connect` share shows its card. Plan mode is
+    `session/set_mode` (default/plan offered when Grok lists none); the
+    Permission option (ask/auto/always-approve) is host-wide, sent as
+    `_x.ai/yolo_mode_changed` and in every session request's `_meta`; Auto
+    falls back to asking where Grok's auto gate is off. Images are sent
+    though Grok advertises none; `_x.ai/billing` feeds the usage window;
+    Fast pairs a model with its `<name> Fast` partner. The
     leader socket (joining a terminal client's live session) is not used:
     the host owns its agent process. See [Grok Build](docs/grok-build.md).
 

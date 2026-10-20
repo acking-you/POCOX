@@ -72,6 +72,18 @@ async fn supplements_reach_the_running_turn_and_grok_turns_are_followed() {
         Ok((SteerOutcome::Injected, Some(turn.clone())))
     );
     eventually(|| agent_said(&host, "interjected:more"), "the interjection").await;
+    // Shown where Grok merged it: after the response it arrived during
+    // (which kept streaming into the same message), before the next one.
+    let texts: Vec<String> = host
+        .state()
+        .transcript_ref(&session)
+        .and_then(|t| t.turn(&turn).cloned())
+        .expect("turn")
+        .items
+        .iter()
+        .map(|item| item.text.clone())
+        .collect();
+    assert_eq!(texts, ["slow", "working still", "more", "interjected:more"], "{texts:?}");
     host.cancel(&session, Some(&turn), None)
         .await
         .expect("cancel");
@@ -219,5 +231,64 @@ async fn renames_and_context_usage_come_from_grok() {
     eventually(|| super::tests::outcome(&host, &session, &turn).is_some(), "the end").await;
     assert_eq!(host.state().sessions[&session].usage, Some((250, 1000)));
     assert_eq!(host.info()["commands"][0]["name"], "compact");
+    host.stop().await;
+}
+
+/// Grok's plan and permission modes are offered, the permission mode reaches
+/// Grok (and later sessions start in it), its usage window maps to the
+/// app's rate limits, and image prompts are accepted.
+#[tokio::test]
+async fn grok_modes_permissions_usage_window_and_images() {
+    let (host, session, cwd) = grok_host().await;
+    assert_eq!(host.info()["capabilities"]["image"], true);
+    let state = host.state().session_body(&session);
+    assert_eq!(state["modes"]["availableModes"][1]["id"], "plan");
+    let permission = state["configOptions"]
+        .as_array()
+        .and_then(|options| {
+            options
+                .iter()
+                .find(|o| o["id"] == "x.ai/permission_mode")
+                .cloned()
+        })
+        .expect("permission option");
+    assert_eq!(permission["currentValue"], "ask");
+
+    let body = host
+        .set_config_option(&session, "x.ai/permission_mode", "auto", None)
+        .await
+        .expect("set");
+    assert!(body["configOptions"]
+        .to_string()
+        .contains("\"currentValue\":\"auto\""));
+    let turn = host
+        .prompt(&session, "perm", &[], None)
+        .await
+        .expect("turn");
+    eventually(|| agent_said(&host, "perm:auto"), "the mode reaching Grok").await;
+    eventually(|| outcome_of(&host, &session, &turn).is_some(), "the end").await;
+    host.set_mode(&session, "plan", None)
+        .await
+        .expect("plan mode");
+
+    // A later session starts in it.
+    host.set_config_option(&session, "x.ai/permission_mode", "always-approve", None)
+        .await
+        .expect("set");
+    let second = host
+        .new_session(&cwd.path().to_string_lossy(), None)
+        .await
+        .expect("session")["sessionId"]
+        .as_str()
+        .expect("id")
+        .to_string();
+    let turn = host.prompt(&second, "perm", &[], None).await.expect("turn");
+    eventually(|| agent_said(&host, "perm:always-approve"), "a new session's mode").await;
+    eventually(|| outcome_of(&host, &second, &turn).is_some(), "the end").await;
+
+    let limits = host.rate_limits().await.expect("usage window");
+    assert_eq!(limits["rateLimits"]["secondary"]["usedPercent"], 12.0);
+    assert_eq!(limits["rateLimits"]["secondary"]["windowDurationMins"], 10080);
+    assert_eq!(limits["planType"], "SuperGrok Heavy");
     host.stop().await;
 }

@@ -42,7 +42,13 @@ class TranscriptItem {
     this.turnId = '',
     this.turnCompletedAt,
     this.turnDurationMs,
+    this.held = false,
   });
+
+  /// A supplement the agent took but merges only at its next response (an
+  /// ACP agent such as Grok): it stays the last row of its turn until the
+  /// host shows where it was merged.
+  bool held;
 
   /// Stable row id: the server's item id, or a locally minted one for an
   /// optimistic user message.

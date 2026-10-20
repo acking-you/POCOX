@@ -25,6 +25,7 @@
 //! supplement is sent only while Grok reports this host's turn running.
 
 use super::*;
+use crate::acp::state::{GrokPermission, HeldSupplement};
 
 /// Grok's queue state, with the prompt it runs.
 pub(super) const QUEUE_CHANGED: &str = "_x.ai/queue/changed";
@@ -37,6 +38,53 @@ const RENAME: &str = "_x.ai/session/rename";
 pub(super) const PLAN_APPROVAL: &str = "_x.ai/exit_plan_mode";
 /// Grok asks the user questions with offered answers.
 pub(super) const QUESTION: &str = "_x.ai/ask_user_question";
+
+/// The option of Grok's permission mode, which this host sets for it.
+pub(super) const PERMISSION_OPTION: &str = "x.ai/permission_mode";
+/// The Grok account's credit usage and period.
+const BILLING: &str = "_x.ai/billing";
+/// Grok's permission mode change, applied to every session of its process.
+const PERMISSION_CHANGED: &str = "_x.ai/yolo_mode_changed";
+
+/// Grok's permission mode as a select option (`category` names it for the
+/// UI, which labels its values).
+pub(crate) fn grok_permission_option(mode: GrokPermission) -> Value {
+    json!({
+        "id": PERMISSION_OPTION,
+        "name": "Permissions",
+        "category": "x.ai/permission",
+        "type": "select",
+        "currentValue": mode.id(),
+        "options": [
+            {"value": "ask", "name": "Ask"},
+            {"value": "auto", "name": "Auto"},
+            {"value": "always-approve", "name": "Always approve"},
+        ],
+    })
+}
+
+/// Grok's plan mode as session modes: Grok accepts `default` and `plan` in
+/// `session/set_mode` and reports `current_mode_update`, but does not
+/// advertise them.
+pub(super) fn grok_modes(settings: &mut SessionSettings) {
+    if settings.modes.is_none() {
+        settings.modes = Some(json!({
+            "currentModeId": "default",
+            "availableModes": [
+                {"id": "default", "name": "Default"},
+                {"id": "plan", "name": "Plan"},
+            ],
+        }));
+    }
+}
+
+/// The `_meta` starting or reopening a session in `mode`.
+pub(super) fn permission_meta(mode: GrokPermission) -> Value {
+    json!({
+        "yoloMode": mode == GrokPermission::AlwaysApprove,
+        "autoMode": mode == GrokPermission::Auto,
+    })
+}
 
 /// Most questions, and options per question, taken from one request.
 const MAX_QUESTIONS: usize = 8;
@@ -168,6 +216,105 @@ impl AgentHost {
             return;
         };
         self.admit_request(generation, peer, id, request);
+    }
+
+    /// Set Grok's permission mode. It applies to every session of the agent
+    /// process, so every session's state changes; later sessions start in it.
+    pub(super) async fn set_grok_permission(
+        &self,
+        generation: u64,
+        peer: &Peer,
+        session: &str,
+        value: &str,
+    ) -> Result<Value, HostError> {
+        let mode = GrokPermission::from_id(value)
+            .ok_or_else(|| HostError::InvalidInput("that value is not offered".into()))?;
+        let deadline = Instant::now() + self.budgets().control;
+        let delivered = peer
+            .notify(
+                PERMISSION_CHANGED,
+                json!({
+                    "yolo_mode": mode == GrokPermission::AlwaysApprove,
+                    "auto_mode": mode == GrokPermission::Auto,
+                    "permission_mode": mode.id(),
+                }),
+                deadline,
+            )
+            .await;
+        self.control_outcome(generation, peer, delivered)?;
+        let mut state = self.state();
+        if state.generation != generation {
+            return Err(HostError::NotReady);
+        }
+        state.grok_permission = mode;
+        let sessions: Vec<String> = state.sessions.keys().cloned().collect();
+        for id in sessions {
+            state.session_event(&id);
+        }
+        Ok(state.session_body(session))
+    }
+
+    /// The Grok account's usage window (`_x.ai/billing`), in the app's
+    /// rate-limit shape: the period's used share and its reset, with the
+    /// subscription tier. Needs a Grok account (a custom provider has none).
+    pub async fn rate_limits(&self) -> Result<Value, HostError> {
+        let (generation, peer, caps) = self.ready()?;
+        if !caps.grok {
+            return Err(HostError::Unsupported("this agent reports no usage limits".into()));
+        }
+        let answer = peer
+            .request(BILLING, json!({}), Some(CONFIG_TIMEOUT))
+            .await
+            .map_err(|error| self.call_error(generation, error))?;
+        let billing = unwrap_ext(&answer)?;
+        let config = &billing["config"];
+        let used = config["creditUsagePercent"]
+            .as_f64()
+            .ok_or_else(|| HostError::Agent("no usage reported for this account".into()))?;
+        let period = &config["currentPeriod"];
+        let minutes = match period["type"].as_str() {
+            Some("USAGE_PERIOD_TYPE_WEEKLY") => Some(7 * 24 * 60),
+            Some("USAGE_PERIOD_TYPE_MONTHLY") => Some(30 * 24 * 60),
+            _ => None,
+        };
+        let resets = period["end"]
+            .as_str()
+            .or_else(|| config["billingPeriodEnd"].as_str());
+        Ok(json!({
+            "rateLimits": {"secondary": {
+                "usedPercent": used,
+                "windowDurationMins": minutes,
+                "resetsAt": resets,
+            }},
+            "planType": billing["subscription_tier"]
+                .as_str()
+                .or_else(|| billing["subscriptionTier"].as_str()),
+        }))
+    }
+
+    /// Hold a supplement Grok took for `turn` until its next model response,
+    /// where Grok merges it ([`merge_held_supplements`]).
+    pub(super) fn hold_supplement(
+        &self,
+        generation: u64,
+        session: &str,
+        turn: &str,
+        text: &str,
+        images: usize,
+    ) {
+        let mut state = self.state();
+        if state.generation != generation {
+            return;
+        }
+        if let Some(entry) = state.sessions.get_mut(session) {
+            let stream = entry.native_stream;
+            entry.held_supplements.push(HeldSupplement {
+                turn: turn.to_string(),
+                text: text.to_string(),
+                images,
+                stream,
+            });
+        }
     }
 
     /// Whether Grok reports `turn` of `session` running (a supplement goes
@@ -350,4 +497,50 @@ pub(super) fn adopt_native_turn(state: &mut State, session: &str) {
         "userText": text, "imageCount": 0, "agentStarted": true,
     }));
     state.session_event(session);
+}
+
+/// An update of `session` from model response `stream` (Grok's
+/// `_meta.streamStartMs`): a response other than the one a held supplement
+/// arrived during is where Grok merged it, so it is folded before this
+/// update's content.
+pub(super) fn merge_held_supplements(state: &mut State, session: &str, stream: Option<u64>) {
+    let Some(stream) = stream else { return };
+    let Some(entry) = state.sessions.get_mut(session) else { return };
+    if entry.native_stream == Some(stream) {
+        return;
+    }
+    entry.native_stream = Some(stream);
+    let Some(turn) = entry.active.as_ref().map(|active| active.id.clone()) else { return };
+    let (merged, held): (Vec<_>, Vec<_>) = std::mem::take(&mut entry.held_supplements)
+        .into_iter()
+        .partition(|supplement| supplement.turn == turn && supplement.stream != Some(stream));
+    entry.held_supplements = held;
+    for supplement in merged {
+        super::steer::record_supplement(
+            state,
+            session,
+            &supplement.turn,
+            &supplement.text,
+            supplement.images,
+        );
+    }
+}
+
+/// Grok names the context in use on every update (`_meta.totalTokens`);
+/// `true` when the share of the model's window moved by a whole percent,
+/// so controllers are told without an event per streamed chunk. A replay
+/// arrives before the reopen's answer names the window, which
+/// `State::confirm` fills in.
+pub(super) fn note_usage(state: &mut State, session: &str, params: &Value) -> bool {
+    let Some(used) = params["_meta"]["totalTokens"].as_u64() else { return false };
+    let Some(entry) = state.sessions.get_mut(session) else { return false };
+    let size = entry.settings.context_window().unwrap_or_default();
+    let percent = |usage: Option<(u64, u64)>| {
+        usage
+            .filter(|(_, size)| *size > 0)
+            .map(|(used, size)| used.saturating_mul(100) / size)
+    };
+    let before = percent(entry.usage);
+    entry.usage = Some((used, size));
+    !entry.pending && percent(entry.usage) != before
 }

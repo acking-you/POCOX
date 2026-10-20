@@ -365,6 +365,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modeReadOnlyDesc => 'Ask before running; no file writes';
 
   @override
+  String get agentPermissionAsk => 'Ask first';
+
+  @override
+  String get modeStandard => 'Standard';
+
+  @override
   String get modeAuto => 'Auto';
 
   @override
@@ -787,6 +793,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolRan => 'Ran command';
+
+  @override
+  String get toolRead => 'Read file';
+
+  @override
+  String get toolListed => 'Listed files';
+
+  @override
+  String get toolSearchedFiles => 'Searched code';
 
   @override
   String get toolEdited => 'Edited files';
@@ -1929,6 +1944,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get fastMode => 'Fast';
+
+  @override
+  String get agentFastHint => 'Use the Fast variant of this model.';
 
   @override
   String get fastModeHint =>

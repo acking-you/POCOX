@@ -169,6 +169,18 @@ extension _SessionComposer on _AppSessionState {
                   _persistThreadConfig();
                 },
         ),
+      // An agent's Fast is its model's Fast variant (Grok's).
+      if (agentFastPair(_agentSettings) case final pair?)
+        turnChip(
+          key: const Key('agent-fast-btn'),
+          tooltip: l10n.agentFastHint,
+          label: l10n.fastMode,
+          icon: AppIcons.bolt,
+          selected: pair.fast,
+          onSelected: _agentControlsEnabled
+              ? (_) => _setAgentConfig(agentTarget, pair.option, pair.other)
+              : null,
+        ),
       if (_streaming && _caps.steer)
         turnChip(
           key: const Key('supplement-toggle'),

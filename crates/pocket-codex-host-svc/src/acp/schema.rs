@@ -216,7 +216,9 @@ pub fn negotiate(result: &Value) -> Result<Negotiated, NegotiationError> {
         list_sessions: non_null_object(&session["list"]),
         resume_session: non_null_object(&session["resume"]),
         close_session: non_null_object(&session["close"]),
-        image: prompt["image"] == true,
+        // Grok takes image prompts (its terminal client sends them, and it
+        // checks and forwards them to the model) without advertising them.
+        image: prompt["image"] == true || grok_native(&result["_meta"]),
         audio: prompt["audio"] == true,
         embedded_context: prompt["embeddedContext"] == true,
         // Grok's interjection is its steering (see `host/grok.rs`).

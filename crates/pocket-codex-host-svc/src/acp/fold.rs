@@ -43,6 +43,7 @@ use std::collections::VecDeque;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use self::tool::apply_tool_fields;
 use super::schema::{available_commands, select_options, TurnOutcome};
 
 /// Largest text retained per item (a truncation marker follows when cut).
@@ -137,6 +138,10 @@ pub struct Tool {
     pub status: String,
     /// Programmatic tool name, when supplied.
     pub name: Option<String>,
+    /// The agent's own finer kind, when it names one (Grok's
+    /// `_meta["x.ai/tool"].kind`: `list_dir`, `web_search`, `task`, …).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
     /// Reported locations (display only; never file-read authority).
     pub locations: Vec<String>,
     /// Reported diffs.
@@ -368,6 +373,7 @@ fn weight(item: &Item) -> usize {
             + tool.kind.len()
             + tool.status.len()
             + tool.name.as_ref().map_or(0, String::len)
+            + tool.category.as_ref().map_or(0, String::len)
             + tool.locations.iter().map(String::len).sum::<usize>()
             + tool
                 .diffs
@@ -481,111 +487,6 @@ fn new_item(id: String, kind: ItemKind) -> Item {
         text_full: false,
         omitted: Vec::new(),
     }
-}
-
-/// Apply supplied tool fields; collections are replaced, never appended, and
-/// so are the omissions they report.
-fn apply_tool_fields(item: &mut Item, update: &Value) {
-    let tool = item.tool.get_or_insert_with(Tool::default);
-    if let Some(title) = update["title"].as_str() {
-        item.title = title.chars().take(1024).collect();
-    }
-    if let Some(kind) = update["kind"].as_str() {
-        tool.kind = kind.chars().take(64).collect();
-    }
-    if let Some(status) = update["status"].as_str() {
-        tool.status = status.chars().take(64).collect();
-    }
-    if let Some(name) = update["name"].as_str() {
-        tool.name = Some(name.chars().take(256).collect());
-    }
-    let mut input_dropped = None;
-    if let Some(raw) = update.get("rawInput").filter(|raw| !raw.is_null()) {
-        let size = serialized_len(raw);
-        input_dropped = Some(size > MAX_RAW_INPUT);
-        tool.raw_input = Some(if size > MAX_RAW_INPUT {
-            Value::String(format!("[input omitted: {size} bytes]"))
-        } else {
-            raw.clone()
-        });
-    }
-    let mut locations_dropped = None;
-    if let Some(locations) = update["locations"].as_array() {
-        let mut dropped = locations.len() > MAX_LOCATIONS;
-        tool.locations = locations
-            .iter()
-            .filter_map(|location| location["path"].as_str())
-            .take(MAX_LOCATIONS)
-            .map(|path| {
-                let mut path = path.to_string();
-                dropped |= clip(&mut path, MAX_LOCATION);
-                path
-            })
-            .collect();
-        locations_dropped = Some(dropped);
-    }
-    let mut content_dropped = None;
-    if let Some(content) = update["content"].as_array() {
-        let mut text = String::new();
-        let mut images = Vec::new();
-        let mut diff_budget = MAX_ITEM_TEXT;
-        let (mut images_dropped, mut diffs_dropped) = (false, false);
-        tool.diffs.clear();
-        tool.terminals = 0;
-        for entry in content.iter().take(256) {
-            match entry["type"].as_str() {
-                Some("content") => {
-                    let (piece, image) = block_content(&entry["content"]);
-                    if !piece.is_empty() {
-                        if !text.is_empty() {
-                            text.push('\n');
-                        }
-                        text.push_str(&piece);
-                    }
-                    if let Some(image) = image {
-                        images_dropped |= !push_image(&mut images, image);
-                    }
-                },
-                Some("diff") => {
-                    let (Some(path), Some(new_text)) =
-                        (entry["path"].as_str(), entry["newText"].as_str())
-                    else {
-                        continue;
-                    };
-                    let old_text = entry["oldText"].as_str();
-                    let size = path.len() + new_text.len() + old_text.map_or(0, str::len);
-                    if tool.diffs.len() >= MAX_DIFFS || size > diff_budget {
-                        diffs_dropped = true;
-                        continue;
-                    }
-                    diff_budget -= size;
-                    tool.diffs.push(Diff {
-                        path: path.to_string(),
-                        old_text: old_text.map(str::to_string),
-                        new_text: new_text.to_string(),
-                    });
-                },
-                Some("terminal") => tool.terminals += 1,
-                _ => {},
-            }
-        }
-        item.text_full = clip(&mut text, MAX_ITEM_TEXT);
-        item.text = text;
-        item.images = images;
-        content_dropped = Some((content.len() > 256, images_dropped, diffs_dropped));
-    }
-    if let Some(dropped) = input_dropped {
-        item.omit_if(OMITTED_INPUT, dropped);
-    }
-    if let Some(dropped) = locations_dropped {
-        item.omit_if(OMITTED_LOCATIONS, dropped);
-    }
-    if let Some((entries, images, diffs)) = content_dropped {
-        item.omit_if(OMITTED_CONTENT, entries);
-        item.omit_if(OMITTED_IMAGES, images);
-        item.omit_if(OMITTED_DIFFS, diffs);
-    }
-    item.truncated = item.text_full || !item.omitted.is_empty();
 }
 
 impl Transcript {
@@ -997,3 +898,4 @@ pub fn replay_turn(id: &str, updates: &[Value]) -> Turn {
 
 #[cfg(test)]
 mod tests;
+mod tool;

@@ -97,6 +97,8 @@ extension _SessionSupplement on _AppSessionState {
           images: resolveImageUrls(images),
           imageUrls: images,
           turnId: acceptedTurnId,
+          // An ACP host shows where the agent merged it.
+          held: _caps.isAcp && !_placedSupplements.remove(text),
         );
         if (!reload) {
           if (_streaming && _turnId == turnId) _turnId = acceptedTurnId;

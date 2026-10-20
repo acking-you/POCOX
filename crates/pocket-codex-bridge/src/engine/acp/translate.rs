@@ -140,9 +140,55 @@ fn tool_parts(item: &Item) -> (&'static str, String, String) {
         }
         text.push_str("[failed]");
     }
-    match tool.kind.as_str() {
+    // The agent's own finer kind (Grok's `x.ai/tool`) tells more apart than
+    // ACP's: a listing is ACP `other`, a web search ACP `search`.
+    let kind = match (tool.category.as_deref(), tool.kind.as_str()) {
+        (Some("execute" | "monitor"), _) | (None, "execute") => "execute",
+        (Some("read" | "memory_get"), _) | (None, "read") => "read",
+        (Some("list" | "list_dir"), _) => "list",
+        (Some("search" | "memory_search" | "lsp"), _) | (None, "search") => "search",
+        (Some("web_search" | "web_fetch"), _) | (None, "fetch") => "web",
+        (Some("task" | "active_agent_message"), _) => "subagent",
+        (Some("plan"), _) => "plan",
+        // Grok calls MCP tools through its `use_tool`.
+        (Some("use_tool"), _) => "mcp",
+        (Some("image_gen" | "video_gen" | "image_to_video" | "reference_to_video"), _) => {
+            "generate"
+        },
+        (_, kind) => kind,
+    };
+    let dynamic = |item_type: &'static str| {
+        let detail = ToolDetail {
+            input: tool.raw_input.as_ref(),
+            output: &text,
+            tool: tool.name.as_deref().unwrap_or(&tool.kind),
+        };
+        // reason: a struct of strings and a JSON value always serializes.
+        let detail = serde_json::to_string(&detail).expect("serializable");
+        (item_type, item.title.clone(), detail)
+    };
+    match kind {
         "execute" => ("commandExecution", item.title.clone(), text),
-        "edit" | "delete" | "move" if !tool.diffs.is_empty() => {
+        "read" => ("fileRead", item.title.clone(), text),
+        "list" => ("fileList", item.title.clone(), text),
+        "search" => ("fileSearch", item.title.clone(), text),
+        "web" => ("webSearch", item.title.clone(), text),
+        "plan" => ("planUpdate", item.title.clone(), text),
+        "subagent" => dynamic("subAgentActivity"),
+        "mcp" => {
+            let (_, title, detail) = dynamic("mcpToolCall");
+            // `<server>__<tool>` reads as `<server>.<tool>`, as Codex names
+            // MCP calls.
+            let named = tool
+                .raw_input
+                .as_ref()
+                .and_then(|input| input["tool_name"].as_str())
+                .and_then(|name| name.split_once("__"))
+                .map(|(server, tool)| format!("{server}.{tool}"));
+            ("mcpToolCall", named.unwrap_or(title), detail)
+        },
+        "generate" => dynamic("imageGeneration"),
+        "edit" | "delete" | "move" | "write" if !tool.diffs.is_empty() => {
             let title = match tool.diffs.as_slice() {
                 [one] => one.path.clone(),
                 many => format!("{} files", many.len()),
@@ -155,17 +201,7 @@ fn tool_parts(item: &Item) -> (&'static str, String, String) {
                 .join("\n");
             ("fileChange", title, body)
         },
-        "search" | "fetch" => ("webSearch", item.title.clone(), text),
-        _ => {
-            let detail = ToolDetail {
-                input: tool.raw_input.as_ref(),
-                output: &text,
-                tool: tool.name.as_deref().unwrap_or(&tool.kind),
-            };
-            // reason: a struct of strings and a JSON value always serializes.
-            let detail = serde_json::to_string(&detail).expect("serializable");
-            ("dynamicToolCall", item.title.clone(), detail)
-        },
+        _ => dynamic("dynamicToolCall"),
     }
 }
 
@@ -384,13 +420,20 @@ pub fn recovered(thread: &str, turn: &Turn, agent_started: bool) -> Vec<AppEvent
         // started has none, so its messages come from the fold.
         .filter(|mapped| agent_started || mapped.item_type != "userMessage")
         .map(|mapped| {
+            // A reasoning or reply that another item follows has ended.
+            let followed = |at: usize| at + 1 < turn.items.len();
             let done = mapped.item_type == "historyGap"
                 || mapped.item_type == CONTENT_OMITTED
                 || turn
                     .items
                     .iter()
-                    .find(|item| item.id == mapped.id)
-                    .is_some_and(|item| item.kind == ItemKind::Plan || tool_done(item));
+                    .position(|item| item.id == mapped.id)
+                    .is_some_and(|at| {
+                        let item = &turn.items[at];
+                        item.kind == ItemKind::Plan
+                            || tool_done(item)
+                            || (is_message(item) && followed(at))
+                    });
             let kind = if done || mapped.item_type == "userMessage" {
                 "item/completed"
             } else {
@@ -525,6 +568,27 @@ pub fn turn_completed(thread: &str, turn: &str, outcome: Option<&Value>) -> AppE
     event("turn/completed", Some(thread), json!({"threadId": thread, "turn": turn_raw}))
 }
 
+/// Completion of the reasoning or reply that an item started in `changes`
+/// follows: the agent moved on, so it stops showing as in progress (ACP
+/// reports no end of a message; the turn's end would settle it much later).
+fn settled(shared: &Shared, thread: &str, turn: &str, changes: &[Change]) -> Vec<AppEvent> {
+    let Some(fold) = shared.live.turn(thread, turn) else { return Vec::new() };
+    changes
+        .iter()
+        .filter_map(|change| match change {
+            Change::Started(item) => {
+                let at = fold.items.iter().position(|kept| kept.id == item.id)?;
+                let before = fold.items.get(at.checked_sub(1)?)?;
+                is_message(before).then(|| {
+                    let mapped = app_item(before, turn);
+                    item_event("item/completed", thread, &mapped, Some(mapped.text.clone()))
+                })
+            },
+            _ => None,
+        })
+        .collect()
+}
+
 fn turn_started(thread: &str, turn: &str, agent_started: bool) -> AppEvent {
     event(
         "turn/started",
@@ -635,7 +699,10 @@ pub fn gateway_event(shared: &mut Shared, body: &Value) -> Vec<AppEvent> {
         },
         "update" | "supplement" => {
             let folded = shared.live.apply(body);
-            changes(&thread, body["turnId"].as_str().unwrap_or(""), folded)
+            let turn = body["turnId"].as_str().unwrap_or("");
+            let mut out = settled(shared, &thread, turn, &folded);
+            out.extend(changes(&thread, turn, folded));
+            out
         },
         "turn_ended" => {
             // Only the end of the turn this view shows running releases it: a

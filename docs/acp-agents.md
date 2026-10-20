@@ -219,6 +219,13 @@ it cannot leave a consumed request unresolved on a live generation.
   `{"status": "queued"}` is `injected`; turns Grok starts by itself are
   opened and followed like prompt turns. See
   [Grok Build › Grok's own extensions](grok-build.md#groks-own-extensions).
+- Tool calls take the app's native rows by their ACP kind (`execute` a
+  command, `read` a file read, `search` a code search, `fetch` a web
+  search, an edit with diffs a file change); an agent's finer kind in the
+  call's `_meta` (Grok's `x.ai/tool`) wins over ACP's, and any other call
+  is a generic tool row (`bridge/src/engine/acp/translate.rs`, `tool_parts`).
+  A message or reasoning the agent moved on from, because another item
+  began, is completed then, so it stops showing as in progress.
 - An agent's slash commands are its standard `available_commands_update`
   (the latest list of any session, also in the host info and its
   `host_state` events): the composer's `/` list offers them, and an agent

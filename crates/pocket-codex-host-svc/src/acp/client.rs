@@ -317,6 +317,11 @@ impl GatewayClient {
         .await
     }
 
+    /// `GET rate-limits`: the agent account's usage window.
+    pub async fn rate_limits(&self) -> Result<Value, ClientError> {
+        self.get("acp/v1/rate-limits", &[]).await
+    }
+
     /// `POST sessions/rename`, refused when the host is not `expected`.
     pub async fn rename(
         &self,

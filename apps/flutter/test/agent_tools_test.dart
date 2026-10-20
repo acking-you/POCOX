@@ -123,6 +123,34 @@ Widget _host(FakeBridgeApi api, Widget child) => ProviderScope(
 );
 
 void main() {
+  test('Grok\'s share through use_tool stands alone with its link', () {
+    // Grok reports an MCP call's result only as its output text, which the
+    // bridge carries in the call's JSON detail.
+    final call = TranscriptItem(
+      id: 'grok',
+      type: 'mcpToolCall',
+      title: 'pocox.connect',
+      text: jsonEncode({
+        'input': {
+          'tool_name': 'pocox__connect',
+          'tool_input': {
+            'action': 'share',
+            'ports': [8737],
+          },
+        },
+        'output':
+            'Shared "Docs" (port 8737): '
+            'pocox://open?service=pcx:studio.ab12:port:8737&path=/docs\n'
+            'On this machine: http://localhost:8737/',
+        'tool': 'use_tool',
+      }),
+      turnId: 't',
+    );
+    expect(call.share?.service, 'pcx:studio.ab12:port:8737');
+    expect(call.share?.path, '/docs');
+    expect(call.standsAlone, isTrue);
+  });
+
   test('an agent\'s share stands alone at its tool call', () {
     final call = TranscriptItem(
       id: 'call',

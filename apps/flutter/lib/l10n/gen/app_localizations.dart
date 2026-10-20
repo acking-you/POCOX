@@ -734,6 +734,18 @@ abstract class AppLocalizations {
   /// **'Ask before running; no file writes'**
   String get modeReadOnlyDesc;
 
+  /// No description provided for @agentPermissionAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask first'**
+  String get agentPermissionAsk;
+
+  /// No description provided for @modeStandard.
+  ///
+  /// In en, this message translates to:
+  /// **'Standard'**
+  String get modeStandard;
+
   /// No description provided for @modeAuto.
   ///
   /// In en, this message translates to:
@@ -1465,6 +1477,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ran command'**
   String get toolRan;
+
+  /// No description provided for @toolRead.
+  ///
+  /// In en, this message translates to:
+  /// **'Read file'**
+  String get toolRead;
+
+  /// No description provided for @toolListed.
+  ///
+  /// In en, this message translates to:
+  /// **'Listed files'**
+  String get toolListed;
+
+  /// No description provided for @toolSearchedFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Searched code'**
+  String get toolSearchedFiles;
 
   /// No description provided for @toolEdited.
   ///
@@ -3487,6 +3517,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fast'**
   String get fastMode;
+
+  /// No description provided for @agentFastHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the Fast variant of this model.'**
+  String get agentFastHint;
 
   /// No description provided for @fastModeHint.
   ///

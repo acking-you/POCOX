@@ -712,6 +712,72 @@ void main() {
     );
   });
 
+  testWidgets('Grok\'s Fast switches to its model\'s Fast variant and its '
+      'permission mode reads in the app\'s words', (t) async {
+    final api = _api();
+    api.sessionSettings['$_acp|ses-a'] = const SessionSettings(
+      configOptions: [
+        SessionConfigOption(
+          id: 'model',
+          name: 'Model',
+          category: 'model',
+          currentValue: 'grok-4.7',
+          values: [
+            SessionConfigValue(value: 'grok-4.7', name: 'Grok 4.7'),
+            SessionConfigValue(
+              value: 'grok-4.7-build-fast',
+              name: 'Grok 4.7 Fast',
+            ),
+            SessionConfigValue(value: 'grok-4.6', name: 'Grok 4.6'),
+          ],
+        ),
+        SessionConfigOption(
+          id: 'x.ai/permission_mode',
+          name: 'Permissions',
+          category: 'x.ai/permission',
+          currentValue: 'ask',
+          values: [
+            SessionConfigValue(value: 'ask', name: 'Ask'),
+            SessionConfigValue(value: 'auto', name: 'Auto'),
+            SessionConfigValue(value: 'always-approve', name: 'Always approve'),
+          ],
+        ),
+      ],
+    );
+    final shown = localizedSettings(
+      api.sessionSettings['$_acp|ses-a']!,
+      lookupAppLocalizations(const Locale('en')),
+    ).configOptions.last;
+    expect((shown.name, shown.currentLabel), ('Permission', 'Ask first'));
+    await _open(t, api, thread: 'ses-a');
+    await t.tap(find.byKey(const Key('agent-fast-btn')));
+    await _frames(t);
+    expect(api.sessionConfigCalls, [('ses-a', 'model', 'grok-4.7-build-fast')]);
+    // A model without a Fast variant offers no Fast.
+    expect(
+      agentFastPair(
+        const SessionSettings(
+          configOptions: [
+            SessionConfigOption(
+              id: 'model',
+              name: 'Model',
+              category: 'model',
+              currentValue: 'grok-4.6',
+              values: [
+                SessionConfigValue(value: 'grok-4.6', name: 'Grok 4.6'),
+                SessionConfigValue(
+                  value: 'grok-4.7-build-fast',
+                  name: 'Grok 4.7 Fast',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      isNull,
+    );
+  });
+
   testWidgets('a short option list stays a menu under the limit', (t) async {
     expect(kOptionMenuLimit, 8);
     final api = _api(count: kOptionMenuLimit);

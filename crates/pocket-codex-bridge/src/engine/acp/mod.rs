@@ -373,8 +373,10 @@ pub fn capabilities_of(info: &Value, generation: u64) -> Capabilities {
         caps.steer = negotiated["steering"] == true;
         // Grok renames its own sessions (`_x.ai/session/rename`).
         caps.rename = negotiated["grok"] == true;
-        // Grok's questions may each take several answers.
+        // Grok's questions may each take several answers, and its account
+        // reports a usage window.
         caps.question_multiple = negotiated["grok"] == true;
+        caps.rate_limits = negotiated["grok"] == true;
         caps.session_config = true;
         caps.session_reopen = if negotiated["loadSession"] == true {
             "load"
