@@ -28,7 +28,8 @@ With `publish=true` on `main`, it replaces that release's AppImage and refreshes
 its signed update manifest. The input ZIP is verified against the release's
 signed manifest before unpacking; the publication step verifies the current
 manifest again and retains the release version, build, source commit and other
-artifacts. The signing key remains in GitHub Actions secrets.
+artifacts. The launcher icon comes from that signed source commit as well,
+instead of the current checkout. The signing key remains in GitHub Actions secrets.
 
 Keep `pocket-codex-app-<tag>-linux-x86_64.AppImage`: existing installed updaters
 select that suffix. AppImageHub's filename suggestions are advisory, so they do

@@ -49,15 +49,22 @@ jobs:
           python3 scripts/release_manifest.py verify input/release-manifest.json \
             --public scripts/update_signing_key.pub.pem
           python3 - <<'PY'
-          import hashlib, json, os
+          import hashlib, json, os, re
           from pathlib import Path
           manifest = json.loads(Path('input/release-manifest.json').read_text())
           assert manifest['tag'] == os.environ['RELEASE_TAG']
+          assert re.fullmatch(r'[0-9a-f]{40}', manifest['commit'])
           archive = Path('input') / f"pocket-codex-app-{manifest['tag']}-linux-x64.zip"
           entry, = [a for a in manifest['assets'] if a['name'] == archive.name]
           assert archive.stat().st_size == entry['size']
           assert hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest() == entry['sha256']
           PY
+          # Keep artwork tied to the signed source identity, even when main has
+          # moved on or a release tag has subsequently been moved.
+          source_commit=$(jq -r '.commit' input/release-manifest.json)
+          gh api -H 'Accept: application/vnd.github.raw' \
+            "repos/$GITHUB_REPOSITORY/contents/apps/flutter/icon/icon_glyph.png?ref=$source_commit" \
+            > input/icon_glyph.png
           unzip -q "input/pocket-codex-app-$RELEASE_TAG-linux-x64.zip" -d bundle
       - name: Install packaging dependencies
         run: |
@@ -67,7 +74,7 @@ jobs:
             imagemagick patchelf desktop-file-utils
       - name: Package
         run: |
-          bash scripts/package_appimage.sh bundle apps/flutter/icon/icon_glyph.png \
+          bash scripts/package_appimage.sh bundle input/icon_glyph.png \
             "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
       - name: Verify dependencies and offline startup in a clean desktop
         run: bash scripts/test_appimage.sh "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
