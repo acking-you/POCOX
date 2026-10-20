@@ -1171,7 +1171,11 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     (`FloatingStatus`); loading fades in; the turn clock and sidebar motion
     no longer rebuild the transcript. Narrow and touch layouts fold turn
     navigation into a faint `TurnNavigationHandle` (opens on touch, folds after
-    5 s or a scroll); wide desktops keep the rail. The review
+    5 s or a scroll); wide desktops keep the rail. While above the latest message,
+    the jump-to-latest button shows a blue moving ring when the conversation
+    runs here or through a followed writer (2026-10-21). Its arrow and hit target
+    stay still, its action still returns to and follows the end, and reduced
+    motion keeps a steady ring; hidden and idle controls do not animate. The review
     (`lib/src/review/`) replaces the diff sheet: a resizable right sidebar
     from 1100 px, an overlay panel below that, its own page on phones (back or
     swipe right). It shows this conversation's edits (every edit of a file in

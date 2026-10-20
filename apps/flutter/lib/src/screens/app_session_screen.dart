@@ -76,6 +76,7 @@ import 'package:pocket_codex/src/widgets/draggable_navigation.dart';
 import 'package:pocket_codex/src/widgets/history_arrival.dart';
 import 'package:pocket_codex/src/widgets/agent_icon.dart';
 import 'package:pocket_codex/src/widgets/host_switcher.dart';
+import 'package:pocket_codex/src/widgets/jump_to_latest_button.dart';
 import 'package:pocket_codex/src/widgets/layered_navigation.dart';
 import 'package:pocket_codex/src/widgets/file_browser_panel.dart';
 import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';

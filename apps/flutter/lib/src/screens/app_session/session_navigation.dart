@@ -511,22 +511,14 @@ extension _SessionNavigation on _AppSessionState {
   }
 
   /// Back to the latest message, offered while the reader is above it: a
-  /// small pill of floating glass that rises in and sinks away.
+  /// small pill of floating glass, animated while the conversation runs.
   Widget _jumpToLatest() => FloatingStatusSwitcher(
     child: _atBottom
         ? null
-        : Glass(
+        : JumpToLatestButton(
             key: const ValueKey('jump-to-latest'),
-            depth: GlassDepth.floating,
-            borderRadius: BorderRadius.circular(24),
-            lift: 0.6,
-            padding: const EdgeInsets.all(2),
-            child: _navButton(
-              const Key('nav-to-bottom'),
-              AppIcons.vertical_align_bottom,
-              AppLocalizations.of(context).jumpToLatest,
-              () => _scrollToEnd(force: true),
-            ),
+            running: _streaming || _externalWriterRunning,
+            onPressed: () => _scrollToEnd(force: true),
           ),
   );
 }

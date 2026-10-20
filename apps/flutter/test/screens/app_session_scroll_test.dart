@@ -4,12 +4,102 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/widgets/middle_click_scroll.dart';
+import 'package:pocket_codex/src/widgets/jump_to_latest_button.dart';
 
 import '../fake_bridge_api.dart';
 import '../support/screen_harness.dart';
+import '../support/ui_preview.dart';
 
 void main() {
+  setUpAll(loadPreviewFonts);
+
+  testWidgets('the phone jump button follows turn state and still returns '
+      'to the latest message while running', (t) async {
+    AppSessionScreen.debugResetThreadMemory();
+    t.view.devicePixelRatio = 1;
+    t.view.physicalSize = const Size(393, 852);
+    addTearDown(t.view.reset);
+    final api = FakeBridgeApi();
+    const service = 'pcx:studio:app:default';
+    await api.appConnect(service, 0);
+    api.readResult = ThreadHistory(
+      items: [
+        for (var i = 0; i < 30; i++)
+          ThreadItem(
+            id: 'item-$i',
+            turnId: 'turn-${i ~/ 2}',
+            itemType: i.isEven ? 'userMessage' : 'agentMessage',
+            title: '',
+            text: 'Message $i\n\n${'Conversation history. ' * 10}',
+          ),
+      ],
+      running: false,
+    );
+    await t.pumpWidget(
+      RepaintBoundary(
+        key: previewKey,
+        child: host(
+          const AppSessionScreen(serviceKey: service, threadId: 'jump-history'),
+          api,
+          theme: darkTheme(),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    final controller = t
+        .widget<MiddleClickScroll>(find.byType(MiddleClickScroll))
+        .controller;
+    final viewport = find.byKey(const Key('chat-conversation-layer'));
+    await t.drag(viewport, const Offset(0, 500));
+    await t.pumpAndSettle();
+    expect(
+      t.widget<JumpToLatestButton>(find.byType(JumpToLatestButton)).running,
+      isFalse,
+    );
+
+    api.pushEvent(
+      service,
+      const AppEvent(
+        kind: 'turn/started',
+        threadId: 'jump-history',
+        raw: '{"turn":{"id":"live"}}',
+      ),
+    );
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+    expect(
+      t.widget<JumpToLatestButton>(find.byType(JumpToLatestButton)).running,
+      isTrue,
+    );
+    await t.pump(const Duration(milliseconds: 350));
+    await capturePreview(t, 'jump-running-phone');
+    await t.tap(find.byKey(const Key('nav-to-bottom')));
+    for (var i = 0; i < 6; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(controller.position.extentAfter, lessThan(1));
+    expect(find.byType(JumpToLatestButton), findsNothing);
+
+    await t.drag(viewport, const Offset(0, 500));
+    await t.pump(const Duration(milliseconds: 300));
+    api.pushEvent(
+      service,
+      const AppEvent(
+        kind: 'turn/completed',
+        threadId: 'jump-history',
+        raw: '{"turn":{"id":"live","status":"completed"}}',
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(
+      t.widget<JumpToLatestButton>(find.byType(JumpToLatestButton)).running,
+      isFalse,
+    );
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('middle-click reads back through the real transcript viewport', (
     t,
   ) async {
