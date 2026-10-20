@@ -12,6 +12,8 @@ not a promise of compatibility with every Linux distribution.
 WebView plugin still links WebKitGTK. v0.6.0 originally omitted that library and
 failed before showing a window on systems without WebKit. Copying just the
 Ayatana tray libraries did not cover the app's native dependency closure.
+The unused `libdartjni.so` from `path_provider_android` is omitted: Linux uses
+`path_provider_linux`, so a Java VM is not a runtime dependency of POCOX.
 
 Both the regular release job and `.github/workflows/appimage.yml` use the same
 packaging script. `scripts/test_appimage.sh` runs the resulting artifact as an

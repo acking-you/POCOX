@@ -33,6 +33,10 @@ fetch https://github.com/AppImage/type2-runtime/releases/download/continuous/run
 
 mkdir -p AppDir/usr/bin AppDir/usr/share/applications
 cp -a "$bundle/." AppDir/usr/bin/
+# path_provider_android pulls in jni's FFI library on every build target.
+# Linux uses path_provider_linux and never loads it; do not ship an unused
+# JVM bridge that would otherwise require a Java installation.
+rm -f AppDir/usr/bin/lib/libdartjni.so
 cat > AppDir/usr/share/applications/pocket-codex.desktop <<'DESKTOP'
 [Desktop Entry]
 Name=POCOX
