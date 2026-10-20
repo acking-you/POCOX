@@ -70,7 +70,11 @@ jobs:
           bash scripts/package_appimage.sh bundle apps/flutter/icon/icon_glyph.png \
             "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
       - name: Verify dependencies and offline startup in a clean desktop
-        run: bash scripts/test_appimage.sh "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
+        run: bash scripts/test_appimage.sh "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appimage-preview
+          path: ${{ runner.temp }}/appimage-preview/*.png
       - uses: actions/upload-artifact@v4
         with:
           name: appimage

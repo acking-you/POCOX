@@ -21,9 +21,10 @@ pid=$!
 trap 'kill "$pid" 2>/dev/null || true; cat app.log' EXIT
 for ((i=0; i<30; i++)); do
   kill -0 "$pid"
-  if xdotool search --onlyvisible --name POCOX >/dev/null 2>&1; then
+  if window=$(xdotool search --onlyvisible --name POCOX | head -1); then
     sleep 5
     kill -0 "$pid"
+    import -window "$window" /output/window.png
     echo 'POCOX displayed its window and stayed running without network or system WebKit.'
     exit 0
   fi

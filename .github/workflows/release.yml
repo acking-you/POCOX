@@ -372,7 +372,7 @@ jobs:
           # 2) AppImage: collect the complete native dependency closure.
           bash ../../scripts/package_appimage.sh "$bundle" "$icon_png" \
             "dist/pocket-codex-app-${tag}-linux-x86_64.AppImage"
-          bash ../../scripts/test_appimage.sh "dist/pocket-codex-app-${tag}-linux-x86_64.AppImage"
+          bash ../../scripts/test_appimage.sh "dist/pocket-codex-app-${tag}-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
 
           # 3) Debian package
           deb=pocket-codex-deb

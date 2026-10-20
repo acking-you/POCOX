@@ -15,8 +15,7 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 cd "$work"
 
-# Pin both versions and bytes. The runtime's upstream release is rolling;
-# an upstream replacement must be reviewed instead of silently entering a build.
+# Pin both versions and bytes, including a dated static runtime release.
 fetch() {
   curl --fail --location --retry 3 "$1" --output "$2"
   printf '%s  %s\n' "$3" "$2" | sha256sum --check --status
@@ -28,8 +27,8 @@ fetch https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/7a3fb
   linuxdeploy-plugin-gtk.sh b0f4cbc684a0103a9651f0955b635eaea0096b3a66c0f5a2c2aa337960375171
 fetch https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage \
   appimagetool.AppImage ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
-fetch https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 \
-  runtime-x86_64 617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+fetch https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64 \
+  runtime-x86_64 2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
 
 mkdir -p AppDir/usr/bin AppDir/usr/share/applications
 cp -a "$bundle/." AppDir/usr/bin/
@@ -53,7 +52,13 @@ convert "$icon" -resize 256x256 pocket-codex.png
 # browser. Collect every ELF dependency (including Flutter plugins), not just
 # the tray libraries. The GTK plugin also supplies schemas and loadable modules.
 export APPIMAGE_EXTRACT_AND_RUN=1 NO_STRIP=1 DEPLOY_GTK_VERSION=3
+# Flutter opens GLES dynamically, so it is absent from the ELF dependency
+# graph. Bundle the vendor-neutral loader; linuxdeploy leaves graphics drivers
+# and GLdispatch on the host, where they must match the installed hardware.
+gles=$(ldconfig -p | awk '$1 == "libGLESv2.so.2" && !found {print $NF; found=1}')
+test -n "$gles"
 ./linuxdeploy.AppImage --appdir AppDir --plugin gtk \
+  --library "$gles" \
   --desktop-file AppDir/usr/share/applications/pocket-codex.desktop \
   --icon-file pocket-codex.png
 
