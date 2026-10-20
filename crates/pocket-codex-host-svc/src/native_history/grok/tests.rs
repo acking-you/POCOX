@@ -282,6 +282,35 @@ fn a_live_tail_extends_the_last_turn_only_while_nothing_is_missing() {
     assert_eq!(texts(&older), [vec!["first", "one"]]);
 }
 
+/// A line over the parse limit is shown as omitted, but its `eventId` (in
+/// `params._meta`, after the update) still counts, so an overlay waiting
+/// for it is released once it is in the log.
+#[test]
+fn an_oversized_lines_event_id_releases_the_overlay() {
+    use transcript::{read, Index, LiveTail};
+    let home = TempDir::new().expect("home");
+    let dir = session(home.path(), "%2Fwork", ID, summary(ID, "Big", "2026-10-19T10:00:00Z"));
+    // Grok's field order; the text ends with a quoted decoy `_meta`.
+    let text = format!("{}\"_meta\":{{\"eventId\":\"{ID}-99\"}}", "x".repeat(9 << 20));
+    let big = format!(
+        r#"{{"timestamp":1,"method":"session/update","params":{{"sessionId":"{ID}","update":{{"sessionUpdate":"agent_message_chunk","content":{{"type":"text","text":"{text}"}}}},"_meta":{{"eventId":"{ID}-5"}}}}}}"#
+    );
+    append(&dir, &[stamped(prompt(0, "first"), 1), stamped(reply("one"), 2), big]);
+    let update =
+        serde_json::from_str::<Value>(&reply("after")).expect("update")["params"]["update"].clone();
+    // The follower dropped the live copy of the large update and waits for
+    // the log to reach it.
+    let live = LiveTail {
+        through: 5,
+        updates: vec![(6, update)],
+    };
+    let mut index = Index::default();
+    let shown = read(&dir, ID, &mut index, None, 20, Some(&live)).expect("page");
+    assert_eq!(index.max_seq(), 5);
+    // The streamed text continues the reply the large line belongs to.
+    assert_eq!(texts(&shown), [vec!["first", "oneafter"]]);
+}
+
 pub(super) fn registry(home: &Path, pid: u32, opened_at: &str) {
     fs::write(
         home.join("active_sessions.json"),

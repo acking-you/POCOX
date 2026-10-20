@@ -228,7 +228,15 @@ impl GrokHistory {
     /// runs there.
     pub async fn liveness(&self, session: &str) -> crate::sessions::SessionLiveness {
         let view = match &self.ownership {
-            Some(probe) => probe.inspect(session).await,
+            // A follow connects only on fresh verified ownership, so a
+            // display cache from before the client registered must not
+            // hide its live state: read it again.
+            Some(probe) => match probe.inspect(session).await {
+                view if !view.held_open && self.live(session).is_some() => {
+                    probe.inspect_fresh(session).await
+                },
+                view => view,
+            },
             None => ownership::unknown(session),
         };
         self.with_turn(session, view)

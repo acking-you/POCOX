@@ -301,7 +301,10 @@ view shows such a session, POCOX follows it there, read-only
   session was idle shows every update at once; one that subscribed mid-turn
   waits until the log reaches the first update it received, since a run
   begun earlier may still be buffered. A live rewind, or an update over
-  4 MiB, waits for the log too. A next prompt appears once its first line is
+  4 MiB, waits for the log too; a persisted line over 8 MiB is shown as
+  omitted, but its id (in `params._meta`, which Grok writes after the
+  update) still counts, so reaching it releases the wait. A next prompt
+  appears once its first line is
   written, which gives the turn its id. At most 4,096 updates or 16 MiB are
   kept, and updates the log holds are dropped.
 - Running state comes from the roster's activity, `_x.ai/queue/changed`
@@ -309,9 +312,12 @@ view shows such a session, POCOX follows it there, read-only
   `x.ai/sessions/changed` broadcasts. Local sessions then shows **Running
   elsewhere**, and a host's access reason becomes `external_running` or
   `external_idle` instead of `external_open`; the session stays read-only.
+  While a follow is connected, an ownership view cached as unowned is read
+  again, since the follow connected on fresh verified ownership.
 - Local sessions follows through `app_native_session_follow`, a stream that
   pushes a revision on each live change and every three seconds, ending
-  when the view closes. A host's native follow stream wakes on live
+  when the view closes, the app leaves the foreground or another page covers
+  it (it follows again when shown). A host's native follow stream wakes on live
   changes as well as every two seconds.
 
 Two effects on the leader remain. A subscriber keeps the session loaded

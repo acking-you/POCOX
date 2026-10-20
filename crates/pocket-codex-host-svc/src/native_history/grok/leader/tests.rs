@@ -248,3 +248,24 @@ async fn the_follower_leaves_when_it_could_receive_what_only_a_driver_does() {
     client.wait().expect("reap");
     peer.leaves().await;
 }
+
+/// A display cache read before the terminal client registered does not
+/// hide the follow's live state for the cache's lifetime: the follow
+/// connected on fresh verified ownership.
+#[tokio::test]
+async fn a_display_cache_from_before_the_client_does_not_hide_a_live_follow() {
+    let home = Home::new();
+    let cached = tokio::time::Instant::now();
+    assert_eq!(home.reader.liveness(ID).await.safety, "nativeUnowned");
+    let _follow = home.reader.follow(ID).expect("follow");
+    let mut client = grok_client(home.path());
+    let mut peer = home.accept().await;
+    peer.subscribe("idle").await;
+    // Well within the display cache's 5 s.
+    while home.reader.liveness(ID).await.safety != "nativeOwnedIdle" {
+        assert!(cached.elapsed() < Duration::from_secs(4), "the live state stayed hidden");
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    client.kill().expect("kill");
+    client.wait().expect("reap");
+}
