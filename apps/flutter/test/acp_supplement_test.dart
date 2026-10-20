@@ -598,6 +598,36 @@ void main() {
       expect(api.supplementCalls.single.$4, hasLength(2));
     });
 
+    testWidgets('the host\'s copy arriving first shows the images sent', (
+      t,
+    ) async {
+      final api = await running(t, imageInput: true);
+      await attachImages(t, picker, ['a.png']);
+      final gate = Completer<void>();
+      api.supplementGate = gate;
+      await supplement(t, 'look at this');
+      // The host keeps only an image count, so its item has no image data.
+      api.pushEvent(
+        acp,
+        AppEvent(
+          kind: 'item/completed',
+          threadId: 'ses-1',
+          itemId: 'ses-1:s1',
+          itemType: 'userMessage',
+          text: 'look at this',
+          raw: jsonEncode({
+            'turnId': 't1',
+            'clientId': api.lastSupplementClientId,
+          }),
+        ),
+      );
+      await frames(t);
+      gate.complete();
+      await frames(t);
+      expect(find.text('look at this'), findsOneWidget);
+      expect(find.byKey(const Key('msg-image-0')), findsOneWidget);
+    });
+
     testWidgets('an unchanged input with images is queued once', (t) async {
       final api = await running(t, imageInput: true)
         ..supplementInjects = false;

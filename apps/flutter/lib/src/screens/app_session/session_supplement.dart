@@ -99,7 +99,9 @@ extension _SessionSupplement on _AppSessionState {
       // host's item may also have arrived first (see [_handleItemEvent]).
       final reload =
           _historyGeneration != historyGeneration || _historyLoad != null;
-      final shown = _items.any((item) => item.clientId == clientId);
+      final hostCopy = _items
+          .where((item) => item.clientId == clientId)
+          .firstOrNull;
       _updateState(() {
         final item = TranscriptItem(
           id: 'local-user-$clientId',
@@ -114,9 +116,16 @@ extension _SessionSupplement on _AppSessionState {
         );
         if (!reload) {
           if (_streaming && _turnId == turnId) _turnId = acceptedTurnId;
-          if (!shown) {
+          if (hostCopy == null) {
             _itemIndex[item.id] = _items.length;
             _items.add(item);
+          } else if (hostCopy.imageUrls.isEmpty && images.isNotEmpty) {
+            // The host's item arrived first and is this message's one row;
+            // it carries only an image count, so it shows the images sent.
+            hostCopy
+              ..images = item.images
+              ..imageUrls = images;
+            _cachedRows = null;
           }
         }
         _supplement = false;
