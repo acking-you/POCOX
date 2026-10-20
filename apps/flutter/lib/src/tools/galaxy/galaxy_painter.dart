@@ -2,7 +2,8 @@
 /// to near with their orbits split around each star, connections as arcs of
 /// light, and labels that keep out of each other's way. Where everything
 /// goes is computed in Rust ([GalaxyGeometry], `galaxy_frame.dart`); this
-/// only draws it.
+/// only draws it, its glows and spheres from cached images
+/// ([GalaxySprites]).
 library;
 
 import 'dart:math' as math;
@@ -14,6 +15,7 @@ import 'package:pocket_codex/src/service_key.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_sprites.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
 import 'package:pocket_codex/src/tools/planet_glyph.dart';
 
@@ -162,6 +164,7 @@ class GalaxyPainter extends CustomPainter {
     required this.l10n,
     required this.labels,
     required this.geometry,
+    required this.sprites,
     required this.starfield,
     required this.onBackdrop,
   }) : super(repaint: view);
@@ -180,6 +183,9 @@ class GalaxyPainter extends CustomPainter {
 
   /// The scene's buffers and the frame computation.
   final GalaxyGeometry geometry;
+
+  /// The cached glows and spheres.
+  final GalaxySprites sprites;
 
   /// The stars.
   final Starfield starfield;
@@ -219,11 +225,13 @@ class GalaxyPainter extends CustomPainter {
     if (values == null) return;
     final reader = FrameReader(values);
     starfield.paint(canvas, reader, dark: dark);
+    sprites.begin(canvas, dark: dark, ratio: palette.ratio);
     final frame = _Frame(this, canvas, reader, geometry.bodies!, styles, size);
     frame.plane();
     frame.systems();
     frame.links();
     frame.ghosts();
+    sprites.flush();
     frame.labels();
     view.hits = frame.hits;
   }
@@ -289,6 +297,7 @@ class _Frame {
 
   GalaxyView get view => painter.view;
   GalaxyPalette get palette => painter.palette;
+  GalaxySprites get sprites => painter.sprites;
   bool get dark => palette.dark;
 
   /// Runs of points (count, then each run's points) as views of the frame.
@@ -316,11 +325,10 @@ class _Frame {
     final blur = reader.next();
     // A soft glow over the plane, with no edge to it.
     if (glow) {
-      canvas.drawOval(
+      sprites.softOval(
         oval,
-        Paint()
-          ..color = palette.ink.withValues(alpha: dark ? 0.035 : 0.03)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, blur),
+        blur,
+        palette.ink.withValues(alpha: dark ? 0.035 : 0.03),
       );
     }
     // Faint guide circles give the plane its perspective, fading outwards.
@@ -376,6 +384,7 @@ class _Frame {
 
   void _strokeRuns(List<Float32List> runs, double opacity) {
     if (runs.isEmpty || opacity <= 0) return;
+    sprites.flush();
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = dark ? 0.9 : 0.8
@@ -401,8 +410,8 @@ class _Frame {
         : palette.scheme.outline;
     if (dark && !online) {
       // An offline device is a dim ember: no light of its own.
-      paintPlanet(
-        canvas,
+      paintSphere(
+        sprites,
         c,
         radius,
         color,
@@ -412,53 +421,24 @@ class _Frame {
       );
     } else if (dark) {
       for (final (scale, alpha) in [(7.0, 0.06), (3.4, 0.16), (1.8, 0.32)]) {
-        canvas.drawCircle(
+        sprites.softDisc(
           c,
           radius * scale,
-          Paint()
-            ..color = color.withValues(alpha: alpha * opacity)
-            ..maskFilter = MaskFilter.blur(
-              BlurStyle.normal,
-              radius * scale * 0.5,
-            ),
+          radius * scale * 0.5,
+          color.withValues(alpha: alpha * opacity),
         );
       }
       // Diffraction spikes, faint and short, on the brighter stars.
-      if (online) {
-        final reach = radius * 3.2;
-        final spike = Paint()
-          ..strokeWidth = 0.8
-          ..shader = RadialGradient(
-            colors: [
-              Colors.white.withValues(alpha: 0.28 * opacity),
-              Colors.white.withValues(alpha: 0),
-            ],
-          ).createShader(Rect.fromCircle(center: c, radius: reach));
-        canvas
-          ..drawLine(c - Offset(reach, 0), c + Offset(reach, 0), spike)
-          ..drawLine(c - Offset(0, reach), c + Offset(0, reach), spike);
-      }
-      canvas.drawCircle(
-        c,
-        radius,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              Colors.white.withValues(alpha: opacity),
-              color.withValues(alpha: opacity),
-            ],
-            stops: const [0.25, 1],
-          ).createShader(Rect.fromCircle(center: c, radius: radius)),
-      );
+      if (online) sprites.spikes(c, radius * 3.2, 0.8, 0.28 * opacity);
+      sprites.starBody(c, radius, color, opacity);
     } else {
-      canvas.drawCircle(
+      sprites.softDisc(
         c,
         radius * 2.6,
-        Paint()
-          ..color = color.withValues(alpha: 0.14 * opacity)
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * 1.4),
+        radius * 1.4,
+        color.withValues(alpha: 0.14 * opacity),
       );
-      paintPlanet(canvas, c, radius, color, dark: false, opacity: opacity);
+      paintSphere(sprites, c, radius, color, dark: false, opacity: opacity);
     }
     _focusRings(system.id, c, radius);
     hits.add(
@@ -485,6 +465,7 @@ class _Frame {
     // A ripple crosses the ring when the status changes.
     final t = body.ripple;
     if (t >= 0) {
+      sprites.flush();
       canvas.drawCircle(
         c,
         radius * (1.2 + t * 3.2),
@@ -494,8 +475,8 @@ class _Frame {
           ..color = color.withValues(alpha: (1 - t) * 0.7 * opacity),
       );
     }
-    paintPlanet(
-      canvas,
+    paintSphere(
+      sprites,
       c,
       radius,
       color,
@@ -527,6 +508,7 @@ class _Frame {
       ..strokeWidth = 0.9
       ..color = palette.ink.withValues(alpha: (dark ? 0.32 : 0.36) * opacity);
     const dashes = 18;
+    sprites.flush();
     for (var i = 0; i < dashes; i++) {
       final start = i / dashes * math.pi * 2;
       canvas.drawArc(
@@ -538,8 +520,8 @@ class _Frame {
       );
     }
     final angle = view.still ? -0.6 : view.time * 0.9;
-    paintPlanet(
-      canvas,
+    paintSphere(
+      sprites,
       c + Offset(math.cos(angle) * orbit, math.sin(angle) * orbit * 0.55),
       math.max(1.6, radius * 0.34),
       _moonColor(palette, harness),
@@ -551,6 +533,7 @@ class _Frame {
       final left =
           (expiresMs - DateTime.now().millisecondsSinceEpoch) /
           const Duration(hours: 24).inMilliseconds;
+      sprites.flush();
       canvas.drawArc(
         Rect.fromCircle(center: c, radius: radius * 1.55),
         -math.pi / 2,
@@ -568,6 +551,7 @@ class _Frame {
   void _focusRings(String id, Offset c, double radius) {
     final pulse = view.still ? 0.0 : (math.sin(view.time * 3) + 1) / 2;
     if (view.selected == id || view.focused == id) {
+      sprites.flush();
       canvas.drawCircle(
         c,
         radius + 5 + pulse * 2,
@@ -577,6 +561,7 @@ class _Frame {
           ..color = palette.ink.withValues(alpha: 0.75),
       );
     } else if (view.hovered == id) {
+      sprites.flush();
       canvas.drawCircle(
         c,
         radius + 4,
@@ -598,6 +583,7 @@ class _Frame {
         Offset(curve[0], curve[1]),
         Offset(curve[last], curve[last + 1]),
       ).inflate(1);
+      sprites.flush();
       canvas.drawPath(
         _path(curve),
         Paint()
@@ -613,12 +599,11 @@ class _Frame {
       );
       // Particles flow from the service to the device using it.
       for (var i = 0; i < particles.length; i += 2) {
-        canvas.drawCircle(
+        sprites.softDisc(
           Offset(particles[i], particles[i + 1]),
           dark ? 2.2 : 1.8,
-          Paint()
-            ..color = light.withValues(alpha: 0.9)
-            ..maskFilter = MaskFilter.blur(BlurStyle.normal, dark ? 2.2 : 1),
+          dark ? 2.2 : 1,
+          light.withValues(alpha: 0.9),
         );
       }
     }
@@ -627,6 +612,7 @@ class _Frame {
   void ghosts() {
     view.ghosts.removeWhere((g) => view.time - g.since > 1.0);
     if (view.ghosts.isEmpty) return;
+    sprites.flush();
     final projection = view.camera.project(size);
     for (final ghost in view.ghosts) {
       final p = projection.at(ghost.position);

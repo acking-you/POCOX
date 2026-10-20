@@ -9,8 +9,16 @@
 //
 // Each scene animates for [_sample] after a warm-up and prints one
 // `GALAXY_PERF {...}` line: UI-thread (build, which includes the painter) and
-// raster durations in microseconds, as percentiles over every frame.
+// raster durations in microseconds, as percentiles over every frame; the
+// process's resident memory and the galaxy's sprite images at the end; and
+// the sample's wall-clock window, to line up an outside sampler such as
+// `footprint`, which also counts the GPU memory resident memory leaves out.
+// The window stays on top of the main display while it runs: macOS stops
+// drawing a covered window, which would leave a scene with a handful of
+// frames, and another display may have another pixel ratio and refresh
+// rate.
 import 'dart:convert';
+import 'dart:io' show ProcessInfo;
 import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/material.dart';
@@ -25,6 +33,8 @@ import 'package:pocket_codex/src/providers.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_screen.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_sprites.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../test/fake_bridge_api.dart';
 
@@ -119,6 +129,13 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   const enabled = bool.fromEnvironment('PCX_GALAXY_PERF');
+  if (enabled) {
+    setUpAll(() async {
+      await windowManager.ensureInitialized();
+      await windowManager.setPosition(const Offset(80, 80));
+      await windowManager.setAlwaysOnTop(true);
+    });
+  }
 
   for (final (scene, devices, ports) in [('typical', 5, 2), ('busy', 24, 5)]) {
     for (final dark in [true, false]) {
@@ -135,7 +152,9 @@ void main() {
         final timings = <FrameTiming>[];
         void collect(List<FrameTiming> batch) => timings.addAll(batch);
         SchedulerBinding.instance.addTimingsCallback(collect);
+        final started = DateTime.now().millisecondsSinceEpoch;
         await tester.pump(_sample);
+        final ended = DateTime.now().millisecondsSinceEpoch;
         // Timings arrive in batches; let the last one in.
         await tester.pump(const Duration(milliseconds: 300));
         SchedulerBinding.instance.removeTimingsCallback(collect);
@@ -155,6 +174,9 @@ void main() {
           'raster_us': _stats([
             for (final t in timings) t.rasterDuration.inMicroseconds,
           ]),
+          'rss_mb': (ProcessInfo.currentRss / (1 << 20)).round(),
+          'sprite_kb': GalaxySprites.liveBytes >> 10,
+          'window_ms': [started, ended],
         };
         debugPrint('GALAXY_PERF ${jsonEncode(result)}');
         expect(timings, isNotEmpty);

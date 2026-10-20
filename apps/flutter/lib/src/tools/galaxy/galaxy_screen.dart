@@ -21,6 +21,7 @@ import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_painter.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_panel.dart';
+import 'package:pocket_codex/src/tools/galaxy/galaxy_sprites.dart';
 import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
 import 'package:pocket_codex/src/tools/planet_glyph.dart';
 import 'package:pocket_codex/src/tools/tools_actions.dart';
@@ -43,6 +44,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   final GalaxyView _view = GalaxyView();
   final LabelCache _labels = LabelCache();
   final GalaxyGeometry _geometry = GalaxyGeometry();
+  final GalaxySprites _sprites = GalaxySprites();
   final Starfield _stars = Starfield();
   final FocusNode _focus = FocusNode(debugLabel: 'galaxy');
   final TextEditingController _search = TextEditingController();
@@ -80,6 +82,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
     _search.dispose();
     _view.dispose();
     _geometry.dispose();
+    _sprites.dispose();
     super.dispose();
   }
 
@@ -343,6 +346,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                           l10n: l10n,
                           labels: _labels,
                           geometry: _geometry,
+                          sprites: _sprites,
                           starfield: _stars,
                           onBackdrop: _backdropReady,
                         ),

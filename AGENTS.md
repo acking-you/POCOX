@@ -1616,8 +1616,25 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     where the library is not loaded (`flutter test`); change both together, and
     keep `test/galaxy_frame_parity_test.dart` (opt-in, built library) passing.
     Measured on one Mac in profile mode: UI-thread time per frame down about a
-    quarter (typical) to a third (busy scene), raster unchanged and still the
-    larger cost. See `docs/galaxy-geometry.md`.
+    quarter (typical) to a third (busy scene), raster unchanged by that move
+    (item 46 cuts it). See `docs/galaxy-geometry.md`.
+
+46. **Galaxy glows and spheres from cached images (2026-10-20).** The galaxy
+    draws its blurred glows, halos, contact shadows, lit bodies, rims,
+    specular points, spikes, particles and the plane's glow as sprites from
+    one atlas (`galaxy_sprites.dart`, `drawRawAtlas`), in the vector painter's
+    order and each layer at its own opacity. `paintSphere` builds a sphere
+    through `SphereLayers`; `CanvasSphereLayers` paints the cards' spheres, the
+    vector fallback and the atlas cells alike, so a layer changes in one place.
+    White coverage images are coloured when drawn; sharp layers are bucketed
+    by on-screen size, soft ones scaled up. Keep the atlas bounded (512×2048;
+    0.3–0.55 MB measured at 2×) and never rebuilt every frame. Measured on one
+    Mac (Skia on Metal, profile, 2×): raster −49 % (busy, dark), −65 % (busy,
+    light), −12 to −25 % typical; UI build −32 to −37 % busy, +20–40 µs
+    typical; total footprint not higher. Cached edges move by sub-pixel
+    resampling; zoomed in, the plane's glow keeps the blur the test renderer
+    collapses. iOS/Android (Impeller) not measured. See
+    `docs/galaxy-geometry.md`.
 
 ## 10. Communication conventions
 
