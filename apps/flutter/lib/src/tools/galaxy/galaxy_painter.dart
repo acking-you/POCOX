@@ -612,14 +612,13 @@ class _Frame {
   void ghosts() {
     view.ghosts.removeWhere((g) => view.time - g.since > 1.0);
     if (view.ghosts.isEmpty) return;
-    sprites.flush();
     final projection = view.camera.project(size);
     for (final ghost in view.ghosts) {
       final p = projection.at(ghost.position);
       if (p == null) continue;
       final t = (view.time - ghost.since).clamp(0.0, 1.0);
-      paintPlanet(
-        canvas,
+      paintSphere(
+        sprites,
         p.point,
         math.max(2.0, ghost.size * p.scale) * (1 + t * 0.4),
         palette.scheme.outline,

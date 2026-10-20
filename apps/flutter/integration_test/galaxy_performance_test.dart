@@ -154,10 +154,10 @@ void main() {
         SchedulerBinding.instance.addTimingsCallback(collect);
         final started = DateTime.now().millisecondsSinceEpoch;
         await tester.pump(_sample);
-        final ended = DateTime.now().millisecondsSinceEpoch;
         // Timings arrive in batches; let the last one in.
         await tester.pump(const Duration(milliseconds: 300));
         SchedulerBinding.instance.removeTimingsCallback(collect);
+        final ended = DateTime.now().millisecondsSinceEpoch;
         final size = tester.view.physicalSize / tester.view.devicePixelRatio;
         final result = {
           'scene': name,

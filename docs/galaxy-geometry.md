@@ -82,12 +82,16 @@ painter would:
   1/32 octave), rendered with an 8 px blur and stretched to the frame's oval;
   it is rendered again only when that shape changes.
 - Sprites are submitted in runs between the vector draws (orbits, link curves,
-  rings, ripples, share dashes, ghosts, labels), about three
-  `drawRawAtlas` calls per star system. Those vector draws, the guide circles
-  and the starfield are unchanged.
+  rings, ripples, share dashes, labels), about three `drawRawAtlas` calls per
+  star system. Those vector draws, the guide circles and the starfield are
+  unchanged; the fading spheres of removed services use the sprites too.
 - A layer is painted as vectors in the frame that first asks for it; the next
   frame renders the atlas again: the previous image as it was and the new
   cells packed bottom-left on a skyline. A change of theme starts afresh.
+- `toImageSync` rasterizes when an image is first drawn, so a failure (a lost
+  GPU context) surfaces as a `PictureRasterizationException` from the draw:
+  the images are dropped, that frame loses those sprites, and the galaxy
+  paints vectors for 600 frames before making images again.
 
 Memory: the atlas is at most 512×2048 pixels (4 MB). Measured at 2×, it and the
 plane's image held 0.3–0.55 MB (the harness reports `sprite_kb`). Image

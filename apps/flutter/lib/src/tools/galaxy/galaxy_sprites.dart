@@ -115,6 +115,10 @@ class GalaxySprites implements SphereLayers {
   bool? _dark;
   bool _full = false;
   int _frames = 0;
+
+  /// Frames left to paint only vectors after an image failed to rasterize
+  /// (a lost GPU context); then the images are made again.
+  int _hold = 0;
   final List<_Span> _skyline = [_Span(0, 0, _width.toDouble())];
   double _height = 0;
 
@@ -164,6 +168,7 @@ class GalaxySprites implements SphereLayers {
     _canvas = canvas;
     _ratio = ratio;
     _frames++;
+    if (_hold > 0) _hold--;
     // Nothing carries over from a frame that did not finish.
     _transforms.clear();
     _rects.clear();
@@ -179,18 +184,32 @@ class GalaxySprites implements SphereLayers {
     final image = _image;
     final canvas = _canvas;
     if (_colors.isEmpty || image == null || canvas == null) return;
-    canvas.drawRawAtlas(
-      image,
-      Float32List.fromList(_transforms),
-      Float32List.fromList(_rects),
-      Int32List.fromList(_colors),
-      BlendMode.modulate,
-      null,
-      _paint,
-    );
+    try {
+      canvas.drawRawAtlas(
+        image,
+        Float32List.fromList(_transforms),
+        Float32List.fromList(_rects),
+        Int32List.fromList(_colors),
+        BlendMode.modulate,
+        null,
+        _paint,
+      );
+    } on ui.PictureRasterizationException {
+      // These sprites are lost for this one frame.
+      _failed();
+    }
     _transforms.clear();
     _rects.clear();
     _colors.clear();
+  }
+
+  /// An image could not be rasterized, which surfaces only when it is
+  /// drawn: drop every image and paint vectors for a while.
+  void _failed() {
+    _clear();
+    _setPlane(null);
+    _planeKey = null;
+    _hold = _refill;
   }
 
   /// Release the images.
@@ -358,6 +377,13 @@ class GalaxySprites implements SphereLayers {
   void softOval(Rect oval, double sigma, Color color) {
     if (oval.isEmpty || sigma <= 0) return;
     flush();
+    void vector() => _canvas!.drawOval(
+      oval,
+      Paint()
+        ..color = color
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma),
+    );
+    if (_hold > 0) return vector();
     // The shape is its size relative to its blur, in 1/32 octaves.
     int log(double v) => (math.log(v) / math.ln2 * 32).round();
     final key = (log(oval.width / sigma), log(oval.height / sigma));
@@ -380,37 +406,30 @@ class GalaxySprites implements SphereLayers {
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, blur),
       );
       final picture = recorder.endRecording();
-      try {
-        _setPlane(
-          picture.toImageSync(
-            _round(_planeSource.width, 16),
-            _round(_planeSource.height, 16),
-          ),
-        );
-      } catch (_) {
-        _setPlane(null);
-      } finally {
-        picture.dispose();
-      }
+      // Rasterized when first drawn; a failure surfaces there.
+      _setPlane(
+        picture.toImageSync(
+          _round(_planeSource.width, 16),
+          _round(_planeSource.height, 16),
+        ),
+      );
+      picture.dispose();
     }
     final image = _plane;
-    if (image == null) {
-      _canvas!.drawOval(
-        oval,
+    if (image == null) return vector();
+    try {
+      _canvas!.drawImageRect(
+        image,
+        _planeSource,
+        oval.inflate(sigma * 3),
         Paint()
-          ..color = color
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, sigma),
+          ..filterQuality = FilterQuality.low
+          ..colorFilter = ColorFilter.mode(color, BlendMode.modulate),
       );
-      return;
+    } on ui.PictureRasterizationException {
+      _failed();
+      vector();
     }
-    _canvas!.drawImageRect(
-      image,
-      _planeSource,
-      oval.inflate(sigma * 3),
-      Paint()
-        ..filterQuality = FilterQuality.low
-        ..colorFilter = ColorFilter.mode(color, BlendMode.modulate),
-    );
   }
 
   static final Rect _unitBox = Rect.fromLTRB(-1, -1, 1, 1);
@@ -455,7 +474,7 @@ class GalaxySprites implements SphereLayers {
     bool upright = false,
   }) {
     final cell = _cells[key];
-    if (cell == null || !cell.ready) return false;
+    if (cell == null || !cell.ready || _hold > 0) return false;
     final scale = size / cell.unit;
     final anchor = cell.anchor;
     if (upright) {
@@ -483,7 +502,7 @@ class GalaxySprites implements SphereLayers {
   /// Place a cell of [unit] pixels spanning [box] (in units around its
   /// centre) for the next frame's atlas.
   void _add(int key, double unit, Rect box, _CellPaint paint) {
-    if (_full) return;
+    if (_full || _hold > 0) return;
     final width = (box.width * unit).ceilToDouble() + _pad * 2;
     final height = (box.height * unit).ceilToDouble() + _pad * 2;
     final rect = _place(width, height);
@@ -543,7 +562,15 @@ class GalaxySprites implements SphereLayers {
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder);
     final old = _image;
-    if (old != null) canvas.drawImage(old, Offset.zero, Paint());
+    if (old != null) {
+      try {
+        canvas.drawImage(old, Offset.zero, Paint());
+      } on ui.PictureRasterizationException {
+        recorder.endRecording().dispose();
+        _failed();
+        return;
+      }
+    }
     for (final cell in _fresh) {
       final rect = cell.rect;
       canvas
@@ -554,17 +581,13 @@ class GalaxySprites implements SphereLayers {
       canvas.restore();
     }
     final picture = recorder.endRecording();
-    try {
-      _setImage(picture.toImageSync(_width, _round(_height, 64)));
-      for (final cell in _fresh) {
-        cell.ready = true;
-      }
-    } catch (_) {
-      // No rasteriser: these layers stay vectors.
-    } finally {
-      picture.dispose();
-      _fresh.clear();
+    // Rasterized when first drawn; a failure surfaces there ([flush]).
+    _setImage(picture.toImageSync(_width, _round(_height, 64)));
+    picture.dispose();
+    for (final cell in _fresh) {
+      cell.ready = true;
     }
+    _fresh.clear();
   }
 
   void _setImage(ui.Image? image) {
