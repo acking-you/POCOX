@@ -16,6 +16,21 @@ extension _NativeFollow on _LocalSessionViewState {
         .listen(_onNativeRevision, onError: _onNativeFollowError);
   }
 
+  /// Follow only while this view is in the foreground and the visible
+  /// route: a hidden view reads nothing and, for Grok, keeps no leader
+  /// connection open. Visible again, it follows again.
+  void _syncNativeFollow() {
+    if (!_source.isNative) return;
+    final visible = _foreground && _onTop;
+    if (visible && _follow == null) {
+      _startNativeFollow();
+    } else if (!visible && _follow != null) {
+      unawaited(_follow!.cancel());
+      _follow = null;
+      _pendingRevision = null;
+    }
+  }
+
   void _onNativeRevision(NativeSessionRevision revision) {
     if (!mounted || !_foreground || !_onTop) return;
     // A change during a read is applied right after it.

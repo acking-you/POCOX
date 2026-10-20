@@ -137,18 +137,21 @@ async fn session(
         tokio::select! {
             biased;
             _ = &mut *stopped => return Ok(End::Stopped),
-            message = frames.next() => {
-                let message = message?;
-                if let Some(end) = on_message(state, writer, message).await? {
-                    return Ok(end);
-                }
-            },
+            // Before frames: a streaming turn keeps frames ready, and the
+            // follower must still leave within a check of the registration
+            // ending.
             _ = owner_check.tick() => {
                 if !connected(state) && Instant::now() >= deadline {
                     bail!("the Grok leader did not answer in time");
                 }
                 if !held(probe, &state.session).await {
                     return Ok(End::OwnerGone);
+                }
+            },
+            message = frames.next() => {
+                let message = message?;
+                if let Some(end) = on_message(state, writer, message).await? {
+                    return Ok(end);
                 }
             },
         }

@@ -298,6 +298,33 @@ void main() {
       );
     },
   );
+  testWidgets('a hidden view ends its follow and follows again when shown', (
+    t,
+  ) async {
+    final api = NativeFake()..follow = StreamController.broadcast();
+    await t.pumpWidget(
+      host(const LocalSessionViewScreen(threadId: 's', provider: 'grok'), api),
+    );
+    await settle(t);
+    expect(api.follow!.hasListener, isTrue);
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await t.pump();
+    expect(api.follow!.hasListener, isFalse, reason: 'in the background');
+    t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await settle(t);
+    expect(api.follow!.hasListener, isTrue);
+    final navigator = t.state<NavigatorState>(find.byType(Navigator));
+    unawaited(
+      navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold())),
+    );
+    await settle(t);
+    expect(api.follow!.hasListener, isFalse, reason: 'covered by a route');
+    navigator.pop();
+    await settle(t);
+    expect(api.follow!.hasListener, isTrue);
+    await t.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('a running OpenCode host continues the native session there', (
     t,
   ) async {

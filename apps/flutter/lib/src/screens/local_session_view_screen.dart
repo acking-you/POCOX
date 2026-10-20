@@ -241,8 +241,16 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Also runs when another route covers this one or leaves it.
+    _syncNativeFollow();
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _foreground = state == AppLifecycleState.resumed;
+    _syncNativeFollow();
     if (_foreground && _source.isNative) _load();
   }
 
