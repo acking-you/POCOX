@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:pocket_codex/src/bridge_api.dart';
 import 'package:pocket_codex/src/hosting/host_names.dart';
 import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocket_codex/src/updates/update_api.dart';
 
 part 'support/fake_bridge/state.dart';
 part 'support/fake_bridge/connection.dart';
@@ -14,6 +15,7 @@ part 'support/fake_bridge/threads.dart';
 part 'support/fake_bridge/management.dart';
 part 'support/fake_bridge/tools.dart';
 part 'support/fake_bridge/grok.dart';
+part 'support/fake_bridge/updates.dart';
 
 /// In-memory bridge with shared, inspectable state for widget tests.
 class FakeBridgeApi extends _FakeBridgeState
@@ -24,7 +26,8 @@ class FakeBridgeApi extends _FakeBridgeState
         _FakeThreads,
         _FakeManagement,
         _FakeTools,
-        _FakeGrok {
+        _FakeGrok,
+        _FakeUpdates {
   /// Creates a fake seeded with optional configuration and services.
   FakeBridgeApi({super.config, super.services});
 

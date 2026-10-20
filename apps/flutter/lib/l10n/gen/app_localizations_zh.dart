@@ -4081,4 +4081,104 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String get grokAuthHint =>
       'Grok 需要登录。请打开这个主机的设置，在官方账号下使用 Grok 登录（或选择自定义服务商），然后重启主机。';
+
+  @override
+  String get updatesTitle => '更新';
+
+  @override
+  String get updatesInfo =>
+      'POCOX 会在后台悄悄检查 GitHub 上是否有新版本，最多每隔几小时一次。只有在你选择更新时才会下载，并且只有发布签名和校验和都匹配时才会安装。';
+
+  @override
+  String updateVersion(String version) {
+    return 'POCOX $version';
+  }
+
+  @override
+  String get updateUpToDate => '已是最新版本';
+
+  @override
+  String get updateNotChecked => '尚未检查';
+
+  @override
+  String updateCheckedAgo(String ago) {
+    return '$ago检查';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return '$version 可用';
+  }
+
+  @override
+  String updateDownloading(int percent) {
+    return '正在下载 $percent%';
+  }
+
+  @override
+  String get updateVerifying => '正在校验…';
+
+  @override
+  String get updateRestarting => '正在重启…';
+
+  @override
+  String get updateOpening => '正在打开…';
+
+  @override
+  String get updateOpened => '已在安装程序中打开';
+
+  @override
+  String updateSaved(String path) {
+    return '已保存到 $path';
+  }
+
+  @override
+  String get updateVerifiedOnly => '已校验。开发版本不会替换自身。';
+
+  @override
+  String get updateCheckFailed => '无法检查更新';
+
+  @override
+  String get updateFailedNetwork => '无法连接 GitHub';
+
+  @override
+  String get updateFailedSignature => '发布签名不匹配';
+
+  @override
+  String get updateFailedChecksum => '下载的文件与发布不一致';
+
+  @override
+  String get updateFailedVerification => '新版本未通过校验';
+
+  @override
+  String get updateFailedInstall => '无法安装更新';
+
+  @override
+  String get updateFailedPermission => '请允许 POCOX 安装应用，然后重试';
+
+  @override
+  String get updateFailedQuit => 'POCOX 无法退出以完成更新';
+
+  @override
+  String get updateCheckNow => '立即检查';
+
+  @override
+  String get updateChecking => '正在检查…';
+
+  @override
+  String get updateAndRestart => '更新并重启';
+
+  @override
+  String get updateInstall => '更新';
+
+  @override
+  String get updateDownload => '下载';
+
+  @override
+  String get updateReleasePage => '发布页面';
+
+  @override
+  String updateToast(String version) {
+    return 'POCOX $version 已发布';
+  }
 }

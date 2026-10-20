@@ -13,6 +13,10 @@
 #
 # Release notes are generated ONCE in the `prepare` job and every other job
 # attaches that same body (`body_path:`), so the body is never duplicated.
+#
+# The `manifest` job runs last: it lists every file the release ends up with
+# (size + SHA-256) in `release-manifest.json` and signs it with the update key.
+# The apps' updater trusts nothing else (scripts/release_manifest.py).
 name: Release
 
 on:
@@ -704,3 +708,37 @@ jobs:
           draft: ${{ env.IS_DRAFT }}
           body_path: release_notes.md
           files: apps/flutter/dist/*
+
+  # --- Update manifest: what the apps' updater trusts --------------------------
+  # After every package job, whether or not each succeeded (a platform that
+  # failed simply has no file listed), and again after a macOS refresh, so the
+  # signed manifest always names exactly the release's current files.
+  manifest:
+    name: Update manifest
+    needs: [prepare, cli, app-windows, app-linux, app-macos, app-android, app-ios]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collect, sign and attach the manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+          RELEASE_TAG: ${{ inputs.macos_release_tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          test -n "$UPDATE_SIGNING_KEY" || { echo "UPDATE_SIGNING_KEY is not set"; exit 1; }
+          mkdir assets
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --dir assets --pattern 'pocket-codex-*'
+          python3 scripts/release_manifest.py collect assets "$RELEASE_TAG" "$GITHUB_SHA" \
+            --out release-manifest.json
+          key="$(mktemp)"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+          python3 scripts/release_manifest.py sign release-manifest.json --key "$key"
+          python3 scripts/release_manifest.py verify release-manifest.json \
+            --public scripts/update_signing_key.pub.pem
+          cat release-manifest.json
+          gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            release-manifest.json release-manifest.json.sig SHA256SUMS

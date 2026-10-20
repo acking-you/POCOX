@@ -4320,4 +4320,106 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get grokAuthHint =>
       'Grok needs a sign-in. Open this host\'s settings, sign in with Grok under Official account (or choose a custom provider), then restart the host.';
+
+  @override
+  String get updatesTitle => 'Updates';
+
+  @override
+  String get updatesInfo =>
+      'POCOX looks for a newer release on GitHub quietly in the background, at most every few hours. Nothing is downloaded until you choose to update, and an update is installed only when the release\'s signature and checksums match.';
+
+  @override
+  String updateVersion(String version) {
+    return 'POCOX $version';
+  }
+
+  @override
+  String get updateUpToDate => 'Up to date';
+
+  @override
+  String get updateNotChecked => 'Not checked yet';
+
+  @override
+  String updateCheckedAgo(String ago) {
+    return 'checked $ago';
+  }
+
+  @override
+  String updateAvailable(String version) {
+    return '$version is available';
+  }
+
+  @override
+  String updateDownloading(int percent) {
+    return 'Downloading $percent%';
+  }
+
+  @override
+  String get updateVerifying => 'Verifying…';
+
+  @override
+  String get updateRestarting => 'Restarting…';
+
+  @override
+  String get updateOpening => 'Opening…';
+
+  @override
+  String get updateOpened => 'Opened in the installer';
+
+  @override
+  String updateSaved(String path) {
+    return 'Saved to $path';
+  }
+
+  @override
+  String get updateVerifiedOnly =>
+      'Verified. Development builds do not replace themselves.';
+
+  @override
+  String get updateCheckFailed => 'Couldn\'t check for updates';
+
+  @override
+  String get updateFailedNetwork => 'Couldn\'t reach GitHub';
+
+  @override
+  String get updateFailedSignature => 'The release\'s signature did not match';
+
+  @override
+  String get updateFailedChecksum => 'The download did not match the release';
+
+  @override
+  String get updateFailedVerification => 'The new version failed verification';
+
+  @override
+  String get updateFailedInstall => 'Couldn\'t install the update';
+
+  @override
+  String get updateFailedPermission =>
+      'Allow POCOX to install apps, then try again';
+
+  @override
+  String get updateFailedQuit => 'POCOX couldn\'t quit to finish updating';
+
+  @override
+  String get updateCheckNow => 'Check now';
+
+  @override
+  String get updateChecking => 'Checking…';
+
+  @override
+  String get updateAndRestart => 'Update and restart';
+
+  @override
+  String get updateInstall => 'Update';
+
+  @override
+  String get updateDownload => 'Download';
+
+  @override
+  String get updateReleasePage => 'Release page';
+
+  @override
+  String updateToast(String version) {
+    return 'POCOX $version is available';
+  }
 }

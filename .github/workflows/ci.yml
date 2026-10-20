@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 -m unittest discover -s scripts -p 'test_package_macos.py'
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
   fmt:
     name: rust fmt

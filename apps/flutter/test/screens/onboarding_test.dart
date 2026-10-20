@@ -557,6 +557,12 @@ void main() {
     );
     await t.pumpAndSettle();
     expect(find.text('@octocat'), findsOneWidget); // signed-in identity
+    // Centred: at the list's edge it would sit under the bottom navigation.
+    await Scrollable.ensureVisible(
+      t.element(find.byKey(const Key('sign-out-btn'))),
+      alignment: 0.5,
+    );
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('sign-out-btn')));
     await t.pumpAndSettle();
     expect(api.accountUser, isNull); // accountLogout ran

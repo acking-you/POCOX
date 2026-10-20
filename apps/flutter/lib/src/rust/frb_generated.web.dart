@@ -23,6 +23,7 @@ import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';
 import 'api/bridge/threads.dart';
+import 'api/bridge/updates.dart';
 import 'api/simple.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -65,6 +66,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<ToolsUpdateDto> dco_decode_StreamSink_tools_update_dto_Sse(
+    dynamic raw,
+  );
+
+  @protected
+  RustStreamSink<UpdateStateDto> dco_decode_StreamSink_update_state_dto_Sse(
     dynamic raw,
   );
 
@@ -620,6 +626,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void dco_decode_unit(dynamic raw);
 
   @protected
+  UpdateStateDto dco_decode_update_state_dto(dynamic raw);
+
+  @protected
   WebLoginStartDto dco_decode_web_login_start_dto(dynamic raw);
 
   @protected
@@ -654,6 +663,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<ToolsUpdateDto> sse_decode_StreamSink_tools_update_dto_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<UpdateStateDto> sse_decode_StreamSink_update_state_dto_Sse(
     SseDeserializer deserializer,
   );
 
@@ -1371,6 +1385,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
+  UpdateStateDto sse_decode_update_state_dto(SseDeserializer deserializer);
+
+  @protected
   WebLoginStartDto sse_decode_web_login_start_dto(SseDeserializer deserializer);
 
   @protected
@@ -1415,6 +1432,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_tools_update_dto_Sse(
     RustStreamSink<ToolsUpdateDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_update_state_dto_Sse(
+    RustStreamSink<UpdateStateDto> self,
     SseSerializer serializer,
   );
 
@@ -2329,6 +2352,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_update_state_dto(
+    UpdateStateDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_web_login_start_dto(

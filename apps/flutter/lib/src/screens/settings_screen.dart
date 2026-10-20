@@ -15,6 +15,7 @@ import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/tools/tools_settings.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/updates/update_settings.dart';
 import 'package:pocket_codex/src/widgets/app_toast.dart';
 import 'package:pocket_codex/src/widgets/github_avatar.dart';
 import 'package:pocket_codex/src/widgets/group_card.dart';
@@ -160,6 +161,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     padding: const EdgeInsets.all(16),
     children: [
       Card(child: _cacheTile(l10n)),
+      const Card(child: UpdateRow()),
       Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -326,6 +328,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  const UpdateSettings(),
                   const SizedBox(height: 10),
                   GroupCard(
                     title: l10n.settingsHosting,

@@ -5,6 +5,7 @@ library;
 import 'dart:typed_data';
 
 import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocket_codex/src/updates/update_api.dart';
 
 part 'bridge/capability_types.dart';
 part 'bridge/connection_types.dart';
@@ -19,7 +20,7 @@ part 'bridge/device_metadata.dart';
 part 'bridge/tools_types.dart';
 part 'bridge/grok_types.dart';
 
-abstract interface class BridgeApi {
+abstract interface class BridgeApi implements UpdateApi {
   /// Read only local disk; cached history is display-only until synchronized.
   Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
   Future<bool> appHistorySyncPrepare(String serviceKey);

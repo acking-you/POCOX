@@ -115,6 +115,9 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 url = "2.5"
 percent-encoding = "2.3"
 directories = "5"
+# Release manifests are Ed25519-signed; ring is already the TLS crypto provider.
+ring = "0.17"
+semver = "1"
 # Codex compresses cold rollouts to `.jsonl.zst`; already resolved through reqwest/tower-http.
 zstd = "0.13"
 which = "6"

@@ -61,7 +61,20 @@ class ToastMessenger {
   /// A neutral notice.
   void notice(String message) => _raise(message, _Tone.neutral);
 
-  void _raise(String message, _Tone tone) {
+  /// A neutral notice that offers one thing to do about it ([action] runs
+  /// [onAction] and closes the toast). It stays long enough to be acted on,
+  /// then goes by itself: an offer, never a prompt the user must answer.
+  void offer(
+    String message, {
+    required String action,
+    required VoidCallback onAction,
+  }) => _raise(
+    message,
+    _Tone.neutral,
+    action: (label: action, onPressed: onAction),
+  );
+
+  void _raise(String message, _Tone tone, {_Action? action}) {
     final messenger = _messenger;
     // A late completion may outlive the captured messenger.
     if (messenger == null || !messenger.mounted) return;
@@ -75,10 +88,21 @@ class ToastMessenger {
         scheme: _scheme,
         textTheme: _textTheme,
         wide: _wide,
+        action: action == null
+            ? null
+            : (
+                label: action.label,
+                onPressed: () {
+                  messenger.hideCurrentSnackBar();
+                  action.onPressed();
+                },
+              ),
       ),
     );
   }
 }
+
+typedef _Action = ({String label, VoidCallback onPressed});
 
 /// The design's toast: a raised card 17px glyph + 10 from its label, padded
 /// 13/11, on the panel radius — the same lift as the composer and the floating
@@ -94,6 +118,7 @@ const double _insetBreakpoint = 520;
 
 const Duration _briefly = Duration(seconds: 2);
 const Duration _longEnoughToRead = Duration(seconds: 4);
+const Duration _longEnoughToAct = Duration(seconds: 10);
 
 SnackBar _bar({
   required String message,
@@ -101,6 +126,7 @@ SnackBar _bar({
   required ColorScheme scheme,
   required TextTheme textTheme,
   required bool wide,
+  _Action? action,
 }) {
   final (IconData icon, Color color) = switch (tone) {
     _Tone.ok => (AppIcons.check_circle_outline, successColor(scheme)),
@@ -114,7 +140,11 @@ SnackBar _bar({
     elevation: 0,
     padding: EdgeInsets.zero,
     behavior: SnackBarBehavior.floating,
-    duration: tone == _Tone.error ? _longEnoughToRead : _briefly,
+    duration: action != null
+        ? _longEnoughToAct
+        : tone == _Tone.error
+        ? _longEnoughToRead
+        : _briefly,
     width: wide ? _desktopWidth : null,
     margin: wide ? null : const EdgeInsets.all(12),
     // A pane of glass over whatever the page shows beneath it.
@@ -133,6 +163,14 @@ SnackBar _bar({
                 style: textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
               ),
             ),
+            if (action != null) ...[
+              const SizedBox(width: _glyphGap),
+              TextButton(
+                key: const Key('toast-action'),
+                onPressed: action.onPressed,
+                child: Text(action.label),
+              ),
+            ],
           ],
         ),
       ),

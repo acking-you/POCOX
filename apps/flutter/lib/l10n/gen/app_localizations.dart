@@ -7456,6 +7456,180 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Grok needs a sign-in. Open this host\'s settings, sign in with Grok under Official account (or choose a custom provider), then restart the host.'**
   String get grokAuthHint;
+
+  /// No description provided for @updatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates'**
+  String get updatesTitle;
+
+  /// No description provided for @updatesInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX looks for a newer release on GitHub quietly in the background, at most every few hours. Nothing is downloaded until you choose to update, and an update is installed only when the release\'s signature and checksums match.'**
+  String get updatesInfo;
+
+  /// No description provided for @updateVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX {version}'**
+  String updateVersion(String version);
+
+  /// No description provided for @updateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get updateUpToDate;
+
+  /// No description provided for @updateNotChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked yet'**
+  String get updateNotChecked;
+
+  /// No description provided for @updateCheckedAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'checked {ago}'**
+  String updateCheckedAgo(String ago);
+
+  /// No description provided for @updateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'{version} is available'**
+  String updateAvailable(String version);
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {percent}%'**
+  String updateDownloading(int percent);
+
+  /// No description provided for @updateVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying…'**
+  String get updateVerifying;
+
+  /// No description provided for @updateRestarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Restarting…'**
+  String get updateRestarting;
+
+  /// No description provided for @updateOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening…'**
+  String get updateOpening;
+
+  /// No description provided for @updateOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Opened in the installer'**
+  String get updateOpened;
+
+  /// No description provided for @updateSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to {path}'**
+  String updateSaved(String path);
+
+  /// No description provided for @updateVerifiedOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Verified. Development builds do not replace themselves.'**
+  String get updateVerifiedOnly;
+
+  /// No description provided for @updateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t check for updates'**
+  String get updateCheckFailed;
+
+  /// No description provided for @updateFailedNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t reach GitHub'**
+  String get updateFailedNetwork;
+
+  /// No description provided for @updateFailedSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'The release\'s signature did not match'**
+  String get updateFailedSignature;
+
+  /// No description provided for @updateFailedChecksum.
+  ///
+  /// In en, this message translates to:
+  /// **'The download did not match the release'**
+  String get updateFailedChecksum;
+
+  /// No description provided for @updateFailedVerification.
+  ///
+  /// In en, this message translates to:
+  /// **'The new version failed verification'**
+  String get updateFailedVerification;
+
+  /// No description provided for @updateFailedInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t install the update'**
+  String get updateFailedInstall;
+
+  /// No description provided for @updateFailedPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow POCOX to install apps, then try again'**
+  String get updateFailedPermission;
+
+  /// No description provided for @updateFailedQuit.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX couldn\'t quit to finish updating'**
+  String get updateFailedQuit;
+
+  /// No description provided for @updateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check now'**
+  String get updateCheckNow;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking…'**
+  String get updateChecking;
+
+  /// No description provided for @updateAndRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Update and restart'**
+  String get updateAndRestart;
+
+  /// No description provided for @updateInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get updateInstall;
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get updateDownload;
+
+  /// No description provided for @updateReleasePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Release page'**
+  String get updateReleasePage;
+
+  /// No description provided for @updateToast.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX {version} is available'**
+  String updateToast(String version);
 }
 
 class _AppLocalizationsDelegate

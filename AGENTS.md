@@ -1588,6 +1588,24 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     `external_idle`. Local sessions follows through
     `app_native_session_follow`. See [Grok Build](docs/grok-build.md).
 
+44. **App updates (2026-10-20).** The bridge's `engine::updates` checks GitHub
+    Releases quietly (20 s after start, then at most every six hours, also across
+    restarts) and installs only what the release's Ed25519-signed manifest
+    (`release-manifest.json`, written and signed by the release workflow's last
+    `manifest` job, `scripts/release_manifest.py`) names, by size and SHA-256. The
+    key's private half lives only in the `UPDATE_SIGNING_KEY` secret and the
+    maintainer's backup; never commit it. macOS also requires the staged bundle's
+    Developer ID team, notarization, identifier and version before a detached
+    helper swaps it in after the app quits through its normal path. Windows
+    installs run the installer quietly, AppImages replace themselves, `.deb` and
+    Android packages go to the system's installer, portable archives to Downloads,
+    iOS to the release page. Flutter only renders the engine's state
+    (`lib/src/updates/`) and does the app's part: quit, the Android installer
+    channel, opening the page. One toast per new version; no dialogs. Development
+    builds stop after verification unless a `POCOX_UPDATE_*` test override is
+    set. The CLI keeps updating through its install scripts. See
+    `docs/app-updates.md`.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.

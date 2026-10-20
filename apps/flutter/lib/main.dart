@@ -15,6 +15,7 @@ import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/theme_transition.dart';
 import 'package:pocket_codex/src/tools/tools_host.dart';
 import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocket_codex/src/updates/update_host.dart';
 import 'package:pocket_codex/src/widgets/popover.dart';
 import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
 import 'package:pocket_codex/src/rust/frb_generated.dart';
@@ -227,8 +228,11 @@ class _PocketCodexAppState extends ConsumerState<PocketCodexApp>
         }
         // The light/dark switch captures this subtree; see ThemeTransition.
         // Agents' share requests and new shares appear above every page.
+        // Updates are checked quietly and offered once per release.
         final page = ThemeTransitionHost(
-          child: ToolsHost(child: child ?? const SizedBox.shrink()),
+          child: UpdateHost(
+            child: ToolsHost(child: child ?? const SizedBox.shrink()),
+          ),
         );
         if (!DesktopTray.supported) return page;
         // A quit in progress, or one that could not stop every hosted

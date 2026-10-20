@@ -59,6 +59,9 @@ once_cell = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 futures = { workspace = true }
+ring = { workspace = true }
+semver = { workspace = true }
+directories = { workspace = true }
 
 # The agent tools' MCP endpoint runs only where POCOX hosts (desktops and the
 # CLI host). Phones never serve it, so they do not link the SDK.

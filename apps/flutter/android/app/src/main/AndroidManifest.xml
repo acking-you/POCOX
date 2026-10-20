@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Hands a user-requested, verified update to the system installer,
+         which asks the user before anything installs. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="POCOX"
         android:name="${applicationName}"
@@ -53,6 +56,11 @@
                 <data android:scheme="pocketcodex" />
             </intent-filter>
         </activity>
+        <!-- Hears the package installer's status and shows its
+             confirmation (UpdateInstaller.kt). -->
+        <receiver
+            android:name=".UpdateInstallReceiver"
+            android:exported="false" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

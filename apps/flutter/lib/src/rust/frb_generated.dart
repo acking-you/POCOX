@@ -20,6 +20,7 @@ import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';
 import 'api/bridge/threads.dart';
+import 'api/bridge/updates.dart';
 import 'api/simple.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -83,7 +84,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1680500333;
+  int get rustContentHash => -260549328;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -910,6 +911,29 @@ abstract class RustLibApi extends BaseApi {
   List<ToolsTokenDto> crateApiBridgeAgentToolsToolsTokens();
 
   Stream<ToolsUpdateDto> crateApiBridgeAgentToolsToolsWatch();
+
+  void crateApiBridgeUpdatesUpdateAnnounce({required String version});
+
+  void crateApiBridgeUpdatesUpdateCancel();
+
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateCheck({
+    required bool force,
+  });
+
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateDownload();
+
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateInstall();
+
+  void crateApiBridgeUpdatesUpdateReport({
+    required String kind,
+    required String detail,
+  });
+
+  void crateApiBridgeUpdatesUpdateStartBackground();
+
+  UpdateStateDto crateApiBridgeUpdatesUpdateState();
+
+  Stream<UpdateStateDto> crateApiBridgeUpdatesUpdateWatch();
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -7135,6 +7159,261 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgeAgentToolsToolsWatchConstMeta =>
       const TaskConstMeta(debugName: "tools_watch", argNames: ["sink"]);
 
+  @override
+  void crateApiBridgeUpdatesUpdateAnnounce({required String version}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(version, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 184,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateAnnounceConstMeta,
+        argValues: [version],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateAnnounceConstMeta =>
+      const TaskConstMeta(debugName: "update_announce", argNames: ["version"]);
+
+  @override
+  void crateApiBridgeUpdatesUpdateCancel() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 185,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateCancelConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateCancelConstMeta =>
+      const TaskConstMeta(debugName: "update_cancel", argNames: []);
+
+  @override
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateCheck({
+    required bool force,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(force, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 186,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_update_state_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateCheckConstMeta,
+        argValues: [force],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateCheckConstMeta =>
+      const TaskConstMeta(debugName: "update_check", argNames: ["force"]);
+
+  @override
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateDownload() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 187,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_update_state_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateDownloadConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateDownloadConstMeta =>
+      const TaskConstMeta(debugName: "update_download", argNames: []);
+
+  @override
+  Future<UpdateStateDto> crateApiBridgeUpdatesUpdateInstall() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 188,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_update_state_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateInstallConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateInstallConstMeta =>
+      const TaskConstMeta(debugName: "update_install", argNames: []);
+
+  @override
+  void crateApiBridgeUpdatesUpdateReport({
+    required String kind,
+    required String detail,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(kind, serializer);
+          sse_encode_String(detail, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 189,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateReportConstMeta,
+        argValues: [kind, detail],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateReportConstMeta =>
+      const TaskConstMeta(
+        debugName: "update_report",
+        argNames: ["kind", "detail"],
+      );
+
+  @override
+  void crateApiBridgeUpdatesUpdateStartBackground() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 190,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateStartBackgroundConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateStartBackgroundConstMeta =>
+      const TaskConstMeta(debugName: "update_start_background", argNames: []);
+
+  @override
+  UpdateStateDto crateApiBridgeUpdatesUpdateState() {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 191,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_update_state_dto,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgeUpdatesUpdateStateConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateStateConstMeta =>
+      const TaskConstMeta(debugName: "update_state", argNames: []);
+
+  @override
+  Stream<UpdateStateDto> crateApiBridgeUpdatesUpdateWatch() {
+    final sink = RustStreamSink<UpdateStateDto>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_StreamSink_update_state_dto_Sse(sink, serializer);
+            pdeCallFfi(
+              generalizedFrbRustBinding,
+              serializer,
+              funcId: 192,
+              port: port_,
+            );
+          },
+          codec: SseCodec(
+            decodeSuccessData: sse_decode_unit,
+            decodeErrorData: sse_decode_AnyhowException,
+          ),
+          constMeta: kCrateApiBridgeUpdatesUpdateWatchConstMeta,
+          argValues: [sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiBridgeUpdatesUpdateWatchConstMeta =>
+      const TaskConstMeta(debugName: "update_watch", argNames: ["sink"]);
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -7181,6 +7460,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<ToolsUpdateDto> dco_decode_StreamSink_tools_update_dto_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
+  RustStreamSink<UpdateStateDto> dco_decode_StreamSink_update_state_dto_Sse(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
@@ -9172,6 +9459,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  UpdateStateDto dco_decode_update_state_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 13)
+      throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
+    return UpdateStateDto(
+      current: dco_decode_String(arr[0]),
+      phase: dco_decode_String(arr[1]),
+      latest: dco_decode_opt_String(arr[2]),
+      newer: dco_decode_bool(arr[3]),
+      method: dco_decode_String(arr[4]),
+      size: dco_decode_opt_box_autoadd_i_64(arr[5]),
+      received: dco_decode_i_64(arr[6]),
+      page: dco_decode_String(arr[7]),
+      checkedAtMs: dco_decode_opt_box_autoadd_i_64(arr[8]),
+      failure: dco_decode_opt_String(arr[9]),
+      failureDetail: dco_decode_opt_String(arr[10]),
+      path: dco_decode_opt_String(arr[11]),
+      announced: dco_decode_opt_String(arr[12]),
+    );
+  }
+
+  @protected
   WebLoginStartDto dco_decode_web_login_start_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -9236,6 +9546,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   RustStreamSink<ToolsUpdateDto> sse_decode_StreamSink_tools_update_dto_Sse(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<UpdateStateDto> sse_decode_StreamSink_update_state_dto_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -11933,6 +12251,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  UpdateStateDto sse_decode_update_state_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_current = sse_decode_String(deserializer);
+    var var_phase = sse_decode_String(deserializer);
+    var var_latest = sse_decode_opt_String(deserializer);
+    var var_newer = sse_decode_bool(deserializer);
+    var var_method = sse_decode_String(deserializer);
+    var var_size = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_received = sse_decode_i_64(deserializer);
+    var var_page = sse_decode_String(deserializer);
+    var var_checkedAtMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_failure = sse_decode_opt_String(deserializer);
+    var var_failureDetail = sse_decode_opt_String(deserializer);
+    var var_path = sse_decode_opt_String(deserializer);
+    var var_announced = sse_decode_opt_String(deserializer);
+    return UpdateStateDto(
+      current: var_current,
+      phase: var_phase,
+      latest: var_latest,
+      newer: var_newer,
+      method: var_method,
+      size: var_size,
+      received: var_received,
+      page: var_page,
+      checkedAtMs: var_checkedAtMs,
+      failure: var_failure,
+      failureDetail: var_failureDetail,
+      path: var_path,
+      announced: var_announced,
+    );
+  }
+
+  @protected
   WebLoginStartDto sse_decode_web_login_start_dto(
     SseDeserializer deserializer,
   ) {
@@ -12059,6 +12410,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_tools_update_dto,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_update_state_dto_Sse(
+    RustStreamSink<UpdateStateDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_update_state_dto,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -14166,6 +14534,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @protected
   void sse_encode_unit(void self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
+  }
+
+  @protected
+  void sse_encode_update_state_dto(
+    UpdateStateDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.current, serializer);
+    sse_encode_String(self.phase, serializer);
+    sse_encode_opt_String(self.latest, serializer);
+    sse_encode_bool(self.newer, serializer);
+    sse_encode_String(self.method, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.size, serializer);
+    sse_encode_i_64(self.received, serializer);
+    sse_encode_String(self.page, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.checkedAtMs, serializer);
+    sse_encode_opt_String(self.failure, serializer);
+    sse_encode_opt_String(self.failureDetail, serializer);
+    sse_encode_opt_String(self.path, serializer);
+    sse_encode_opt_String(self.announced, serializer);
   }
 
   @protected

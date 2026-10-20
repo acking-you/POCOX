@@ -37,6 +37,7 @@ pub mod services;
 pub mod session_access;
 pub mod session_config;
 pub mod threads;
+pub mod updates;
 
 pub use self::{
     agent_tools::{
@@ -129,6 +130,10 @@ pub use self::{
         app_turn_supplement, history_cache_set_limit, history_cache_status, AppTurnSupplementDto,
         HistoryCacheStatusDto, ModelInfoDto, OlderPageDto, ThreadHistoryDto, ThreadItemDto,
         ThreadMetaDto, ThreadRuntimeConfigDto, TurnItemsPageDto, TurnSummaryDto,
+    },
+    updates::{
+        update_announce, update_cancel, update_check, update_download, update_install,
+        update_report, update_start_background, update_state, update_watch, UpdateStateDto,
     },
 };
 

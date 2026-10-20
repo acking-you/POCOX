@@ -21,6 +21,8 @@ import 'package:pocket_codex/src/rust/api/bridge/services.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/session_config.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/session_access.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/threads.dart' as frb;
+import 'package:pocket_codex/src/rust/api/bridge/updates.dart' as frb;
+import 'package:pocket_codex/src/updates/update_api.dart';
 
 part 'bridge/rust_hosting.dart';
 part 'bridge/rust_threads.dart';
@@ -28,6 +30,7 @@ part 'bridge/rust_host_sessions.dart';
 part 'bridge/rust_management.dart';
 part 'bridge/rust_tools.dart';
 part 'bridge/rust_grok.dart';
+part 'bridge/rust_updates.dart';
 
 /// Real [BridgeApi] backed by generated Rust bindings.
 class RustBridgeApi
@@ -37,7 +40,8 @@ class RustBridgeApi
         _RustHostSessions,
         _RustManagement,
         _RustTools,
-        _RustGrok
+        _RustGrok,
+        _RustUpdates
     implements BridgeApi {
   /// Creates the real bridge.
   const RustBridgeApi();
