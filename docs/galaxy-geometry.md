@@ -218,3 +218,16 @@ scene reports `"ratio":2.0` and about 1000 frames. On a Mac whose Xcode
 `CARGO_PROFILE_RELEASE_STRIP=false CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false`
 for the local profile build; release CI is unaffected. Remove
 `build/macos/Build/Products/Profile` between profile runs.
+
+## Frame scratch follow-up (2026-10-21)
+
+Rust now reuses thread-local geometry scratch (discarded above a 1 MiB
+retention threshold), caches circle samples and streams plane runs directly
+into the output buffer. A warmed allocator probe falls from 66 to 5
+allocation/reallocation calls per frame. The actual fixed-camera FFI path
+falls from 48 to 27–28 µs p50 in the typical scene and 224–225 to 125 µs in the
+busy scene, preserving scene/output sizes and native/reference parity.
+These are geometry measurements; the window sizes differed between runs,
+so this follow-up makes no raster speedup claim. See the
+[text and Galaxy report](rust-text-performance.md) for raw data, bounds and
+reproduction; its results are separate from the rendering measurements above.

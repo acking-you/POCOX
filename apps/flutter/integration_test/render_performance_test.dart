@@ -1,5 +1,5 @@
 // Opt-in production-widget and parsing measurements; no host or model access.
-// Run with flutter drive --profile -d macos and PCX_RENDER_PERF=true.
+// Run with flutter drive --profile -d macos and POCOX_RENDER_PERF=true.
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -50,8 +50,8 @@ void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
   testWidgets('render cost profile', (tester) async {
-    if (!const bool.fromEnvironment('PCX_RENDER_PERF')) {
-      markTestSkipped('set PCX_RENDER_PERF=true');
+    if (!const bool.fromEnvironment('POCOX_RENDER_PERF')) {
+      markTestSkipped('set POCOX_RENDER_PERF=true');
       return;
     }
     await RustLib.init();

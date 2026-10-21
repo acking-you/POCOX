@@ -1,3 +1,5 @@
+// Pre-migration comparator for the opt-in profile harness only. Production
+// uses native semantic tokens; do not import this fixture from lib/.
 /// Syntax highlighting for fenced code blocks.
 ///
 /// Backed by `re_highlight`, a pure-Dart port of highlight.js (grammars synced

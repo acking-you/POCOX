@@ -5,7 +5,7 @@
 //   fvm flutter drive --profile -d macos \
 //     --driver=test_driver/integration_test.dart \
 //     --target=integration_test/galaxy_performance_test.dart \
-//     --dart-define=PCX_GALAXY_PERF=true
+//     --dart-define=POCOX_GALAXY_PERF=true
 //
 // Each scene animates for [_sample] after a warm-up and prints one
 // `GALAXY_PERF {...}` line: UI-thread (build, which includes the painter) and
@@ -131,7 +131,7 @@ Map<String, num> _stats(List<int> micros) {
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   binding.framePolicy = LiveTestWidgetsFlutterBindingFramePolicy.fullyLive;
-  const enabled = bool.fromEnvironment('PCX_GALAXY_PERF');
+  const enabled = bool.fromEnvironment('POCOX_GALAXY_PERF');
   if (enabled) {
     setUpAll(() async {
       await windowManager.ensureInitialized();
@@ -147,7 +147,7 @@ void main() {
       final name = '$scene-${dark ? 'dark' : 'light'}';
       testWidgets('galaxy frame times: $name', (tester) async {
         if (!enabled) {
-          markTestSkipped('set PCX_GALAXY_PERF=true to run');
+          markTestSkipped('set POCOX_GALAXY_PERF=true to run');
           return;
         }
         final api = FakeBridgeApi()
@@ -223,6 +223,11 @@ void main() {
         };
         debugPrint('GALAXY_PERF ${jsonEncode(result)}');
         expect(timings, isNotEmpty);
+        expect(
+          timings.any((t) => t.rasterDuration.inMicroseconds > 100),
+          isTrue,
+          reason: 'The profile window must actually draw frames',
+        );
         await tester.pumpWidget(const SizedBox());
       });
     }

@@ -2,7 +2,8 @@
 
 > 这是迁移前 `b2e056be` 的评审快照，下文行号、复现和验证结果属于该基线。
 > 随后的执行边界、日志、会话准入与投影、附件和 Diff 实现见
-> [Rust offload 落地说明](rust-offload.md)；本文保留原始发现和分批顺序。
+> [Rust offload 落地说明](rust-offload.md)，文本与 Galaxy 的实测及迁移见
+> [性能报告](rust-text-performance.md)；本文保留原始发现和分批顺序。
 
 建议继续把协议解释、会话状态、任务调度、附件处理和诊断收拢到 Rust。收益最大的边界是“Rust 持有数据和任务，Flutter 订阅可显示的结果”，而不是把 Dart 函数逐个翻译成 Rust。
 

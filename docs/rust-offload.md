@@ -149,8 +149,12 @@ with warnings denied, bridge tests (389 passed, 12 ignored), CLI tests, Flutter
 analyze/format and the full Flutter suite (1,666 passed, 9 skipped) pass; the
 real-library `native_offload_test` passes against the rebuilt bridge.
 
-Real-device frame latency, RSS/GC, bridge byte counts, release size and
-cross-platform acceptance still need measurement. No end-to-end speedup is
-claimed. Markdown/highlighting, project indexing, Galaxy scratch reuse and
-business-preference persistence remain the review's profiling-led follow-up;
-UI rendering, audio tracks and platform permission flows stay in Flutter.
+The follow-up [text and Galaxy measurements](rust-text-performance.md) cover
+macOS profile runs, complete text-processing round trips, native frame geometry,
+allocation counts and their limitations. Markdown/highlighting now use the
+native CPU lane, and Galaxy reuses bounded frame scratch. The whole Markdown
+widget did not get faster in the measured workload; no application-wide speedup
+is claimed. Mobile frame latency, RSS/GC, shipping release size and cross-platform
+acceptance still need measurement. Project indexing and business-preference
+persistence remain profiling-led follow-ups; UI rendering, audio tracks and
+platform permission flows stay in Flutter.
