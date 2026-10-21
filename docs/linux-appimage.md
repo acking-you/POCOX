@@ -21,6 +21,9 @@ unprivileged user in a clean Ubuntu 22.04 desktop container, with no network,
 FUSE, WebKit packages or build dependencies. It checks the executable/plugins
 with `ldd`, then requires a visible POCOX window that stays running. The main
 release job will not upload its Linux packages if this check fails.
+Pull requests build their own Linux bundle before packaging, so changes to
+native library names and executable names are checked against the same commit.
+Manual repair requires an explicit release tag with `pocox-app-*` assets.
 
 For a packaging-only repair of an existing release, run **AppImage packaging**
 with the release tag. By default it produces only a tested workflow artifact.

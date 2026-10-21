@@ -12,7 +12,6 @@ on:
       release_tag:
         description: 'Existing release whose Linux bundle should be repackaged'
         required: true
-        default: 'v0.6.0'
       publish:
         description: 'Replace the AppImage and re-sign its release manifest after testing'
         type: boolean
@@ -29,16 +28,17 @@ jobs:
   package:
     name: Offline AppImage startup
     runs-on: ubuntu-22.04
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       GH_TOKEN: ${{ github.token }}
-      RELEASE_TAG: ${{ inputs.release_tag || 'v0.6.0' }}
+      RELEASE_TAG: ${{ inputs.release_tag || format('pr-{0}', github.event.pull_request.number) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Download and verify the released Linux bundle
+        if: github.event_name == 'workflow_dispatch'
         run: |
           set -euo pipefail
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
@@ -69,9 +69,35 @@ jobs:
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev \
+          sudo apt-get install -y clang cmake ninja-build pkg-config liblzma-dev \
+            libgtk-3-dev libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev librsvg2-dev libgirepository1.0-dev \
             imagemagick patchelf desktop-file-utils
+      - uses: subosito/flutter-action@v2
+        if: github.event_name == 'pull_request'
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@master
+        if: github.event_name == 'pull_request'
+        with:
+          toolchain: nightly-2026-06-01
+      - uses: Swatinem/rust-cache@v2
+        if: github.event_name == 'pull_request'
+        with:
+          key: appimage
+          workspaces: . -> apps/flutter/build/linux/x64/release/plugins/pocox_bridge/cargokit_build
+      - name: Build the pull request's Linux bundle
+        if: github.event_name == 'pull_request'
+        working-directory: apps/flutter
+        run: |
+          cp pubspec-desktop.yaml pubspec.yaml
+          flutter pub get
+          flutter build linux --release
+          cp -a build/linux/x64/release/bundle ../../bundle
+          mkdir -p ../../input
+          cp icon/icon_glyph.png ../../input/icon_glyph.png
       - name: Package
         run: |
           bash scripts/package_appimage.sh bundle input/icon_glyph.png \
