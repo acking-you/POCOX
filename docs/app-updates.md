@@ -134,3 +134,6 @@ Android uses the existing release signing key. `POCOX_ANDROID_KEY_ALIAS` (a
 repository variable forwarded to Gradle) selects its keystore entry, defaulting
 to `pocox` when unset or empty. A signing alias is independent of the application
 ID; renaming the app does not require replacing its private key.
+Release repair workflows verify the source manifest and reject older or mixed
+artifact naming before uploading anything. Publish a new release for the new
+baseline; do not retrofit an old release and replace its signed asset inventory.

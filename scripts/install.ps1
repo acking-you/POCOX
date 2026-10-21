@@ -75,9 +75,6 @@ if ($existing) {
   $curVer = if ($cur) { ($cur -split '\s+')[-1] } else { '(unknown version)' }
   Info "found $Bin $curVer at $($existing.Source) — updating to $tag"
 }
-else { '(unknown version)' }
-  Info "found $OldBin $curVer at $old — updating to $Bin $tag"
-}
 else {
   Info "installing $Bin $tag"
 }

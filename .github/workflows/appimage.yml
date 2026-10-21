@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Existing release whose Linux bundle should be repackaged'
+        description: 'Existing pocox-named release whose Linux bundle should be repackaged'
         required: true
       publish:
         description: 'Replace the AppImage and re-sign its release manifest after testing'
@@ -46,7 +46,7 @@ jobs:
           gh release download "$RELEASE_TAG" --dir input \
             --pattern "pocox-app-$RELEASE_TAG-linux-x64.zip" \
             --pattern 'release-manifest.json*'
-          python3 scripts/release_manifest.py verify input/release-manifest.json \
+          python3 scripts/release_manifest.py require-baseline input/release-manifest.json "$RELEASE_TAG" \
             --public scripts/update_signing_key.pub.pem
           python3 - <<'PY'
           import hashlib, json, os, re

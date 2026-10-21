@@ -26,7 +26,7 @@ on:
   workflow_dispatch:
     inputs:
       macos_release_tag:
-        description: "Update only the signed macOS assets of an existing release (for example v0.2.10)"
+        description: "Update only the signed macOS assets of an existing pocox-named release"
         required: false
         default: ""
         type: string
@@ -67,6 +67,11 @@ jobs:
           test "${app_version%%+*}" = "${RELEASE_TAG#v}"
           test "$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
             --jq '.draft == false and .prerelease == false and .immutable != true')" = true
+          gh release download "$RELEASE_TAG" --dir "$RUNNER_TEMP/source-manifest" \
+            --pattern 'release-manifest.json*'
+          python3 scripts/release_manifest.py require-baseline \
+            "$RUNNER_TEMP/source-manifest/release-manifest.json" "$RELEASE_TAG" \
+            --public scripts/update_signing_key.pub.pem
       - name: Build release notes
         if: inputs.macos_release_tag == ''
         shell: bash

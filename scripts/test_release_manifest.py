@@ -38,6 +38,20 @@ class ReleaseManifestTests(unittest.TestCase):
         self.assertRegex(version, r'^\d+\.\d+\.\d+$')
         self.assertGreater(build, 0)
 
+    def test_refresh_refuses_a_different_release_or_mixed_naming(self):
+        with tempfile.TemporaryDirectory() as work:
+            path = Path(work) / 'manifest.json'
+            data = {'tag': 'v1.2.3', 'assets': [{'name': 'pocox-app-v1.2.3-macos-arm64.dmg'}]}
+            path.write_text(json.dumps(data))
+            release_manifest.require_baseline(path, 'v1.2.3')
+            with self.assertRaises(ValueError):
+                release_manifest.require_baseline(path, 'v1.2.4')
+            data['assets'].append({'name': 'legacy-app-v1.2.3-linux.zip'})
+            path.write_text(json.dumps(data))
+            with self.assertRaises(ValueError):
+                release_manifest.require_baseline(path, 'v1.2.3')
+            self.assertEqual(json.loads(path.read_text()), data)
+
     def test_repackaging_keeps_other_assets_and_source_identity(self):
         with tempfile.TemporaryDirectory() as work:
             work = Path(work)
