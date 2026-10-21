@@ -302,6 +302,7 @@ void main() {
         await _pump(t, api, initial: initial);
         await _frames(t);
         await t.ensureVisible(find.byKey(Key(button)));
+        await t.pump();
         await t.tap(find.byKey(Key(button)));
         await _frames(t);
         expect(find.byType(CodexSetupScreen), findsOneWidget);
