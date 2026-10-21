@@ -68,15 +68,13 @@ class CodeBlock extends StatelessWidget {
       primary: false,
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.fromLTRB(16, 2, 16, 14),
-      child: Text.rich(
-        highlightCode(
-          code: code,
-          language: language,
-          base: mono,
-          brightness: Theme.of(context).brightness,
-          // Upright: italic comments over a CJK fallback look distorted.
-          allowItalic: false,
-        ),
+      child: HighlightedCode(
+        code: code,
+        language: language,
+        base: mono,
+        brightness: Theme.of(context).brightness,
+        // Upright: italic comments over a CJK fallback look distorted.
+        allowItalic: false,
       ),
     );
     return Container(

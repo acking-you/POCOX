@@ -27,6 +27,7 @@ import 'api/bridge/network.dart';
 import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';
+import 'api/bridge/text_render.dart';
 import 'api/bridge/threads.dart';
 import 'api/bridge/updates.dart';
 import 'api/simple.dart';
@@ -331,6 +332,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GrokSignInDto dco_decode_grok_sign_in_dto(dynamic raw);
 
   @protected
+  HighlightInputDto dco_decode_highlight_input_dto(dynamic raw);
+
+  @protected
+  HighlightTokensDto dco_decode_highlight_tokens_dto(dynamic raw);
+
+  @protected
   HistoryCacheStatusDto dco_decode_history_cache_status_dto(dynamic raw);
 
   @protected
@@ -398,6 +405,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<FileEntryDto> dco_decode_list_file_entry_dto(dynamic raw);
+
+  @protected
+  List<HighlightInputDto> dco_decode_list_highlight_input_dto(dynamic raw);
+
+  @protected
+  List<HighlightTokensDto> dco_decode_list_highlight_tokens_dto(dynamic raw);
 
   @protected
   List<HolderDto> dco_decode_list_holder_dto(dynamic raw);
@@ -1124,6 +1137,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GrokSignInDto sse_decode_grok_sign_in_dto(SseDeserializer deserializer);
 
   @protected
+  HighlightInputDto sse_decode_highlight_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HighlightTokensDto sse_decode_highlight_tokens_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HistoryCacheStatusDto sse_decode_history_cache_status_dto(
     SseDeserializer deserializer,
   );
@@ -1211,6 +1234,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<FileEntryDto> sse_decode_list_file_entry_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HighlightInputDto> sse_decode_list_highlight_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HighlightTokensDto> sse_decode_list_highlight_tokens_dto(
     SseDeserializer deserializer,
   );
 
@@ -2118,6 +2151,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_highlight_input_dto(
+    HighlightInputDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_highlight_tokens_dto(
+    HighlightTokensDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_history_cache_status_dto(
     HistoryCacheStatusDto self,
     SseSerializer serializer,
@@ -2231,6 +2276,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_file_entry_dto(
     List<FileEntryDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_highlight_input_dto(
+    List<HighlightInputDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_highlight_tokens_dto(
+    List<HighlightTokensDto> self,
     SseSerializer serializer,
   );
 

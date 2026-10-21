@@ -235,7 +235,7 @@ class _DiffHunksState extends State<_DiffHunks> {
           ? scheme.onSurfaceVariant
           : scheme.onSurface,
     );
-    final span = highlightCode(
+    final code = HighlightedCode(
       code: line.text,
       language: lang,
       base: base,
@@ -266,10 +266,7 @@ class _DiffHunksState extends State<_DiffHunks> {
               style: _mono.copyWith(color: markerColor),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Text.rich(span),
-          ),
+          Padding(padding: const EdgeInsets.only(right: 12), child: code),
         ],
       ),
     );

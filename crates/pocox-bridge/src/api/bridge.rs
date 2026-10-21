@@ -41,6 +41,7 @@ pub mod network;
 pub mod services;
 pub mod session_access;
 pub mod session_config;
+pub mod text_render;
 pub mod threads;
 pub mod updates;
 

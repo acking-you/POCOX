@@ -1,160 +1,145 @@
+import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/src/code_highlight.dart';
+import 'package:pocox/src/syntax_highlighter.dart';
 
 void main() {
   const base = TextStyle(fontFamily: 'monospace', fontSize: 12.5);
+  tearDown(() => SyntaxHighlighter.shared = SyntaxHighlighter());
 
-  group('resolveLanguage', () {
-    test('accepts a grammar by its own name', () {
-      expect(resolveLanguage('rust'), 'rust');
-      expect(resolveLanguage('dart'), 'dart');
-    });
-
-    test('maps the aliases models actually write', () {
-      expect(resolveLanguage('sh'), 'bash');
-      expect(resolveLanguage('ps1'), 'powershell');
-      expect(resolveLanguage('ts'), 'typescript');
-      expect(resolveLanguage('yml'), 'yaml');
-      expect(resolveLanguage('toml'), 'ini');
-      expect(resolveLanguage('patch'), 'diff');
-    });
-
-    test('is case- and whitespace-insensitive, and ignores fence extras', () {
-      expect(resolveLanguage('  Rust  '), 'rust');
-      expect(resolveLanguage('dart title="main.dart"'), 'dart');
-    });
-
-    test('declines the cases that must stay plain', () {
-      expect(resolveLanguage(''), isNull); // no info string
-      expect(resolveLanguage('text'), isNull);
-      expect(resolveLanguage('plaintext'), isNull);
-      expect(resolveLanguage('brainfuck'), isNull); // not registered
-    });
+  test('fences keep explicit aliases, extras and plain fallback', () {
+    for (final (input, expected) in [
+      ('sh', 'bash'),
+      ('ts', 'typescript'),
+      ('toml', 'ini'),
+      ('patch', 'diff'),
+      (' Rust title="x"', 'rust'),
+    ]) {
+      expect(resolveLanguage(input), expected);
+    }
+    for (final input in ['', 'text', 'plaintext', 'brainfuck']) {
+      expect(resolveLanguage(input), isNull);
+    }
   });
 
-  group('highlightCode', () {
-    test('colours a known language into more than one span', () {
-      final span = highlightCode(
-        code: 'fn main() {\n    let x = 1; // hi\n}',
+  test('semantic runs preserve UTF-16 text, themes and upright rendering', () {
+    const source = 'fn 😀中文';
+    final runs = Uint32List.fromList([2, 1, source.length, 6 | 512]);
+    TextSpan render(Brightness brightness) => highlightCode(
+      code: source,
+      language: 'rust',
+      base: base,
+      brightness: brightness,
+      runs: runs,
+      allowItalic: false,
+    );
+    final light = render(Brightness.light), dark = render(Brightness.dark);
+    expect(light.toPlainText(), source);
+    expect(dark.toPlainText(), source);
+    expect(
+      (light.children!.first as TextSpan).style!.color,
+      isNot((dark.children!.first as TextSpan).style!.color),
+    );
+    expect(
+      (light.children!.last as TextSpan).style!.fontStyle,
+      FontStyle.normal,
+    );
+    expect(
+      highlightCode(
+        code: source,
         language: 'rust',
         base: base,
         brightness: Brightness.light,
+        runs: Uint32List.fromList([999, 1]),
+      ).text,
+      source,
+    );
+  });
+
+  test('batches deduplicate, release obsolete work and reuse tokens', () async {
+    final calls = <List<HighlightSource>>[];
+    final service = SyntaxHighlighter(
+      loader: (inputs) async {
+        calls.add(inputs);
+        return [
+          for (final input in inputs)
+            Uint32List.fromList([input.code.length, 1]),
+        ];
+      },
+    );
+    final a = service.request('fn a', 'rust'),
+        duplicate = service.request('fn a', 'rust');
+    final removed = service.request('old prefix', 'rust')..release();
+    final b = service.request('fn b', 'rust');
+    await Future.wait([a.result, duplicate.result, b.result, removed.result]);
+    expect(calls.single.map((i) => i.code), ['fn a', 'fn b']);
+    expect(identical(await a.result, await duplicate.result), isTrue);
+    final cached = service.request('fn a', 'rust');
+    expect(identical(await a.result, await cached.result), isTrue);
+    expect(calls, hasLength(1));
+    for (final lease in [a, duplicate, b, cached]) {
+      lease.release();
+    }
+  });
+
+  test('admission is bounded and worker failures remain readable', () async {
+    final done = Completer<List<Uint32List>>();
+    var calls = 0;
+    final service = SyntaxHighlighter(
+      loader: (inputs) {
+        calls++;
+        return done.future;
+      },
+    );
+    final leases = [
+      for (var i = 0; i < 200; i++) service.request('${'x' * 19990}$i', 'rust'),
+    ];
+    await Future<void>.delayed(Duration.zero);
+    expect(calls, 2);
+    expect(await leases.last.result, isEmpty);
+    for (final lease in leases) {
+      lease.release();
+    }
+    done.completeError(StateError('unavailable'));
+    expect(await leases.first.result, isEmpty);
+    expect(service.peek('${'x' * 19990}0', 'rust'), isNull);
+  });
+
+  testWidgets(
+    'late syntax cannot decorate new text and theme changes do not parse',
+    (tester) async {
+      final responses = <Completer<List<Uint32List>>>[];
+      SyntaxHighlighter.shared = SyntaxHighlighter(
+        loader: (_) {
+          final response = Completer<List<Uint32List>>();
+          responses.add(response);
+          return response.future;
+        },
       );
-      expect(span.children, isNotNull);
-      expect(span.children!.length, greaterThan(1));
-      // Whatever the grammar decides, the visible text must survive intact.
-      expect(span.toPlainText(), 'fn main() {\n    let x = 1; // hi\n}');
-    });
-
-    test('dark and light produce different colours for the same source', () {
-      // Walk the tree: the ROOT span's toString() says nothing about its
-      // children, so comparing that would pass no matter what the theme did.
-      List<Color> colours(Brightness b) {
-        final out = <Color>[];
-        void walk(InlineSpan s) {
-          if (s is TextSpan) {
-            final c = s.style?.color;
-            if (c != null) out.add(c);
-            s.children?.forEach(walk);
-          }
-        }
-
-        walk(
-          highlightCode(
-            code: 'fn main() { let x = 1; }',
-            language: 'rust',
-            base: base,
-            brightness: b,
-          ),
-        );
-        return out;
-      }
-
-      final light = colours(Brightness.light);
-      expect(light, isNotEmpty);
-      expect(light, isNot(colours(Brightness.dark)));
-    });
-
-    test('allowItalic:false forces every span upright', () {
-      // A comment is what the theme italicises; with allowItalic:false no span
-      // in the tree may keep a slant.
-      final span = highlightCode(
-        code: 'fn main() {} // a comment here',
-        language: 'rust',
-        base: base,
-        brightness: Brightness.light,
-        allowItalic: false,
-      );
-      var sawItalic = false;
-      void walk(InlineSpan s) {
-        if (s is TextSpan) {
-          if (s.style?.fontStyle == FontStyle.italic) sawItalic = true;
-          s.children?.forEach(walk);
-        }
-      }
-
-      walk(span);
-      expect(sawItalic, isFalse);
-      expect(span.toPlainText(), 'fn main() {} // a comment here');
-    });
-
-    test('an unknown language falls back to one plain span', () {
-      final span = highlightCode(
-        code: 'some free text',
-        language: '',
-        base: base,
-        brightness: Brightness.light,
-      );
-      expect(span.text, 'some free text');
-      expect(span.style, base);
-      expect(span.children, isNull);
-    });
-
-    test('a huge block is left plain rather than swept', () {
-      final big = 'let x = 1;\n' * 5000; // > 20k chars
-      final span = highlightCode(
-        code: big,
-        language: 'rust',
-        base: base,
-        brightness: Brightness.light,
-      );
-      expect(span.text, big);
-      expect(span.children, isNull);
-    });
-
-    test('an empty block does not render nothing', () {
-      final span = highlightCode(
-        code: '',
-        language: 'dart',
-        base: base,
-        brightness: Brightness.light,
-      );
-      expect(span.toPlainText(), '');
-    });
-
-    test('text is preserved verbatim for every registered language', () {
-      const samples = {
-        'bash': r'set -e\necho "$HOME" # note',
-        'python': 'def f(x):\n    return x * 2  # note',
-        'json': '{"a": [1, 2], "b": null}',
-        'yaml': 'key: value\nlist:\n  - one',
-        'diff': '--- a\n+++ b\n-old\n+new',
-        'ini': '[section]\nkey = "value"',
-      };
-      for (final entry in samples.entries) {
-        final span = highlightCode(
-          code: entry.value,
-          language: entry.key,
+      Widget app(String code, Brightness brightness) => MaterialApp(
+        home: HighlightedCode(
+          code: code,
+          language: 'rust',
           base: base,
-          brightness: Brightness.dark,
-        );
-        expect(
-          span.toPlainText(),
-          entry.value,
-          reason: '${entry.key} lost or reordered text',
-        );
-      }
-    });
-  });
+          brightness: brightness,
+        ),
+      );
+      await tester.pumpWidget(app('old', Brightness.light));
+      await tester.pumpWidget(app('new 😀', Brightness.light));
+      responses.first.complete([
+        Uint32List.fromList([3, 1]),
+      ]);
+      await tester.pump();
+      expect(find.text('new 😀', findRichText: true), findsOneWidget);
+      responses.last.complete([
+        Uint32List.fromList([3, 1, 6, 0]),
+      ]);
+      await tester.pump();
+      await tester.pumpWidget(app('new 😀', Brightness.dark));
+      expect(responses, hasLength(2));
+      expect(find.text('new 😀', findRichText: true), findsOneWidget);
+    },
+  );
 }

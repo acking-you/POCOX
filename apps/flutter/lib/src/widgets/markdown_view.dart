@@ -1,5 +1,5 @@
 import 'package:pocox/src/network/network_image.dart';
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:pocox/src/file_links.dart';
 import 'package:flutter/gestures.dart';
@@ -11,6 +11,7 @@ import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/lru_cache.dart';
 import 'package:pocox/src/markdown_cjk.dart';
+import 'package:pocox/src/native_markdown.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/widgets/code_block.dart';
 import 'package:pocox/src/widgets/links.dart';
@@ -62,13 +63,14 @@ class _MarkdownViewState extends State<MarkdownView>
   final _recognizers = <GestureRecognizer>[];
   List<Widget> _children = const [];
   // This row's parse and the text it was made from.
-  List<md.Node>? _nodes;
+  List<md.Node>? _nodes, _renderedNodes;
   String? _nodesFor;
+  bool _parsing = false, _parsed = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _build();
+    _build(force: true);
   }
 
   @override
@@ -78,7 +80,12 @@ class _MarkdownViewState extends State<MarkdownView>
         old.keepLineBreaks != widget.keepLineBreaks ||
         old.muted != widget.muted ||
         old.dense != widget.dense) {
-      _build();
+      _build(
+        force:
+            old.keepLineBreaks != widget.keepLineBreaks ||
+            old.muted != widget.muted ||
+            old.dense != widget.dense,
+      );
     }
   }
 
@@ -89,7 +96,7 @@ class _MarkdownViewState extends State<MarkdownView>
     // still streaming never stores the prefixes it passed through.
     final nodes = _nodes;
     final data = _nodesFor;
-    if (nodes != null && data != null) _parses.put(data, nodes);
+    if (_parsed && nodes != null && data != null) _parses.put(data, nodes);
     _disposeRecognizers();
     _links.dispose();
     super.dispose();
@@ -98,7 +105,31 @@ class _MarkdownViewState extends State<MarkdownView>
   /// Lay the (cached) parse out as widgets. Runs when the text, the variant
   /// or the theme changed — never on an unrelated rebuild, and a row that
   /// scrolls back into view reuses the parse instead of redoing it.
-  void _build() {
+  void _build({bool force = false}) {
+    final data = widget.data;
+    if (_nodesFor != data) {
+      final cached = _parses.get(data);
+      if (cached != null) {
+        _nodes = cached;
+        _nodesFor = data;
+        _parsed = true;
+      } else if (!_parsing) {
+        final result = MarkdownParsing.parse(data);
+        if (result is List<md.Node>) {
+          _nodes = result;
+          _nodesFor = data;
+          _parsed = true;
+        } else {
+          _parsing = true;
+          unawaited(_finishParse(data, result));
+        }
+      }
+    }
+    // Streaming keeps the last formatted prefix until the latest parse is
+    // ready. Unrelated content immediately shows its own selectable source.
+    final samePrefix = _nodesFor != null && data.startsWith(_nodesFor!);
+    if (!force && samePrefix && identical(_renderedNodes, _nodes)) return;
+    _renderedNodes = samePrefix ? _nodes : null;
     _disposeRecognizers();
     final builder = MarkdownBuilder(
       delegate: this,
@@ -122,12 +153,36 @@ class _MarkdownViewState extends State<MarkdownView>
       onTapText: null,
       softLineBreak: widget.keepLineBreaks,
     );
-    final data = widget.data;
-    if (_nodesFor != data) {
-      _nodes = _parses.get(data) ?? _parse(data);
-      _nodesFor = data;
+    _children = builder.build(
+      samePrefix
+          ? _nodes!
+          : [
+              md.Element('p', [md.Text(data)]),
+            ],
+    );
+  }
+
+  Future<void> _finishParse(String source, Future<List<md.Node>> work) async {
+    List<md.Node> nodes;
+    var parsed = true;
+    try {
+      nodes = await work;
+    } catch (_) {
+      nodes = [
+        md.Element('p', [md.Text(source)]),
+      ];
+      parsed = false;
     }
-    _children = builder.build(_nodes!);
+    if (!mounted) return;
+    _parsing = false;
+    if (widget.data == source) {
+      _nodes = nodes;
+      _nodesFor = source;
+      _parsed = parsed;
+    }
+    // At most one parse per row is pending; intermediate streamed prefixes
+    // are discarded, then _build submits the newest source if needed.
+    setState(_build);
   }
 
   void _disposeRecognizers() {
@@ -177,10 +232,6 @@ final _parses = LruCache<String, List<md.Node>>(
 
 md.Document _document() =>
     md.Document(extensionSet: markdownExtensionSet, encodeHtml: false);
-
-List<md.Node> _parse(String data) => _document().parseLines(
-  const LineSplitter().convert(autolinkifyMarkdown(data)),
-);
 
 // Stylesheets handed out so far, keyed by the theme they came from. Building
 // one costs ~40 TextStyles, and every message in the transcript asks for it on

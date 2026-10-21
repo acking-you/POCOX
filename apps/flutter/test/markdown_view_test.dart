@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:pocox/src/code_highlight.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
@@ -25,7 +27,7 @@ Future<void> pumpMarkdown(WidgetTester tester, String data) async {
       ),
     ),
   );
-  await tester.pump();
+  await tester.pumpAndSettle();
 }
 
 /// The painted span whose text contains [needle].
@@ -45,6 +47,16 @@ Set<Color> spanColours(InlineSpan span) {
 }
 
 void main() {
+  setUp(() {
+    SyntaxHighlighter.shared = SyntaxHighlighter(
+      loader: (inputs) async => [
+        for (final input in inputs)
+          Uint32List.fromList([2, 1, input.code.length, 6]),
+      ],
+    );
+  });
+  tearDown(() => SyntaxHighlighter.shared = SyntaxHighlighter());
+
   testWidgets('bolds CJK text that CommonMark leaves literal', (tester) async {
     await pumpMarkdown(tester, '**重点是印度：**苹果页面同时列出 ₹700。');
 

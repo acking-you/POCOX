@@ -131,7 +131,7 @@ class DiffCodeLine extends StatelessWidget {
       scheme,
       dimmed: line.kind == DiffLineKind.removed,
     );
-    final span = highlightCode(
+    final code = HighlightedCode(
       code: line.text,
       language: language,
       base: base,
@@ -173,7 +173,7 @@ class DiffCodeLine extends StatelessWidget {
                     style: base.copyWith(color: markerColor),
                   ),
           ),
-          Expanded(child: Text.rich(span)),
+          Expanded(child: code),
         ],
       ),
     );

@@ -95,13 +95,8 @@ dependencies:
   # file dialog on desktop (delegates to file_selector). Camera is not used,
   # so no camera permission strings are required.
   image_picker: ^1.2.0
-  # Decode → EXIF-bake → downscale → JPEG-re-encode picked images in a
-  # background isolate before sending, so a 12 MP photo doesn't ship
-  # multi-MB base64 through the relay tunnel and the model context. Pure
-  # Dart. (Also used by test/gen_icon_test.dart for icon generation.)
   desktop_drop: ^0.7.1
   pasteboard: ^0.5.0
-  re_highlight: ^0.0.3
   # Renders an .svg the agent produced in the file preview (pure Dart, the
   # Flutter team's package). Pinned exactly: a renderer bump can change
   # what a preview looks like.
@@ -115,6 +110,8 @@ dependencies:
   webview_flutter: ^4.14.1
 
 dev_dependencies:
+  # Pre-migration comparator for the opt-in rendering benchmark only.
+  re_highlight: ^0.0.3
   image: ^4.9.1
   flutter_test:
     sdk: flutter

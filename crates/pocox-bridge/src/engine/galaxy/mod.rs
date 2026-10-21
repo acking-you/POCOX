@@ -11,6 +11,8 @@
 //! either draws the same picture; `galaxy_frame_parity_test.dart` compares
 //! them on the built library.
 pub mod ffi;
+mod scratch;
+use scratch::Scratch;
 #[cfg(test)]
 mod tests;
 
@@ -445,12 +447,18 @@ struct Hit {
 /// - links: count, then per link its curve's points and its particles' points;
 /// - labels: count, then per label the body, strong (0/1), x, y.
 pub fn frame(scene: &Scene, frame: &Frame, out: &mut Out) {
-    let camera = Camera::new(frame);
-    stars(scene, frame, out);
-    plane(scene, &camera, out);
-    let hits = systems(scene, frame, &camera, out);
-    links(scene, frame, &camera, out);
-    labels(scene, frame, &hits, out);
+    thread_local! {
+        static SCRATCH: std::cell::RefCell<Scratch> = std::cell::RefCell::new(Scratch::default());
+    }
+    SCRATCH.with_borrow_mut(|scratch| {
+        let camera = Camera::new(frame);
+        stars(scene, frame, out);
+        plane(scene, &camera, out, &scratch.circle);
+        systems(scene, frame, &camera, out, scratch);
+        links(scene, frame, &camera, out);
+        labels(scene, frame, out, scratch);
+        scratch.trim();
+    });
 }
 
 fn extent(scene: &Scene, system: &System) -> f64 {
@@ -466,25 +474,36 @@ fn extent(scene: &Scene, system: &System) -> f64 {
     }
 }
 
-/// Runs of projected points along `point(i)` for `i` in `0..=steps`,
-/// broken where a point falls behind the camera.
-fn runs(camera: &Camera, steps: usize, point: impl Fn(usize) -> V3) -> Vec<Vec<(f64, f64)>> {
-    let mut runs: Vec<Vec<(f64, f64)>> = Vec::new();
-    let mut open = false;
+/// Stream projected runs into the caller's output, backfilling their counts.
+fn runs(camera: &Camera, steps: usize, point: impl Fn(usize) -> V3, out: &mut Out) {
+    let total = out.hole();
+    let (mut runs, mut count, mut points) = (0, None, 0);
     for i in 0..=steps {
         match camera.at(point(i)) {
-            None => open = false,
-            Some(p) if open => runs.last_mut().into_iter().for_each(|r| r.push((p.x, p.y))),
+            None => {
+                if let Some(at) = count.take() {
+                    out.fill(at, points as f64);
+                }
+            },
             Some(p) => {
-                runs.push(vec![(p.x, p.y)]);
-                open = true;
+                if count.is_none() {
+                    count = Some(out.hole());
+                    points = 0;
+                    runs += 1;
+                }
+                out.push(p.x);
+                out.push(p.y);
+                points += 1;
             },
         }
     }
-    runs
+    if let Some(at) = count {
+        out.fill(at, points as f64);
+    }
+    out.fill(total, runs as f64);
 }
 
-fn plane(scene: &Scene, camera: &Camera, out: &mut Out) {
+fn plane(scene: &Scene, camera: &Camera, out: &mut Out, circle: &[(f64, f64); 97]) {
     if scene.systems.is_empty() {
         for _ in 0..6 {
             out.push(0.0);
@@ -497,21 +516,20 @@ fn plane(scene: &Scene, camera: &Camera, out: &mut Out) {
         reach = reach.max(system.position.length() + extent(scene, system));
     }
     // A soft glow over the plane.
-    let mut rim = Vec::with_capacity(48);
+    let (mut l, mut t, mut r, mut b) =
+        (f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY);
+    let mut visible = 0;
     for i in 0..48 {
         let a = i as f64 / 48.0 * PI * 2.0;
         if let Some(p) = camera.at(V3::new(a.cos() * reach, 0.0, a.sin() * reach)) {
-            rim.push((p.x, p.y));
+            l = l.min(p.x);
+            t = t.min(p.y);
+            r = r.max(p.x);
+            b = b.max(p.y);
+            visible += 1;
         }
     }
-    if rim.len() > 8 {
-        let (mut l, mut t, mut r, mut b) = (rim[0].0, rim[0].1, rim[0].0, rim[0].1);
-        for &(x, y) in &rim {
-            l = l.min(x);
-            t = t.min(y);
-            r = r.max(x);
-            b = b.max(y);
-        }
+    if visible > 8 {
         let shortest = (r - l).min(b - t);
         let inset = shortest * 0.12;
         for value in [1.0, l + inset, t + inset, r - inset, b - inset, shortest * 0.22] {
@@ -528,14 +546,15 @@ fn plane(scene: &Scene, camera: &Camera, out: &mut Out) {
     let mut r = 2.6;
     while r < reach {
         out.push(1.0 - r / (reach * 1.15));
-        let runs = runs(camera, 96, |i| {
-            let a = i as f64 / 96.0 * PI * 2.0;
-            V3::new(a.cos() * r, 0.0, a.sin() * r)
-        });
-        out.push(runs.len() as f64);
-        for run in &runs {
-            out.points(run);
-        }
+        runs(
+            camera,
+            96,
+            |i| {
+                let (x, z) = circle[i];
+                V3::new(x * r, 0.0, z * r)
+            },
+            out,
+        );
         n += 1;
         r += 2.6;
     }
@@ -562,18 +581,29 @@ fn fade(frame: &Frame, depth: f64) -> f64 {
     (1.25 - (depth - reference) / (reference * 1.6)).clamp(0.42, 1.0)
 }
 
-fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<Hit> {
-    let mut ordered: Vec<(usize, Projected)> = scene
-        .systems
-        .iter()
-        .enumerate()
-        .filter_map(|(i, s)| camera.at(s.position).map(|p| (i, p)))
-        .collect();
-    ordered.sort_by(|a, b| b.1.depth.total_cmp(&a.1.depth));
+fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out, scratch: &mut Scratch) {
+    let Scratch {
+        ordered,
+        hits,
+        back,
+        front,
+        placed,
+        circle,
+        ..
+    } = scratch;
+    ordered.clear();
+    ordered.extend(
+        scene
+            .systems
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| camera.at(s.position).map(|p| (i, p))),
+    );
+    ordered.sort_unstable_by(|a, b| b.1.depth.total_cmp(&a.1.depth).then(a.0.cmp(&b.0)));
     let n_systems = scene.systems.len();
-    let mut hits = Vec::new();
+    hits.clear();
     out.push(ordered.len() as f64);
-    for (index, core) in ordered {
+    for &(index, core) in ordered.iter() {
         let system = &scene.systems[index];
         let online = system.online;
         let base = (if online { 1.0 } else { 0.45 })
@@ -598,21 +628,16 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<
         }
         // One orbit per ring, split at the star so the front half covers it.
         let planets = &scene.planets[system.first..system.first + system.count];
-        let mut rings: Vec<&Planet> = Vec::new();
-        for planet in planets {
-            if !rings.iter().any(|r| r.ring == planet.ring) {
-                rings.push(planet);
+        back.clear();
+        front.clear();
+        for (i, ring) in planets.iter().enumerate() {
+            if planets[..i].iter().any(|p| p.ring == ring.ring) {
+                continue;
             }
-        }
-        let mut back: Vec<Vec<(f64, f64)>> = Vec::new();
-        let mut front: Vec<Vec<(f64, f64)>> = Vec::new();
-        // Runs are filled after they are filed, so keep (side, index).
-        for ring in rings {
             let mut run: Option<(bool, usize)> = None;
-            for i in 0..=96 {
-                let a = i as f64 / 96.0 * PI * 2.0;
+            for &(x, z) in circle.iter() {
                 let local = tilt_around(
-                    V3::new(a.cos() * ring.radius, 0.0, a.sin() * ring.radius),
+                    V3::new(x * ring.radius, 0.0, z * ring.radius),
                     ring.tilt_axis,
                     ring.tilt,
                 );
@@ -623,30 +648,26 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<
                 let behind = p.depth > core.depth;
                 match run {
                     Some((side, at)) if side == behind => {
-                        let list = if side { &mut back } else { &mut front };
-                        list[at].push((p.x, p.y));
+                        let list = if side { &mut *back } else { &mut *front };
+                        list.push(at, (p.x, p.y));
                     },
                     _ => {
                         let previous = run.and_then(|(side, at)| {
-                            let list = if side { &back } else { &front };
-                            list[at].last().copied()
+                            let list = if side { &*back } else { &*front };
+                            list.last(at)
                         });
-                        let list = if behind { &mut back } else { &mut front };
-                        list.push(previous.into_iter().chain([(p.x, p.y)]).collect());
-                        run = Some((behind, list.len() - 1));
+                        let list = if behind { &mut *back } else { &mut *front };
+                        let at = list.begin(previous, (p.x, p.y));
+                        run = Some((behind, at));
                     },
                 }
             }
         }
-        for side in [&back, &front] {
-            out.push(side.len() as f64);
-            for run in side.iter() {
-                out.points(run);
-            }
-        }
+        back.write(out);
+        front.write(out);
         // Planets where they are drawn now.
         let count = out.hole();
-        let mut placed = Vec::new();
+        placed.clear();
         for (offset, planet) in planets.iter().enumerate() {
             let p = system.first + offset;
             let appear = if frame.still || planet.appeared.is_nan() {
@@ -700,7 +721,7 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<
         }
         out.fill(count, placed.len() as f64);
         // Hits in drawing order: planets behind, the star, planets in front.
-        for &(body, at, radius, behind) in &placed {
+        for &(body, at, radius, behind) in placed.iter() {
             if behind {
                 hits.push(Hit {
                     body,
@@ -716,7 +737,7 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<
             y: core.y,
             radius: radius * 1.6,
         });
-        for &(body, at, radius, behind) in &placed {
+        for &(body, at, radius, behind) in placed.iter() {
             if !behind {
                 hits.push(Hit {
                     body,
@@ -727,7 +748,6 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) -> Vec<
             }
         }
     }
-    hits
 }
 
 fn links(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) {
@@ -746,25 +766,32 @@ fn links(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) {
                 .add(control.mul(2.0 * (1.0 - t) * t))
                 .add(to.mul(t * t))
         };
-        let points: Vec<(f64, f64)> = (0..=32)
-            .filter_map(|i| camera.at(at(i as f64 / 32.0)).map(|p| (p.x, p.y)))
-            .collect();
-        if points.len() < 2 {
+        let mut points = [(0.0, 0.0); 33];
+        let mut len = 0;
+        for i in 0..=32 {
+            if let Some(p) = camera.at(at(i as f64 / 32.0)) {
+                points[len] = (p.x, p.y);
+                len += 1;
+            }
+        }
+        if len < 2 {
             continue;
         }
-        out.points(&points);
-        // Particles flow from the service to the device using it.
-        let particles: Vec<(f64, f64)> = (0..3)
-            .filter_map(|k| {
-                let t = if frame.still {
-                    (k + 1) as f64 / 4.0
-                } else {
-                    (frame.time * 0.22 + k as f64 / 3.0).rem_euclid(1.0)
-                };
-                camera.at(at(t)).map(|p| (p.x, p.y))
-            })
-            .collect();
-        out.points(&particles);
+        out.points(&points[..len]);
+        let mut particles = [(0.0, 0.0); 3];
+        let mut len = 0;
+        for k in 0..3 {
+            let t = if frame.still {
+                (k + 1) as f64 / 4.0
+            } else {
+                (frame.time * 0.22 + k as f64 / 3.0).rem_euclid(1.0)
+            };
+            if let Some(p) = camera.at(at(t)) {
+                particles[len] = (p.x, p.y);
+                len += 1;
+            }
+        }
+        out.points(&particles[..len]);
         n += 1;
     }
     out.fill(count, n as f64);
@@ -806,7 +833,14 @@ impl Rect {
     }
 }
 
-fn labels(scene: &Scene, frame: &Frame, hits: &[Hit], out: &mut Out) {
+fn labels(scene: &Scene, frame: &Frame, out: &mut Out, scratch: &mut Scratch) {
+    let Scratch {
+        hits,
+        label_order: order,
+        label_stars: stars,
+        label_rects: placed,
+        ..
+    } = scratch;
     let n_systems = scene.systems.len();
     let emphasized =
         |body: usize| [frame.selected, frame.hovered, frame.focused].contains(&(body as i64));
@@ -819,29 +853,28 @@ fn labels(scene: &Scene, frame: &Frame, hits: &[Hit], out: &mut Out) {
             1
         }
     };
-    let mut order: Vec<usize> = (0..hits.len()).collect();
+    order.clear();
+    order.extend(0..hits.len());
     // Stable: equals keep their drawing order.
-    order.sort_by(|&a, &b| {
+    order.sort_unstable_by(|&a, &b| {
         rank(&hits[b])
             .cmp(&rank(&hits[a]))
             .then(hits[b].radius.total_cmp(&hits[a].radius))
+            .then(a.cmp(&b))
     });
     // Stars are obstacles: a planet's label never lies over one.
-    let stars: Vec<Rect> = hits
-        .iter()
-        .filter(|h| h.body < n_systems)
-        .map(|h| Rect {
-            l: h.x - h.radius * 0.7,
-            t: h.y - h.radius * 0.7,
-            r: h.x + h.radius * 0.7,
-            b: h.y + h.radius * 0.7,
-        })
-        .collect();
-    let mut placed: Vec<Rect> = Vec::new();
+    stars.clear();
+    stars.extend(hits.iter().filter(|h| h.body < n_systems).map(|h| Rect {
+        l: h.x - h.radius * 0.7,
+        t: h.y - h.radius * 0.7,
+        r: h.x + h.radius * 0.7,
+        b: h.y + h.radius * 0.7,
+    }));
+    placed.clear();
     let count = out.hole();
     let mut shown = 0;
     let mut n = 0;
-    for i in order {
+    for &i in order.iter() {
         let hit = &hits[i];
         let device = hit.body < n_systems;
         let emphasis = emphasized(hit.body);

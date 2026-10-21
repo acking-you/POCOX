@@ -343,14 +343,12 @@ class _SourceView extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Text.rich(
-            highlightCode(
-              code: text,
-              language: language,
-              base: mono,
-              brightness: Theme.of(context).brightness,
-              allowItalic: false,
-            ),
+          child: HighlightedCode(
+            code: text,
+            language: language,
+            base: mono,
+            brightness: Theme.of(context).brightness,
+            allowItalic: false,
           ),
         ),
       );

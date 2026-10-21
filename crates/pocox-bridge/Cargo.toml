@@ -17,7 +17,7 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
 default = ["flutter"]
-flutter = ["dep:flutter_rust_bridge"]
+flutter = ["dep:flutter_rust_bridge", "dep:comrak", "dep:syntect", "dep:two-face"]
 
 [lints.rust]
 # `cfg(frb_expand)` is set during macro expansion only; silence the
@@ -63,6 +63,9 @@ ring = { workspace = true }
 semver = { workspace = true }
 directories = { workspace = true }
 image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico", "pnm", "tga"] }
+syntect = { optional = true, version = "=5.3.0", default-features = false, features = ["parsing", "regex-onig"] }
+two-face = { optional = true, version = "=0.5.2", default-features = false, features = ["syntect-onig"] }
+comrak = { optional = true, version = "=0.56.0", default-features = false }
 
 # The agent tools' MCP endpoint runs only where POCOX hosts (desktops and the
 # CLI host). Phones never serve it, so they do not link the SDK.
@@ -73,3 +76,7 @@ tokio-util = { workspace = true }
 [dev-dependencies]
 tempfile = "3"
 tokio-tungstenite = { workspace = true }
+
+[[example]]
+name = "galaxy_allocations"
+required-features = ["flutter"]
