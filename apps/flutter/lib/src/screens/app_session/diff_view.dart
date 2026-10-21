@@ -147,18 +147,14 @@ class _DiffHunksState extends State<_DiffHunks> {
     final shown = widget.file.lines.take(_maxDiffLines).toList();
 
     final rows = <Widget>[];
-    int? newNo;
     for (final line in shown) {
       switch (line.kind) {
         case DiffLineKind.hunk:
-          newNo = hunkNewStart(line.text);
           rows.add(_hunkRow(scheme, line.text));
         case DiffLineKind.added:
-          rows.add(_codeRow(scheme, brightness, lang, line, newNo));
-          if (newNo != null) newNo++;
+          rows.add(_codeRow(scheme, brightness, lang, line, line.newLine));
         case DiffLineKind.context:
-          rows.add(_codeRow(scheme, brightness, lang, line, newNo));
-          if (newNo != null) newNo++;
+          rows.add(_codeRow(scheme, brightness, lang, line, line.newLine));
         case DiffLineKind.removed:
           rows.add(_codeRow(scheme, brightness, lang, line, null));
       }

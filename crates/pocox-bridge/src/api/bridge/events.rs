@@ -6,6 +6,10 @@ use super::*;
 /// One app-server event mirrored for Dart. `kind` is the JSON-RPC method
 /// (e.g. `turn/started`, `item/agentMessage/delta`, `turn/completed`).
 pub struct AppEventDto {
+    /// Thread activity decoded by the native projection.
+    pub running: Option<bool>,
+    /// Parsed file changes, with numbered rows and totals.
+    pub diff: Option<super::diff::DiffDto>,
     /// JSON-RPC method name of the originating notification.
     pub kind: String,
     /// Thread id the event belongs to, when present.
@@ -27,6 +31,12 @@ pub struct AppEventDto {
     pub request_id: Option<String>,
     /// Full params JSON for fields not modelled above.
     pub raw: String,
+    /// Native-decoded turn identity, without an item-id fallback.
+    pub turn_id: Option<String>,
+    /// Host-declared sending client; empty is distinct from absent.
+    pub sender: Option<String>,
+    /// Delta text carries a complete prefix and replaces the displayed text.
+    pub text_is_snapshot: bool,
 }
 
 /// One captured runtime log line for the in-app log viewer.
@@ -48,6 +58,59 @@ fn to_log_dto(l: logging::LogLine) -> LogLineDto {
         message: l.message,
         timestamp_ms: l.timestamp_ms,
     }
+}
+
+/// A filtered view of the single native log ring.
+pub struct LogViewDto {
+    /// Matched lines, oldest first.
+    pub lines: Vec<LogLineDto>,
+    /// Number of retained lines before filtering.
+    pub total: u32,
+    /// Disk records lost to queue saturation or write failure.
+    pub disk_lost: u64,
+}
+
+/// Read logs only when a viewer needs them. Filtering runs off the UI thread.
+pub async fn log_query(level: Option<String>, keyword: String) -> Result<LogViewDto> {
+    crate::engine::execution::run(crate::engine::execution::Lane::Read, move || {
+        let view = logging::query(level.as_deref(), &keyword);
+        Ok(LogViewDto {
+            lines: view.lines.into_iter().map(to_log_dto).collect(),
+            total: view.total as u32,
+            disk_lost: view.disk_lost as u64,
+        })
+    })
+    .await
+}
+
+/// Coalesced invalidations, never a backlog of log payloads. Query the latest
+/// view at most once at a time; intermediate revisions need no replay.
+pub fn log_changes(sink: StreamSink<u32>) {
+    runtime::runtime().spawn(async move {
+        let Some(mut rx) = logging::changes() else { return };
+        loop {
+            let revision = *rx.borrow_and_update() as u32;
+            if sink.add(revision).is_err() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            if rx.changed().await.is_err() {
+                break;
+            }
+        }
+    });
+}
+
+/// Add a bounded controller diagnostic without performing disk I/O.
+#[frb(sync)]
+pub fn log_record(level: String, target: String, message: String) {
+    logging::record(level, target, message);
+}
+
+/// Clear the shared in-memory history; persisted logs remain available.
+#[frb(sync)]
+pub fn log_clear() {
+    logging::clear();
 }
 
 /// Stream captured `tracing` events for the in-app log viewer: the retained
@@ -139,6 +202,8 @@ pub fn app_events(service_key: String, sink: StreamSink<AppEventDto>) -> Result<
         };
         forward_app_events(rx, |ev| {
             sink.add(AppEventDto {
+                diff: None,
+                running: None,
                 kind: ev.kind,
                 thread_id: ev.thread_id,
                 item_id: ev.item_id,
@@ -148,6 +213,9 @@ pub fn app_events(service_key: String, sink: StreamSink<AppEventDto>) -> Result<
                 images: ev.images,
                 request_id: ev.request_id,
                 raw: ev.raw,
+                turn_id: None,
+                sender: None,
+                text_is_snapshot: false,
             })
             .is_ok()
         })
@@ -204,3 +272,139 @@ fn forward_retained_requests(
 #[cfg(test)]
 #[path = "bridge_events_tests.rs"]
 mod bridge_events_tests;
+
+/// Subscribe to a native controller projection. `topic` is `all`, `activity`
+/// or `realtime`; an optional thread filter still admits service-wide events.
+pub fn app_projected_events(
+    service_key: String,
+    thread_id: Option<String>,
+    topic: String,
+    sink: StreamSink<AppEventDto>,
+) {
+    runtime::runtime().spawn(async move {
+        let Ok(rx) = engine(&service_key).subscribe_events(&service_key) else { return };
+        forward_projected_events(rx, thread_id, topic, |update| {
+            let ev = update.event;
+            sink.add(AppEventDto {
+                diff: update.diff.as_deref().map(super::diff::dto),
+                running: update.running,
+                kind: ev.kind,
+                thread_id: ev.thread_id,
+                item_id: ev.item_id,
+                item_type: ev.item_type,
+                title: ev.title,
+                text: ev.text,
+                images: ev.images,
+                request_id: ev.request_id,
+                raw: ev.raw,
+                turn_id: update.turn_id,
+                sender: update.sender,
+                text_is_snapshot: update.text_is_snapshot,
+            })
+            .is_ok()
+        })
+        .await;
+    });
+}
+
+async fn forward_projected_events(
+    mut rx: tokio::sync::broadcast::Receiver<app_session::AppEvent>,
+    thread: Option<String>,
+    topic: String,
+    mut send: impl FnMut(crate::engine::session_projection::ProjectedEvent) -> bool,
+) {
+    use tokio::{
+        sync::broadcast::error::RecvError,
+        time::{Duration, Instant},
+    };
+
+    use crate::engine::session_projection::{self as projection, Projection};
+    let mut view = Projection::default();
+    let mut pending: Option<app_session::AppEvent> = None;
+    let mut deadline = Instant::now();
+    loop {
+        let received = if pending.is_some() {
+            tokio::select! {
+                event = rx.recv() => Some(event),
+                _ = tokio::time::sleep_until(deadline) => None,
+            }
+        } else {
+            Some(rx.recv().await)
+        };
+        let Some(received) = received else {
+            if let Some(event) = pending.take() {
+                if !send_projected(&mut view, &mut send, event).await {
+                    break;
+                }
+            }
+            continue;
+        };
+        let event = match received {
+            Ok(event) => event,
+            Err(error) => {
+                if let Some(event) = pending.take() {
+                    if !send_projected(&mut view, &mut send, event).await {
+                        break;
+                    }
+                }
+                if let RecvError::Lagged(skipped) = error {
+                    tracing::warn!(
+                        skipped,
+                        "controller projection lagged; closing for history recovery"
+                    );
+                    forward_retained_requests(&mut rx, &mut |event| {
+                        !projection::accepts(&event, thread.as_deref(), &topic)
+                            || send(view.apply(event))
+                    });
+                }
+                break;
+            },
+        };
+        if !projection::accepts(&event, thread.as_deref(), &topic) {
+            continue;
+        }
+        if let Some(previous) = &mut pending {
+            if projection::can_merge(previous, &event) {
+                previous
+                    .text
+                    .get_or_insert_default()
+                    .push_str(event.text.as_deref().unwrap_or_default());
+                continue;
+            }
+        }
+        if let Some(previous) = pending.take() {
+            if !send_projected(&mut view, &mut send, previous).await {
+                break;
+            }
+        }
+        if projection::text_delta(&event) {
+            deadline = Instant::now() + Duration::from_millis(16);
+            pending = Some(event);
+        } else if !send_projected(&mut view, &mut send, event).await {
+            break;
+        }
+    }
+}
+
+async fn send_projected(
+    view: &mut crate::engine::session_projection::Projection,
+    send: &mut impl FnMut(crate::engine::session_projection::ProjectedEvent) -> bool,
+    event: app_session::AppEvent,
+) -> bool {
+    let mut update = view.apply(event);
+    if update.event.item_type.as_deref() == Some("fileChange") {
+        let text = update.event.text.clone().unwrap_or_default();
+        match crate::engine::execution::run(crate::engine::execution::Lane::Cpu, move || {
+            Ok(crate::engine::git_diff::parse(&text))
+        })
+        .await
+        {
+            Ok(diff) => update.diff = Some(diff),
+            Err(error) => {
+                tracing::warn!(%error, "diff projection unavailable; closing for history recovery");
+                return false;
+            },
+        }
+    }
+    send(update)
+}

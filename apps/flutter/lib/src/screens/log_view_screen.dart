@@ -15,8 +15,8 @@ import 'package:pocox/src/widgets/utility_page.dart';
 import 'package:pocox/src/app_icons.dart';
 
 /// Real-time viewer for the app's captured runtime logs (`tracing` events from
-/// the Rust bridge — hosting, tunnels, sessions, embedded codex, …). Reads the
-/// shared [LogManager] buffer, with a minimum-level threshold + keyword filter,
+/// the Rust bridge — hosting, tunnels, sessions, external agents, …). Reads the
+/// native log buffer through [LogManager], with a minimum-level threshold + keyword filter,
 /// and auto-follows the tail while pinned to the bottom.
 class LogViewScreen extends StatefulWidget {
   /// Creates the log viewer.
@@ -31,18 +31,23 @@ class _LogViewScreenState extends State<LogViewScreen> {
   final ScrollController _scroll = ScrollController();
   final TextEditingController _keywordCtrl = TextEditingController();
 
-  StreamSubscription<List<LogLine>>? _sub;
+  StreamSubscription<void>? _sub;
   Timer? _keywordDebounce;
   String? _levelFilter;
   String _keyword = '';
   bool _followTail = true;
   List<LogLine> _filtered = [];
+  int _total = 0;
+  int _diskLost = 0;
+  int _queryRevision = 0;
+  bool _queryRunning = false;
+  bool _queryPending = false;
 
   @override
   void initState() {
     super.initState();
-    _filtered = _logs.filter();
-    _sub = _logs.stream.listen((_) => _applyFilters(scrollToTail: true));
+    _sub = _logs.changes.listen((_) => _applyFilters(scrollToTail: true));
+    _applyFilters();
   }
 
   @override
@@ -55,15 +60,34 @@ class _LogViewScreenState extends State<LogViewScreen> {
   }
 
   void _applyFilters({bool scrollToTail = false}) {
-    final next = _logs.filter(level: _levelFilter, keyword: _keyword);
-    if (!mounted) return;
-    setState(() => _filtered = next);
-    if (scrollToTail && _followTail) {
-      // Guard `mounted`: a post-frame callback isn't cancelled on dispose, and
-      // _scrollToBottom would touch the disposed ScrollController.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _scrollToBottom(jump: true);
-      });
+    _queryRevision++;
+    _queryPending = true;
+    if (!_queryRunning) unawaited(_readView(scrollToTail));
+  }
+
+  Future<void> _readView(bool scrollToTail) async {
+    _queryRunning = true;
+    try {
+      while (mounted && _queryPending) {
+        _queryPending = false;
+        final revision = _queryRevision;
+        final view = await _logs.query(level: _levelFilter, keyword: _keyword);
+        if (!mounted || revision != _queryRevision) continue;
+        setState(() {
+          _filtered = view.lines;
+          _total = view.total;
+          _diskLost = view.diskLost;
+        });
+        if (scrollToTail && _followTail) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _scrollToBottom(jump: true);
+          });
+        }
+      }
+    } catch (_) {
+      // Keep the last readable view; the next native change retries the query.
+    } finally {
+      _queryRunning = false;
     }
   }
 
@@ -387,9 +411,21 @@ class _LogViewScreenState extends State<LogViewScreen> {
           color: scheme.onSurfaceVariant,
         ),
         const SizedBox(width: 8),
-        Text(
-          l10n.logsVisible(_filtered.length, _logs.count),
-          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                l10n.logsVisible(_filtered.length, _total),
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+              ),
+              if (_diskLost > 0)
+                Text(
+                  l10n.logsDiskLost(_diskLost),
+                  style: TextStyle(color: scheme.error, fontSize: 12),
+                ),
+            ],
+          ),
         ),
       ],
     ),

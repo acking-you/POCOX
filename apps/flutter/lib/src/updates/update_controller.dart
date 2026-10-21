@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/services.dart';
+import 'package:pocox/src/log_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/src/desktop_tray.dart';
 import 'package:pocox/src/providers.dart';
@@ -89,6 +90,18 @@ class UpdateActions {
   /// Opens the newest release's page.
   Future<void> openPage() => _open(api.updateState().page);
 
+  Future<void> _report(String kind, String detail) async {
+    try {
+      await api.updateReport(kind, detail);
+    } catch (error) {
+      LogManager.instance.record(
+        'updates',
+        'Could not report $kind: $error',
+        level: 'WARN',
+      );
+    }
+  }
+
   /// The one-click update: fetch, verify and apply the newest release the
   /// way this installation allows. A failure lands in the state, which the
   /// UI shows; nothing here throws.
@@ -104,14 +117,14 @@ class UpdateActions {
     if (state.phase == 'installing' && state.restarts) {
       // The helper is waiting for this process to exit.
       final blocked = await _quit();
-      if (blocked != null) api.updateReport('quit', blocked);
+      if (blocked != null) await _report('quit', blocked);
     } else if (state.phase == 'opened' && state.method == 'system_installer') {
       try {
         await _systemInstall(state.path!);
       } on _NeedsPermission {
-        api.updateReport('permission', 'install permission not granted');
+        await _report('permission', 'install permission not granted');
       } catch (error) {
-        api.updateReport('install', '$error');
+        await _report('install', '$error');
       }
     }
   }

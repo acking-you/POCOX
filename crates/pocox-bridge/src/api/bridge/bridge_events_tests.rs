@@ -102,3 +102,35 @@ async fn a_gap_preserves_retained_approvals_and_questions_before_closing() {
     ]);
     assert_eq!(tx.receiver_count(), 0);
 }
+
+#[tokio::test]
+async fn projection_coalesces_text_without_reordering_approvals_or_completion() {
+    let (tx, rx) = broadcast::channel(8);
+    let mut started = event("item/started");
+    started.item_id = Some("item".into());
+    started.item_type = Some("agentMessage".into());
+    started.text = Some("prefix".into());
+    tx.send(started.clone()).unwrap();
+    for text in [" one", " two"] {
+        let mut delta = started.clone();
+        delta.kind = "item/agentMessage/delta".into();
+        delta.text = Some(text.into());
+        tx.send(delta).unwrap();
+    }
+    let mut approval = event("item/commandExecution/requestApproval");
+    approval.request_id = Some("approval".into());
+    tx.send(approval).unwrap();
+    tx.send(event("turn/completed")).unwrap();
+    drop(tx);
+    let mut received = Vec::new();
+    super::forward_projected_events(rx, Some("thread".into()), "all".into(), |event| {
+        received.push(event);
+        true
+    })
+    .await;
+    assert_eq!(received.len(), 4);
+    assert_eq!(received[1].event.text.as_deref(), Some("prefix one two"));
+    assert!(received[1].text_is_snapshot);
+    assert_eq!(received[2].event.request_id.as_deref(), Some("approval"));
+    assert_eq!(received[3].event.kind, "turn/completed");
+}

@@ -554,6 +554,11 @@ void _registerWork() {
         itemId: 'f1',
         itemType: 'fileChange',
         title: 'Cargo.lock',
+        diff: diffFixture(
+          'Cargo.lock',
+          removed: [],
+          added: [for (var i = 0; i < 900; i++) 'line $i'],
+        ),
         text: buf.toString(),
         raw: '{}',
       ),
@@ -752,12 +757,17 @@ void _registerWork() {
 
     api.pushEvent(
       'pcx:lb7666:app:default',
-      const AppEvent(
+      AppEvent(
         kind: 'item/completed',
         threadId: 't1',
         itemId: 'f1',
         itemType: 'fileChange',
         title: 'lib/x.dart',
+        diff: diffFixture(
+          'lib/x.dart',
+          removed: ['old'],
+          added: ['new', 'more'],
+        ),
         text:
             'diff --git a/lib/x.dart b/lib/x.dart\n'
             '--- a/lib/x.dart\n'

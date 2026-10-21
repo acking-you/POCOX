@@ -3,7 +3,11 @@
 use pocox_host_svc::session_access::{AccessHolder, SessionAccess};
 
 use super::*;
-use crate::engine::{acp, opencode};
+use crate::engine::{
+    acp,
+    execution::{self, Lane},
+    opencode,
+};
 
 /// Positive holder evidence without command lines or environments.
 pub struct AccessHolderDto {
@@ -119,38 +123,50 @@ impl From<SessionAccessDto> for SessionAccess {
 
 /// Inspect current writer admission without restoring or closing a native
 /// session.
-pub fn app_session_access(service_key: String, thread_id: String) -> Result<SessionAccessDto> {
-    Ok(match session_engine::protocol_of(&service_key) {
-        Protocol::Acp => acp::session_access(&service_key, &thread_id)?,
-        Protocol::OpenCode => opencode::access(&service_key, &thread_id)?,
-        other => return Err(session_engine::unsupported(other, "provider session access")),
-    }
-    .into())
+pub async fn app_session_access(
+    service_key: String,
+    thread_id: String,
+) -> Result<SessionAccessDto> {
+    execution::run(Lane::Read, move || {
+        Ok(match session_engine::protocol_of(&service_key) {
+            Protocol::Acp => acp::session_access(&service_key, &thread_id)?,
+            Protocol::OpenCode => opencode::access(&service_key, &thread_id)?,
+            other => return Err(session_engine::unsupported(other, "provider session access")),
+        }
+        .into())
+    })
+    .await
 }
 
 /// Safely open the exact original session; another writer yields a follow view.
-pub fn app_session_open(service_key: String, thread_id: String) -> Result<SessionAccessDto> {
-    Ok(match session_engine::protocol_of(&service_key) {
-        Protocol::Acp => acp::session_open(&service_key, &thread_id)?,
-        Protocol::OpenCode => opencode::open(&service_key, &thread_id)?,
-        other => return Err(session_engine::unsupported(other, "provider session access")),
-    }
-    .into())
+pub async fn app_session_open(service_key: String, thread_id: String) -> Result<SessionAccessDto> {
+    execution::run(Lane::Control, move || {
+        Ok(match session_engine::protocol_of(&service_key) {
+            Protocol::Acp => acp::session_open(&service_key, &thread_id)?,
+            Protocol::OpenCode => opencode::open(&service_key, &thread_id)?,
+            other => return Err(session_engine::unsupported(other, "provider session access")),
+        }
+        .into())
+    })
+    .await
 }
 
 /// Relinquish this host's idle writer against the exact displayed source
 /// snapshot.
-pub fn app_session_release(
+pub async fn app_session_release(
     service_key: String,
     snapshot: SessionAccessDto,
 ) -> Result<SessionAccessDto> {
-    let snapshot = snapshot.into();
-    Ok(match session_engine::protocol_of(&service_key) {
-        Protocol::Acp => acp::session_release(&service_key, &snapshot)?,
-        Protocol::OpenCode => opencode::release(&service_key, &snapshot)?,
-        other => return Err(session_engine::unsupported(other, "provider session release")),
-    }
-    .into())
+    execution::run(Lane::Control, move || {
+        let snapshot = snapshot.into();
+        Ok(match session_engine::protocol_of(&service_key) {
+            Protocol::Acp => acp::session_release(&service_key, &snapshot)?,
+            Protocol::OpenCode => opencode::release(&service_key, &snapshot)?,
+            other => return Err(session_engine::unsupported(other, "provider session release")),
+        }
+        .into())
+    })
+    .await
 }
 
 /// Native command metadata; implementation templates remain private on the
@@ -167,30 +183,33 @@ pub struct AgentCommandDto {
 }
 
 /// List commands from the selected project without creating a session.
-pub fn app_command_list_for_project(
+pub async fn app_command_list_for_project(
     service_key: String,
     directory: Option<String>,
 ) -> Result<Vec<AgentCommandDto>> {
-    match session_engine::protocol_of(&service_key) {
-        Protocol::OpenCode => Ok(opencode::commands(&service_key, directory.as_deref())?
-            .into_iter()
-            .map(|c| AgentCommandDto {
-                name: c.name,
-                description: c.description,
-                source: c.source,
-                hints: c.hints,
-            })
-            .collect()),
-        // An ACP agent's commands are its own, the same in every project.
-        Protocol::Acp => Ok(acp::commands(&service_key)?
-            .into_iter()
-            .map(|c| AgentCommandDto {
-                name: c.name,
-                description: (!c.description.is_empty()).then_some(c.description),
-                source: "command".into(),
-                hints: c.hint.into_iter().collect(),
-            })
-            .collect()),
-        other => Err(session_engine::unsupported(other, "commands")),
-    }
+    execution::run(Lane::Read, move || {
+        match session_engine::protocol_of(&service_key) {
+            Protocol::OpenCode => Ok(opencode::commands(&service_key, directory.as_deref())?
+                .into_iter()
+                .map(|c| AgentCommandDto {
+                    name: c.name,
+                    description: c.description,
+                    source: c.source,
+                    hints: c.hints,
+                })
+                .collect()),
+            // An ACP agent's commands are its own, the same in every project.
+            Protocol::Acp => Ok(acp::commands(&service_key)?
+                .into_iter()
+                .map(|c| AgentCommandDto {
+                    name: c.name,
+                    description: (!c.description.is_empty()).then_some(c.description),
+                    source: "command".into(),
+                    hints: c.hint.into_iter().collect(),
+                })
+                .collect()),
+            other => Err(session_engine::unsupported(other, "commands")),
+        }
+    })
+    .await
 }

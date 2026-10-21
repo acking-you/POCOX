@@ -18,13 +18,14 @@ pub fn native_liveness(service_key: &str, session: &str) -> Result<SessionLivene
 }
 
 /// Follow source revisions without loading or resuming an external session.
-pub async fn follow_native_session<F>(
+pub async fn follow_native_session<F, Fut>(
     service_key: &str,
     session: &str,
     mut on_update: F,
 ) -> Result<()>
 where
-    F: FnMut(SessionFollowUpdate) -> bool,
+    F: FnMut(SessionFollowUpdate) -> Fut,
+    Fut: std::future::Future<Output = bool>,
 {
     let link = conn(service_key)?;
     let identity = link.identity();
@@ -50,7 +51,7 @@ where
             super::super::app_session::external_history_changed(service_key, session);
         }
         version = Some(next);
-        if !on_update(update) {
+        if !on_update(update).await {
             return Ok(());
         }
     }

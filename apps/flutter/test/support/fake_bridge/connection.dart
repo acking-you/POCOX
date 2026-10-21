@@ -318,12 +318,89 @@ mixin _FakeConnection on _FakeBridgeState {
       reachableLocal[localAddr] ?? true;
 
   @override
-  Stream<AppEvent> appEvents(String serviceKey) => _appEvents
+  Stream<AppEvent> appEvents(
+    String serviceKey, {
+    String? threadId,
+    String topic = 'all',
+  }) => _appEvents
       .putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast)
-      .stream;
+      .stream
+      .map((e) {
+        Map<dynamic, dynamic> data = const {};
+        try {
+          final parsed = jsonDecode(e.raw);
+          if (parsed is Map) data = parsed;
+        } catch (_) {}
+        final turn =
+            data['turnId'] ??
+            (!e.kind.startsWith('item/')
+                ? data['id'] ??
+                      (data['turn'] is Map ? data['turn']['id'] : null)
+                : null);
+        return AppEvent(
+          kind: e.kind,
+          threadId: e.threadId,
+          itemId: e.itemId,
+          itemType: e.itemType,
+          title: e.title,
+          text: e.text,
+          images: e.images,
+          requestId: e.requestId,
+          raw: e.raw,
+          turnId: e.turnId ?? (turn is String ? turn : null),
+          sender:
+              e.sender ??
+              (data.containsKey('clientId')
+                  ? data['clientId'] as String? ?? ''
+                  : null),
+          textIsSnapshot: e.textIsSnapshot,
+          running:
+              e.running ??
+              switch (e.kind) {
+                'turn/started' => true,
+                'turn/completed' || 'turn/failed' => false,
+                'thread/status/changed' =>
+                  data['status'] is Map && data['status']['type'] is String
+                      ? data['status']['type'] == 'active'
+                      : null,
+                _ => null,
+              },
+          diff: e.diff,
+        );
+      });
+
+  final StreamController<void> _logChanges = StreamController<void>.broadcast();
+  final List<LogLine> logs = [];
+
+  /// Inject a log line into the live stream (test helper).
+  void pushLog(LogLine line) {
+    logs.add(line);
+    _logChanges.add(null);
+  }
 
   @override
-  Stream<LogLine> logEvents() => _logEvents.stream;
+  Stream<void> logChanges() => _logChanges.stream;
+
+  @override
+  Future<LogView> logQuery({String? level, String keyword = ''}) async =>
+      LogView(lines: List.of(logs), total: logs.length);
+
+  @override
+  void logRecord(String target, String message, {String level = 'INFO'}) =>
+      pushLog(
+        LogLine(
+          level: level,
+          target: target,
+          message: message,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        ),
+      );
+
+  @override
+  void logClear() {
+    logs.clear();
+    _logChanges.add(null);
+  }
 
   @override
   Stream<RetryProgress> metaRetryEvents() => _retryEvents.stream;

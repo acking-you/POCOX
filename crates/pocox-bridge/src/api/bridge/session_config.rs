@@ -1,6 +1,7 @@
 //! ACP session settings: config options and modes.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 #[cfg(test)]
 mod settings_dto_tests {
@@ -164,43 +165,59 @@ pub fn app_session_settings(service_key: String, thread_id: String) -> Option<Se
 /// Refresh native session choices off the UI thread, or read cached ACP state.
 /// OpenCode may perform network requests; UI callers should use this entry
 /// point. Read failures are errors, never authoritative empty settings.
-pub fn app_session_settings_refresh(
+pub async fn app_session_settings_refresh(
     service_key: String,
     thread_id: String,
 ) -> Result<Option<SessionSettingsDto>> {
-    if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
-        crate::engine::opencode::refresh_settings(&service_key, &thread_id)
-            .map(|body| Some(settings_dto(&body)))
-    } else {
-        Ok(app_session_settings(service_key, thread_id))
-    }
+    execution::run(Lane::Read, move || {
+        if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
+            crate::engine::opencode::refresh_settings(&service_key, &thread_id)
+                .map(|body| Some(settings_dto(&body)))
+        } else {
+            Ok(app_session_settings(service_key, thread_id))
+        }
+    })
+    .await
 }
 
 /// Read draft choices in the selected native project without opening a session.
-pub fn app_draft_session_settings(
+pub async fn app_draft_session_settings(
     service_key: String,
     directory: Option<String>,
 ) -> Result<Option<SessionSettingsDto>> {
-    if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
-        crate::engine::opencode::draft_settings(&service_key, directory.as_deref())
-            .map(|body| Some(settings_dto(&body)))
-    } else {
-        Ok(app_session_settings(service_key, String::new()))
-    }
+    execution::run(Lane::Read, move || {
+        if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
+            crate::engine::opencode::draft_settings(&service_key, directory.as_deref())
+                .map(|body| Some(settings_dto(&body)))
+        } else {
+            Ok(app_session_settings(service_key, String::new()))
+        }
+    })
+    .await
 }
 
 /// Set an ACP select configuration option to one of its advertised values.
 /// The agent answers with the complete new option state.
-pub fn app_set_session_config(
+pub async fn app_set_session_config(
     service_key: String,
     thread_id: String,
     config_id: String,
     value: String,
 ) -> Result<()> {
-    engine(&service_key).set_session_config(&service_key, &thread_id, &config_id, &value)
+    execution::run(Lane::Control, move || {
+        engine(&service_key).set_session_config(&service_key, &thread_id, &config_id, &value)
+    })
+    .await
 }
 
 /// Switch an ACP session's legacy mode to one it advertised.
-pub fn app_set_session_mode(service_key: String, thread_id: String, mode_id: String) -> Result<()> {
-    engine(&service_key).set_session_mode(&service_key, &thread_id, &mode_id)
+pub async fn app_set_session_mode(
+    service_key: String,
+    thread_id: String,
+    mode_id: String,
+) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).set_session_mode(&service_key, &thread_id, &mode_id)
+    })
+    .await
 }

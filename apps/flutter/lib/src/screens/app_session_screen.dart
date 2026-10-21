@@ -303,7 +303,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   StreamSubscription<AppEvent>? _sub;
   int _subscriptionEpoch = 0;
 
-  String? _threadId;
+  String? _selectedThreadId;
   late final VoiceController _voice;
 
   /// The composer microphone: a background realtime session, paused until a

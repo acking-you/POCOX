@@ -444,7 +444,7 @@ class DictationLine extends ChangeNotifier {
       connected.future.ignore();
       _connected = connected;
       _events = api
-          .appEvents(serviceKey)
+          .appEvents(serviceKey, threadId: id, topic: 'realtime')
           .listen(
             (e) {
               if (current()) _event(e, generation);

@@ -585,9 +585,6 @@ abstract class _FakeBridgeState implements BridgeApi {
   /// [apiProbeLocal]), keyed by the local `host:port` (default: reachable).
   final Map<String, bool> reachableLocal = {};
 
-  final StreamController<LogLine> _logEvents =
-      StreamController<LogLine>.broadcast();
-
   final StreamController<RetryProgress> _retryEvents =
       StreamController<RetryProgress>.broadcast();
 
@@ -595,9 +592,6 @@ abstract class _FakeBridgeState implements BridgeApi {
   void pushRetry(int attempt, {int maxAttempts = 10}) => _retryEvents.add(
     RetryProgress(attempt: attempt, maxAttempts: maxAttempts),
   );
-
-  /// Inject a log line into the live stream (test helper).
-  void pushLog(LogLine line) => _logEvents.add(line);
 
   /// Inject a server event into [serviceKey]'s stream (test helper).
   void pushEvent(String serviceKey, AppEvent event) =>
@@ -623,7 +617,7 @@ abstract class _FakeBridgeState implements BridgeApi {
   String rateLimitsJson = '{}';
 
   /// Unified diff returned by [appGitDiff] (tests can override).
-  String gitDiffText = '';
+  DiffModel gitDiff = const DiffModel([]);
 
   /// When set, [appGitDiff] waits on this before returning — so a test can hold
   /// the fetch open and assert on the loading state, then complete it.

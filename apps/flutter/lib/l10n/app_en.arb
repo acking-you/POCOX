@@ -1662,5 +1662,7 @@
   "networkProxySaveFailed": "Could not save the proxy. Check the address and try again.",
   "networkProxyReadFailed": "Could not read the proxy. Tap to retry.",
   "networkProxyShow": "Show proxy URL",
-  "networkProxyHide": "Hide proxy URL"
+  "networkProxyHide": "Hide proxy URL",
+  "logsDiskLost": "{count} disk log drops or write failures.",
+  "@logsDiskLost": {"placeholders": {"count": {"type": "int"}}}
 }

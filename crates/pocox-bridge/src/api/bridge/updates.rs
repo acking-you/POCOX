@@ -7,6 +7,7 @@ use flutter_rust_bridge::frb;
 
 use crate::{
     engine::{
+        execution::{self, Lane},
         runtime,
         updates::{self, Kind, Snapshot},
     },
@@ -91,17 +92,27 @@ pub fn update_start_background() {
 
 /// Checks for a newer release now (`force`), or only when the last answer
 /// is older than the background interval.
-pub fn update_check(force: bool) -> UpdateStateDto {
-    runtime::runtime()
-        .block_on(updates::updater().check(force))
-        .into()
+pub async fn update_check(force: bool) -> Result<UpdateStateDto> {
+    execution::run(Lane::Background, move || {
+        Ok({
+            runtime::runtime()
+                .block_on(updates::updater().check(force))
+                .into()
+        })
+    })
+    .await
 }
 
 /// Downloads and verifies the newest release's file for this installation.
-pub fn update_download() -> UpdateStateDto {
-    runtime::runtime()
-        .block_on(updates::updater().download())
-        .into()
+pub async fn update_download() -> Result<UpdateStateDto> {
+    execution::run(Lane::Transfer, move || {
+        Ok({
+            runtime::runtime()
+                .block_on(updates::updater().download())
+                .into()
+        })
+    })
+    .await
 }
 
 /// Stops a download in progress.
@@ -113,19 +124,25 @@ pub fn update_cancel() {
 /// Applies the downloaded update. When the method restarts the app, the
 /// caller quits through its normal path next; on Android it hands `path` to
 /// the system installer.
-pub fn update_install() -> UpdateStateDto {
-    updates::updater().install().into()
+pub async fn update_install() -> Result<UpdateStateDto> {
+    execution::run(Lane::Control, move || Ok(updates::updater().install().into())).await
 }
 
 /// Reports a failure of the app's own part (`quit`, `permission`,
 /// `install`).
-#[frb(sync)]
-pub fn update_report(kind: String, detail: String) {
-    updates::updater().report(Kind::parse(&kind), detail);
+pub async fn update_report(kind: String, detail: String) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        updates::updater().report(Kind::parse(&kind), detail);
+        Ok(())
+    })
+    .await
 }
 
 /// Remembers that the user has been told about `version`.
-#[frb(sync)]
-pub fn update_announce(version: String) {
-    updates::updater().announce(version);
+pub async fn update_announce(version: String) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        updates::updater().announce(version);
+        Ok(())
+    })
+    .await
 }

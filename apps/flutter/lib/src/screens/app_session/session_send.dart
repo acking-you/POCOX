@@ -126,6 +126,7 @@ extension _SessionSend on _AppSessionState {
     final api = ref.read(bridgeApiProvider);
     final sendingDraft = _draft;
     final request = Object();
+    final sendLease = sendingDraft.control.beginSend();
     _sendRequest = request;
     // The whole send goes to the service and host connection it began on:
     // nothing is dispatched once that connection was lost or replaced, and
@@ -166,6 +167,7 @@ extension _SessionSend on _AppSessionState {
     });
     // Leaving before the send starts releases only what this request holds.
     void abandon() {
+      sendingDraft.control.finishSend(sendLease);
       queued?.inFlight = false;
       if (!mounted) return;
       _updateState(() => _releaseSend(request));
@@ -255,8 +257,7 @@ extension _SessionSend on _AppSessionState {
       final entry = queued;
       if (entry == null) return;
       requeued = true;
-      entry.inFlight = false;
-      entry.uncertain = uncertain;
+      entry.fail(uncertain: uncertain);
       entry.failure = message;
       sendingDraft.queuePaused = true;
       if (!mounted || !identical(_draft, sendingDraft)) return;
@@ -304,7 +305,6 @@ extension _SessionSend on _AppSessionState {
       showToast(context, '$message ${l10n.sendReturnedToDraft}');
     }
 
-    sendingDraft.sendPending = true;
     _drafts.save(sendingDraft, changed: true);
     try {
       // Collaboration mode for this turn. Send it when the user explicitly
@@ -502,7 +502,7 @@ extension _SessionSend on _AppSessionState {
       // is open, so nothing is adopted (no queue removal, no admission).
       if (!sameLink()) throw const _LinkMoved();
       sent = true;
-      if (queued != null) sendingDraft.queue.remove(queued);
+      if (queued != null) sendingDraft.queue.accept(queued);
       // Admitted, but its start may not have arrived: until it does the
       // session is busy and the queue must not send the next message.
       if (current() && !_streaming && _turnStateRevision == turnRevision) {
@@ -607,7 +607,7 @@ extension _SessionSend on _AppSessionState {
       }
     } finally {
       if (queued != null && !requeued) queued.inFlight = false;
-      sendingDraft.sendPending = false;
+      sendingDraft.control.finishSend(sendLease);
       _drafts.save(sendingDraft, changed: true);
       if (mounted) _updateState(() => _releaseSend(request));
       // Only an idle session drains; an admitted turn ends first (see
@@ -675,15 +675,8 @@ extension _SessionSend on _AppSessionState {
       final api = ref.read(bridgeApiProvider);
       await api.appThreadResume(service, tid);
       if (!unchanged()) return null;
-      final history = await api.appThreadRead(service, tid);
-      if (!unchanged()) return null;
-      final want = text.trim();
-      for (final i in history.items.reversed) {
-        if (i.itemType == 'userMessage') {
-          return i.text.trim() == want && listEquals(i.images, images);
-        }
-      }
-      return false;
+      final committed = await api.appTurnCommitted(service, tid, text, images);
+      return unchanged() ? committed : null;
     } catch (_) {
       return null;
     }
@@ -800,19 +793,8 @@ extension _SessionSend on _AppSessionState {
   /// refusals, each given before a turn is admitted. Every other failure —
   /// a lost request or answer, a timeout, any phrasing not listed here —
   /// leaves open whether the turn was admitted.
-  bool _definitelyRefused(String msg) {
-    final m = msg.toLowerCase();
-    return const [
-      'the agent is not running',
-      'the agent host changed',
-      'unknown session',
-      'a turn is already running in this session',
-      'the session is still loading',
-      'too many sessions are busy',
-      'too many pending operations',
-      'invalid request:',
-    ].any(m.startsWith);
-  }
+  bool _definitelyRefused(String msg) =>
+      ref.read(bridgeApiProvider).turnErrorIsRefusal(msg);
 
   /// Whether an error message looks like the app-server connection dropped, so
   /// the banner can offer "reconnect" (which re-establishes the session) rather

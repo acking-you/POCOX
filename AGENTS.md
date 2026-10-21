@@ -1652,6 +1652,20 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     size and hash checks remain mandatory. Mobile Codex setup never reads local
     Codex state or offers its local prompt mutation. See `docs/app-updates.md`.
 
+49. **Rust offload boundaries (2026-10-21).** Blocking bridge calls use bounded
+    async execution lanes for control, reads, discovery, transfers and CPU work.
+    Rust owns the log ring, filtering and bounded rotating disk writer; update
+    snapshots read memory. Native event subscriptions filter and coalesce text
+    while preserving lifecycle/approval barriers, and history ordering returns
+    indices without round-tripping row bodies. Native composer controllers own
+    queue identity/order, send leases, unknown outcomes and attachment admission
+    generations; only explicit Retry permits an unknown send again. Rust also
+    prepares images, retains selected file bodies through scoped uploads, parses
+    diffs and indexes review metadata. Flutter retains editable drafts, lifecycle
+    orchestration, platform permissions and rendering. Keep native budgets,
+    stale-result checks and visible truncation; do not claim device performance
+    from unit tests. See `docs/rust-offload.md` for limits and real-FRB tests.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.

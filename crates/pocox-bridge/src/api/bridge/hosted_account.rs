@@ -2,6 +2,7 @@
 //! account services.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// A started device flow, mirrored for Dart: show the code + URL, then poll.
 pub struct DeviceCodeDto {
@@ -51,58 +52,65 @@ pub struct AccountPollDto {
 
 /// Begin a GitHub device-flow login. `backend` overrides the configured /
 /// default backend (and is remembered on success).
-pub fn account_login_start(backend: Option<String>) -> Result<DeviceCodeDto> {
-    let dir = runtime::support_dir()?;
-    let start = runtime::runtime().block_on(account::device_start(&dir, backend.as_deref()))?;
-    Ok(DeviceCodeDto {
-        user_code: start.user_code,
-        verification_uri: start.verification_uri,
-        poll_handle: start.poll_handle,
-        interval_secs: start.interval_secs,
-        expires_in_secs: start.expires_in_secs,
-        backend: start.backend,
+pub async fn account_login_start(backend: Option<String>) -> Result<DeviceCodeDto> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        let start = runtime::runtime().block_on(account::device_start(&dir, backend.as_deref()))?;
+        Ok(DeviceCodeDto {
+            user_code: start.user_code,
+            verification_uri: start.verification_uri,
+            poll_handle: start.poll_handle,
+            interval_secs: start.interval_secs,
+            expires_in_secs: start.expires_in_secs,
+            backend: start.backend,
+        })
     })
+    .await
 }
 
 /// Poll a device flow once. On `authorized` the session is persisted and the
 /// app switches to account mode.
-pub fn account_login_poll(poll_handle: String, backend: String) -> Result<AccountPollDto> {
-    let dir = runtime::support_dir()?;
-    let outcome = runtime::runtime().block_on(account::device_poll(&dir, &backend, poll_handle))?;
-    Ok(match outcome {
-        account::PollOutcome::Pending => AccountPollDto {
-            status: "pending".to_string(),
-            login: None,
-            account_id: None,
-        },
-        account::PollOutcome::SlowDown => AccountPollDto {
-            status: "slow_down".to_string(),
-            login: None,
-            account_id: None,
-        },
-        account::PollOutcome::Expired => AccountPollDto {
-            status: "expired".to_string(),
-            login: None,
-            account_id: None,
-        },
-        account::PollOutcome::Denied => AccountPollDto {
-            status: "denied".to_string(),
-            login: None,
-            account_id: None,
-        },
-        account::PollOutcome::Authorized {
-            login,
-            account_id,
-        } => {
-            // Signed in: services are now the account's.
-            transport::context_changed();
-            AccountPollDto {
-                status: "authorized".to_string(),
-                login: Some(login),
+pub async fn account_login_poll(poll_handle: String, backend: String) -> Result<AccountPollDto> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        let outcome =
+            runtime::runtime().block_on(account::device_poll(&dir, &backend, poll_handle))?;
+        Ok(match outcome {
+            account::PollOutcome::Pending => AccountPollDto {
+                status: "pending".to_string(),
+                login: None,
+                account_id: None,
+            },
+            account::PollOutcome::SlowDown => AccountPollDto {
+                status: "slow_down".to_string(),
+                login: None,
+                account_id: None,
+            },
+            account::PollOutcome::Expired => AccountPollDto {
+                status: "expired".to_string(),
+                login: None,
+                account_id: None,
+            },
+            account::PollOutcome::Denied => AccountPollDto {
+                status: "denied".to_string(),
+                login: None,
+                account_id: None,
+            },
+            account::PollOutcome::Authorized {
+                login,
                 account_id,
-            }
-        },
+            } => {
+                // Signed in: services are now the account's.
+                transport::context_changed();
+                AccountPollDto {
+                    status: "authorized".to_string(),
+                    login: Some(login),
+                    account_id,
+                }
+            },
+        })
     })
+    .await
 }
 
 /// A started web (authorization-code) login, mirrored for Dart. The caller
@@ -126,94 +134,112 @@ pub struct WebLoginStartDto {
 /// platform-specific callback the browser returns to (the app's custom scheme
 /// on mobile, a loopback URL on desktop). `backend` overrides the configured /
 /// default backend (and is remembered on a successful exchange).
-pub fn account_web_login_start(
+pub async fn account_web_login_start(
     redirect_uri: String,
     backend: Option<String>,
 ) -> Result<WebLoginStartDto> {
-    let dir = runtime::support_dir()?;
-    let start = runtime::runtime().block_on(account::web_login_start(
-        &dir,
-        &redirect_uri,
-        backend.as_deref(),
-    ))?;
-    Ok(WebLoginStartDto {
-        authorize_url: start.authorize_url,
-        state: start.state,
-        code_verifier: start.code_verifier,
-        backend: start.backend,
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        let start = runtime::runtime().block_on(account::web_login_start(
+            &dir,
+            &redirect_uri,
+            backend.as_deref(),
+        ))?;
+        Ok(WebLoginStartDto {
+            authorize_url: start.authorize_url,
+            state: start.state,
+            code_verifier: start.code_verifier,
+            backend: start.backend,
+        })
     })
+    .await
 }
 
 /// Redeem the one-time `exchange_code` (with its PKCE `code_verifier`) from the
 /// browser redirect. On success the session is persisted and the app switches
 /// to account mode. Returns the signed-in identity.
-pub fn account_web_login_exchange(
+pub async fn account_web_login_exchange(
     exchange_code: String,
     code_verifier: String,
     backend: String,
 ) -> Result<AccountUserDto> {
-    let dir = runtime::support_dir()?;
-    let outcome = runtime::runtime().block_on(account::web_login_exchange(
-        &dir,
-        &backend,
-        exchange_code,
-        code_verifier,
-    ))?;
-    match outcome {
-        account::PollOutcome::Authorized {
-            login,
-            account_id,
-        } => {
-            transport::context_changed();
-            Ok(AccountUserDto {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        let outcome = runtime::runtime().block_on(account::web_login_exchange(
+            &dir,
+            &backend,
+            exchange_code,
+            code_verifier,
+        ))?;
+        match outcome {
+            account::PollOutcome::Authorized {
                 login,
                 account_id,
-            })
-        },
-        _ => Err(anyhow!("web exchange did not authorize")),
-    }
+            } => {
+                transport::context_changed();
+                Ok(AccountUserDto {
+                    login,
+                    account_id,
+                })
+            },
+            _ => Err(anyhow!("web exchange did not authorize")),
+        }
+    })
+    .await
 }
 
 /// The signed-in user (verified against the backend), or `None` if not signed
 /// in.
-pub fn account_current_user() -> Result<Option<AccountUserDto>> {
-    let dir = runtime::support_dir()?;
-    Ok(runtime::runtime()
-        .block_on(account::current_user(&dir))?
-        .map(|u| AccountUserDto {
-            login: u.login,
-            account_id: u.account_id,
-        }))
+pub async fn account_current_user() -> Result<Option<AccountUserDto>> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        Ok(runtime::runtime()
+            .block_on(account::current_user(&dir))?
+            .map(|u| AccountUserDto {
+                login: u.login,
+                account_id: u.account_id,
+            }))
+    })
+    .await
 }
 
 /// Sign out: revoke the refresh token (best effort) and clear the local
 /// session.
-pub fn account_logout() -> Result<()> {
-    let dir = runtime::support_dir()?;
-    let result = runtime::runtime().block_on(account::logout(&dir));
-    // Whatever the revocation did, this device no longer acts as the account.
-    transport::context_changed();
-    result
+pub async fn account_logout() -> Result<()> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        let result = runtime::runtime().block_on(account::logout(&dir));
+        // Whatever the revocation did, this device no longer acts as the account.
+        transport::context_changed();
+        result
+    })
+    .await
 }
 
 /// List the account's services from the backend.
-pub fn account_services() -> Result<Vec<AccountServiceDto>> {
-    let dir = runtime::support_dir()?;
-    Ok(runtime::runtime()
-        .block_on(account::services(&dir))?
-        .into_iter()
-        .map(|s| AccountServiceDto {
-            device: s.device,
-            kind: s.kind.as_key_segment().to_string(),
-            name: s.name,
-        })
-        .collect())
+pub async fn account_services() -> Result<Vec<AccountServiceDto>> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        Ok(runtime::runtime()
+            .block_on(account::services(&dir))?
+            .into_iter()
+            .map(|s| AccountServiceDto {
+                device: s.device,
+                kind: s.kind.as_key_segment().to_string(),
+                name: s.name,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Deregister one of the account's services from the relay (best-effort; a
 /// still-running host re-registers shortly after). `kind` is the service's
 /// key segment (`"app"`, `"acp"`, `"api"` or `"meta"`).
-pub fn account_deregister_service(device: String, kind: String, name: String) -> Result<()> {
-    let dir = runtime::support_dir()?;
-    runtime::runtime().block_on(account::deregister_service(&dir, &device, &kind, &name))
+pub async fn account_deregister_service(device: String, kind: String, name: String) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        let dir = runtime::support_dir()?;
+        runtime::runtime().block_on(account::deregister_service(&dir, &device, &kind, &name))
+    })
+    .await
 }

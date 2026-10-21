@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:image/image.dart' as img;
+import 'package:pocox/src/rust/api/bridge/attachments.dart' as native;
 
 /// Longest edge an attachment is downscaled to before sending. Keeps a photo's
 /// base64 payload in the hundreds-of-KB range (vs multi-MB camera originals)
@@ -29,6 +29,7 @@ class ProcessedImage {
     required this.mime,
     required this.width,
     required this.height,
+    required this.dataUrl,
   });
 
   /// Encoded image bytes (original passthrough, or the downscaled JPEG).
@@ -46,100 +47,36 @@ class ProcessedImage {
   /// The `data:` URL form sent to the app-server — the only image form that
   /// works for BOTH local and relay-tunneled remote hosts (a filesystem path
   /// would resolve on the wrong machine).
-  String get dataUrl => 'data:$mime;base64,${base64Encode(bytes)}';
+  final String dataUrl;
 }
 
-/// Decode → EXIF-bake → downscale → re-encode one picked image.
-///
-/// Pure and top-level so it runs in a background isolate via [compute] — a
-/// 12 MP photo takes noticeable CPU to decode in pure Dart, which must not
-/// jank the UI. Small, already-fitting originals pass through byte-identical
-/// (see [kPassthroughMaxBytes]); everything else is re-encoded as JPEG
-/// [kJpegQuality] with the long edge capped at [kMaxImageEdge] and any alpha
-/// composited over white (JPEG has no alpha). Throws [FormatException] for
-/// data that isn't a decodable image.
-ProcessedImage processImageBytes(Uint8List bytes) {
-  final decoder = img.findDecoderForData(bytes);
-  // frame: 0 — decoding ALL frames of an animated GIF/WebP would materialize
-  // every frame's RGBA in memory (potentially hundreds of MB) when only the
-  // first is ever used. A small animated original still passes through
-  // byte-identical below, keeping its animation.
-  final decoded = decoder?.decode(bytes, frame: 0);
-  if (decoder == null || decoded == null) {
-    throw const FormatException('not a decodable image');
-  }
-  final mime = _decoderMime(decoder);
-  final rotated =
-      decoded.exif.imageIfd.hasOrientation &&
-      decoded.exif.imageIfd.orientation != 1;
-  final longEdge = decoded.width > decoded.height
-      ? decoded.width
-      : decoded.height;
-  if (!rotated &&
-      longEdge <= kMaxImageEdge &&
-      bytes.length <= kPassthroughMaxBytes &&
-      mime != null) {
-    return ProcessedImage(
-      bytes: bytes,
-      mime: mime,
-      width: decoded.width,
-      height: decoded.height,
-    );
-  }
-  // Bake EXIF rotation so the model (and our thumbnails) see the photo
-  // upright, then downscale to the cap.
-  var image = rotated ? img.bakeOrientation(decoded) : decoded;
-  final edge = image.width > image.height ? image.width : image.height;
-  if (edge > kMaxImageEdge) {
-    image = image.width >= image.height
-        ? img.copyResize(
-            image,
-            width: kMaxImageEdge,
-            interpolation: img.Interpolation.linear,
-          )
-        : img.copyResize(
-            image,
-            height: kMaxImageEdge,
-            interpolation: img.Interpolation.linear,
-          );
-  }
-  // JPEG drops alpha; composite transparent images over white first so
-  // transparent regions don't come out black. hasAlpha covers RGBA (4ch) AND
-  // grayscale+alpha (2ch); the latter converts to RGBA so compositing sees
-  // color channels.
-  if (image.hasAlpha) {
-    final rgba = image.numChannels == 4 ? image : image.convert(numChannels: 4);
-    final bg = img.Image(width: rgba.width, height: rgba.height);
-    img.fill(bg, color: img.ColorRgb8(255, 255, 255));
-    img.compositeImage(bg, rgba);
-    image = bg;
-  }
-  final jpg = img.encodeJpg(image, quality: kJpegQuality);
-  return ProcessedImage(
-    bytes: jpg,
-    mime: 'image/jpeg',
-    width: image.width,
-    height: image.height,
-  );
-}
+/// CPU work and Base64 encoding run in the bounded native worker queue.
+Future<ProcessedImage> processImageNative(Uint8List bytes) async =>
+    _processed(await native.attachmentPrepareImage(bytes: bytes, path: null));
 
-/// Test seam for [processImage]: widget tests swap this for a direct call —
-/// [compute] spawns a real isolate, whose completion never lands under
-/// flutter_test's fake clock (pumpAndSettle would hang).
+/// Picked local paths are read on the native worker too.
+Future<ProcessedImage> processImageFile(String path) async =>
+    _processed(await native.attachmentPrepareImage(bytes: null, path: path));
+
+ProcessedImage _processed(native.PreparedImageDto image) => ProcessedImage(
+  bytes: image.bytes,
+  mime: image.mime,
+  width: image.width,
+  height: image.height,
+  dataUrl: image.dataUrl,
+);
+
+/// Widget tests inject prepared fixtures; algorithms are covered in Rust.
 @visibleForTesting
-Future<ProcessedImage> Function(Uint8List bytes) processImageImpl = (bytes) =>
-    compute(processImageBytes, bytes);
+Future<ProcessedImage> Function(Uint8List bytes) processImageImpl =
+    processImageNative;
 
-/// [processImageBytes] on a background isolate.
 Future<ProcessedImage> processImage(Uint8List bytes) => processImageImpl(bytes);
 
-String? _decoderMime(img.Decoder decoder) => switch (decoder) {
-  img.JpegDecoder() => 'image/jpeg',
-  img.PngDecoder() => 'image/png',
-  img.GifDecoder() => 'image/gif',
-  img.WebPDecoder() => 'image/webp',
-  _ => null,
-};
+/// Whether a picker supplied an actual local path rather than a platform URI
+/// or an in-memory source. Such sources stay with the platform's byte reader.
+bool localAttachmentPath(String path) =>
+    path.startsWith('/') || RegExp(r'^[A-Za-z]:[\\/]').hasMatch(path);
 
 /// File extension for [bytes] sniffed from container magic: `png` / `gif` /
 /// `webp`, else `jpg` (the only other format this app produces or passes

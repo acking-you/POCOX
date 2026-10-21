@@ -12,6 +12,7 @@
 // more and adopts no outcome. Driven through hit-tested taps and typed
 // input, with bounded pumps while a turn runs.
 
+import 'support/native_image_fixture.dart';
 import 'dart:async';
 
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart'

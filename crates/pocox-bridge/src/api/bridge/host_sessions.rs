@@ -11,6 +11,7 @@
 //! it on the relay.
 
 use super::{threads::ThreadItemDto, *};
+use crate::engine::execution::{self, Lane};
 
 /// A process holding a session's rollout open (a would-be takeover
 /// target), mirrored for Dart.
@@ -139,28 +140,34 @@ fn local_session_dto(s: sessions::LocalSession) -> LocalSessionDto {
 /// *other* codex clients (the desktop app, the CLI, the VS Code
 /// extension) that share this `CODEX_HOME`. Meaningful only when the UI
 /// runs on the same machine as those sessions.
-pub fn app_local_sessions() -> Result<Vec<LocalSessionDto>> {
-    Ok(sessions::list_local_sessions()?
-        .into_iter()
-        .map(local_session_dto)
-        .collect())
+pub async fn app_local_sessions() -> Result<Vec<LocalSessionDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(sessions::list_local_sessions()?
+            .into_iter()
+            .map(local_session_dto)
+            .collect())
+    })
+    .await
 }
 
 /// Inspect one session's current resume-safety and the processes a force
 /// takeover would evict. Poll this before showing a resume button so the
 /// UI reflects live ownership (a session can flip between read-only and
 /// resumable as the desktop app loads / releases it).
-pub fn app_session_liveness(thread_id: String) -> Result<SessionLivenessDto> {
-    let view = sessions::session_liveness(&thread_id)?;
-    Ok(SessionLivenessDto {
-        thread_id: view.thread_id,
-        turn_state: view.turn_state,
-        held_open: view.held_open,
-        safety: view.safety,
-        allows_resume: view.allows_resume,
-        requires_takeover: view.requires_takeover,
-        holders: view.holders.into_iter().map(holder_dto).collect(),
+pub async fn app_session_liveness(thread_id: String) -> Result<SessionLivenessDto> {
+    execution::run(Lane::Read, move || {
+        let view = sessions::session_liveness(&thread_id)?;
+        Ok(SessionLivenessDto {
+            thread_id: view.thread_id,
+            turn_state: view.turn_state,
+            held_open: view.held_open,
+            safety: view.safety,
+            allows_resume: view.allows_resume,
+            requires_takeover: view.requires_takeover,
+            holders: view.holders.into_iter().map(holder_dto).collect(),
+        })
     })
+    .await
 }
 
 /// Read a local session's transcript for READ-ONLY viewing. Parses the
@@ -170,23 +177,28 @@ pub fn app_session_liveness(thread_id: String) -> Result<SessionLivenessDto> {
 /// viewer reuses the live-conversation rendering. Poll it alongside
 /// [`app_session_liveness`] to follow a running session and notice when it
 /// goes idle (resume-eligible).
-pub fn app_local_session_transcript(thread_id: String) -> Result<Vec<ThreadItemDto>> {
-    Ok(sessions::local_session_transcript(&thread_id)?
-        .into_iter()
-        .map(|i| ThreadItemDto {
-            id: i.id,
-            item_type: i.item_type,
-            title: i.title,
-            text: i.text,
-            images: i.images,
-            // A rollout file on disk has no turn envelope, so these read as
-            // "unknown" rather than being reconstructed from the item order.
-            turn_id: String::new(),
-            turn_completed_at: None,
-            turn_duration_ms: None,
-            questions_json: None,
-        })
-        .collect())
+pub async fn app_local_session_transcript(thread_id: String) -> Result<Vec<ThreadItemDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(sessions::local_session_transcript(&thread_id)?
+            .into_iter()
+            .map(|i| ThreadItemDto {
+                diff: (i.item_type == "fileChange")
+                    .then(|| super::diff::dto(&crate::engine::git_diff::parse(&i.text))),
+                id: i.id,
+                item_type: i.item_type,
+                title: i.title,
+                text: i.text,
+                images: i.images,
+                // A rollout file on disk has no turn envelope, so these read as
+                // "unknown" rather than being reconstructed from the item order.
+                turn_id: String::new(),
+                turn_completed_at: None,
+                turn_duration_ms: None,
+                questions_json: None,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Force-resume a session into the app-server behind `service_key`.
@@ -198,16 +210,22 @@ pub fn app_local_session_transcript(thread_id: String) -> Result<Vec<ThreadItemD
 /// running (`SessionLivenessDto::allows_resume == false`). The returned
 /// report says exactly which processes were killed / survived and whether
 /// the resume took.
-pub fn app_force_resume(service_key: String, thread_id: String) -> Result<ForceResumeReportDto> {
-    require_native(&service_key, "forced resume")?;
-    let outcome = sessions::force_resume(&service_key, &thread_id)?;
-    Ok(ForceResumeReportDto {
-        killed: outcome.killed.into_iter().map(holder_dto).collect(),
-        survived: outcome.survived.into_iter().map(holder_dto).collect(),
-        still_held: outcome.still_held,
-        resumed: outcome.resumed,
-        resume_error: outcome.resume_error,
+pub async fn app_force_resume(
+    service_key: String,
+    thread_id: String,
+) -> Result<ForceResumeReportDto> {
+    execution::run(Lane::Control, move || {
+        require_native(&service_key, "forced resume")?;
+        let outcome = sessions::force_resume(&service_key, &thread_id)?;
+        Ok(ForceResumeReportDto {
+            killed: outcome.killed.into_iter().map(holder_dto).collect(),
+            survived: outcome.survived.into_iter().map(holder_dto).collect(),
+            still_held: outcome.still_held,
+            resumed: outcome.resumed,
+            resume_error: outcome.resume_error,
+        })
     })
+    .await
 }
 
 
@@ -234,6 +252,8 @@ pub(super) fn meta_liveness_dto(
 
 fn meta_thread_item_dto(value: pocox_host_svc::sessions::TranscriptItem) -> ThreadItemDto {
     ThreadItemDto {
+        diff: (value.item_type == "fileChange")
+            .then(|| super::diff::dto(&crate::engine::git_diff::parse(&value.text))),
         id: value.id,
         item_type: value.item_type,
         title: value.title,
@@ -298,20 +318,29 @@ fn thread_config_from_dto(c: ThreadConfigDto) -> pocox_host_svc::store::ThreadCo
 /// behind `service_key` via its meta tunnel (loopback when this app is the
 /// host, a relay subscription when remote). Lets a phone see a desktop host's
 /// sessions — including those owned by another codex client.
-pub fn meta_sessions(
+pub async fn meta_sessions(
     service_key: String,
     running_only: Option<bool>,
 ) -> Result<Vec<LocalSessionDto>> {
-    Ok(meta::sessions(&service_key, running_only.unwrap_or(false))?
-        .into_iter()
-        .map(local_session_dto)
-        .collect())
+    execution::run(Lane::Read, move || {
+        Ok(meta::sessions(&service_key, running_only.unwrap_or(false))?
+            .into_iter()
+            .map(local_session_dto)
+            .collect())
+    })
+    .await
 }
 
 /// Remote analogue of [`app_session_liveness`].
-pub fn meta_session_liveness(service_key: String, thread_id: String) -> Result<SessionLivenessDto> {
-    let v = meta::session_liveness(&service_key, &thread_id)?;
-    Ok(meta_liveness_dto(v))
+pub async fn meta_session_liveness(
+    service_key: String,
+    thread_id: String,
+) -> Result<SessionLivenessDto> {
+    execution::run(Lane::Read, move || {
+        let v = meta::session_liveness(&service_key, &thread_id)?;
+        Ok(meta_liveness_dto(v))
+    })
+    .await
 }
 
 /// Subscribe to live read-only transcript + ownership snapshots for a session
@@ -324,7 +353,16 @@ pub fn meta_session_events(
 ) -> Result<()> {
     runtime::runtime().spawn(async move {
         let result = meta::follow_session(&service_key, &thread_id, |update| {
-            sink.add(meta_follow_update_dto(update)).is_ok()
+            let sink = &sink;
+            async move {
+                match execution::run(Lane::Cpu, move || Ok(meta_follow_update_dto(update))).await {
+                    Ok(dto) => sink.add(dto).is_ok(),
+                    Err(error) => {
+                        let _ = sink.add_error(error.to_string());
+                        false
+                    },
+                }
+            }
         })
         .await;
         if let Err(error) = result {
@@ -335,28 +373,37 @@ pub fn meta_session_events(
 }
 
 /// Remote analogue of [`app_local_session_transcript`].
-pub fn meta_session_transcript(
+pub async fn meta_session_transcript(
     service_key: String,
     thread_id: String,
 ) -> Result<Vec<ThreadItemDto>> {
-    Ok(meta::transcript(&service_key, &thread_id)?
-        .into_iter()
-        .map(meta_thread_item_dto)
-        .collect())
+    execution::run(Lane::Read, move || {
+        Ok(meta::transcript(&service_key, &thread_id)?
+            .into_iter()
+            .map(meta_thread_item_dto)
+            .collect())
+    })
+    .await
 }
 
 /// Remote analogue of [`app_force_resume`]: the host evicts the rollout's live
 /// holders and resumes it into its colocated app-server over loopback. The UI
 /// must gate this on explicit confirmation and not offer it while a turn runs.
-pub fn meta_force_resume(service_key: String, thread_id: String) -> Result<ForceResumeReportDto> {
-    let o = meta::force_resume(&service_key, &thread_id)?;
-    Ok(ForceResumeReportDto {
-        killed: o.killed.into_iter().map(meta_holder_dto).collect(),
-        survived: o.survived.into_iter().map(meta_holder_dto).collect(),
-        still_held: o.still_held,
-        resumed: o.resumed,
-        resume_error: o.resume_error,
+pub async fn meta_force_resume(
+    service_key: String,
+    thread_id: String,
+) -> Result<ForceResumeReportDto> {
+    execution::run(Lane::Control, move || {
+        let o = meta::force_resume(&service_key, &thread_id)?;
+        Ok(ForceResumeReportDto {
+            killed: o.killed.into_iter().map(meta_holder_dto).collect(),
+            survived: o.survived.into_iter().map(meta_holder_dto).collect(),
+            still_held: o.still_held,
+            resumed: o.resumed,
+            resume_error: o.resume_error,
+        })
     })
+    .await
 }
 
 /// Upload a document/file attachment to the host behind `service_key` (over
@@ -365,44 +412,62 @@ pub fn meta_force_resume(service_key: String, thread_id: String) -> Result<Force
 /// references that path so the agent reads the file with its own tools —
 /// codex's native host-file workflow (its input protocol carries only text
 /// and images inline; there is no document slot).
-pub fn meta_upload_file(service_key: String, file_name: String, bytes: Vec<u8>) -> Result<String> {
-    Ok(meta::upload_file(&service_key, &file_name, bytes)?.path)
+pub async fn meta_upload_file(
+    service_key: String,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<String> {
+    execution::run(Lane::Transfer, move || {
+        Ok(meta::upload_file(&service_key, &file_name, bytes)?.path)
+    })
+    .await
 }
 
 /// Capture attachment destination ownership before asynchronous file reads.
-#[frb(sync)]
-pub fn meta_upload_context() -> Result<String> {
-    meta::upload_context()
+pub async fn meta_upload_context() -> Result<String> {
+    execution::run(Lane::Read, meta::upload_context).await
 }
 
 /// Upload using the context captured before reading the file; reject a changed
 /// account or relay without transmitting attachment bytes.
-pub fn meta_upload_file_scoped(
+pub async fn meta_upload_file_scoped(
     service_key: String,
     file_name: String,
     bytes: Vec<u8>,
     context: String,
 ) -> Result<String> {
-    Ok(meta::upload_file_scoped(&service_key, &file_name, bytes, &context)?.path)
+    execution::run(Lane::Transfer, move || {
+        Ok(meta::upload_file_scoped(&service_key, &file_name, bytes, &context)?.path)
+    })
+    .await
 }
 
 /// Read a thread's persisted config from the host behind `service_key`.
-pub fn meta_thread_config_get(service_key: String, thread_id: String) -> Result<ThreadConfigDto> {
-    Ok(thread_config_dto(meta::config_get(&service_key, &thread_id)?))
+pub async fn meta_thread_config_get(
+    service_key: String,
+    thread_id: String,
+) -> Result<ThreadConfigDto> {
+    execution::run(Lane::Read, move || {
+        Ok(thread_config_dto(meta::config_get(&service_key, &thread_id)?))
+    })
+    .await
 }
 
 /// Persist a thread's config on the host behind `service_key`; returns the
 /// stored value.
-pub fn meta_thread_config_set(
+pub async fn meta_thread_config_set(
     service_key: String,
     thread_id: String,
     config: ThreadConfigDto,
 ) -> Result<ThreadConfigDto> {
-    Ok(thread_config_dto(meta::config_put(
-        &service_key,
-        &thread_id,
-        thread_config_from_dto(config),
-    )?))
+    execution::run(Lane::Control, move || {
+        Ok(thread_config_dto(meta::config_put(
+            &service_key,
+            &thread_id,
+            thread_config_from_dto(config),
+        )?))
+    })
+    .await
 }
 
 /// The host's project-folder config (mirrored for Dart): the roots a remote
@@ -446,24 +511,28 @@ pub struct FileEntryDto {
 }
 
 /// Read the project-folder config of the host behind `service_key`.
-pub fn meta_project_config(service_key: String) -> Result<ProjectConfigDto> {
-    Ok(project_config_dto(meta::project_config(&service_key)?))
+pub async fn meta_project_config(service_key: String) -> Result<ProjectConfigDto> {
+    execution::run(Lane::Read, move || Ok(project_config_dto(meta::project_config(&service_key)?)))
+        .await
 }
 
 /// Replace the project-folder config of the host behind `service_key`; returns
 /// the stored value. The desktop host edits this over its own loopback tunnel.
-pub fn meta_set_project_config(
+pub async fn meta_set_project_config(
     service_key: String,
     project_roots: Vec<String>,
     default_project: Option<String>,
 ) -> Result<ProjectConfigDto> {
-    Ok(project_config_dto(meta::set_project_config(
-        &service_key,
-        pocox_host_svc::store::HostConfig {
-            project_roots,
-            default_project,
-        },
-    )?))
+    execution::run(Lane::Control, move || {
+        Ok(project_config_dto(meta::set_project_config(
+            &service_key,
+            pocox_host_svc::store::HostConfig {
+                project_roots,
+                default_project,
+            },
+        )?))
+    })
+    .await
 }
 
 /// Project settings with an optional new-host revision and effective default.
@@ -511,7 +580,11 @@ impl From<ProjectViewResponse> for ProjectSettingsDto {
 }
 
 /// Read current host defaults and conflict metadata without creating a folder.
-pub fn meta_project_settings(service_key: String) -> Result<ProjectSettingsDto> {
+pub async fn meta_project_settings(service_key: String) -> Result<ProjectSettingsDto> {
+    execution::run(Lane::Read, move || project_settings(service_key)).await
+}
+
+pub(super) fn project_settings(service_key: String) -> Result<ProjectSettingsDto> {
     let view: ProjectViewResponse = crate::engine::management_client::request(
         &service_key,
         reqwest::Method::GET,
@@ -522,36 +595,43 @@ pub fn meta_project_settings(service_key: String) -> Result<ProjectSettingsDto> 
 }
 
 /// Save reviewed project settings. New hosts require their last read revision.
-pub fn meta_save_project_settings(
+pub async fn meta_save_project_settings(
     service_key: String,
     project_roots: Vec<String>,
     default_project: Option<String>,
     expected_revision: Option<String>,
 ) -> Result<ProjectSettingsDto> {
-    let body = pocox_host_svc::projects::ProjectsUpdate {
-        config: pocox_host_svc::store::HostConfig {
-            project_roots,
-            default_project,
-        },
-        expected_revision,
-    };
-    let view: ProjectViewResponse = crate::engine::management_client::request(
-        &service_key,
-        reqwest::Method::PUT,
-        &["projects"],
-        Some(&body),
-    )?;
-    Ok(view.into())
+    execution::run(Lane::Control, move || {
+        let body = pocox_host_svc::projects::ProjectsUpdate {
+            config: pocox_host_svc::store::HostConfig {
+                project_roots,
+                default_project,
+            },
+            expected_revision,
+        };
+        let view: ProjectViewResponse = crate::engine::management_client::request(
+            &service_key,
+            reqwest::Method::PUT,
+            &["projects"],
+            Some(&body),
+        )?;
+        Ok(view.into())
+    })
+    .await
 }
 
 /// Resolve the host's default at first send. Never substitute the controller's
 /// filesystem or overwrite an explicitly selected project. On a legacy host,
 /// returns its configured default or None so the existing picker can be used.
-pub fn meta_ensure_default_project(service_key: String) -> Result<Option<String>> {
+pub async fn meta_ensure_default_project(service_key: String) -> Result<Option<String>> {
+    execution::run(Lane::Control, move || ensure_default_project(service_key)).await
+}
+
+pub(super) fn ensure_default_project(service_key: String) -> Result<Option<String>> {
     if !meta::default_projects_available(&service_key)? {
         return Ok(None);
     }
-    let view = match meta_project_settings(service_key.clone()) {
+    let view = match project_settings(service_key.clone()) {
         Ok(view) => view,
         Err(error)
             if error
@@ -578,37 +658,43 @@ pub fn meta_ensure_default_project(service_key: String) -> Result<Option<String>
 /// List the sub-directories of `path` on the host behind `service_key`, for the
 /// remote project-folder browser. Errors (with a `403`-carrying message) if
 /// `path` is outside the host's configured project roots.
-pub fn meta_list_dir(service_key: String, path: String) -> Result<Vec<DirEntryDto>> {
-    Ok(meta::list_dir(&service_key, &path)?
-        .into_iter()
-        .map(|e| DirEntryDto {
-            name: e.name,
-            path: e.path,
-            is_git_repo: e.is_git_repo,
-        })
-        .collect())
+pub async fn meta_list_dir(service_key: String, path: String) -> Result<Vec<DirEntryDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(meta::list_dir(&service_key, &path)?
+            .into_iter()
+            .map(|e| DirEntryDto {
+                name: e.name,
+                path: e.path,
+                is_git_repo: e.is_git_repo,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// List the files (not sub-directories) in `path` on the host behind
 /// `service_key`, for the file-transfer panel. Errors (with a `403`-carrying
 /// message) if `path` is outside the host's configured project roots.
-pub fn meta_list_files(service_key: String, path: String) -> Result<Vec<FileEntryDto>> {
-    Ok(meta::list_files(&service_key, &path)?
-        .into_iter()
-        .map(|e| FileEntryDto {
-            name: e.name,
-            path: e.path,
-            size: e.size,
-            mtime: e.mtime,
-        })
-        .collect())
+pub async fn meta_list_files(service_key: String, path: String) -> Result<Vec<FileEntryDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(meta::list_files(&service_key, &path)?
+            .into_iter()
+            .map(|e| FileEntryDto {
+                name: e.name,
+                path: e.path,
+                size: e.size,
+                mtime: e.mtime,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Download a host file's raw bytes (root-confined) from the host behind
 /// `service_key`, for saving to the controller's local disk. Errors (with a
 /// `403`-carrying message) if `path` is outside the configured project roots.
-pub fn meta_read_file(service_key: String, path: String) -> Result<Vec<u8>> {
-    meta::read_file(&service_key, &path)
+pub async fn meta_read_file(service_key: String, path: String) -> Result<Vec<u8>> {
+    execution::run(Lane::Read, move || meta::read_file(&service_key, &path)).await
 }
 
 /// Bounded file preview returned after an explicit user action.
@@ -620,31 +706,37 @@ pub struct FilePreviewDto {
 }
 
 /// Determine whether the selected host shares this app's filesystem.
-pub fn meta_host_is_local(service_key: String) -> Result<bool> {
-    meta::host_is_local(&service_key)
+pub async fn meta_host_is_local(service_key: String) -> Result<bool> {
+    execution::run(Lane::Read, move || meta::host_is_local(&service_key)).await
 }
 
 /// Read a bounded preview of a selected session file link.
-pub fn meta_file_preview(
+pub async fn meta_file_preview(
     service_key: String,
     thread_id: Option<String>,
     href: String,
 ) -> Result<FilePreviewDto> {
-    let preview = meta::file_preview(&service_key, thread_id.as_deref(), &href)?;
-    Ok(FilePreviewDto {
-        bytes: preview.bytes,
-        total_size: preview.total_size,
+    execution::run(Lane::Read, move || {
+        let preview = meta::file_preview(&service_key, thread_id.as_deref(), &href)?;
+        Ok(FilePreviewDto {
+            bytes: preview.bytes,
+            total_size: preview.total_size,
+        })
     })
+    .await
 }
 
 /// Stream a selected file into a new controller-side staging file.
-pub fn meta_file_download(
+pub async fn meta_file_download(
     service_key: String,
     thread_id: Option<String>,
     href: String,
     destination: String,
 ) -> Result<()> {
-    meta::file_download(&service_key, thread_id.as_deref(), &href, &destination)
+    execution::run(Lane::Transfer, move || {
+        meta::file_download(&service_key, thread_id.as_deref(), &href, &destination)
+    })
+    .await
 }
 
 /// Read an image that `thread_id`'s transcript already references, so the UI
@@ -653,23 +745,27 @@ pub fn meta_file_download(
 /// makes a pasted screenshot in the OS temp directory visible to a remote
 /// controller without granting it a general file read. Errors (with a
 /// `403`-carrying message) for a path the transcript never mentioned.
-pub fn meta_read_thread_image(
+pub async fn meta_read_thread_image(
     service_key: String,
     thread_id: String,
     path: String,
 ) -> Result<Vec<u8>> {
-    meta::read_thread_image(&service_key, &thread_id, &path)
+    execution::run(Lane::Read, move || meta::read_thread_image(&service_key, &thread_id, &path))
+        .await
 }
 
 /// Upload local `bytes` as `file_name` into host directory `dir`
 /// (root-confined) on the host behind `service_key`; returns the absolute HOST
 /// path where it landed. Never overwrites an existing same-named file (a
 /// collision surfaces the host's `409` in the returned message).
-pub fn meta_write_file(
+pub async fn meta_write_file(
     service_key: String,
     dir: String,
     file_name: String,
     bytes: Vec<u8>,
 ) -> Result<String> {
-    Ok(meta::write_file(&service_key, &dir, &file_name, bytes)?.path)
+    execution::run(Lane::Control, move || {
+        Ok(meta::write_file(&service_key, &dir, &file_name, bytes)?.path)
+    })
+    .await
 }

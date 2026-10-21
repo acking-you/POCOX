@@ -1,7 +1,10 @@
 //! Device management and durable local restore choices.
 
 use super::*;
-use crate::engine::{management, management_client as remote};
+use crate::engine::{
+    execution::{self, Lane},
+    management, management_client as remote,
+};
 
 /// Whether other authorized controllers can manage this computer.
 pub struct DeviceManagementDto {
@@ -30,13 +33,13 @@ impl From<management::LocalStatus> for DeviceManagementDto {
 }
 
 /// Read this device's management setting and reachability.
-pub fn device_management_status() -> Result<DeviceManagementDto> {
-    Ok(management::local_status()?.into())
+pub async fn device_management_status() -> Result<DeviceManagementDto> {
+    execution::run(Lane::Read, move || Ok(management::local_status()?.into())).await
 }
 
 /// Enable or disable remote management on this computer only.
-pub fn device_management_set_enabled(enabled: bool) -> Result<DeviceManagementDto> {
-    Ok(management::set_enabled(enabled)?.into())
+pub async fn device_management_set_enabled(enabled: bool) -> Result<DeviceManagementDto> {
+    execution::run(Lane::Read, move || Ok(management::set_enabled(enabled)?.into())).await
 }
 
 /// Authoritative override to old Flutter auto-host preferences.
@@ -51,15 +54,18 @@ pub struct HostRestoreOverrideDto {
 
 /// Apply these records before planning automatic restores. On failure, stop
 /// restoring and show the error; never restore stale controller preferences.
-pub fn host_restore_overrides() -> Result<Vec<HostRestoreOverrideDto>> {
-    Ok(crate::engine::host_lifecycle::entries()?
-        .into_iter()
-        .map(|(name, entry)| HostRestoreOverrideDto {
-            name,
-            revision: entry.revision,
-            runtime: entry.runtime.map(HostRuntimeDto::of),
-        })
-        .collect())
+pub async fn host_restore_overrides() -> Result<Vec<HostRestoreOverrideDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(crate::engine::host_lifecycle::entries()?
+            .into_iter()
+            .map(|(name, entry)| HostRestoreOverrideDto {
+                name,
+                revision: entry.revision,
+                runtime: entry.runtime.map(HostRuntimeDto::of),
+            })
+            .collect())
+    })
+    .await
 }
 
 /// One host owned by the selected remote computer's POCOX app.
@@ -114,24 +120,29 @@ pub struct ManagedDeviceDto {
 }
 
 /// Read a remote management service discovered under kind `host`.
-pub fn managed_device(service_key: String) -> Result<ManagedDeviceDto> {
-    let value = remote::device(&service_key)?;
-    Ok(ManagedDeviceDto {
-        device: value.device,
-        os: value.os,
-        metadata: value
-            .metadata
-            .filter(|metadata| metadata.protocol == pocox_core::device::DeviceMetadata::PROTOCOL)
-            .map(Into::into),
-        app_version: value.app_version,
-        hosts: value.hosts.into_iter().map(Into::into).collect(),
-        restore_problem: value.restore_problem,
+pub async fn managed_device(service_key: String) -> Result<ManagedDeviceDto> {
+    execution::run(Lane::Read, move || {
+        let value = remote::device(&service_key)?;
+        Ok(ManagedDeviceDto {
+            device: value.device,
+            os: value.os,
+            metadata: value
+                .metadata
+                .filter(|metadata| {
+                    metadata.protocol == pocox_core::device::DeviceMetadata::PROTOCOL
+                })
+                .map(Into::into),
+            app_version: value.app_version,
+            hosts: value.hosts.into_iter().map(Into::into).collect(),
+            restore_problem: value.restore_problem,
+        })
     })
+    .await
 }
 
 /// Read one remote host's configuration and live status.
-pub fn managed_host(service_key: String, name: String) -> Result<ManagedHostDto> {
-    Ok(remote::host(&service_key, &name)?.into())
+pub async fn managed_host(service_key: String, name: String) -> Result<ManagedHostDto> {
+    execution::run(Lane::Read, move || Ok(remote::host(&service_key, &name)?.into())).await
 }
 
 /// Restricted host-side runtime selection. No path/argv can cross this API.
@@ -184,7 +195,7 @@ fn provider(
 
 /// Create one remote service; a lost response requires status refresh, not
 /// auto-retry.
-pub fn managed_host_start(
+pub async fn managed_host_start(
     service_key: String,
     name: String,
     runtime: ManagedRuntimeDto,
@@ -192,14 +203,17 @@ pub fn managed_host_start(
     key_action: String,
     key: Option<String>,
 ) -> Result<ManagedHostDto> {
-    let (input, key) = provider(input, key_action, key)?;
-    Ok(remote::start(&service_key, &management::StartRequest {
-        name,
-        runtime: runtime.choice()?,
-        input,
-        key,
-    })?
-    .into())
+    execution::run(Lane::Read, move || {
+        let (input, key) = provider(input, key_action, key)?;
+        Ok(remote::start(&service_key, &management::StartRequest {
+            name,
+            runtime: runtime.choice()?,
+            input,
+            key,
+        })?
+        .into())
+    })
+    .await
 }
 
 /// A complete remote edit of one reviewed configuration revision.
@@ -219,52 +233,61 @@ pub struct ManagedHostSaveDto {
 }
 
 /// Save with optimistic concurrency, leaving the live service unchanged.
-pub fn managed_host_save(
+pub async fn managed_host_save(
     service_key: String,
     name: String,
     edit: ManagedHostSaveDto,
 ) -> Result<ManagedHostDto> {
-    let (input, key) = provider(edit.input, edit.key_action, edit.key)?;
-    Ok(remote::save(&service_key, &name, &management::SaveRequest {
-        input,
-        key,
-        expected_revision: edit.expected_revision,
-        runtime: edit.runtime.map(ManagedRuntimeDto::choice).transpose()?,
-        keep_base_url: edit.keep_base_url,
-    })?
-    .into())
+    execution::run(Lane::Read, move || {
+        let (input, key) = provider(edit.input, edit.key_action, edit.key)?;
+        Ok(remote::save(&service_key, &name, &management::SaveRequest {
+            input,
+            key,
+            expected_revision: edit.expected_revision,
+            runtime: edit.runtime.map(ManagedRuntimeDto::choice).transpose()?,
+            keep_base_url: edit.keep_base_url,
+        })?
+        .into())
+    })
+    .await
 }
 
 /// Apply the exact revision and running incarnation reviewed in the editor.
-pub fn managed_host_apply(
+pub async fn managed_host_apply(
     service_key: String,
     name: String,
     expected_incarnation: String,
     expected_revision: u64,
 ) -> Result<HostApplyDto> {
-    let value = remote::apply(&service_key, &name, &management::ApplyRequest {
-        expected_incarnation,
-        expected_revision,
-    })?;
-    Ok(HostApplyDto {
-        name: value.name,
-        applied: value.applied,
-        restored_previous: value.restored_previous,
-        error: value.error,
-        restore_error: value.restore_error,
-        revision: value.revision,
+    execution::run(Lane::Read, move || {
+        let value = remote::apply(&service_key, &name, &management::ApplyRequest {
+            expected_incarnation,
+            expected_revision,
+        })?;
+        Ok(HostApplyDto {
+            name: value.name,
+            applied: value.applied,
+            restored_previous: value.restored_previous,
+            error: value.error,
+            restore_error: value.restore_error,
+            revision: value.revision,
+        })
     })
+    .await
 }
 
 /// Stop the exact observed instance; the computer's management entry remains.
-pub fn managed_host_stop(
+pub async fn managed_host_stop(
     service_key: String,
     name: String,
     expected_incarnation: String,
 ) -> Result<()> {
-    remote::stop(&service_key, &name, &management::StopRequest {
-        expected_incarnation,
+    execution::run(Lane::Read, move || {
+        remote::stop(&service_key, &name, &management::StopRequest {
+            expected_incarnation,
+        })
     })
+    .await
 }
 
 /// Available runtime on a managed computer, independent of this controller OS.
@@ -287,69 +310,82 @@ pub struct ManagedRuntimeAvailabilityDto {
 }
 
 /// Discover installed runtimes; never installs or signs in automatically.
-pub fn managed_runtimes(service_key: String) -> Result<Vec<ManagedRuntimeAvailabilityDto>> {
-    Ok(remote::runtimes(&service_key)?
-        .into_iter()
-        .map(|value| ManagedRuntimeAvailabilityDto {
-            kind: value.kind,
-            ready: value.ready,
-            path: value.path,
-            version: value.version,
-            needs_host_login: value.needs_host_login,
-            can_prepare: value.can_prepare,
-            problem: value.problem,
-        })
-        .collect())
+pub async fn managed_runtimes(service_key: String) -> Result<Vec<ManagedRuntimeAvailabilityDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(remote::runtimes(&service_key)?
+            .into_iter()
+            .map(|value| ManagedRuntimeAvailabilityDto {
+                kind: value.kind,
+                ready: value.ready,
+                path: value.path,
+                version: value.version,
+                needs_host_login: value.needs_host_login,
+                can_prepare: value.can_prepare,
+                problem: value.problem,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Explicitly prepare the host's pinned Claude adapter, or read its progress.
 /// Only set `start` after the user's Prepare action, never during discovery.
-pub fn managed_claude_prepare(
+pub async fn managed_claude_prepare(
     service_key: String,
     start: bool,
 ) -> Result<hosting::AcpClaudeSetupDto> {
-    let value = remote::claude_prepare(&service_key, start)?;
-    Ok(hosting::AcpClaudeSetupDto {
-        state: value.state,
-        stage: value.stage,
-        elapsed_ms: value.elapsed_ms,
-        downloaded_bytes: value.downloaded_bytes,
-        download_bytes_per_second: value.download_bytes_per_second,
-        error: value.error,
-        run: value.run,
-        started: value.started,
+    execution::run(Lane::Read, move || {
+        let value = remote::claude_prepare(&service_key, start)?;
+        Ok(hosting::AcpClaudeSetupDto {
+            state: value.state,
+            stage: value.stage,
+            elapsed_ms: value.elapsed_ms,
+            downloaded_bytes: value.downloaded_bytes,
+            download_bytes_per_second: value.download_bytes_per_second,
+            error: value.error,
+            run: value.run,
+            started: value.started,
+        })
     })
+    .await
 }
 
 /// Start a stopped service from the exact reviewed saved revision. Retains
 /// host-only credentials, URL parameters, runtime paths and Claude overrides.
-pub fn managed_host_start_saved(
+pub async fn managed_host_start_saved(
     service_key: String,
     name: String,
     expected_revision: u64,
 ) -> Result<ManagedHostDto> {
-    Ok(remote::start_saved(&service_key, &name, expected_revision)?.into())
+    execution::run(Lane::Read, move || {
+        Ok(remote::start_saved(&service_key, &name, expected_revision)?.into())
+    })
+    .await
 }
 
 /// Restore only the boot-time choice still current under the host lease.
 /// For an old UI preference with no override, pass no revision and its local
 /// runtime. A later remote stop takes precedence even while this call waits.
-pub fn host_restore_service(
+pub async fn host_restore_service(
     name: String,
     expected_revision: Option<u64>,
     legacy_runtime: Option<HostRuntimeDto>,
 ) -> Result<()> {
-    crate::engine::host_lifecycle::restore(
-        &name,
-        expected_revision,
-        legacy_runtime
-            .map(HostRuntimeDto::into_runtime)
-            .transpose()?,
-    )
+    execution::run(Lane::Read, move || {
+        crate::engine::host_lifecycle::restore(
+            &name,
+            expected_revision,
+            legacy_runtime
+                .map(HostRuntimeDto::into_runtime)
+                .transpose()?,
+        )
+    })
+    .await
 }
 
 /// Read a restart-persistence warning without hiding a successful start/apply.
 /// None selects any warning on this computer; a name limits it to that host.
-pub fn host_restore_problem(name: Option<String>) -> Result<Option<String>> {
-    crate::engine::host_lifecycle::problem(name.as_deref())
+pub async fn host_restore_problem(name: Option<String>) -> Result<Option<String>> {
+    execution::run(Lane::Read, move || crate::engine::host_lifecycle::problem(name.as_deref()))
+        .await
 }

@@ -38,9 +38,70 @@ mixin _FakeThreads on _FakeBridgeState {
   Future<String> appRateLimits(String serviceKey) async => rateLimitsJson;
 
   @override
-  Future<String> appGitDiff(String serviceKey, String threadId) async {
+  ComposerControl composerCreate() => FakeComposerControl();
+
+  @override
+  bool turnErrorIsRefusal(String message) => const [
+    'the agent is not running',
+    'the agent host changed',
+    'unknown session',
+    'a turn is already running in this session',
+    'the session is still loading',
+    'too many sessions are busy',
+    'too many pending operations',
+    'invalid request:',
+  ].any(message.toLowerCase().startsWith);
+
+  @override
+  Future<bool> appTurnCommitted(
+    String service,
+    String thread,
+    String text,
+    List<String> images,
+  ) async {
+    final history = await appThreadRead(service, thread);
+    final latest = history.items.reversed
+        .where((item) => item.itemType == 'userMessage')
+        .firstOrNull;
+    return latest != null &&
+        latest.text.trim() == text.trim() &&
+        listEquals(latest.images, images);
+  }
+
+  @override
+  Future<ReviewIndex> reviewIndex(List<DiffModel> edits) async =>
+      reviewIndexFixture(edits);
+
+  @override
+  Future<List<int>> historyMerge(
+    List<String> currentIds,
+    List<String> currentTurns,
+    List<String> incomingIds,
+    List<String> incomingTurns,
+    List<String> turnOrder,
+    bool olderPage,
+  ) async {
+    final current = [
+      for (var i = 0; i < currentIds.length; i++)
+        TranscriptItem(id: currentIds[i], type: '', turnId: currentTurns[i]),
+    ];
+    final incoming = [
+      for (var i = 0; i < incomingIds.length; i++)
+        TranscriptItem(id: incomingIds[i], type: '', turnId: incomingTurns[i]),
+    ];
+    final source = [...current, ...incoming];
+    return fakeMergeHistoryItems(
+      current,
+      incoming,
+      turnOrder: turnOrder,
+      olderPage: olderPage,
+    ).map(source.indexOf).toList();
+  }
+
+  @override
+  Future<DiffModel> appGitDiff(String serviceKey, String threadId) async {
     // Answers with the tree as it was when asked, however late it arrives.
-    final text = gitDiffText;
+    final text = gitDiff;
     final gate = gitDiffGate;
     if (gate != null) await gate.future;
     return text;

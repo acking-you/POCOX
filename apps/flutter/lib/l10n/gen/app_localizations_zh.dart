@@ -4214,4 +4214,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyHide => '隐藏代理地址';
+
+  @override
+  String logsDiskLost(int count) {
+    return '日志落盘发生 $count 次丢弃或写入失败。';
+  }
 }

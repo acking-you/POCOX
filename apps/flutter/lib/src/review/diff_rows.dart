@@ -46,10 +46,10 @@ class DiffGapRow extends DiffRow {
 /// unchanged lines before a hunk.
 List<DiffRow> diffRowsOf(DiffFile file) {
   final rows = <DiffRow>[];
-  int? oldNo, newNo; // next old-/new-file line numbers
+  int? newNo; // next old-/new-file line numbers
   for (final line in file.lines) {
     if (line.kind == DiffLineKind.hunk) {
-      final ns = hunkNewStart(line.text);
+      final ns = line.newLine;
       if (ns != null) {
         // The unchanged run git left out before this hunk, on the new side.
         final gapStart = newNo ?? 1;
@@ -59,23 +59,19 @@ List<DiffRow> diffRowsOf(DiffFile file) {
         }
         newNo = ns;
       }
-      final os = hunkOldStart(line.text);
-      if (os != null) oldNo = os;
       continue;
     }
     switch (line.kind) {
       case DiffLineKind.removed:
         rows.add(
-          DiffCodeRow(line, oldNo),
+          DiffCodeRow(line, line.oldLine),
         ); // removed lines carry the old number
-        if (oldNo != null) oldNo++;
       case DiffLineKind.added:
-        rows.add(DiffCodeRow(line, newNo));
-        if (newNo != null) newNo++;
+        rows.add(DiffCodeRow(line, line.newLine));
+        newNo = line.newLine == null ? newNo : line.newLine! + 1;
       case DiffLineKind.context:
-        rows.add(DiffCodeRow(line, newNo));
-        if (oldNo != null) oldNo++;
-        if (newNo != null) newNo++;
+        rows.add(DiffCodeRow(line, line.newLine));
+        newNo = line.newLine == null ? newNo : line.newLine! + 1;
       case DiffLineKind.hunk:
         break;
     }

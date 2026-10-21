@@ -1,25 +1,19 @@
 //! In-process log capture for the UI's real-time log viewer.
 //!
 //! Installs a `tracing` layer as the process-global subscriber. Every event is
-//! formatted into a [`LogLine`], kept in a bounded ring buffer (so a viewer
-//! opened later still sees recent history), and broadcast to any live
-//! subscribers. The bridge exposes this to Dart as one stream (see
-//! `api::bridge::log_events`) that replays the retained history then streams
-//! live.
-//!
-//! codex, when hosted in-process, calls `tracing_subscriber` `try_init()` too —
-//! but ours runs first (from `init_bridge`), so its call is a no-op and codex's
-//! events flow through this layer as well.
+//! formatted into a [`LogLine`] and retained in a bounded native ring. The
+//! viewer queries filtered snapshots after coalesced revision notifications;
+//! the legacy line stream remains available for existing consumers.
+mod disk;
 
 use std::{
     collections::VecDeque,
-    fs::{self, File, OpenOptions},
-    io::Write,
-    path::{Path, PathBuf},
+    path::Path,
     sync::Mutex,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
+use disk::DiskLog;
 use once_cell::sync::OnceCell;
 use tokio::sync::broadcast;
 use tracing::{Event, Level, Subscriber};
@@ -44,78 +38,147 @@ const RING_CAPACITY: usize = 2000;
 /// reported to Dart as a gap rather than blocking the logger).
 const CHANNEL_CAPACITY: usize = 1024;
 
-/// How long an inactive log file is kept after its last write.
-const FILE_RETENTION: Duration = Duration::from_secs(6 * 60 * 60);
-const FILE_MAINTENANCE_INTERVAL: Duration = Duration::from_secs(60);
+const RING_BYTES: usize = 2 << 20;
+const MESSAGE_BYTES: usize = 16 << 10;
 
 static CHANNEL: OnceCell<broadcast::Sender<LogLine>> = OnceCell::new();
-static RING: OnceCell<Mutex<VecDeque<LogLine>>> = OnceCell::new();
-/// Hourly on-disk sink; absent when no support directory was set (tests).
-static FILE: OnceCell<Mutex<RotatingFile>> = OnceCell::new();
+static RING: OnceCell<Mutex<LogBuffer>> = OnceCell::new();
+static REVISION: OnceCell<tokio::sync::watch::Sender<u64>> = OnceCell::new();
+static FILE: OnceCell<DiskLog> = OnceCell::new();
 
-struct RotatingFile {
-    dir: PathBuf,
-    hour: Option<u64>,
-    file: Option<File>,
-    last_prune: Option<SystemTime>,
+#[derive(Default)]
+struct LogBuffer {
+    lines: VecDeque<LogLine>,
+    bytes: usize,
+    revision: u64,
 }
 
-impl RotatingFile {
-    fn new(dir: PathBuf) -> Self {
-        Self {
-            dir,
-            hour: None,
-            file: None,
-            last_prune: None,
-        }
+impl LogLine {
+    fn weight(&self) -> usize {
+        self.level.capacity()
+            + self.target.capacity()
+            + self.message.capacity()
+            + std::mem::size_of::<Self>()
     }
+}
 
-    fn maintain(&mut self, now: SystemTime) {
-        let hour = now.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() / 3600;
-        if self.hour != Some(hour) {
-            // Close before pruning: Windows cannot delete our open file.
-            self.file = None;
-            self.hour = Some(hour);
+impl LogBuffer {
+    fn push(&mut self, line: LogLine) {
+        self.bytes += line.weight();
+        self.lines.push_back(line);
+        while self.lines.len() > RING_CAPACITY || self.bytes > RING_BYTES {
+            if let Some(old) = self.lines.pop_front() {
+                self.bytes -= old.weight();
+            }
         }
-        let due = self
-            .last_prune
-            .and_then(|last| now.duration_since(last).ok())
-            .is_none_or(|elapsed| elapsed >= FILE_MAINTENANCE_INTERVAL);
-        if due {
-            prune_old_logs(&self.dir, now);
-            self.last_prune = Some(now);
-        }
+        self.revision = self.revision.wrapping_add(1);
     }
+}
 
-    fn write(&mut self, line: &LogLine, now: SystemTime) {
-        self.maintain(now);
-        if self.file.is_none() {
-            let hour = self.hour.unwrap_or(0);
-            let path =
-                self.dir
-                    .join(format!("pocox-{}-{:02}.log", date_stamp(hour * 3600), hour % 24));
-            self.file = OpenOptions::new().create(true).append(true).open(path).ok();
+fn truncate(text: &mut String, limit: usize) {
+    if text.len() <= limit {
+        if text.capacity() > limit + 32 {
+            text.shrink_to_fit();
         }
-        if let Some(file) = &mut self.file {
-            let _ = writeln!(
-                file,
-                "{} {:5} {} {}",
-                clock(line.timestamp_ms),
-                line.level,
-                line.target,
-                line.message
-            );
+        return;
+    }
+    let mut end = limit;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    text.truncate(end);
+    text.push_str("…[truncated]");
+    text.shrink_to_fit();
+}
+
+/// One bounded, filtered view of the native log buffer.
+pub struct LogView {
+    /// Matched lines, oldest first.
+    pub lines: Vec<LogLine>,
+    /// All retained lines before filtering.
+    pub total: usize,
+    /// Dropped disk records plus disk write/flush failures.
+    pub disk_lost: usize,
+}
+
+/// Query the native ring without retaining a second application-wide copy.
+pub fn query(level: Option<&str>, keyword: &str) -> LogView {
+    let minimum = level.and_then(priority);
+    let keyword = keyword.trim().to_lowercase();
+    let lines = snapshot();
+    let total = lines.len();
+    let lines = lines
+        .into_iter()
+        .filter(|line| {
+            let included = minimum
+                .zip(priority(&line.level))
+                .is_none_or(|(min, current)| current >= min);
+            included
+                && (keyword.is_empty()
+                    || format!("{} {} {}", line.level, line.target, line.message)
+                        .to_lowercase()
+                        .contains(&keyword))
+        })
+        .collect();
+    LogView {
+        lines,
+        total,
+        disk_lost: FILE.get().map_or(0, DiskLog::lost),
+    }
+}
+
+fn priority(level: &str) -> Option<u8> {
+    match level.trim().to_ascii_uppercase().as_str() {
+        "TRACE" => Some(0),
+        "DEBUG" => Some(1),
+        "INFO" => Some(2),
+        "WARN" => Some(3),
+        "ERROR" => Some(4),
+        _ => None,
+    }
+}
+
+/// Observe only revision changes; slow viewers always see the latest value.
+pub fn changes() -> Option<tokio::sync::watch::Receiver<u64>> {
+    REVISION.get().map(tokio::sync::watch::Sender::subscribe)
+}
+
+/// Clear retained UI history; persisted diagnostic files are left intact.
+pub fn clear() {
+    if let Some(ring) = RING.get() {
+        let mut ring = ring.lock().unwrap_or_else(|e| e.into_inner());
+        ring.lines.clear();
+        ring.bytes = 0;
+        ring.revision = ring.revision.wrapping_add(1);
+        if let Some(revision) = REVISION.get() {
+            revision.send_replace(ring.revision);
         }
     }
+}
+
+/// Record controller diagnostics in the same bounded ring and disk sink.
+pub fn record(level: String, target: String, message: String) {
+    emit(LogLine {
+        level,
+        target,
+        message,
+        timestamp_ms: now_ms(),
+    });
+}
+
+/// Flush admitted disk records, bounded to two seconds on shutdown.
+pub fn flush() -> bool {
+    FILE.get().is_none_or(DiskLog::flush)
 }
 
 /// Install the capture layer as the global subscriber. Idempotent — safe to
 /// call once at boot; a second call (or codex's own `try_init`) is a no-op.
 pub fn init() {
     CHANNEL.get_or_init(|| broadcast::channel(CHANNEL_CAPACITY).0);
-    RING.get_or_init(|| Mutex::new(VecDeque::with_capacity(RING_CAPACITY)));
+    RING.get_or_init(|| Mutex::new(LogBuffer::default()));
+    REVISION.get_or_init(|| tokio::sync::watch::channel(0).0);
     // Honour RUST_LOG when set, else a useful default: everything at info, our
-    // own bridge at debug. The viewer's own filtering happens in Dart.
+    // own bridge at debug. The viewer queries native filtering only while open.
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info,pocox_bridge=debug"));
     let _ = tracing_subscriber::registry()
@@ -131,6 +194,7 @@ pub fn snapshot() -> Vec<LogLine> {
         .map(|r| {
             r.lock()
                 .unwrap_or_else(|e| e.into_inner())
+                .lines
                 .iter()
                 .cloned()
                 .collect()
@@ -186,48 +250,7 @@ fn parse_level(raw: &str) -> &'static str {
 /// file copy must not stop the app from starting.
 pub fn init_file(support_dir: &Path) {
     let dir = support_dir.join("logs");
-    if fs::create_dir_all(&dir).is_err() {
-        return;
-    }
-    FILE.get_or_init(|| {
-        let mut log = RotatingFile::new(dir.clone());
-        log.maintain(SystemTime::now());
-        let _ = std::thread::Builder::new()
-            .name("pcx-log-retention".into())
-            .spawn(|| loop {
-                std::thread::sleep(FILE_MAINTENANCE_INTERVAL);
-                if let Some(log) = FILE.get() {
-                    log.lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .maintain(SystemTime::now());
-                }
-            });
-        Mutex::new(log)
-    });
-    tracing::info!(target: "pocox_bridge::logging", "log directory: {}", dir.display());
-}
-
-/// Delete log files last modified longer ago than [`FILE_RETENTION`].
-fn prune_old_logs(dir: &Path, now: SystemTime) {
-    let Ok(entries) = fs::read_dir(dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if !name.starts_with("pocox-") || !name.ends_with(".log") {
-            continue;
-        }
-        let aged = entry
-            .metadata()
-            .and_then(|meta| meta.modified())
-            .ok()
-            .and_then(|modified| now.duration_since(modified).ok())
-            .is_some_and(|age| age > FILE_RETENTION);
-        if aged {
-            let _ = fs::remove_file(entry.path());
-        }
-    }
+    let _ = FILE.get_or_try_init(|| DiskLog::start(dir));
 }
 
 /// `YYYY-MM-DD` in UTC, for the log file name.
@@ -255,21 +278,21 @@ fn clock(timestamp_ms: i64) -> String {
     format!("{:02}:{:02}:{:02}.{ms:03}", secs / 3600, (secs % 3600) / 60, secs % 60)
 }
 
-fn emit(line: LogLine) {
+fn emit(mut line: LogLine) {
+    truncate(&mut line.level, 16);
+    truncate(&mut line.target, 256);
+    truncate(&mut line.message, MESSAGE_BYTES);
     if let Some(ring) = RING.get() {
-        let mut r = ring.lock().unwrap_or_else(|e| e.into_inner());
-        if r.len() >= RING_CAPACITY {
-            r.pop_front();
+        let mut ring = ring.lock().unwrap_or_else(|e| e.into_inner());
+        ring.push(line.clone());
+        if let Some(revision) = REVISION.get() {
+            revision.send_replace(ring.revision);
         }
-        r.push_back(line.clone());
     }
     if let Some(file) = FILE.get() {
-        file.lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .write(&line, SystemTime::now());
+        file.push(line.clone());
     }
     if let Some(tx) = CHANNEL.get() {
-        // Err just means no viewers are open — the ring already retained it.
         let _ = tx.send(line);
     }
 }

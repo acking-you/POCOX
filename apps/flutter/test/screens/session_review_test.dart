@@ -1,3 +1,5 @@
+import '../support/native_diff_fixture.dart';
+import 'package:pocox/src/git_diff.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -13,16 +15,9 @@ const _service = 'pcx:lb7666:app:default';
 /// The environment button is a desktop affordance.
 final _desktop = TargetPlatformVariant.only(TargetPlatform.macOS);
 
-String _diffOf(String path) =>
-    'diff --git a/$path b/$path\n'
-    '--- a/$path\n'
-    '+++ b/$path\n'
-    '@@ -1 +1 @@\n'
-    '-old\n'
-    '+new\n';
+DiffModel _diffOf(String path) => diffFixture(path);
 
-/// A wide conversation in `/proj` whose working tree is [diff].
-Future<FakeBridgeApi> _mount(WidgetTester t, String diff) async {
+Future<FakeBridgeApi> _mount(WidgetTester t, DiffModel diff) async {
   t.view.devicePixelRatio = 1.0;
   t.view.physicalSize = const Size(1600, 1000);
   addTearDown(t.view.reset);
@@ -38,7 +33,7 @@ Future<FakeBridgeApi> _mount(WidgetTester t, String diff) async {
     branch: 'main',
     cwd: '/proj',
   );
-  api.gitDiffText = diff;
+  api.gitDiff = diff;
   await t.pumpWidget(
     host(const AppSessionScreen(serviceKey: _service, threadId: 't'), api),
   );
@@ -59,12 +54,12 @@ void main() {
     // A read of the old tree hangs while a newer read answers first.
     final slow = Completer<void>();
     api
-      ..gitDiffText = _diffOf('lib/old.dart')
+      ..gitDiff = _diffOf('lib/old.dart')
       ..gitDiffGate = slow;
     await _tapEnv(t);
     await _tapEnv(t); // close
     api
-      ..gitDiffText = _diffOf('lib/new.dart')
+      ..gitDiff = _diffOf('lib/new.dart')
       ..gitDiffGate = null;
     await _tapEnv(t);
     expect(find.byKey(const Key('env-file-lib/new.dart')), findsOneWidget);

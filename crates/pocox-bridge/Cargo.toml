@@ -62,6 +62,7 @@ futures = { workspace = true }
 ring = { workspace = true }
 semver = { workspace = true }
 directories = { workspace = true }
+image = { version = "=0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff", "ico", "pnm", "tga"] }
 
 # The agent tools' MCP endpoint runs only where POCOX hosts (desktops and the
 # CLI host). Phones never serve it, so they do not link the SDK.

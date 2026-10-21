@@ -1,3 +1,4 @@
+import 'support/native_diff_fixture.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
@@ -19,28 +20,80 @@ Widget _host(Widget child, {Size size = const Size(900, 2000)}) => MaterialApp(
   ),
 );
 
-TranscriptItem _edit(String id, String diff) =>
-    TranscriptItem(id: id, type: 'fileChange', text: diff, turnId: 't-$id');
+TranscriptItem _edit(String id, DiffModel diff) =>
+    TranscriptItem(id: id, type: 'fileChange', diff: diff, turnId: 't-$id');
 
-String _diffOf(String path, String old, String now) =>
-    '--- a/$path\n+++ b/$path\n@@ -1 +1 @@\n-$old\n+$now\n';
+DiffModel _diffOf(String path, String old, String now) =>
+    diffFixture(path, removed: [old], added: [now]);
+
+SessionChanges _sessionFixture(List<TranscriptItem> items) {
+  final edits = <SessionEdit>[];
+  for (final item in items) {
+    if (item.diff == null || item.diff!.isEmpty) continue;
+    edits.add(
+      SessionEdit(
+        id: item.id,
+        index: edits.length + 1,
+        turnId: item.turnId,
+        diff: item.diff!,
+      ),
+    );
+  }
+  final index = reviewIndexFixture(edits.map((e) => e.diff).toList());
+  return SessionChanges(
+    edits,
+    [
+      for (final file in index.files)
+        SessionFile(
+          file.path,
+          [
+            for (final s in file.sections)
+              (edits[s.$1], edits[s.$1].diff.files[s.$2]),
+          ],
+          added: file.added,
+          removed: file.removed,
+        ),
+    ],
+    added: index.added,
+    removed: index.removed,
+  );
+}
 
 void main() {
   // A file changed at the top and again far down, so git emits two hunks with
   // an elided run between them (lines 4..49 unchanged).
-  const twoHunks =
-      'diff --git a/lib/x.dart b/lib/x.dart\n'
-      '--- a/lib/x.dart\n'
-      '+++ b/lib/x.dart\n'
-      '@@ -1,3 +1,3 @@\n'
-      ' line 1\n'
-      '-line 2 old\n'
-      '+line 2 new\n'
-      ' line 3\n'
-      '@@ -50,2 +50,3 @@\n'
-      ' line 50\n'
-      '+line 51 added\n'
-      ' line 52\n';
+  const twoHunks = DiffModel(
+    [
+      DiffFile(
+        path: 'lib/x.dart',
+        added: 2,
+        removed: 1,
+        lines: [
+          DiffLine(
+            DiffLineKind.hunk,
+            '@@ -1,3 +1,3 @@',
+            oldLine: 1,
+            newLine: 1,
+          ),
+          DiffLine(DiffLineKind.context, 'line 1', oldLine: 1, newLine: 1),
+          DiffLine(DiffLineKind.removed, 'line 2 old', oldLine: 2),
+          DiffLine(DiffLineKind.added, 'line 2 new', newLine: 2),
+          DiffLine(DiffLineKind.context, 'line 3', oldLine: 3, newLine: 3),
+          DiffLine(
+            DiffLineKind.hunk,
+            '@@ -50,2 +50,3 @@',
+            oldLine: 50,
+            newLine: 50,
+          ),
+          DiffLine(DiffLineKind.context, 'line 50', oldLine: 50, newLine: 50),
+          DiffLine(DiffLineKind.added, 'line 51 added', newLine: 51),
+          DiffLine(DiffLineKind.context, 'line 52', oldLine: 51, newLine: 52),
+        ],
+      ),
+    ],
+    added: 2,
+    removed: 1,
+  );
 
   group('a workspace diff reads its elided lines in from the host', () {
     Future<void> pump(
@@ -50,7 +103,7 @@ void main() {
       t.view.devicePixelRatio = 1;
       t.view.physicalSize = const Size(900, 2000);
       addTearDown(t.view.reset);
-      final file = DiffModel.parse(twoHunks).files.single;
+      final file = twoHunks.files.single;
       await t.pumpWidget(
         _host(
           ReviewFileDiff(
@@ -96,34 +149,18 @@ void main() {
     });
   });
 
-  test('session changes keep each edit of a file, in order', () {
-    final changes = SessionChanges.of([
-      _edit('e1', _diffOf('lib/a.dart', 'a0', 'a1')),
-      TranscriptItem(id: 'm', type: 'agentMessage', text: 'done'),
-      _edit(
-        'e2',
-        _diffOf('lib/a.dart', 'a1', 'a2') + _diffOf('lib/b.dart', 'b0', 'b1'),
-      ),
-      // An edit recorded without a diff shows nothing to review.
-      _edit('e3', 'lib/c.dart'),
-    ]);
-    expect(changes.edits.map((e) => (e.id, e.index)), [('e1', 1), ('e2', 2)]);
-    expect(changes.files.map((f) => f.path), ['lib/a.dart', 'lib/b.dart']);
-    final a = changes.files.first;
-    expect(a.edits.map((e) => e.$1.id), ['e1', 'e2']);
-    expect((a.added, a.removed), (2, 2));
-  });
-
   group('the review', () {
-    final session = SessionChanges.of([
+    final session = _sessionFixture([
       _edit('e1', _diffOf('/proj/lib/a.dart', 'first', 'second')),
       _edit(
         'e2',
-        _diffOf('/proj/lib/a.dart', 'second', 'third') +
-            _diffOf('/proj/lib/b.dart', 'old b', 'new b'),
+        combineDiffFixtures(
+          _diffOf('/proj/lib/a.dart', 'second', 'third'),
+          _diffOf('/proj/lib/b.dart', 'old b', 'new b'),
+        ),
       ),
     ]);
-    final workspace = DiffModel.parse(_diffOf('lib/w.dart', 'was', 'is'));
+    final workspace = _diffOf('lib/w.dart', 'was', 'is');
 
     Widget panel({
       ReviewTarget? target,
@@ -241,7 +278,7 @@ void main() {
       await t.pumpAndSettle();
       expect(reads, 1);
       version = 2;
-      final moved = DiffModel.parse(_diffOf('lib/w.dart', 'was', 'now'));
+      final moved = _diffOf('lib/w.dart', 'was', 'now');
       await t.pumpWidget(panel(width: 900, load: load, tree: moved));
       await t.pumpAndSettle();
       expect(reads, 2);
@@ -251,9 +288,9 @@ void main() {
     testWidgets('a path named twice in the working tree keeps both records', (
       t,
     ) async {
-      final tree = DiffModel.parse(
-        _diffOf('lib/w.dart', 'index old', 'index new') +
-            _diffOf('lib/w.dart', 'tree old', 'tree new'),
+      final tree = combineDiffFixtures(
+        _diffOf('lib/w.dart', 'index old', 'index new'),
+        _diffOf('lib/w.dart', 'tree old', 'tree new'),
       );
       await t.pumpWidget(panel(tree: tree));
       await t.pumpAndSettle();

@@ -183,7 +183,7 @@ fn remote_follow_setup_returns_errors_without_panicking_the_stream_task() {
     super::super::runtime::init(std::env::temp_dir()).expect("test runtime");
     runtime::runtime().block_on(async {
         let task = tokio::spawn(async {
-            follow_session("pcx:unconfigured:app:test", "test", |_| false).await
+            follow_session("pcx:unconfigured:app:test", "test", |_| std::future::ready(false)).await
         });
         // Even an unconfigured remote must report an error through the stream,
         // instead of panicking while recursively entering the Tokio runtime.
@@ -212,7 +212,7 @@ fn real_remote_follow_remains_open_and_receives_updates() {
                 assert!(event.items.is_empty());
                 updates += 1;
                 eprintln!("follow update={updates} elapsed_ms={}", start.elapsed().as_millis());
-                start.elapsed() < Duration::from_secs(45)
+                std::future::ready(start.elapsed() < Duration::from_secs(45))
             }),
         )
         .await

@@ -11,14 +11,14 @@ extension _SessionReview on _AppSessionState {
     final read = ++_gitRead;
     final service = widget.serviceKey;
     try {
-      final raw = await ref.read(bridgeApiProvider).appGitDiff(service, cwd);
+      final diff = await ref.read(bridgeApiProvider).appGitDiff(service, cwd);
       if (!mounted ||
           read != _gitRead ||
           widget.serviceKey != service ||
           _cwd?.trim() != cwd) {
         return;
       }
-      _updateState(() => _diff = DiffModel.parse(raw));
+      _updateState(() => _diff = diff);
     } catch (_) {
       // Not a git repo / no remote: leave the badge as branch-only.
     }
@@ -147,20 +147,24 @@ extension _SessionReview on _AppSessionState {
   void _closeReview() => _updateState(() => _reviewOpen = false);
 
   /// The review, live: what the conversation and the working tree changed.
-  Widget _reviewPanel({bool page = false}) => ReviewPanel(
-    key: const Key('review-panel'),
-    session: SessionChanges.of(_items),
-    workspace: _diff,
-    workspaceAvailable: _workspaceReview,
-    workspaceLoading: _diffLoading,
-    onRefreshWorkspace: _refreshDiff,
-    onCancelRefresh: _cancelDiff,
-    branch: _branch,
-    root: _cwd,
-    target: _reviewTarget,
-    onLoadFile: _loadReviewFile,
-    onClose: _closeReview,
-    page: page,
+  Widget _reviewPanel({bool page = false}) => SessionChangesView(
+    api: ref.read(bridgeApiProvider),
+    items: _items,
+    builder: (changes) => ReviewPanel(
+      key: const Key('review-panel'),
+      session: changes,
+      workspace: _diff,
+      workspaceAvailable: _workspaceReview,
+      workspaceLoading: _diffLoading,
+      onRefreshWorkspace: _refreshDiff,
+      onCancelRefresh: _cancelDiff,
+      branch: _branch,
+      root: _cwd,
+      target: _reviewTarget,
+      onLoadFile: _loadReviewFile,
+      onClose: _closeReview,
+      page: page,
+    ),
   );
 
   /// The app-bar environment button + its popover: a floating summary card

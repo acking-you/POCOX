@@ -16,7 +16,7 @@ void _registerSendOwnership() {
     setUp(() {
       previousProcess = processImageImpl;
       // compute() never completes under the fake clock: process inline.
-      processImageImpl = (bytes) async => processImageBytes(bytes);
+      processImageImpl = (bytes) async => preparedImageFixture(bytes);
       previousPicker = ImagePickerPlatform.instance;
       previousFiles = fsel.FileSelectorPlatform.instance;
       picker = FakeImagePicker();
@@ -51,8 +51,8 @@ void _registerSendOwnership() {
     }
 
     final allImages = [
-      processImageBytes(red).dataUrl,
-      processImageBytes(blue).dataUrl,
+      preparedImageFixture(red).dataUrl,
+      preparedImageFixture(blue).dataUrl,
     ];
     final secondWithFile = appendFileRefs('second', [notesPath]);
 

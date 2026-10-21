@@ -2,7 +2,7 @@ part of '../app_session_screen.dart';
 
 extension _SessionAttachments on _AppSessionState {
   // Composer attachments not yet sent; an entry with `processed == null` is
-  // still being downscaled/re-encoded in a background isolate.
+  // still being downscaled/re-encoded in a native worker.
   List<_Attachment> get _attachments => _draft.attachments;
 
   /// A single rounded composer surface: borderless multiline input on top, a
@@ -10,8 +10,8 @@ extension _SessionAttachments on _AppSessionState {
   /// common AI-chat composers rather than a bare TextField.
   /// Pick images to attach (photo library on Android/iOS via the system
   /// picker — no permission prompt; a file dialog on desktop). Each pick is
-  /// processed (EXIF-bake / downscale / JPEG re-encode) on a background
-  /// isolate before it becomes sendable, showing a spinner chip meanwhile.
+  /// processed (EXIF-bake / downscale / JPEG re-encode) on a native
+  /// worker before it becomes sendable, showing a spinner chip meanwhile.
   Future<void> _pickImages() async {
     final draft = _draft;
     final ticket = _ticketFor(draft);
@@ -76,9 +76,16 @@ extension _SessionAttachments on _AppSessionState {
   Future<void> _processAttachment(_Attachment att, XFile file) async {
     att.source = file;
     try {
-      final bytes = await file.readAsBytes();
-      if (!_drafts.containsAttachment(att)) return;
-      await _processImageBytes(att, bytes);
+      if (localAttachmentPath(file.path)) {
+        final image = await processImageFile(file.path);
+        if (!_drafts.containsAttachment(att)) return;
+        att.processed = image;
+        _drafts.attachmentChanged(att);
+      } else {
+        final bytes = await file.readAsBytes();
+        if (!_drafts.containsAttachment(att)) return;
+        await _processImageBytes(att, bytes);
+      }
     } catch (e) {
       att.error = friendlyError(e);
       _drafts.attachmentChanged(att);
@@ -144,7 +151,7 @@ extension _SessionAttachments on _AppSessionState {
 
   /// The view on screen stopped being editable (it turned read-only):
   /// nothing granted to its draft before may still arrive.
-  void _revokeOnScreenAdmissions() => _draft.admission++;
+  void _revokeOnScreenAdmissions() => _draft.revokeAdmission();
 
   /// Pick document/file attachments (any type). Each is uploaded to the HOST
   /// right away (spinner chip while in flight) and later travels as a path
@@ -408,9 +415,26 @@ extension _SessionAttachments on _AppSessionState {
     final tooLarge = l10n.fileTooLarge(kMaxFileBytes ~/ (1024 * 1024));
     final revoked = l10n.attachmentRevoked;
     try {
-      final destination = api.metaUploadContext();
+      final destination = await api.metaUploadContext();
       if (await file.length() > kMaxFileBytes) throw StateError(tooLarge);
       if (!_drafts.containsAttachment(att)) return;
+      if (localAttachmentPath(file.path)) {
+        final prepared = await api.attachmentReadFile(file.path);
+        try {
+          if (!_drafts.containsAttachment(att)) return;
+          if (!_mayUpload(att)) throw StateError(revoked);
+          att.hostPath = await api.metaUploadPreparedFile(
+            service,
+            att.name,
+            prepared,
+            destination,
+          );
+        } finally {
+          api.attachmentReleaseFile(prepared);
+        }
+        _drafts.attachmentChanged(att);
+        return;
+      }
       final bytes = await file.readAsBytes();
       if (bytes.length > kMaxFileBytes) throw StateError(tooLarge);
       if (!_drafts.containsAttachment(att)) return;

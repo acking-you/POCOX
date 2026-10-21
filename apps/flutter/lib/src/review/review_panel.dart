@@ -178,15 +178,14 @@ class _ReviewPanelState extends State<ReviewPanel> {
     ReviewFileEntry entry(List<DiffFile> records, {int edits = 0}) {
       final first = records.first.lines
           .where((l) => l.kind == DiffLineKind.hunk)
-          .firstOrNull
-          ?.text;
+          .firstOrNull;
       return ReviewFileEntry(
         path: records.first.path,
         added: records.fold(0, (n, f) => n + f.added),
         removed: records.fold(0, (n, f) => n + f.removed),
         edits: edits,
-        created: first != null && hunkOldStart(first) == 0,
-        deleted: first != null && hunkNewStart(first) == 0,
+        created: first != null && first.oldLine == 0,
+        deleted: first != null && first.newLine == 0,
       );
     }
 
@@ -344,6 +343,13 @@ class _ReviewPanelState extends State<ReviewPanel> {
           children: [
             _header(context, l10n, entries, unread: unread),
             const Divider(height: 1),
+            if (_source == ReviewSource.workspace
+                ? widget.workspace?.truncated == true
+                : widget.session.edits.any((edit) => edit.diff.truncated))
+              Padding(
+                padding: const EdgeInsets.all(10),
+                child: Text(l10n.contentOmittedNotice(l10n.omittedDiffs)),
+              ),
             Expanded(child: unread ? _unreadWorkspace(context, l10n) : body),
           ],
         );

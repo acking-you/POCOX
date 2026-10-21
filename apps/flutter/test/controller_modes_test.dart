@@ -1,3 +1,4 @@
+import 'support/native_image_fixture.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/widgets/turn_minimap.dart';
-import 'package:flutter/foundation.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:pocox/src/image_attachments.dart';
 import 'package:pocox/src/theme.dart';
@@ -83,10 +83,10 @@ FakeImagePicker imagePicker() {
   final original = ImagePickerPlatform.instance;
   final picker = FakeImagePicker();
   ImagePickerPlatform.instance = picker;
-  processImageImpl = (bytes) async => processImageBytes(bytes);
+  processImageImpl = (bytes) async => preparedImageFixture(bytes);
   addTearDown(() {
     ImagePickerPlatform.instance = original;
-    processImageImpl = (bytes) => compute(processImageBytes, bytes);
+    processImageImpl = processImageNative;
   });
   return picker;
 }
@@ -345,10 +345,10 @@ void main() {
     final picker = FakeImagePicker()
       ..files = [MemXFile(tinyPng(), 'supplement.png')];
     ImagePickerPlatform.instance = picker;
-    processImageImpl = (bytes) async => processImageBytes(bytes);
+    processImageImpl = (bytes) async => preparedImageFixture(bytes);
     addTearDown(() {
       ImagePickerPlatform.instance = originalPicker;
-      processImageImpl = (bytes) => compute(processImageBytes, bytes);
+      processImageImpl = processImageNative;
     });
     final api = ModesApi();
     await running(t, api);

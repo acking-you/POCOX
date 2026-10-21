@@ -22,12 +22,16 @@ use crate::{
 };
 
 pub mod agent_tools;
+pub mod attachments;
 pub mod codex_setup;
+pub mod composer;
 pub mod connection;
 pub mod device_management;
 pub mod device_metadata;
+pub mod diff;
 pub mod events;
 pub mod grok;
+pub mod history_projection;
 pub mod host_config;
 pub mod host_sessions;
 pub mod hosted_account;
@@ -170,6 +174,7 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // after the fact instead of only in a viewer that was open at the time.
     logging::init_file(&support_dir);
     runtime::init(support_dir)?;
+    let _ = crate::engine::updates::updater();
     // Before anything can host or publish: an app started while another one
     // runs on the same hosting state hosts nothing for its whole run.
     crate::engine::host_owner::claim_desktop();

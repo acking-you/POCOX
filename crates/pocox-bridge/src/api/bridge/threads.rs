@@ -2,6 +2,7 @@
 //! history cache.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// Thread summary mirrored for Dart.
 pub struct ThreadMetaDto {
@@ -69,6 +70,8 @@ pub struct ThreadItemDto {
     pub turn_completed_at: Option<i64>,
     /// This item's turn duration in milliseconds, when the server reports it.
     pub turn_duration_ms: Option<i64>,
+    /// Parsed file edits, prepared by Rust for the review and inline card.
+    pub diff: Option<super::diff::DiffDto>,
 }
 
 /// A thread's recovered history + whether a turn is still running, plus the
@@ -150,22 +153,25 @@ fn turn_page_dto(page: app_session::TurnItemsPage) -> TurnItemsPageDto {
 /// `delta_only` opts into new items only on continuation; omission preserves
 /// cumulative windows for older callers. Opening always returns the cached
 /// prefix.
-pub fn app_thread_turn_page(
+pub async fn app_thread_turn_page(
     service_key: String,
     thread_id: String,
     turn_id: String,
     load_more: bool,
     delta_only: Option<bool>,
 ) -> Result<TurnItemsPageDto> {
-    engine(&service_key)
-        .thread_turn_page(
-            &service_key,
-            &thread_id,
-            &turn_id,
-            load_more,
-            delta_only.unwrap_or(false),
-        )
-        .map(turn_page_dto)
+    execution::run(Lane::Read, move || {
+        engine(&service_key)
+            .thread_turn_page(
+                &service_key,
+                &thread_id,
+                &turn_id,
+                load_more,
+                delta_only.unwrap_or(false),
+            )
+            .map(turn_page_dto)
+    })
+    .await
 }
 
 /// A turn reduced to what the rail shows.
@@ -214,17 +220,23 @@ pub struct ThreadRuntimeConfigDto {
 }
 
 /// List threads known to the app-server.
-pub fn app_thread_list(service_key: String) -> Result<Vec<ThreadMetaDto>> {
-    let threads = engine(&service_key).thread_list(&service_key)?;
-    Ok(threads.into_iter().map(thread_meta_dto).collect())
+pub async fn app_thread_list(service_key: String) -> Result<Vec<ThreadMetaDto>> {
+    execution::run(Lane::Read, move || {
+        let threads = engine(&service_key).thread_list(&service_key)?;
+        Ok(threads.into_iter().map(thread_meta_dto).collect())
+    })
+    .await
 }
 
 /// Inspect one thread without resuming it or taking ownership. Native Codex
 /// only (callers gate on `native_metadata`); other protocols are refused
 /// before any network call.
-pub fn app_thread_metadata(service_key: String, thread_id: String) -> Result<ThreadMetaDto> {
-    require_native(&service_key, "thread metadata")?;
-    app_session::thread_metadata(&service_key, &thread_id).map(thread_meta_dto)
+pub async fn app_thread_metadata(service_key: String, thread_id: String) -> Result<ThreadMetaDto> {
+    execution::run(Lane::Read, move || {
+        require_native(&service_key, "thread metadata")?;
+        app_session::thread_metadata(&service_key, &thread_id).map(thread_meta_dto)
+    })
+    .await
 }
 
 fn thread_meta_dto(t: app_session::ThreadMeta) -> ThreadMetaDto {
@@ -241,55 +253,61 @@ fn thread_meta_dto(t: app_session::ThreadMeta) -> ThreadMetaDto {
 }
 
 /// List the models the app-server offers.
-pub fn app_model_list(service_key: String) -> Result<Vec<ModelInfoDto>> {
-    app_model_list_for_project(service_key, None)
+pub async fn app_model_list(service_key: String) -> Result<Vec<ModelInfoDto>> {
+    app_model_list_for_project(service_key, None).await
 }
 
 /// List native project models; other engines retain their existing catalog.
-pub fn app_model_list_for_project(
+pub async fn app_model_list_for_project(
     service_key: String,
     directory: Option<String>,
 ) -> Result<Vec<ModelInfoDto>> {
-    let models = if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode
-    {
-        crate::engine::opencode::models_for_project(&service_key, directory.as_deref())?
-    } else {
-        engine(&service_key).model_list(&service_key)?
-    };
-    Ok(models
-        .into_iter()
-        .map(|m| ModelInfoDto {
-            id: m.id,
-            display_name: m.display_name,
-            description: m.description,
-            supported_reasoning_efforts: m.supported_reasoning_efforts,
-            default_reasoning_effort: m.default_reasoning_effort,
-            supported_service_tiers: m.supported_service_tiers,
-            default_service_tier: m.default_service_tier,
-            is_default: m.is_default,
-        })
-        .collect())
+    execution::run(Lane::Read, move || {
+        let models =
+            if session_engine::protocol_of(&service_key) == session_engine::Protocol::OpenCode {
+                crate::engine::opencode::models_for_project(&service_key, directory.as_deref())?
+            } else {
+                engine(&service_key).model_list(&service_key)?
+            };
+        Ok(models
+            .into_iter()
+            .map(|m| ModelInfoDto {
+                id: m.id,
+                display_name: m.display_name,
+                description: m.description,
+                supported_reasoning_efforts: m.supported_reasoning_efforts,
+                default_reasoning_effort: m.default_reasoning_effort,
+                supported_service_tiers: m.supported_service_tiers,
+                default_service_tier: m.default_service_tier,
+                is_default: m.is_default,
+            })
+            .collect())
+    })
+    .await
 }
 
 /// Send a thread realtime control request; returns the upstream JSON result.
 /// Accepts the six `thread/realtime/*` methods, `thread/timeline/list`,
 /// marked voice `thread/start` (and ephemeral dictation `thread/start`), and
 /// `thread/unsubscribe`.
-pub fn app_realtime_request(
+pub async fn app_realtime_request(
     service_key: String,
     method: String,
     params_json: String,
 ) -> Result<String> {
-    // Live voice and dictation are native Codex realtime features. An ACP
-    // agent's audio prompt support is a different thing and is not routed here.
-    require_native(&service_key, "realtime voice")?;
-    app_session::realtime_request(&service_key, &method, &params_json)
+    execution::run(Lane::Control, move || {
+        // Live voice and dictation are native Codex realtime features. An ACP
+        // agent's audio prompt support is a different thing and is not routed here.
+        require_native(&service_key, "realtime voice")?;
+        app_session::realtime_request(&service_key, &method, &params_json)
+    })
+    .await
 }
 
 /// Start a new thread / project. `approval_policy` is one of
 /// `untrusted` / `on-failure` / `on-request` / `never`; `sandbox` is one of
 /// `read-only` / `workspace-write` / `danger-full-access`. Returns the id.
-pub fn app_thread_start(
+pub async fn app_thread_start(
     service_key: String,
     model: Option<String>,
     cwd: Option<String>,
@@ -298,39 +316,45 @@ pub fn app_thread_start(
     service_tier: Option<String>,
     sandbox: Option<String>,
 ) -> Result<String> {
-    let epoch = crate::engine::transport::epoch();
-    let cwd = match cwd.filter(|path| !path.trim().is_empty()) {
-        Some(explicit) => Some(explicit),
-        None => host_sessions::meta_ensure_default_project(service_key.clone())?,
-    };
-    if !crate::engine::transport::is_current(epoch) {
-        anyhow::bail!("connection changed before the conversation was created; try again");
-    }
-    engine(&service_key).thread_start(&service_key, StartOptions {
-        model,
-        cwd,
-        approval_policy,
-        approvals_reviewer,
-        service_tier,
-        sandbox,
+    execution::run(Lane::Control, move || {
+        let epoch = crate::engine::transport::epoch();
+        let cwd = match cwd.filter(|path| !path.trim().is_empty()) {
+            Some(explicit) => Some(explicit),
+            None => host_sessions::ensure_default_project(service_key.clone())?,
+        };
+        if !crate::engine::transport::is_current(epoch) {
+            anyhow::bail!("connection changed before the conversation was created; try again");
+        }
+        engine(&service_key).thread_start(&service_key, StartOptions {
+            model,
+            cwd,
+            approval_policy,
+            approvals_reviewer,
+            service_tier,
+            sandbox,
+        })
     })
+    .await
 }
 
 /// Append an asynchronous answer and return the accepted active turn ID.
-pub fn app_turn_steer(
+pub async fn app_turn_steer(
     service_key: String,
     thread_id: String,
     turn_id: Option<String>,
     text: String,
     images: Option<Vec<String>>,
 ) -> Result<String> {
-    engine(&service_key).turn_steer(
-        &service_key,
-        &thread_id,
-        turn_id.as_deref(),
-        &text,
-        &images.unwrap_or_default(),
-    )
+    execution::run(Lane::Control, move || {
+        engine(&service_key).turn_steer(
+            &service_key,
+            &thread_id,
+            turn_id.as_deref(),
+            &text,
+            &images.unwrap_or_default(),
+        )
+    })
+    .await
 }
 
 /// What became of [`app_turn_supplement`].
@@ -348,7 +372,7 @@ pub struct AppTurnSupplementDto {
 /// fails, as [`app_turn_steer`] does. An error means the input was refused
 /// or its fate is unknown, and it is never retried. `client_id` is the
 /// caller's own name for the input, carried back on its live item (ACP).
-pub fn app_turn_supplement(
+pub async fn app_turn_supplement(
     service_key: String,
     thread_id: String,
     turn_id: Option<String>,
@@ -356,24 +380,27 @@ pub fn app_turn_supplement(
     images: Option<Vec<String>>,
     client_id: Option<String>,
 ) -> Result<AppTurnSupplementDto> {
-    let outcome = engine(&service_key).turn_supplement(
-        &service_key,
-        &thread_id,
-        turn_id.as_deref(),
-        &text,
-        &images.unwrap_or_default(),
-        client_id.as_deref(),
-    )?;
-    Ok(match outcome {
-        session_engine::Supplement::Injected(turn) => AppTurnSupplementDto {
-            outcome: "injected".into(),
-            turn_id: Some(turn),
-        },
-        session_engine::Supplement::PromptRequired => AppTurnSupplementDto {
-            outcome: "promptRequired".into(),
-            turn_id: None,
-        },
+    execution::run(Lane::Control, move || {
+        let outcome = engine(&service_key).turn_supplement(
+            &service_key,
+            &thread_id,
+            turn_id.as_deref(),
+            &text,
+            &images.unwrap_or_default(),
+            client_id.as_deref(),
+        )?;
+        Ok(match outcome {
+            session_engine::Supplement::Injected(turn) => AppTurnSupplementDto {
+                outcome: "injected".into(),
+                turn_id: Some(turn),
+            },
+            session_engine::Supplement::PromptRequired => AppTurnSupplementDto {
+                outcome: "promptRequired".into(),
+                turn_id: None,
+            },
+        })
     })
+    .await
 }
 
 /// Answer a server approval request. For Codex `decision` is
@@ -382,12 +409,15 @@ pub fn app_turn_supplement(
 /// For an ACP permission (`acp/permission/requested`) `decision` is the
 /// agent's own option id, passed verbatim; an option the request did not
 /// offer is refused and the request stays pending.
-pub fn app_respond_approval(
+pub async fn app_respond_approval(
     service_key: String,
     request_id: String,
     decision: String,
 ) -> Result<()> {
-    engine(&service_key).respond_approval(&service_key, &request_id, &decision)
+    execution::run(Lane::Control, move || {
+        engine(&service_key).respond_approval(&service_key, &request_id, &decision)
+    })
+    .await
 }
 
 /// Answer an `item/tool/requestUserInput` elicitation (the model asking the
@@ -397,22 +427,30 @@ pub fn app_respond_approval(
 /// `{}` cancels. The session layer wraps it into the protocol's
 /// `ToolRequestUserInputResponse` so the model actually receives the user's
 /// selections.
-pub fn app_respond_user_input(
+pub async fn app_respond_user_input(
     service_key: String,
     request_id: String,
     answers_json: String,
 ) -> Result<()> {
-    engine(&service_key).respond_user_input(&service_key, &request_id, &answers_json)
+    execution::run(Lane::Control, move || {
+        engine(&service_key).respond_user_input(&service_key, &request_id, &answers_json)
+    })
+    .await
 }
 
 /// Resume an existing thread (load it into the session) before reading it or
 /// sending turns; otherwise the server reports "thread not found".
-pub fn app_thread_resume(service_key: String, thread_id: String) -> Result<()> {
-    engine(&service_key).thread_resume(&service_key, &thread_id)
+pub async fn app_thread_resume(service_key: String, thread_id: String) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).thread_resume(&service_key, &thread_id)
+    })
+    .await
 }
 
 pub(super) fn item_dto(i: app_session::ThreadItem) -> ThreadItemDto {
     ThreadItemDto {
+        diff: (i.item_type == "fileChange")
+            .then(|| super::diff::dto(&crate::engine::git_diff::parse(&i.text))),
         id: i.id,
         item_type: i.item_type,
         title: i.title,
@@ -432,17 +470,20 @@ pub(super) fn item_dto(i: app_session::ThreadItem) -> ThreadItemDto {
 /// with [`app_thread_older_page`] — plus a summary of every turn in `turns`.
 /// Monitoring clients set `include_turn_pages` to false to omit cached windows
 /// they already hold. Omission retains the full reopening response.
-pub fn app_thread_read(
+pub async fn app_thread_read(
     service_key: String,
     thread_id: String,
     include_turn_pages: Option<bool>,
 ) -> Result<ThreadHistoryDto> {
-    let h = engine(&service_key).thread_read(
-        &service_key,
-        &thread_id,
-        include_turn_pages.unwrap_or(true),
-    )?;
-    Ok(history_dto(h))
+    execution::run(Lane::Read, move || {
+        let h = engine(&service_key).thread_read(
+            &service_key,
+            &thread_id,
+            include_turn_pages.unwrap_or(true),
+        )?;
+        Ok(history_dto(h))
+    })
+    .await
 }
 
 fn history_dto(h: app_session::ThreadHistory) -> ThreadHistoryDto {
@@ -484,26 +525,32 @@ fn history_dto(h: app_session::ThreadHistory) -> ThreadHistoryDto {
 ///
 /// Returns an empty page when the thread reads whole or is already at its
 /// start.
-pub fn app_thread_older_page(service_key: String, thread_id: String) -> Result<OlderPageDto> {
-    let page = engine(&service_key).thread_older_page(&service_key, &thread_id)?;
-    Ok(OlderPageDto {
-        items: page.items.into_iter().map(item_dto).collect(),
-        has_older: page.has_older,
+pub async fn app_thread_older_page(service_key: String, thread_id: String) -> Result<OlderPageDto> {
+    execution::run(Lane::Read, move || {
+        let page = engine(&service_key).thread_older_page(&service_key, &thread_id)?;
+        Ok(OlderPageDto {
+            items: page.items.into_iter().map(item_dto).collect(),
+            has_older: page.has_older,
+        })
     })
+    .await
 }
 
 /// Every item of one turn, oldest first — for jumping to a turn the transcript
 /// hasn't scrolled back to yet.
-pub fn app_thread_turn_items(
+pub async fn app_thread_turn_items(
     service_key: String,
     thread_id: String,
     turn_id: String,
 ) -> Result<Vec<ThreadItemDto>> {
-    Ok(engine(&service_key)
-        .thread_turn_items(&service_key, &thread_id, &turn_id)?
-        .into_iter()
-        .map(item_dto)
-        .collect())
+    execution::run(Lane::Read, move || {
+        Ok(engine(&service_key)
+            .thread_turn_items(&service_key, &thread_id, &turn_id)?
+            .into_iter()
+            .map(item_dto)
+            .collect())
+    })
+    .await
 }
 
 /// The latest server-reported runtime config for a thread (from its
@@ -531,24 +578,28 @@ pub fn app_thread_runtime_config(
 
 /// Read the account rate-limit / quota snapshot as raw JSON (5h + weekly
 /// windows). Parsed on the Dart side since the shape is nested and volatile.
-pub fn app_rate_limits(service_key: String) -> Result<String> {
-    if session_engine::protocol_of(&service_key) == session_engine::Protocol::Acp {
-        return crate::engine::acp::rate_limits(&service_key);
-    }
-    require_native(&service_key, "rate limits")?;
-    app_session::rate_limits(&service_key)
+pub async fn app_rate_limits(service_key: String) -> Result<String> {
+    execution::run(Lane::Read, move || {
+        if session_engine::protocol_of(&service_key) == session_engine::Protocol::Acp {
+            return crate::engine::acp::rate_limits(&service_key);
+        }
+        require_native(&service_key, "rate limits")?;
+        app_session::rate_limits(&service_key)
+    })
+    .await
 }
 
 /// Unified diff of the repo at `cwd` vs its remote default branch. Empty when
 /// the cwd isn't a git repo or there are no changes.
-pub fn app_git_diff(service_key: String, cwd: String) -> Result<String> {
-    engine(&service_key).git_diff(&service_key, &cwd)
+pub async fn app_git_diff(service_key: String, cwd: String) -> Result<String> {
+    execution::run(Lane::Read, move || engine(&service_key).git_diff(&service_key, &cwd)).await
 }
 
 /// Start a manual conversation compaction; the server emits `thread/compacted`
 /// when done.
-pub fn app_compact(service_key: String, thread_id: String) -> Result<()> {
-    engine(&service_key).compact(&service_key, &thread_id)
+pub async fn app_compact(service_key: String, thread_id: String) -> Result<()> {
+    execution::run(Lane::Control, move || engine(&service_key).compact(&service_key, &thread_id))
+        .await
 }
 
 /// A one-line gist of where a thread got to (the opening sentence of its most
@@ -559,22 +610,24 @@ pub fn app_compact(service_key: String, thread_id: String) -> Result<()> {
 /// so the UI fetches these lazily for the rows it actually shows instead of
 /// paying for every conversation up front.
 pub async fn app_thread_summary(service_key: String, thread_id: String) -> Result<Option<String>> {
-    // Engines without a summary source answer `None` without any I/O.
-    if !matches!(session_engine::protocol_of(&service_key), Protocol::CodexAppServer) {
-        return engine(&service_key).thread_summary(&service_key, &thread_id);
-    }
-    // Summary RPCs must not occupy the CPU-sized FRB pool, even on one-core
-    // devices. The UI separately bounds how many background requests run.
-    runtime::runtime()
-        .spawn_blocking(move || engine(&service_key).thread_summary(&service_key, &thread_id))
-        .await?
+    execution::run(Lane::Background, move || {
+        engine(&service_key).thread_summary(&service_key, &thread_id)
+    })
+    .await
 }
 
 /// Rename a conversation. The title is persisted by the app-server (so it
 /// follows the thread across devices); an empty `name` clears it, and the UI
 /// falls back to the thread preview.
-pub fn app_set_thread_name(service_key: String, thread_id: String, name: String) -> Result<()> {
-    engine(&service_key).set_thread_name(&service_key, &thread_id, &name)
+pub async fn app_set_thread_name(
+    service_key: String,
+    thread_id: String,
+    name: String,
+) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).set_thread_name(&service_key, &thread_id, &name)
+    })
+    .await
 }
 
 /// Send a user message (text and/or attached images), starting a model turn.
@@ -592,7 +645,7 @@ pub fn app_set_thread_name(service_key: String, thread_id: String, name: String)
 /// sending view knows the message as its own. The reply streams via
 /// [`app_events`]; this returns once the turn is accepted.
 #[allow(clippy::too_many_arguments)]
-pub fn app_turn_start(
+pub async fn app_turn_start(
     service_key: String,
     thread_id: String,
     text: String,
@@ -606,59 +659,77 @@ pub fn app_turn_start(
     reasoning_effort: Option<String>,
     client_id: Option<String>,
 ) -> Result<()> {
-    engine(&service_key).turn_start(&service_key, &thread_id, TurnOptions {
-        text,
-        client_id,
-        images,
-        model,
-        approval_policy,
-        approvals_reviewer,
-        service_tier,
-        sandbox,
-        collaboration_mode,
-        reasoning_effort,
+    execution::run(Lane::Control, move || {
+        engine(&service_key).turn_start(&service_key, &thread_id, TurnOptions {
+            text,
+            client_id,
+            images,
+            model,
+            approval_policy,
+            approvals_reviewer,
+            service_tier,
+            sandbox,
+            collaboration_mode,
+            reasoning_effort,
+        })
     })
+    .await
 }
 
 /// Interrupt the running turn. `turn_id` (from the latest `turn/started`) is
 /// required by the server; pass null only if unknown.
-pub fn app_turn_interrupt(
+pub async fn app_turn_interrupt(
     service_key: String,
     thread_id: String,
     turn_id: Option<String>,
 ) -> Result<()> {
-    engine(&service_key).turn_interrupt(&service_key, &thread_id, turn_id)
+    execution::run(Lane::Control, move || {
+        engine(&service_key).turn_interrupt(&service_key, &thread_id, turn_id)
+    })
+    .await
 }
 
 /// Load a display-only persisted history without contacting a host.
-pub fn app_history_cached(
+pub async fn app_history_cached(
     service_key: String,
     thread_id: String,
 ) -> Result<Option<ThreadHistoryDto>> {
-    Ok(crate::engine::session_sync::cached_history(&service_key, &thread_id)?.map(history_dto))
+    execution::run(Lane::Read, move || {
+        Ok(crate::engine::session_sync::cached_history(&service_key, &thread_id)?.map(history_dto))
+    })
+    .await
 }
 
 /// Negotiate the independent meta history protocol before remote reads.
-pub fn app_history_sync_prepare(service_key: String) -> Result<bool> {
-    // The meta history protocol reads Codex rollouts; ACP history is the
-    // host's retained window.
-    if session_engine::protocol_of(&service_key) != Protocol::CodexAppServer {
-        return Ok(false);
-    }
-    crate::engine::session_sync::prepare(&service_key)
+pub async fn app_history_sync_prepare(service_key: String) -> Result<bool> {
+    execution::run(Lane::Read, move || {
+        // The meta history protocol reads Codex rollouts; ACP history is the
+        // host's retained window.
+        if session_engine::protocol_of(&service_key) != Protocol::CodexAppServer {
+            return Ok(false);
+        }
+        crate::engine::session_sync::prepare(&service_key)
+    })
+    .await
 }
 
 /// Prefetch only a bounded running-session tail without resuming it.
-pub fn app_history_prefetch(service_key: String, thread_id: String) -> Result<()> {
-    if session_engine::protocol_of(&service_key) != Protocol::CodexAppServer {
-        return Ok(());
-    }
-    crate::engine::session_sync::prefetch(&service_key, &thread_id)
+pub async fn app_history_prefetch(service_key: String, thread_id: String) -> Result<()> {
+    execution::run(Lane::Background, move || {
+        if session_engine::protocol_of(&service_key) != Protocol::CodexAppServer {
+            return Ok(());
+        }
+        crate::engine::session_sync::prefetch(&service_key, &thread_id)
+    })
+    .await
 }
 
 /// Prioritize the current reader over background prefetch in the disk cache.
-pub fn app_history_focus(service_key: String, thread_id: Option<String>) -> Result<()> {
-    crate::engine::session_cache::set_focus(&service_key, thread_id.as_deref())
+pub async fn app_history_focus(service_key: String, thread_id: Option<String>) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        crate::engine::session_cache::set_focus(&service_key, thread_id.as_deref())
+    })
+    .await
 }
 
 /// Controller-wide persistent cache capacity and actual disk usage.
@@ -670,15 +741,73 @@ pub struct HistoryCacheStatusDto {
 }
 
 /// Inspect and enforce the shared disk quota without contacting any host.
-pub fn history_cache_status() -> Result<HistoryCacheStatusDto> {
-    let cfg = config::load_config(&runtime::support_dir()?)?;
-    Ok(HistoryCacheStatusDto {
-        limit_mb: cfg.history_cache.disk_limit_mb,
-        used_bytes: crate::engine::session_cache::application_cache()?.usage()?,
+pub async fn history_cache_status() -> Result<HistoryCacheStatusDto> {
+    execution::run(Lane::Read, move || {
+        let cfg = config::load_config(&runtime::support_dir()?)?;
+        Ok(HistoryCacheStatusDto {
+            limit_mb: cfg.history_cache.disk_limit_mb,
+            used_bytes: crate::engine::session_cache::application_cache()?.usage()?,
+        })
     })
+    .await
 }
 
 /// Set the shared cache quota, immediately evicting cold disposable windows.
-pub fn history_cache_set_limit(limit_mb: u32) -> Result<()> {
-    crate::engine::session_cache::set_limit(&runtime::support_dir()?, limit_mb)
+pub async fn history_cache_set_limit(limit_mb: u32) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        crate::engine::session_cache::set_limit(&runtime::support_dir()?, limit_mb)
+    })
+    .await
+}
+
+/// Compare an explicit retry with the latest recorded user input in Rust.
+/// A non-match is not proof that a lost send never committed; only the user's
+/// explicit retry may act on it. Read failures remain errors, never `false`.
+pub async fn app_turn_committed(
+    service_key: String,
+    thread_id: String,
+    text: String,
+    images: Vec<String>,
+) -> Result<bool> {
+    execution::run(Lane::Read, move || {
+        let history = engine(&service_key).thread_read(&service_key, &thread_id, false)?;
+        Ok(latest_input_matches(&history.items, &text, &images))
+    })
+    .await
+}
+
+fn latest_input_matches(items: &[app_session::ThreadItem], text: &str, images: &[String]) -> bool {
+    let space = |c: char| c.is_whitespace() || c == '\u{feff}';
+    items
+        .iter()
+        .rev()
+        .find(|item| item.item_type == "userMessage")
+        .is_some_and(|item| {
+            item.text.trim_matches(space) == text.trim_matches(space) && item.images == images
+        })
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+    #[test]
+    fn retry_compares_the_latest_user_input_and_exact_image_identity() {
+        let mut item = app_session::ThreadItem {
+            id: "user".into(),
+            item_type: "userMessage".into(),
+            title: String::new(),
+            text: " \u{feff} photo ".into(),
+            images: vec!["data:first".into()],
+            questions_json: None,
+            turn_id: String::new(),
+            turn_completed_at: None,
+            turn_duration_ms: None,
+        };
+        assert!(latest_input_matches(&[item.clone()], "photo", &["data:first".into()]));
+        assert!(!latest_input_matches(&[item.clone()], "photo", &["data:other".into()]));
+        let first = item.clone();
+        item.text = "later".into();
+        assert!(!latest_input_matches(&[first, item], "photo", &["data:first".into()]));
+        assert!(!latest_input_matches(&[], "photo", &[]));
+    }
 }

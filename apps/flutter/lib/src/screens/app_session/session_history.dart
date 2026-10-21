@@ -110,30 +110,22 @@ extension _SessionHistory on _AppSessionState {
     return _cachedRows = rows;
   }
 
-  void _replaceTranscriptItems(List<ThreadItem> items, {String? activeTurnId}) {
-    _items.clear();
-    _itemIndex.clear();
-    _asyncQuestions.clear();
+  List<TranscriptItem> _historyItems(
+    List<ThreadItem> items,
+    String? activeTurnId,
+  ) {
+    final result = <TranscriptItem>[];
     for (final item in items) {
-      final questions = AsyncQuestionPrompt.parse(item.id, item.questionsJson);
-      if (questions != null &&
-          !_answeredAsyncQuestions.contains('$_threadId:${item.id}')) {
-        _asyncQuestions[item.id] = questions;
+      if (item.itemType == 'userMessage') {
+        if (isContextFragment(item.text)) continue;
+        if (result.isNotEmpty &&
+            result.last.isUser &&
+            result.last.text.trim() == item.text.trim() &&
+            listEquals(result.last.imageUrls, item.images)) {
+          continue;
+        }
       }
-      // Defensively collapse a back-to-back duplicate user message. A genuine
-      // re-ask has the model's reply in between, so it remains distinct.
-      if (item.itemType == 'userMessage' &&
-          _items.isNotEmpty &&
-          _items.last.type == 'userMessage' &&
-          _items.last.text.trim() == item.text.trim() &&
-          listEquals(_items.last.imageUrls, item.images)) {
-        continue;
-      }
-      if (item.itemType == 'userMessage' && isContextFragment(item.text)) {
-        continue;
-      }
-      _itemIndex[item.id] = _items.length;
-      _items.add(
+      result.add(
         _transcriptItemOf(
           item,
           activeTurnId,
@@ -143,6 +135,32 @@ extension _SessionHistory on _AppSessionState {
         ),
       );
     }
+    return result;
+  }
+
+  void _restoreHistoryQuestions(List<ThreadItem> items) {
+    _asyncQuestions.clear();
+    for (final item in items) {
+      final questions = AsyncQuestionPrompt.parse(item.id, item.questionsJson);
+      if (questions != null &&
+          !_answeredAsyncQuestions.contains('$_threadId:${item.id}')) {
+        _asyncQuestions[item.id] = questions;
+      }
+    }
+  }
+
+  void _installHistory(List<TranscriptItem> items) {
+    _items
+      ..clear()
+      ..addAll(items);
+    _rebuildItemIndex();
+    _dropHostedStops();
+    _cachedRows = null;
+  }
+
+  void _replaceTranscriptItems(List<ThreadItem> items, {String? activeTurnId}) {
+    _restoreHistoryQuestions(items);
+    _installHistory(_historyItems(items, activeTurnId));
   }
 
   /// [item] as the transcript shows it. It streams while it is a compaction
@@ -157,6 +175,7 @@ extension _SessionHistory on _AppSessionState {
     type: item.itemType,
     title: item.title,
     text: item.text,
+    diff: item.diff,
     images: resolveImageUrls(item.images),
     imageUrls: item.images,
     streaming: compacting || _generatingImage(item, activeTurnId),
@@ -174,37 +193,63 @@ extension _SessionHistory on _AppSessionState {
       item.turnCompletedAt == null &&
       imageGenerationInProgress(item.text);
 
-  void _mergeHistoryLiveItems(
-    Map<String, TranscriptItem> liveItems,
-    Set<String> partialItems,
-  ) {
-    for (final item in liveItems.values) {
-      final index = _itemIndex[item.id];
-      if (index == null || partialItems.contains(item.id)) continue;
-      final snapshot = _items[index];
-      if (item.turnId.isEmpty) item.turnId = snapshot.turnId;
-      item.turnCompletedAt ??= snapshot.turnCompletedAt;
-      item.turnDurationMs ??= snapshot.turnDurationMs;
-      _items[index] = item;
-    }
-    // A bounded tail may omit earlier live work. Shared IDs anchor that work
-    // before its reply instead of appending it after (and folding the reply).
-    final merged = mergeHistoryItems(
-      _items,
-      liveItems.values.toList(),
-      turnOrder: _turnSummaries.map((turn) => turn.turnId),
-      olderPage: false,
-    );
-    _items
-      ..clear()
-      ..addAll(
-        merged.where(
-          (item) => item.type != 'contentOmitted' || item.text.isNotEmpty,
-        ),
+  /// Text-only deltas mutate the same objects and need no reorder. A new row,
+  /// replacement or newly assigned turn invalidates an in-flight native merge.
+  List<(TranscriptItem, String)> _historyShape(
+    Iterable<TranscriptItem> items,
+  ) => [for (final item in items) (item, item.turnId)];
+
+  Future<List<TranscriptItem>?> _projectHistory(
+    ThreadHistory history,
+    Map<String, TranscriptItem> live,
+    Set<String> partial,
+    bool Function() current,
+  ) async {
+    final api = ref.read(bridgeApiProvider);
+    var base = _historyItems(history.items, history.activeTurnId);
+    final order = history.turns.map((turn) => turn.turnId).toList();
+    for (final page in history.turnPages) {
+      base = await mergeHistoryItems(
+        api,
+        base,
+        _historyItems(page.items, history.activeTurnId),
+        turnOrder: order,
+        olderPage: true,
       );
-    _rebuildItemIndex();
-    _dropHostedStops();
-    _cachedRows = null;
+      if (!current()) return null;
+    }
+    while (current()) {
+      final overlay = live.values.toList();
+      final incomplete = Set.of(partial);
+      final byId = {for (final item in base) item.id: item};
+      for (final item in overlay) {
+        final snapshot = byId[item.id];
+        if (snapshot == null || incomplete.contains(item.id)) continue;
+        if (item.turnId.isEmpty) item.turnId = snapshot.turnId;
+        item.turnCompletedAt ??= snapshot.turnCompletedAt;
+        item.turnDurationMs ??= snapshot.turnDurationMs;
+        byId[item.id] = item;
+      }
+      final shape = _historyShape(overlay);
+      final merged = await mergeHistoryItems(
+        api,
+        [for (final item in base) byId[item.id]!],
+        overlay,
+        turnOrder: order,
+        olderPage: false,
+      );
+      if (!current()) return null;
+      if (!listEquals(shape, _historyShape(live.values)) ||
+          !setEquals(incomplete, partial)) {
+        continue;
+      }
+      return merged
+          .where(
+            (item) => item.type != 'contentOmitted' || item.text.isNotEmpty,
+          )
+          .toList();
+    }
+    return null;
   }
 
   /// Drop optimistic user messages (`local-user-*`) that [items], read from
@@ -243,40 +288,54 @@ extension _SessionHistory on _AppSessionState {
     _cachedRows = null;
   }
 
-  /// Splice [items] into the transcript by turn order, skipping ids already
-  /// present, and rebuild the id→index map.
-  ///
-  /// Both sequential pages and jumped-to turns use the skeleton's order.
-  void _spliceTranscriptItems(
+  /// Resolve a page against the latest live identities without copying bodies
+  /// to Rust. Re-run only when ordering changed during the worker's await.
+  Future<List<TranscriptItem>?> _projectSplice(
     List<ThreadItem> items, {
     required bool atStart,
+    required bool Function() current,
     String? activeTurnId,
-  }) {
-    final known = _items.map((i) => i.id).toSet();
-    final fresh = <TranscriptItem>[];
-    for (final item in items) {
-      if (item.id.isEmpty) continue;
-      if (item.itemType == 'userMessage' && isContextFragment(item.text)) {
-        continue;
+    List<String>? turnOrder,
+    bool replace = false,
+    bool refresh = false,
+  }) async {
+    final api = ref.read(bridgeApiProvider);
+    while (current()) {
+      final shape = _historyShape(_items);
+      final existing = replace ? <TranscriptItem>[] : List.of(_items);
+      final byId = {for (final item in existing) item.id: item};
+      final fresh = _historyItems(
+        items,
+        activeTurnId,
+      ).where((item) => item.id.isNotEmpty).toList();
+      if (refresh) {
+        final refreshed = {for (final item in fresh) item.id: item};
+        for (var i = 0; i < existing.length; i++) {
+          final old = existing[i];
+          final next = refreshed[old.id];
+          if (next != null) {
+            next
+              ..held = old.held
+              ..model = old.model
+              ..effortWire = old.effortWire
+              ..modelConfirmed = old.modelConfirmed
+              ..modelRerouted = old.modelRerouted;
+            existing[i] = next;
+          }
+        }
       }
-      if (known.contains(item.id)) {
-        fresh.add(_items[_itemIndex[item.id]!]);
-        continue;
-      }
-      fresh.add(_transcriptItemOf(item, activeTurnId));
+      final merged = await mergeHistoryItems(
+        api,
+        existing,
+        [for (final item in fresh) refresh ? item : byId[item.id] ?? item],
+        turnOrder: turnOrder ?? _turnSummaries.map((turn) => turn.turnId),
+        olderPage: atStart,
+      );
+      if (!current()) return null;
+      if (!listEquals(shape, _historyShape(_items))) continue;
+      return merged;
     }
-    if (fresh.isEmpty) return;
-    final merged = mergeHistoryItems(
-      _items,
-      fresh,
-      turnOrder: _turnSummaries.map((t) => t.turnId),
-      olderPage: atStart,
-    );
-    _items
-      ..clear()
-      ..addAll(merged);
-    _rebuildItemIndex();
-    _dropHostedStops();
+    return null;
   }
 
   /// Fetch the page of history before what's shown, keeping the reading
@@ -440,11 +499,17 @@ extension _SessionHistory on _AppSessionState {
           hasMore: turn.hasMore,
         );
       }
+      final projected = await _projectSplice(
+        items,
+        atStart: !(turn != null && loadMore),
+        current: current,
+      );
+      if (projected == null || !current()) return;
       final anchor = _captureHistoryAnchor();
       _updateState(() {
         // A continuation is the later part of a turn already showing its
         // start; everything else reads backwards.
-        _spliceTranscriptItems(items, atStart: !(turn != null && loadMore));
+        _installHistory(projected);
         if (turnId == null) {
           _hasOlder = older!.hasOlder;
           _sequentialHistoryIds.addAll(items.map((item) => item.id));

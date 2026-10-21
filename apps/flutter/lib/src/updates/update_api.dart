@@ -114,8 +114,8 @@ abstract interface class UpdateApi {
 
   /// Reports a failure of the app's own part (`quit`, `permission`,
   /// `install`).
-  void updateReport(String kind, String detail);
+  Future<void> updateReport(String kind, String detail);
 
   /// Remembers that the user was told about [version].
-  void updateAnnounce(String version);
+  Future<void> updateAnnounce(String version);
 }

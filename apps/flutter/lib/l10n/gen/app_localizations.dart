@@ -7690,6 +7690,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide proxy URL'**
   String get networkProxyHide;
+
+  /// No description provided for @logsDiskLost.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} disk log drops or write failures.'**
+  String logsDiskLost(int count);
 }
 
 class _AppLocalizationsDelegate

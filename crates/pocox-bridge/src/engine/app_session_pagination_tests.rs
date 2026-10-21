@@ -386,8 +386,11 @@ fn public_resume_rejects_guardian_and_unknown_metadata_before_mutating_the_threa
         );
         let session = TestSession::new(client);
         record_runtime_config(&session.0, "reviewer", &json!({"model":"unchanged"}));
-        let error = crate::api::bridge::app_thread_resume(session.0.clone(), "reviewer".into())
-            .expect_err("read-only boundary");
+        let error = futures::executor::block_on(crate::api::bridge::app_thread_resume(
+            session.0.clone(),
+            "reviewer".into(),
+        ))
+        .expect_err("read-only boundary");
         assert!(error.to_string().contains(expected), "{error:#}");
         assert_eq!(
             thread_runtime_config(&session.0, "reviewer")

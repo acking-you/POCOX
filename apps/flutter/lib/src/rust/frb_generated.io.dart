@@ -5,12 +5,16 @@
 
 import 'api/bridge.dart';
 import 'api/bridge/agent_tools.dart';
+import 'api/bridge/attachments.dart';
 import 'api/bridge/codex_setup.dart';
+import 'api/bridge/composer.dart';
 import 'api/bridge/connection.dart';
 import 'api/bridge/device_management.dart';
 import 'api/bridge/device_metadata.dart';
+import 'api/bridge/diff.dart';
 import 'api/bridge/events.dart';
 import 'api/bridge/grok.dart';
+import 'api/bridge/history_projection.dart';
 import 'api/bridge/host_config.dart';
 import 'api/bridge/host_sessions.dart';
 import 'api/bridge/hosted_account.dart';
@@ -37,8 +41,46 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     required super.portManager,
   });
 
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_ComposerControllerPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr;
+
+  CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_PreparedFilePtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr;
+
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw);
+
+  @protected
+  ComposerController
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    dynamic raw,
+  );
+
+  @protected
+  PreparedFile
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    dynamic raw,
+  );
+
+  @protected
+  ComposerController
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    dynamic raw,
+  );
+
+  @protected
+  ComposerController
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    dynamic raw,
+  );
+
+  @protected
+  PreparedFile
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    dynamic raw,
+  );
 
   @protected
   RustStreamSink<AppEventDto> dco_decode_StreamSink_app_event_dto_Sse(
@@ -67,6 +109,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   RustStreamSink<ToolsUpdateDto> dco_decode_StreamSink_tools_update_dto_Sse(
     dynamic raw,
   );
+
+  @protected
+  RustStreamSink<int> dco_decode_StreamSink_u_32_Sse(dynamic raw);
 
   @protected
   RustStreamSink<UpdateStateDto> dco_decode_StreamSink_update_state_dto_Sse(
@@ -149,6 +194,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DeviceMetadataDto dco_decode_box_autoadd_device_metadata_dto(dynamic raw);
 
   @protected
+  DiffDto dco_decode_box_autoadd_diff_dto(dynamic raw);
+
+  @protected
   HostActiveDto dco_decode_box_autoadd_host_active_dto(dynamic raw);
 
   @protected
@@ -213,6 +261,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   CodexSetupStatusDto dco_decode_codex_setup_status_dto(dynamic raw);
 
   @protected
+  ComposerAction dco_decode_composer_action(dynamic raw);
+
+  @protected
+  ComposerViewDto dco_decode_composer_view_dto(dynamic raw);
+
+  @protected
   ConfigView dco_decode_config_view(dynamic raw);
 
   @protected
@@ -223,6 +277,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DeviceMetadataDto dco_decode_device_metadata_dto(dynamic raw);
+
+  @protected
+  DiffDto dco_decode_diff_dto(dynamic raw);
+
+  @protected
+  DiffFileDto dco_decode_diff_file_dto(dynamic raw);
+
+  @protected
+  DiffLineDto dco_decode_diff_line_dto(dynamic raw);
 
   @protected
   DirEntryDto dco_decode_dir_entry_dto(dynamic raw);
@@ -276,6 +339,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   HostStartedDto dco_decode_host_started_dto(dynamic raw);
 
   @protected
+  int dco_decode_i_32(dynamic raw);
+
+  @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
@@ -295,6 +361,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ClaudeVariableDto> dco_decode_list_claude_variable_dto(dynamic raw);
+
+  @protected
+  List<DiffFileDto> dco_decode_list_diff_file_dto(dynamic raw);
+
+  @protected
+  List<DiffLineDto> dco_decode_list_diff_line_dto(dynamic raw);
 
   @protected
   List<DirEntryDto> dco_decode_list_dir_entry_dto(dynamic raw);
@@ -319,6 +391,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<LocalSessionDto> dco_decode_list_local_session_dto(dynamic raw);
 
   @protected
+  List<LogLineDto> dco_decode_list_log_line_dto(dynamic raw);
+
+  @protected
   List<ManagedHostDto> dco_decode_list_managed_host_dto(dynamic raw);
 
   @protected
@@ -335,10 +410,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint16List dco_decode_list_prim_u_16_strict(dynamic raw);
 
   @protected
+  Uint32List dco_decode_list_prim_u_32_strict(dynamic raw);
+
+  @protected
   List<int> dco_decode_list_prim_u_8_loose(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  List<QueuedCommandDto> dco_decode_list_queued_command_dto(dynamic raw);
+
+  @protected
+  List<ReviewEditInputDto> dco_decode_list_review_edit_input_dto(dynamic raw);
+
+  @protected
+  List<ReviewFileDto> dco_decode_list_review_file_dto(dynamic raw);
+
+  @protected
+  List<ReviewFileInputDto> dco_decode_list_review_file_input_dto(dynamic raw);
+
+  @protected
+  List<ReviewSectionDto> dco_decode_list_review_section_dto(dynamic raw);
 
   @protected
   List<ServiceIdDto> dco_decode_list_service_id_dto(dynamic raw);
@@ -405,6 +498,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LogLineDto dco_decode_log_line_dto(dynamic raw);
 
   @protected
+  LogViewDto dco_decode_log_view_dto(dynamic raw);
+
+  @protected
   ManagedDeviceDto dco_decode_managed_device_dto(dynamic raw);
 
   @protected
@@ -468,6 +564,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DiffDto? dco_decode_opt_box_autoadd_diff_dto(dynamic raw);
+
+  @protected
   HostActiveDto? dco_decode_opt_box_autoadd_host_active_dto(dynamic raw);
 
   @protected
@@ -517,13 +616,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  PreparedImageDto dco_decode_prepared_image_dto(dynamic raw);
+
+  @protected
   ProjectConfigDto dco_decode_project_config_dto(dynamic raw);
 
   @protected
   ProjectSettingsDto dco_decode_project_settings_dto(dynamic raw);
 
   @protected
+  QueuedCommandDto dco_decode_queued_command_dto(dynamic raw);
+
+  @protected
   RetryProgressDto dco_decode_retry_progress_dto(dynamic raw);
+
+  @protected
+  ReviewEditInputDto dco_decode_review_edit_input_dto(dynamic raw);
+
+  @protected
+  ReviewFileDto dco_decode_review_file_dto(dynamic raw);
+
+  @protected
+  ReviewFileInputDto dco_decode_review_file_input_dto(dynamic raw);
+
+  @protected
+  ReviewIndexDto dco_decode_review_index_dto(dynamic raw);
+
+  @protected
+  ReviewSectionDto dco_decode_review_section_dto(dynamic raw);
 
   @protected
   ServiceIdDto dco_decode_service_id_dto(dynamic raw);
@@ -631,10 +754,43 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   UpdateStateDto dco_decode_update_state_dto(dynamic raw);
 
   @protected
+  BigInt dco_decode_usize(dynamic raw);
+
+  @protected
   WebLoginStartDto dco_decode_web_login_start_dto(dynamic raw);
 
   @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
+
+  @protected
+  ComposerController
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PreparedFile
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ComposerController
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ComposerController
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PreparedFile
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RustStreamSink<AppEventDto> sse_decode_StreamSink_app_event_dto_Sse(
@@ -665,6 +821,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<ToolsUpdateDto> sse_decode_StreamSink_tools_update_dto_Sse(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RustStreamSink<int> sse_decode_StreamSink_u_32_Sse(
     SseDeserializer deserializer,
   );
 
@@ -773,6 +934,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DiffDto sse_decode_box_autoadd_diff_dto(SseDeserializer deserializer);
+
+  @protected
   HostActiveDto sse_decode_box_autoadd_host_active_dto(
     SseDeserializer deserializer,
   );
@@ -865,6 +1029,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ComposerAction sse_decode_composer_action(SseDeserializer deserializer);
+
+  @protected
+  ComposerViewDto sse_decode_composer_view_dto(SseDeserializer deserializer);
+
+  @protected
   ConfigView sse_decode_config_view(SseDeserializer deserializer);
 
   @protected
@@ -879,6 +1049,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DeviceMetadataDto sse_decode_device_metadata_dto(
     SseDeserializer deserializer,
   );
+
+  @protected
+  DiffDto sse_decode_diff_dto(SseDeserializer deserializer);
+
+  @protected
+  DiffFileDto sse_decode_diff_file_dto(SseDeserializer deserializer);
+
+  @protected
+  DiffLineDto sse_decode_diff_line_dto(SseDeserializer deserializer);
 
   @protected
   DirEntryDto sse_decode_dir_entry_dto(SseDeserializer deserializer);
@@ -944,6 +1123,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   HostStartedDto sse_decode_host_started_dto(SseDeserializer deserializer);
 
   @protected
+  int sse_decode_i_32(SseDeserializer deserializer);
+
+  @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
@@ -975,6 +1157,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<DiffFileDto> sse_decode_list_diff_file_dto(SseDeserializer deserializer);
+
+  @protected
+  List<DiffLineDto> sse_decode_list_diff_line_dto(SseDeserializer deserializer);
+
+  @protected
   List<DirEntryDto> sse_decode_list_dir_entry_dto(SseDeserializer deserializer);
 
   @protected
@@ -1001,6 +1189,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<LogLineDto> sse_decode_list_log_line_dto(SseDeserializer deserializer);
+
+  @protected
   List<ManagedHostDto> sse_decode_list_managed_host_dto(
     SseDeserializer deserializer,
   );
@@ -1023,10 +1214,38 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint16List sse_decode_list_prim_u_16_strict(SseDeserializer deserializer);
 
   @protected
+  Uint32List sse_decode_list_prim_u_32_strict(SseDeserializer deserializer);
+
+  @protected
   List<int> sse_decode_list_prim_u_8_loose(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  List<QueuedCommandDto> sse_decode_list_queued_command_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewEditInputDto> sse_decode_list_review_edit_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewFileDto> sse_decode_list_review_file_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewFileInputDto> sse_decode_list_review_file_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<ReviewSectionDto> sse_decode_list_review_section_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   List<ServiceIdDto> sse_decode_list_service_id_dto(
@@ -1123,6 +1342,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   LogLineDto sse_decode_log_line_dto(SseDeserializer deserializer);
 
   @protected
+  LogViewDto sse_decode_log_view_dto(SseDeserializer deserializer);
+
+  @protected
   ManagedDeviceDto sse_decode_managed_device_dto(SseDeserializer deserializer);
 
   @protected
@@ -1206,6 +1428,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  DiffDto? sse_decode_opt_box_autoadd_diff_dto(SseDeserializer deserializer);
+
+  @protected
   HostActiveDto? sse_decode_opt_box_autoadd_host_active_dto(
     SseDeserializer deserializer,
   );
@@ -1261,6 +1486,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  PreparedImageDto sse_decode_prepared_image_dto(SseDeserializer deserializer);
+
+  @protected
   ProjectConfigDto sse_decode_project_config_dto(SseDeserializer deserializer);
 
   @protected
@@ -1269,7 +1500,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  QueuedCommandDto sse_decode_queued_command_dto(SseDeserializer deserializer);
+
+  @protected
   RetryProgressDto sse_decode_retry_progress_dto(SseDeserializer deserializer);
+
+  @protected
+  ReviewEditInputDto sse_decode_review_edit_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReviewFileDto sse_decode_review_file_dto(SseDeserializer deserializer);
+
+  @protected
+  ReviewFileInputDto sse_decode_review_file_input_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ReviewIndexDto sse_decode_review_index_dto(SseDeserializer deserializer);
+
+  @protected
+  ReviewSectionDto sse_decode_review_section_dto(SseDeserializer deserializer);
 
   @protected
   ServiceIdDto sse_decode_service_id_dto(SseDeserializer deserializer);
@@ -1393,14 +1646,49 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   UpdateStateDto sse_decode_update_state_dto(SseDeserializer deserializer);
 
   @protected
-  WebLoginStartDto sse_decode_web_login_start_dto(SseDeserializer deserializer);
+  BigInt sse_decode_usize(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_i_32(SseDeserializer deserializer);
+  WebLoginStartDto sse_decode_web_login_start_dto(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(
     AnyhowException self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    ComposerController self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    PreparedFile self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    ComposerController self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    ComposerController self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    PreparedFile self,
     SseSerializer serializer,
   );
 
@@ -1437,6 +1725,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_tools_update_dto_Sse(
     RustStreamSink<ToolsUpdateDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_u_32_Sse(
+    RustStreamSink<int> self,
     SseSerializer serializer,
   );
 
@@ -1576,6 +1870,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_diff_dto(DiffDto self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_host_active_dto(
     HostActiveDto self,
     SseSerializer serializer,
@@ -1687,6 +1984,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_composer_action(
+    ComposerAction self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_composer_view_dto(
+    ComposerViewDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_config_view(ConfigView self, SseSerializer serializer);
 
   @protected
@@ -1703,6 +2012,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     DeviceMetadataDto self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_diff_dto(DiffDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_diff_file_dto(DiffFileDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_diff_line_dto(DiffLineDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_dir_entry_dto(DirEntryDto self, SseSerializer serializer);
@@ -1789,6 +2107,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_i_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
@@ -1821,6 +2142,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_claude_variable_dto(
     List<ClaudeVariableDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_diff_file_dto(
+    List<DiffFileDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_diff_line_dto(
+    List<DiffLineDto> self,
     SseSerializer serializer,
   );
 
@@ -1861,6 +2194,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_log_line_dto(
+    List<LogLineDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_managed_host_dto(
     List<ManagedHostDto> self,
     SseSerializer serializer,
@@ -1891,11 +2230,47 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_prim_u_32_strict(
+    Uint32List self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_loose(List<int> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_queued_command_dto(
+    List<QueuedCommandDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_review_edit_input_dto(
+    List<ReviewEditInputDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_review_file_dto(
+    List<ReviewFileDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_review_file_input_dto(
+    List<ReviewFileInputDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_review_section_dto(
+    List<ReviewSectionDto> self,
     SseSerializer serializer,
   );
 
@@ -2017,6 +2392,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_log_line_dto(LogLineDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_log_view_dto(LogViewDto self, SseSerializer serializer);
+
+  @protected
   void sse_encode_managed_device_dto(
     ManagedDeviceDto self,
     SseSerializer serializer,
@@ -2119,6 +2497,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_diff_dto(
+    DiffDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_host_active_dto(
     HostActiveDto? self,
     SseSerializer serializer,
@@ -2185,6 +2569,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_prim_u_8_strict(
+    Uint8List? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_prepared_image_dto(
+    PreparedImageDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_project_config_dto(
     ProjectConfigDto self,
     SseSerializer serializer,
@@ -2197,8 +2593,41 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_queued_command_dto(
+    QueuedCommandDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_retry_progress_dto(
     RetryProgressDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_review_edit_input_dto(
+    ReviewEditInputDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_review_file_dto(ReviewFileDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_review_file_input_dto(
+    ReviewFileInputDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_review_index_dto(
+    ReviewIndexDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_review_section_dto(
+    ReviewSectionDto self,
     SseSerializer serializer,
   );
 
@@ -2371,13 +2800,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_usize(BigInt self, SseSerializer serializer);
+
+  @protected
   void sse_encode_web_login_start_dto(
     WebLoginStartDto self,
     SseSerializer serializer,
   );
-
-  @protected
-  void sse_encode_i_32(int self, SseSerializer serializer);
 }
 
 // Section: wire_class
@@ -2393,4 +2822,72 @@ class RustLibWire implements BaseWire {
   /// The symbols are looked up in [dynamicLibrary].
   RustLibWire(ffi.DynamicLibrary dynamicLibrary)
     : _lookup = dynamicLibrary.lookup;
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 }

@@ -4,25 +4,31 @@ part of '../app_session_screen.dart';
 // Hosts have separate stores; new conversations are also scoped by project.
 final _composerDraftsProvider =
     ChangeNotifierProvider.family<_ComposerDrafts, String>(
-      (ref, service) => _ComposerDrafts(),
+      (ref, service) => _ComposerDrafts(ref.read(bridgeApiProvider)),
     );
 
 class _ComposerDraft {
-  _ComposerDraft(this.threadId, this.project);
+  _ComposerDraft(this.threadId, this.project, this.control)
+    : queue = _DraftQueue(control);
+
+  final ComposerControl control;
 
   String? threadId;
   String? project;
-  bool sendPending = false;
+  bool get sendPending => control.state.sendToken != null;
 
   /// The head of [queue] was refused; the queue sends nothing more until the
   /// user retries or sends another message.
-  bool queuePaused = false;
+  bool get queuePaused => control.state.paused;
+  set queuePaused(bool value) =>
+      control.apply(value ? ComposerAction.pause : ComposerAction.resume);
 
   /// Revision of what may still enter this draft asynchronously (see
   /// [AttachmentTicket]): it moves when the draft's view stops being an
   /// editable view of the same host — it turned read-only, its host
   /// connection was lost or replaced, or image support changed.
-  int admission = 0;
+  int get admission => control.state.admission;
+  void revokeAdmission() => control.apply(ComposerAction.revoke);
 
   /// An ACP session being opened for this unsent draft ahead of its first
   /// message (see `_ensureAgentSession`). Completes when that attempt ended,
@@ -48,7 +54,7 @@ class _ComposerDraft {
   (String?, String?) get key => (threadId, threadId == null ? project : null);
   TextEditingValue value = TextEditingValue.empty;
   final List<_Attachment> attachments = [];
-  final List<_Queued> queue = [];
+  final _DraftQueue queue;
 
   /// Built-in tools picked for the next message (`tools/builtin_tools.dart`).
   final List<String> tools = [];
@@ -82,6 +88,8 @@ void addToConversationDraft(
 }
 
 class _ComposerDrafts extends ChangeNotifier {
+  _ComposerDrafts(this.api);
+  final BridgeApi api;
   final Map<(String?, String?), _ComposerDraft> _drafts = {};
   final Set<(String?, String?)> _badges = {};
   int nextAttachmentId = 0;
@@ -92,7 +100,10 @@ class _ComposerDrafts extends ChangeNotifier {
   _ComposerDraft forThread(String? id, {String? cwd}) {
     final project = cwd == null || cwd.trim().isEmpty ? null : cwd;
     final key = (id, id == null ? project : null);
-    return _drafts.putIfAbsent(key, () => _ComposerDraft(id, project));
+    return _drafts.putIfAbsent(
+      key,
+      () => _ComposerDraft(id, project, api.composerCreate()),
+    );
   }
 
   // Default discovery must keep pending pickers attached to the same draft.
@@ -154,7 +165,7 @@ class _ComposerDrafts extends ChangeNotifier {
   /// read or uploaded were granted for a host that is gone.
   void revokeAdmissions() {
     for (final draft in _drafts.values) {
-      draft.admission++;
+      draft.revokeAdmission();
     }
   }
 
@@ -174,5 +185,43 @@ class _ComposerDrafts extends ChangeNotifier {
     _disposed = true;
     _drafts.clear();
     super.dispose();
+  }
+}
+
+/// Payloads stay beside the editable draft. Rust owns their queue order and
+/// admission; this map is only the UI's handle-to-preview association.
+class _DraftQueue extends Iterable<_Queued> {
+  _DraftQueue(this.control);
+  final ComposerControl control;
+  final Map<int, _Queued> _payloads = {};
+  @override
+  Iterator<_Queued> get iterator =>
+      control.state.queue.map((entry) => _payloads[entry.id]!).iterator;
+  @override
+  int get length => control.state.queue.length;
+
+  void add(_Queued entry) => _insert(entry, ComposerAction.enqueue);
+  void insert(int at, _Queued entry) {
+    assert(at == 0);
+    _insert(entry, ComposerAction.prepend);
+  }
+
+  void _insert(_Queued entry, ComposerAction action) {
+    control.apply(action, id: entry.id);
+    entry.control = control;
+    _payloads[entry.id] = entry;
+  }
+
+  void accept(_Queued entry) {
+    control.apply(ComposerAction.accept, id: entry.id);
+    _payloads.remove(entry.id);
+  }
+
+  void removeWhere(bool Function(_Queued) predicate) {
+    final removed = where(predicate).map((entry) => entry.id).toList();
+    for (final id in removed) {
+      control.apply(ComposerAction.drop, id: id);
+      _payloads.remove(id);
+    }
   }
 }

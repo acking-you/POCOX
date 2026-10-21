@@ -128,7 +128,7 @@ void _registerMonitoring() {
         holders: [],
       );
       api.liveness['watched'] = running;
-      api.readResult = const ThreadHistory(
+      api.readResult = ThreadHistory(
         items: [
           ThreadItem(
             id: 'remote-image',
@@ -153,7 +153,7 @@ void _registerMonitoring() {
       }
       expect(find.byType(ImageLoadingPlaceholder), findsOneWidget);
       api.threadImageBytes['/remote/circle.png'] = onePixelPng;
-      api.readResult = const ThreadHistory(
+      api.readResult = ThreadHistory(
         items: [
           ThreadItem(
             id: 'remote-image',
@@ -232,7 +232,7 @@ void _registerMonitoring() {
           loaded: true,
         ),
       ];
-      api.readResult = const ThreadHistory(
+      api.readResult = ThreadHistory(
         items: [
           ThreadItem(
             id: 'opening',
@@ -262,7 +262,7 @@ void _registerMonitoring() {
       await t.pumpAndSettle();
       expect(find.text('Opening question'), findsOneWidget);
       expect(find.text('Before update'), findsOneWidget);
-      api.readResult = const ThreadHistory(
+      api.readResult = ThreadHistory(
         items: [
           ThreadItem(
             id: 'reply',
@@ -326,7 +326,7 @@ void _registerMonitoring() {
       await t.pump(const Duration(seconds: 1));
       pending.completeError(StateError('app-server connection closed'));
       await t.pumpAndSettle();
-      api.readResult = const ThreadHistory(
+      api.readResult = ThreadHistory(
         items: [
           ThreadItem(
             id: 'recovered',
@@ -367,7 +367,7 @@ void _registerMonitoring() {
           ..appThreadResumeError = StateError(
             'thread already has an active writer',
           )
-          ..readResult = const ThreadHistory(
+          ..readResult = ThreadHistory(
             items: [
               ThreadItem(
                 id: 'first',
@@ -419,7 +419,7 @@ void _registerMonitoring() {
       await t.pump(const Duration(milliseconds: 100));
     }
     await t.pumpWidget(const SizedBox());
-    pending.complete(const ThreadHistory(items: [], running: false));
+    pending.complete(ThreadHistory(items: [], running: false));
     await t.pump(const Duration(seconds: 2));
     expect(t.takeException(), isNull);
   });
@@ -435,12 +435,7 @@ void _registerMonitoring() {
           ..appThreadResumeError = StateError(
             'thread t-active already has an active writer',
           )
-          ..gitDiffText = '''--- a/lib/live.dart
-+++ b/lib/live.dart
-@@ -1 +1 @@
--old
-+new
-''';
+          ..gitDiff = diffFixture('lib/live.dart');
     await api.appConnect(key, 28080);
     api.transcripts['t-active'] = const [
       ThreadItem(
@@ -544,7 +539,7 @@ void _registerMonitoring() {
       requiresTakeover: false,
       holders: [],
     );
-    const liveItems = [
+    final liveItems = [
       ThreadItem(
         id: 'remote-progress',
         itemType: 'agentMessage',
@@ -566,6 +561,7 @@ void _registerMonitoring() {
       ThreadItem(
         id: 'remote-edit',
         itemType: 'fileChange',
+        diff: diffFixture('lib/live.dart'),
         title: 'lib/live.dart',
         text: '''--- a/lib/live.dart
 +++ b/lib/live.dart
@@ -583,7 +579,7 @@ void _registerMonitoring() {
     ];
     api.pushMetaSessionUpdate(
       't-active',
-      const SessionFollowUpdate(liveness: running, items: liveItems),
+      SessionFollowUpdate(liveness: running, items: liveItems),
     );
     await t.pump();
     await t.pump(const Duration(milliseconds: 100));
@@ -606,7 +602,7 @@ void _registerMonitoring() {
     // A stream update flips the action immediately when the other turn ends.
     api.pushMetaSessionUpdate(
       't-active',
-      const SessionFollowUpdate(
+      SessionFollowUpdate(
         liveness: SessionLiveness(
           threadId: 't-active',
           turnState: 'completed',

@@ -4,15 +4,19 @@ pub mod account;
 pub mod acp;
 pub mod agent_tools;
 pub mod app_session;
+pub mod attachments;
 pub mod claude_setup;
 pub mod codex_login;
 pub mod config;
 pub mod daemon;
 pub mod discovery;
+pub mod execution;
 // The galaxy's frame geometry, called by the app through `dart:ffi`.
 #[cfg(feature = "flutter")]
 pub mod galaxy;
+pub mod git_diff;
 pub mod grok_account;
+pub mod history_projection;
 pub mod host_apply;
 mod host_lease;
 pub mod host_lifecycle;
@@ -39,6 +43,7 @@ pub mod serve_acp;
 pub mod serve_opencode;
 pub mod session_cache;
 pub mod session_engine;
+pub mod session_projection;
 pub mod session_sync;
 pub mod sessions;
 pub mod transport;

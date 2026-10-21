@@ -77,11 +77,11 @@ mixin _FakeUpdates on _FakeBridgeState {
   }
 
   @override
-  void updateReport(String kind, String detail) =>
+  Future<void> updateReport(String kind, String detail) async =>
       updateCalls.add('report:$kind');
 
   @override
-  void updateAnnounce(String version) {
+  Future<void> updateAnnounce(String version) async {
     updateCalls.add('announce:$version');
     update = UpdateState(
       current: update.current,

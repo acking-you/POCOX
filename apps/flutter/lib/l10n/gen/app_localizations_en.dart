@@ -4457,4 +4457,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkProxyHide => 'Hide proxy URL';
+
+  @override
+  String logsDiskLost(int count) {
+    return '$count disk log drops or write failures.';
+  }
 }

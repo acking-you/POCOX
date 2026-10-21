@@ -1,6 +1,7 @@
 //! App-server remote control: connecting, probing and capabilities.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// Display identity only; does not grant capabilities or establish a session.
 pub struct AgentIdentityDto {
@@ -15,28 +16,34 @@ pub struct AgentIdentityDto {
 /// Read an agent's display identity before connecting. ACP uses its existing
 /// read-only info route over a temporary tunnel; native engines need no
 /// request.
-pub fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto> {
-    let caps = match session_engine::protocol_of(&service_key) {
-        Protocol::Acp => {
-            let owned = transport::resolve_owned_blocking()?;
-            let info = crate::engine::acp::host_info(&service_key, &owned)?;
-            crate::engine::acp::capabilities_of(&info, 0)
-        },
-        _ => engine(&service_key).capabilities(&service_key),
-    };
-    Ok(AgentIdentityDto {
-        provider: caps.provider,
-        profile_id: caps.profile_id,
-        name: caps.provider_name,
+pub async fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto> {
+    execution::run(Lane::Background, move || {
+        let caps = match session_engine::protocol_of(&service_key) {
+            Protocol::Acp => {
+                let owned = transport::resolve_owned_blocking()?;
+                let info = crate::engine::acp::host_info(&service_key, &owned)?;
+                crate::engine::acp::capabilities_of(&info, 0)
+            },
+            _ => engine(&service_key).capabilities(&service_key),
+        };
+        Ok(AgentIdentityDto {
+            provider: caps.provider,
+            profile_id: caps.profile_id,
+            name: caps.provider_name,
+        })
     })
+    .await
 }
 
 /// Connect to a session service, dispatched by its key's protocol: a Codex
 /// app-server (subscribe on `127.0.0.1:<local_port>`, open the JSON-RPC
 /// websocket, run `initialize`) or an ACP gateway (`/acp/v1` snapshot, then
 /// its event stream). Idempotent.
-pub fn app_connect(service_key: String, local_port: u16) -> Result<()> {
-    engine(&service_key).connect(service_key.clone(), local_port)
+pub async fn app_connect(service_key: String, local_port: u16) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).connect(service_key.clone(), local_port)
+    })
+    .await
 }
 
 /// Whether a live app-server session exists for `service_key`.
@@ -47,8 +54,12 @@ pub fn app_is_connected(service_key: String) -> bool {
 
 /// Disconnect this controller's session and its pb-mapper subscription.
 /// Work owned by a host (ACP turns, permissions) keeps running there.
-pub fn app_disconnect(service_key: String) {
-    engine(&service_key).disconnect(&service_key);
+pub async fn app_disconnect(service_key: String) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).disconnect(&service_key);
+        Ok(())
+    })
+    .await
 }
 
 /// Probe whether a session service is actually REACHABLE — its backend
@@ -58,8 +69,8 @@ pub fn app_disconnect(service_key: String) {
 /// tunnel + `initialize` with a timeout; an ACP gateway answers `/acp/v1`
 /// info with a ready agent.
 /// A live session short-circuits to `true`.
-pub fn app_probe(service_key: String) -> Result<bool> {
-    Ok(app_probe_reason(service_key)?.is_none())
+pub async fn app_probe(service_key: String) -> Result<bool> {
+    Ok(app_probe_reason(service_key).await?.is_none())
 }
 
 /// Why [`app_probe`] considers a service unreachable, or `None` when it is
@@ -70,8 +81,9 @@ pub fn app_probe(service_key: String) -> Result<bool> {
 /// handshake (missing or stale authentication code) is the common case, and it
 /// needs a different fix from a dead backend. This hands the transport's own
 /// words to the UI so it can name the actual problem.
-pub fn app_probe_reason(service_key: String) -> Result<Option<String>> {
-    engine(&service_key).probe_reason(service_key.clone())
+pub async fn app_probe_reason(service_key: String) -> Result<Option<String>> {
+    execution::run(Lane::Background, move || engine(&service_key).probe_reason(service_key.clone()))
+        .await
 }
 
 /// Probe whether an API proxy is actually REACHABLE — its host answers a
@@ -81,8 +93,11 @@ pub fn app_probe_reason(service_key: String) -> Result<Option<String>> {
 /// instead of a false "online", matching the app-server's [`app_probe`]. Opens
 /// a transient tunnel, hits the proxy's local 403 fallback (no upstream model
 /// call), then tears it down.
-pub fn api_probe(service_key: String) -> Result<bool> {
-    Ok(app_session::probe_api(service_key, &transport::resolve_blocking()?))
+pub async fn api_probe(service_key: String) -> Result<bool> {
+    execution::run(Lane::Background, move || {
+        Ok(app_session::probe_api(service_key, &transport::resolve_blocking()?))
+    })
+    .await
 }
 
 /// Health-check an app-server THIS machine hosts itself, by its loopback
@@ -91,8 +106,8 @@ pub fn api_probe(service_key: String) -> Result<bool> {
 /// wedged / half-open codex (the listener still `accept`s but never answers
 /// RPC), so a locally-hosted server that has silently stopped serving reads
 /// `false` instead of a false "running". Fast because it stays on loopback.
-pub fn app_probe_local(local_addr: String) -> bool {
-    app_session::probe_endpoint(&local_addr)
+pub async fn app_probe_local(local_addr: String) -> Result<bool> {
+    execution::run(Lane::Background, move || Ok(app_session::probe_endpoint(&local_addr))).await
 }
 
 /// Health-check an API proxy THIS machine hosts itself, by its loopback
@@ -100,8 +115,9 @@ pub fn app_probe_local(local_addr: String) -> bool {
 /// local host's API tunnel read "online" the instant its proxy is up instead
 /// of waiting on a slower transient relay round-trip. Mirrors
 /// [`app_probe_local`].
-pub fn api_probe_local(local_addr: String) -> bool {
-    app_session::probe_http_endpoint(&local_addr)
+pub async fn api_probe_local(local_addr: String) -> Result<bool> {
+    execution::run(Lane::Background, move || Ok(app_session::probe_http_endpoint(&local_addr)))
+        .await
 }
 
 /// What a session service's provider supports, so the shared session UI can
@@ -226,6 +242,6 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
 
 /// Ids of sessions executing now, from the engine itself (ACP).
 /// Codex lists them through the meta service instead.
-pub fn app_running_threads(service_key: String) -> Result<Vec<String>> {
-    engine(&service_key).running_threads(&service_key)
+pub async fn app_running_threads(service_key: String) -> Result<Vec<String>> {
+    execution::run(Lane::Read, move || engine(&service_key).running_threads(&service_key)).await
 }

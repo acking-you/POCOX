@@ -1,164 +1,37 @@
-import 'dart:async';
-
 import 'package:pocox/src/bridge_api.dart';
 
-/// Buffers captured runtime log lines and exposes them — with level + keyword
-/// filtering — to the log viewer.
-///
-/// A process-wide singleton subscribed once (at app start via [initialize]) to
-/// [BridgeApi.logEvents], which replays retained history then streams live. So
-/// the viewer shows recent logs even when opened long after boot, and multiple
-/// viewers share one buffer.
+/// App-wide access to native diagnostics. Rust owns retention and filtering;
+/// only an open viewer subscribes and retains its current display snapshot.
 class LogManager {
   LogManager._();
-
-  /// The shared instance.
   static final LogManager instance = LogManager._();
+  static const levels = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR'];
+  BridgeApi? _api;
 
-  /// How many lines to retain (matches the Rust ring buffer).
-  static const int maxLines = 2000;
+  void initialize(BridgeApi api) => _api ??= api;
+  void dispose() => _api = null;
 
-  /// Levels low→high, for the threshold dropdown.
-  static const List<String> levels = [
-    'TRACE',
-    'DEBUG',
-    'INFO',
-    'WARN',
-    'ERROR',
-  ];
-  static const Map<String, int> _priority = {
-    'TRACE': 0,
-    'DEBUG': 1,
-    'INFO': 2,
-    'WARN': 3,
-    'ERROR': 4,
-  };
+  Stream<void> get changes => _api?.logChanges() ?? const Stream.empty();
 
-  final List<LogLine> _lines = [];
-  final StreamController<List<LogLine>> _controller =
-      StreamController<List<LogLine>>.broadcast();
-  StreamSubscription<LogLine>? _sub;
-  Timer? _emitTimer;
-  bool _initialized = false;
+  Future<LogView> query({String? level, String keyword = ''}) async =>
+      await _api?.logQuery(level: level, keyword: keyword) ??
+      const LogView(lines: [], total: 0);
 
-  /// Emits the full buffer on every change (a fresh unmodifiable snapshot).
-  Stream<List<LogLine>> get stream => _controller.stream;
+  /// Callers must not include credentials or message bodies.
+  void record(String target, String message, {String level = 'INFO'}) =>
+      _api?.logRecord(target, message, level: level);
 
-  /// The current buffer (oldest first).
-  List<LogLine> get lines => List.unmodifiable(_lines);
+  void clear() => _api?.logClear();
 
-  /// Number of buffered lines.
-  int get count => _lines.length;
-
-  /// Record a controller lifecycle event in the same bounded, exportable log
-  /// as bridge events. Callers must not include credentials or message bodies.
-  void record(String target, String message, {String level = 'INFO'}) {
-    _lines.add(
-      LogLine(
-        level: level,
-        target: target,
-        message: message,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      ),
-    );
-    if (_lines.length > maxLines) {
-      _lines.removeRange(0, _lines.length - maxLines);
-    }
-    _emit();
-  }
-
-  /// Subscribe to the bridge's log stream. Idempotent — safe to call once at
-  /// boot; later calls are no-ops.
-  void initialize(BridgeApi api) {
-    if (_initialized) return;
-    _initialized = true;
-    _sub = api.logEvents().listen(_add, onError: (_) {});
-    _emit();
-  }
-
-  /// Stop capturing + reset (test teardown). Clears the buffer so a later
-  /// [initialize] doesn't replay the ring on top of retained history.
-  void dispose() {
-    _sub?.cancel();
-    _sub = null;
-    _emitTimer?.cancel();
-    _emitTimer = null;
-    _lines.clear();
-    _initialized = false;
-  }
-
-  void _add(LogLine line) {
-    _lines.add(line);
-    if (_lines.length > maxLines) {
-      _lines.removeRange(0, _lines.length - maxLines);
-    }
-    _scheduleEmit();
-  }
-
-  // Coalesce a burst of lines into one snapshot per window: each snapshot copies
-  // the whole buffer, so emitting per line would be O(n²) under a log storm.
-  void _scheduleEmit() {
-    if (_controller.isClosed) return;
-    _emitTimer ??= Timer(const Duration(milliseconds: 100), () {
-      _emitTimer = null;
-      _emit();
-    });
-  }
-
-  void _emit() {
-    if (!_controller.isClosed) {
-      _controller.add(List.unmodifiable(_lines));
-    }
-  }
-
-  /// Drop all buffered lines (the source keeps streaming new ones).
-  void clear() {
-    _lines.clear();
-    _emit();
-  }
-
-  /// Normalize a level string to one of [levels], else `UNKNOWN`.
   static String normalizeLevel(String level) {
-    final n = level.trim().toUpperCase();
-    return _priority.containsKey(n) ? n : 'UNKNOWN';
+    final normalized = level.trim().toUpperCase();
+    return levels.contains(normalized) ? normalized : 'UNKNOWN';
   }
 
-  /// Whether `entry` is at or above the `threshold` level.
-  static bool includesThreshold({
-    required String threshold,
-    required String entry,
-  }) {
-    final t = _priority[normalizeLevel(threshold)];
-    final e = _priority[normalizeLevel(entry)];
-    if (t == null) return true;
-    // An unknown-level line is shown rather than hidden by any threshold — a
-    // viewer should never silently drop logs it can't classify.
-    if (e == null) return true;
-    return e >= t;
-  }
-
-  /// Dropdown label for a threshold level (`WARN+`, but plain `ERROR`).
   static String thresholdLabel(String level) {
-    final n = normalizeLevel(level);
-    return (n == 'ERROR' || n == 'UNKNOWN') ? n : '$n+';
-  }
-
-  /// The buffer filtered by a minimum level threshold + a case-insensitive
-  /// keyword (matched against level, target, and message).
-  List<LogLine> filter({String? level, String keyword = ''}) {
-    final lvl = (level == null || level.trim().isEmpty)
-        ? null
-        : normalizeLevel(level);
-    final kw = keyword.trim().toLowerCase();
-    return _lines.where((l) {
-      if (lvl != null && !includesThreshold(threshold: lvl, entry: l.level)) {
-        return false;
-      }
-      if (kw.isNotEmpty) {
-        final hay = '${l.level} ${l.target} ${l.message}'.toLowerCase();
-        if (!hay.contains(kw)) return false;
-      }
-      return true;
-    }).toList();
+    final normalized = normalizeLevel(level);
+    return normalized == 'ERROR' || normalized == 'UNKNOWN'
+        ? normalized
+        : '$normalized+';
   }
 }

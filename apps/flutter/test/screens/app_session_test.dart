@@ -2,6 +2,9 @@
 /// the panes and pickers around them.
 library;
 
+import '../support/native_diff_fixture.dart';
+
+import '../support/native_image_fixture.dart';
 import 'dart:async';
 import 'dart:convert';
 

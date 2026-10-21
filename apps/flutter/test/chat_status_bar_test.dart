@@ -1,3 +1,5 @@
+import 'support/native_diff_fixture.dart';
+import 'package:pocox/src/git_diff.dart';
 // The conversation's status bar on phones: state, model, clock, branch and
 // change counts on one line, with real fonts. It used to overflow once a
 // branch and its counts were shown beside the model.
@@ -16,15 +18,11 @@ import 'support/ui_preview.dart';
 
 const _service = 'pcx:mac:app:default';
 
-String _diff(int added, int removed) => [
-  'diff --git a/a.rs b/a.rs',
-  '--- a/a.rs',
-  '+++ b/a.rs',
-  '@@ -1,$removed +1,$added @@',
-  for (var i = 0; i < removed; i++) '-old $i',
-  for (var i = 0; i < added; i++) '+new $i',
-  '',
-].join('\n');
+DiffModel _diff(int added, int removed) => diffFixture(
+  'lib/x.dart',
+  added: [for (var i = 0; i < added; i++) 'new $i'],
+  removed: [for (var i = 0; i < removed; i++) 'old $i'],
+);
 
 Future<void> _mount(
   WidgetTester t, {
@@ -46,7 +44,7 @@ Future<void> _mount(
       defaultReasoningEffort: 'xhigh',
     ),
   ];
-  api.gitDiffText = _diff(554, 248);
+  api.gitDiff = _diff(554, 248);
   api.readResult = ThreadHistory(
     running: running,
     activeTurnId: running ? 'turn-1' : null,

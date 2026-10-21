@@ -303,6 +303,8 @@ pub struct Updater {
     /// Application support directory, owning network settings and update state.
     support_dir: Box<dyn Fn() -> Option<PathBuf> + Send + Sync>,
     state: Mutex<State>,
+    published: Mutex<Snapshot>,
+    saved: Mutex<()>,
     watchers: Mutex<Vec<Watcher>>,
     cancelled: AtomicBool,
     auto: std::sync::Once,
@@ -329,25 +331,33 @@ impl Updater {
         host: manifest::Host,
         support_dir: impl Fn() -> Option<PathBuf> + Send + Sync + 'static,
     ) -> Self {
-        Self {
+        let state = State {
+            phase: Phase::Idle,
+            release: None,
+            received: 0,
+            checked_at: None,
+            failure: None,
+            staged: None,
+            path: None,
+            announced: None,
+            loaded: false,
+        };
+        let published = Mutex::new(Self::snapshot_for(&config, &state));
+        let updater = Self {
             config,
             host,
             support_dir: Box::new(support_dir),
-            state: Mutex::new(State {
-                phase: Phase::Idle,
-                release: None,
-                received: 0,
-                checked_at: None,
-                failure: None,
-                staged: None,
-                path: None,
-                announced: None,
-                loaded: false,
-            }),
+            state: Mutex::new(state),
+            published,
+            saved: Mutex::new(()),
             watchers: Mutex::new(Vec::new()),
             cancelled: AtomicBool::new(false),
             auto: std::sync::Once::new(),
-        }
+        };
+        // Constructed during bridge initialization, away from the UI thread.
+        let restored = updater.lock();
+        updater.publish(restored);
+        updater
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
@@ -426,10 +436,14 @@ impl Updater {
     }
 
     fn snapshot_of(&self, state: &State) -> Snapshot {
+        Self::snapshot_for(&self.config, state)
+    }
+
+    fn snapshot_for(config: &Config, state: &State) -> Snapshot {
         let release = state.release.as_ref();
-        let newer = release.filter(|(manifest, _)| manifest.version > self.config.current);
+        let newer = release.filter(|(manifest, _)| manifest.version > config.current);
         Snapshot {
-            current: self.config.current.to_string(),
+            current: config.current.to_string(),
             phase: state.phase,
             latest: release.map(|(manifest, _)| manifest.version.to_string()),
             newer: newer.is_some(),
@@ -446,7 +460,10 @@ impl Updater {
 
     /// The current state.
     pub fn snapshot(&self) -> Snapshot {
-        self.snapshot_of(&self.lock())
+        self.published
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .clone()
     }
 
     /// Calls `watcher` with the current state and every later change, until
@@ -462,6 +479,7 @@ impl Updater {
 
     fn publish(&self, state: MutexGuard<'_, State>) {
         let snapshot = self.snapshot_of(&state);
+        *self.published.lock().unwrap_or_else(|p| p.into_inner()) = snapshot.clone();
         drop(state);
         self.watchers
             .lock()
@@ -517,6 +535,7 @@ impl Updater {
                 state.checked_at = Some(now_ms());
                 state.failure = None;
                 self.adopt(&mut state, release);
+                let _save = self.saved.lock().unwrap_or_else(|p| p.into_inner());
                 let mut saved = self.read_saved();
                 saved.checked_at = state.checked_at;
                 saved.manifest = Some(text);
@@ -729,9 +748,13 @@ impl Updater {
 
     /// Remembers that the user has been told about `version`.
     pub fn announce(&self, version: String) {
+        let mut state = self.lock();
+        let save = self.saved.lock().unwrap_or_else(|p| p.into_inner());
         let mut saved = self.read_saved();
         saved.announced = Some(version.clone());
         self.write_saved(&saved);
-        self.set(|state| state.announced = Some(version));
+        drop(save);
+        state.announced = Some(version);
+        self.publish(state);
     }
 }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:pocox/src/voice/dictation.dart';
 import 'package:pocox/src/voice/voice_transport.dart';
@@ -490,17 +489,12 @@ final runningThreadsProvider = StreamProvider.autoDispose
       void connect() {
         if (disposed) return;
         subscription = api
-            .appEvents(serviceKey)
+            .appEvents(serviceKey, topic: 'activity')
             .listen(
               (event) {
                 final tid = event.threadId;
                 if (tid == null || tid.isEmpty) return;
-                final running = switch (event.kind) {
-                  'turn/started' => true,
-                  'turn/completed' || 'turn/failed' => false,
-                  'thread/status/changed' => _threadStatusActive(event.raw),
-                  _ => null,
-                };
+                final running = event.running;
                 if (running == null) return;
                 events[tid] = (running: running, at: _nextActivity());
                 emit();
@@ -541,21 +535,6 @@ final runningThreadsProvider = StreamProvider.autoDispose
       connect();
       return out.stream;
     });
-
-/// Whether a `thread/status/changed` payload reports a running turn; null when
-/// it carries no status.
-bool? _threadStatusActive(String raw) {
-  try {
-    final status = switch (jsonDecode(raw)) {
-      {'status': final Map<String, dynamic> status} => status,
-      _ => null,
-    };
-    final type = status?['type'];
-    return type is String ? type == 'active' : null;
-  } catch (_) {
-    return null;
-  }
-}
 
 /// Active UI locale (`null` = follow system). Seeded at boot from the
 /// persisted config via a ProviderScope override, then changed by the

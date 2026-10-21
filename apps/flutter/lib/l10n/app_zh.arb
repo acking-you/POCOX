@@ -1398,5 +1398,7 @@
   "networkProxySaveFailed": "代理保存失败，请检查地址后重试。",
   "networkProxyReadFailed": "无法读取代理配置，点击重试。",
   "networkProxyShow": "显示代理地址",
-  "networkProxyHide": "隐藏代理地址"
+  "networkProxyHide": "隐藏代理地址",
+  "logsDiskLost": "日志落盘发生 {count} 次丢弃或写入失败。",
+  "@logsDiskLost": {"placeholders": {"count": {"type": "int"}}}
 }

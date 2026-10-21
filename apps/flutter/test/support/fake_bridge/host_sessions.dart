@@ -271,7 +271,27 @@ mixin _FakeHostSessions on _FakeBridgeState {
   }
 
   @override
-  String metaUploadContext() => uploadContext;
+  void attachmentReleaseFile(Object file) {}
+
+  @override
+  Future<Object> attachmentReadFile(String path) async =>
+      throw UnsupportedError('seed native file preparation in this fixture');
+
+  @override
+  Future<String> metaUploadPreparedFile(
+    String serviceKey,
+    String fileName,
+    Object file,
+    String expectedContext,
+  ) => metaUploadFileScoped(
+    serviceKey,
+    fileName,
+    file as Uint8List,
+    expectedContext,
+  );
+
+  @override
+  Future<String> metaUploadContext() async => uploadContext;
 
   @override
   Future<ThreadConfig> metaThreadConfigGet(

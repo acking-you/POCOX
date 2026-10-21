@@ -2,6 +2,7 @@
 //! hosts, the in-app equivalent of `pocox serve`.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// Result of starting local hosting, mirrored for Dart. One host publishes two
 /// tunnels (`app:<name>` remote control + `api:<name>` Responses proxy).
@@ -137,8 +138,8 @@ impl From<crate::engine::serve_opencode::OpenCodeStatus> for OpenCodeHostStatusD
 }
 
 /// Refresh one running OpenCode host's sanitized native catalog summary.
-pub fn opencode_refresh(name: String) -> Result<()> {
-    crate::engine::serve_opencode::refresh_catalog(&name)
+pub async fn opencode_refresh(name: String) -> Result<()> {
+    execution::run(Lane::Read, move || crate::engine::serve_opencode::refresh_catalog(&name)).await
 }
 
 /// Installed external OpenCode; detection never starts or resumes a session.
@@ -155,21 +156,26 @@ pub struct OpenCodeEnvironmentDto {
 }
 
 /// Inspect an explicit OpenCode executable or the host's child PATH.
-pub fn opencode_detect(binary: Option<String>) -> OpenCodeEnvironmentDto {
-    match crate::engine::serve_opencode::detect(binary.as_deref()) {
-        Ok(found) => OpenCodeEnvironmentDto {
-            path: Some(found.path),
-            version: Some(found.version),
-            problem: None,
-            background_server: found.background_server,
-        },
-        Err(error) => OpenCodeEnvironmentDto {
-            path: None,
-            version: None,
-            problem: Some(error.to_string()),
-            background_server: false,
-        },
-    }
+pub async fn opencode_detect(binary: Option<String>) -> Result<OpenCodeEnvironmentDto> {
+    execution::run(Lane::Read, move || {
+        Ok({
+            match crate::engine::serve_opencode::detect(binary.as_deref()) {
+                Ok(found) => OpenCodeEnvironmentDto {
+                    path: Some(found.path),
+                    version: Some(found.version),
+                    problem: None,
+                    background_server: found.background_server,
+                },
+                Err(error) => OpenCodeEnvironmentDto {
+                    path: None,
+                    version: None,
+                    problem: Some(error.to_string()),
+                    background_server: false,
+                },
+            }
+        })
+    })
+    .await
 }
 
 /// An ACP agent executable and argument vector, passed verbatim without a
@@ -263,8 +269,11 @@ pub fn hosting_owned_elsewhere() -> bool {
 
 /// The executable `program` resolves to (explicit path, `PATH`, then the
 /// preset's install locations), or `None`.
-pub fn acp_locate(program: String, profile_id: Option<String>) -> Option<String> {
-    serve_acp::locate(&program, profile_id.as_deref()).map(|p| p.display().to_string())
+pub async fn acp_locate(program: String, profile_id: Option<String>) -> Result<Option<String>> {
+    execution::run(Lane::Read, move || {
+        Ok(serve_acp::locate(&program, profile_id.as_deref()).map(|p| p.display().to_string()))
+    })
+    .await
 }
 
 /// The Claude preset's local environment, mirrored for Dart: paths and
@@ -329,33 +338,36 @@ fn setup_dto(snapshot: claude_setup::Snapshot) -> AcpClaudeSetupDto {
 
 /// Detect the adapter, a Node.js new enough for it and the native CLI
 /// (runs `node --version` on candidates; nothing is installed or changed).
-pub fn acp_claude_status() -> Result<AcpClaudeStatusDto> {
-    let status = claude_setup::status()?;
-    Ok(AcpClaudeStatusDto {
-        ready: status.ready,
-        adapter: status.adapter.to_string(),
-        adapter_path: status.adapter_path,
-        runtime: status.runtime.to_string(),
-        runtime_version: status.runtime_version,
-        runtime_path: status.runtime_path,
-        cli: status.cli.to_string(),
-        cli_path: status.cli_path,
-        can_prepare: status.can_prepare,
-        package: format!(
-            "{}@{}",
-            pocox_host_svc::acp::claude::ADAPTER_PACKAGE,
-            pocox_host_svc::acp::claude::ADAPTER_VERSION
-        ),
-        problem: status.problem,
+pub async fn acp_claude_status() -> Result<AcpClaudeStatusDto> {
+    execution::run(Lane::Read, move || {
+        let status = claude_setup::status()?;
+        Ok(AcpClaudeStatusDto {
+            ready: status.ready,
+            adapter: status.adapter.to_string(),
+            adapter_path: status.adapter_path,
+            runtime: status.runtime.to_string(),
+            runtime_version: status.runtime_version,
+            runtime_path: status.runtime_path,
+            cli: status.cli.to_string(),
+            cli_path: status.cli_path,
+            can_prepare: status.can_prepare,
+            package: format!(
+                "{}@{}",
+                pocox_host_svc::acp::claude::ADAPTER_PACKAGE,
+                pocox_host_svc::acp::claude::ADAPTER_VERSION
+            ),
+            problem: status.problem,
+        })
     })
+    .await
 }
 
 /// Start preparing Claude's pinned ACP adapter in this app's cache (or join
 /// the preparation already running) and return at once; detection runs in
 /// the preparation. Poll [`acp_claude_prepare_state`]: a preparation that
 /// cannot run here ends `failed` with the reason.
-pub fn acp_claude_prepare_start() -> Result<AcpClaudeSetupDto> {
-    Ok(setup_dto(claude_setup::prepare_start()))
+pub async fn acp_claude_prepare_start() -> Result<AcpClaudeSetupDto> {
+    execution::run(Lane::Read, move || Ok(setup_dto(claude_setup::prepare_start()))).await
 }
 
 /// Where the adapter preparation is.
@@ -379,25 +391,31 @@ pub fn acp_claude_prepare_cancel_run(run: u64) -> AcpClaudeSetupDto {
 
 /// Launch and host an ACP agent as `acp:<name>` plus `meta:<name>`. Works in
 /// self-host and account mode. Stopping hosting stops the agent.
-pub fn app_serve_start_acp(name: Option<String>, spec: AcpAgentSpecDto) -> Result<AcpServeDto> {
-    let r = serve_acp::start(name, spec.into_spec())?;
-    crate::engine::management::enable_after_hosting();
-    Ok(AcpServeDto {
-        device: r.device,
-        name: r.name,
-        service_key: r.service_key,
-        listen_addr: r.listen_addr,
-        meta_service_key: r.meta_service_key,
-        profile_id: r.profile_id,
-        display_name: r.display_name,
-        reused: r.reused,
-        notice: r.notice,
+pub async fn app_serve_start_acp(
+    name: Option<String>,
+    spec: AcpAgentSpecDto,
+) -> Result<AcpServeDto> {
+    execution::run(Lane::Read, move || {
+        let r = serve_acp::start(name, spec.into_spec())?;
+        crate::engine::management::enable_after_hosting();
+        Ok(AcpServeDto {
+            device: r.device,
+            name: r.name,
+            service_key: r.service_key,
+            listen_addr: r.listen_addr,
+            meta_service_key: r.meta_service_key,
+            profile_id: r.profile_id,
+            display_name: r.display_name,
+            reused: r.reused,
+            notice: r.notice,
+        })
     })
+    .await
 }
 
 /// Restart the agent of a local ACP host (new process, new generation).
-pub fn app_serve_restart_acp(name: String) -> Result<()> {
-    serve_acp::restart(&name)
+pub async fn app_serve_restart_acp(name: String) -> Result<()> {
+    execution::run(Lane::Read, move || serve_acp::restart(&name)).await
 }
 
 /// Legacy version endpoint; returns `unavailable` because no engine is bundled.
@@ -411,32 +429,38 @@ pub fn embedded_codex_version() -> String {
 /// `proxy` is the upstream proxy both use to reach chatgpt.com (`None` =
 /// inherit env). Desktop only. `embedded` is retained for bridge compatibility;
 /// passing true returns a built-in-engine-not-implemented error before startup.
-pub fn app_serve_start(
+pub async fn app_serve_start(
     port: u16,
     binary_override: Option<String>,
     name: Option<String>,
     proxy: Option<String>,
     embedded: bool,
 ) -> Result<AppServeDto> {
-    let r = serve::serve_start(port, binary_override, name, proxy, embedded)?;
-    crate::engine::management::enable_after_hosting();
-    Ok(AppServeDto {
-        device: r.device,
-        name: r.name,
-        app_service_key: r.app_service_key,
-        app_listen_addr: r.app_listen_addr,
-        api_service_key: r.api_service_key,
-        api_listen_addr: r.api_listen_addr,
-        meta_service_key: r.meta_service_key,
-        meta_listen_addr: r.meta_listen_addr,
-        pid: r.pid,
-        reused: r.reused,
+    execution::run(Lane::Read, move || {
+        let r = serve::serve_start(port, binary_override, name, proxy, embedded)?;
+        crate::engine::management::enable_after_hosting();
+        Ok(AppServeDto {
+            device: r.device,
+            name: r.name,
+            app_service_key: r.app_service_key,
+            app_listen_addr: r.app_listen_addr,
+            api_service_key: r.api_service_key,
+            api_listen_addr: r.api_listen_addr,
+            meta_service_key: r.meta_service_key,
+            meta_listen_addr: r.meta_listen_addr,
+            pid: r.pid,
+            reused: r.reused,
+        })
     })
+    .await
 }
 
 /// Snapshot of every local host (for the status cards + periodic re-probe).
-pub fn app_serve_status() -> Vec<AppServeStatusDto> {
-    serve::serve_status().into_iter().map(Into::into).collect()
+pub async fn app_serve_status() -> Result<Vec<AppServeStatusDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(serve::serve_status().into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 impl From<serve::ServeStatus> for AppServeStatusDto {
@@ -478,31 +502,36 @@ impl From<serve::ServeStatus> for AppServeStatusDto {
 /// Take one tunnel (`kind` = `"app"`/`"api"`/`"meta"`) of a local host off the
 /// relay without stopping the host — a reversible unpublish. The codex / API
 /// proxy / meta service keep running; [`app_serve_reregister`] re-publishes it.
-pub fn app_serve_deregister(name: String, kind: String) -> Result<()> {
-    serve::serve_deregister(&name, &kind)
+pub async fn app_serve_deregister(name: String, kind: String) -> Result<()> {
+    execution::run(Lane::Read, move || serve::serve_deregister(&name, &kind)).await
 }
 
 /// Re-publish a previously deregistered tunnel (`kind` = `"app"`/`"api"`/
 /// `"meta"`) of a still-running local host.
-pub fn app_serve_reregister(name: String, kind: String) -> Result<()> {
-    serve::serve_reregister(&name, &kind)
+pub async fn app_serve_reregister(name: String, kind: String) -> Result<()> {
+    execution::run(Lane::Read, move || serve::serve_reregister(&name, &kind)).await
 }
 
 /// Fully stop one local host by name (both tunnels + watchdog + API proxy, and
 /// stops codex).
-pub fn app_serve_stop(name: String) -> Result<()> {
-    serve::serve_stop_remembered(&name, None)
+pub async fn app_serve_stop(name: String) -> Result<()> {
+    execution::run(Lane::Control, move || serve::serve_stop_remembered(&name, None)).await
 }
 
 /// Stop every local host (called on app quit so a real quit leaves no orphan
 /// codex). A no-op when nothing is hosting. An error says what may still
 /// run: the app must not exit as if it had stopped; calling it again retries.
-pub fn app_serve_stop_all() -> Result<()> {
-    serve::serve_stop_all()
+pub async fn app_serve_stop_all() -> Result<()> {
+    execution::run(Lane::Control, move || {
+        let result = serve::serve_stop_all();
+        let _ = logging::flush();
+        result
+    })
+    .await
 }
 
 /// The resolved `codex` binary path (persisted config → `$PATH`), or `None` so
 /// the UI can prompt the user to point at one.
-pub fn codex_locate() -> Option<String> {
-    serve::codex_locate()
+pub async fn codex_locate() -> Result<Option<String>> {
+    execution::run(Lane::Read, move || Ok(serve::codex_locate())).await
 }

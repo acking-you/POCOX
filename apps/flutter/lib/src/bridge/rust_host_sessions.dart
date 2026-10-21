@@ -208,6 +208,9 @@ mixin _RustHostSessions implements BridgeApi {
                   itemType: item.itemType,
                   title: item.title,
                   text: item.text,
+                  diff: item.diff == null
+                      ? null
+                      : DiffModel.fromNative(item.diff!),
                   images: item.images,
                   turnId: item.turnId,
                   turnCompletedAt: item.turnCompletedAt?.toInt(),
@@ -243,7 +246,7 @@ mixin _RustHostSessions implements BridgeApi {
   }
 
   @override
-  String metaUploadContext() => frb.metaUploadContext();
+  Future<String> metaUploadContext() => frb.metaUploadContext();
 
   @override
   Future<String> metaUploadFileScoped(

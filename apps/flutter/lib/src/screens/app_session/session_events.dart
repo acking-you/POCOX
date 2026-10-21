@@ -226,7 +226,7 @@ extension _SessionEvents on _AppSessionState {
     switch (e.kind) {
       case 'turn/started':
         _turnStateRevision++;
-        final sender = _sender(e.raw);
+        final sender = (e.sender?.isEmpty ?? true) ? null : e.sender;
         // A turn another view or the agent started is not the start a send
         // here awaits.
         if (sender == null || sender == _awaitedStart?.clientId) {
@@ -237,7 +237,7 @@ extension _SessionEvents on _AppSessionState {
         // Capture the turn id so the stop button can interrupt this turn.
         _updateState(() {
           _streaming = true;
-          _turnId = _parseTurnId(e.raw);
+          _turnId = e.turnId;
           final prompt = _items.lastOrNull;
           // The host names the message: its copy here, if any, is this
           // turn's. A host that names no sender: the last message sent here
@@ -281,15 +281,15 @@ extension _SessionEvents on _AppSessionState {
       case 'turn/completed':
         // The end of an earlier turn (reported late, e.g. by a recovery)
         // must not end the one running now.
-        if (_endsAnotherTurn(e.raw) || _endsAnEndedTurn(e.raw)) return;
+        if (_endsAnotherTurn(e.turnId) || _endsAnEndedTurn(e.turnId)) return;
         _turnStateRevision++;
-        _turnEnded(e.raw);
+        _turnEnded(e.turnId);
         // Terminal notifications can carry errors on failed or interrupted turns.
         final failure = _turnFailureText(e.raw);
         // A classified model failure is said by its card in the transcript,
         // never also by the error banner.
         final modelFailure = failure == null ? null : _modelFailure(e.raw);
-        final ended = _parseTurnId(e.raw) ?? '';
+        final ended = e.turnId ?? '';
         final interruption = _interruption(e.raw);
         _updateState(() {
           _streaming = false;
@@ -329,9 +329,9 @@ extension _SessionEvents on _AppSessionState {
         // permanently stale for the thread the user is actually working in.
         _invalidateSummary(e.threadId);
       case 'turn/failed':
-        if (_endsAnotherTurn(e.raw) || _endsAnEndedTurn(e.raw)) return;
+        if (_endsAnotherTurn(e.turnId) || _endsAnEndedTurn(e.turnId)) return;
         _turnStateRevision++;
-        _turnEnded(e.raw);
+        _turnEnded(e.turnId);
         _updateState(() {
           _streaming = false;
           _supplement = false;
@@ -343,7 +343,7 @@ extension _SessionEvents on _AppSessionState {
           // A turn the user stopped also ends as failed/aborted; show the
           // "stopped" marker rather than an error banner.
           if (_pendingInterrupt) {
-            _addStoppedMarker(_parseTurnId(e.raw) ?? '');
+            _addStoppedMarker(e.turnId ?? '');
           } else {
             _error = _humanizeTurnError(e.text);
             _retry = () => _send(retry: true);
@@ -497,17 +497,15 @@ extension _SessionEvents on _AppSessionState {
   /// While the next turn is awaited, a repeated terminal event of a turn
   /// this view already saw end (a recovery re-announcing it) is not the new
   /// turn's end: it must neither release the queue nor reset anything.
-  bool _endsAnEndedTurn(String raw) {
+  bool _endsAnEndedTurn(String? ended) {
     if (!_awaitingTurnStart) return false;
-    final ended = _parseTurnId(raw);
     return ended != null && _endedTurns.contains(ended);
   }
 
   /// A turn of this view ended: remember it, stop awaiting a start, and
   /// re-read the agent's session state, which may still name it as running
   /// and so hold the controls it gates.
-  void _turnEnded(String raw) {
-    final ended = _parseTurnId(raw);
+  void _turnEnded(String? ended) {
     if (ended != null && !_endedTurns.contains(ended)) {
       _endedTurns.add(ended);
       if (_endedTurns.length > 256) _endedTurns.removeAt(0);
@@ -575,8 +573,7 @@ extension _SessionEvents on _AppSessionState {
   /// Whether a terminal event names a turn other than the one this view
   /// tracks as running. Its items stop streaming; the running turn, its Stop
   /// target and the queue are left alone.
-  bool _endsAnotherTurn(String raw) {
-    final ended = _parseTurnId(raw);
+  bool _endsAnotherTurn(String? ended) {
     final current = _turnId;
     if (ended == null || current == null || ended == current) return false;
     _updateState(() {
@@ -585,20 +582,6 @@ extension _SessionEvents on _AppSessionState {
       }
     });
     return true;
-  }
-
-  /// Pull the turn id out of a turn/started event's raw params, tolerating
-  /// `{turnId}`, `{turn:{id}}`, or `{id}` shapes.
-  String? _parseTurnId(String raw) {
-    try {
-      final m = jsonDecode(raw);
-      if (m is! Map) return null;
-      final direct = m['turnId'] ?? m['id'];
-      if (direct is String && direct.isNotEmpty) return direct;
-      final turn = m['turn'];
-      if (turn is Map && turn['id'] is String) return turn['id'] as String;
-    } catch (_) {}
-    return null;
   }
 
   /// Whether [turn] is known to have ended: it is not the turn running here,
@@ -638,22 +621,6 @@ extension _SessionEvents on _AppSessionState {
     return at == _items.length ? null : at;
   }
 
-  /// Who sent the message of a `turn/started` event or a user message, as an
-  /// ACP host names it: the client id the sending view gave it, `''` when no
-  /// view did (another device's older app, or a turn the agent started), or
-  /// null when the host does not say (an older host, a recovery, another
-  /// engine).
-  String? _sender(String raw) {
-    try {
-      final m = jsonDecode(raw);
-      if (m is! Map || !m.containsKey('clientId')) return null;
-      final id = m['clientId'];
-      return id is String ? id : '';
-    } catch (_) {
-      return null;
-    }
-  }
-
   /// Whether this view shows its own copy of the message it sent as
   /// [clientId] (never for `''`); that copy is [turn]'s when it had none
   /// yet. The host's item for it marks where the agent merged a held
@@ -671,17 +638,6 @@ extension _SessionEvents on _AppSessionState {
     return true;
   }
 
-  /// The turn an `item/*` event names by its explicit `turnId`; never an item's
-  /// own `id`, which [_parseTurnId] accepts for turn events.
-  String? _itemEventTurn(String raw) {
-    try {
-      final m = jsonDecode(raw);
-      final turn = m is Map ? m['turnId'] : null;
-      if (turn is String && turn.isNotEmpty) return turn;
-    } catch (_) {}
-    return null;
-  }
-
   /// Upsert a tool/activity or message item from an `item/*` event.
   void _handleItemEvent(AppEvent e) {
     final id = e.itemId, type = e.itemType;
@@ -690,12 +646,12 @@ extension _SessionEvents on _AppSessionState {
     // (shown on send), every other one — another device's prompt or
     // supplement, a turn the agent started — by the host's item. A host
     // that does not say who sent it leaves it to the next history read.
-    final sender = type == 'userMessage' ? _sender(e.raw) : null;
+    final sender = type == 'userMessage' ? e.sender : null;
     if (type == 'userMessage') {
       if (sender == null) return;
       if (sender.isNotEmpty && !_itemIndex.containsKey(id)) {
         var own = false;
-        _updateState(() => own = _claimSent(sender, _itemEventTurn(e.raw)));
+        _updateState(() => own = _claimSent(sender, e.turnId));
         if (own) return;
       }
     }
@@ -709,7 +665,7 @@ extension _SessionEvents on _AppSessionState {
         type: type,
         title: '',
         text: '',
-        turnId: _parseTurnId(e.raw) ?? _turnId ?? '',
+        turnId: e.turnId ?? _turnId ?? '',
       );
       _historyPartialItems?.remove(id);
       if (_itemIndex.containsKey(id)) {
@@ -730,7 +686,7 @@ extension _SessionEvents on _AppSessionState {
     // are kept for the read to merge.
     String? lateTurn;
     if (!_itemIndex.containsKey(id) && _historyLiveItems == null) {
-      final itemTurn = _itemEventTurn(e.raw);
+      final itemTurn = e.turnId;
       if (_endedHere(itemTurn)) {
         if (e.kind != 'item/completed') return;
         lateTurn = itemTurn;
@@ -756,9 +712,10 @@ extension _SessionEvents on _AppSessionState {
       // A pre-existing row can also have missed deltas while disconnected.
       // Only a full snapshot received during this read establishes its prefix.
       if (isDelta &&
+          !e.textIsSnapshot &&
           (idx == null || _historyLiveItems?.containsKey(id) == false)) {
         _historyPartialItems?.add(id);
-      } else if (!isDelta) {
+      } else if (!isDelta || e.textIsSnapshot) {
         _historyPartialItems?.remove(id);
       }
       if (idx == null) {
@@ -767,12 +724,13 @@ extension _SessionEvents on _AppSessionState {
           type: type,
           title: e.title ?? '',
           text: e.text ?? '',
+          diff: e.diff,
           images: resolveImageUrls(e.images),
           imageUrls: e.images,
           streaming: type == 'agentMessage' ? true : running,
           // The live turn this item belongs to, so a reply that streams in as
           // several items groups the same way it will after a reload.
-          turnId: _parseTurnId(e.raw) ?? _turnId ?? '',
+          turnId: e.turnId ?? _turnId ?? '',
           clientId: sender == null || sender.isEmpty ? null : sender,
         );
         final at = lateTurn == null
@@ -788,9 +746,10 @@ extension _SessionEvents on _AppSessionState {
       } else {
         final it = _items[idx];
         it.type = type;
-        if (it.turnId.isEmpty) it.turnId = _parseTurnId(e.raw) ?? _turnId ?? '';
+        if (type == 'fileChange') it.diff = e.diff;
+        if (it.turnId.isEmpty) it.turnId = e.turnId ?? _turnId ?? '';
         if ((e.title ?? '').isNotEmpty) it.title = e.title!;
-        if (isDelta) {
+        if (isDelta && !e.textIsSnapshot) {
           it.text += e.text ?? '';
         } else if ((e.text ?? '').isNotEmpty || !it.isAgent) {
           it.text = e.text ?? '';

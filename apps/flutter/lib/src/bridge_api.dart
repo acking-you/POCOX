@@ -2,6 +2,11 @@
 /// UI and tests do not import generated bindings).
 library;
 
+import 'package:pocox/src/composer_control.dart';
+export 'package:pocox/src/composer_control.dart';
+
+import 'package:pocox/src/git_diff.dart';
+
 import 'dart:typed_data';
 
 import 'package:pocox/src/service_key.dart';
@@ -19,8 +24,9 @@ part 'bridge/management_types.dart';
 part 'bridge/device_metadata.dart';
 part 'bridge/tools_types.dart';
 part 'bridge/grok_types.dart';
+part 'bridge/controller_api.dart';
 
-abstract interface class BridgeApi implements UpdateApi {
+abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
   Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
   Future<bool> appHistorySyncPrepare(String serviceKey);
@@ -412,7 +418,11 @@ abstract interface class BridgeApi implements UpdateApi {
   Future<bool> apiProbeLocal(String localAddr);
 
   /// Live event stream for [serviceKey] (turn/item notifications).
-  Stream<AppEvent> appEvents(String serviceKey);
+  Stream<AppEvent> appEvents(
+    String serviceKey, {
+    String? threadId,
+    String topic = 'all',
+  });
 
   /// Upstream realtime controls and marked voice thread creation.
   Future<String> appRealtimeRequest(
@@ -422,9 +432,6 @@ abstract interface class BridgeApi implements UpdateApi {
   );
 
   /// Captured `tracing` events for the in-app log viewer: retained recent
-  /// history (oldest first) followed by every new event live.
-  Stream<LogLine> logEvents();
-
   /// Retry progress for host meta requests. Notifications only — the request's
   /// own result still arrives through whichever call was made; this exists so a
   /// wait can say "retrying 2/10" instead of looking frozen.
@@ -449,10 +456,6 @@ abstract interface class BridgeApi implements UpdateApi {
   /// Read the account rate-limit / quota snapshot as raw JSON (5h + weekly
   /// windows). Parsed on the Dart side since the shape is nested and volatile.
   Future<String> appRateLimits(String serviceKey);
-
-  /// Unified diff of the repo at [cwd] vs its remote default branch. Empty when
-  /// the cwd isn't a git repo or there are no changes.
-  Future<String> appGitDiff(String serviceKey, String cwd);
 
   /// Start a manual conversation compaction; the server emits a
   /// `thread/compacted` event when done.
@@ -733,17 +736,6 @@ abstract interface class BridgeApi implements UpdateApi {
   Future<List<AgentCommand>> appCommandListForProject(
     String serviceKey,
     String? directory,
-  );
-
-  /// Capture the current destination context before reading attachment bytes.
-  String metaUploadContext();
-
-  /// Reject a context change before transmitting attachment bytes.
-  Future<String> metaUploadFileScoped(
-    String serviceKey,
-    String fileName,
-    Uint8List bytes,
-    String context,
   );
 
   /// Read a thread's persisted config from the host behind [serviceKey]

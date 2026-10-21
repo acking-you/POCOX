@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:pocox/src/log_manager.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/router.dart';
@@ -23,6 +24,7 @@ class UpdateHost extends ConsumerStatefulWidget {
 }
 
 class _UpdateHostState extends ConsumerState<UpdateHost> {
+  String? _offered;
   @override
   void initState() {
     super.initState();
@@ -37,12 +39,22 @@ class _UpdateHostState extends ConsumerState<UpdateHost> {
     if (!state.newer ||
         state.phase != 'available' ||
         latest == null ||
-        latest == state.announced) {
+        latest == state.announced ||
+        latest == _offered) {
       return;
     }
     // Once per version, whether or not the user acts on it: Settings keeps
     // offering it after the toast has gone.
-    ref.read(updateApiProvider).updateAnnounce(latest);
+    _offered = latest;
+    ref.read(updateApiProvider).updateAnnounce(latest).catchError((
+      Object error,
+    ) {
+      LogManager.instance.record(
+        'updates',
+        'Could not persist update announcement: $error',
+        level: 'WARN',
+      );
+    });
     final l10n = AppLocalizations.of(context);
     final actions = ref.read(updateActionsProvider);
     final page = state.method == 'release_page';

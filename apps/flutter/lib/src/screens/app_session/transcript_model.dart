@@ -10,6 +10,7 @@
 library;
 
 import 'package:pocox/src/tools/share_ref.dart';
+import 'package:pocox/src/git_diff.dart';
 import 'package:pocox/src/widgets/message_images.dart';
 
 /// Width at which the transcript switches from mobile chat bubbles to the
@@ -32,6 +33,7 @@ class TranscriptItem {
     required this.type,
     this.title = '',
     this.text = '',
+    this.diff,
     this.images = const [],
     this.imageUrls = const [],
     this.streaming = false,
@@ -68,6 +70,9 @@ class TranscriptItem {
 
   /// The row's body. Appended to in place while [streaming].
   String text;
+
+  /// Parsed changes from Rust, replaced together with the item text.
+  DiffModel? diff;
 
   /// User attachments or generated images, resolved once (data URLs decoded to
   /// bytes; host-only paths kept as chips) so rebuilds never re-decode base64.

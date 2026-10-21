@@ -3,6 +3,7 @@
 use pocox_core::device::DeviceMetadata;
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// The environment owning a service, never inferred from its device label.
 pub struct DeviceMetadataDto {
@@ -44,7 +45,10 @@ pub fn local_device_metadata() -> DeviceMetadataDto {
 
 /// Read a registered service's metadata over its existing meta/host tunnel.
 /// Older hosts without the route return `None`; outages remain errors.
-pub fn service_device_metadata(service_key: String) -> Result<Option<DeviceMetadataDto>> {
-    crate::engine::management_client::device_metadata(&service_key)
-        .map(|value| value.map(Into::into))
+pub async fn service_device_metadata(service_key: String) -> Result<Option<DeviceMetadataDto>> {
+    execution::run(Lane::Read, move || {
+        crate::engine::management_client::device_metadata(&service_key)
+            .map(|value| value.map(Into::into))
+    })
+    .await
 }

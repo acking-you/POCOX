@@ -226,7 +226,7 @@ class VoiceController extends ChangeNotifier {
     final transport = createTransport();
     _transport = transport;
     _events = api
-        .appEvents(serviceKey)
+        .appEvents(serviceKey, threadId: id, topic: 'realtime')
         .listen(
           (event) {
             if (!current()) return;

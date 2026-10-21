@@ -20,7 +20,7 @@ class _FileChangeCardState extends State<FileChangeCard> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final muted = scheme.onSurfaceVariant;
-    final diff = DiffModel.cached(widget.item.text);
+    final diff = widget.item.diff ?? const DiffModel([]);
     final hasDiff = !diff.isEmpty;
     final title = widget.item.title.trim();
     final expandable = hasDiff || widget.item.text.trim().isNotEmpty;
@@ -101,6 +101,11 @@ class _FileChangeCardState extends State<FileChangeCard> {
               ),
             ),
           ),
+          if (diff.truncated)
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Text(l10n.contentOmittedNotice(l10n.omittedDiffs)),
+            ),
           if (_expanded)
             DecoratedBox(
               decoration: BoxDecoration(

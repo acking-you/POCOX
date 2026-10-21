@@ -4,7 +4,10 @@
 use anyhow::{Context, Result};
 use flutter_rust_bridge::frb;
 
-use crate::engine::grok_account;
+use crate::engine::{
+    execution::{self, Lane},
+    grok_account,
+};
 
 /// What Grok reports about its sign-in.
 pub struct GrokAccountDto {
@@ -41,18 +44,22 @@ fn account(account: pocox_host_svc::acp::grok_control::GrokAccount) -> GrokAccou
 
 /// The Grok account a Grok-account host on this computer would use, read
 /// through `program` (default: the installed `grok`).
-pub fn grok_account_status(program: Option<String>) -> Result<GrokAccountDto> {
-    grok_account::status(program.as_deref()).map(account)
+pub async fn grok_account_status(program: Option<String>) -> Result<GrokAccountDto> {
+    execution::run(Lane::Read, move || grok_account::status(program.as_deref()).map(account)).await
 }
 
 /// Sign out of Grok on this computer.
-pub fn grok_sign_out(program: Option<String>) -> Result<GrokAccountDto> {
-    grok_account::sign_out(program.as_deref()).map(account)
+pub async fn grok_sign_out(program: Option<String>) -> Result<GrokAccountDto> {
+    execution::run(Lane::Read, move || grok_account::sign_out(program.as_deref()).map(account))
+        .await
 }
 
 /// Begin Grok's device sign-in; returns the attempt id to poll.
-pub fn grok_sign_in_start(program: Option<String>) -> Result<String> {
-    grok_account::sign_in_start(program.as_deref()).map(|id| id.to_string())
+pub async fn grok_sign_in_start(program: Option<String>) -> Result<String> {
+    execution::run(Lane::Read, move || {
+        grok_account::sign_in_start(program.as_deref()).map(|id| id.to_string())
+    })
+    .await
 }
 
 /// Where sign-in `attempt` is.
@@ -70,7 +77,10 @@ pub fn grok_sign_in_state(attempt: String) -> Result<GrokSignInDto> {
 }
 
 /// Cancel sign-in `attempt` and stop its `grok`.
-pub fn grok_sign_in_cancel(attempt: String) -> Result<()> {
-    let id = attempt.parse().context("invalid sign-in attempt")?;
-    grok_account::sign_in_cancel(id)
+pub async fn grok_sign_in_cancel(attempt: String) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        let id = attempt.parse().context("invalid sign-in attempt")?;
+        grok_account::sign_in_cancel(id)
+    })
+    .await
 }

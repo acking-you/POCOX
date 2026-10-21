@@ -7,7 +7,9 @@ use pocox_core::provider::{ApiProtocol, Secret};
 
 use super::{codex_setup::CodexLoginStartDto, hosting::AcpAgentSpecDto, *};
 use crate::engine::{
-    codex_login, host_apply,
+    codex_login,
+    execution::{self, Lane},
+    host_apply,
     host_profiles::{
         self, Change, Engine, KeyChange, ProfileInput, Runtime, RuntimeChange, Source,
     },
@@ -309,9 +311,12 @@ pub(super) fn change_of(
 
 /// The saved configuration of host `name` (inherited when never saved) and
 /// what it runs with now.
-pub fn host_config_get(name: String) -> Result<HostConfigDto> {
-    let profile = host_profiles::get(&name)?;
-    Ok(dto(profile, active_of(&name)))
+pub async fn host_config_get(name: String) -> Result<HostConfigDto> {
+    execution::run(Lane::Read, move || {
+        let profile = host_profiles::get(&name)?;
+        Ok(dto(profile, active_of(&name)))
+    })
+    .await
 }
 
 /// Model-service choices for the selected native engine or ACP agent.
@@ -393,7 +398,7 @@ pub fn host_config_supported(
 /// `replace` (with `key`) or `remove`. With `expected_revision`, a save
 /// made elsewhere meanwhile is refused. Nothing that runs changes until
 /// [`app_serve_apply`].
-pub fn host_config_save(
+pub async fn host_config_save(
     name: String,
     input: HostConfigInputDto,
     key_action: String,
@@ -402,15 +407,23 @@ pub fn host_config_save(
     spec: Option<AcpAgentSpecDto>,
     runtime: Option<HostRuntimeDto>,
 ) -> Result<HostConfigDto> {
-    let mut change = change_of(input, &key_action, key)?;
-    let runtime = runtime.map(HostRuntimeDto::into_runtime).transpose()?;
-    let spec = spec.map(AcpAgentSpecDto::into_spec);
-    if let Some(runtime) = runtime {
-        change.runtime = RuntimeChange::Set(runtime);
-    }
-    let profile =
-        save_profile(&host_profiles::root()?, &name, &change, expected_revision, spec.as_ref())?;
-    Ok(dto(profile, active_of(&name)))
+    execution::run(Lane::Read, move || {
+        let mut change = change_of(input, &key_action, key)?;
+        let runtime = runtime.map(HostRuntimeDto::into_runtime).transpose()?;
+        let spec = spec.map(AcpAgentSpecDto::into_spec);
+        if let Some(runtime) = runtime {
+            change.runtime = RuntimeChange::Set(runtime);
+        }
+        let profile = save_profile(
+            &host_profiles::root()?,
+            &name,
+            &change,
+            expected_revision,
+            spec.as_ref(),
+        )?;
+        Ok(dto(profile, active_of(&name)))
+    })
+    .await
 }
 
 fn save_profile(
@@ -439,62 +452,69 @@ fn save_profile(
 /// caller reviewed: a replaced host or a newer save is refused. Only that
 /// host restarts; controllers reconnect. A failed start restores the
 /// previous configuration exactly.
-pub fn app_serve_apply(
+pub async fn app_serve_apply(
     name: String,
     expected_incarnation: Option<String>,
     expected_revision: Option<u64>,
 ) -> Result<HostApplyDto> {
-    let expected = host_apply::Expected {
-        incarnation: expected_incarnation,
-        revision: expected_revision,
-    };
-    let report = host_apply::apply(&name, &expected)?;
-    Ok(HostApplyDto {
-        name: report.name,
-        applied: report.applied,
-        restored_previous: report.restored_previous,
-        error: report.error,
-        restore_error: report.restore_error,
-        revision: report.revision,
+    execution::run(Lane::Read, move || {
+        let expected = host_apply::Expected {
+            incarnation: expected_incarnation,
+            revision: expected_revision,
+        };
+        let report = host_apply::apply(&name, &expected)?;
+        Ok(HostApplyDto {
+            name: report.name,
+            applied: report.applied,
+            restored_previous: report.restored_previous,
+            error: report.error,
+            restore_error: report.restore_error,
+            revision: report.revision,
+        })
     })
+    .await
 }
 
 /// Start a new host `name` with `runtime` and this configuration, saved and
 /// started as one operation: a failed start puts the previous saved
 /// configuration back. Refused when the name is already hosting.
-pub fn app_serve_start_configured(
+pub async fn app_serve_start_configured(
     name: Option<String>,
     runtime: HostRuntimeDto,
     input: HostConfigInputDto,
     key_action: String,
     key: Option<String>,
 ) -> Result<HostStartedDto> {
-    let change = change_of(input, &key_action, key)?;
-    let started = host_start::start_configured(name.as_deref(), runtime.into_runtime()?, change)?;
-    crate::engine::management::enable_after_hosting();
-    Ok(match started {
-        Started::Codex(r) => HostStartedDto {
-            name: r.name,
-            provider: "codex".into(),
-            service_key: r.app_service_key,
-            reused: r.reused,
-            notice: None,
-        },
-        Started::OpenCode(r) => HostStartedDto {
-            name: r.name,
-            provider: "opencode".into(),
-            service_key: r.service_key,
-            reused: false,
-            notice: None,
-        },
-        Started::Acp(r) => HostStartedDto {
-            name: r.name,
-            provider: "acp".into(),
-            service_key: r.service_key,
-            reused: r.reused,
-            notice: r.notice,
-        },
+    execution::run(Lane::Read, move || {
+        let change = change_of(input, &key_action, key)?;
+        let started =
+            host_start::start_configured(name.as_deref(), runtime.into_runtime()?, change)?;
+        crate::engine::management::enable_after_hosting();
+        Ok(match started {
+            Started::Codex(r) => HostStartedDto {
+                name: r.name,
+                provider: "codex".into(),
+                service_key: r.app_service_key,
+                reused: r.reused,
+                notice: None,
+            },
+            Started::OpenCode(r) => HostStartedDto {
+                name: r.name,
+                provider: "opencode".into(),
+                service_key: r.service_key,
+                reused: false,
+                notice: None,
+            },
+            Started::Acp(r) => HostStartedDto {
+                name: r.name,
+                provider: "acp".into(),
+                service_key: r.service_key,
+                reused: r.reused,
+                notice: r.notice,
+            },
+        })
     })
+    .await
 }
 
 /// How the private sign-in codex reports its account, and how one login
@@ -515,51 +535,60 @@ pub struct CodexLocalAuthDto {
 /// on the relay; other sign-ins are untouched), with `binary` (`None`: the
 /// saved codex, then `PATH`) and `proxy` for its OAuth traffic. Returns the
 /// session id the other calls take.
-pub fn codex_local_session_open(binary: Option<String>, proxy: Option<String>) -> Result<String> {
-    codex_login::open(binary, proxy)
+pub async fn codex_local_session_open(
+    binary: Option<String>,
+    proxy: Option<String>,
+) -> Result<String> {
+    execution::run(Lane::Read, move || codex_login::open(binary, proxy)).await
 }
 
 /// Stop the private sign-in codex `session_id`; nothing for another id.
 /// Fails while its codex has not been seen to exit; calling it again tries
 /// that codex again.
-pub fn codex_local_session_close(session_id: String) -> Result<()> {
-    codex_login::close(&session_id)
+pub async fn codex_local_session_close(session_id: String) -> Result<()> {
+    execution::run(Lane::Read, move || codex_login::close(&session_id)).await
 }
 
 /// Begin the official ChatGPT login on the private sign-in codex.
-pub fn codex_local_login_start(session_id: String) -> Result<CodexLoginStartDto> {
-    let s = codex_login::login_start(&session_id)?;
-    Ok(CodexLoginStartDto {
-        mode: s.mode,
-        login_id: s.login_id,
-        auth_url: s.auth_url,
-        verification_url: s.verification_url,
-        user_code: s.user_code,
+pub async fn codex_local_login_start(session_id: String) -> Result<CodexLoginStartDto> {
+    execution::run(Lane::Read, move || {
+        let s = codex_login::login_start(&session_id)?;
+        Ok(CodexLoginStartDto {
+            mode: s.mode,
+            login_id: s.login_id,
+            auth_url: s.auth_url,
+            verification_url: s.verification_url,
+            user_code: s.user_code,
+        })
     })
+    .await
 }
 
 /// The private sign-in codex's account and how login `login_id` ended.
-pub fn codex_local_auth_status(
+pub async fn codex_local_auth_status(
     session_id: String,
     login_id: Option<String>,
 ) -> Result<CodexLocalAuthDto> {
-    let status = codex_login::auth_status(&session_id, login_id.as_deref())?;
-    Ok(CodexLocalAuthDto {
-        authenticated: status.authenticated,
-        method: status.method,
-        completed: status.completed.as_ref().map(|c| c.success),
-        error: status.completed.and_then(|c| c.error),
+    execution::run(Lane::Read, move || {
+        let status = codex_login::auth_status(&session_id, login_id.as_deref())?;
+        Ok(CodexLocalAuthDto {
+            authenticated: status.authenticated,
+            method: status.method,
+            completed: status.completed.as_ref().map(|c| c.success),
+            error: status.completed.and_then(|c| c.error),
+        })
     })
+    .await
 }
 
 /// Cancel login `login_id` on the private sign-in codex.
-pub fn codex_local_login_cancel(session_id: String, login_id: String) -> Result<()> {
-    codex_login::login_cancel(&session_id, &login_id)
+pub async fn codex_local_login_cancel(session_id: String, login_id: String) -> Result<()> {
+    execution::run(Lane::Control, move || codex_login::login_cancel(&session_id, &login_id)).await
 }
 
 /// Sign codex out through the private sign-in codex.
-pub fn codex_local_logout(session_id: String) -> Result<()> {
-    codex_login::logout(&session_id)
+pub async fn codex_local_logout(session_id: String) -> Result<()> {
+    execution::run(Lane::Read, move || codex_login::logout(&session_id)).await
 }
 
 #[cfg(test)]
@@ -633,6 +662,7 @@ mod tests {
 
     #[test]
     fn unknown_values_are_refused_before_anything_is_saved() {
+        runtime::init(std::env::temp_dir()).expect("test runtime");
         let input = || HostConfigInputDto {
             claude_env: None,
             source: "custom".into(),
@@ -645,7 +675,15 @@ mod tests {
             ..input()
         };
         let save = |input, action: &str| {
-            host_config_save("h".into(), input, action.into(), None, None, None, None)
+            futures::executor::block_on(host_config_save(
+                "h".into(),
+                input,
+                action.into(),
+                None,
+                None,
+                None,
+                None,
+            ))
         };
         assert!(save(bad_source, "keep").is_err());
         assert!(save(input(), "rotate").is_err());

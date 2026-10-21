@@ -182,14 +182,24 @@ extension _SessionExternalWriter on _AppSessionState {
           .read(bridgeApiProvider)
           .appThreadRead(widget.serviceKey, threadId, includeTurnPages: false);
       if (!current() || _externalWriterLegacy) return;
+      final replace =
+          (_caps.isAcp || _historyEpoch != null) &&
+          history.historyEpoch != null &&
+          _historyEpoch != history.historyEpoch;
+      final projected = await _projectSplice(
+        history.items,
+        atStart: false,
+        current: current,
+        activeTurnId: history.activeTurnId,
+        turnOrder: history.turns.map((turn) => turn.turnId).toList(),
+        replace: replace,
+        refresh: true,
+      );
+      if (projected == null || !current() || _externalWriterLegacy) return;
       final followTail = _loading || _atBottom;
       final anchor = followTail ? null : _captureHistoryAnchor();
       _updateState(() {
-        // ACP replay and native history use different item identities, even
-        // when replay had no epoch. Replace only after a successful read.
-        if ((_caps.isAcp || _historyEpoch != null) &&
-            history.historyEpoch != null &&
-            _historyEpoch != history.historyEpoch) {
+        if (replace) {
           _replaceTranscriptItems(const []);
           _turnWindows.clear();
           _fetchedTurns.clear();
@@ -203,43 +213,14 @@ extension _SessionExternalWriter on _AppSessionState {
         _firstTurnId = history.firstTurnId;
         _hasOlder = history.hasOlder;
         _sequentialHistoryIds.addAll(history.items.map((item) => item.id));
-        // Messages this view sent while it wrote are in the host's history
-        // now (a release or another writer turned it read-only).
+        final before = _items.map((item) => item.id).toSet();
         _dropHostHeldLocalPrompts(history.items);
-        for (final item in history.items) {
-          final index = _itemIndex[item.id];
-          if (index == null) continue;
-          final existing = _items[index];
-          if (!listEquals(existing.imageUrls, item.images)) {
-            existing.imageUrls = item.images;
-            existing.images = resolveImageUrls(item.images);
-          }
-          if (item.itemType == 'imageGeneration') {
-            existing.streaming = _generatingImage(item, history.activeTurnId);
-          }
-          existing
-            ..text = item.text
-            ..title = item.title
-            ..type = item.itemType
-            ..turnId = item.turnId
-            ..turnCompletedAt = item.turnCompletedAt
-            ..turnDurationMs = item.turnDurationMs;
-        }
-        _spliceTranscriptItems(
-          history.items,
-          atStart: false,
-          activeTurnId: history.activeTurnId,
+        final dropped = before.difference(
+          _items.map((item) => item.id).toSet(),
         );
-        for (final page in history.turnPages) {
-          // An older read completed while this background refresh was queued.
-          _turnWindows.putIfAbsent(page.turnId, () => page);
-          _fetchedTurns.add(page.turnId);
-          _spliceTranscriptItems(
-            page.items,
-            atStart: true,
-            activeTurnId: history.activeTurnId,
-          );
-        }
+        _installHistory(
+          projected.where((item) => !dropped.contains(item.id)).toList(),
+        );
         for (final item in _items) {
           if (item.type == 'imageGeneration' &&
               item.turnId != history.activeTurnId) {

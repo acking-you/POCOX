@@ -4,9 +4,10 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../../frb_generated.dart';
+import 'diff.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `history_dto`, `item_dto`, `thread_meta_dto`, `turn_page_dto`
+// These functions are ignored because they are not marked as `pub`: `history_dto`, `item_dto`, `latest_input_matches`, `thread_meta_dto`, `turn_page_dto`
 
 /// Read or continue a selected turn, reusing its previously loaded pages.
 /// `delta_only` opts into new items only on continuation; omission preserves
@@ -374,6 +375,21 @@ Future<void> historyCacheSetLimit({required int limitMb}) => RustLib
     .api
     .crateApiBridgeThreadsHistoryCacheSetLimit(limitMb: limitMb);
 
+/// Compare an explicit retry with the latest recorded user input in Rust.
+/// A non-match is not proof that a lost send never committed; only the user's
+/// explicit retry may act on it. Read failures remain errors, never `false`.
+Future<bool> appTurnCommitted({
+  required String serviceKey,
+  required String threadId,
+  required String text,
+  required List<String> images,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppTurnCommitted(
+  serviceKey: serviceKey,
+  threadId: threadId,
+  text: text,
+  images: images,
+);
+
 /// What became of [`app_turn_supplement`].
 class AppTurnSupplementDto {
   /// `injected`: the running turn took it. `promptRequired`: no turn was
@@ -690,6 +706,9 @@ class ThreadItemDto {
   /// This item's turn duration in milliseconds, when the server reports it.
   final PlatformInt64? turnDurationMs;
 
+  /// Parsed file edits, prepared by Rust for the review and inline card.
+  final DiffDto? diff;
+
   const ThreadItemDto({
     required this.id,
     required this.itemType,
@@ -700,6 +719,7 @@ class ThreadItemDto {
     required this.turnId,
     this.turnCompletedAt,
     this.turnDurationMs,
+    this.diff,
   });
 
   @override
@@ -712,7 +732,8 @@ class ThreadItemDto {
       images.hashCode ^
       turnId.hashCode ^
       turnCompletedAt.hashCode ^
-      turnDurationMs.hashCode;
+      turnDurationMs.hashCode ^
+      diff.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -727,7 +748,8 @@ class ThreadItemDto {
           images == other.images &&
           turnId == other.turnId &&
           turnCompletedAt == other.turnCompletedAt &&
-          turnDurationMs == other.turnDurationMs;
+          turnDurationMs == other.turnDurationMs &&
+          diff == other.diff;
 }
 
 /// Thread summary mirrored for Dart.

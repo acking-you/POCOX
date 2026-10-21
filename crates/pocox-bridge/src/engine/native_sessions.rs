@@ -177,19 +177,21 @@ mod tests {
         let session = std::env::var("POCOX_TEST_OPENCODE_SESSION").expect("fixture session");
         let marker = std::env::var("POCOX_TEST_OPENCODE_MARKER").expect("fixture public marker");
         crate::engine::runtime::init(std::env::temp_dir()).expect("fixture runtime");
-        let inventory = api::app_native_sessions("opencode".into(), None, None).expect("inventory");
+        let inventory =
+            futures::executor::block_on(api::app_native_sessions("opencode".into(), None, None))
+                .expect("inventory");
         let row = inventory
             .sessions
             .iter()
             .find(|row| row.thread_id == session)
             .expect("listed session");
         assert!(!row.allows_resume && !row.requires_takeover);
-        let page = api::app_native_session_page(
+        let page = futures::executor::block_on(api::app_native_session_page(
             "opencode".into(),
             session.clone(),
             None,
             Some(inventory.source_id.clone()),
-        )
+        ))
         .expect("persisted page");
         assert!(page.items.iter().any(|item| item.text.contains(&marker)));
         assert!(page
@@ -199,18 +201,21 @@ mod tests {
                 && item.title == "bash"
                 && item.text.contains("sleep 45")));
         assert!(page.items.iter().all(|item| item.item_type != "reasoning"));
-        let revision =
-            api::app_native_session_revision("opencode".into(), session, Some(inventory.source_id))
-                .expect("revision");
+        let revision = futures::executor::block_on(api::app_native_session_revision(
+            "opencode".into(),
+            session,
+            Some(inventory.source_id),
+        ))
+        .expect("revision");
         assert_eq!(revision.generation, page.generation);
         assert_eq!(revision.source_id, page.source_id);
         assert!(!revision.liveness.allows_resume && !revision.liveness.requires_takeover);
-        assert!(api::app_native_session_page(
+        assert!(futures::executor::block_on(api::app_native_session_page(
             "opencode".into(),
             row.thread_id.clone(),
             None,
             Some("different-root".into())
-        )
+        ))
         .is_err());
     }
 }

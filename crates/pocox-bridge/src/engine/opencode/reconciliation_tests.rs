@@ -237,7 +237,7 @@ fn follow_detects_external_deletion_without_an_sse_invalidation() {
         .block_on(async {
             tokio::time::timeout(
                 std::time::Duration::from_secs(5),
-                follow::follow_link(link.clone(), "unused", "ses_fixture", |_| {
+                follow::follow_link(link.clone(), "unused", "ses_fixture", |_| async {
                     panic!("deleted history is never delivered")
                 }),
             )

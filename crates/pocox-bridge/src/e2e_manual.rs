@@ -37,8 +37,14 @@ fn init_and_host(name: &str) -> crate::api::bridge::AppServeDto {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(0);
-    let host =
-        api::app_serve_start(port, None, Some(name.into()), None, false).expect("app_serve_start");
+    let host = futures::executor::block_on(api::app_serve_start(
+        port,
+        None,
+        Some(name.into()),
+        None,
+        false,
+    ))
+    .expect("app_serve_start");
     println!("hosting: app={} (pid {})", host.app_service_key, host.pid);
     host
 }
@@ -53,7 +59,7 @@ fn image_turn_round_trips_through_a_real_host() {
     let name = format!("e2e-img-{}", std::process::id());
     let host = init_and_host(&name);
     let result = std::panic::catch_unwind(|| run_image_turn(&host.app_service_key));
-    let _ = api::app_serve_stop(name);
+    let _ = futures::executor::block_on(api::app_serve_stop(name));
     if let Err(p) = result {
         std::panic::resume_unwind(p);
     }
@@ -76,7 +82,7 @@ fn file_turn_round_trips_through_a_real_host() {
     let result = std::panic::catch_unwind(|| {
         run_file_turn(&host.app_service_key, "read-only", /* expect_settings_update */ false)
     });
-    let _ = api::app_serve_stop(name);
+    let _ = futures::executor::block_on(api::app_serve_stop(name));
     if let Err(p) = result {
         std::panic::resume_unwind(p);
     }
@@ -89,7 +95,7 @@ fn connect_with_retry(key: &str) {
     use crate::api::bridge as api;
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
-        match api::app_connect(key.to_string(), 0) {
+        match futures::executor::block_on(api::app_connect(key.to_string(), 0)) {
             Ok(()) => return,
             Err(e) if Instant::now() < deadline => {
                 println!("connect retry: {e:#}");
@@ -105,11 +111,11 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
 
     const SENTINEL: &str = "pocox-e2e-sentinel-7429";
     let content = format!("The magic word is: {SENTINEL}\n");
-    let host_path = api::meta_upload_file(
+    let host_path = futures::executor::block_on(api::meta_upload_file(
         key.to_string(),
         "sentinel notes.txt".to_string(),
         content.clone().into_bytes(),
-    )
+    ))
     .expect("meta_upload_file");
     println!("uploaded to host path: {host_path}");
     assert!(host_path.ends_with("sentinel notes.txt"), "basename preserved: {host_path}");
@@ -119,7 +125,7 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
 
     let cwd = std::env::temp_dir().join("pcx-e2e-file");
     std::fs::create_dir_all(&cwd).expect("temp cwd");
-    let tid = api::app_thread_start(
+    let tid = futures::executor::block_on(api::app_thread_start(
         key.to_string(),
         None,
         Some(cwd.to_string_lossy().into_owned()),
@@ -127,7 +133,7 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
         None,
         None,
         Some(sandbox.to_string()),
-    )
+    ))
     .expect("app_thread_start");
 
     // The thread/start response reports the runtime config the thread actually
@@ -160,7 +166,7 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
         "Read the attached file and reply with the exact magic word it contains.\n\n## Attached \
          files (read them from this machine's filesystem):\n- \"{host_path}\""
     );
-    api::app_turn_start(
+    futures::executor::block_on(api::app_turn_start(
         key.to_string(),
         tid.clone(),
         text,
@@ -173,7 +179,7 @@ fn run_file_turn(key: &str, sandbox: &str, expect_settings_update: bool) {
         None,
         Some("low".into()),
         None,
-    )
+    ))
     .expect("app_turn_start");
 
     let deadline = Instant::now() + Duration::from_secs(300);
@@ -246,7 +252,7 @@ fn run_image_turn(key: &str) {
 
     let cwd = std::env::temp_dir().join("pcx-e2e-img");
     std::fs::create_dir_all(&cwd).expect("temp cwd");
-    let tid = api::app_thread_start(
+    let tid = futures::executor::block_on(api::app_thread_start(
         key.to_string(),
         None,
         Some(cwd.to_string_lossy().into_owned()),
@@ -254,13 +260,13 @@ fn run_image_turn(key: &str) {
         None,
         None,
         Some("read-only".into()),
-    )
+    ))
     .expect("app_thread_start");
     println!("thread: {tid}");
 
     let prompt = "Describe this image in one short sentence: name the shapes, their colors, and \
                   any text you can read.";
-    api::app_turn_start(
+    futures::executor::block_on(api::app_turn_start(
         key.to_string(),
         tid.clone(),
         prompt.to_string(),
@@ -273,7 +279,7 @@ fn run_image_turn(key: &str) {
         None,
         None,
         None,
-    )
+    ))
     .expect("app_turn_start with image");
 
     // Stream events until the turn ends, accumulating the agent's reply.
@@ -307,7 +313,8 @@ fn run_image_turn(key: &str) {
 
     // History must echo the user message with the image data URL intact — this
     // is what a re-opened conversation (and a second device) renders from.
-    let h = api::app_thread_read(key.to_string(), tid, None).expect("app_thread_read");
+    let h = futures::executor::block_on(api::app_thread_read(key.to_string(), tid, None))
+        .expect("app_thread_read");
     let user = h
         .items
         .iter()

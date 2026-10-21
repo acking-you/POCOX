@@ -1,3 +1,9 @@
+import 'package:flutter/foundation.dart' show listEquals;
+import 'support/fake_composer_control.dart';
+import 'support/native_diff_fixture.dart';
+import 'support/history_projection_fixture.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/git_diff.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';

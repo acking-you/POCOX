@@ -1,6 +1,13 @@
-use std::fs::FileTimes;
+use std::{
+    fs::{self, File, FileTimes},
+    path::PathBuf,
+    time::Duration,
+};
 
-use super::*;
+use super::{
+    disk::{RotatingFile, FILE_RETENTION},
+    *,
+};
 
 struct LogDir(PathBuf);
 
@@ -41,18 +48,22 @@ fn running_logger_rotates_and_prunes_without_reinitializing() {
     let dir = LogDir::new();
     let now = SystemTime::now();
     let mut log = RotatingFile::new(dir.0.clone());
-    log.write(&line("first hour"), now);
+    log.write(&line("first hour"), now).unwrap();
+    log.flush().unwrap();
     let first = dir.files().pop().expect("first file");
     log.file
         .as_ref()
         .expect("first handle")
+        .get_ref()
         .set_times(FileTimes::new().set_modified(now))
         .expect("timestamp first file");
     let later = now + Duration::from_secs(3600);
-    log.write(&line("second hour"), later);
+    log.write(&line("second hour"), later).unwrap();
+    log.flush().unwrap();
     log.file
         .as_ref()
         .expect("second handle")
+        .get_ref()
         .set_times(FileTimes::new().set_modified(later))
         .expect("timestamp second file");
     assert_eq!(dir.files().len(), 2);
@@ -92,4 +103,35 @@ fn pruning_keeps_other_files_and_removes_legacy_daily_logs() {
     log.maintain(now);
     assert!(!old.exists());
     assert!(unrelated.exists());
+}
+
+#[test]
+fn retention_is_bounded_by_bytes_and_lines_and_truncates_utf8() {
+    let mut ring = LogBuffer::default();
+    for _ in 0..RING_CAPACITY + 1 {
+        ring.push(line("small"));
+    }
+    assert_eq!(ring.lines.len(), RING_CAPACITY);
+    for _ in 0..300 {
+        ring.push(line(&"汉".repeat(5000)));
+    }
+    assert!(ring.bytes <= RING_BYTES);
+    assert!(ring.lines.len() < RING_CAPACITY);
+    let mut text = "汉".repeat(MESSAGE_BYTES);
+    truncate(&mut text, MESSAGE_BYTES);
+    assert!(text.ends_with("…[truncated]"));
+    assert!(text.len() < MESSAGE_BYTES + 32);
+    assert!(text.capacity() < MESSAGE_BYTES + 32);
+}
+
+#[test]
+fn disk_writer_flushes_controller_records_before_shutdown() {
+    let dir = LogDir::new();
+    let log = DiskLog::start(dir.0.clone()).unwrap();
+    log.push(line("controller recovered"));
+    assert!(log.flush());
+    assert!(fs::read_to_string(&dir.files()[0])
+        .unwrap()
+        .contains("controller recovered"));
+    assert_eq!(log.lost(), 0);
 }

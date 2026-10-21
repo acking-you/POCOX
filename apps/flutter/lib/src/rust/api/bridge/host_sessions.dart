@@ -4,10 +4,11 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../../frb_generated.dart';
+import 'diff.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'threads.dart';
 
-// These functions are ignored because they are not marked as `pub`: `holder_dto`, `local_session_dto`, `meta_follow_update_dto`, `meta_holder_dto`, `meta_liveness_dto`, `meta_thread_item_dto`, `project_config_dto`, `thread_config_dto`, `thread_config_from_dto`
+// These functions are ignored because they are not marked as `pub`: `ensure_default_project`, `holder_dto`, `local_session_dto`, `meta_follow_update_dto`, `meta_holder_dto`, `meta_liveness_dto`, `meta_thread_item_dto`, `project_config_dto`, `project_settings`, `thread_config_dto`, `thread_config_from_dto`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `ProjectViewResponse`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
 
@@ -130,7 +131,7 @@ Future<String> metaUploadFile({
 );
 
 /// Capture attachment destination ownership before asynchronous file reads.
-String metaUploadContext() =>
+Future<String> metaUploadContext() =>
     RustLib.instance.api.crateApiBridgeHostSessionsMetaUploadContext();
 
 /// Upload using the context captured before reading the file; reject a changed

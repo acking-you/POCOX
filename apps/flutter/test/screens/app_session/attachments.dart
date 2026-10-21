@@ -7,12 +7,12 @@ void _registerAttachments() {
     setUp(() {
       // compute() spawns a real isolate whose completion never lands under the
       // fake test clock — run the processing pipeline inline instead.
-      processImageImpl = (bytes) async => processImageBytes(bytes);
+      processImageImpl = (bytes) async => preparedImageFixture(bytes);
       picker = FakeImagePicker();
       ImagePickerPlatform.instance = picker;
     });
     tearDown(() {
-      processImageImpl = (bytes) => compute(processImageBytes, bytes);
+      processImageImpl = processImageNative;
     });
 
     testWidgets('a failed image remains retryable without choosing it again', (
@@ -38,7 +38,7 @@ void _registerAttachments() {
         t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
         isNull,
       );
-      processImageImpl = (bytes) async => processImageBytes(bytes);
+      processImageImpl = (bytes) async => preparedImageFixture(bytes);
       await t.tap(find.byKey(const Key('attachment-0')));
       await t.pumpAndSettle();
       expect(find.text('重试'), findsNothing);
@@ -366,12 +366,12 @@ void _registerAttachments() {
     setUp(() {
       // Inline image processing (see the image-attachments group) — a picked
       // .png routes to the image pipeline even from the file picker.
-      processImageImpl = (bytes) async => processImageBytes(bytes);
+      processImageImpl = (bytes) async => preparedImageFixture(bytes);
       selector = FakeFileSelector();
       fsel.FileSelectorPlatform.instance = selector;
     });
     tearDown(() {
-      processImageImpl = (bytes) => compute(processImageBytes, bytes);
+      processImageImpl = processImageNative;
     });
 
     XFile tmpFile(String name, List<int> bytes) =>

@@ -28,22 +28,24 @@ pub fn liveness(service: &str, session: &str) -> Result<SessionLiveness> {
 }
 
 /// Follow only this captured host/source and original ID until the UI leaves.
-pub async fn follow_session<F>(service: &str, session: &str, on_update: F) -> Result<()>
+pub async fn follow_session<F, Fut>(service: &str, session: &str, on_update: F) -> Result<()>
 where
-    F: FnMut(SessionFollowUpdate) -> bool,
+    F: FnMut(SessionFollowUpdate) -> Fut,
+    Fut: std::future::Future<Output = bool>,
 {
     let link = conn(service)?;
     follow_link(link, service, session, on_update).await
 }
 
-pub(super) async fn follow_link<F>(
+pub(super) async fn follow_link<F, Fut>(
     link: Link,
     service: &str,
     session: &str,
     mut on_update: F,
 ) -> Result<()>
 where
-    F: FnMut(SessionFollowUpdate) -> bool,
+    F: FnMut(SessionFollowUpdate) -> Fut,
+    Fut: std::future::Future<Output = bool>,
 {
     let identity = link.identity();
     let mut updates = link.tx.subscribe();
@@ -89,7 +91,7 @@ where
         }
         super::super::app_session::external_history_changed(service, session);
         previous = Some(update.clone());
-        if !on_update(update) {
+        if !on_update(update).await {
             return Ok(());
         }
     }

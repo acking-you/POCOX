@@ -392,14 +392,7 @@ void _registerChrome() {
       tokensUsed: 5000,
       contextWindow: 100000,
     );
-    api.gitDiffText =
-        'diff --git a/lib/x.dart b/lib/x.dart\n'
-        '--- a/lib/x.dart\n'
-        '+++ b/lib/x.dart\n'
-        '@@ -1 +1,2 @@\n'
-        '-old\n'
-        '+new\n'
-        '+more\n';
+    api.gitDiff = diffFixture('lib/x.dart', added: ['new', 'extra']);
     await t.pumpWidget(
       host(
         const AppSessionScreen(
@@ -455,13 +448,7 @@ void _registerChrome() {
       tokensUsed: 5000,
       contextWindow: 100000,
     );
-    api.gitDiffText =
-        'diff --git a/lib/x.dart b/lib/x.dart\n'
-        '--- a/lib/x.dart\n'
-        '+++ b/lib/x.dart\n'
-        '@@ -1 +1,2 @@\n'
-        '-old\n'
-        '+new\n';
+    api.gitDiff = diffFixture('lib/x.dart', added: ['new', 'extra']);
     // Gate the diff from the very start, so the screen reaches the badge with
     // NO diff read yet — the only case that has to block on a fetch.
     final gate = Completer<void>();
@@ -527,13 +514,7 @@ void _registerChrome() {
       tokensUsed: 5000,
       contextWindow: 100000,
     );
-    api.gitDiffText =
-        'diff --git a/lib/x.dart b/lib/x.dart\n'
-        '--- a/lib/x.dart\n'
-        '+++ b/lib/x.dart\n'
-        '@@ -1 +1,2 @@\n'
-        '-old\n'
-        '+new\n';
+    api.gitDiff = diffFixture('lib/x.dart', added: ['new', 'extra']);
     await t.pumpWidget(
       host(
         const AppSessionScreen(

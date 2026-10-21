@@ -283,8 +283,78 @@ mixin _RustThreads implements BridgeApi {
       frb.appRateLimits(serviceKey: serviceKey);
 
   @override
-  Future<String> appGitDiff(String serviceKey, String cwd) =>
-      frb.appGitDiff(serviceKey: serviceKey, cwd: cwd);
+  bool turnErrorIsRefusal(String message) =>
+      frb.turnErrorIsRefusal(message: message);
+
+  @override
+  Future<bool> appTurnCommitted(
+    String service,
+    String thread,
+    String text,
+    List<String> images,
+  ) => frb.appTurnCommitted(
+    serviceKey: service,
+    threadId: thread,
+    text: text,
+    images: images,
+  );
+
+  @override
+  Future<ReviewIndex> reviewIndex(List<DiffModel> edits) async {
+    final index = await frb.reviewIndex(
+      edits: [
+        for (final edit in edits)
+          frb.ReviewEditInputDto(
+            files: [
+              for (final file in edit.files)
+                frb.ReviewFileInputDto(
+                  path: file.path,
+                  added: file.added,
+                  removed: file.removed,
+                ),
+            ],
+          ),
+      ],
+    );
+    return ReviewIndex(
+      [
+        for (final file in index.files)
+          ReviewFileIndex(
+            path: file.path,
+            added: file.added.toInt(),
+            removed: file.removed.toInt(),
+            sections: [
+              for (final section in file.sections) (section.edit, section.file),
+            ],
+          ),
+      ],
+      added: index.added.toInt(),
+      removed: index.removed.toInt(),
+    );
+  }
+
+  @override
+  Future<List<int>> historyMerge(
+    List<String> currentIds,
+    List<String> currentTurns,
+    List<String> incomingIds,
+    List<String> incomingTurns,
+    List<String> turnOrder,
+    bool olderPage,
+  ) => frb.historyMerge(
+    currentIds: currentIds,
+    currentTurns: currentTurns,
+    incomingIds: incomingIds,
+    incomingTurns: incomingTurns,
+    turnOrder: turnOrder,
+    olderPage: olderPage,
+  );
+
+  @override
+  Future<DiffModel> appGitDiff(String serviceKey, String cwd) async =>
+      DiffModel.fromNative(
+        await frb.appGitDiffParsed(serviceKey: serviceKey, cwd: cwd),
+      );
 
   @override
   Future<void> appCompact(String serviceKey, String threadId) =>
@@ -492,6 +562,7 @@ ThreadItem _item(frb.ThreadItemDto i) => ThreadItem(
   itemType: i.itemType,
   title: i.title,
   text: i.text,
+  diff: i.diff == null ? null : DiffModel.fromNative(i.diff!),
   images: i.images,
   turnId: i.turnId,
   turnCompletedAt: i.turnCompletedAt?.toInt(),

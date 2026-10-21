@@ -493,9 +493,14 @@ pub fn transcript(service_key: &str, thread_id: &str) -> Result<Vec<TranscriptIt
 /// rollout or its ownership changes, so one relay connection replaces client
 /// polling. New hosts emit revisions for bounded app-server reads; old hosts
 /// that ignore the query retain their full-snapshot response semantics.
-pub async fn follow_session<F>(service_key: &str, thread_id: &str, mut on_update: F) -> Result<()>
+pub async fn follow_session<F, Fut>(
+    service_key: &str,
+    thread_id: &str,
+    mut on_update: F,
+) -> Result<()>
 where
-    F: FnMut(SessionFollowUpdate) -> bool,
+    F: FnMut(SessionFollowUpdate) -> Fut,
+    Fut: std::future::Future<Output = bool>,
 {
     if protocol_of(service_key) == Protocol::OpenCode {
         return super::opencode::follow_session(service_key, thread_id, on_update).await;
@@ -537,7 +542,7 @@ where
                 super::app_session::external_history_changed(service_key, thread_id);
             }
             version = Some(next_version);
-            if !on_update(update) {
+            if !on_update(update).await {
                 return Ok(());
             }
         }

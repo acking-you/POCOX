@@ -2,7 +2,10 @@
 //! answers, and this device's connections to other devices' shares.
 
 use super::*;
-use crate::engine::agent_tools::{self as tools, connections, model, shares, tokens, watch};
+use crate::engine::{
+    agent_tools::{self as tools, connections, model, shares, tokens, watch},
+    execution::{self, Lane},
+};
 
 /// The tools on this installation.
 pub struct AgentToolsStatusDto {
@@ -354,18 +357,18 @@ pub fn tools_status() -> AgentToolsStatusDto {
 }
 
 /// Switch the tools on or off on this installation.
-pub fn tools_set_enabled(enabled: bool) -> Result<AgentToolsStatusDto> {
-    Ok(tools::set_enabled(enabled)?.into())
+pub async fn tools_set_enabled(enabled: bool) -> Result<AgentToolsStatusDto> {
+    execution::run(Lane::Read, move || Ok(tools::set_enabled(enabled)?.into())).await
 }
 
 /// Ask (or not) before an agent's first share.
-pub fn tools_set_ask_before_sharing(ask: bool) -> Result<AgentToolsStatusDto> {
-    Ok(tools::set_ask_before_sharing(ask)?.into())
+pub async fn tools_set_ask_before_sharing(ask: bool) -> Result<AgentToolsStatusDto> {
+    execution::run(Lane::Read, move || Ok(tools::set_ask_before_sharing(ask)?.into())).await
 }
 
 /// Every device and service visible now, read once.
-pub fn tools_overview() -> Result<ToolsOverviewDto> {
-    Ok(overview(tools::catalog::overview_blocking()?))
+pub async fn tools_overview() -> Result<ToolsOverviewDto> {
+    execution::run(Lane::Read, move || Ok(overview(tools::catalog::overview_blocking()?))).await
 }
 
 /// Follow every device's services and shares; ends when the Dart stream is
@@ -383,101 +386,119 @@ pub fn tools_watch(sink: StreamSink<ToolsUpdateDto>) -> Result<()> {
 
 /// Answer a consent request of `device`: `allow_once`,
 /// `allow_conversation` or `deny`.
-pub fn tools_answer(device: String, consent_id: String, decision: String) -> Result<()> {
-    let decision: model::Decision = serde_json::from_value(serde_json::Value::String(decision))
-        .map_err(|_| anyhow!("unknown decision"))?;
-    tools::answer_on(&device, &consent_id, decision)
+pub async fn tools_answer(device: String, consent_id: String, decision: String) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        let decision: model::Decision = serde_json::from_value(serde_json::Value::String(decision))
+            .map_err(|_| anyhow!("unknown decision"))?;
+        tools::answer_on(&device, &consent_id, decision)
+    })
+    .await
 }
 
 /// Hand built-in `tools` the user picked in the composer to `conversation`
 /// of agent service `service`, on whichever device hosts it: the gated ones
 /// need no consent prompt in that conversation.
-pub fn tools_grant(service: String, conversation: String, tools: Vec<String>) -> Result<()> {
-    use pocox_account_proto::key::NamespacedServiceId;
-    use pocox_core::service::ServiceId;
-    let device = ServiceId::parse_key(&service)
-        .or_else(|| NamespacedServiceId::parse_key(&service).map(|id| id.service))
-        .map(|id| id.device)
-        .ok_or_else(|| anyhow!("not a service key"))?;
-    tools::grant_on(&device, &service, &conversation, &tools)
+pub async fn tools_grant(service: String, conversation: String, tools: Vec<String>) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        use pocox_account_proto::key::NamespacedServiceId;
+        use pocox_core::service::ServiceId;
+        let device = ServiceId::parse_key(&service)
+            .or_else(|| NamespacedServiceId::parse_key(&service).map(|id| id.service))
+            .map(|id| id.device)
+            .ok_or_else(|| anyhow!("not a service key"))?;
+        tools::grant_on(&device, &service, &conversation, &tools)
+    })
+    .await
 }
 
 /// Stop a share of `device`, as the user.
-pub fn tools_stop_share(device: String, share_id: String) -> Result<()> {
-    tools::stop_on(&device, &share_id)
+pub async fn tools_stop_share(device: String, share_id: String) -> Result<()> {
+    execution::run(Lane::Read, move || tools::stop_on(&device, &share_id)).await
 }
 
 /// Keep a share of `device` until the user stops it.
-pub fn tools_keep_share(device: String, share_id: String) -> Result<()> {
-    tools::keep_on(&device, &share_id)
+pub async fn tools_keep_share(device: String, share_id: String) -> Result<()> {
+    execution::run(Lane::Read, move || tools::keep_on(&device, &share_id)).await
 }
 
 /// Share ports of this computer with the user's other devices.
-pub fn tools_share(
+pub async fn tools_share(
     ports: Vec<u16>,
     title: Option<String>,
     path: Option<String>,
 ) -> Result<ToolsSharedDto> {
-    let request = shares::ShareRequest {
-        ports,
-        title,
-        path,
-        wait_ready_seconds: Some(5),
-        secure: false,
-        epoch: None,
-    };
-    let caller = shares::Caller::user("You");
-    match runtime::runtime().block_on(shares::share(&caller, request)) {
-        Ok(Ok(shared)) => Ok(ToolsSharedDto {
-            share: share(shared.share),
-            on_this_machine: shared.on_this_machine,
-            open: shared.open,
-            ends: shared.ends,
-        }),
-        Ok(Err(pending)) => Err(anyhow!(pending.message())),
-        Err(error) => Err(anyhow!(error.message())),
-    }
+    execution::run(Lane::Read, move || {
+        let request = shares::ShareRequest {
+            ports,
+            title,
+            path,
+            wait_ready_seconds: Some(5),
+            secure: false,
+            epoch: None,
+        };
+        let caller = shares::Caller::user("You");
+        match runtime::runtime().block_on(shares::share(&caller, request)) {
+            Ok(Ok(shared)) => Ok(ToolsSharedDto {
+                share: share(shared.share),
+                on_this_machine: shared.on_this_machine,
+                open: shared.open,
+                ends: shared.ends,
+            }),
+            Ok(Err(pending)) => Err(anyhow!(pending.message())),
+            Err(error) => Err(anyhow!(error.message())),
+        }
+    })
+    .await
 }
 
 /// Share `ports` of `device` as the user: this computer, or another of the
 /// user's devices (Share and open on a `localhost` link; `secure` for an
 /// `https://localhost` one).
-pub fn tools_share_on(
+pub async fn tools_share_on(
     device: String,
     ports: Vec<u16>,
     title: Option<String>,
     path: Option<String>,
     secure: bool,
 ) -> Result<ToolsSharedDto> {
-    let shared = tools::share_on(&device, ports, title, path, secure)?;
-    Ok(ToolsSharedDto {
-        share: share(shared.share),
-        on_this_machine: shared.on_this_machine,
-        open: shared.open,
-        ends: shared.ends,
+    execution::run(Lane::Read, move || {
+        let shared = tools::share_on(&device, ports, title, path, secure)?;
+        Ok(ToolsSharedDto {
+            share: share(shared.share),
+            on_this_machine: shared.on_this_machine,
+            open: shared.open,
+            ends: shared.ends,
+        })
     })
+    .await
 }
 
 /// Make another device's shared port or API reachable on this device, at
 /// the same port number when it is free.
-pub fn tools_connect(service: String, local_port: Option<u16>) -> Result<ToolsConnectionDto> {
-    let request = connections::ConnectRequest {
-        service,
-        local_port,
-    };
-    let caller = shares::Caller::user("This device");
-    match runtime::runtime().block_on(connections::connect(&caller, request)) {
-        Ok(Ok(view)) => Ok(connection(view)),
-        Ok(Err(pending)) => Err(anyhow!(pending.message())),
-        Err(error) => Err(anyhow!(error.message())),
-    }
+pub async fn tools_connect(service: String, local_port: Option<u16>) -> Result<ToolsConnectionDto> {
+    execution::run(Lane::Read, move || {
+        let request = connections::ConnectRequest {
+            service,
+            local_port,
+        };
+        let caller = shares::Caller::user("This device");
+        match runtime::runtime().block_on(connections::connect(&caller, request)) {
+            Ok(Ok(view)) => Ok(connection(view)),
+            Ok(Err(pending)) => Err(anyhow!(pending.message())),
+            Err(error) => Err(anyhow!(error.message())),
+        }
+    })
+    .await
 }
 
 /// End this device's connection to `service`.
-pub fn tools_disconnect(service: String) -> Result<()> {
-    connections::disconnect(None, &service)
-        .map(drop)
-        .map_err(|error| anyhow!(error.message()))
+pub async fn tools_disconnect(service: String) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        connections::disconnect(None, &service)
+            .map(drop)
+            .map_err(|error| anyhow!(error.message()))
+    })
+    .await
 }
 
 /// Tokens issued on this installation.
@@ -502,13 +523,16 @@ pub fn tools_tokens() -> Vec<ToolsTokenDto> {
 }
 
 /// Revoke a token; what its holder shared or connected ends.
-pub fn tools_revoke(token_id: String) -> Result<()> {
-    tools::revoke(&token_id)
+pub async fn tools_revoke(token_id: String) -> Result<()> {
+    execution::run(Lane::Read, move || tools::revoke(&token_id)).await
 }
 
 /// A ready-to-paste entry for a harness POCOX does not launch (`codex`,
 /// `claude`, `opencode` or `generic`), with a token issued to it, shown once.
-pub fn tools_harness_config(harness: String) -> Result<String> {
-    let issued = tools::issue(&harness, None)?;
-    Ok(tools::harness::snippet(&harness, &issued))
+pub async fn tools_harness_config(harness: String) -> Result<String> {
+    execution::run(Lane::Read, move || {
+        let issued = tools::issue(&harness, None)?;
+        Ok(tools::harness::snippet(&harness, &issued))
+    })
+    .await
 }

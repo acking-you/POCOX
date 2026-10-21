@@ -41,13 +41,14 @@ Future<UpdateStateDto> updateInstall() =>
 
 /// Reports a failure of the app's own part (`quit`, `permission`,
 /// `install`).
-void updateReport({required String kind, required String detail}) => RustLib
-    .instance
-    .api
-    .crateApiBridgeUpdatesUpdateReport(kind: kind, detail: detail);
+Future<void> updateReport({required String kind, required String detail}) =>
+    RustLib.instance.api.crateApiBridgeUpdatesUpdateReport(
+      kind: kind,
+      detail: detail,
+    );
 
 /// Remembers that the user has been told about `version`.
-void updateAnnounce({required String version}) =>
+Future<void> updateAnnounce({required String version}) =>
     RustLib.instance.api.crateApiBridgeUpdatesUpdateAnnounce(version: version);
 
 /// Everything the UI shows about updates.

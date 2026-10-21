@@ -7,7 +7,10 @@ use super::{
     threads::{item_dto, ThreadItemDto},
     StreamSink,
 };
-use crate::engine::{native_sessions, runtime};
+use crate::engine::{
+    execution::{self, Lane},
+    native_sessions, runtime,
+};
 
 /// How often a followed view's revision is re-read without a live change.
 const FOLLOW_POLL: std::time::Duration = std::time::Duration::from_secs(3);
@@ -56,87 +59,100 @@ pub struct NativeSessionRevisionDto {
 
 /// Read a bounded native inventory, without connecting to or launching an
 /// agent.
-pub fn app_native_sessions(
+pub async fn app_native_sessions(
     provider: String,
     cursor: Option<String>,
     source_id: Option<String>,
 ) -> Result<NativeSessionListDto> {
-    let source = native_sessions::source(&provider, source_id.as_deref(), cursor.is_none())?;
-    let value = runtime::runtime().block_on(source.reader.list_sessions(cursor.as_deref(), 100))?;
-    let entries = value["sessions"]
-        .as_array()
-        .context("invalid native inventory")?;
-    let sessions = entries
-        .iter()
-        .map(|entry| -> Result<_> {
-            let id = entry["sessionId"]
-                .as_str()
-                .context("missing native session id")?;
-            Ok(LocalSessionDto {
-                thread_id: id.into(),
-                cwd: entry["cwd"].as_str().map(str::to_owned),
-                preview: entry["title"].as_str().unwrap_or_default().into(),
-                name: None,
-                status: None,
-                source: Some(provider.clone()),
-                parent_thread_id: entry["parentSessionId"].as_str().map(str::to_owned),
-                thread_source: None,
-                updated_at: entry["updatedAt"]
+    execution::run(Lane::Read, move || {
+        let source = native_sessions::source(&provider, source_id.as_deref(), cursor.is_none())?;
+        let value =
+            runtime::runtime().block_on(source.reader.list_sessions(cursor.as_deref(), 100))?;
+        let entries = value["sessions"]
+            .as_array()
+            .context("invalid native inventory")?;
+        let sessions = entries
+            .iter()
+            .map(|entry| -> Result<_> {
+                let id = entry["sessionId"]
                     .as_str()
-                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                    .map_or(0, |v| v.timestamp()),
-                turn_state: "unknown".into(),
-                held_open: false,
-                safety: "unknown".into(),
-                allows_resume: false,
-                requires_takeover: false,
+                    .context("missing native session id")?;
+                Ok(LocalSessionDto {
+                    thread_id: id.into(),
+                    cwd: entry["cwd"].as_str().map(str::to_owned),
+                    preview: entry["title"].as_str().unwrap_or_default().into(),
+                    name: None,
+                    status: None,
+                    source: Some(provider.clone()),
+                    parent_thread_id: entry["parentSessionId"].as_str().map(str::to_owned),
+                    thread_source: None,
+                    updated_at: entry["updatedAt"]
+                        .as_str()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map_or(0, |v| v.timestamp()),
+                    turn_state: "unknown".into(),
+                    held_open: false,
+                    safety: "unknown".into(),
+                    allows_resume: false,
+                    requires_takeover: false,
+                })
             })
+            .collect::<Result<Vec<_>>>()?;
+        Ok(NativeSessionListDto {
+            source_id: source.id.clone(),
+            location: source.location.clone(),
+            sessions,
+            next_cursor: value["nextCursor"].as_str().map(str::to_owned),
+            manageable: provider == "grok",
         })
-        .collect::<Result<Vec<_>>>()?;
-    Ok(NativeSessionListDto {
-        source_id: source.id.clone(),
-        location: source.location.clone(),
-        sessions,
-        next_cursor: value["nextCursor"].as_str().map(str::to_owned),
-        manageable: provider == "grok",
     })
+    .await
 }
 /// Read one bounded native transcript page. Never resumes an external session.
-pub fn app_native_session_page(
+pub async fn app_native_session_page(
     provider: String,
     thread_id: String,
     before: Option<String>,
     source_id: Option<String>,
 ) -> Result<NativeSessionPageDto> {
-    let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
-    let page =
-        runtime::runtime().block_on(source.reader.read_page(&thread_id, before.as_deref(), 20))?;
-    let items = page
-        .turns
-        .iter()
-        .flat_map(|turn| {
-            turn.items
-                .iter()
-                .map(|item| item_dto(crate::engine::acp::native_item(item, &turn.id)))
+    execution::run(Lane::Read, move || {
+        let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
+        let page = runtime::runtime().block_on(source.reader.read_page(
+            &thread_id,
+            before.as_deref(),
+            20,
+        ))?;
+        let items = page
+            .turns
+            .iter()
+            .flat_map(|turn| {
+                turn.items
+                    .iter()
+                    .map(|item| item_dto(crate::engine::acp::native_item(item, &turn.id)))
+            })
+            .collect();
+        Ok(NativeSessionPageDto {
+            source_id: source.id.clone(),
+            generation: page.generation,
+            revision: page.revision,
+            items,
+            next_before: page.next_before,
+            truncated: page.truncated,
         })
-        .collect();
-    Ok(NativeSessionPageDto {
-        source_id: source.id.clone(),
-        generation: page.generation,
-        revision: page.revision,
-        items,
-        next_before: page.next_before,
-        truncated: page.truncated,
     })
+    .await
 }
 /// Refresh visible local history even if process ownership is unknown.
-pub fn app_native_session_revision(
+pub async fn app_native_session_revision(
     provider: String,
     thread_id: String,
     source_id: Option<String>,
 ) -> Result<NativeSessionRevisionDto> {
-    let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
-    runtime::runtime().block_on(revision(&source, &thread_id))
+    execution::run(Lane::Read, move || {
+        let source = native_sessions::source(&provider, source_id.as_deref(), false)?;
+        runtime::runtime().block_on(revision(&source, &thread_id))
+    })
+    .await
 }
 
 /// Follow a visible local view: its revision and ownership now, then on
@@ -195,23 +211,29 @@ async fn revision(
 
 /// Rename a session of this computer's Grok home through Grok itself.
 /// Refused while a Grok terminal client or a POCOX host holds it.
-pub fn app_native_session_rename(
+pub async fn app_native_session_rename(
     provider: String,
     thread_id: String,
     title: String,
     source_id: Option<String>,
 ) -> Result<()> {
-    anyhow::ensure!(provider == "grok", "this provider's sessions cannot be renamed here");
-    crate::engine::grok_account::manage_session(&thread_id, Some(&title), source_id.as_deref())
+    execution::run(Lane::Control, move || {
+        anyhow::ensure!(provider == "grok", "this provider's sessions cannot be renamed here");
+        crate::engine::grok_account::manage_session(&thread_id, Some(&title), source_id.as_deref())
+    })
+    .await
 }
 
 /// Delete a session of this computer's Grok home permanently, through Grok
 /// itself. Refused while a Grok terminal client or a POCOX host holds it.
-pub fn app_native_session_delete(
+pub async fn app_native_session_delete(
     provider: String,
     thread_id: String,
     source_id: Option<String>,
 ) -> Result<()> {
-    anyhow::ensure!(provider == "grok", "this provider's sessions cannot be deleted here");
-    crate::engine::grok_account::manage_session(&thread_id, None, source_id.as_deref())
+    execution::run(Lane::Control, move || {
+        anyhow::ensure!(provider == "grok", "this provider's sessions cannot be deleted here");
+        crate::engine::grok_account::manage_session(&thread_id, None, source_id.as_deref())
+    })
+    .await
 }

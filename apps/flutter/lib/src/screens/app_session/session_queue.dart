@@ -4,7 +4,7 @@ extension _SessionQueue on _AppSessionState {
   // Messages composed while a turn was already in flight. They queue instead of
   // racing the running turn and each flushes as its own turn once the prior one
   // ends (codex-cli parity). Esc pops the most recent back into the composer.
-  List<_Queued> get _queue => _draft.queue;
+  _DraftQueue get _queue => _draft.queue;
 
   /// The user's explicit Retry of a queued message whose send may already
   /// have reached the host. Nothing can prove it did not (the protocol has
@@ -25,7 +25,7 @@ extension _SessionQueue on _AppSessionState {
       return;
     }
     _updateState(() {
-      entry.uncertain = false;
+      entry.retryUnknown();
       _draft.queuePaused = false;
       _error = null;
       _retry = null;
@@ -157,20 +157,24 @@ extension _SessionQueue on _AppSessionState {
     final atts = List<_Attachment>.from(_attachments);
     if (_input.text.trim().isEmpty && atts.isEmpty) return;
     if (atts.any((a) => !a.ready)) return;
-    _updateState(() {
-      _queue.add(
-        _Queued(
-          id: _drafts.nextQueueId++,
-          text: _input.text,
-          attachments: atts,
-          tools: List.of(_tools),
-        ),
-      );
-      _attachments.clear();
-      _tools.clear();
-      _input.clear();
-      _saveDraft();
-    });
+    try {
+      _updateState(() {
+        _queue.add(
+          _Queued(
+            id: _drafts.nextQueueId++,
+            text: _input.text,
+            attachments: atts,
+            tools: List.of(_tools),
+          ),
+        );
+        _attachments.clear();
+        _tools.clear();
+        _input.clear();
+        _saveDraft();
+      });
+    } catch (error) {
+      _updateState(() => _error = friendlyError(error));
+    }
   }
 
   /// Send the head of the queue as a new turn, if the session is idle. Called on

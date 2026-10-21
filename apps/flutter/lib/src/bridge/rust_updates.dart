@@ -42,9 +42,10 @@ mixin _RustUpdates implements BridgeApi {
       _updateState(await frb.updateInstall());
 
   @override
-  void updateReport(String kind, String detail) =>
+  Future<void> updateReport(String kind, String detail) =>
       frb.updateReport(kind: kind, detail: detail);
 
   @override
-  void updateAnnounce(String version) => frb.updateAnnounce(version: version);
+  Future<void> updateAnnounce(String version) =>
+      frb.updateAnnounce(version: version);
 }

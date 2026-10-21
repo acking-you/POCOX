@@ -1,4 +1,9 @@
+import 'package:pocox/src/rust/api/bridge/composer.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/history_projection.dart' as frb;
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/rust/api/bridge/diff.dart' as frb;
 import 'dart:typed_data';
+import 'package:pocox/src/rust/api/bridge/attachments.dart' as frb;
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show PlatformInt64Util;
@@ -32,6 +37,7 @@ part 'bridge/rust_management.dart';
 part 'bridge/rust_tools.dart';
 part 'bridge/rust_grok.dart';
 part 'bridge/rust_updates.dart';
+part 'bridge/rust_composer.dart';
 
 /// Real [BridgeApi] backed by generated Rust bindings.
 class RustBridgeApi
@@ -46,6 +52,32 @@ class RustBridgeApi
     implements BridgeApi {
   /// Creates the real bridge.
   const RustBridgeApi();
+
+  @override
+  ComposerControl composerCreate() => _NativeComposerControl();
+
+  @override
+  void attachmentReleaseFile(Object file) {
+    final handle = file as frb.PreparedFile;
+    if (!handle.isDisposed) handle.dispose();
+  }
+
+  @override
+  Future<Object> attachmentReadFile(String path) =>
+      frb.attachmentReadFile(path: path);
+
+  @override
+  Future<String> metaUploadPreparedFile(
+    String serviceKey,
+    String fileName,
+    Object file,
+    String expectedContext,
+  ) => frb.metaUploadPreparedFile(
+    serviceKey: serviceKey,
+    fileName: fileName,
+    file: file as frb.PreparedFile,
+    expectedContext: expectedContext,
+  );
 
   @override
   Future<String?> networkProxy() => frb.networkProxy();
@@ -265,8 +297,16 @@ class RustBridgeApi
       frb.apiProbeLocal(localAddr: localAddr);
 
   @override
-  Stream<AppEvent> appEvents(String serviceKey) => frb
-      .appEvents(serviceKey: serviceKey)
+  Stream<AppEvent> appEvents(
+    String serviceKey, {
+    String? threadId,
+    String topic = 'all',
+  }) => frb
+      .appProjectedEvents(
+        serviceKey: serviceKey,
+        threadId: threadId,
+        topic: topic,
+      )
       .map(
         (e) => AppEvent(
           kind: e.kind,
@@ -278,18 +318,42 @@ class RustBridgeApi
           images: e.images,
           requestId: e.requestId,
           raw: e.raw,
+          turnId: e.turnId,
+          sender: e.sender,
+          textIsSnapshot: e.textIsSnapshot,
+          running: e.running,
+          diff: e.diff == null ? null : DiffModel.fromNative(e.diff!),
         ),
       );
 
   @override
-  Stream<LogLine> logEvents() => frb.logEvents().map(
-    (l) => LogLine(
-      level: l.level,
-      target: l.target,
-      message: l.message,
-      timestampMs: l.timestampMs,
-    ),
-  );
+  Stream<void> logChanges() => frb.logChanges().map((_) {});
+
+  @override
+  Future<LogView> logQuery({String? level, String keyword = ''}) async {
+    final view = await frb.logQuery(level: level, keyword: keyword);
+    return LogView(
+      lines: view.lines
+          .map(
+            (l) => LogLine(
+              level: l.level,
+              target: l.target,
+              message: l.message,
+              timestampMs: l.timestampMs,
+            ),
+          )
+          .toList(growable: false),
+      total: view.total,
+      diskLost: view.diskLost.toInt(),
+    );
+  }
+
+  @override
+  void logRecord(String target, String message, {String level = 'INFO'}) =>
+      frb.logRecord(level: level, target: target, message: message);
+
+  @override
+  void logClear() => frb.logClear();
 
   @override
   Stream<RetryProgress> metaRetryEvents() => frb.metaRetryEvents().map(

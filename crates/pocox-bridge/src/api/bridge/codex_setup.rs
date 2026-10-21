@@ -2,6 +2,7 @@
 //! the system prompt variant.
 
 use super::*;
+use crate::engine::execution::{self, Lane};
 
 /// What the external codex has on disk in `CODEX_HOME`, for the onboarding
 /// wizard.
@@ -33,20 +34,23 @@ pub struct CodexSetupStatusDto {
 /// Detect whether the external codex has a usable provider + credentials.
 /// Drives the first-run setup wizard: `needs_setup` is `true` when neither a
 /// login nor a custom provider is configured.
-pub fn codex_setup_status() -> Result<CodexSetupStatusDto> {
-    let s = pocox_codex::setup::setup_status()?;
-    Ok(CodexSetupStatusDto {
-        codex_home: s.codex_home,
-        has_config: s.has_config,
-        has_auth: s.has_auth,
-        has_custom_provider: s.has_custom_provider,
-        auth_mode: s.auth_mode,
-        needs_setup: s.needs_setup,
-        prompt_variant: s.prompt_variant,
-        selected_provider: s.selected_provider,
-        config_error: s.config_error,
-        effective_source: s.effective_source.to_string(),
+pub async fn codex_setup_status() -> Result<CodexSetupStatusDto> {
+    execution::run(Lane::Read, move || {
+        let s = pocox_codex::setup::setup_status()?;
+        Ok(CodexSetupStatusDto {
+            codex_home: s.codex_home,
+            has_config: s.has_config,
+            has_auth: s.has_auth,
+            has_custom_provider: s.has_custom_provider,
+            auth_mode: s.auth_mode,
+            needs_setup: s.needs_setup,
+            prompt_variant: s.prompt_variant,
+            selected_provider: s.selected_provider,
+            config_error: s.config_error,
+            effective_source: s.effective_source.to_string(),
+        })
     })
+    .await
 }
 
 /// Configure a minimal custom OpenAI-compatible provider (base URL + API key)
@@ -54,26 +58,29 @@ pub fn codex_setup_status() -> Result<CodexSetupStatusDto> {
 /// is needed — the key rides as the provider's bearer token. `model` is
 /// optional (defaults to a sensible model). Takes effect on the next hosting
 /// start.
-pub fn codex_setup_provider(
+pub async fn codex_setup_provider(
     base_url: String,
     api_key: String,
     model: Option<String>,
 ) -> Result<()> {
-    pocox_codex::setup::write_provider_config(&base_url, &api_key, model.as_deref())
+    execution::run(Lane::Read, move || {
+        pocox_codex::setup::write_provider_config(&base_url, &api_key, model.as_deref())
+    })
+    .await
 }
 
 /// The active external-codex system-prompt variant (`default` / `non_degraded`
 /// / `custom`).
-pub fn codex_prompt_variant() -> Result<String> {
-    Ok(pocox_codex::setup::setup_status()?.prompt_variant)
+pub async fn codex_prompt_variant() -> Result<String> {
+    execution::run(Lane::Read, move || Ok(pocox_codex::setup::setup_status()?.prompt_variant)).await
 }
 
 /// Switch the external-codex system prompt. `non_degraded` swaps in the bundled
 /// prompt that drops the commentary / intermediary-update mandates (which can
 /// starve reasoning, see openai/codex#30364); `default` restores codex's
 /// built-in prompt. Takes effect for threads started after the change.
-pub fn codex_set_prompt_variant(variant: String) -> Result<()> {
-    pocox_codex::setup::set_prompt_variant(&variant)
+pub async fn codex_set_prompt_variant(variant: String) -> Result<()> {
+    execution::run(Lane::Read, move || pocox_codex::setup::set_prompt_variant(&variant)).await
 }
 
 /// A started ChatGPT login on the external codex, mirrored for Dart. `mode` is
@@ -110,33 +117,39 @@ pub struct CodexAuthStatusDto {
 /// until `authenticated`. The OAuth HTTP inherits the proxy the host was
 /// started with, so a China-network user hosts with a proxy and login goes
 /// through it.
-pub fn codex_login_chatgpt_start(service_key: String) -> Result<CodexLoginStartDto> {
-    let s = app_session::login_chatgpt_start(&service_key)?;
-    Ok(CodexLoginStartDto {
-        mode: s.mode,
-        login_id: s.login_id,
-        auth_url: s.auth_url,
-        verification_url: s.verification_url,
-        user_code: s.user_code,
+pub async fn codex_login_chatgpt_start(service_key: String) -> Result<CodexLoginStartDto> {
+    execution::run(Lane::Read, move || {
+        let s = app_session::login_chatgpt_start(&service_key)?;
+        Ok(CodexLoginStartDto {
+            mode: s.mode,
+            login_id: s.login_id,
+            auth_url: s.auth_url,
+            verification_url: s.verification_url,
+            user_code: s.user_code,
+        })
     })
+    .await
 }
 
 /// Poll the codex auth status for the app-server behind `service_key`.
-pub fn codex_auth_status(service_key: String) -> Result<CodexAuthStatusDto> {
-    let (authenticated, method) = app_session::auth_status(&service_key)?;
-    Ok(CodexAuthStatusDto {
-        authenticated,
-        method,
+pub async fn codex_auth_status(service_key: String) -> Result<CodexAuthStatusDto> {
+    execution::run(Lane::Read, move || {
+        let (authenticated, method) = app_session::auth_status(&service_key)?;
+        Ok(CodexAuthStatusDto {
+            authenticated,
+            method,
+        })
     })
+    .await
 }
 
 /// Cancel an in-flight ChatGPT login (from [`codex_login_chatgpt_start`]).
-pub fn codex_login_cancel(service_key: String, login_id: String) -> Result<()> {
-    app_session::login_cancel(&service_key, &login_id)
+pub async fn codex_login_cancel(service_key: String, login_id: String) -> Result<()> {
+    execution::run(Lane::Control, move || app_session::login_cancel(&service_key, &login_id)).await
 }
 
 /// Sign the external codex out (revoke + delete its `auth.json`) on
 /// `service_key`.
-pub fn codex_logout(service_key: String) -> Result<()> {
-    app_session::codex_logout(&service_key)
+pub async fn codex_logout(service_key: String) -> Result<()> {
+    execution::run(Lane::Read, move || app_session::codex_logout(&service_key)).await
 }

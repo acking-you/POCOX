@@ -1,7 +1,7 @@
 part of '../app_session_screen.dart';
 
 /// One composer attachment. An IMAGE is processed locally (EXIF-bake /
-/// downscale / re-encode in a background isolate) and travels inline as a
+/// downscale / re-encode on the Rust CPU queue) and travels inline as a
 /// data URL; a FILE is uploaded to the HOST over the meta tunnel and travels
 /// as a path reference in the turn text (codex's native document workflow —
 /// its input protocol has no document slot). Either kind shows a spinner chip
@@ -12,7 +12,8 @@ class _Attachment {
   final int id;
   final String name;
   final bool isFile;
-  ProcessedImage? processed; // image: null while the isolate is still working
+  ProcessedImage?
+  processed; // image: null while native preparation is still working
   String? hostPath; // file: null while the upload is still in flight
   XFile? source;
   Uint8List? sourceBytes;
@@ -49,7 +50,12 @@ class _Queued {
 
   /// Being sent: it stays first in the queue until the host admits it, so a
   /// refusal keeps its place; meanwhile it cannot be dequeued or discarded.
-  bool inFlight = false;
+  late final ComposerControl control;
+  bool get inFlight => control.state.byId[id]?.inFlight ?? false;
+  set inFlight(bool value) => control.apply(
+    value ? ComposerAction.beginQueued : ComposerAction.endQueued,
+    id: id,
+  );
 
   /// Its send failed in a way that leaves open whether the host admitted
   /// it (the request or its answer was lost). It stays first, the queue
@@ -57,7 +63,12 @@ class _Queued {
   /// reload, reconnect or turn end: only the user's explicit Retry sends it
   /// again (see `_resendUncertain`); the user may also edit (tap) or remove
   /// it.
-  bool uncertain = false;
+  bool get uncertain => control.state.byId[id]?.uncertain ?? false;
+  void fail({required bool uncertain}) => control.apply(
+    uncertain ? ComposerAction.unknown : ComposerAction.refused,
+    id: id,
+  );
+  void retryUnknown() => control.apply(ComposerAction.retryUnknown, id: id);
 
   /// Why its last send failed, while it is held at the head of a paused
   /// queue: the Retry its banner offered is offered again after a reload,
