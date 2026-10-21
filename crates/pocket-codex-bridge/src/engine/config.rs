@@ -65,7 +65,15 @@ pub fn load_config(support_dir: &Path) -> Result<Config> {
 fn load_unlocked(support_dir: &Path) -> Result<Config> {
     let path = config_path(support_dir);
     match std::fs::read_to_string(&path) {
-        Ok(raw) => toml::from_str(&raw).context("parsing config.toml"),
+        // TOML errors quote the source line, which can contain relay keys,
+        // account tokens or proxy credentials. Keep only its location.
+        Ok(raw) => toml::from_str(&raw).map_err(|error: toml::de::Error| {
+            let location = error
+                .span()
+                .map(|span| format!(" at byte {}", span.start))
+                .unwrap_or_default();
+            anyhow!("parsing config.toml{location}")
+        }),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Config::default()),
         Err(e) => Err(e).context("reading config.toml"),
     }
@@ -162,5 +170,19 @@ mod tests {
             assert_eq!(mode & 0o777, 0o600, "config holds the key; must be 0600");
         }
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn malformed_config_errors_never_quote_private_values() {
+        let dir = tempfile::tempdir().expect("directory");
+        std::fs::write(
+            config_path(dir.path()),
+            "[network]\nproxy = \"http://alice:private-password@127.0.0.1:7890",
+        )
+        .expect("malformed config");
+        let error = load_config(dir.path()).expect_err("invalid TOML");
+        assert!(error.to_string().contains("parsing config.toml at byte"));
+        assert!(!format!("{error:?}").contains("private-password"));
+        assert!(!format!("{error:#}").contains("private-password"));
     }
 }
