@@ -4181,4 +4181,37 @@ class AppLocalizationsZh extends AppLocalizations {
   String updateToast(String version) {
     return 'POCOX $version 已发布';
   }
+
+  @override
+  String get networkProxyTitle => '应用网络代理';
+
+  @override
+  String get networkProxyScope =>
+      '用于 POCOX 检查更新、下载、账号请求和网络图片。托管智能体、中继连接和系统浏览器使用各自的网络设置。保存后对新请求生效，当前传输继续完成。';
+
+  @override
+  String get networkProxyDefault => '默认网络';
+
+  @override
+  String get networkProxyAddress => '代理地址';
+
+  @override
+  String get networkProxyHint =>
+      '填写 HTTP(S) 或 SOCKS5 地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080，可带用户名和密码。SOCKS5 通过代理解析域名。留空恢复默认网络。手机上的 127.0.0.1 指手机本身。';
+
+  @override
+  String get networkProxyInvalid =>
+      '请输入含主机和有效端口的 HTTP(S) 或 SOCKS5 代理地址，不要附带路径、查询参数或片段。';
+
+  @override
+  String get networkProxySaveFailed => '代理保存失败，请检查地址后重试。';
+
+  @override
+  String get networkProxyReadFailed => '无法读取代理配置，点击重试。';
+
+  @override
+  String get networkProxyShow => '显示代理地址';
+
+  @override
+  String get networkProxyHide => '隐藏代理地址';
 }

@@ -30,6 +30,7 @@ pub mod management_client;
 pub mod management_runtimes;
 pub mod meta;
 pub mod native_sessions;
+pub mod network;
 pub mod opencode;
 mod owned_child;
 pub mod runtime;

@@ -1,3 +1,4 @@
+import 'package:pocket_codex/src/network/network_image.dart';
 import 'dart:convert';
 
 import 'package:pocket_codex/src/file_links.dart';
@@ -515,15 +516,18 @@ class _Favicon extends StatelessWidget {
     return SizedBox(
       width: _size,
       height: _size,
-      child: Image.network(
-        'https://$host/favicon.ico',
+      child: Image(
+        image: ResizeImage.resizeIfNeeded(
+          (_size * MediaQuery.devicePixelRatioOf(context)).round(),
+          null,
+          AppNetworkImage('https://$host/favicon.ico'),
+        ),
         width: _size,
         height: _size,
         fit: BoxFit.contain,
         // Sites routinely serve a 256 px (or larger) .ico. Without a decode
         // bound each one is held in the image cache at full size for a 15 px
         // slot — a transcript citing a dozen hosts would pin several MB.
-        cacheWidth: (_size * MediaQuery.devicePixelRatioOf(context)).round(),
         errorBuilder: (context, error, stack) {
           _faviconMisses[host] = DateTime.now();
           return fallback;

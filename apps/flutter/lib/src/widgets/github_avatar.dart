@@ -1,3 +1,4 @@
+import 'package:pocket_codex/src/network/network_image.dart';
 import 'package:flutter/material.dart';
 
 /// When an account id's avatar fetch last failed. Flutter's image cache does not
@@ -57,12 +58,17 @@ class GitHubAvatar extends StatelessWidget {
       // the same box: the source is a 460px PNG, and holding that in the image
       // cache for a 36px slot wastes most of a megabyte per account.
       final pixels = (size * MediaQuery.devicePixelRatioOf(context)).round();
-      content = Image.network(
-        'https://avatars.githubusercontent.com/u/$id?s=$pixels',
+      content = Image(
+        image: ResizeImage.resizeIfNeeded(
+          pixels,
+          null,
+          AppNetworkImage(
+            'https://avatars.githubusercontent.com/u/$id?s=$pixels',
+          ),
+        ),
         width: size,
         height: size,
         fit: BoxFit.cover,
-        cacheWidth: pixels,
         errorBuilder: (context, error, stack) {
           _avatarMisses[id] = DateTime.now();
           return fallback;

@@ -22,6 +22,7 @@ import 'package:pocket_codex/src/rust/api/bridge/session_config.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/session_access.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/threads.dart' as frb;
 import 'package:pocket_codex/src/rust/api/bridge/updates.dart' as frb;
+import 'package:pocket_codex/src/rust/api/bridge/network.dart' as frb;
 import 'package:pocket_codex/src/updates/update_api.dart';
 
 part 'bridge/rust_hosting.dart';
@@ -45,6 +46,13 @@ class RustBridgeApi
     implements BridgeApi {
   /// Creates the real bridge.
   const RustBridgeApi();
+
+  @override
+  Future<String?> networkProxy() => frb.networkProxy();
+
+  @override
+  Future<void> networkSetProxy(String value) =>
+      frb.networkSetProxy(value: value);
 
   @override
   Future<ConfigInfo> getConfig() async {

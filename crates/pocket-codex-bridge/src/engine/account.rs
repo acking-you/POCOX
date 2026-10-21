@@ -34,11 +34,8 @@ use pocket_codex_core::{config::Config, service::sanitize_component};
 use crate::engine::config::save_config;
 use crate::engine::config::{load_config, update_config};
 
-// Upstream protocol dependencies also enable reqwest's native TLS backend.
-// Select Rustls explicitly so mobile clients retain bundled public trust roots.
-fn http_client() -> Result<reqwest::Client> {
-    reqwest::Client::builder()
-        .use_rustls_tls()
+fn http_client(support_dir: &Path) -> Result<reqwest::Client> {
+    super::network::client(support_dir)?
         .build()
         .context("building account HTTP client")
 }
@@ -108,7 +105,7 @@ pub async fn device_start(
 ) -> Result<DeviceStart> {
     let config = load_config(support_dir)?;
     let backend = resolve_backend(&config, backend_override)?;
-    let resp: DeviceStartResponse = http_client()?
+    let resp: DeviceStartResponse = http_client(support_dir)?
         .post(format!("{backend}/auth/device/start"))
         .json(&DeviceStartRequest::default())
         .send()
@@ -154,7 +151,7 @@ pub async fn device_poll(
     backend: &str,
     poll_handle: String,
 ) -> Result<PollOutcome> {
-    let resp: DevicePollResponse = http_client()?
+    let resp: DevicePollResponse = http_client(support_dir)?
         .post(format!("{backend}/auth/device/poll"))
         .json(&DevicePollRequest {
             poll_handle,
@@ -222,7 +219,7 @@ pub async fn web_login_start(
     let backend = resolve_backend(&config, backend_override)?;
     let code_verifier = pkce::gen_verifier();
     let state = pkce::gen_state();
-    let resp: WebStartResponse = http_client()?
+    let resp: WebStartResponse = http_client(support_dir)?
         .post(format!("{backend}/auth/web/start"))
         .json(&WebStartRequest {
             redirect_uri: redirect_uri.to_string(),
@@ -254,7 +251,7 @@ pub async fn web_login_exchange(
     exchange_code: String,
     code_verifier: String,
 ) -> Result<PollOutcome> {
-    let resp: WebExchangeResponse = http_client()?
+    let resp: WebExchangeResponse = http_client(support_dir)?
         .post(format!("{backend}/auth/web/exchange"))
         .json(&WebExchangeRequest {
             exchange_code,
@@ -322,7 +319,7 @@ pub async fn current_user(support_dir: &Path) -> Result<Option<AccountUser>> {
     }
     let backend = backend_base(&config);
     let token = valid_token(support_dir, &mut config, &backend).await?;
-    let me: MeResponse = http_client()?
+    let me: MeResponse = http_client(support_dir)?
         .get(format!("{backend}/v1/me"))
         .bearer_auth(&token)
         .send()
@@ -345,7 +342,7 @@ pub async fn logout(support_dir: &Path) -> Result<()> {
     let config = load_config(support_dir)?;
     let backend = backend_base(&config);
     if let Some(refresh_token) = config.account_refresh_token() {
-        if let Ok(client) = http_client() {
+        if let Ok(client) = http_client(support_dir) {
             let _ = client
                 .post(format!("{backend}/auth/logout"))
                 .json(&LogoutRequest {
@@ -373,7 +370,7 @@ pub async fn services(support_dir: &Path) -> Result<Vec<ServiceEntry>> {
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
     let token = valid_token(support_dir, &mut config, &backend).await?;
-    let body: pocket_codex_account_proto::http::ServicesResponse = http_client()?
+    let body: pocket_codex_account_proto::http::ServicesResponse = http_client(support_dir)?
         // Older backends ignore `include_acp` and simply omit ACP services:
         // discovery then falls back to services this app hosts itself.
         .get(format!("{backend}/v1/services?include_acp=true&include_opencode=true"))
@@ -407,7 +404,7 @@ pub async fn deregister_service(
     // (the relay key was registered through the same sanitizer).
     let device = sanitize_component(device);
     let name = sanitize_component(name);
-    http_client()?
+    http_client(support_dir)?
         .delete(format!("{backend}/v1/services/{device}/{kind}/{name}"))
         .bearer_auth(&token)
         .send()
@@ -451,7 +448,7 @@ async fn valid_token(support_dir: &Path, config: &mut Config, backend: &str) -> 
         .account_refresh_token()
         .ok_or_else(|| anyhow!("not signed in"))?
         .to_string();
-    let resp = http_client()?
+    let resp = http_client(support_dir)?
         .post(format!("{backend}/auth/refresh"))
         .json(&RefreshRequest {
             refresh_token,
@@ -619,7 +616,7 @@ async fn fetch_relay_credential(support_dir: &Path) -> Result<RelayCredentialRes
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
     let token = valid_token(support_dir, &mut config, &backend).await?;
-    let resp = http_client()?
+    let resp = http_client(support_dir)?
         .get(format!("{backend}/v1/relay"))
         .bearer_auth(&token)
         .send()

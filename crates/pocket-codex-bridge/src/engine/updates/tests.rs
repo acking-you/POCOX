@@ -203,7 +203,7 @@ async fn a_newer_release_downloads_only_as_the_manifest_names_it() {
     assert_eq!(refused.failure.map(|f| f.kind), Some(Kind::Checksum));
     assert!(!dir
         .path()
-        .join("work")
+        .join("updates/work")
         .read_dir()
         .expect("work")
         .any(|_| true));
@@ -261,4 +261,34 @@ async fn background_checks_stay_rare_and_survive_a_restart() {
     // Once it is installed, the same answer means up to date.
     let updated = updater(&feed, &key, dir.path().into(), "0.7.0");
     assert_eq!(updated.snapshot().phase, Phase::UpToDate);
+}
+
+#[tokio::test]
+async fn checks_and_downloads_follow_the_current_app_proxy_and_verify_bytes() {
+    use crate::engine::network::set_proxy;
+    let (mut feed, key) = (Feed::start().await, Key::new());
+    let dir = tempfile::tempdir().expect("directory");
+    let proxy_url = feed.url.clone();
+    set_proxy(dir.path(), &proxy_url).expect("proxy setting");
+    feed.url = "http://release.invalid/".into();
+    let name = "pocket-codex-app-v0.7.0-linux-x64.zip";
+    let package = b"verified package";
+    let manifest = manifest_for("0.7.0", &[(name, package)]);
+    feed.put("http://release.invalid/release-manifest.json.sig", key.sign(&manifest).into_bytes());
+    feed.put("http://release.invalid/release-manifest.json", manifest);
+    feed.put(&format!("http://release.invalid/{name}"), package.to_vec());
+    let update = updater(&feed, &key, dir.path().into(), "0.6.0");
+    assert_eq!(update.check(true).await.phase, Phase::Available);
+    assert_eq!(feed.hits.load(Ordering::SeqCst), 2);
+
+    let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("closed proxy");
+    let dead_url = format!("http://{}", closed.local_addr().expect("address"));
+    drop(closed);
+    set_proxy(dir.path(), &dead_url).expect("new proxy");
+    assert_eq!(update.download().await.failure.map(|f| f.kind), Some(Kind::Network));
+    assert_eq!(feed.hits.load(Ordering::SeqCst), 2);
+
+    set_proxy(dir.path(), &proxy_url).expect("restore proxy");
+    assert_eq!(update.download().await.phase, Phase::Ready);
+    assert_eq!(feed.hits.load(Ordering::SeqCst), 3);
 }

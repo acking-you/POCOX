@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocket_codex/src/widgets/github_avatar.dart';
+import 'package:pocket_codex/src/network/network_image.dart';
 import 'package:pocket_codex/src/app_icons.dart';
 
 Widget _host(Widget child) => MaterialApp(
@@ -31,7 +32,7 @@ void main() {
     // the source is a 460px PNG and the slot is 36.
     final resize = image.image as ResizeImage;
     expect(resize.width, isNotNull);
-    final provider = resize.imageProvider as NetworkImage;
+    final provider = resize.imageProvider as AppNetworkImage;
     expect(provider.url, contains('avatars.githubusercontent.com/u/73544345'));
     // Asks GitHub for the size actually drawn, too.
     expect(provider.url, contains('?s='));

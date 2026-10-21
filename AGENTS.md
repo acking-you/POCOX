@@ -1655,6 +1655,18 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     re-signs the manifest while preserving all other assets and source identity.
     See `docs/linux-appimage.md`.
 
+48. **Application proxy and mobile Codex setup (2026-10-21).** The app's
+    `[network].proxy` is independent of hosted runtime proxies and relay TCP.
+    `engine::network` builds outbound HTTP clients for updates, the account
+    backend and bounded avatar/favicon reads. HTTP(S) and authenticated SOCKS5
+    are supported; SOCKS5 resolves names remotely. Explicit settings bypass
+    loopback, override environment proxies and never fall back to direct on
+    failure; clearing restores the default environment behavior. Each operation
+    reads current settings; in-flight transfers keep their client. The editor
+    masks credentials and summaries/debug output omit them. Update signatures,
+    size and hash checks remain mandatory. Mobile Codex setup never reads local
+    Codex state or offers its local prompt mutation. See `docs/app-updates.md`.
+
 ## 10. Communication conventions
 
 - Reply in whatever language the person you are talking to is using.

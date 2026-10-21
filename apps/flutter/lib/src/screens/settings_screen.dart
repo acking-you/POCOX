@@ -10,6 +10,7 @@ import 'package:pocket_codex/src/error_format.dart';
 import 'package:pocket_codex/src/fonts.dart';
 import 'package:pocket_codex/src/hosting/host_picker.dart';
 import 'package:pocket_codex/src/providers.dart';
+import 'package:pocket_codex/src/network/network_settings.dart';
 import 'package:pocket_codex/src/theme.dart';
 import 'package:pocket_codex/src/tools/tools_providers.dart';
 import 'package:pocket_codex/src/tools/tools_settings.dart';
@@ -162,6 +163,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     children: [
       Card(child: _cacheTile(l10n)),
       const Card(child: UpdateRow()),
+      const Card(child: NetworkProxyRow()),
       Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -330,6 +332,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   ),
                   const SizedBox(height: 10),
                   const UpdateSettings(),
+                  const SizedBox(height: 10),
+                  const Card(child: NetworkProxyRow()),
                   const SizedBox(height: 10),
                   GroupCard(
                     title: l10n.settingsHosting,

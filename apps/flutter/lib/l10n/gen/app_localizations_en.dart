@@ -4422,4 +4422,39 @@ class AppLocalizationsEn extends AppLocalizations {
   String updateToast(String version) {
     return 'POCOX $version is available';
   }
+
+  @override
+  String get networkProxyTitle => 'Application network proxy';
+
+  @override
+  String get networkProxyScope =>
+      'Used by POCOX for update checks, downloads, account requests and web images. Hosted agents, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.';
+
+  @override
+  String get networkProxyDefault => 'Default network';
+
+  @override
+  String get networkProxyAddress => 'Proxy URL';
+
+  @override
+  String get networkProxyHint =>
+      'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.';
+
+  @override
+  String get networkProxyInvalid =>
+      'Enter an HTTP(S) or SOCKS5 proxy URL with a host and valid port, without a path, query or fragment.';
+
+  @override
+  String get networkProxySaveFailed =>
+      'Could not save the proxy. Check the address and try again.';
+
+  @override
+  String get networkProxyReadFailed =>
+      'Could not read the proxy. Tap to retry.';
+
+  @override
+  String get networkProxyShow => 'Show proxy URL';
+
+  @override
+  String get networkProxyHide => 'Hide proxy URL';
 }

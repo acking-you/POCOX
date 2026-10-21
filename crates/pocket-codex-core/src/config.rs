@@ -64,6 +64,27 @@ pub struct Config {
     /// Controller-side persistent history cache, shared across remote hosts.
     #[serde(default)]
     pub history_cache: HistoryCacheConfig,
+
+    /// Outbound HTTP settings for POCOX itself, independent of hosted agents.
+    #[serde(default)]
+    pub network: NetworkConfig,
+}
+
+/// Application-owned requests, including release checks and downloads.
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct NetworkConfig {
+    /// Optional HTTP(S) or SOCKS5 proxy URL; may contain credentials.
+    /// Absent means the HTTP client's normal environment proxy behavior.
+    pub proxy: Option<String>,
+}
+
+impl std::fmt::Debug for NetworkConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NetworkConfig")
+            .field("proxy", &self.proxy.as_ref().map(|_| "[redacted]"))
+            .finish()
+    }
 }
 
 /// Capacity of the controller's disposable disk cache, separate from RAM.

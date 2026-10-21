@@ -300,8 +300,8 @@ type Watcher = Box<dyn FnMut(&Snapshot) -> bool + Send>;
 pub struct Updater {
     config: Config,
     host: manifest::Host,
-    /// Where [`Saved`] and downloads live.
-    dir: Box<dyn Fn() -> Option<PathBuf> + Send + Sync>,
+    /// Application support directory, owning network settings and update state.
+    support_dir: Box<dyn Fn() -> Option<PathBuf> + Send + Sync>,
     state: Mutex<State>,
     watchers: Mutex<Vec<Watcher>>,
     cancelled: AtomicBool,
@@ -309,11 +309,7 @@ pub struct Updater {
 }
 
 static UPDATER: Lazy<Updater> = Lazy::new(|| {
-    Updater::new(Config::current(), apply::host(), || {
-        super::runtime::support_dir()
-            .ok()
-            .map(|dir| dir.join("updates"))
-    })
+    Updater::new(Config::current(), apply::host(), || super::runtime::support_dir().ok())
 });
 
 /// This app's updater.
@@ -326,16 +322,17 @@ fn now_ms() -> i64 {
 }
 
 impl Updater {
-    /// An updater for `host` under `config`, keeping its files in `dir`.
+    /// An updater for `host` under `config`, keeping its files under
+    /// `support_dir/updates`.
     pub fn new(
         config: Config,
         host: manifest::Host,
-        dir: impl Fn() -> Option<PathBuf> + Send + Sync + 'static,
+        support_dir: impl Fn() -> Option<PathBuf> + Send + Sync + 'static,
     ) -> Self {
         Self {
             config,
             host,
-            dir: Box::new(dir),
+            support_dir: Box::new(support_dir),
             state: Mutex::new(State {
                 phase: Phase::Idle,
                 release: None,
@@ -362,8 +359,18 @@ impl Updater {
         state
     }
 
+    fn directory(&self) -> Option<PathBuf> {
+        (self.support_dir)().map(|dir| dir.join("updates"))
+    }
+
+    fn fetcher(&self) -> Result<Fetcher, Failure> {
+        let support = (self.support_dir)()
+            .ok_or_else(|| Failure::new(Kind::Network, "app support directory unavailable"))?;
+        Fetcher::new(&support)
+    }
+
     fn saved_path(&self) -> Option<PathBuf> {
-        (self.dir)().map(|dir| dir.join("state.json"))
+        self.directory().map(|dir| dir.join("state.json"))
     }
 
     fn read_saved(&self) -> Saved {
@@ -530,7 +537,7 @@ impl Updater {
     }
 
     async fn fetch_release(&self) -> Result<(Manifest, String, String), Failure> {
-        let fetcher = Fetcher::new()?;
+        let fetcher = self.fetcher()?;
         let bytes = fetcher
             .small(&self.config.manifest_url(), MANIFEST_LIMIT)
             .await?;
@@ -577,7 +584,7 @@ impl Updater {
             let Some(asset) = plan.asset.filter(|_| release.version > self.config.current) else {
                 return self.snapshot_of(&state);
             };
-            let Some(dir) = (self.dir)() else {
+            let Some(dir) = self.directory() else {
                 state.phase = Phase::Failed;
                 state.failure = Some(Failure::new(Kind::Install, "no folder for downloads"));
                 let snapshot = self.snapshot_of(&state);
@@ -621,6 +628,7 @@ impl Updater {
         method: Method,
         dir: &Path,
     ) -> Result<Staged, Stop> {
+        let fetcher = self.fetcher()?;
         // Earlier attempts' files are of no further use.
         let _ = tokio::fs::remove_dir_all(dir.join("work")).await;
         let work = dir
@@ -639,7 +647,6 @@ impl Updater {
                 self.set(|state| state.received = received);
             }
         };
-        let fetcher = Fetcher::new()?;
         let result = fetcher
             .file(&url, &file, asset, progress, &self.cancelled)
             .await;

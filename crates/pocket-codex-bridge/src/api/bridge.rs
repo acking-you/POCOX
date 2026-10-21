@@ -33,6 +33,7 @@ pub mod host_sessions;
 pub mod hosted_account;
 pub mod hosting;
 pub mod native_sessions;
+pub mod network;
 pub mod services;
 pub mod session_access;
 pub mod session_config;

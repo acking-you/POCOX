@@ -17,6 +17,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 /// Icon constants used across the app.
 abstract final class AppIcons {
+  /// Reveal a private field.
+  static const IconData visibility = LucideIcons.eye300;
+
+  /// Conceal a private field.
+  static const IconData visibility_off = LucideIcons.eyeOff300;
+
   /// `account_circle_outlined`.
   static const IconData account_circle_outlined =
       LucideIcons.circleUserRound300;

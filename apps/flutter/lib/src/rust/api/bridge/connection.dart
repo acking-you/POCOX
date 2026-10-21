@@ -7,7 +7,8 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 /// Read an agent's display identity before connecting. ACP uses its existing
-/// read-only info route over a temporary tunnel; native engines need no request.
+/// read-only info route over a temporary tunnel; native engines need no
+/// request.
 Future<AgentIdentityDto> appAgentIdentity({required String serviceKey}) =>
     RustLib.instance.api.crateApiBridgeConnectionAppAgentIdentity(
       serviceKey: serviceKey,

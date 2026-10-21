@@ -7630,6 +7630,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'POCOX {version} is available'**
   String updateToast(String version);
+
+  /// No description provided for @networkProxyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Application network proxy'**
+  String get networkProxyTitle;
+
+  /// No description provided for @networkProxyScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by POCOX for update checks, downloads, account requests and web images. Hosted agents, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.'**
+  String get networkProxyScope;
+
+  /// No description provided for @networkProxyDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default network'**
+  String get networkProxyDefault;
+
+  /// No description provided for @networkProxyAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Proxy URL'**
+  String get networkProxyAddress;
+
+  /// No description provided for @networkProxyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.'**
+  String get networkProxyHint;
+
+  /// No description provided for @networkProxyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter an HTTP(S) or SOCKS5 proxy URL with a host and valid port, without a path, query or fragment.'**
+  String get networkProxyInvalid;
+
+  /// No description provided for @networkProxySaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save the proxy. Check the address and try again.'**
+  String get networkProxySaveFailed;
+
+  /// No description provided for @networkProxyReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the proxy. Tap to retry.'**
+  String get networkProxyReadFailed;
+
+  /// No description provided for @networkProxyShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show proxy URL'**
+  String get networkProxyShow;
+
+  /// No description provided for @networkProxyHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide proxy URL'**
+  String get networkProxyHide;
 }
 
 class _AppLocalizationsDelegate

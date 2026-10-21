@@ -16,6 +16,7 @@ import 'api/bridge/host_sessions.dart';
 import 'api/bridge/hosted_account.dart';
 import 'api/bridge/hosting.dart';
 import 'api/bridge/native_sessions.dart';
+import 'api/bridge/network.dart';
 import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';

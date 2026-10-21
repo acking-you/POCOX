@@ -127,37 +127,48 @@ void main() {
       promptVariant: 'default',
     );
 
-    testWidgets('unconfigured says why, and where each method is set', (
-      t,
-    ) async {
-      final api = await pump(t, status: unconfigured);
+    testWidgets(
+      'unconfigured says why, and where each method is set',
+      (t) async {
+        final api = await pump(t, status: unconfigured);
 
-      // The state card answers "is this working" before any method is offered.
-      expect(find.text('尚未配置'), findsOneWidget); // codexSetupStatusNeedSetup
-      expect(find.text('使用中'), findsNothing);
-      // No global provider form: a provider is set per host.
-      expect(find.byKey(const Key('codex-base-url')), findsNothing);
-      expect(find.byKey(const Key('codex-save-provider')), findsNothing);
-      // What this page sets up is explained behind the section's info mark.
-      expect(
-        find.byWidgetPredicate(
-          (w) =>
-              w is Tooltip &&
-              (w.message ?? '').contains(_zh.codexSetupProviderScope),
-        ),
-        findsOneWidget,
-      );
-      // This harness is a phone (android): there is no local Codex to sign
-      // in on or host with, so both rows say where that happens instead.
-      expect(find.byKey(const Key('codex-login-chatgpt')), findsNothing);
-      expect(find.byKey(const Key('codex-login-desktop-only')), findsOneWidget);
-      expect(find.byKey(const Key('codex-provider-hosts')), findsNothing);
-      expect(
-        find.byKey(const Key('codex-provider-desktop-only')),
-        findsOneWidget,
-      );
-      expect(api.lastProvider, isNull);
-    });
+        // The state card answers "is this working" before any method is offered.
+        expect(api.codexSetupReads, 0);
+        expect(find.byKey(const Key('codex-setup-state')), findsNothing);
+        expect(find.byKey(const Key('codex-setup-error')), findsNothing);
+        expect(find.byKey(const Key('codex-nondegraded-toggle')), findsNothing);
+        expect(find.text('使用中'), findsNothing);
+        // No global provider form: a provider is set per host.
+        expect(find.byKey(const Key('codex-base-url')), findsNothing);
+        expect(find.byKey(const Key('codex-save-provider')), findsNothing);
+        // What this page sets up is explained behind the section's info mark.
+        expect(
+          find.byWidgetPredicate(
+            (w) =>
+                w is Tooltip &&
+                (w.message ?? '').contains(_zh.codexSetupProviderScope),
+          ),
+          findsOneWidget,
+        );
+        // This harness is a phone (android): there is no local Codex to sign
+        // in on or host with, so both rows say where that happens instead.
+        expect(find.byKey(const Key('codex-login-chatgpt')), findsNothing);
+        expect(
+          find.byKey(const Key('codex-login-desktop-only')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('codex-provider-hosts')), findsNothing);
+        expect(
+          find.byKey(const Key('codex-provider-desktop-only')),
+          findsOneWidget,
+        );
+        expect(api.lastProvider, isNull);
+      },
+      variant: const TargetPlatformVariant({
+        TargetPlatform.android,
+        TargetPlatform.iOS,
+      }),
+    );
 
     testWidgets(
       'on a desktop each method has its control in its row',
@@ -176,63 +187,69 @@ void main() {
       variant: TargetPlatformVariant.only(TargetPlatform.macOS),
     );
 
-    testWidgets('an unreadable config.toml is not reported as working', (
-      t,
-    ) async {
-      await pump(
-        t,
-        status: const CodexSetupStatus(
-          codexHome: r'C:\Users\test\.codex',
-          hasConfig: true,
-          hasAuth: true,
-          hasCustomProvider: false,
-          authMode: 'chatgpt',
-          needsSetup: false,
-          promptVariant: 'default',
-          configError: true,
-          effectiveSource: 'invalid',
-        ),
-      );
+    testWidgets(
+      'an unreadable config.toml is not reported as working',
+      (t) async {
+        await pump(
+          t,
+          status: const CodexSetupStatus(
+            codexHome: r'C:\Users\test\.codex',
+            hasConfig: true,
+            hasAuth: true,
+            hasCustomProvider: false,
+            authMode: 'chatgpt',
+            needsSetup: false,
+            promptVariant: 'default',
+            configError: true,
+            effectiveSource: 'invalid',
+          ),
+        );
 
-      expect(find.text('无法读取 Codex 的 config.toml'), findsOneWidget);
-      expect(find.text('使用中'), findsNothing);
-    });
+        expect(find.text('无法读取 Codex 的 config.toml'), findsOneWidget);
+        expect(find.text('使用中'), findsNothing);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
 
-    testWidgets('a provider codex already selects is reported, not edited', (
-      t,
-    ) async {
-      final api = await pump(
-        t,
-        status: const CodexSetupStatus(
-          codexHome: r'C:\Users\test\.codex',
-          hasConfig: true,
-          hasAuth: false,
-          hasCustomProvider: true,
-          needsSetup: false,
-          promptVariant: 'default',
-          effectiveSource: 'custom',
-        ),
-      );
+    testWidgets(
+      'a provider codex already selects is reported, not edited',
+      (t) async {
+        final api = await pump(
+          t,
+          status: const CodexSetupStatus(
+            codexHome: r'C:\Users\test\.codex',
+            hasConfig: true,
+            hasAuth: false,
+            hasCustomProvider: true,
+            needsSetup: false,
+            promptVariant: 'default',
+            effectiveSource: 'custom',
+          ),
+        );
 
-      // codexSetupStatusProvider: the state card reads codex's own setup.
-      expect(find.text('已配置自定义供应商'), findsOneWidget);
-      expect(find.text('使用中'), findsOneWidget);
-      expect(find.byKey(const Key('codex-global-provider')), findsOneWidget);
-      expect(find.byKey(const Key('codex-base-url')), findsNothing);
-      expect(find.byKey(const Key('codex-save-provider')), findsNothing);
-      expect(api.lastProvider, isNull, reason: 'nothing is written');
-    });
+        // codexSetupStatusProvider: the state card reads codex's own setup.
+        expect(find.text('已配置自定义供应商'), findsOneWidget);
+        expect(find.text('使用中'), findsOneWidget);
+        expect(find.byKey(const Key('codex-global-provider')), findsOneWidget);
+        expect(find.byKey(const Key('codex-base-url')), findsNothing);
+        expect(find.byKey(const Key('codex-save-provider')), findsNothing);
+        expect(api.lastProvider, isNull, reason: 'nothing is written');
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
 
-    testWidgets('the prompt switch lives under Advanced and persists', (
-      t,
-    ) async {
-      final api = await pump(t, status: signedIn);
+    testWidgets(
+      'the prompt switch lives under Advanced and persists',
+      (t) async {
+        final api = await pump(t, status: signedIn);
 
-      await t.tap(find.byKey(const Key('codex-nondegraded-toggle')));
-      await t.pumpAndSettle();
+        await t.tap(find.byKey(const Key('codex-nondegraded-toggle')));
+        await t.pumpAndSettle();
 
-      expect(api.codexStatus.promptVariant, 'non_degraded');
-    });
+        expect(api.codexStatus.promptVariant, 'non_degraded');
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.macOS),
+    );
   });
 
   testWidgets('Onboarding explains why an expired account must sign in', (

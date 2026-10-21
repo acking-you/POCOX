@@ -1652,5 +1652,15 @@
   "updateDownload": "Download",
   "updateReleasePage": "Release page",
   "updateToast": "POCOX {version} is available",
-  "@updateToast": {"placeholders": {"version": {"type": "String"}}}
+  "@updateToast": {"placeholders": {"version": {"type": "String"}}},
+  "networkProxyTitle": "Application network proxy",
+  "networkProxyScope": "Used by POCOX for update checks, downloads, account requests and web images. Hosted agents, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.",
+  "networkProxyDefault": "Default network",
+  "networkProxyAddress": "Proxy URL",
+  "networkProxyHint": "HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.",
+  "networkProxyInvalid": "Enter an HTTP(S) or SOCKS5 proxy URL with a host and valid port, without a path, query or fragment.",
+  "networkProxySaveFailed": "Could not save the proxy. Check the address and try again.",
+  "networkProxyReadFailed": "Could not read the proxy. Tap to retry.",
+  "networkProxyShow": "Show proxy URL",
+  "networkProxyHide": "Hide proxy URL"
 }

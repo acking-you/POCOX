@@ -21,6 +21,33 @@ and only the app's own part in Flutter (`apps/flutter/lib/src/updates`).
   Cancel stops a download. Failures name their cause, with the underlying
   error behind the info mark.
 
+## Application network proxy
+
+**Settings › Application network proxy** is available on phones and desktops.
+Enter an `http://`, `https://`, `socks5://` or `socks5h://` URL, optionally with
+`username:password@` authentication. For example, `http://127.0.0.1:7890` or
+`socks5://127.0.0.1:1080`. On a phone, `127.0.0.1` means that phone; a proxy
+running on a computer needs that computer's reachable address instead.
+
+The private `[network].proxy` setting in the app's `config.toml` applies to
+release manifests, signatures and package downloads (including redirects),
+POCOX account/backend requests, GitHub avatars and site favicons. SOCKS5
+resolves destination names through the proxy. Explicit proxies take precedence
+over environment variables and bypass loopback destinations. An unavailable
+proxy fails the request; it never falls back to a direct connection.
+
+Save affects new operations without a restart. An existing transfer keeps its
+client. Clearing the field restores the previous default: proxy environment
+variables such as `HTTPS_PROXY` apply, but native OS proxy settings are not
+read. Proxy credentials are masked in the editor and omitted from summaries
+and debug output; the app's config remains private (0600 on Unix).
+
+This setting does not configure relay TCP transports, hosted harnesses, the
+Responses API service's upstream proxy, or pages opened in the system browser.
+Their existing network configuration remains authoritative. Automatic checks
+still fetch only release metadata; package downloading starts when the user
+chooses Update. Signature and package verification remain mandatory.
+
 ## Trust
 
 The release workflow's last job (`manifest` in `.github/workflows/release.yml`)
@@ -92,8 +119,8 @@ test key.
 
 ## Limits
 
-- The update traffic uses the system's proxy variables (`HTTPS_PROXY`, …);
-  macOS and Windows system proxy settings are not read.
+- Native macOS/Windows proxy settings and the system browser are outside the
+  application proxy setting. Configure an explicit URL when needed.
 - Verified on macOS only (see the PR for the run). Windows, Linux and Android
   paths compile in the release workflow and are covered by unit tests of the
   shared logic, not by a run on those systems.

@@ -94,6 +94,7 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
   BridgeApi get _api => ref.read(bridgeApiProvider);
 
   Future<void> _loadStatus() async {
+    if (!isDesktop) return;
     try {
       final s = await _api.codexSetupStatus();
       if (mounted) {
@@ -175,11 +176,13 @@ class _CodexSetupScreenState extends ConsumerState<CodexSetupScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                GroupCard(
-                  title: l10n.codexSetupAdvanced,
-                  children: [_nonDegradedRow(l10n, theme, nonDegraded)],
-                ),
+                if (isDesktop) ...[
+                  const SizedBox(height: 10),
+                  GroupCard(
+                    title: l10n.codexSetupAdvanced,
+                    children: [_nonDegradedRow(l10n, theme, nonDegraded)],
+                  ),
+                ],
                 if (_error case final error?)
                   Padding(
                     padding: const EdgeInsets.only(top: 14),

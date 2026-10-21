@@ -32,6 +32,12 @@ abstract interface class BridgeApi implements UpdateApi {
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
 
+  /// Read the private application proxy setting for its editor.
+  Future<String?> networkProxy();
+
+  /// Validate and save the application proxy; blank restores the default.
+  Future<void> networkSetProxy(String value);
+
   /// Set the relay `host:port` and persist.
   Future<void> setRelay(String relay);
 

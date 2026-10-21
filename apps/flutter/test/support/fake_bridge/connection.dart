@@ -18,6 +18,19 @@ mixin _FakeConnection on _FakeBridgeState {
   @override
   Future<void> historyCacheSetLimit(int limitMb) async {}
 
+  String? savedNetworkProxy;
+  Object? networkSaveError;
+  int codexSetupReads = 0;
+
+  @override
+  Future<String?> networkProxy() async => savedNetworkProxy;
+
+  @override
+  Future<void> networkSetProxy(String value) async {
+    if (networkSaveError case final error?) throw error;
+    savedNetworkProxy = value.trim().isEmpty ? null : value.trim();
+  }
+
   @override
   Future<ConfigInfo> getConfig() async => _config;
 
@@ -85,7 +98,10 @@ mixin _FakeConnection on _FakeBridgeState {
   );
 
   @override
-  Future<CodexSetupStatus> codexSetupStatus() async => codexStatus;
+  Future<CodexSetupStatus> codexSetupStatus() async {
+    codexSetupReads++;
+    return codexStatus;
+  }
 
   @override
   Future<void> codexSetupProvider({

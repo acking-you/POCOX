@@ -18,8 +18,7 @@ const SMALL: Duration = Duration::from_secs(30);
 /// A package may take long; a stall this long ends it.
 const STALL: Duration = Duration::from_secs(60);
 
-/// The updater's HTTP client: the system's proxy variables apply, as for
-/// every outbound request of the app.
+/// The updater's HTTP client uses POCOX's application network configuration.
 pub struct Fetcher {
     client: reqwest::Client,
 }
@@ -44,8 +43,9 @@ fn network(error: impl std::fmt::Display) -> Failure {
 
 impl Fetcher {
     /// A client with the updater's timeouts.
-    pub fn new() -> Result<Self, Failure> {
-        let client = reqwest::Client::builder()
+    pub fn new(support: &Path) -> Result<Self, Failure> {
+        let client = crate::engine::network::client(support)
+            .map_err(network)?
             .connect_timeout(CONNECT)
             .user_agent(concat!("POCOX/", env!("CARGO_PKG_VERSION"), " updater"))
             .build()
