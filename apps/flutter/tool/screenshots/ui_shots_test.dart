@@ -18,19 +18,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session/step_body.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/widgets/host_switcher.dart';
-import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
-import 'package:pocket_codex/src/widgets/file_preview.dart';
-import 'package:pocket_codex/src/screens/home_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session/step_body.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/widgets/host_switcher.dart';
+import 'package:pocox/src/widgets/local_host_dialog.dart';
+import 'package:pocox/src/widgets/file_preview.dart';
+import 'package:pocox/src/screens/home_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
+import 'package:pocox/src/theme.dart';
 
 import '../../test/fake_bridge_api.dart';
 import '../../test/support/agent_catalog_fixture.dart';
@@ -107,19 +107,19 @@ FakeBridgeApi _api() {
     ThreadMeta(
       id: 't1',
       preview: '把首页的加载状态改成骨架屏',
-      cwd: '/Users/me/work/pocket-codex',
+      cwd: '/Users/me/work/pocox',
       updatedAt: now - 120,
     ),
     ThreadMeta(
       id: 't2',
       preview: 'Fix the flaky relay reconnect test',
-      cwd: '/Users/me/work/pocket-codex',
+      cwd: '/Users/me/work/pocox',
       updatedAt: now - 3600,
     ),
     ThreadMeta(
       id: 't3',
       preview: '整理 CHANGELOG 并准备 0.2.9',
-      cwd: '/Users/me/work/pocket-codex',
+      cwd: '/Users/me/work/pocox',
       updatedAt: now - 86400 * 2,
     ),
     ThreadMeta(
@@ -137,7 +137,7 @@ FakeBridgeApi _api() {
   ]);
   api.readResult = const ThreadHistory(
     branch: 'feat/skeleton-loading',
-    cwd: '/Users/me/work/pocket-codex',
+    cwd: '/Users/me/work/pocox',
     tokensUsed: 48000,
     contextWindow: 258000,
     model: 'gpt-5.5',
@@ -399,7 +399,7 @@ void stepShots() {
     TranscriptItem(
       id: 'c1',
       type: 'commandExecution',
-      title: 'cargo test -p pocket-codex-bridge session_sync',
+      title: 'cargo test -p pocox-bridge session_sync',
       text:
           'running 4 tests\n'
           'test retained_serves_current_generation ... ok\n'

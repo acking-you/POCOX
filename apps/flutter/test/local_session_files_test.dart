@@ -6,15 +6,15 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/local_session_view_screen.dart';
-import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/local_session_view_screen.dart';
+import 'package:pocox/src/screens/app_session/generated_image_card.dart';
+import 'package:pocox/src/widgets/message_images.dart';
 
 import 'fake_bridge_api.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 final _png = base64Decode(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgaPj/HwAEggJ/59habAAAAABJRU5ErkJggg==',

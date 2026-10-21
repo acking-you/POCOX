@@ -1,0 +1,59 @@
+[package]
+name = "pocox-host-svc"
+description = "Host-side meta service: remote-viewable codex sessions + per-thread config, exposed through the account broker."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pocox-core = { workspace = true }
+pocox-codex = { workspace = true }
+# `json` adds the Json extractor/response and `query` the Query extractor (for
+# `/fs/list?path=`) on top of the workspace axum (already linked by the bridge
+# via pocox-api-proxy, so this is no new dep in the mobile artifact).
+axum = { workspace = true, features = ["json", "query"] }
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+tokio-util = { workspace = true }
+url = { workspace = true }
+percent-encoding = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+tower-http = { workspace = true, features = ["compression-zstd", "compression-gzip"] }
+# ACP client + gateway; all already in the lockfile.
+reqwest = { workspace = true, features = ["zstd", "gzip"] }
+thiserror = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+# Decodes a rollout's inline copy of a deleted attachment (already linked by
+# the bridge).
+base64 = { workspace = true }
+# Grok Build session summaries carry RFC 3339 times; its launch config is TOML.
+chrono = { workspace = true }
+toml = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+nix = { workspace = true, features = ["user"] }
+
+# Native desktop history reads existing databases without loading an agent.
+[target.'cfg(any(target_os = "macos", target_os = "linux", target_os = "windows"))'.dependencies]
+sqlx = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
+zstd = { workspace = true }
+# Drive the real router over a loopback listener in the HTTP integration test —
+# the same rustls-webpki reqwest the bridge's meta client uses, so no new
+# workspace dep and the exact request path is exercised.
+reqwest = { workspace = true, features = ["zstd", "gzip"] }

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/ide_context.dart';
+import 'package:pocox/src/ide_context.dart';
 
 // The real payload from a desktop-app message that pasted a clipboard image.
 const _desktopAppMessage = '''

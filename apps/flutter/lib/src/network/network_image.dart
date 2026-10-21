@@ -2,7 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
-import 'package:pocket_codex/src/rust/api/bridge/network.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/network.dart' as frb;
 
 /// Flutter's image cache and decoder, with bounded reads through the app proxy.
 /// Proxy URLs never enter cache keys, image diagnostics or error messages.

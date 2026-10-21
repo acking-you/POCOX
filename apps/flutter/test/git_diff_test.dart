@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/git_diff.dart';
+import 'package:pocox/src/git_diff.dart';
 
 void main() {
   group('DiffModel.parse', () {

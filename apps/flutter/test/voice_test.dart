@@ -6,14 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart' show StatsReport;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/voice/voice_controller.dart';
-import 'package:pocket_codex/src/voice/voice_transport.dart';
-import 'package:pocket_codex/src/voice/voice_widgets.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/voice/voice_controller.dart';
+import 'package:pocox/src/voice/voice_transport.dart';
+import 'package:pocox/src/voice/voice_widgets.dart';
 
 import 'fake_bridge_api.dart';
 
@@ -50,7 +50,7 @@ class _VoiceApi extends FakeBridgeApi {
             preview: '',
             cwd: '/repo',
             updatedAt: 1,
-            threadSource: 'pocket-codex-voice',
+            threadSource: 'pocox-voice',
           ),
         );
         return '{"thread":{"id":"voice","cwd":"/repo"}}';
@@ -155,7 +155,7 @@ void main() {
       preview: '',
       cwd: '',
       updatedAt: 0,
-      threadSource: 'pocket-codex-voice',
+      threadSource: 'pocox-voice',
     );
     expect(t.withName('Renamed').isVoice, isTrue);
   });
@@ -583,7 +583,7 @@ void main() {
           api.calls
               .firstWhere((c) => c.$1 == 'thread/start')
               .$2['threadSource'],
-          'pocket-codex-voice',
+          'pocox-voice',
         );
         expect(api.lastResumed, isNull);
         expect(find.textContaining('no rollout found'), findsNothing);

@@ -1,0 +1,118 @@
+use futures::{SinkExt, StreamExt};
+use pocox_core::state::CodexProcessInfo;
+use serde_json::Value;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_tungstenite::{
+    accept_async_with_config,
+    tungstenite::{protocol::WebSocketConfig, Message},
+};
+
+use super::*;
+
+async fn adopted_server(answer_list: bool, wildcard: bool) -> Result<(), StartupFailure> {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind fake server");
+    let addr = listener.local_addr().expect("listen address");
+    let peer = tokio::spawn(async move {
+        let (mut http, _) = listener.accept().await.expect("HTTP connection");
+        let mut request = [0u8; 512];
+        let received = http.read(&mut request).await.expect("read readyz");
+        assert!(received > 0);
+        http.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            .await
+            .expect("readyz response");
+        drop(http);
+        let mut ws = accept_async_with_config(
+            listener.accept().await.expect("RPC connection").0,
+            Some(WebSocketConfig::default()),
+        )
+        .await
+        .expect("websocket handshake");
+        for method in ["initialize", "initialized", "thread/list"] {
+            let text = ws
+                .next()
+                .await
+                .expect("RPC frame")
+                .expect("valid frame")
+                .into_text()
+                .expect("text frame");
+            let request: Value = serde_json::from_str(&text).expect("JSON request");
+            assert_eq!(request["method"], method);
+            if method == "initialize" {
+                let params = &request["params"];
+                assert_eq!(params["clientInfo"]["title"], "POCOX");
+                assert!(params["clientInfo"]["name"].as_str().is_some());
+                assert_eq!(params["clientInfo"]["version"], env!("CARGO_PKG_VERSION"));
+                assert_eq!(params["capabilities"]["experimentalApi"], true);
+                assert!(params["capabilities"].get("explicitGatewayOauth").is_none());
+            }
+            if method == "initialized" {
+                assert!(request.get("id").is_none());
+                continue;
+            }
+            if method == "thread/list" && !answer_list {
+                break;
+            }
+            ws.send(Message::text(
+                json!({"id": request["id"], "result": {"data": []}}).to_string(),
+            ))
+            .await
+            .expect("RPC response");
+        }
+        assert!(
+            matches!(ws.next().await, Some(Ok(Message::Close(_)))),
+            "probe must close even after an RPC timeout"
+        );
+        ws.flush().await.expect("close reply");
+    });
+    let report = SpawnReport {
+        info: CodexProcessInfo {
+            pid: std::process::id(),
+            listen: if wildcard {
+                format!("ws://0.0.0.0:{}", addr.port())
+            } else {
+                format!("ws://{addr}")
+            },
+            log_file: PathBuf::from("no-child-log"),
+            started_at: String::new(),
+        },
+        reused: true,
+        log_offset: 0,
+        listener_confirmed: true,
+        spawned: None,
+        owned: None,
+    };
+    let budget = if answer_list { Duration::from_secs(3) } else { Duration::from_millis(200) };
+    let result = tokio::task::spawn_blocking(move || verify_ready(&report, budget))
+        .await
+        .expect("readiness task");
+    tokio::time::timeout(Duration::from_secs(2), peer)
+        .await
+        .expect("probe released peer")
+        .expect("fake server completed");
+    result
+}
+
+#[tokio::test]
+async fn adopted_listener_must_answer_a_real_thread_request() {
+    let failure = adopted_server(false, false)
+        .await
+        .expect_err("wedged listener must not be adopted");
+    assert!(failure.to_string().contains("thread/list timed out"));
+    assert!(!failure.process_exited);
+}
+
+#[tokio::test]
+async fn functional_adopted_listener_is_preserved() {
+    adopted_server(true, false)
+        .await
+        .expect("healthy listener should be reused");
+}
+
+#[tokio::test]
+async fn adopted_wildcard_listener_is_probed_over_loopback() {
+    adopted_server(true, true)
+        .await
+        .expect("wildcard listener should be reused");
+}

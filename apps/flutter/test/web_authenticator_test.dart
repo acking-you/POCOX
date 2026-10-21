@@ -4,7 +4,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/web_authenticator.dart';
+import 'package:pocox/src/web_authenticator.dart';
 
 void main() {
   test('the desktop OAuth callback names 127.0.0.1, not localhost', () {

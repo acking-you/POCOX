@@ -8,7 +8,7 @@ backend never carries client traffic.
 ```
                  lb7666.top
   ┌──────────────────────────────────────────────┐
-  │ pocket-codex-backend                          │
+  │ pocox-backend                          │
   │   HTTP API  :8443  (TLS)  /auth/* /v1/*       │
   │     │  holds the relay ADMIN key              │
   │     │  mints per-account credentials          │
@@ -46,12 +46,12 @@ be aware of when upgrading:
 ## Prerequisites (provided by you)
 
 1. **GitHub OAuth App** with *Device Flow* enabled → its **client id**
-   (`PCX_GITHUB_CLIENT_ID`). The device flow uses no client secret.
+   (`POCOX_GITHUB_CLIENT_ID`). The device flow uses no client secret.
    *Optional — to also enable the browser-redirect (web) login:* in the same
    OAuth App, set the **Authorization callback URL** to
    `https://<host:port>/auth/web/callback` (e.g.
    `https://lb7666.top:8443/auth/web/callback`) and generate a **client secret**,
-   then set `PCX_GITHUB_CLIENT_SECRET` (backend.env) + `public_url` (backend.toml)
+   then set `POCOX_GITHUB_CLIENT_SECRET` (backend.env) + `public_url` (backend.toml)
    to that same base. One OAuth App + one client id serves both flows; leaving the
    secret unset keeps the web flow off (device flow still works).
 2. A TLS certificate for the host clients connect to (e.g. `lb7666.top`). The
@@ -61,7 +61,7 @@ be aware of when upgrading:
    ```
    (or reuse an existing cert / a reverse proxy — see "TLS options").
 3. **pb-mapper 0.5+** on the relay, and its 32-byte **administrator** key
-   (`PCX_MSG_HEADER_KEY`). `deploy.sh` copies it out of
+   (`POCOX_MSG_HEADER_KEY`). `deploy.sh` copies it out of
    `/var/lib/pb-mapper/auth/admin.key` for you when run with `sudo`, and replaces
    a stale pre-0.5 key if one is already configured.
 
@@ -74,22 +74,22 @@ be aware of when upgrading:
 ## One-time server setup
 
 ```bash
-sudo useradd --system --home /var/lib/pocket-codex --shell /usr/sbin/nologin pcx || true
-sudo mkdir -p /var/lib/pocket-codex /etc/pocket-codex
-sudo chown pcx:pcx /var/lib/pocket-codex
+sudo useradd --system --home /var/lib/pocox --shell /usr/sbin/nologin pcx || true
+sudo mkdir -p /var/lib/pocox /etc/pocox
+sudo chown pcx:pcx /var/lib/pocox
 
 # Config + secrets (or just run ./deploy.sh, which does all of this correctly).
-sudo install -m 0644 backend.toml.example /etc/pocket-codex/backend.toml
+sudo install -m 0644 backend.toml.example /etc/pocox/backend.toml
 # Create the secret file 0600 + pcx-owned BEFORE typing any secret into it, and
 # use sudoedit (sudo resets $EDITOR's environment):
-sudo install -m 0600 -o pcx -g pcx backend.env.example /etc/pocket-codex/backend.env
-sudoedit /etc/pocket-codex/backend.env   # set PCX_JWT_SECRET + PCX_GITHUB_CLIENT_ID
+sudo install -m 0600 -o pcx -g pcx backend.env.example /etc/pocox/backend.env
+sudoedit /etc/pocox/backend.env   # set POCOX_JWT_SECRET + POCOX_GITHUB_CLIENT_ID
 
 # Binary + unit
-sudo install -m755 pocket-codex-backend /usr/local/bin/pocket-codex-backend
-sudo cp pocket-codex-backend.service /etc/systemd/system/
+sudo install -m755 pocox-backend /usr/local/bin/pocox-backend
+sudo cp pocox-backend.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now pocket-codex-backend
+sudo systemctl enable --now pocox-backend
 ```
 
 ## Relay configuration (REQUIRED)
@@ -118,7 +118,7 @@ tells clients to dial, so it must resolve for them too — `lb7666.top:7666`, no
 
 - **files** (recommended): `tls_mode = "files"` + `tls_cert`/`tls_key` pointing
   at Let's Encrypt PEMs. The backend reloads them on restart; add a certbot
-  deploy hook that runs `systemctl restart pocket-codex-backend`.
+  deploy hook that runs `systemctl restart pocox-backend`.
 - **plain**: `tls_mode = "plain"` — no TLS. Only for a local smoke test or
   behind a TLS-terminating proxy; **never** expose plain to the internet (the
   session token would travel in cleartext).
@@ -127,7 +127,7 @@ tells clients to dial, so it must resolve for them too — `lb7666.top:7666`, no
 
 ```bash
 curl -fsS https://lb7666.top:8443/healthz        # -> ok
-journalctl -u pocket-codex-backend -f            # watch logs
+journalctl -u pocox-backend -f            # watch logs
 ```
 
 Then from a client: `pocox login` → `pocox serve`, and on another
@@ -148,8 +148,8 @@ administrator key — stop and fix the configuration before any client sees it.
 
 On the server (has Rust):
 ```bash
-cargo build --release -p pocket-codex-backend
-# target/release/pocket-codex-backend
+cargo build --release -p pocox-backend
+# target/release/pocox-backend
 ```
 Or cross-compile a static musl binary (see `.github/workflows/release.yml` for
 the `cross` setup) and `scp` it over.
@@ -162,8 +162,8 @@ Validated on the live server (Tencent Cloud Ubuntu, 2 GB RAM):
   backend therefore terminates its **own** TLS on `:8443`, reusing Caddy's
   Let's Encrypt cert
   (`/var/lib/caddy/.local/share/caddy/certificates/.../lb7666.top/lb7666.top.{crt,key}`,
-  copied to `/etc/pocket-codex/` so `pcx` can read them). Caddy renews that cert,
-  so add a renewal hook that re-copies + `systemctl restart pocket-codex-backend`.
+  copied to `/etc/pocox/` so `pcx` can read them). Caddy renews that cert,
+  so add a renewal hook that re-copies + `systemctl restart pocox-backend`.
 - **Cloud security group:** `:8443` must be opened in the **Tencent Cloud
   console** (a local `ufw` won't help) for external clients to reach the API.
   `:7666` is already open, which the direct-connect design needs. `:7900` was the

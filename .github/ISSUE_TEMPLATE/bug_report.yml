@@ -12,7 +12,7 @@ body:
           mapping are all expected to change. Please include the exact
           commit / version you saw the bug on.
         - **Logs help.** `pocox` uses `tracing`; running with
-          `RUST_LOG=pocket_codex=debug` (or `trace`) usually surfaces what
+          `RUST_LOG=pocox=debug` (or `trace`) usually surfaces what
           went wrong.
         - **Don't paste secrets.** Scrub `CODEX_ACCESS_TOKEN`, ChatGPT
           session cookies, relay credentials and any contents of

@@ -3,12 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/app_dialog.dart';
 
 enum _MessageAction { copy, select, edit, share }
 

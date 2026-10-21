@@ -11,7 +11,7 @@ import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
 /// The custom URL scheme registered for the browser-redirect login deep link
 /// (Android intent-filter / iOS + macOS CFBundleURLSchemes). Mobile + macOS use
 /// it; Windows + Linux use a loopback http server instead.
-const String appAuthScheme = 'pocketcodex';
+const String appAuthScheme = 'pocox';
 
 /// The loopback port flutter_web_auth_2 listens on for the desktop
 /// (Windows/Linux) browser flow. Any free high port works — GitHub never sees it

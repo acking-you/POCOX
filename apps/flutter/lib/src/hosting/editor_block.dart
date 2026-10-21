@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/text_measure.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/text_measure.dart';
+import 'package:pocox/src/widgets/app_dialog.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// One padded block inside a hosting editor [GroupCard] section, inset like
 /// the card's own header.

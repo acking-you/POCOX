@@ -1,18 +1,18 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/codex_setup_screen.dart';
-import 'package:pocket_codex/src/screens/home_screen.dart';
-import 'package:pocket_codex/src/screens/local_session_view_screen.dart';
-import 'package:pocket_codex/src/screens/account_onboarding_screen.dart';
-import 'package:pocket_codex/src/screens/local_sessions_screen.dart';
-import 'package:pocket_codex/src/screens/log_view_screen.dart';
-import 'package:pocket_codex/src/screens/onboarding_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
-import 'package:pocket_codex/src/screens/welcome_guide_screen.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_screen.dart';
-import 'package:pocket_codex/src/tools/preview_browser.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/codex_setup_screen.dart';
+import 'package:pocox/src/screens/home_screen.dart';
+import 'package:pocox/src/screens/local_session_view_screen.dart';
+import 'package:pocox/src/screens/account_onboarding_screen.dart';
+import 'package:pocox/src/screens/local_sessions_screen.dart';
+import 'package:pocox/src/screens/log_view_screen.dart';
+import 'package:pocox/src/screens/onboarding_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
+import 'package:pocox/src/screens/welcome_guide_screen.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_screen.dart';
+import 'package:pocox/src/tools/preview_browser.dart';
 
 /// The live router instance, captured by [buildRouter] so code outside the
 /// widget tree — namely the desktop tray's "Settings" item — can navigate. Null

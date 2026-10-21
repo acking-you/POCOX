@@ -1,4 +1,4 @@
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
 
 /// A permission preset bundling a codex approval policy + sandbox mode into a
 /// single user-facing choice (mirrors the "permission mode" idea in the

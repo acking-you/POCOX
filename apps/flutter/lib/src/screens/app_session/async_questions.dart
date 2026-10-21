@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// Nonblocking questions delivered as an agent message, answered with user text.
 class AsyncQuestionPrompt {

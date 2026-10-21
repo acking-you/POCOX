@@ -7,8 +7,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -30,7 +30,7 @@ const _busy = SessionAccess(
   mode: 'write',
   writer: 'this_host',
   turn: 'running',
-  exclusion: 'pocket',
+  exclusion: 'pocox',
   reason: 'owned',
 );
 

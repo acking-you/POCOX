@@ -8,7 +8,7 @@ fi
 bundle=$(realpath "$1")
 icon=$(realpath "$2")
 output=$(realpath -m "$3")
-test -x "$bundle/pocket_codex"
+test -x "$bundle/pocox"
 test -f "$icon"
 mkdir -p "$(dirname "$output")"
 work=$(mktemp -d)
@@ -36,17 +36,17 @@ cp -a "$bundle/." AppDir/usr/bin/
 # Linux uses path_provider_linux and never loads it; do not ship an unused
 # JVM bridge that would otherwise require a Java installation.
 rm -f AppDir/usr/bin/lib/libdartjni.so
-cat > AppDir/usr/share/applications/pocket-codex.desktop <<'DESKTOP'
+cat > AppDir/usr/share/applications/pocox.desktop <<'DESKTOP'
 [Desktop Entry]
 Name=POCOX
 Comment=Access your coding agents and sessions from every device
-Exec=pocket_codex
-Icon=pocket-codex
+Exec=pocox
+Icon=pocox
 Terminal=false
 Type=Application
 Categories=Development;Utility;
 DESKTOP
-convert "$icon" -resize 256x256 pocket-codex.png
+convert "$icon" -resize 256x256 pocox.png
 
 # The web-auth plugin links WebKit even though authentication uses the system
 # browser. Collect every ELF dependency (including Flutter plugins), not just
@@ -59,8 +59,8 @@ gles=$(ldconfig -p | awk '$1 == "libGLESv2.so.2" && !found {print $NF; found=1}'
 test -n "$gles"
 ./linuxdeploy.AppImage --appdir AppDir --plugin gtk \
   --library "$gles" \
-  --desktop-file AppDir/usr/share/applications/pocket-codex.desktop \
-  --icon-file pocket-codex.png
+  --desktop-file AppDir/usr/share/applications/pocox.desktop \
+  --icon-file pocox.png
 
 # Flutter's assets stay beside the executable. Source the GTK resource hook
 # while retaining the Flutter bundle's lib/ and linuxdeploy's shared lib/.
@@ -72,7 +72,7 @@ export LD_LIBRARY_PATH="$APPDIR/usr/bin/lib:$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$
 for hook in "$APPDIR"/apprun-hooks/*.sh; do
   [ ! -f "$hook" ] || source "$hook"
 done
-exec "$APPDIR/usr/bin/pocket_codex" "$@"
+exec "$APPDIR/usr/bin/pocox" "$@"
 APPRUN
 chmod +x AppDir/AppRun
 ARCH=x86_64 ./appimagetool.AppImage --runtime-file runtime-x86_64 AppDir "$output"

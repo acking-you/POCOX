@@ -13,17 +13,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/loading.dart';
-import 'package:pocket_codex/src/widgets/running_sheen.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/loading.dart';
+import 'package:pocox/src/widgets/running_sheen.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';
 import 'support/ui_preview.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 const _service = 'pcx:sidebar:app:default';
 const _parent = ThreadMeta(

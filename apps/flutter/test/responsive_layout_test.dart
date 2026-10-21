@@ -2,32 +2,32 @@
 // fonts on an iOS target at the narrowest width with the largest text:
 // the services capability rows, the composer's agent options and model
 // chip, the welcome guide's found host, the settings subscriptions and the
-// share card. Set PCX_UI_PREVIEW_DIR to write the previews (`responsive-*`).
+// share card. Set POCOX_UI_PREVIEW_DIR to write the previews (`responsive-*`).
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
-import 'package:pocket_codex/src/screens/welcome_guide_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/tools/share_card.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
+import 'package:pocox/src/screens/welcome_guide_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/share_card.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/ui_preview.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
 
 const _device = 'ackingliu-mc1';
 const _openCode = 'pcx:$_device:opencode:opencode';
 const _codex = 'pcx:$_device:app:default';
-const _cwd = '/work/pocket-codex';
+const _cwd = '/work/pocox';
 // The narrowest phone at the largest text in both languages, and a common
 // phone at default text: the cases where the layouts used to break.
 const _cases = [
@@ -569,8 +569,8 @@ void main() {
         home: true,
       );
       const command =
-          'cargo test -p pocket_codex_bridge --locked -- serve_lifecycle '
-          '/Users/me/work/pocket-codex/crates/pocket-codex-bridge/src';
+          'cargo test -p pocox_bridge --locked -- serve_lifecycle '
+          '/Users/me/work/pocox/crates/pocox-bridge/src';
       FakeBridgeApi? last;
       const scale = 2.0;
       for (final (size, keyboard) in const [
@@ -611,7 +611,7 @@ void main() {
           const AppEvent(
             kind: 'execCommandApproval',
             requestId: '7',
-            raw: '{"command":"$command","cwd":"/Users/me/work/pocket-codex"}',
+            raw: '{"command":"$command","cwd":"/Users/me/work/pocox"}',
           ),
         );
         await _frames(t);

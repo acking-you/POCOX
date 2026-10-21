@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
 
 /// Help for the field it wraps, shown beneath it only while focus is inside:
 /// a form at rest shows names and values, and the instructions for a field

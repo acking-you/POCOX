@@ -2,7 +2,7 @@
 // drag-and-drop and clipboard paste.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/screens/app_session/attachment_gate.dart';
+import 'package:pocox/src/screens/app_session/attachment_gate.dart';
 
 void main() {
   test('a text-only provider takes documents but refuses images', () {

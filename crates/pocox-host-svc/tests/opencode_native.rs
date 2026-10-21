@@ -1,0 +1,785 @@
+//! Opt-in tests against an installed native binary and disposable data only.
+#![cfg(unix)]
+
+use std::{ffi::OsString, path::PathBuf, time::Duration};
+
+use pocox_host_svc::{
+    opencode::{
+        ownership::{Evidence, Source},
+        runtime::{Launch, Server},
+        schema::{Prompt, Session},
+    },
+    process,
+};
+use serde_json::{json, Value};
+
+#[path = "opencode_fixture/model.rs"]
+mod model_fixture;
+
+fn fixture(root: &std::path::Path) -> Launch {
+    let program =
+        PathBuf::from(std::env::var_os("POCOX_OPENCODE_BIN").expect("set POCOX_OPENCODE_BIN"));
+    let mut env: Vec<(OsString, OsString)> = Vec::new();
+    for (key, directory) in [
+        ("HOME", "home"),
+        ("OPENCODE_TEST_HOME", "home"),
+        ("XDG_DATA_HOME", "data"),
+        ("XDG_CONFIG_HOME", "config"),
+        ("XDG_CACHE_HOME", "cache"),
+        ("XDG_STATE_HOME", "state"),
+        ("OPENCODE_CONFIG_DIR", "config"),
+    ] {
+        let path = root.join(directory);
+        std::fs::create_dir_all(&path).expect("fixture directory");
+        env.push((key.into(), path.into_os_string()));
+    }
+    let config = root.join("config.json");
+    std::fs::write(&config, "{}").expect("empty isolated config");
+    env.extend([
+        ("OPENCODE_DB".into(), root.join("data/opencode/fixture.db").into_os_string()),
+        ("OPENCODE_CONFIG".into(), config.into_os_string()),
+        ("OPENCODE_CONFIG_CONTENT".into(), "{\"plugin\":[]}".into()),
+        ("OPENCODE_DISABLE_PROJECT_CONFIG".into(), "true".into()),
+        ("OPENCODE_DISABLE_MODELS_FETCH".into(), "true".into()),
+        ("OPENCODE_DISABLE_AUTOUPDATE".into(), "true".into()),
+        ("OPENCODE_PURE".into(), "true".into()),
+    ]);
+    Launch {
+        program,
+        path: None,
+        env,
+    }
+}
+
+/// `fixture` whose default model is the local deterministic model service.
+fn fixture_with_model(root: &std::path::Path, model: &model_fixture::Fixture) -> Launch {
+    let mut launch = fixture(root);
+    launch
+        .env
+        .retain(|(key, _)| key != "OPENCODE_CONFIG_CONTENT");
+    launch.env.push(("OPENCODE_CONFIG_CONTENT".into(), json!({
+        "plugin":[],"model":"fixture/test","permission":{"bash":"ask"},
+        "command":{"fixture":{"template":"COMMAND_FIXTURE $ARGUMENTS","description":"Isolated command"}},
+        "provider":{"fixture":{"npm":"@ai-sdk/openai-compatible","options":{"baseURL":model.address,"apiKey":"fixture-only"},
+            "models":{"test":{"name":"Fixture test","limit":{"context":32000,"output":1024},
+                "modalities":{"input":["text","image"],"output":["text"]},"variants":{"careful":{"temperature":0.1}}}}}}
+    }).to_string().into()));
+    launch
+}
+
+/// A real 1x1 PNG: OpenCode 2 sniffs the type from the bytes.
+const PIXEL: &str = "data:image/png;base64,\
+                     iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/\
+                     pLvAAAAAElFTkSuQmCC";
+
+/// An outside reader that only opens the database, whatever its schema.
+const OUTSIDE_READER: &str = "import sqlite3,sys,time; \
+                              c=sqlite3.connect('file:'+sys.argv[1]+'?mode=ro',uri=True); \
+                              c.execute('select count(*) from sqlite_master').fetchone(); \
+                              print('ready',flush=True); time.sleep(60)";
+
+#[tokio::test]
+#[ignore = "requires POCOX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_lifecycle_original_session_and_external_database_holder() {
+    let model = model_fixture::start().await;
+    let root = tempfile::tempdir().expect("disposable source");
+    let launch = fixture_with_model(root.path(), &model);
+    let mut server = Server::start(&launch).await.expect("native start");
+    let source =
+        Source::new(server.detection.database.clone(), server.pid, server.started).expect("source");
+    assert_eq!(source.inspect().await, Evidence::Clear, "owned native database handle is visible");
+    assert!(Server::start(&launch).await.is_err(), "a second POCOX server cannot own this source");
+    let directory = root.path().join("中文 project");
+    std::fs::create_dir(&directory).expect("project");
+    let directory = directory.to_str().expect("UTF-8");
+    let session: Session = server
+        .client
+        .create_session(directory)
+        .await
+        .expect("create original session");
+    let mut events = server.client.events().await.expect("global events");
+    let event = tokio::time::timeout(Duration::from_secs(5), events.next())
+        .await
+        .expect("connection event deadline")
+        .expect("event")
+        .expect("event frame");
+    assert_eq!(event.kind, "server.connected");
+    drop(events);
+    let input = Prompt {
+        message_id: None,
+        model: None,
+        agent: None,
+        variant: None,
+        parts: vec![
+            json!({"type":"text","text":"Original session fixture"}),
+            json!({"type":"file","mime":"image/png","url":PIXEL}),
+        ],
+    };
+    server
+        .client
+        .prompt(&session.id, directory, &input, false)
+        .await
+        .expect("prompt the local fixture model");
+    // The prompt route answers before the reply is persisted.
+    let mut page = None;
+    for _ in 0..100 {
+        let read = server
+            .client
+            .messages(&session.id, directory, None)
+            .await
+            .expect("native history");
+        let parts = || read.messages.iter().flat_map(|m| &m.parts);
+        if parts().any(|p| p["text"] == "Original session fixture")
+            && parts().any(|p| p["type"] == "file" && p["url"] == PIXEL)
+            && parts().any(|p| p["text"] == "NATIVE_PREFIX IMAGE COMPLETE")
+        {
+            page = Some(read);
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    let page = page.expect("persisted prompt and reply");
+
+    // This independently owned fixture only opens the same SQLite database;
+    // it performs no write. Even an idle holder prevents a false free claim.
+    let process::Spawned {
+        mut process,
+        stdin,
+        mut stdout,
+    } = process::spawn(
+        std::path::Path::new("/usr/bin/python3"),
+        &["-c".into(), OUTSIDE_READER.into(), server.detection.database.display().to_string()],
+        None,
+        &[],
+    )
+    .expect("outside reader");
+    drop(stdin);
+    use tokio::io::AsyncReadExt;
+    let mut ready = [0u8; 6];
+    tokio::time::timeout(Duration::from_secs(10), stdout.read_exact(&mut ready))
+        .await
+        .expect("reader ready deadline")
+        .expect("reader ready");
+    let evidence = source.inspect().await;
+    assert!(
+        matches!(evidence, Evidence::External(ref holders) if holders.iter().any(|h| Some(h.pid) == process.id())),
+        "a foreign source holder stays follow-only: {evidence:?}"
+    );
+    assert!(process.stop(Duration::from_millis(50)).await);
+    assert_eq!(source.inspect().await, Evidence::Clear);
+    server.stop().await.expect("confirmed native stop");
+    let mut resumed = Server::start(&launch).await.expect("restart same source");
+    let original = resumed
+        .client
+        .session(&session.id)
+        .await
+        .expect("original session");
+    assert_eq!(original.id, session.id);
+    assert_eq!(
+        resumed
+            .client
+            .messages(&session.id, directory, None)
+            .await
+            .expect("retained history")
+            .messages
+            .len(),
+        page.messages.len()
+    );
+    resumed.stop().await.expect("stop restarted native server");
+}
+
+#[tokio::test]
+#[ignore = "requires POCOX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_gateway_original_admission_and_closed_mutation_routes() {
+    use pocox_host_svc::opencode::{
+        api,
+        host::{Host, Snapshot},
+    };
+    use tokio::io::AsyncBufReadExt;
+
+    let root = tempfile::tempdir().expect("disposable source");
+    let launch = fixture(root.path());
+    let server = Server::start(&launch).await.expect("native start");
+    let database = server.detection.database.clone();
+    let v2 = server.detection.version.starts_with("2.");
+    let host = Host::new(server).await.expect("host stream ready");
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("listener");
+    let origin = format!("http://{}", listener.local_addr().expect("address"));
+    let serving = tokio::spawn(api::serve(listener, host.clone()));
+    let http = reqwest::Client::builder()
+        .no_proxy()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .expect("http");
+    let identity = host.info().identity;
+    let gateway = pocox_host_svc::opencode::gateway::Gateway::new(&origin).expect("gateway client");
+    assert_eq!(gateway.info().await.expect("gateway protocol").identity, identity);
+    gateway
+        .catalog(None, &identity)
+        .await
+        .expect("identity-pinned public catalog");
+    let mut stale_read = identity.clone();
+    stale_read.host_id = "obsolete-controller-host".into();
+    assert!(matches!(gateway.catalog(None, &stale_read).await,
+        Err(pocox_host_svc::opencode::client::ClientError::Gateway { code, .. }) if code == "stale_host"));
+
+    let mut invalidations = gateway.events(&identity, 0).await.expect("gateway events");
+    let change = tokio::time::timeout(Duration::from_secs(5), invalidations.next())
+        .await
+        .expect("initial invalidation deadline")
+        .expect("event")
+        .expect("event frame");
+    assert_eq!(change.kind, "changed");
+    assert!(change.properties["sequence"].as_u64().is_some());
+    drop(invalidations);
+    let directory = root.path().join("project");
+    std::fs::create_dir(&directory).expect("project");
+    let created = http
+        .post(format!("{origin}/opencode/v1/create"))
+        .json(&json!({"identity":identity,"directory":directory,"options":{}}))
+        .send()
+        .await
+        .expect("create");
+    assert_eq!(created.status(), 200);
+    let session: Session = created.json().await.expect("session");
+    let mutation = json!({"identity":identity,"sessionId":session.id});
+    let opened: Snapshot = http
+        .post(format!("{origin}/opencode/v1/open"))
+        .json(&mutation)
+        .send()
+        .await
+        .expect("open")
+        .error_for_status()
+        .expect("open status")
+        .json()
+        .await
+        .expect("snapshot");
+    assert_eq!(opened.session.id, session.id);
+    assert_eq!(opened.access.mode, "write");
+    assert_eq!(opened.access.exclusion, "pocox");
+    assert!(opened.window.connected);
+
+    for path in [
+        "/provider",
+        "/config",
+        "/opencode/v1/native/config",
+        "/opencode/v1/auth",
+        "/opencode/v1/shell",
+    ] {
+        assert_eq!(
+            http.get(format!("{origin}{path}"))
+                .send()
+                .await
+                .expect("closed route")
+                .status(),
+            404,
+            "{path}"
+        );
+    }
+    let mut stale = mutation.clone();
+    stale["identity"]["hostId"] = json!("previous host");
+    let mut stale_identity = identity.clone();
+    stale_identity.host_id = "previous host".into();
+    assert!(matches!(gateway.release(&session.id, &stale_identity).await,
+        Err(pocox_host_svc::opencode::client::ClientError::Gateway { code, status: 409 }) if code == "stale_host"));
+    assert_eq!(
+        http.post(format!("{origin}/opencode/v1/release"))
+            .json(&stale)
+            .send()
+            .await
+            .expect("stale mutation")
+            .status(),
+        409
+    );
+    let released: Value = http
+        .post(format!("{origin}/opencode/v1/release"))
+        .json(&mutation)
+        .send()
+        .await
+        .expect("release")
+        .error_for_status()
+        .expect("release status")
+        .json()
+        .await
+        .expect("access");
+    assert_eq!(released["reason"], "released_here");
+
+    // 2.x's own clients leave its background server holding the history; its
+    // port is the fixture's own. 1.x has none, so an outside reader stands in.
+    let (program, args, ready) = if v2 {
+        let args = ["serve", "--service", "--port", "0"]
+            .map(String::from)
+            .to_vec();
+        (launch.program.clone(), args, "server listening on")
+    } else {
+        let args = vec!["-c".into(), OUTSIDE_READER.into(), database.display().to_string()];
+        (PathBuf::from("/usr/bin/python3"), args, "ready")
+    };
+    let process::Spawned {
+        mut process,
+        stdin,
+        stdout,
+    } = process::spawn(&program, &args, None, &launch.env).expect("isolated outside holder");
+    drop(stdin);
+    let mut lines = tokio::io::BufReader::new(stdout).lines();
+    tokio::time::timeout(Duration::from_secs(20), async {
+        while let Some(line) = lines.next_line().await.expect("holder output") {
+            if line.contains(ready) {
+                return;
+            }
+        }
+        panic!("the outside holder exited before it was ready");
+    })
+    .await
+    .expect("fixture deadline");
+    let followed: Snapshot = http
+        .post(format!("{origin}/opencode/v1/open"))
+        .json(&mutation)
+        .send()
+        .await
+        .expect("follow open")
+        .error_for_status()
+        .expect("follow status")
+        .json()
+        .await
+        .expect("follow snapshot");
+    assert_eq!(followed.access.reason, "external_source_open");
+    let holder = followed.access.holder.as_ref().map(|h| h.client.as_str());
+    assert_eq!(holder, Some(if v2 { "opencode_service" } else { "unknown" }));
+    assert_eq!(followed.access.turn, "unknown");
+    assert_eq!(followed.access.mode, "follow");
+    let mut rename = mutation.clone();
+    rename["title"] = json!("MUST NOT CHANGE");
+    assert_eq!(
+        http.post(format!("{origin}/opencode/v1/rename"))
+            .json(&rename)
+            .send()
+            .await
+            .expect("blocked rename")
+            .status(),
+        409
+    );
+    assert!(process.stop(Duration::from_millis(50)).await);
+    let resumed: Snapshot = http
+        .post(format!("{origin}/opencode/v1/open"))
+        .json(&mutation)
+        .send()
+        .await
+        .expect("resume")
+        .error_for_status()
+        .expect("resume status")
+        .json()
+        .await
+        .expect("resumed snapshot");
+    assert_eq!(resumed.session.id, session.id);
+    assert_eq!(resumed.access.mode, "write");
+    assert_ne!(resumed.session.title, "MUST NOT CHANGE");
+    let mut events = gateway
+        .events(&identity, host.live().sequence().await)
+        .await
+        .expect("controller stream before stopping");
+    host.stop().await.expect("native stopped");
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while let Some(event) = events.next().await {
+            match event {
+                Ok(_) => {},
+                Err(pocox_host_svc::opencode::client::ClientError::EventStreamEnded) => {
+                    break;
+                },
+                Err(error) => panic!("unexpected final stream error: {error}"),
+            }
+        }
+    })
+    .await
+    .expect("stopping ends existing SSE even while the gateway listener is retained");
+    assert!(gateway.info().await.is_err(), "a stopped host cannot report a healthy handshake");
+    assert!(gateway.events(&identity, 0).await.is_err(), "a stopped host rejects new streams");
+    serving.abort();
+    let _ = serving.await;
+}
+
+#[tokio::test]
+#[ignore = "requires POCOX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_host_stream_options_permissions_questions_commands_and_cancel() {
+    use pocox_host_svc::opencode::host::{Answer, Host, Input, Options, Snapshot};
+    async fn until(host: &Host, id: &str, ready: impl Fn(&Snapshot) -> bool) -> Snapshot {
+        let mut last = None;
+        let result = tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let snapshot = host.snapshot(id, None).await.expect("snapshot");
+                if ready(&snapshot) {
+                    return snapshot;
+                }
+                last = Some(snapshot);
+                tokio::time::sleep(Duration::from_millis(50)).await;
+            }
+        })
+        .await;
+        assert!(result.is_ok(), "native transition deadline; last snapshot: {last:?}");
+        result.expect("native transition")
+    }
+    fn text(snapshot: &Snapshot) -> String {
+        snapshot
+            .window
+            .messages
+            .iter()
+            .filter(|m| m.info["role"] == "assistant")
+            .flat_map(|m| &m.parts)
+            .filter(|part| part["type"] == "text")
+            .filter_map(|part| part["text"].as_str())
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+    let model_service = model_fixture::start().await;
+    let root = tempfile::tempdir().expect("disposable source");
+    let server = Server::start(&fixture_with_model(root.path(), &model_service))
+        .await
+        .expect("native start");
+    // 1.x streams a reply's text as it arrives; 2.x shows it when the text
+    // step ends.
+    let streams = server.detection.version.starts_with("1.");
+    let native = server.client.clone();
+    let host = Host::new(server).await.expect("host ready");
+    let directory = root.path().join("project");
+    std::fs::create_dir(&directory).expect("project");
+    // 2.x asks before reading `.env` by default; the fixture reads it there.
+    std::fs::write(directory.join(".env"), "FIXTURE=1\n").expect("permission fixture");
+    let directory = directory.to_str().expect("UTF8");
+    // 2.x loads configured commands shortly after it starts listening.
+    let mut catalog = host.catalog(Some(directory)).await.expect("catalog");
+    for _ in 0..50 {
+        if catalog
+            .commands
+            .iter()
+            .any(|command| command.name == "fixture")
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        catalog = host.catalog(Some(directory)).await.expect("catalog");
+    }
+    let model = catalog.model("fixture/test").expect("native model");
+    assert!(model.variants.contains(&"careful".into()) && model.images);
+    assert!(catalog
+        .commands
+        .iter()
+        .any(|command| command.name == "fixture"));
+    let identity = host.info().identity;
+    let options = Options {
+        model: Some("fixture/test".into()),
+        agent: Some("build".into()),
+        variant: Some("careful".into()),
+    };
+    let session = host
+        .create(directory, options.clone(), &identity)
+        .await
+        .expect("session");
+    let input = |text: &str| Input {
+        text: text.into(),
+        images: vec![],
+    };
+    let first = host
+        .prompt(&session.id, input("HOLD_FIXTURE"), None, &identity)
+        .await
+        .expect("prompt");
+    let streaming = if streams {
+        until(&host, &session.id, |s| text(s).contains("NATIVE_PREFIX ")).await
+    } else {
+        until(&host, &session.id, |s| s.access.turn == "running").await
+    };
+    assert!(!text(&streaming).contains("COMPLETE"));
+    assert_eq!(streaming.turn_id.as_deref(), Some(first.as_str()));
+    let persisted = native
+        .messages(&session.id, directory, None)
+        .await
+        .expect("persisted history");
+    assert!(
+        !persisted
+            .messages
+            .iter()
+            .flat_map(|m| &m.parts)
+            .any(|p| p["text"]
+                .as_str()
+                .is_some_and(|t| t.contains("NATIVE_PREFIX"))),
+        "the live prefix is still absent from native persisted history"
+    );
+    assert!(host
+        .prompt(&session.id, input("new turn must queue"), None, &identity)
+        .await
+        .is_err());
+    assert_eq!(
+        host.prompt(&session.id, input("SUPPLEMENT_FIXTURE"), Some(&first), &identity)
+            .await
+            .expect("supplement"),
+        first
+    );
+    model_service.gate.notify_waiters();
+    let settled = until(&host, &session.id, |s| s.access.turn == "idle").await;
+    assert!(text(&settled).contains("NATIVE_PREFIX COMPLETE"));
+    // A controller finds a turn's outcome on its replies, by parent.
+    assert!(
+        settled
+            .window
+            .messages
+            .iter()
+            .any(|m| m.info["role"] == "assistant"
+                && m.info["parentID"] == first.as_str()
+                && m.info["finish"] == "stop"
+                && m.info["time"]["completed"].is_number()),
+        "{:#?}",
+        settled
+            .window
+            .messages
+            .iter()
+            .map(|m| &m.info)
+            .collect::<Vec<_>>()
+    );
+    assert!(!text(&settled).contains("NATIVE_PREFIX NATIVE_PREFIX"));
+    assert_eq!(settled.options, options);
+    host.prompt(&session.id, input("PERMISSION_FIXTURE"), None, &identity)
+        .await
+        .expect("permission prompt");
+    let pending = until(&host, &session.id, |s| !s.permissions.is_empty()).await;
+    let request = pending.permissions[0]["id"]
+        .as_str()
+        .expect("permission id");
+    host.answer(
+        &session.id,
+        request,
+        Answer::Permission {
+            reply: "once".into(),
+        },
+        &identity,
+    )
+    .await
+    .expect("permission reply");
+    until(&host, &session.id, |s| s.access.turn == "idle").await;
+    host.prompt(&session.id, input("QUESTION_FIXTURE"), None, &identity)
+        .await
+        .expect("question prompt");
+    let pending = until(&host, &session.id, |s| !s.questions.is_empty()).await;
+    assert_eq!(pending.questions[0]["questions"][0]["multiple"], true);
+    let request = pending.questions[0]["id"].as_str().expect("question id");
+    host.answer(
+        &session.id,
+        request,
+        Answer::Question {
+            answers: vec![vec!["A".into(), "B".into()]],
+        },
+        &identity,
+    )
+    .await
+    .expect("question reply");
+    until(&host, &session.id, |s| s.access.turn == "idle").await;
+    host.prompt(&session.id, input("/fixture arguments"), None, &identity)
+        .await
+        .expect("native command");
+    let command = until(&host, &session.id, |s| s.access.turn == "idle").await;
+    assert!(command.operation_error.is_none(), "{:?}", command.operation_error);
+    assert!(command
+        .window
+        .messages
+        .iter()
+        .flat_map(|m| &m.parts)
+        .any(|p| p["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("COMMAND_FIXTURE arguments"))));
+    let cancelled = host
+        .prompt(&session.id, input("HOLD_FIXTURE cancellation"), None, &identity)
+        .await
+        .expect("cancel prompt");
+    until(&host, &session.id, |s| {
+        s.turn_id.as_deref() == Some(&cancelled) && s.access.turn == "running"
+    })
+    .await;
+    assert!(host
+        .cancel(&session.id, &cancelled, &identity)
+        .await
+        .expect("cancel"));
+    model_service.gate.notify_waiters();
+    until(&host, &session.id, |s| s.access.turn == "idle").await;
+    host.stop().await.expect("native cleanup");
+}
+
+/// Run the fixture's executable with its isolated environment.
+async fn cli(launch: &Launch, args: &[&str]) -> String {
+    let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
+    let output = process::inspect_output(
+        &launch.program,
+        &args,
+        launch.path.as_ref(),
+        &launch.env,
+        Duration::from_secs(60),
+        64 * 1024,
+    )
+    .await
+    .unwrap_or_else(|error| panic!("opencode {args:?}: {error}"));
+    String::from_utf8(output).expect("UTF-8").trim().to_owned()
+}
+
+/// Stops the fixture's own background server, whatever the test reached.
+struct ServiceStop(Launch);
+
+impl Drop for ServiceStop {
+    fn drop(&mut self) {
+        let _ = std::process::Command::new(&self.0.program)
+            .args(["service", "stop"])
+            .envs(self.0.env.iter().cloned())
+            .stdin(std::process::Stdio::null())
+            .output();
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires POCOX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_background_server_attach_client_admission_and_replacement() {
+    use pocox_host_svc::opencode::{
+        host::{Host, Input},
+        service::State,
+    };
+    async fn until<T>(what: &str, mut check: impl AsyncFnMut() -> Option<T>) -> T {
+        for _ in 0..300 {
+            if let Some(value) = check().await {
+                return value;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("timed out waiting for {what}");
+    }
+
+    let model = model_fixture::start().await;
+    let root = tempfile::tempdir().expect("disposable source");
+    let launch = fixture_with_model(root.path(), &model);
+    if cli(&launch, &["--version"])
+        .await
+        .trim_start_matches('v')
+        .starts_with("1.")
+    {
+        // 1.x has no background server: the host keeps its own.
+        assert!(Server::attach(&launch).await.expect("1.x").is_none());
+        return;
+    }
+    // The fixture's service listens on a port of its own, never the default.
+    let port = std::net::TcpListener::bind("127.0.0.1:0")
+        .and_then(|listener| listener.local_addr())
+        .expect("free port")
+        .port();
+    cli(&launch, &["service", "set", "port", &port.to_string()]).await;
+    let _stop = ServiceStop(launch.clone());
+    cli(&launch, &["service", "set", "disabled", "true"]).await;
+    assert!(Server::attach(&launch).await.expect("turned off").is_none());
+    cli(&launch, &["service", "set", "disabled", "false"]).await;
+
+    // None runs: the host starts it as OpenCode's clients do, then attaches.
+    let server = Server::attach(&launch)
+        .await
+        .expect("attach")
+        .expect("2.x has a background server");
+    let service = server.service().cloned().expect("attached");
+    assert_eq!(service.address().port(), port);
+    assert_eq!(service.pid(), server.pid);
+    assert!(Server::attach(&launch).await.is_err(), "one POCOX host per source");
+    let directory = root.path().join("project");
+    std::fs::create_dir(&directory).expect("project");
+    let directory = directory.to_str().expect("UTF-8");
+    let session = server
+        .client
+        .create_session(directory)
+        .await
+        .expect("session");
+    let host = Host::new(server).await.expect("attached host");
+    let identity = host.info().identity;
+    assert_eq!(
+        host.open(&session.id, &identity)
+            .await
+            .expect("open")
+            .access
+            .mode,
+        "write"
+    );
+    let input = Input {
+        text: "Through the background server".into(),
+        images: Vec::new(),
+    };
+    host.prompt(&session.id, input, None, &identity)
+        .await
+        .expect("write with no other client");
+    until("the reply", async || {
+        let snapshot = host.snapshot(&session.id, None).await.ok()?;
+        let parts = || snapshot.window.messages.iter().flat_map(|m| &m.parts);
+        (snapshot.access.turn == "idle" && parts().any(|p| p["text"] == "NATIVE_PREFIX COMPLETE"))
+            .then_some(())
+    })
+    .await;
+
+    // OpenCode's terminal app, idle, holds a connection to the server.
+    let mut env = launch.env.clone();
+    env.push(("TERM".into(), "xterm-256color".into()));
+    let program = launch.program.display().to_string();
+    #[cfg(target_os = "macos")]
+    let args = vec!["-q".into(), "/dev/null".into(), program, directory.into()];
+    #[cfg(not(target_os = "macos"))]
+    let args = vec!["-qec".into(), format!("'{program}' '{directory}'"), "/dev/null".into()];
+    let process::Spawned {
+        process: mut tui,
+        stdin: _keep,
+        stdout,
+    } = process::spawn(std::path::Path::new("/usr/bin/script"), &args, None, &env)
+        .expect("terminal app under a pty");
+    let drain = tokio::spawn(async move {
+        use tokio::io::AsyncReadExt;
+        let mut stdout = stdout;
+        let mut sink = [0u8; 8192];
+        while matches!(stdout.read(&mut sink).await, Ok(n) if n > 0) {}
+    });
+    let access = until("the connected client", async || {
+        let access = host.access(&session.id).await.ok()?;
+        (access.reason == "external_source_open").then_some(access)
+    })
+    .await;
+    let holder = access.holder.expect("named client");
+    assert_eq!(holder.client, "opencode_client");
+    assert_eq!((access.mode.as_str(), access.turn.as_str()), ("follow", "idle"));
+    assert!(host
+        .rename(&session.id, "MUST NOT CHANGE", &identity)
+        .await
+        .is_err());
+    assert!(tui.stop(Duration::from_millis(200)).await);
+    drain.abort();
+    until("writing once the client left", async || {
+        let opened = host.open(&session.id, &identity).await.ok()?;
+        (opened.access.mode == "write").then_some(())
+    })
+    .await;
+
+    // A client replaces the server: the host attaches to the new one.
+    cli(&launch, &["service", "restart"]).await;
+    until("the replacement", async || (service.state().await == State::Replaced).then_some(()))
+        .await;
+    assert_ne!(host.access(&session.id).await.expect("access").mode, "write");
+    host.stop().await.expect("detach");
+    let server = Server::attach(&launch)
+        .await
+        .expect("attach again")
+        .expect("replacement");
+    let replacement = server.service().cloned().expect("attached");
+    assert_ne!(replacement.pid(), service.pid());
+    let host = Host::new(server).await.expect("attached again");
+    let identity = host.info().identity;
+    assert_eq!(
+        host.open(&session.id, &identity)
+            .await
+            .expect("reopen")
+            .access
+            .mode,
+        "write"
+    );
+
+    // Stopping the host only detaches: the server keeps serving its clients.
+    host.stop().await.expect("detach");
+    assert_eq!(replacement.state().await, State::Current);
+    cli(&launch, &["service", "stop"]).await;
+    assert_eq!(replacement.state().await, State::Gone);
+}

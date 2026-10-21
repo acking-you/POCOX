@@ -192,7 +192,7 @@ extension _SessionVoice on _AppSessionState {
       var id = _isVoiceThread ? _threadId : null;
       if (id == null) {
         final result = await _voice.request('thread/start', {
-          'threadSource': 'pocket-codex-voice',
+          'threadSource': 'pocox-voice',
           if (_cwd != null) 'cwd': _cwd,
           if (_model != null) 'model': _model!.id,
           'approvalPolicy': _mode.approval,
@@ -223,7 +223,7 @@ extension _SessionVoice on _AppSessionState {
               preview: '',
               cwd: cwd ?? '',
               updatedAt: 0,
-              threadSource: 'pocket-codex-voice',
+              threadSource: 'pocox-voice',
             ),
             ..._threads,
           ];

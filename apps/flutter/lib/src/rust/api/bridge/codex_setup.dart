@@ -45,7 +45,7 @@ Future<void> codexSetPromptVariant({required String variant}) => RustLib
 /// (which must be a connected host). Tries the browser flow, falling back to
 /// device code when codex can't bind its local callback port (`:1455`/`:1457`,
 /// reserved on many Windows machines). codex writes `auth.json` itself —
-/// Pocket- Codex never generates the credential. Poll [`codex_auth_status`]
+/// POCOX never generates the credential. Poll [`codex_auth_status`]
 /// until `authenticated`. The OAuth HTTP inherits the proxy the host was
 /// started with, so a China-network user hosts with a proxy and login goes
 /// through it.

@@ -1,6 +1,6 @@
-import 'package:pocket_codex/src/hosting/host_editor_page.dart';
+import 'package:pocox/src/hosting/host_editor_page.dart';
 
-export 'package:pocket_codex/src/hosting/host_editor_page.dart'
+export 'package:pocox/src/hosting/host_editor_page.dart'
     show HostingEditor, showHostingEditor;
 
 /// The former hosting dialog, now the full-page [HostingEditor]; the name is

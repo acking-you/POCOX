@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/history_arrival.dart';
+import 'package:pocox/src/widgets/history_arrival.dart';
 
 void main() {
   testWidgets('history feedback preserves row state on replay and removal', (

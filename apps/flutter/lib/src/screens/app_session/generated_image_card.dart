@@ -1,11 +1,11 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/message_images.dart';
 
 import 'transcript_model.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 Map<String, dynamic> _details(String text) {
   try {

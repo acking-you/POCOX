@@ -4,11 +4,11 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/router.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
-import 'package:pocket_codex/src/updates/update_controller.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/router.dart';
+import 'package:pocox/src/updates/update_api.dart';
+import 'package:pocox/src/updates/update_controller.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 
 /// Wraps the app's pages with the update check and its offer.
 class UpdateHost extends ConsumerStatefulWidget {

@@ -6,18 +6,18 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/router.dart';
-import 'package:pocket_codex/src/tools/share_ref.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/router.dart';
+import 'package:pocox/src/tools/share_ref.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-export 'package:pocket_codex/src/tools/share_ref.dart';
+export 'package:pocox/src/tools/share_ref.dart';
 
 /// The owner as the user reads it.
 String ownerLabel(AppLocalizations l10n, ToolsOwner owner) =>

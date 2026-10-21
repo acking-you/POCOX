@@ -1,30 +1,30 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/src/dismissed_services.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/hosting/host_restore.dart';
-import 'package:pocket_codex/src/hosting/hosting_owner.dart';
-import 'package:pocket_codex/src/managed/managed_providers.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/brand_logo.dart';
-import 'package:pocket_codex/src/widgets/host_switcher.dart';
-import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
-import 'package:pocket_codex/src/widgets/relay_problem.dart';
-import 'package:pocket_codex/src/widgets/utility_page.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/src/dismissed_services.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/hosting/host_restore.dart';
+import 'package:pocox/src/hosting/hosting_owner.dart';
+import 'package:pocox/src/managed/managed_providers.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/brand_logo.dart';
+import 'package:pocox/src/widgets/host_switcher.dart';
+import 'package:pocox/src/widgets/local_host_dialog.dart';
+import 'package:pocox/src/widgets/relay_problem.dart';
+import 'package:pocox/src/widgets/utility_page.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// Chat-first home: resolves the right app service (explicit default → last
 /// used → locally hosted → first reachable), connects, picks the latest

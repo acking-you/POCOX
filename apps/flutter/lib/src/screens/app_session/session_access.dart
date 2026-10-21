@@ -374,7 +374,7 @@ extension _SessionAccess on _AppSessionState {
     }
     return switch (access.exclusion) {
       'engine' => l10n.accessScopeEngine(_caps.providerName),
-      'pocket' => l10n.accessScopePocket,
+      'pocox' => l10n.accessScopePocox,
       _ => l10n.accessScopeNone,
     };
   }

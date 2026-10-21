@@ -11,8 +11,8 @@
 /// <the user's message>
 ///
 /// ## Attached files (read them from this machine's filesystem):
-/// - "C:\Users\u\.codex\pocket-codex-uploads\...-report with space.pdf"
-/// - /home/u/.codex/pocket-codex-uploads/...-notes.md
+/// - "C:\Users\u\.codex\pocox-uploads\...-report with space.pdf"
+/// - /home/u/.codex/pocox-uploads/...-notes.md
 /// ```
 ///
 /// The block is part of the sent text — it echoes back verbatim in history and
@@ -20,10 +20,10 @@
 /// header line is wire format: changing it orphans chips in old transcripts.
 library;
 
-import 'package:pocket_codex/src/automation_prompt.dart';
-import 'package:pocket_codex/src/ide_context.dart';
-import 'package:pocket_codex/src/realtime_delegation.dart';
-import 'package:pocket_codex/src/tools/builtin_tags.dart';
+import 'package:pocox/src/automation_prompt.dart';
+import 'package:pocox/src/ide_context.dart';
+import 'package:pocox/src/realtime_delegation.dart';
+import 'package:pocox/src/tools/builtin_tags.dart';
 
 /// Header line introducing the attached-files block (English on purpose — it
 /// is model-facing wire text, like codex's own `<image>` markers).

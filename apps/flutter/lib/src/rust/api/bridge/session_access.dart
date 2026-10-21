@@ -57,7 +57,7 @@ class AccessHolderDto {
   /// Verified process creation time in Unix milliseconds.
   final PlatformInt64? startedAt;
 
-  /// Known Pocket host name.
+  /// Known POCOX host name.
   final String? hostName;
 
   /// Known reachable service key; never inferred.
@@ -148,13 +148,13 @@ class SessionAccessDto {
   /// write, follow, or blocked.
   final String mode;
 
-  /// this_host, none, pocket_host, native_client, or unknown.
+  /// this_host, none, pocox_host, native_client, or unknown.
   final String writer;
 
   /// idle, running, unfinished, or unknown.
   final String turn;
 
-  /// engine, pocket, or none.
+  /// engine, pocox, or none.
   final String exclusion;
 
   /// Stable localized availability reason.

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/widgets/agent_icon.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/widgets/agent_icon.dart';
 
 /// A compact pill naming the service provider of a host (Codex or
 /// an ACP agent), shown next to host names so providers on one device stay

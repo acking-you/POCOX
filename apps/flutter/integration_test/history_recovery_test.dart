@@ -1,7 +1,7 @@
 // Live desktop regression: real bridge -> relay -> app-server -> transcript.
 // Use an isolated CODEX_HOME copy: resuming a thread can update its metadata.
-// Run with --dart-define-from-file containing PCX_RELAY, PCX_KEY, PCX_SERVICE,
-// PCX_HISTORY_THREAD (paginated, >100 items) and PCX_SECOND_THREAD (legacy).
+// Run with --dart-define-from-file containing POCOX_RELAY, POCOX_KEY, POCOX_SERVICE,
+// POCOX_HISTORY_THREAD (paginated, >100 items) and POCOX_SECOND_THREAD (legacy).
 // Both threads must be visible in thread/list; publish the matching meta
 // service too, as the screen restores its per-thread configuration from it.
 // This test never starts a model turn.
@@ -12,21 +12,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
-import 'package:pocket_codex/src/rust/frb_generated.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/rust/frb_generated.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/ui_prefs.dart';
 import 'package:window_manager/window_manager.dart';
 
-const _relay = String.fromEnvironment('PCX_RELAY');
-const _key = String.fromEnvironment('PCX_KEY');
-const _service = String.fromEnvironment('PCX_SERVICE');
-const _paginated = String.fromEnvironment('PCX_HISTORY_THREAD');
-const _legacy = String.fromEnvironment('PCX_SECOND_THREAD');
+const _relay = String.fromEnvironment('POCOX_RELAY');
+const _key = String.fromEnvironment('POCOX_KEY');
+const _service = String.fromEnvironment('POCOX_SERVICE');
+const _paginated = String.fromEnvironment('POCOX_HISTORY_THREAD');
+const _legacy = String.fromEnvironment('POCOX_SECOND_THREAD');
 
 class _MemoryPrefs extends UiPrefsStore {
   @override

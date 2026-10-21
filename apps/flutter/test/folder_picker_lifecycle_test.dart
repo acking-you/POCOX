@@ -4,8 +4,8 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
     as fsel;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/widgets/folder_tree_picker.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';

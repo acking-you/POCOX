@@ -14,8 +14,8 @@ import 'dart:ui';
 import 'package:ffi/ffi.dart' show malloc;
 import 'package:flutter_rust_bridge/flutter_rust_bridge.dart'
     show loadExternalLibrary;
-import 'package:pocket_codex/src/rust/frb_generated.dart' show RustLib;
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/rust/frb_generated.dart' show RustLib;
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
 /// The layouts' version, the same on both ends.
 const double galaxyFrameVersion = 1;

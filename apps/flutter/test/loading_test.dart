@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/widgets/loading.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/loading.dart';
 
 Widget _host(Widget child, {bool reduceMotion = false}) => MaterialApp(
   localizationsDelegates: AppLocalizations.localizationsDelegates,

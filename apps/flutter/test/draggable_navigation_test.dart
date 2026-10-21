@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/draggable_navigation.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/widgets/draggable_navigation.dart';
+import 'package:pocox/src/app_icons.dart';
 
 void main() {
   testWidgets('drag stays inside viewport across rebuilds and resize', (

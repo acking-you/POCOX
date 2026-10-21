@@ -1,18 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
+import 'package:pocox/src/attachment_refs.dart';
 
 void main() {
   test('append + split round-trips text and paths', () {
     final sent = appendFileRefs('please review', [
-      r'C:\Users\u\.codex\pocket-codex-uploads\1-report.pdf',
-      '/home/u/.codex/pocket-codex-uploads/2-notes.md',
+      r'C:\Users\u\.codex\pocox-uploads\1-report.pdf',
+      '/home/u/.codex/pocox-uploads/2-notes.md',
     ]);
     expect(sent, contains(kAttachedFilesHeader));
     final back = splitFileRefs(sent);
     expect(back.text, 'please review');
     expect(back.paths, [
-      r'C:\Users\u\.codex\pocket-codex-uploads\1-report.pdf',
-      '/home/u/.codex/pocket-codex-uploads/2-notes.md',
+      r'C:\Users\u\.codex\pocox-uploads\1-report.pdf',
+      '/home/u/.codex/pocox-uploads/2-notes.md',
     ]);
   });
 

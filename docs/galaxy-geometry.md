@@ -2,7 +2,7 @@
 
 The galaxy (`/galaxy`, `apps/flutter/lib/src/tools/galaxy/`) draws every device
 as a star and its services as orbiting planets on a turning, perspective disk.
-Its per-frame geometry is computed in Rust (`crates/pocket-codex-bridge/src/engine/galaxy/`),
+Its per-frame geometry is computed in Rust (`crates/pocox-bridge/src/engine/galaxy/`),
 following proxy-everything's `galaxy-geometry` crate: one bounded leaf
 `dart:ffi` call per frame on buffers the app owns. The Dart painter only issues
 draw calls, and draws the glows and spheres from images rendered once
@@ -115,7 +115,7 @@ The cached images are not pixel-identical. `test/galaxy_sprites_test.dart`
 compares sprite-drawn spheres and glows with vectors at radii 1.2–26 and
 opacities 1, 0.62 and 0.3, in both themes at 2×: fewer than 0.1 % of channels
 differ by more than 8/255, all on anti-aliased edges. Widget-test captures
-(`galaxy_test.dart` with `PCX_UI_PREVIEW_DIR`, at 1×) before and after:
+(`galaxy_test.dart` with `POCOX_UI_PREVIEW_DIR`, at 1×) before and after:
 
 | Capture | Pixels that differ | by more than 2/255 | by more than 8/255 | Worst |
 |---|---|---|---|---|
@@ -207,7 +207,7 @@ FLUTTER_XCODE_ARCHS=arm64 FLUTTER_XCODE_ONLY_ACTIVE_ARCH=YES \
 fvm flutter drive --profile -d macos \
   --driver=test_driver/integration_test.dart \
   --target=integration_test/galaxy_performance_test.dart \
-  --dart-define=PCX_GALAXY_PERF=true
+  --dart-define=POCOX_GALAXY_PERF=true
 ```
 
 The harness keeps its window on top of the main display: macOS stops drawing a

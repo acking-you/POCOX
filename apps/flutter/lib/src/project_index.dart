@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// The project each conversation's folder belongs to.
 ///

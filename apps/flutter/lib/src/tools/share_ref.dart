@@ -5,7 +5,7 @@ library;
 
 import 'dart:convert';
 
-import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocox/src/service_key.dart';
 
 /// A share as an agent's tool call or a link names it.
 class ShareRef {

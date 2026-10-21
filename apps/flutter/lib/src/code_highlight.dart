@@ -43,7 +43,7 @@ import 'package:re_highlight/languages/xml.dart';
 import 'package:re_highlight/languages/yaml.dart';
 import 'package:re_highlight/re_highlight.dart';
 
-import 'package:pocket_codex/src/lru_cache.dart';
+import 'package:pocox/src/lru_cache.dart';
 
 /// The registry, built once. Grammar compilation is not free, and a streaming
 /// turn re-renders every code block in the transcript on every chunk.

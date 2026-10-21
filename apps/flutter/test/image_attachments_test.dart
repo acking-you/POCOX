@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:pocket_codex/src/image_attachments.dart';
+import 'package:pocox/src/image_attachments.dart';
 
 Uint8List _png({int w = 6, int h = 4, bool alpha = false}) {
   final im = img.Image(width: w, height: h, numChannels: alpha ? 4 : 3);

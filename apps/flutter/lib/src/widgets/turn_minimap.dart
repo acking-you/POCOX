@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
 /// One turn on the minimap: where to jump, and what to show while hovering it.
 @immutable

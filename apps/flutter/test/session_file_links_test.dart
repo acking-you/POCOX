@@ -8,12 +8,12 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/file_exports.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
-import 'package:pocket_codex/src/widgets/session_file_links.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/file_exports.dart';
+import 'package:pocox/src/widgets/links.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
+import 'package:pocox/src/widgets/session_file_links.dart';
 
 import 'fake_bridge_api.dart';
 

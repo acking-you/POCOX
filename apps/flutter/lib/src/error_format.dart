@@ -67,7 +67,7 @@ bool isSandboxHelperFailure(String message) {
 /// instead of the raw reason.
 ///
 /// Matches the exact phrasings produced by `engine/host_services.rs`'s
-/// `register_service`, `pocket_codex_pb::PublishError::Conflict`, and the CLI's
+/// `register_service`, `pocox_pb::PublishError::Conflict`, and the CLI's
 /// relay probe. This is the one registration failure that must not be retried:
 /// two publishers of one key evict each other on the relay indefinitely.
 bool isHostNameConflict(String message) {

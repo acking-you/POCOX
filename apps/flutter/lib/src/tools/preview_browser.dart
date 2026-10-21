@@ -11,13 +11,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/tools/send_to_agent.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/busy_label.dart';
-import 'package:pocket_codex/src/widgets/error_details.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/tools/send_to_agent.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/error_details.dart';
+import 'package:pocox/src/widgets/links.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// [url] as the in-app browser opens it: an `http` or `https` address on this

@@ -8,18 +8,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/dismissed_services.dart';
-import 'package:pocket_codex/src/hosting/host_editor_page.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/managed/managed_providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/home_screen.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/dismissed_services.dart';
+import 'package:pocox/src/hosting/host_editor_page.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/managed/managed_providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/home_screen.dart';
+import 'package:pocox/src/ui_prefs.dart';
 
 import 'fake_bridge_api.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 part 'home_screen/host_switching.dart';
 

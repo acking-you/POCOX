@@ -4,7 +4,7 @@ POCOX starts a dedicated voice conversation from the waveform button
 above the composer. An existing voice conversation can be reopened and started
 again explicitly. Its waveform icon and “Live voice” label survive renaming,
 restart and opening it from a different controller because Codex persists
-`threadSource: "pocket-codex-voice"`.
+`threadSource: "pocox-voice"`.
 
 The microphone, output audio, echo cancellation and encoding belong to the
 controller's native WebRTC implementation. Codex still runs externally on the
@@ -83,7 +83,7 @@ Composer dictation is built from the same upstream V3 WebRTC realtime path, not
 from a transcription RPC (`apps/flutter/lib/src/voice/dictation.dart`):
 
 - On desktop, focusing the composer warms a background realtime session on an
-  ephemeral `pocket-codex-dictation` thread, with no microphone attached and a
+  ephemeral `pocox-dictation` thread, with no microphone attached and a
   silent, never-speaking prompt. It closes itself after an idle timeout and
   releases its thread.
 - On iOS and Android nothing is warmed: an open media link receives audio, and
@@ -134,7 +134,7 @@ Mouse text selection and reduced-motion behavior are preserved.
 
 ## Source map and verification
 
-- `crates/pocket-codex-bridge/src/engine/app_session_turns.rs` (upstream
+- `crates/pocox-bridge/src/engine/app_session_turns.rs` (upstream
   forwarding) and `app_session_threads.rs` (persisted thread-source parsing).
   No new runtime dependency.
 - `apps/flutter/lib/src/voice/voice_transport.dart`: native media lifecycle.
@@ -155,7 +155,7 @@ Mouse text selection and reduced-motion behavior are preserved.
   fvm flutter drive -d linux --profile \
     --driver integration_test/voice_driver.dart \
     --target integration_test/voice_native_test.dart \
-    --dart-define=PCX_NATIVE_VOICE=true
+    --dart-define=POCOX_NATIVE_VOICE=true
   ```
 
 Widget tests cannot prove real microphone, Bluetooth routing, remote account

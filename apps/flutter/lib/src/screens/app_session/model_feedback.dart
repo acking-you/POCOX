@@ -10,15 +10,15 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart'
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart'
     show MessageAction;
-import 'package:pocket_codex/src/screens/app_session/message_actions.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/src/screens/app_session/message_actions.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// A `modelError` item's body (also a classified terminal `turn.error`):
 /// `{code, statusCode?, retryable, model, provider, itemId, turnId}`.

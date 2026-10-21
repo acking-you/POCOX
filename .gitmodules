@@ -1,7 +1,7 @@
 [submodule "deps/codex"]
 	path = deps/codex
 	url = git@github.com:acking-you/codex.git
-	branch = pocket-codex
+	branch = pocox
 [submodule "deps/grok-build"]
 	path = deps/grok-build
 	url = git@github.com:acking-you/grok-build.git

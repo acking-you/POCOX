@@ -8,10 +8,10 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/providers.dart';
 
 /// The commands of the session service in a project (null: outside one),
 /// read once per use. Each project is its own entry: a list read for a

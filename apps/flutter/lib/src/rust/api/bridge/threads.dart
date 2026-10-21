@@ -742,7 +742,7 @@ class ThreadMetaDto {
   /// falls back to `preview`).
   final String? name;
 
-  /// App-owned classification, including `pocket-codex-voice`.
+  /// App-owned classification, including `pocox-voice`.
   final String? threadSource;
 
   /// Parent thread for a spawned child.

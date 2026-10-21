@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/brand_logo.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/brand_logo.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 
 /// The rail's width on wide windows.
 const double workspaceNavigationWidth = 208;

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
-import 'package:pocket_codex/src/automation_prompt.dart';
+import 'package:pocox/src/attachment_refs.dart';
+import 'package:pocox/src/automation_prompt.dart';
 
 void main() {
   const heartbeat =

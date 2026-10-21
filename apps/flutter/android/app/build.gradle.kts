@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "io.github.acking_you.pocket_codex"
+    namespace = "io.github.acking_you.pocox"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -16,7 +16,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "io.github.acking_you.pocket_codex"
+        applicationId = "io.github.acking_you.pocox"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -25,14 +25,15 @@ android {
         versionName = flutter.versionName
     }
 
-    val releaseStore = System.getenv("PCX_ANDROID_KEYSTORE_PATH")
+    val releaseStore = System.getenv("POCOX_ANDROID_KEYSTORE_PATH")
     signingConfigs {
         if (releaseStore != null) {
             create("release") {
                 storeFile = file(releaseStore)
-                storePassword = System.getenv("PCX_ANDROID_KEYSTORE_PASSWORD")
-                keyAlias = "pocket-codex"
-                keyPassword = System.getenv("PCX_ANDROID_KEYSTORE_PASSWORD")
+                storePassword = System.getenv("POCOX_ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("POCOX_ANDROID_KEY_ALIAS")
+                    ?.takeIf { it.isNotBlank() } ?: "pocox"
+                keyPassword = System.getenv("POCOX_ANDROID_KEYSTORE_PASSWORD")
             }
         }
     }

@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show protected, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pocket_codex/src/bridge_api.dart' show AcpAgentSpec;
+import 'package:pocox/src/bridge_api.dart' show AcpAgentSpec;
 
 /// Durable, device-local UI preferences backing the chat-first home screen:
 /// which app service the user prefers and last talked to, the last-open thread

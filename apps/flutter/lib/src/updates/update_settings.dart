@@ -4,17 +4,17 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/time_ago.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
-import 'package:pocket_codex/src/updates/update_controller.dart';
-import 'package:pocket_codex/src/widgets/action_row.dart';
-import 'package:pocket_codex/src/widgets/busy_label.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/widgets/icon_badge.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/time_ago.dart';
+import 'package:pocox/src/updates/update_api.dart';
+import 'package:pocox/src/updates/update_controller.dart';
+import 'package:pocox/src/widgets/action_row.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/widgets/icon_badge.dart';
 
 /// The Updates settings group.
 class UpdateSettings extends StatelessWidget {

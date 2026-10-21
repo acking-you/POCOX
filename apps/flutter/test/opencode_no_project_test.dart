@@ -11,9 +11,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/tools/builtin_tags.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/tools/builtin_tags.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';

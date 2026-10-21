@@ -2,14 +2,14 @@ import 'dart:async';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// What a native OpenCode host is started with: the instance name, where it
 /// keeps its sessions ([separateHistory]) and the `opencode` executable

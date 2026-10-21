@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/code_row.dart';
-import 'package:pocket_codex/src/widgets/icon_badge.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/code_row.dart';
+import 'package:pocox/src/widgets/icon_badge.dart';
+import 'package:pocox/src/widgets/links.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Subscribe to an API capability and expose it on a local OpenAI-compatible
 /// port, as a transient panel over the capability list.
@@ -287,9 +287,9 @@ class _ProviderSnippet extends StatelessWidget {
     // Pasted into Codex configuration: its values keep the former product
     // name, like everything else written there.
     final snippet =
-        'model_provider = "pocket-codex-api"\n\n'
-        '[model_providers.pocket-codex-api]\n'
-        'name = "PocketCodex API"\n'
+        'model_provider = "pocox-api"\n\n'
+        '[model_providers.pocox-api]\n'
+        'name = "POCOX API"\n'
         'base_url = "http://$localAddr/v1"\n'
         'wire_api = "responses"\n'
         'requires_openai_auth = false\n'

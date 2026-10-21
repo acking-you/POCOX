@@ -5,7 +5,7 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/src/theme.dart';
 
 /// The colour of a service state: healthy, waiting, failing, refused or gone.
 Color statusColor(ColorScheme scheme, String status) => switch (status) {

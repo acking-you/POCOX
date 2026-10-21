@@ -1,0 +1,24 @@
+[package]
+name = "pocox-account-proto"
+description = "Wire types and pb-mapper key namespacing shared between the POCOX hosted backend and its CLI/app clients."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pocox-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+# Client-side PKCE for the web (authorization-code) login flow. Pure (no I/O),
+# shared by the CLI and the Flutter bridge so neither reimplements it.
+base64 = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }

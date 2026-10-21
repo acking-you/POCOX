@@ -18,22 +18,22 @@
 		<string>6.0</string>
 		<!-- flutter_web_auth_2 deep-link callback for the browser-redirect login:
 		     ASWebAuthenticationSession returns to the app when GitHub's backend
-		     callback redirects to pocketcodex://… -->
+		     callback redirects to pocox://… -->
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
 				<key>CFBundleTypeRole</key>
 				<string>Editor</string>
 				<key>CFBundleURLName</key>
-				<string>com.pocketcodex.auth</string>
+				<string>com.pocox.auth</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
-					<string>pocketcodex</string>
+					<string>pocox</string>
 				</array>
 			</dict>
 		</array>
 		<key>CFBundleName</key>
-		<string>pocket_codex</string>
+		<string>pocox</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>
@@ -51,7 +51,7 @@
 			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
-		<!-- No route opens from a URL: the pocketcodex scheme is only the
+		<!-- No route opens from a URL: the pocox scheme is only the
 		     login callback, which ASWebAuthenticationSession receives itself,
 		     and pages such as /preview must not open on a link's say. -->
 		<key>FlutterDeepLinkingEnabled</key>

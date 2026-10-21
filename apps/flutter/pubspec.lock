@@ -780,7 +780,7 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.8"
-  pocket_codex_bridge:
+  pocox_bridge:
     dependency: "direct main"
     description:
       path: rust_builder

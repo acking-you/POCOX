@@ -42,11 +42,11 @@
 - Riverpod `localeProvider`(`StateProvider<Locale?>`,`null` = 跟随系统)。
 - boot 时与现有 `getConfig()` 同一次桥调用读出 `locale`,经
   `ProviderScope(overrides:)` 注入初值(零额外延迟、无语言闪烁)。
-- `PocketCodexApp` 改 `ConsumerWidget`,`watch(localeProvider)` 驱动
+- `PocoxApp` 改 `ConsumerWidget`,`watch(localeProvider)` 驱动
   `MaterialApp.locale`。切换 = 设 provider state + `await bridgeApi.setLocale(code)`。
 
 ### 3. Rust + Bridge
-- `pocket-codex-core` Config 加 `#[serde(default)] pub ui: UiConfig`,
+- `pocox-core` Config 加 `#[serde(default)] pub ui: UiConfig`,
   `UiConfig { locale: Option<String> }` + `locale()` / `set_locale()` 访问器。
   旧 config 无 `[ui]` 段 → serde default(向后兼容)。
 - bridge `ConfigView` 加 `locale: Option<String>`;新增
@@ -120,5 +120,5 @@ languageEnglish        "English"
 ## 风险
 - `deny_unknown_fields` + 新 `[ui]` 段:旧二进制读新 config 会失败(同 relay-init
   的已知前向兼容限制);同代/新二进制不受影响。
-- 改动集中在 `apps/flutter` + `pocket-codex-core` + `pocket-codex-bridge`;
+- 改动集中在 `apps/flutter` + `pocox-core` + `pocox-bridge`;
   不动 CLI / `state.toml` / `deps/`。回滚即 revert 这批 commit。

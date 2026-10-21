@@ -9,7 +9,7 @@
 // (each brought on screen), and the model list searched with a phone
 // keyboard up. Each captured control is checked on screen and operable.
 //
-// Set PCX_UI_PREVIEW_DIR to also write each scene as a PNG for review
+// Set POCOX_UI_PREVIEW_DIR to also write each scene as a PNG for review
 // (fonts as in acp_layout_test; nothing is downloaded).
 
 import 'dart:math' as math;
@@ -19,15 +19,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/widgets/local_host_dialog.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';

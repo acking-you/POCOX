@@ -1,10 +1,10 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/text_measure.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/text_measure.dart';
+import 'package:pocox/src/theme.dart';
 
 /// The app's layered material, back to front:
 ///

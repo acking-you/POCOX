@@ -3,8 +3,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/running_sheen.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/running_sheen.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
 
 Future<List<int>> pixels(WidgetTester t, GlobalKey key) async {
   final boundary =

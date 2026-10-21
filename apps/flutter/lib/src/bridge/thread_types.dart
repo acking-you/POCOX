@@ -115,7 +115,7 @@ class ThreadMeta {
   bool get isGuardian => threadSource == 'guardian_review';
 
   /// True for conversations created through the live voice entry point.
-  bool get isVoice => threadSource == 'pocket-codex-voice';
+  bool get isVoice => threadSource == 'pocox-voice';
 
   /// Working directory — the project this thread controls.
   final String cwd;

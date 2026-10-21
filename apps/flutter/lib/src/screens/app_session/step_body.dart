@@ -6,11 +6,11 @@ library;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/widgets/code_block.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/widgets/code_block.dart';
+import 'package:pocox/src/widgets/links.dart';
 
 /// Step types whose detail is a JSON object of the item's fields (the bridge
 /// serialises a chosen subset for them).

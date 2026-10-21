@@ -2,7 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/middle_click_scroll.dart';
+import 'package:pocox/src/widgets/middle_click_scroll.dart';
 
 const _anchor = Offset(250, 250);
 final _indicator = find.byKey(const Key('middle-click-scroll-anchor'));

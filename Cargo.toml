@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/pocket-codex-core",
-    "crates/pocket-codex-codex",
-    "crates/pocket-codex-pb",
-    "crates/pocket-codex-api-proxy",
-    "crates/pocket-codex-host-svc",
-    "crates/pocket-codex-cli",
-    "crates/pocket-codex-bridge",
-    "crates/pocket-codex-account-proto",
-    "crates/pocket-codex-store",
-    "crates/pocket-codex-auth",
-    "crates/pocket-codex-backend",
+    "crates/pocox-core",
+    "crates/pocox-codex",
+    "crates/pocox-pb",
+    "crates/pocox-api-proxy",
+    "crates/pocox-host-svc",
+    "crates/pocox-cli",
+    "crates/pocox-bridge",
+    "crates/pocox-account-proto",
+    "crates/pocox-store",
+    "crates/pocox-auth",
+    "crates/pocox-backend",
 ]
 # `deps/codex` is a vendored upstream source kept as a git submodule,
 # intentionally excluded from this workspace so its own build
@@ -48,16 +48,16 @@ readme = "README.md"
 [workspace.dependencies]
 # The dedicated branch carries the SDK fixes used by POCOX. Cargo.lock
 # pins its exact commit; update it deliberately with `cargo update -p pb-mapper`.
-pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "pocket-codex" }
+pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox" }
 
 # Internal crates
-pocket-codex-core = { path = "crates/pocket-codex-core" }
-pocket-codex-account-proto = { path = "crates/pocket-codex-account-proto" }
-pocket-codex-codex = { path = "crates/pocket-codex-codex" }
-pocket-codex-pb = { path = "crates/pocket-codex-pb" }
-pocket-codex-api-proxy = { path = "crates/pocket-codex-api-proxy" }
-pocket-codex-host-svc = { path = "crates/pocket-codex-host-svc" }
-pocket_codex_bridge = { path = "crates/pocket-codex-bridge", default-features = false }
+pocox-core = { path = "crates/pocox-core" }
+pocox-account-proto = { path = "crates/pocox-account-proto" }
+pocox-codex = { path = "crates/pocox-codex" }
+pocox-pb = { path = "crates/pocox-pb" }
+pocox-api-proxy = { path = "crates/pocox-api-proxy" }
+pocox-host-svc = { path = "crates/pocox-host-svc" }
+pocox_bridge = { path = "crates/pocox-bridge", default-features = false }
 
 # Async runtime
 tokio = { version = "1.40", features = ["full"] }
@@ -141,8 +141,8 @@ figment = { version = "0.10", features = ["env", "toml"] }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 
 # Internal backend crates
-pocket-codex-store = { path = "crates/pocket-codex-store" }
-pocket-codex-auth = { path = "crates/pocket-codex-auth" }
+pocox-store = { path = "crates/pocox-store" }
+pocox-auth = { path = "crates/pocox-auth" }
 
 [workspace.lints.rust]
 # Doc coverage is part of the contract — every public item has a comment.

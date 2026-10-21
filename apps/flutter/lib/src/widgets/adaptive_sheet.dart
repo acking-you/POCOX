@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
-import 'package:pocket_codex/src/widgets/popover.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_dialog.dart';
+import 'package:pocox/src/widgets/popover.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Width at or above which a transient panel is shown as a centred dialog
 /// rather than a bottom sheet. Matches the transcript's document-layout

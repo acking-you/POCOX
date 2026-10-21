@@ -16,13 +16,13 @@
   `apps/flutter/lib/src/screens/app_session_screen.dart:1280`。
 - 回合游标与计数纳入打开会话后新增的实时回合；分页时间缓存保留已枚举回合的完成
   时间与耗时，并用于初始窗口、旧页和单回合读取。原有最多 500 回合的骨架枚举上限
-  保持不变。`crates/pocket-codex-bridge/src/engine/app_session.rs:1510`。
+  保持不变。`crates/pocox-bridge/src/engine/app_session.rs:1510`。
 - 摘要 API 改为 async，慢 RPC 转到独立的阻塞执行器，不占用交互所用的 FRB 工作线程。
   Dart 仍限制后台请求并发量；单异步工作线程测试验证摘要等待期间交互请求可完成。
-  Rust/Dart 绑定已重新生成。`crates/pocket-codex-bridge/src/api/bridge.rs:1056`。
+  Rust/Dart 绑定已重新生成。`crates/pocox-bridge/src/api/bridge.rs:1056`。
 - 磁盘日志按 UTC 小时轮转，每分钟检查并删除最后写入超过六小时的日志，空闲驻留
   托盘时也清理。仍兼容清理旧的按日命名日志，轮转先关闭文件以支持 Windows。
-  `crates/pocket-codex-bridge/src/engine/logging.rs:58`。
+  `crates/pocox-bridge/src/engine/logging.rs:58`。
 - 全量 Flutter **435 passed，3 skipped**；WSL 全量 Rust **293 passed，6 ignored**；
   全部第一方 Rust fmt、clippy 与 Dart format、analyze 通过。Windows 本轮原生构建
   使用桌面 manifest 与独立 Profile 产物，结果记录在 PR 的验证说明中。
@@ -38,9 +38,9 @@
 - `AppClient` 原先仅在 ping 看门狗判死时清除健康标志。正常关闭、写入失败、
   RPC 超时后仍可能被 bridge 当作在线；请求超时也没有覆盖写锁等待。
   现在统一关闭状态、终止事件流并唤醒全部等待请求，取消请求时清理 pending。
-  普通业务 RPC 错误不关闭连接。见 `crates/pocket-codex-codex/src/client.rs:253`、
-  `crates/pocket-codex-codex/src/client.rs:288`、
-  `crates/pocket-codex-codex/src/client_tests.rs:1`。
+  普通业务 RPC 错误不关闭连接。见 `crates/pocox-codex/src/client.rs:253`、
+  `crates/pocox-codex/src/client.rs:288`、
+  `crates/pocox-codex/src/client_tests.rs:1`。
 - Flutter 的内容加载函数会保留旧数据并吞掉异常；自动重连因此可能在新连接的
   第一个 `thread/list` 已失败后仍宣告就绪。现在流关闭立即发布离线状态，
   恢复完成前再次检查连接。已先用测试复现误报，再验证修复。
@@ -50,18 +50,18 @@
   HTTP 200 和 pong 不能单独证明请求处理正常。`0.0.0.0` 监听通过回环地址探测。
   运行中 CLI/桌面托管进程的既有看门狗也使用功能探测，连续三次失败进入既有
   重启流程。没有启动模型 turn；启动时拒绝复用不健康的外部进程，仍保留不擅自
-  杀掉该进程的原有边界。见 `crates/pocket-codex-codex/src/readiness.rs:244`、
-  `crates/pocket-codex-codex/src/readiness_rpc_tests.rs:1`、
-  `crates/pocket-codex-bridge/src/engine/serve.rs:1442`。
+  杀掉该进程的原有边界。见 `crates/pocox-codex/src/readiness.rs:244`、
+  `crates/pocox-codex/src/readiness_rpc_tests.rs:1`、
+  `crates/pocox-bridge/src/engine/serve.rs:1442`。
 - 分页历史的 `has_older` 以 item 分页游标为准。原逻辑在只有一个长 turn 时可能
   错误隐藏更早的 item；同时支持上游 user message 的 `content[]` 文本摘要。
   两项均有失败前后的回归证据。见
-  `crates/pocket-codex-bridge/src/engine/app_session_pagination_tests.rs:1`。
+  `crates/pocox-bridge/src/engine/app_session_pagination_tests.rs:1`。
 - 账号中继凭证续期原先先清空缓存，backend 失联后连尚未过期的凭证也无法复用。
   现在续期成功后才替换缓存，网络请求与缓存读取使用不同锁；后台续期卡住时，
   同一账号仍能立即使用有效凭证，过期与账号切换仍拒绝复用。5 个回归测试覆盖
   失联、请求挂起、过期、成功续期与途中切换账号。见
-  `crates/pocket-codex-bridge/src/engine/account_relay_tests.rs:1`。
+  `crates/pocox-bridge/src/engine/account_relay_tests.rs:1`。
 
 ### Windows UI 补充修复
 
@@ -88,7 +88,7 @@
   因此本机新进程加真实数据副本**没有复现原始持续卡死**，不能据此确认 Mac
   长期存活进程内部阻塞的原因，更不能声称原故障已得到原位验证。
 - 可重跑的独立诊断程序：
-  `crates/pocket-codex-codex/examples/app_server_probe.rs:1`。
+  `crates/pocox-codex/examples/app_server_probe.rs:1`。
   使用 `--features embedded-codex`、`--embedded` 启动固定版本；`--resume` 会更新
   被恢复会话的元数据，应搭配独立 `CODEX_HOME` 副本。
 - `lb7666.top` 中继经 SSH 只读检查仍正常；本次没有部署或重启生产中继。
@@ -111,7 +111,7 @@
   Caddy `:443` 的证书已续到 **2026-10-31**；两者没有同步。
   已将 backend 的副本更新为 Caddy 当前有效证书，保持 `pcx:pcx`、0640，
   并重启账号服务；启用默认 TLS 校验的 `/healthz` 验证通过。原证书备份于
-  服务器 `/etc/pocket-codex/tls-backup-20260905/`。未重启生产中继。
+  服务器 `/etc/pocox/tls-backup-20260905/`。未重启生产中继。
   自动证书同步任务尚未部署，后续续签仍需同步此独立副本。
 - 包含缓存修复的正式 Windows Release 重编成功并启动。真实账号日志确认
   已直连 relay、`thread/resume`（2.13s）与 `thread/read`（2.75s）成功。
@@ -127,7 +127,7 @@
 
 - WSL：`cargo clippy --workspace --all-targets --locked -- -D warnings` 通过；
   `cargo test --workspace --locked` **289 passed，6 ignored**（已有手动/在线测试）。
-- Windows：`cargo check -p pocket_codex_bridge --locked` 通过，确实编译嵌入式路径；
+- Windows：`cargo check -p pocox_bridge --locked` 通过，确实编译嵌入式路径；
   Flutter 3.44.0 Windows Release 构建成功。
 - Flutter：pub get、全量 dart format、analyze 通过；单元/组件测试
   **425 passed，3 skipped**（包含后续中键滚动与游标修复）。
@@ -168,7 +168,7 @@
 日志位置（本次新增的文件落盘，保留 6 小时）：
 
 ```
-~/Library/Application Support/io.github.ackingyou.pocketCodex/logs/pocket-codex-<date>.log
+~/Library/Application Support/io.github.ackingyou.pocox/logs/pocox-<date>.log
 ```
 
 ```
@@ -195,7 +195,7 @@
 12:24:29 / 12:25:41 / 12:26:53 / 12:28:05 / 12:29:17 ...
 ```
 
-`72 = 60 + 12`，而 60 秒正是我们自己 `crates/pocket-codex-codex/src/client.rs:60` 的
+`72 = 60 + 12`，而 60 秒正是我们自己 `crates/pocox-codex/src/client.rs:60` 的
 `REQUEST_TIMEOUT`。**是我们的客户端主动断开**，中继只是忠实记录。
 
 ### 2.3 每周期只回 573 字节，且每次完全相同
@@ -230,7 +230,7 @@ forward finish! we send 573 bytes, detail:server->client
 
 ### 关键可疑点：adopt 没有功能性健康检查
 
-`crates/pocket-codex-codex/src/process.rs:412-438`
+`crates/pocox-codex/src/process.rs:412-438`
 
 adopt 的判据只有「端口被占用」+「占用者是 codex 进程」，随后直接返回
 `listener_confirmed: true`。**没有发一个真实请求验证它还能工作。** 一个僵掉的
@@ -281,9 +281,9 @@ app-server 会被无条件复用，且每次启动都复用同一个。
 
 - 控制心跳 2 秒 / 容忍 6 秒 / 租约 15 秒（`pb-mapper-core-0.5.0/src/config.rs:207-215`），
   日志中 `local_server_heartbeat_sent` 正常
-- 临时凭据提前 **30 分钟**续期（`crates/pocket-codex-pb/src/keepalive.rs:33`）
-- 凭据缓存带余量检查（`crates/pocket-codex-bridge/src/engine/account.rs:477`）
-- 订阅侧 `keep_alive: true`（`crates/pocket-codex-pb/src/session.rs:93`）
+- 临时凭据提前 **30 分钟**续期（`crates/pocox-pb/src/keepalive.rs:33`）
+- 凭据缓存带余量检查（`crates/pocox-bridge/src/engine/account.rs:477`）
+- 订阅侧 `keep_alive: true`（`crates/pocox-pb/src/session.rs:93`）
 
 ---
 
@@ -317,18 +317,18 @@ app-server 会被无条件复用，且每次启动都复用同一个。
 已推送）。当时的工作区内容后续已提交到 `0a52779`，分三部分：
 
 **1. 分页历史加载（功能，本次主要工作）**
-- `crates/pocket-codex-bridge/src/engine/app_session.rs`：按 `historyMode` 分流，
+- `crates/pocox-bridge/src/engine/app_session.rs`：按 `historyMode` 分流，
   分页会话走 `thread/turns/list` + `thread/items/list`；legacy 保持整体读取；
   新增 `thread_older_page` / `thread_turn_items`；照抄上游 `advancing_cursor` 防游标死循环
-- `crates/pocket-codex-bridge/src/api/bridge.rs` + FRB 生成物：新增
+- `crates/pocox-bridge/src/api/bridge.rs` + FRB 生成物：新增
   `app_thread_older_page` / `app_thread_turn_items`，`ThreadHistoryDto` 加
   `has_older` / `turns`
 - Dart：刻度栏改为骨架驱动（打开即显示完整会话长度）、滚动到顶与 hover 刻度按需补正文、
   顶部"更早历史"行（可点击，因内容不足一屏时无法滚动）
 
 **2. 日志基础设施（本次新增，建议保留）**
-- `crates/pocket-codex-bridge/src/engine/logging.rs`：日志落盘 + 6 小时保留
-- `crates/pocket-codex-codex/src/client.rs`：每个 RPC 的方向/耗时/字节数/in-flight 深度，
+- `crates/pocox-bridge/src/engine/logging.rs`：日志落盘 + 6 小时保留
+- `crates/pocox-codex/src/client.rs`：每个 RPC 的方向/耗时/字节数/in-flight 深度，
   慢于 2 秒告警、超时报 error
 - `app_session.rs`：`thread_read` 进出与各阶段耗时、bridge 并发深度
 

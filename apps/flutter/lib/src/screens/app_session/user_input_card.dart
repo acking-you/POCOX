@@ -6,10 +6,10 @@ library;
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// One question parsed from an elicitation.
 class _UiQuestion {

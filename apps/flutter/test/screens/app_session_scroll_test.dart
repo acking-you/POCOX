@@ -2,11 +2,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/middle_click_scroll.dart';
-import 'package:pocket_codex/src/widgets/jump_to_latest_button.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/middle_click_scroll.dart';
+import 'package:pocox/src/widgets/jump_to_latest_button.dart';
 
 import '../fake_bridge_api.dart';
 import '../support/screen_harness.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:markdown/markdown.dart' as md;
-import 'package:pocket_codex/src/markdown_cjk.dart';
+import 'package:pocox/src/markdown_cjk.dart';
 
 String render(String source) =>
     md.markdownToHtml(source, extensionSet: markdownExtensionSet).trim();

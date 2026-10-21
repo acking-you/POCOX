@@ -40,7 +40,7 @@ until another one is chosen; the editor never swaps it for a supported one.
   [Grok Build](grok-build.md#model-service). For Codex it launches with `-c model_provider="openai"
   -c openai_base_url="" -c chatgpt_base_url="https://chatgpt.com/backend-api/"`.
   Sign-in runs in place on a private loopback
-  `codex app-server` (`crates/pocket-codex-bridge/src/engine/codex_login.rs`)
+  `codex app-server` (`crates/pocox-bridge/src/engine/codex_login.rs`)
   started with the editor's codex binary and proxy and the same official
   route. Each attempt owns its session; cancel, timeout, a new attempt or
   closing the page closes only that session, never another one. An attempt is
@@ -68,8 +68,8 @@ until another one is chosen; the editor never swaps it for a supported one.
 - **Custom provider** takes a base URL, an API type, a default model and an
   API key.
   - Codex: `-c model_providers.pcx_host_<hex(name)>_<authority>.*` with
-    `wire_api = "responses"` and `env_key = "POCKET_CODEX_PROVIDER_KEY"`
-    (`crates/pocket-codex-codex/src/provider_launch.rs`). The record's random
+    `wire_api = "responses"` and `env_key = "POCOX_PROVIDER_KEY"`
+    (`crates/pocox-codex/src/provider_launch.rs`). The record's random
     authority generation is part of the id, which makes an accidental match
     unlikely; a layer naming it anyway is caught by the effective-route check
     below.
@@ -130,7 +130,7 @@ child's environment, never argv, status, diagnostics or the record.
 A Codex host launched with a key never keeps its raw output. Its stdout and
 stderr are piped into the app instead of written by the child, and the
 per-host codex log on disk (`codex-logs/codex-<name>.log`) receives only
-fixed notices (`pocket_codex_core::redact::{OUTPUT_WITHHELD, ADDR_IN_USE}`):
+fixed notices (`pocox_core::redact::{OUTPUT_WITHHELD, ADDR_IN_USE}`):
 that output was withheld, and that a line reported an address in use (the
 line itself is not kept). The app's log viewer, and so log exports, show
 only those notices for such a host, whatever the split of the key across
@@ -216,7 +216,7 @@ not claimed.
 On macOS every native quit (Cmd+Q, the application menu, the Dock, an Apple
 Event) takes the same path as the tray's Quit: `NativeQuitGate`
 (`apps/flutter/macos/Runner/AppDelegate.swift`) cancels the request and
-hands it to Dart over `pocket_codex/app_quit` (`lib/src/native_quit.dart`),
+hands it to Dart over `pocox/app_quit` (`lib/src/native_quit.dart`),
 and the app exits only after the cleanup succeeded and Dart approved the
 next terminate. A quit arriving before Dart listens is held and run once it
 does; repeated quits join the one in progress; a failed cleanup keeps the

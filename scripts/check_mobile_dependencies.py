@@ -5,7 +5,7 @@ import subprocess
 # Walk only normal dependencies: protocol conformance fixtures may be tested
 # separately, but their runtime support must never enter the shipped cdylib.
 tree = subprocess.check_output(
-    ["cargo", "tree", "--locked", "-p", "pocket_codex_bridge", "--target",
+    ["cargo", "tree", "--locked", "-p", "pocox_bridge", "--target",
      "aarch64-linux-android", "--edges", "normal", "--prefix", "none"],
     text=True,
 )

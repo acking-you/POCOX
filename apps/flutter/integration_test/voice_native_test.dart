@@ -80,6 +80,6 @@ void main() {
         await right.dispose();
       }
     },
-    skip: !const bool.fromEnvironment('PCX_NATIVE_VOICE'),
+    skip: !const bool.fromEnvironment('POCOX_NATIVE_VOICE'),
   );
 }

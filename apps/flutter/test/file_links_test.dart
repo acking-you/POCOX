@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/file_links.dart';
+import 'package:pocox/src/file_links.dart';
 
 void main() {
   test('resolves host paths without using the controller path convention', () {

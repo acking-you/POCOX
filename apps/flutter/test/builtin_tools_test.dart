@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/tools/builtin_tools.dart';
+import 'package:pocox/src/attachment_refs.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/tools/builtin_tools.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';

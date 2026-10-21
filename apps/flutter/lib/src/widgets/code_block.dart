@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/code_highlight.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/code_highlight.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// A framed, syntax-highlighted block of code with its language and a copy
 /// button: one look for a fenced block in a reply, a tool call's command or

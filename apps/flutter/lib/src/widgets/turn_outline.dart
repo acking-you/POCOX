@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/widgets/turn_minimap.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/turn_minimap.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// A searchable, virtualized index; opening or searching it never loads history.
 Future<TurnMinimapItem?> showTurnOutline(

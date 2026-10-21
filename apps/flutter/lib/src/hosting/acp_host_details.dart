@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
-import 'package:pocket_codex/src/managed/default_project_tile.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/provider_badge.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/host_diagnostics.dart';
+import 'package:pocox/src/managed/default_project_tile.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/provider_badge.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// A running ACP host: its agent's state (starting, running, not running and
 /// why, sign-in needed), a restart action, what the agent negotiated and the

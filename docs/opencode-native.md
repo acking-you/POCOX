@@ -65,14 +65,14 @@ can only be rejected).
 - **Several hosts, one per history source.** Each host owns its own
   `opencode serve` process, and a device can run several, like Codex and
   ACP hosts, each under its own instance name. One host at a time serves a
-  given database across Pocket processes (a claim keyed by its canonical
+  given database across POCOX processes (a claim keyed by its canonical
   path, `opencode_already_hosted` when taken), so each host chooses its
   **history**:
   - *Shared with OpenCode* (the default, and what every record saved before
     the choice existed means): OpenCode's default database, the sessions the
     OpenCode terminal app shows and Local sessions reads. One host at a time.
   - *This host only* (`separateHistory`): the host's own database,
-    `OPENCODE_DB=pocket-codex-<canonical name>.db`, which OpenCode resolves
+    `OPENCODE_DB=pocox-<canonical name>.db`, which OpenCode resolves
     in its data directory beside its default database (a digest replaces a
     very long name). Detection, the claim and the server all use it; the
     same instance name finds the same history again. OpenCode's
@@ -163,7 +163,7 @@ can only be rejected).
   custom provider's captured default; on existing configuration (inherited)
   it is currently unknown, since no global selection is queried.
   **Refresh**, offered for a
-  healthy host too because models and sign-ins change outside Pocket, asks
+  healthy host too because models and sign-ins change outside POCOX, asks
   that running host by name (`opencode_refresh`) to re-read OpenCode's
   catalog; a read that fails is kept as the status problem, and a result
   from a host restarted meanwhile is discarded. The provider catalog is
@@ -439,7 +439,7 @@ history with the inherited model service:
 - A service of another major version, or one on another database, is refused
   with that reason. The host does not fall back to a server of its own,
   which would be a second engine on the history.
-- The POCOX source claim is still taken, so there is one Pocket host per
+- The POCOX source claim is still taken, so there is one POCOX host per
   source.
 - This mirrors an adopted Codex app-server (AGENTS.md items 26 and 37). The
   host joins a server it did not start and never signals it.
@@ -583,7 +583,7 @@ and the test's own port. The new `opencode_native` live test, on 2.0.32:
 
 - `disabled` keeps an own server;
 - with none running, the host started the service and attached;
-- a second Pocket host on the source was refused;
+- a second POCOX host on the source was refused;
 - a prompt was answered with no other client;
 - the idle terminal app under a pty made the session follow
   (`opencode_client`, idle), refused a rename, and wrote again after the
@@ -634,7 +634,7 @@ stops it alone, while a second host on the shared database is still refused
 and shared-history OpenCode hosts, the OpenCode tile offered `opencode-2`
 with *This host only*; a typed `OpenCode` and the shared choice were each
 refused before anything started; `opencode-2` then ran its own
-`opencode serve` on `pocket-codex-opencode-2.db`, connected with an empty
+`opencode serve` on `pocox-opencode-2.db`, connected with an empty
 session list, and stopped alone. No message was sent. Rust 855 passed (24
 ignored); remote add and edit by tests only.
 
@@ -645,7 +645,7 @@ hash `127debfc…`) was run against the user's real configuration, database
 and sign-ins. With this round's Rust:
 
 - Three opt-in integration tests against a real `opencode serve` passed:
-  source ownership (a second Pocket server is refused, another process
+  source ownership (a second POCOX server is refused, another process
   holding the database is detected), exact original-session admission and
   the gateway's closed mutation routes, the host's live stream, options,
   permissions, questions, commands and cancellation, and a stopped host

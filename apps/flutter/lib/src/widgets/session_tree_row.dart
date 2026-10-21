@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Parent/child affordances shared by live and on-disk session inventories.
 ///

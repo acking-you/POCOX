@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/widgets/turn_minimap.dart';
-import 'package:pocket_codex/src/widgets/turn_outline.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/widgets/turn_minimap.dart';
+import 'package:pocox/src/widgets/turn_outline.dart';
 
 Widget host(Widget child) => MaterialApp(
   locale: const Locale('en'),

@@ -4,7 +4,7 @@
 // made-up provider and model names, so a preview never suggests that any
 // real provider or model is supported.
 
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// `(provider id, provider label, [(model id, model label)])`.
 const _providers = [

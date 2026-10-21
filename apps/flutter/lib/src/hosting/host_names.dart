@@ -2,7 +2,7 @@
 library;
 
 /// The canonical identity of an instance name, as the bridge computes it
-/// (`pocket_codex_core::service::sanitize_component`): lowercase, keep
+/// (`pocox_core::service::sanitize_component`): lowercase, keep
 /// `a-z0-9_.`, turn every other run into one `-`, trim dashes, else
 /// `default`. Two names with one identity are one service on the relay.
 String canonicalHostName(String name) {

@@ -9,8 +9,8 @@
 /// must agree on. NOT here: anything that builds a widget.
 library;
 
-import 'package:pocket_codex/src/tools/share_ref.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
+import 'package:pocox/src/tools/share_ref.dart';
+import 'package:pocox/src/widgets/message_images.dart';
 
 /// Width at which the transcript switches from mobile chat bubbles to the
 /// desktop document layout (role labels, accent rails, compact tool rows).

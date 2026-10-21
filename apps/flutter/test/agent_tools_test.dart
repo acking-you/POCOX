@@ -4,17 +4,17 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_rows.dart';
-import 'package:pocket_codex/src/tools/preview_browser.dart';
-import 'package:pocket_codex/src/tools/send_to_agent.dart';
-import 'package:pocket_codex/src/tools/share_card.dart';
-import 'package:pocket_codex/src/tools/share_ref.dart';
-import 'package:pocket_codex/src/tools/tools_host.dart';
-import 'package:pocket_codex/src/tools/tools_settings.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/transcript_rows.dart';
+import 'package:pocox/src/tools/preview_browser.dart';
+import 'package:pocox/src/tools/send_to_agent.dart';
+import 'package:pocox/src/tools/share_card.dart';
+import 'package:pocox/src/tools/share_ref.dart';
+import 'package:pocox/src/tools/tools_host.dart';
+import 'package:pocox/src/tools/tools_settings.dart';
 
 import 'fake_bridge_api.dart';
 

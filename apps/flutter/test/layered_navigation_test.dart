@@ -2,8 +2,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/layered_navigation.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/widgets/layered_navigation.dart';
+import 'package:pocox/src/app_icons.dart';
 
 const _width = 400.0;
 final _nav = find.byType(LayeredNavigation);

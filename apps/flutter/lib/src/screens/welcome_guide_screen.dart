@@ -3,21 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/managed/default_project_tile.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/brand_logo.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
-import 'package:pocket_codex/src/widgets/local_host_dialog.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/managed/default_project_tile.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/brand_logo.dart';
+import 'package:pocox/src/widgets/links.dart';
+import 'package:pocox/src/widgets/local_host_dialog.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// First-run welcome guide, shown once per device right after the first
 /// account sign-in (`/welcome`; gated by [UiPrefs.guideSeen]).

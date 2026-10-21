@@ -80,17 +80,17 @@ jobs:
         # (and with AGENTS.md §7): add new crates in all three places.
         run: |
           cargo fmt --check \
-            -p pocket-codex-core \
-            -p pocket-codex-codex \
-            -p pocket-codex-pb \
-            -p pocket-codex-api-proxy \
-            -p pocket-codex-host-svc \
-            -p pocket-codex-cli \
-            -p pocket_codex_bridge \
-            -p pocket-codex-account-proto \
-            -p pocket-codex-store \
-            -p pocket-codex-auth \
-            -p pocket-codex-backend
+            -p pocox-core \
+            -p pocox-codex \
+            -p pocox-pb \
+            -p pocox-api-proxy \
+            -p pocox-host-svc \
+            -p pocox-cli \
+            -p pocox_bridge \
+            -p pocox-account-proto \
+            -p pocox-store \
+            -p pocox-auth \
+            -p pocox-backend
 
   clippy:
     name: rust clippy
@@ -204,10 +204,10 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Check native host code
-        run: cargo clippy -p pocket-codex-codex --all-targets --locked -- -D warnings
+        run: cargo clippy -p pocox-codex --all-targets --locked -- -D warnings
 
       - name: Test native host and shell process cleanup
-        run: cargo test -p pocket-codex-codex --locked
+        run: cargo test -p pocox-codex --locked
 
   # Single required status that reflects the whole run. Always runs, so a
   # skipped Rust/Flutter job (path-filtered out) keeps the gate green, while

@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:pocket_codex/src/voice/dictation.dart';
-import 'package:pocket_codex/src/voice/voice_transport.dart';
+import 'package:pocox/src/voice/dictation.dart';
+import 'package:pocox/src/voice/voice_transport.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/app_modes.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/web_authenticator.dart';
+import 'package:pocox/src/app_modes.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/web_authenticator.dart';
 
 /// Each voice call owns native audio resources; tests supply an in-memory transport.
 final voiceTransportFactoryProvider = Provider<VoiceTransport Function()>(

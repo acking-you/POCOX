@@ -33,7 +33,7 @@ project (intent, crate boundaries, engineering principles) lives in
 | Flutter                  | **3.44.0**, locked in lockstep across [`apps/flutter/.fvmrc`](apps/flutter/.fvmrc), [`apps/flutter/pubspec.yaml`](apps/flutter/pubspec.yaml) (`environment.flutter`) and CI (`subosito/flutter-action@v2`). Bump all three together. |
 | FVM                      | Recommended Flutter version manager. `brew tap leoafarias/fvm && brew install fvm` then `fvm install 3.44.0 --setup`. |
 | `codex`                  | A working `codex` binary on `$PATH` for any flow that exercises `pocox serve` / `connect` / `api …` against a real app-server. POCOX deliberately does **not** vendor a model runtime. |
-| `flutter_rust_bridge_codegen` | Only needed when editing `crates/pocket-codex-bridge/src/api/`. |
+| `flutter_rust_bridge_codegen` | Only needed when editing `crates/pocox-bridge/src/api/`. |
 
 ## 3. Repository setup
 
@@ -97,11 +97,11 @@ runs. Run them locally before pushing.
 ```bash
 # Rust workspace.
 cargo fmt --check \
-  -p pocket-codex-core \
-  -p pocket-codex-codex \
-  -p pocket-codex-pb \
-  -p pocket-codex-cli \
-  -p pocket_codex_bridge
+  -p pocox-core \
+  -p pocox-codex \
+  -p pocox-pb \
+  -p pocox-cli \
+  -p pocox_bridge
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --locked
 
@@ -126,7 +126,7 @@ Optional but encouraged when touching FFI or the protocol layer:
 
 ```bash
 cargo doc --workspace --no-deps
-flutter_rust_bridge_codegen generate    # after editing crates/pocket-codex-bridge/src/api/
+flutter_rust_bridge_codegen generate    # after editing crates/pocox-bridge/src/api/
 ```
 
 ## 7. Submodule bumps
@@ -141,7 +141,7 @@ git commit -m "deps(<sub>): bump to <sha-or-tag>"
 ```
 
 If a bump changes the upstream API, update the wrapper crate
-(`pocket-codex-pb` or `pocket-codex-codex`) in the same PR and call out
+(`pocox-pb` or `pocox-codex`) in the same PR and call out
 the upstream commit range in the description.
 
 ## 8. Pull requests

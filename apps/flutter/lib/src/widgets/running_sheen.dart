@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// Marks [child] as live work: a faint steady wash of [color] and, while
 /// ambient motion is allowed, a soft band of it sweeping from the leading to

@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/relay_diagnosis.dart';
+import 'package:pocox/src/relay_diagnosis.dart';
 
 void main() {
   const error =

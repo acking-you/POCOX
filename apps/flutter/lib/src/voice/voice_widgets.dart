@@ -3,12 +3,12 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/voice/voice_controller.dart';
-import 'package:pocket_codex/src/voice/waveform.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/voice/voice_controller.dart';
+import 'package:pocox/src/voice/waveform.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// Session-only speech settings; an empty model preserves the host default.
 class VoiceSettings {

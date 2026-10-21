@@ -38,7 +38,7 @@ Two ways to wire devices together, both first-class:
 - **Self-host** — every device shares one relay address plus a 32-byte
   `MSG_HEADER_KEY`, and talks to the relay directly under `pcx:…` keys.
   Selected by an explicit `--relay`.
-- **Hosted account** — the optional `pocket-codex-backend` runs once on a
+- **Hosted account** — the optional `pocox-backend` runs once on a
   server; devices sign in with GitHub, and the backend hands each account a
   short-lived relay credential confined to its own `pcxu:<user>:…`
   namespace. Devices then talk to the relay **directly**: the relay's
@@ -57,7 +57,7 @@ assets/logo/               # Project artwork (poster.png, logo.png)
 crates/                    # all first-party Rust crates; see §3 for who owns what
 deploy/                    # hosted-backend deployment unit + config examples
 deps/
-  codex/                   # acking-you/codex fork, branch `pocket-codex`
+  codex/                   # acking-you/codex fork, branch `pocox`
                            # (git submodule) = upstream openai/codex main +
                            # our adaptations; see §8
   grok-build/              # acking-you/grok-build, branch `pocox` (git
@@ -72,13 +72,13 @@ vendor/pagable/             # registry source with a 32-bit size-assertion fix
 workspace member (see the `members` list for the canonical set).
 The Codex submodule under `deps/` is kept **out** of the workspace via the
 `exclude` list and retains its upstream lints/profiles. Cargo fetches pb-mapper
-from its dedicated `pocket-codex` Git branch; `Cargo.lock` pins the exact commit
+from its dedicated `pocox` Git branch; `Cargo.lock` pins the exact commit
 and its registry dependencies. No pb-mapper, kanal, or uni-stream submodules
 or local dependency patches are needed.
 
 `vendor/pagable` retains the former ARMv7 patch for provenance. It is excluded
 and is no longer a dependency or Cargo patch. Keep its runtime source unchanged;
-the provenance and patch scope are recorded in its `README.pocket-codex.md`.
+the provenance and patch scope are recorded in its `README.pocox.md`.
 Changes under `vendor/` require the full Rust CI gate and must stay outside
 first-party formatting and lint rewrites.
 
@@ -88,22 +88,22 @@ Shared / host side:
 
 | Crate                       | Owns                                                                                           |
 | --------------------------- | ---------------------------------------------------------------------------------------------- |
-| `pocket-codex-core`         | configuration schema, on-disk `state.toml`, well-known paths, error types, `service::{ServiceId, ServiceKind, sanitize_component, default_device_id}` for `pcx:<device>:<kind>:<name>` relay keys — small, dependency-light |
-| `pocket-codex-codex`        | spawning / supervising / inspecting the external `codex app-server` child process, compatible JSON-RPC wire envelopes |
-| `pocket-codex-pb`           | async wrappers around the Git-pinned `pb-mapper` client SDK: `RelaySession` (address + credential), register / subscribe / status, `publish` (and the one name-conflict failure a caller must not retry), admin credential issuance, and credential keep-alive |
-| `pocket-codex-api-proxy`    | local Responses API proxy: forwards `/v1/responses` (HTTP + WS) to ChatGPT's Codex backend, reusing the host's `codex login`; shared by the CLI worker and the in-app host |
-| `pocket-codex-host-svc`     | host-side meta service — remote-viewable codex sessions, per-thread config, attachment upload — published on the relay as a third `meta:<name>` service |
-| `pocket-codex-cli`          | user-facing `pocox` binary; account (`login` / `logout` / `account`), setup (`init`), high-level `serve` / `connect` / `api {serve,connect}` / `services {list,default set}` / `status` / `stop`, low-level `codex {start,stop,status}`, `pb {register,subscribe,status}`, `remote-hint`, `version` |
-| `pocket_codex_bridge`       | `cdylib + staticlib` consumed by Flutter via `flutter_rust_bridge`; auto-generated bindings live in `lib/src/rust` of the Flutter app |
+| `pocox-core`         | configuration schema, on-disk `state.toml`, well-known paths, error types, `service::{ServiceId, ServiceKind, sanitize_component, default_device_id}` for `pcx:<device>:<kind>:<name>` relay keys — small, dependency-light |
+| `pocox-codex`        | spawning / supervising / inspecting the external `codex app-server` child process, compatible JSON-RPC wire envelopes |
+| `pocox-pb`           | async wrappers around the Git-pinned `pb-mapper` client SDK: `RelaySession` (address + credential), register / subscribe / status, `publish` (and the one name-conflict failure a caller must not retry), admin credential issuance, and credential keep-alive |
+| `pocox-api-proxy`    | local Responses API proxy: forwards `/v1/responses` (HTTP + WS) to ChatGPT's Codex backend, reusing the host's `codex login`; shared by the CLI worker and the in-app host |
+| `pocox-host-svc`     | host-side meta service — remote-viewable codex sessions, per-thread config, attachment upload — published on the relay as a third `meta:<name>` service |
+| `pocox-cli`          | user-facing `pocox` binary; account (`login` / `logout` / `account`), setup (`init`), high-level `serve` / `connect` / `api {serve,connect}` / `services {list,default set}` / `status` / `stop`, low-level `codex {start,stop,status}`, `pb {register,subscribe,status}`, `remote-hint`, `version` |
+| `pocox_bridge`       | `cdylib + staticlib` consumed by Flutter via `flutter_rust_bridge`; auto-generated bindings live in `lib/src/rust` of the Flutter app |
 
 Hosted-account mode (all optional — self-host never touches these):
 
 | Crate                        | Owns                                                                                           |
 | ---------------------------- | ---------------------------------------------------------------------------------------------- |
-| `pocket-codex-account-proto` | wire types and `pcxu:<user>:…` key namespacing shared between the backend and its CLI/app clients |
-| `pocket-codex-auth`          | GitHub device-flow + web auth-code login, session JWTs, refresh tokens                            |
-| `pocket-codex-store`         | SQLite persistence (users, refresh tokens, device flows) for the backend                          |
-| `pocket-codex-backend`       | the deployable binary: GitHub-login HTTP API + `/v1/relay` credential vending; see [`deploy/`](deploy/README.md) |
+| `pocox-account-proto` | wire types and `pcxu:<user>:…` key namespacing shared between the backend and its CLI/app clients |
+| `pocox-auth`          | GitHub device-flow + web auth-code login, session JWTs, refresh tokens                            |
+| `pocox-store`         | SQLite persistence (users, refresh tokens, device flows) for the backend                          |
+| `pocox-backend`       | the deployable binary: GitHub-login HTTP API + `/v1/relay` credential vending; see [`deploy/`](deploy/README.md) |
 
 When in doubt, prefer adding a new module to an existing crate over
 introducing a new crate. Crates are free; *boundaries* are not.
@@ -135,7 +135,7 @@ We follow Linus Torvalds–style engineering. In short:
   reviews.
 - `unsafe` is forbidden by default — crate roots carry
   `#![forbid(unsafe_code)]`. The sanctioned exception is
-  `pocket_codex_bridge`, whose `flutter_rust_bridge`-generated code emits
+  `pocox_bridge`, whose `flutter_rust_bridge`-generated code emits
   `unsafe`. If you really need it elsewhere, justify it in review and gate
   it behind a Cargo feature.
 - Keep functions short and modules shallow. Refactor when nesting
@@ -151,7 +151,7 @@ We follow Linus Torvalds–style engineering. In short:
 - Prefer `tracing` over `println!`/`eprintln!` for anything that is not
   CLI output the user explicitly asked for.
 - File paths in handoff messages and change descriptions follow `path:line`
-  citations (e.g. `crates/pocket-codex-cli/src/main.rs:42`).
+  citations (e.g. `crates/pocox-cli/src/main.rs:42`).
 
 ## 6. Workflow checklist
 
@@ -198,10 +198,10 @@ list below so path/patch dependencies under `deps/` are never rewritten.
 # Rust workspace — the -p list must cover every workspace member in
 # `Cargo.toml`; add new crates here (and in ci.yml) when you create them.
 cargo fmt --check \
-  -p pocket-codex-core -p pocket-codex-codex -p pocket-codex-pb \
-  -p pocket-codex-api-proxy -p pocket-codex-host-svc -p pocket-codex-cli \
-  -p pocket_codex_bridge -p pocket-codex-account-proto -p pocket-codex-store \
-  -p pocket-codex-auth -p pocket-codex-backend
+  -p pocox-core -p pocox-codex -p pocox-pb \
+  -p pocox-api-proxy -p pocox-host-svc -p pocox-cli \
+  -p pocox_bridge -p pocox-account-proto -p pocox-store \
+  -p pocox-auth -p pocox-backend
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --locked
 
@@ -217,7 +217,7 @@ Optional but encouraged for crates touching FFI or the protocol layer:
 
 ```bash
 cargo doc --workspace --no-deps
-flutter_rust_bridge_codegen generate    # after editing crates/pocket-codex-bridge/src/api/
+flutter_rust_bridge_codegen generate    # after editing crates/pocox-bridge/src/api/
 ```
 
 ### Fonts (desktop-only Noto Sans SC)
@@ -251,7 +251,7 @@ git checkout -- apps/flutter/pubspec.yaml   # restore before committing
 `deps/codex` and `deps/grok-build` are git submodules pinned to specific
 commits. `deps/pb-mapper` (plus the `deps/kanal` and `deps/uni-stream` forks it
 pulled in transitively) is gone. pb-mapper is a Cargo Git dependency on
-`https://github.com/acking-you/pb-mapper`, branch `pocket-codex`; `Cargo.lock`
+`https://github.com/acking-you/pb-mapper`, branch `pocox`; `Cargo.lock`
 pins its exact commit. Push SDK fixes to that branch, then run
 `cargo update -p pb-mapper` here and commit the resulting lockfile after
 verification. Normal builds use `--locked` and do not automatically follow
@@ -299,7 +299,7 @@ an explicit change to this product requirement.
 
 ### 8.2 Updating the protocol submodule
 
-`deps/codex` remains pinned to the `pocket-codex` branch of
+`deps/codex` remains pinned to the `pocox` branch of
 `git@github.com:acking-you/codex.git`. Its historical host-integration shims
 are not built into this application. Do not add new runtime shims for this
 project. Continue to merge upstream into the shared fork branch rather than
@@ -308,7 +308,7 @@ rebasing published history, and record the verified submodule pointer here.
 After a protocol bump:
 
 1. Inspect the protocol manifests and run `cargo metadata --format-version 1`
-   / `cargo tree -p pocket_codex_bridge` to verify the dependency restriction
+   / `cargo tree -p pocox_bridge` to verify the dependency restriction
    above on all targets/features.
 2. Mirror any still-required upstream WebSocket fork patches exactly and
    regenerate `Cargo.lock` without unrelated dependency upgrades.
@@ -361,7 +361,7 @@ The order below is our current best guess; it is not a contract.
    POCOX service keys use `pcx:<device>:<service>:<name>`;
    clients can discover services, set a local default target and choose
    app-server or direct Responses API proxy flows independently.
-6. **Hosted account mode (done).** Optional `pocket-codex-backend`:
+6. **Hosted account mode (done).** Optional `pocox-backend`:
    GitHub login (device flow + web auth-code), SQLite-backed sessions,
    and `/v1/relay`, which vends each account a short-lived pb-mapper
    credential scoped to its own `pcxu:<user>:…` namespace. Clients then
@@ -388,7 +388,7 @@ The order below is our current best guess; it is not a contract.
    Flutter reads v2 accounts and current thread model/effort, and answers
    asynchronous questions with `turn/steer` while running or `turn/start` when idle.
    **Strongly-typed JSON-RPC client (next).** Replace the
-   `serde_json::Value` surface in `pocket-codex-codex::protocol` with
+   `serde_json::Value` surface in `pocox-codex::protocol` with
    local types verified against the upstream wire schema, without importing
    its runtime dependency graph.
 9. **Mobile footprint and connection recovery (2026-09-25).** Keep protocol
@@ -496,7 +496,7 @@ this file's roadmap so the source of truth stays in sync.
     respects reduced motion. See `docs/session-cache-sync.md`.
 
 18. **Live voice controls (2026-10-05).** Voice threads persist the upstream
-    `threadSource: pocket-codex-voice` classification independently of their title.
+    `threadSource: pocox-voice` classification independently of their title.
     Client-owned WebRTC carries microphone/output audio; the existing bridge
     carries app-server signaling, with upstream V3 and its V1 voice catalog.
     Keep backend handoffs and approvals on the ordinary Codex path. End capture
@@ -508,7 +508,7 @@ this file's roadmap so the source of truth stays in sync.
 
 21. **Composer dictation (2026-10-08).** The composer microphone runs on the
     same upstream V3 realtime path as live voice: an ephemeral
-    `pocket-codex-dictation` thread, kept open in the background with no
+    `pocox-dictation` thread, kept open in the background with no
     microphone until a take attaches one, then transcript deltas typed at the
     cursor. It uses only the host's default realtime model and never speaks.
     It yields to a live call, ends its take on navigation, and never sends.
@@ -791,7 +791,7 @@ this file's roadmap so the source of truth stays in sync.
     authoritative read and a durable record write, an absent read answers the
     absent snapshot, and a start launches what its stage committed. A keyed
     Codex host's raw output is never kept: its log and viewer get fixed
-    notices only (`pocket_codex_core::redact`); ACP stderr is discarded. An
+    notices only (`pocox_core::redact`); ACP stderr is discarded. An
     authority generation keys ACP session stores. Every start, stop, apply and
     watchdog restart holds the name's lifecycle lease (restarts also check the
     incarnation); quitting fences new hosts, closes admission and waits up to
@@ -861,7 +861,7 @@ this file's roadmap so the source of truth stays in sync.
     Independent local views stay read-only and continue a session only by
     opening it on a running host of its provider. Connected hosts decide
     session access with fresh ownership, source and native-child checks, plus
-    a Pocket cross-process claim retained through uncertain cleanup (item 29
+    a POCOX cross-process claim retained through uncertain cleanup (item 29
     replaces the explicit Session control dialog with automatic access).
     Native clients do not honor that claim; never describe it as a
     provider-wide lease. Release by any controller withdraws write admission
@@ -876,7 +876,7 @@ this file's roadmap so the source of truth stays in sync.
     is a third engine: the host owns the installed `opencode serve` and speaks
     its v1 HTTP + SSE API; the service kind is `opencode:<name>`, protocol
     `opencode-http`, provider `opencode`. Several OpenCode hosts may run, one
-    per real database source across Pocket processes (item 33); its model
+    per real database source across POCOX processes (item 33); its model
     service is OpenCode's own configuration and sign-ins, or a per-host
     custom provider (Responses, Anthropic Messages, Chat Completions; no
     official account, plugin or ACP route), and its desired runtime is the
@@ -1069,7 +1069,7 @@ this file's roadmap so the source of truth stays in sync.
     `docs/remote-device-management.md`.
 
 CLI `serve --allow-remote-management` reuses the same native Rust hosting and
-management engine through `pocket_codex_bridge::headless`, with Flutter bindings
+management engine through `pocox_bridge::headless`, with Flutter bindings
 disabled for CLI builds. Keep ordinary `serve` unchanged. Managed CLI hosts own
 their lifecycle, profiles and process lock under `state/managed-host`, separate
 from desktop restore records; honor saved remote stops across supervisor restarts.
@@ -1079,7 +1079,7 @@ environment to select it. See `docs/remote-device-management.md#cli-host`.
 
 Host platform metadata is published through the existing meta, management and
 Responses API listeners (`GET /host/device`); the management device view embeds
-the same metadata. Keep OS/architecture/WSL detection in `pocket-codex-core`.
+the same metadata. Keep OS/architecture/WSL detection in `pocox-core`.
 Never infer locality from hostname, OS, device label or shared filesystem.
 The services UI keeps an independent local target before hosting starts and
 assigns only this process's exact owned service keys to it; remote metadata
@@ -1133,7 +1133,7 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     failed) in `helpTextStyle`; field errors wrap. OpenCode hosts are no
     longer one per device: each picks OpenCode's shared default database
     (one host at a time; every older record) or a history of its own
-    (`separateHistory`, `OPENCODE_DB=pocket-codex-<canonical name>.db` in
+    (`separateHistory`, `OPENCODE_DB=pocox-<canonical name>.db` in
     OpenCode's data directory), and a new host beside a shared one defaults
     to its own. Only a shared-history host continues Local sessions or writes
     the older `autoHostOpenCode` record; restore brings back every own-history
@@ -1293,32 +1293,17 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     **PO**cket **CO**de**X**: prose, UI strings, app display names (iOS/macOS
     `CFBundleDisplayName`, Android label, window and tray titles, Linux
     desktop entries, the Windows installer name), CLI and backend messages.
-    Identifiers keep their names so installs, scripts and settings carry
-    over: the crates, the `pocket_codex` Dart package,
-    bundle and application IDs, `PRODUCT_NAME`, the Windows `ProductName` (it
-    names the `%APPDATA%` folder), config and state directories,
-    `POCKET_CODEX_*` variables, the `~/PocketCodex` default project folder,
-    `pcx:` keys, release artifact names and the provider names written into
-    Codex configuration (effective-route checks compare them; the API snippet
-    users paste keeps its name too). The repository is `acking-you/POCOX`
-    (renamed from `pocket-codex`, whose URLs GitHub redirects); links in the
-    tree use the new name. The Windows installer keeps its AppId and removes
-    shortcuts made under the old name. The README leads with the aim, every
-    device in your pocket, and with POCOX as a medium beside the vendors' own
-    harnesses. Its poster is regenerated at 2x from the app's own screens
-    (`test/gen_poster_test.dart`; since 2026-10-20 the galaxy of every device
-    and its shares in front, Local sessions behind it, and a phone where an
-    agent shared a dev server through the built-in tools; earlier: Local
-    sessions on a Mac and a phone ready
-    to take over a session Codex's app holds.
-    The CLI executable is `pocox`, short to type. The installers update an
-    existing `pocket-codex` CLI in place and leave that name as an alias (a
-    symlink on Unix, a `.cmd` shim on Windows); the Linux package's
-    `pocket-codex` link to the desktop app is never run or replaced. Worker
-    identity checks accept both executable names, so workers started before
-    an upgrade stay manageable (an older binary cannot recognize a `pocox`
-    worker). Release asset names, the `__worker` subcommand and state files
-    are unchanged.
+    Since 2026-10-21 all first-party identifiers use `pocox`: crates and
+    directories (`pocox-*`, bridge `pocox_bridge`), the Dart package, app IDs,
+    config/state paths, `POCOX_*` variables, `~/pocox`, `pocox://auth`, provider
+    names and release assets. This is an explicitly incompatible fresh-install
+    baseline: do not add legacy-name aliases or migrate old data. The CLI is
+    `pocox`; the Linux desktop launcher is `pocox-app` so both can coexist.
+    Relay key prefixes (`pcx:` / `pcxu:`) remain protocol abbreviations.
+    External Codex and pb-mapper fork branches are `pocox`; renaming does not
+    advance their pinned commits. The repository is `acking-you/POCOX`.
+    The README poster is regenerated at 2x from the app's own fixture screens
+    by `test/gen_poster_test.dart`.
 
 39. **Operating other devices (planned, not started).** Agents working with the
     user's other devices themselves (their shells, their files), so one
@@ -1504,7 +1489,7 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
   Verify large payload round trips and actual peer negotiation separately.
 - Reproduce long-history issues with the opt-in native integration test:
   `fvm flutter test integration_test/local_history_performance_test.dart -d macos
-  --dart-define=PCX_LIVE_UI=true --dart-define=PCX_HISTORY_THREAD_IDS=<id1>,<id2>`.
+  --dart-define=POCOX_LIVE_UI=true --dart-define=POCOX_HISTORY_THREAD_IDS=<id1>,<id2>`.
   It reads existing sessions on the configured host, records open/navigation
   times and RSS, and switches repeatedly without sending turns or taking over.
 - Reference: T3 Code's [virtualized timeline and scroll anchoring](https://github.com/pingdotgg/t3code/blob/cfeaca41ae27bdf2c203158d378c87c7308fea2a/apps/web/src/components/chat/MessagesTimeline.tsx)

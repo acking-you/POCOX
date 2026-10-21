@@ -5,8 +5,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -45,7 +45,7 @@ final writable = access(
   mode: 'write',
   writer: 'this_host',
   reason: 'owned',
-  exclusion: 'pocket',
+  exclusion: 'pocox',
   canRelease: true,
   recheck: false,
 );
@@ -214,17 +214,17 @@ void main() {
     await disposeChat(t);
   });
 
-  testWidgets('a Pocket host holder offers navigation only with its key', (
+  testWidgets('a POCOX host holder offers navigation only with its key', (
     t,
   ) async {
     await openChat(
       t,
       opens: [
         access(
-          writer: 'pocket_host',
-          reason: 'pocket_host',
+          writer: 'pocox_host',
+          reason: 'pocox_host',
           holder: const AccessHolder(
-            client: 'pocket_host',
+            client: 'pocox_host',
             hostName: 'studio',
             serviceKey: 'pcx:studio:acp:claude',
           ),
@@ -239,13 +239,13 @@ void main() {
       t,
       opens: [
         access(
-          writer: 'pocket_host',
-          reason: 'pocket_host',
-          holder: const AccessHolder(client: 'pocket_host'),
+          writer: 'pocox_host',
+          reason: 'pocox_host',
+          holder: const AccessHolder(client: 'pocox_host'),
         ),
       ],
     );
-    expect(find.byKey(const Key('access-panel-pocket_host')), findsOneWidget);
+    expect(find.byKey(const Key('access-panel-pocox_host')), findsOneWidget);
     expect(find.byKey(const Key('access-open-holder')), findsNothing);
     await disposeChat(t);
   });
@@ -311,10 +311,10 @@ void main() {
         size: size,
         opens: [
           access(
-            writer: 'pocket_host',
-            reason: 'pocket_host',
+            writer: 'pocox_host',
+            reason: 'pocox_host',
             holder: const AccessHolder(
-              client: 'pocket_host',
+              client: 'pocox_host',
               hostName: 'a host with a rather long instance name',
               serviceKey: 'pcx:studio:acp:claude',
             ),

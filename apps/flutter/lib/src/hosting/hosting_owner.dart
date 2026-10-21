@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
 
 /// Whether another POCOX app on this computer owned its hosting state when
 /// this one started ([BridgeApi.hostingOwnedElsewhere]): this window then

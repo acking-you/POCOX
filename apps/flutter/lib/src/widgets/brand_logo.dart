@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/src/theme.dart';
 
 /// The POCOX brand mark: the bare "cloud terminal" glyph.
 ///

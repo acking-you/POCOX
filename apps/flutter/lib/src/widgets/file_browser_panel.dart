@@ -1,19 +1,19 @@
 import 'dart:io';
 
-import 'package:pocket_codex/src/file_exports.dart';
+import 'package:pocox/src/file_exports.dart';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/error_retry.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/error_retry.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/attachment_refs.dart';
 
 /// Show the host file-transfer panel over [serviceKey]'s meta tunnel: browse
 /// the host's configured project roots, download a host file to local disk, or

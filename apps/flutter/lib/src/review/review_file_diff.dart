@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/review/diff_rows.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/review/diff_rows.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
-import 'package:pocket_codex/src/widgets/change_counts.dart';
+import 'package:pocox/src/widgets/change_counts.dart';
 
 /// One block of a file's changes in the review: an edit of the conversation,
 /// or the workspace's whole diff of the file.

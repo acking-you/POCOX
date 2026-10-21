@@ -77,12 +77,12 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
   JSON-RPC 协议，让每个平台都拥有原生的 Codex 界面，而无需重新实现模型逻辑。
 - **两种连接方式。** *自建中转*——让每台设备指向你自己的 `pb-mapper` 中转，
   并共享一把 32 字节密钥（最初的方式）。*托管账号*——在你的服务器上运行一次
-  可选的 `pocket-codex-backend`，之后每台设备只需用 **GitHub** 登录
+  可选的 `pocox-backend`，之后每台设备只需用 **GitHub** 登录
   （`pocox login`，或在 App 里点「Sign in with GitHub」）；后端会以
   按用户隔离的 `pcxu:<user>:…` 键，替每个账号经中转代理其服务，因此中转的主
   密钥永远不会下发给客户端，账号之间也彼此不可见。
 
-命令是 `pocox`；从旧名 `pocket-codex` 升级的安装会保留旧名作为别名。crate、包名与应用标识仍是 `pocket-codex`，已有安装、脚本和设置照常沿用。
+命令是 `pocox`。crate、包名、应用标识、数据目录和发布产物统一使用 `pocox`，环境变量使用 `POCOX_*`。本版本以全新安装为起点，不保留旧名别名，也不迁移旧配置；旧数据保持原样，请重新配置应用和 CLI。Linux 桌面启动命令为 `pocox-app`，可与 CLI 共存。
 
 一句话：**每台电脑保留自己的智能体与登录；其它每台设备——POCOX App、远端的
 `codex` CLI，或任意 OpenAI 兼容工具——都通过中转访问它们**，要么用共享的中转密钥
@@ -95,7 +95,7 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 | 工作区 / lints / CI            | 已搭好                                  |
 | `pocox` CLI                    | `login`、`logout`、`account`、`init`、`serve`、`connect`、`api {serve,connect}`、`services {list,default set,share,unshare,connect,disconnect}`、`open`、`tools`、顶层 `status`/`stop`、`codex {start,stop,status}`、`pb {register,subscribe,status}`、`remote-hint`、`version` |
 | 智能体工具 + 星系              | 一个供所有智能体工具使用的 `pocox` MCP 服务：查看你的设备与服务，把开发服务器共享到手机（先征得你的同意），连接其他设备上的服务。托管的 Codex、Claude、OpenCode 默认可用，Grok Build 也是（它在每个 ACP 会话里接受 HTTP MCP 服务），其他智能体复制一段配置即可。星系把所有设备与服务呈现为一幅流动的星图（[详情](docs/agent-tools.md)） |
-| `pb-mapper` 注册/订阅          | Git SDK 来自 `pocket-codex` 分支，由 `Cargo.lock` 固定版本 |
+| `pb-mapper` 注册/订阅          | Git SDK 来自 `pocox` 分支，由 `Cargo.lock` 固定版本 |
 | `codex app-server` 进程管理    | 通过 PID + state.toml 启动/停止/查状态 |
 | 外置 Codex 托管                | 所有桌面端均启动已安装的外置 `codex`，只直接依赖上游协议 crate；「内置引擎」暂未实现，按钮置灰。旧内嵌托管配置恢复为外置模式，需安装 Codex 或指定其路径。 |
 | 对话历史分页 | 会话内有界缓存、明确的分页终点；跳转时间线后在真实缺口加载中间记录，复用已读页；失败手动重试、前插消息保持阅读位置，时间线分组改为线性计算。对话以中心行为锚点排布，上方补入的分页和缺口不会移动屏幕上的内容，跳转在第一帧即准确落位并预读上一轮；已读完的轮次不再重复请求。Codex Desktop 自动化任务显示为可展开指令的紧凑胶囊，空回复不占行；临时文件已被清理的粘贴附件改由 rollout 内联副本提供 |
@@ -105,7 +105,7 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
 | 历史加载与监看 | 历史先展示，配置与模型列表后台补齐；应用内托管走本机直连；其他进程的会话通过小体积版本通知触发有界刷新，缓存日志状态扫描结果 |
 | 传输压缩 | 主机 HTTP 协商 Zstd/Gzip；app-server WebSocket 请求 permessage-deflate，需要外置服务端支持；兼容未压缩连接，SSE 保持流式传输 |
 | 直连 Responses API 代理        | 经 pb-mapper 注册的本地 HTTP/WS 代理   |
-| 托管账号（GitHub）             | 可选的 `pocket-codex-backend`：GitHub 设备流登录，按用户隔离的 `pcxu:<user>:…` 经中转打洞（主密钥不离开服务器）；`--relay` 仍保留自建模式。见 [`deploy/`](deploy/README.md) |
+| 托管账号（GitHub）             | 可选的 `pocox-backend`：GitHub 设备流登录，按用户隔离的 `pcxu:<user>:…` 经中转打洞（主密钥不离开服务器）；`--relay` 仍保留自建模式。见 [`deploy/`](deploy/README.md) |
 | Flutter 界面（`apps/flutter`） | 聊天优先主屏（打开即进入最近会话，从连接页淡入；侧栏可选所有会话，主机首次列出前显示骨架屏；自动连接上次使用/本机托管/首个可达的主机，桌面端自动恢复托管）；账号引导（「Sign in with GitHub」）+ 自建引导（中转+密钥、`pcx1:` 导入/导出）；管理页含服务发现、app-server 会话、API 服务订阅、托管；设置；托管的启动、保存、重启和停止在各自按钮上显示进度，结果固定在操作栏上方，启动或停止完成后有提示；统一的低饱和中性色与单一蓝色信号色（无紫色）、分层半透明（液态玻璃）界面、桌面端锚定式弹出面板、固定辅助导航，适配桌面、平板和手机（明/暗）；用户与助手消息均渲染 Markdown；输入框默认更紧凑，支持拖动调节并记住高度，展开编辑时可实时预览 Markdown，图标与介绍图同步配色 |
 
 两种模式下，多设备 CLI 流程均已可用：
@@ -116,7 +116,7 @@ POCOX 把上游 [`codex app-server`](https://github.com/openai/codex) 协议变�
   键替你代理。下文的 `--relay` 示例则是**自建**模式，显式传入 `--relay` 总会
   选择它（兜底逃生通道）。
 - `pocox init [--relay <host:port>] [--key <32B>]` 把默认中转地址和共享的
-  `MSG_HEADER_KEY` 持久化到 `~/.config/pocket-codex/config.toml`（Unix 下 0600）。
+  `MSG_HEADER_KEY` 持久化到 `~/.config/pocox/config.toml`（Unix 下 0600）。
   之后所有命令默认读取该配置（优先级：`--relay` 参数 > 配置 > `$PB_MAPPER_SERVER`）；
   `--relay` 仍可在单次调用中覆盖。
 - `pocox serve --relay <host:port>` 启动或复用本地 `codex app-server`，
@@ -142,11 +142,11 @@ POCOX/
 ├── assets/
 │   └── logo/                    # 项目美术资源（海报、logo）
 ├── crates/
-│   ├── pocket-codex-core        # 共享类型、配置、状态、路径
-│   ├── pocket-codex-codex       # codex app-server 进程管理器
-│   ├── pocket-codex-pb          # pb-mapper 注册/订阅胶水层
-│   ├── pocket-codex-cli         # `pocox` 二进制
-│   └── pocket-codex-bridge      # 供 flutter_rust_bridge 消费的 cdylib
+│   ├── pocox-core        # 共享类型、配置、状态、路径
+│   ├── pocox-codex       # codex app-server 进程管理器
+│   ├── pocox-pb          # pb-mapper 注册/订阅胶水层
+│   ├── pocox-cli         # `pocox` 二进制
+│   └── pocox-bridge      # 供 flutter_rust_bridge 消费的 cdylib
 ├── deps/
 │   ├── codex/                   # 上游 codex（git 子模块）
 │   ├── pb-mapper/               # 上游 pb-mapper（git 子模块）
@@ -176,8 +176,8 @@ curl -fsSL https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/insta
 irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 | iex
 ```
 
-可用环境变量覆盖：`POCKET_CODEX_VERSION` 固定某个 tag（如 `v0.1.3`）、
-`POCKET_CODEX_BIN_DIR` 指定安装目录、`POCKET_CODEX_NO_MODIFY_PATH=1` 跳过
+可用环境变量覆盖：`POCOX_VERSION` 固定某个 tag（如 `v0.1.3`）、
+`POCOX_BIN_DIR` 指定安装目录、`POCOX_NO_MODIFY_PATH=1` 跳过
 PATH 处理。想用包管理器或从源码构建？见下文。
 
 ### Rust 工作区
@@ -194,7 +194,7 @@ git submodule update --init --recursive
 cargo build --workspace
 
 # 查看 CLI 的命令面。
-cargo run -p pocket-codex-cli -- --help
+cargo run -p pocox-cli -- --help
 ```
 
 `$PATH` 中需有可用的 `codex` 程序；POCOX **不**自带模型运行时。CLI 提供：
@@ -219,7 +219,7 @@ pocox version
 #### 托管账号（推荐）
 
 用 GitHub 登录一次，之后每条命令都**无需中转地址或共享密钥**即可工作。需要一个
-可访问的 `pocket-codex-backend`——自己部署一个；见 [`deploy/`](deploy/README.md)。
+可访问的 `pocox-backend`——自己部署一个；见 [`deploy/`](deploy/README.md)。
 
 > **完整分步指南（CLI + App）：** [`docs/usage.zh-CN.md`](docs/usage.zh-CN.md)
 > （English: [`docs/usage.md`](docs/usage.md)）。
@@ -280,7 +280,7 @@ fvm flutter analyze
 fvm flutter test
 ```
 
-如果你改动了 `crates/pocket-codex-bridge/src/api/` 下的任何内容，请重新生成绑定：
+如果你改动了 `crates/pocox-bridge/src/api/` 下的任何内容，请重新生成绑定：
 
 ```bash
 flutter_rust_bridge_codegen generate

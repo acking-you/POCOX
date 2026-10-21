@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
 /// Return to the conversation's end, with a moving ring while work continues.
 /// The arrow and touch target stay still; reduced motion keeps a steady ring.

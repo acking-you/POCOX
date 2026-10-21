@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/hosting/claude_environment_section.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/hosting/model_service_section.dart'
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/hosting/claude_environment_section.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/model_service_section.dart'
     show ServiceChoice;
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// The credentials Claude accepts, in the order they are offered. One is
 /// used at a time: [ClaudeEnvironmentDraft.setOverride] clears the others.

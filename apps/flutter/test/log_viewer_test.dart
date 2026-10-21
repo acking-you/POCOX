@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/log_manager.dart';
-import 'package:pocket_codex/src/screens/log_view_screen.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/log_manager.dart';
+import 'package:pocox/src/screens/log_view_screen.dart';
 
 import 'fake_bridge_api.dart';
 

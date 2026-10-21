@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 
 /// A raw error, folded under a problem's cause in words: whole, selectable
 /// and copyable once opened.

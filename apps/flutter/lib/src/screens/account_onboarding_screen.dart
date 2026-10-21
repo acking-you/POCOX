@@ -4,19 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/web_authenticator.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/brand_logo.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/web_authenticator.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/brand_logo.dart';
+import 'package:pocox/src/widgets/links.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Default first-run experience: sign in to a hosted account. The convenient
 /// browser-redirect login is the default ("Sign in with GitHub" opens a browser

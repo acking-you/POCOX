@@ -19,7 +19,7 @@ the wire-schema reference, not a bundled runtime or a linked protocol library.
 flowchart LR
     U["upstream main: afb436df8b"] -->|"git pull --ff-only"| L["~/rust_pro/codex"]
     L -->|"merge: beaefbdf0"| S
-    S["deps/codex: reference schemas"] -. "audit wire compatibility" .-> B["Pocket bridge: local JSON envelopes"]
+    S["deps/codex: reference schemas"] -. "audit wire compatibility" .-> B["POCOX bridge: local JSON envelopes"]
     F[Flutter] <--> B
     B <-->|"initialize, initialized, requests and events"| C["Installed external codex app-server"]
     C -->|"turn/completed: failed or interrupted with error"| E["Visible error reason"]
@@ -30,17 +30,17 @@ flowchart LR
 | Upstream change since `c08819510` | POCOX behavior |
 | --- | --- |
 | `Turn.error` can accompany an interrupted turn; `tooManyDenials` and `flexUnavailable` error information added | Show explicit terminal errors on failed or interrupted live turns. Ordinary interruption without an error stays quiet. Preserve the raw error JSON. |
-| `thread/items/list.cursor` additionally accepts an item anchor object | Existing opaque string cursors remain supported and are passed back unchanged. No extra reads or translation are needed; Pocket does not expose item-anchor navigation. |
+| `thread/items/list.cursor` additionally accepts an item anchor object | Existing opaque string cursors remain supported and are passed back unchanged. No extra reads or translation are needed; POCOX does not expose item-anchor navigation. |
 | MCP discovery adds optional `serverName` and `threadId` | Existing full-inventory calls remain valid. Unknown response fields are retained in wire values. |
-| Enterprise MCP OAuth adds `loginId` and completion metadata | No enterprise login flow is added in this release; Pocket's existing account login behavior is unchanged. |
-| Plugin summary drops obsolete extension metadata; account plan/error variants expand | Pocket does not deserialize these into closed upstream enums. No runtime dependency or compatibility shim is added. |
-| Tool-call execution metadata changes within upstream model messages | The app-server item/event surface remains the integration boundary. Pocket does not interpret model-provider message internals. |
+| Enterprise MCP OAuth adds `loginId` and completion metadata | No enterprise login flow is added in this release; POCOX's existing account login behavior is unchanged. |
+| Plugin summary drops obsolete extension metadata; account plan/error variants expand | POCOX does not deserialize these into closed upstream enums. No runtime dependency or compatibility shim is added. |
+| Tool-call execution metadata changes within upstream model messages | The app-server item/event surface remains the integration boundary. POCOX does not interpret model-provider message internals. |
 | Command rollouts now persist only `aggregated_output`; app-server still sends `aggregatedOutput` | Both existing readers already accept these fields. Regression coverage checks current rollouts without legacy stdout/stderr/formatted output, plus live and restored app-server items. Older rollout fallback fields remain readable. |
-| Persisted paginated command output is capped at 64 KiB with a middle truncation marker | Keep the server's text and marker visible. Pocket does not claim the stored output is complete or reread files to reconstruct omitted bytes. |
+| Persisted paginated command output is capped at 64 KiB with a middle truncation marker | Keep the server's text and marker visible. POCOX does not claim the stored output is complete or reread files to reconstruct omitted bytes. |
 | Unknown `CodexErrorInfo` string/object variants are accepted upstream | Local JSON envelopes retain them; the UI shows the supplied error message without requiring a known error enum. Tests cover both future wire shapes. |
 | Resume reuses unchanged stored snapshots after validating writer ownership | This is internal to the external server. Existing `excludeTurns: true` resume and bounded history requests remain valid; no extra controller request or snapshot copy is added. |
 | Rollouts can contain `additional_tools` model metadata | Read-only history ignores it as metadata while retaining command output; it is not a user or assistant transcript row. |
-| Optional goal mutation `origin`, attachment owner lookup, prediction and Bedrock advisory methods are added; `namespaceTools` capability is removed | Pocket does not call these new methods, mutate goals, or depend on the removed capability. Existing consumed requests require no new fields. |
+| Optional goal mutation `origin`, attachment owner lookup, prediction and Bedrock advisory methods are added; `namespaceTools` capability is removed | POCOX does not call these new methods, mutate goals, or depend on the removed capability. Existing consumed requests require no new fields. |
 
 Initialization still waits for the initialize response before sending
 `initialized`. Bounded history windows, model/service-tier discovery, async
@@ -50,8 +50,8 @@ The upstream WebSocket fork revisions and Rust 1.95 compiler floor are unchanged
 ## Local host identity
 
 ```text
-systemd pocket-codex-host
-  +-- Pocket host supervisor
+systemd pocox-host
+  +-- POCOX host supervisor
   +-- npm / Node launcher
   |     +-- native codex app-server PID  <-- record this process
   |           +-- runtime worker TIDs   <-- never record these as the host PID
@@ -69,7 +69,7 @@ matching uses an exact `--listen` argument, not a URL substring.
 
 `deps/codex` now points at `b360f3350bf0b6ee5b11e94b09122b570e84f0d3`, a clean
 merge of upstream `openai/codex` main `b38942ce7ce73a5cee7981f1f1b6f1a3d2c5a5c0`
-(139 commits after `afb436df8b`) into the `pocket-codex` branch, keeping its
+(139 commits after `afb436df8b`) into the `pocox` branch, keeping its
 Windows console-suppression fixes. The branch was fast-forwarded on the fork so
 CI can fetch the pointer.
 
@@ -84,12 +84,12 @@ resolved workspace graph still contains no Codex runtime crate.
 
 `deps/codex` now points at `35eabb7013`, a clean merge of upstream
 `openai/codex` main `8d9f6466f` (356 commits after `b38942ce7`) into the
-`pocket-codex` branch. The resolved workspace graph is unchanged: no Codex
+`pocox` branch. The resolved workspace graph is unchanged: no Codex
 runtime or protocol crate is linked.
 
 | Upstream change since `b38942ce7` | POCOX behavior |
 | --- | --- |
-| `imageGeneration` items carry either `result` or a file-backed `fileId` (attachment store), plus optional `inputImages` | The saved path still renders; a `fileId` with no saved path shows the existing unavailable state. Pocket never reads the attachment store. |
+| `imageGeneration` items carry either `result` or a file-backed `fileId` (attachment store), plus optional `inputImages` | The saved path still renders; a `fileId` with no saved path shows the existing unavailable state. POCOX never reads the attachment store. |
 | Experimental `thread/readState/update`, `thread/readState/changed`, `readState(s)` on `thread/read` / `thread/list`, and `thread/items/read` | Not called; unknown response fields are ignored. |
 | Rollouts left idle for a week are compressed to `….jsonl.zst` (since `a8a6071279`); `thread/list` keeps naming the plain path | Every rollout reader accepts both forms (the plain file wins when both exist). A compressed rollout's last turn is `unknown`: it is never decoded for listing, and Codex decompresses it before writing again. History review offsets address decoded bytes. |
 | Optional request fields (`responsesapiClientMetadataPatch`, `experimentalPredictionMode`, `voiceSessionId`, `websocketRequestId`) and response fields (`McpServerStatus.toolListMeta`, `TurnToolOutput.retain`) | Not sent; ignored by local parsing. |
@@ -97,7 +97,7 @@ runtime or protocol crate is linked.
 ### Standard session state
 
 The host's Codex routes now ask the colocated app-server before reading files
-(`crates/pocket-codex-host-svc/src/codex_inventory.rs`, over one shared
+(`crates/pocox-host-svc/src/codex_inventory.rs`, over one shared
 read-only connection):
 
 ```mermaid

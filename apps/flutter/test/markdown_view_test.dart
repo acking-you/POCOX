@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Everything [MarkdownView] actually painted, concatenated. `includePlaceholders`
 /// keeps `WidgetSpan`s (the favicons) out of the string.

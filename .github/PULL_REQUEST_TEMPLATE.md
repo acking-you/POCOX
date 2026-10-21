@@ -8,7 +8,7 @@ the repo follow the Chinese-summary convention from `AGENTS.md` §10.
 
 <!--
 What changes, and why. Cite files as `path:line` (e.g.
-`crates/pocket-codex-cli/src/main.rs:42`). Keep the *why* here; commit
+`crates/pocox-cli/src/main.rs:42`). Keep the *why* here; commit
 messages can stay short.
 -->
 
@@ -34,11 +34,11 @@ these, call it out explicitly and write a migration note.
 
 - [ ] Changes a `pocox` CLI flag, subcommand or output format
 - [ ] Changes the on-disk layout (`state.toml`, paths under
-      `pocket-codex-core::paths`)
+      `pocox-core::paths`)
 - [ ] Changes a wire-protocol field (codex app-server JSON-RPC,
       Responses API proxy, pb-mapper key shape)
 - [ ] Changes the FRB API surface in
-      `crates/pocket-codex-bridge/src/api/`
+      `crates/pocox-bridge/src/api/`
 - [ ] None of the above
 
 If any of the above are ticked, describe the migration / compatibility
@@ -51,13 +51,13 @@ The commands below mirror `.github/workflows/ci.yml`. Tick the ones you
 ran locally; if anything was skipped, say why.
 -->
 
-- [ ] `cargo fmt --check -p pocket-codex-core -p pocket-codex-codex -p pocket-codex-pb -p pocket-codex-cli -p pocket_codex_bridge`
+- [ ] `cargo fmt --check -p pocox-core -p pocox-codex -p pocox-pb -p pocox-cli -p pocox_bridge`
 - [ ] `cargo clippy --workspace --all-targets -- -D warnings`
 - [ ] `cargo test --workspace --locked`
 - [ ] `dart format --output=none --set-exit-if-changed lib/main.dart test integration_test` (run from `apps/flutter`)
 - [ ] `fvm flutter analyze` (run from `apps/flutter`)
 - [ ] `fvm flutter test` (run from `apps/flutter`)
-- [ ] `flutter_rust_bridge_codegen generate` (only if `crates/pocket-codex-bridge/src/api/` changed)
+- [ ] `flutter_rust_bridge_codegen generate` (only if `crates/pocox-bridge/src/api/` changed)
 - [ ] Manual flow exercised (describe):
 
 ## Linked issues

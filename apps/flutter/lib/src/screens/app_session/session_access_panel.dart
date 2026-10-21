@@ -5,12 +5,12 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// How a non-writable state reads.
 enum AccessTone {
@@ -43,7 +43,7 @@ String accessClientName(
   'claude_code' => l10n.accessClientClaude,
   'opencode' => l10n.accessClientOpenCode,
   'grok' => l10n.accessClientGrok,
-  'pocket_host' => holder?.hostName ?? l10n.accessClientPocketHost,
+  'pocox_host' => holder?.hostName ?? l10n.accessClientPocoxHost,
   _ => providerName.isEmpty ? l10n.accessClientOther : providerName,
 };
 
@@ -143,14 +143,12 @@ AccessView accessView(
       icon: AppIcons.folder_shared_outlined,
       tone: AccessTone.waiting,
     ),
-    'pocket_host' => (
+    'pocox_host' => (
       status: running
           ? l10n.sessionRunningElsewhere
           : l10n.sessionInUseElsewhere,
-      title: l10n.accessPocketHostTitle(client),
-      detail: running
-          ? l10n.accessPocketHostRunning
-          : l10n.accessPocketHostIdle,
+      title: l10n.accessPocoxHostTitle(client),
+      detail: running ? l10n.accessPocoxHostRunning : l10n.accessPocoxHostIdle,
       next: recheck ? l10n.accessNextAutomatic : null,
       icon: AppIcons.devices_other_outlined,
       tone: running ? AccessTone.running : AccessTone.waiting,
@@ -216,7 +214,7 @@ class SessionAccessPanel extends StatelessWidget {
   /// Continue a session this view handed back.
   final VoidCallback? onContinue;
 
-  /// Open the conversation on the Pocket host holding it.
+  /// Open the conversation on the POCOX host holding it.
   final VoidCallback? onOpenHolder;
 
   /// Open the stopped host's editor.

@@ -60,7 +60,7 @@ def credentials(work):
             key = work / "AuthKey.p8"
             key.write_text(required("APPLE_NOTARY_PRIVATE_KEY"))
             key.chmod(0o600)
-            profile = "pocket-codex-release"
+            profile = "pocox-release"
             run("xcrun", "notarytool", "store-credentials", profile,
                 "--key", key, "--key-id", required("APPLE_NOTARY_KEY_ID"),
                 "--issuer", required("APPLE_NOTARY_ISSUER_ID"), "--keychain", keychain)
@@ -101,7 +101,7 @@ def audit_bundle(app, architecture):
     executable = "Contents/MacOS/" + info["CFBundleExecutable"]
     if not (app / executable).is_file():
         raise RuntimeError(f"Missing main executable: {executable}")
-    for framework in ("App.framework", "FlutterMacOS.framework", "pocket_codex_bridge.framework"):
+    for framework in ("App.framework", "FlutterMacOS.framework", "pocox_bridge.framework"):
         if not (app / "Contents/Frameworks" / framework).is_dir():
             raise RuntimeError(f"Missing release framework: {framework}")
     files = macho_files(app)
@@ -173,11 +173,11 @@ def package(args):
     check_credentials()
     logs = output.parent / (output.stem + "-verification")
     logs.mkdir(exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="pocket-codex-signing-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
+    with tempfile.TemporaryDirectory(prefix="pocox-signing-", dir=os.environ.get("RUNNER_TEMP")) as temporary:
         work = Path(temporary)
         stage = work / "image"
         stage.mkdir()
-        app = stage / "pocket_codex.app"
+        app = stage / "pocox.app"
         run("ditto", args.app.resolve(), app)
         files, info = audit_bundle(app, args.architecture)
         entitlements = plistlib.loads(args.entitlements.read_bytes())
@@ -204,7 +204,7 @@ def package(args):
                         or "Authority=Developer ID Application:" not in details
                         or "Timestamp=" not in details or "(runtime)" not in details):
                     raise RuntimeError(f"Not a timestamped Developer ID signature for team {team}: {path.name}")
-            archive = work / "pocket-codex-app.zip"
+            archive = work / "pocox-app.zip"
             run("ditto", "-c", "-k", "--keepParent", app, archive)
             notarize(archive, auth, logs)
             run("xcrun", "stapler", "staple", app)

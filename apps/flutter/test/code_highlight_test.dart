@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/code_highlight.dart';
+import 'package:pocox/src/code_highlight.dart';
 
 void main() {
   const base = TextStyle(fontFamily: 'monospace', fontSize: 12.5);

@@ -9,11 +9,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 
 /// The conversation service of the harness behind the owner of the share
 /// keyed [shareKey]: on the same device, in the same namespace (`pcx:` or an

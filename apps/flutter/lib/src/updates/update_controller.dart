@@ -6,9 +6,9 @@ library;
 
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/desktop_tray.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
+import 'package:pocox/src/desktop_tray.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/updates/update_api.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// The update engine, part of the bridge.
@@ -29,7 +29,7 @@ final updateActionsProvider = Provider<UpdateActions>(
 /// Android: the system installer, which asks the user and refuses a package
 /// signed with a different certificate (`UpdateInstaller.kt`).
 abstract final class AndroidUpdateInstaller {
-  static const MethodChannel _channel = MethodChannel('pocket_codex/updates');
+  static const MethodChannel _channel = MethodChannel('pocox/updates');
 
   /// Whether the user has let POCOX install packages.
   static Future<bool> canInstall() async =>

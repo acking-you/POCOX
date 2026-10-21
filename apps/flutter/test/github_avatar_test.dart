@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/github_avatar.dart';
-import 'package:pocket_codex/src/network/network_image.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/widgets/github_avatar.dart';
+import 'package:pocox/src/network/network_image.dart';
+import 'package:pocox/src/app_icons.dart';
 
 Widget _host(Widget child) => MaterialApp(
   home: Scaffold(body: Center(child: child)),

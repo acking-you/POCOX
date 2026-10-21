@@ -3154,7 +3154,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openCodeRuntimeHint =>
-      'Pocket starts and owns one opencode serve on this computer, reachable only through this host.';
+      'POCOX starts and owns one opencode serve on this computer, reachable only through this host.';
 
   @override
   String get openCodeDetecting => 'Looking for OpenCode…';
@@ -3251,7 +3251,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openCodeScopeNote =>
-      'Every Pocket device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.';
+      'Every POCOX device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.';
 
   @override
   String get refresh => 'Refresh';
@@ -3286,8 +3286,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get accessScopePocket =>
-      'Held by this host. Other Pocket hosts cannot write; native clients are not blocked.';
+  String get accessScopePocox =>
+      'Held by this host. Other POCOX hosts cannot write; native clients are not blocked.';
 
   @override
   String get accessScopeNone =>
@@ -3300,7 +3300,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accessClientOpenCode => 'Another OpenCode process';
 
   @override
-  String get accessClientPocketHost => 'Another Pocket host';
+  String get accessClientPocoxHost => 'Another POCOX host';
 
   @override
   String get accessClientOther => 'Another client';
@@ -3383,7 +3383,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accessSourceOpenDetail =>
-      'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.';
+      'POCOX cannot tell which session or turn it writes. Close or release it there, then check now.';
 
   @override
   String get accessOpenCodeServiceTitle =>
@@ -3402,15 +3402,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.';
 
   @override
-  String accessPocketHostTitle(String client) {
+  String accessPocoxHostTitle(String client) {
     return '$client is writing this session';
   }
 
   @override
-  String get accessPocketHostRunning => 'It is running a turn now.';
+  String get accessPocoxHostRunning => 'It is running a turn now.';
 
   @override
-  String get accessPocketHostIdle =>
+  String get accessPocoxHostIdle =>
       'No turn is running there, but it still holds the session.';
 
   @override
@@ -3582,7 +3582,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String managedComputerSummary(String os, String version) {
-    return '$os · Pocket $version';
+    return '$os · POCOX $version';
   }
 
   @override

@@ -31,7 +31,7 @@ manifest again and retains the release version, build, source commit and other
 artifacts. The launcher icon comes from that signed source commit as well,
 instead of the current checkout. The signing key remains in GitHub Actions secrets.
 
-Keep `pocket-codex-app-<tag>-linux-x86_64.AppImage`: existing installed updaters
+Keep `pocox-app-<tag>-linux-x86_64.AppImage`: existing installed updaters
 select that suffix. AppImageHub's filename suggestions are advisory, so they do
 not justify breaking the update contract. Once a repaired artifact is public,
 the upstream repository owner can request `/retest` on the catalog PR.

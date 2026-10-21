@@ -32,7 +32,7 @@ pocox pb restart --role register --key pcx:device:api:default
 ```
 
 Both selectors are required. The command checks the executable (`pocox`, or
-`pocket-codex` for a worker started before the rename), worker subcommand, key,
+`pocox` for a worker started before the rename), worker subcommand, key,
 endpoint and relay before sending a signal; it refuses a host supervisor or
 another process at a reused PID. It resolves credentials before stopping the
 worker and refuses a relay/account change. A restart replaces this mapping's

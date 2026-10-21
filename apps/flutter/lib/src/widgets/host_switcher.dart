@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/widgets/agent_icon.dart';
-import 'package:pocket_codex/src/widgets/layered_navigation.dart';
-import 'package:pocket_codex/src/widgets/provider_badge.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/agent_icon.dart';
+import 'package:pocox/src/widgets/layered_navigation.dart';
+import 'package:pocox/src/widgets/provider_badge.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Where a host switch stands. Owned by the home, which does the switching,
 /// and shown wherever the user is looking: the switcher row and the strip

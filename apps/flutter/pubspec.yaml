@@ -1,4 +1,4 @@
-name: pocket_codex
+name: pocox
 description: "POCOX Flutter front-end. Drives codex app-server through flutter_rust_bridge."
 publish_to: 'none'
 
@@ -25,7 +25,7 @@ dependencies:
   # integrate`. The version constraint here is what `pub get` checks
   # against; the codegen tool picks a matching binary.
   flutter_rust_bridge: 2.12.0
-  pocket_codex_bridge:
+  pocox_bridge:
     path: rust_builder
   flutter_riverpod: ^2.6.1
   flutter_webrtc: 1.6.2+hotfix.3
@@ -52,7 +52,7 @@ dependencies:
   # back to the app. The backend brokers GitHub's authorization-code flow; the
   # app only ever holds a one-time exchange code (+ a PKCE verifier). Mobile
   # needs the CallbackActivity intent-filter (AndroidManifest) / CFBundleURLSchemes
-  # (Info.plist) for the `pocketcodex` scheme; desktop uses http://localhost.
+  # (Info.plist) for the `pocox` scheme; desktop uses http://localhost.
   flutter_web_auth_2: ^4.1.0
   # Linkifies bare URLs in plain-text widgets (user bubbles, tool/command
   # output, reasoning) — markdown links are handled by MarkdownBody itself.

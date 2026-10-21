@@ -4,17 +4,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/utility_page.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/utility_page.dart';
 
 import 'fake_bridge_api.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 Widget _host(
   Widget child,

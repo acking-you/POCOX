@@ -1,20 +1,20 @@
-import 'package:pocket_codex/src/network/network_image.dart';
+import 'package:pocox/src/network/network_image.dart';
 import 'dart:convert';
 
-import 'package:pocket_codex/src/file_links.dart';
+import 'package:pocox/src/file_links.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/lru_cache.dart';
-import 'package:pocket_codex/src/markdown_cjk.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/code_block.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/lru_cache.dart';
+import 'package:pocox/src/markdown_cjk.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/code_block.dart';
+import 'package:pocox/src/widgets/links.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// One Markdown renderer for every agent-authored surface (replies, plan
 /// proposals, plan explanations), so they share the CJK fixes, the table

@@ -77,7 +77,7 @@ final class NativeQuitGate {
   /// Binds the gate to the Flutter engine of the main window.
   func attach(binaryMessenger: FlutterBinaryMessenger) {
     let channel = FlutterMethodChannel(
-      name: "pocket_codex/app_quit",
+      name: "pocox/app_quit",
       binaryMessenger: binaryMessenger
     )
     channel.setMethodCallHandler { [weak self] call, result in

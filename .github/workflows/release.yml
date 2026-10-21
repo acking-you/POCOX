@@ -4,10 +4,10 @@
 # selects an existing release whose macOS assets should be refreshed).
 #
 # Two product families, named so they never collide:
-#   - CLI  → `pocket-codex-cli-<tag>-<rust-target>.{tar.gz,zip}`
+#   - CLI  → `pocox-cli-<tag>-<rust-target>.{tar.gz,zip}`
 #            Linux builds are musl + fully static (glibc-independent: run on
 #            Alpine, old distros, ARM SBCs) via `cross`.
-#   - App  → `pocket-codex-app-<tag>-<platform>.<ext>` with one-click installers
+#   - App  → `pocox-app-<tag>-<platform>.<ext>` with one-click installers
 #            (Windows .exe, macOS .dmg, Linux .AppImage + .deb) plus the
 #            portable archives, and Android .apk / iOS unsigned .ipa.
 #
@@ -42,10 +42,10 @@ env:
   RELEASE_NAME: POCOX ${{ github.ref_name }}
   IS_DRAFT: ${{ github.event_name == 'workflow_dispatch' }}
   # The backend server the CLI + app default to, baked at build time from the
-  # repo-configurable variable (`gh variable set POCKET_CODEX_BACKEND_HOST`).
+  # repo-configurable variable (`gh variable set POCOX_BACKEND_HOST`).
   # Read via option_env! in both account.rs; empty/unset falls back to the
   # bundled default. cross forwards it into the musl container via Cross.toml.
-  POCKET_CODEX_BACKEND_HOST: ${{ vars.POCKET_CODEX_BACKEND_HOST }}
+  POCOX_BACKEND_HOST: ${{ vars.POCOX_BACKEND_HOST }}
 
 jobs:
   # --- Release notes, generated exactly once ---------------------------------
@@ -89,7 +89,7 @@ jobs:
             echo
             echo "### Which file do I want?"
             echo
-            echo "**App (GUI)** — \`pocket-codex-app-*\`:"
+            echo "**App (GUI)** — \`pocox-app-*\`:"
             echo
             echo "| Platform | File |"
             echo "|---|---|"
@@ -99,7 +99,7 @@ jobs:
             echo "| Android | \`…-android-arm64-v8a.apk\` (most phones) · armeabi-v7a · x86_64 |"
             echo "| iOS | \`…-ios-unsigned.ipa\` (sideload / development) |"
             echo
-            echo "**CLI** — \`pocket-codex-cli-*\`, the \`pocox\` command: statically linked **musl** Linux binaries (x86_64 / aarch64 / armv7 — run on any distro, no glibc dependency), plus macOS (x64 / arm64) and Windows x64."
+            echo "**CLI** — \`pocox-cli-*\`, the \`pocox\` command: statically linked **musl** Linux binaries (x86_64 / aarch64 / armv7 — run on any distro, no glibc dependency), plus macOS (x64 / arm64) and Windows x64."
             echo
             echo "> Android APKs use a persistent release signature from v0.2.4 onward. Older debug-signed builds cannot be upgraded in place; save your settings before uninstalling an old build. iOS remains unsigned for sideloading/development."
             if [ -n "${changelog}" ]; then
@@ -164,28 +164,22 @@ jobs:
             export CARGO_PROFILE_RELEASE_LTO=false
           fi
           if [ "${{ matrix.cross }}" = "true" ]; then
-            cross build --release --locked -p pocket-codex-cli --bin pocox --target ${{ matrix.target }}
+            cross build --release --locked -p pocox-cli --bin pocox --target ${{ matrix.target }}
           else
-            cargo build --release --locked -p pocket-codex-cli --bin pocox --target ${{ matrix.target }}
+            cargo build --release --locked -p pocox-cli --bin pocox --target ${{ matrix.target }}
           fi
       - name: Package
         shell: bash
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME//\//-}"
-          name="pocket-codex-cli-${tag}-${{ matrix.target }}"
+          name="pocox-cli-${tag}-${{ matrix.target }}"
           mkdir -p "dist/$name"
-          # The former command name ships beside it, so an archive extracted
-          # over an older install keeps scripts written for `pocket-codex`
-          # working. Windows gets a copy of the binary rather than a shim: an
-          # older `pocket-codex.exe` left in place would win over a `.cmd`.
           if [ "${{ runner.os }}" = "Windows" ]; then
             cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/"
-            cp "target/${{ matrix.target }}/release/pocox.exe" "dist/$name/pocket-codex.exe"
             (cd dist && 7z a "$name.zip" "$name" >/dev/null)
           else
             cp "target/${{ matrix.target }}/release/pocox" "dist/$name/"
-            ln -s pocox "dist/$name/pocket-codex"
             tar -czf "dist/$name.tar.gz" -C dist "$name"
           fi
           rm -rf "dist/$name"
@@ -249,11 +243,11 @@ jobs:
           $rel = "build/windows/x64/runner/Release"
           New-Item -ItemType Directory -Force dist | Out-Null
           # Portable zip
-          Compress-Archive -Path "$rel/*" -DestinationPath "dist/pocket-codex-app-$tag-windows-x64.zip" -Force
+          Compress-Archive -Path "$rel/*" -DestinationPath "dist/pocox-app-$tag-windows-x64.zip" -Force
           # One-click installer via Inno Setup
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-          & $iscc "/DAppVersion=$ver" "/DBuildDir=$((Resolve-Path $rel).Path)" "/DOutDir=$((Resolve-Path dist).Path)" "windows\packaging\pocket-codex.iss"
-          Rename-Item "dist/pocket-codex-app-setup.exe" "pocket-codex-app-$tag-windows-x64-setup.exe"
+          & $iscc "/DAppVersion=$ver" "/DBuildDir=$((Resolve-Path $rel).Path)" "/DOutDir=$((Resolve-Path dist).Path)" "windows\packaging\pocox.iss"
+          Rename-Item "dist/pocox-app-setup.exe" "pocox-app-$tag-windows-x64-setup.exe"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -345,7 +339,7 @@ jobs:
           # Scaled to the size the hicolor directory it lands in claims. The
           # master is 1024²; shipping that under 256x256/ (as this did) leaves
           # every desktop rescaling it at runtime.
-          icon_png="$(mktemp -d)/pocket-codex.png"
+          icon_png="$(mktemp -d)/pocox.png"
           convert "${icon_master}" -resize 256x256 "${icon_png}"
 
           # Bundle the FULL non-GTK Ayatana/dbusmenu runtime closure that the
@@ -367,33 +361,33 @@ jobs:
           fi
 
           # 1) Portable zip
-          ( cd "$bundle" && zip -qry "${OLDPWD}/dist/pocket-codex-app-${tag}-linux-x64.zip" . )
+          ( cd "$bundle" && zip -qry "${OLDPWD}/dist/pocox-app-${tag}-linux-x64.zip" . )
 
           # 2) AppImage: collect the complete native dependency closure.
           bash ../../scripts/package_appimage.sh "$bundle" "$icon_png" \
-            "dist/pocket-codex-app-${tag}-linux-x86_64.AppImage"
-          bash ../../scripts/test_appimage.sh "dist/pocket-codex-app-${tag}-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
+            "dist/pocox-app-${tag}-linux-x86_64.AppImage"
+          bash ../../scripts/test_appimage.sh "dist/pocox-app-${tag}-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
 
           # 3) Debian package
-          deb=pocket-codex-deb
+          deb=pocox-deb
           rm -rf "$deb"
-          mkdir -p "$deb/DEBIAN" "$deb/usr/bin" "$deb/usr/lib/pocket-codex" \
+          mkdir -p "$deb/DEBIAN" "$deb/usr/bin" "$deb/usr/lib/pocox" \
                    "$deb/usr/share/applications" "$deb/usr/share/icons/hicolor/256x256/apps"
-          cp -r "$bundle"/* "$deb/usr/lib/pocket-codex/"
-          ln -s /usr/lib/pocket-codex/pocket_codex "$deb/usr/bin/pocket-codex"
-          cp "${icon_png}" "$deb/usr/share/icons/hicolor/256x256/apps/pocket-codex.png"
-          cat > "$deb/usr/share/applications/pocket-codex.desktop" <<'DESKTOP'
+          cp -r "$bundle"/* "$deb/usr/lib/pocox/"
+          ln -s /usr/lib/pocox/pocox "$deb/usr/bin/pocox-app"
+          cp "${icon_png}" "$deb/usr/share/icons/hicolor/256x256/apps/pocox.png"
+          cat > "$deb/usr/share/applications/pocox.desktop" <<'DESKTOP'
           [Desktop Entry]
           Name=POCOX
           Comment=Remote-control codex sessions from any device
-          Exec=/usr/lib/pocket-codex/pocket_codex
-          Icon=pocket-codex
+          Exec=/usr/lib/pocox/pocox
+          Icon=pocox
           Terminal=false
           Type=Application
           Categories=Development;Utility;
           DESKTOP
           cat > "$deb/DEBIAN/control" <<CONTROL
-          Package: pocket-codex
+          Package: pocox
           Version: ${debver}
           Section: utils
           Priority: optional
@@ -404,7 +398,7 @@ jobs:
            Remote-control your codex sessions from any device.
           CONTROL
           dpkg-deb --build --root-owner-group "$deb" \
-            "dist/pocket-codex-app-${tag}-linux-amd64.deb"
+            "dist/pocox-app-${tag}-linux-amd64.deb"
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -507,9 +501,9 @@ jobs:
         run: |
           tag="${RELEASE_TAG//\//-}"
           python3 scripts/package_macos.py \
-            --app apps/flutter/build/macos/Build/Products/Release/pocket_codex.app \
+            --app apps/flutter/build/macos/Build/Products/Release/pocox.app \
             --architecture "$XARCH" \
-            --output "apps/flutter/dist/pocket-codex-app-${tag}-macos-${ARCH}.dmg"
+            --output "apps/flutter/dist/pocox-app-${tag}-macos-${ARCH}.dmg"
       - name: Preserve notarization results
         if: always()
         uses: actions/upload-artifact@v4
@@ -602,15 +596,16 @@ jobs:
         run: |
           test -n "$KEYSTORE_BASE64" || { echo "Android release signing key is missing"; exit 1; }
           umask 077
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pocket-codex-release.jks"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pocox-release.jks"
       - name: Build Android APKs (split per ABI)
         env:
-          PCX_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/pocket-codex-release.jks
-          PCX_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
+          POCOX_ANDROID_KEY_ALIAS: ${{ vars.POCOX_ANDROID_KEY_ALIAS }}
+          POCOX_ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/pocox-release.jks
+          POCOX_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEYSTORE_PASSWORD }}
         working-directory: apps/flutter
         run: |
           flutter pub get
-          test -n "$PCX_ANDROID_KEYSTORE_PASSWORD" || { echo "Android signing password is missing"; exit 1; }
+          test -n "$POCOX_ANDROID_KEYSTORE_PASSWORD" || { echo "Android signing password is missing"; exit 1; }
           flutter build apk --release --split-per-abi
       - name: Package
         shell: bash
@@ -623,10 +618,10 @@ jobs:
           for abi in arm64-v8a armeabi-v7a x86_64; do
             python3 ../../scripts/verify_android_apk.py --abi "$abi" "$src/app-$abi-release.apk"
           done
-          cp "$src/app-arm64-v8a-release.apk"   "dist/pocket-codex-app-${tag}-android-arm64-v8a.apk"
-          cp "$src/app-armeabi-v7a-release.apk" "dist/pocket-codex-app-${tag}-android-armeabi-v7a.apk"
-          cp "$src/app-x86_64-release.apk"      "dist/pocket-codex-app-${tag}-android-x86_64.apk"
-          (cd dist && sha256sum ./*.apk > "pocket-codex-${tag}-android-SHA256SUMS.txt")
+          cp "$src/app-arm64-v8a-release.apk"   "dist/pocox-app-${tag}-android-arm64-v8a.apk"
+          cp "$src/app-armeabi-v7a-release.apk" "dist/pocox-app-${tag}-android-armeabi-v7a.apk"
+          cp "$src/app-x86_64-release.apk"      "dist/pocox-app-${tag}-android-x86_64.apk"
+          (cd dist && sha256sum ./*.apk > "pocox-${tag}-android-SHA256SUMS.txt")
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -673,7 +668,7 @@ jobs:
           tag="${GITHUB_REF_NAME//\//-}"
           mkdir -p dist
           ( cd build/ios/iphoneos && mkdir -p Payload && mv Runner.app Payload/ \
-            && zip -qry "${OLDPWD}/dist/pocket-codex-app-${tag}-ios-unsigned.ipa" Payload )
+            && zip -qry "${OLDPWD}/dist/pocox-app-${tag}-ios-unsigned.ipa" Payload )
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
@@ -705,7 +700,7 @@ jobs:
           files="$RUNNER_TEMP/release-files"
           mkdir -p "$files"
           gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-            --dir "$files" --pattern 'pocket-codex-*'
+            --dir "$files" --pattern 'pocox-*'
           python3 scripts/release_manifest.py collect "$files" "$RELEASE_TAG" "$GITHUB_SHA" \
             --out release-manifest.json
           key="$(mktemp)"

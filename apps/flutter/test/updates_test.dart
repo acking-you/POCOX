@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
-import 'package:pocket_codex/src/updates/update_controller.dart';
-import 'package:pocket_codex/src/updates/update_host.dart';
-import 'package:pocket_codex/src/updates/update_settings.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/updates/update_api.dart';
+import 'package:pocox/src/updates/update_controller.dart';
+import 'package:pocox/src/updates/update_host.dart';
+import 'package:pocox/src/updates/update_settings.dart';
 
 import 'fake_bridge_api.dart';
 

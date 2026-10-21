@@ -2195,7 +2195,7 @@ checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 [[package]]
 name = "pb-mapper"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "pb-mapper-client",
 ]
@@ -2203,7 +2203,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-auth"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "parking_lot",
  "pb-mapper-core",
@@ -2220,7 +2220,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-client"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "if-addrs",
  "if-watch",
@@ -2240,7 +2240,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-core"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -2258,7 +2258,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-protocol"
 version = "0.6.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocket-codex#1148bbe7f62096d172a872b210f570286fe5290a"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#1148bbe7f62096d172a872b210f570286fe5290a"
 dependencies = [
  "bytes",
  "parking_lot",
@@ -2358,11 +2358,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
-name = "pocket-codex-account-proto"
+name = "pocox-account-proto"
 version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
- "pocket-codex-core",
+ "pocox-core",
  "rand 0.8.6",
  "serde",
  "serde_json",
@@ -2371,7 +2371,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-api-proxy"
+name = "pocox-api-proxy"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2380,7 +2380,7 @@ dependencies = [
  "bytes",
  "futures",
  "http",
- "pocket-codex-core",
+ "pocox-core",
  "reqwest",
  "rustls",
  "serde",
@@ -2393,13 +2393,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-auth"
+name = "pocox-auth"
 version = "0.6.0"
 dependencies = [
  "base64 0.22.1",
  "jsonwebtoken",
- "pocket-codex-account-proto",
- "pocket-codex-store",
+ "pocox-account-proto",
+ "pocox-store",
  "rand 0.8.6",
  "reqwest",
  "serde",
@@ -2413,7 +2413,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-backend"
+name = "pocox-backend"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2423,11 +2423,11 @@ dependencies = [
  "hyper",
  "hyper-util",
  "jsonwebtoken",
- "pocket-codex-account-proto",
- "pocket-codex-auth",
- "pocket-codex-core",
- "pocket-codex-pb",
- "pocket-codex-store",
+ "pocox-account-proto",
+ "pocox-auth",
+ "pocox-core",
+ "pocox-pb",
+ "pocox-store",
  "reqwest",
  "rustls",
  "rustls-pemfile",
@@ -2443,7 +2443,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-cli"
+name = "pocox-cli"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2454,13 +2454,13 @@ dependencies = [
  "crossterm",
  "open",
  "owo-colors",
- "pocket-codex-account-proto",
- "pocket-codex-api-proxy",
- "pocket-codex-codex",
- "pocket-codex-core",
- "pocket-codex-host-svc",
- "pocket-codex-pb",
- "pocket_codex_bridge",
+ "pocox-account-proto",
+ "pocox-api-proxy",
+ "pocox-codex",
+ "pocox-core",
+ "pocox-host-svc",
+ "pocox-pb",
+ "pocox_bridge",
  "reqwest",
  "rustls",
  "rustls-native-certs",
@@ -2474,7 +2474,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-codex"
+name = "pocox-codex"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2483,7 +2483,7 @@ dependencies = [
  "futures",
  "json5",
  "nix 0.29.0",
- "pocket-codex-core",
+ "pocox-core",
  "rustix 1.1.4",
  "serde",
  "serde_json",
@@ -2502,7 +2502,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-core"
+name = "pocox-core"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2522,7 +2522,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-host-svc"
+name = "pocox-host-svc"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2534,8 +2534,8 @@ dependencies = [
  "futures",
  "nix 0.29.0",
  "percent-encoding",
- "pocket-codex-codex",
- "pocket-codex-core",
+ "pocox-codex",
+ "pocox-core",
  "reqwest",
  "serde",
  "serde_json",
@@ -2554,13 +2554,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-pb"
+name = "pocox-pb"
 version = "0.6.0"
 dependencies = [
  "anyhow",
  "pb-mapper",
- "pocket-codex-account-proto",
- "pocket-codex-core",
+ "pocox-account-proto",
+ "pocox-core",
  "serde",
  "serde_json",
  "socket2",
@@ -2571,7 +2571,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket-codex-store"
+name = "pocox-store"
 version = "0.6.0"
 dependencies = [
  "sqlx",
@@ -2582,7 +2582,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pocket_codex_bridge"
+name = "pocox_bridge"
 version = "0.6.0"
 dependencies = [
  "anyhow",
@@ -2595,12 +2595,12 @@ dependencies = [
  "futures",
  "json5",
  "once_cell",
- "pocket-codex-account-proto",
- "pocket-codex-api-proxy",
- "pocket-codex-codex",
- "pocket-codex-core",
- "pocket-codex-host-svc",
- "pocket-codex-pb",
+ "pocox-account-proto",
+ "pocox-api-proxy",
+ "pocox-codex",
+ "pocox-core",
+ "pocox-host-svc",
+ "pocox-pb",
  "reqwest",
  "ring",
  "rmcp",

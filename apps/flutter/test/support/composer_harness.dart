@@ -4,7 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 
 import '../fake_bridge_api.dart';
 import 'screen_harness.dart';

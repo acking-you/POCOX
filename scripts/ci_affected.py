@@ -2,7 +2,7 @@
 """Scope CI to the surfaces a change actually affects.
 
 POCOX has two independent CI surfaces:
-  * the Cargo workspace (crates/pocket-codex-*), gated by fmt/clippy/test
+  * the Cargo workspace (crates/pocox-*), gated by fmt/clippy/test
   * the Flutter app (apps/flutter), gated by the flutter job
 
 `detect` decides, from the pushed/PR diff alone (stdlib tomllib + git, no

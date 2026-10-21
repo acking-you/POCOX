@@ -1,0 +1,38 @@
+[package]
+name = "pocox-pb"
+description = "Pb-mapper register/subscribe glue used by POCOX to expose codex app-server remotely."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pocox-core = { workspace = true }
+# For `NamespacedServiceId`, which `transport::Transport` uses to decide an
+# account-mode key's shape. A pure (no-I/O) crate, so this stays a leaf edge.
+pocox-account-proto = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+
+# The workspace selects the SDK's dedicated Git branch and locks its commit.
+# `pb-mapper` is a one-line re-export of `pb_mapper_client::sdk`, which is the
+# whole surface we need — no `uni-stream` type parameters to thread any more,
+# because the SDK picks the TCP providers itself.
+pb-mapper = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
+# Lets the connect-timeout test build a loopback listener with a tiny,
+# saturated backlog so a TCP connect hangs without real network access.
+socket2 = "0.6"

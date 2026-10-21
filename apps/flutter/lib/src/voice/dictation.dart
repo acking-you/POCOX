@@ -4,8 +4,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/voice/voice_transport.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/voice/voice_transport.dart';
 
 /// Whether the dictation line (its realtime session on the host) is up.
 enum DictationLink {
@@ -297,7 +297,7 @@ class DictationLine extends ChangeNotifier {
 
   /// Thread source that marks the line's thread; the bridge only allows it
   /// on an ephemeral thread.
-  static const threadSource = 'pocket-codex-dictation';
+  static const threadSource = 'pocox-dictation';
 
   /// Instructions for the session: transcribe, never answer or act.
   static const prompt =

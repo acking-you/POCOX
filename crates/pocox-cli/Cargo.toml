@@ -1,0 +1,48 @@
+[package]
+name = "pocox-cli"
+description = "User-facing CLI for managing codex app-server + pb-mapper from POCOX."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# The binary is short so it reads nicely in shells and scripts. Installs
+# upgraded from the former `pocox` keep that name as an alias.
+[[bin]]
+name = "pocox"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+pocox-core = { workspace = true }
+pocox-codex = { workspace = true }
+pocox-pb = { workspace = true }
+pocox-account-proto = { workspace = true }
+pocox-api-proxy = { workspace = true }
+pocox-host-svc = { workspace = true }
+pocox_bridge = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+async-trait = { workspace = true }
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-native-certs = "0.8"
+url = { workspace = true }
+# Opens the system browser for the `login --web` authorization-code flow. Pure
+# Rust (spawns the platform opener), so it stays fine for the static-musl build.
+open = "5"
+comfy-table = { workspace = true }
+owo-colors = { workspace = true }
+crossterm = { workspace = true }

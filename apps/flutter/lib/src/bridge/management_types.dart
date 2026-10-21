@@ -71,7 +71,7 @@ class ManagedDevice {
   /// Environment and publisher identity; absent on older hosts.
   final DeviceMetadata? metadata;
 
-  /// Pocket version on the computer.
+  /// POCOX version on the computer.
   final String appVersion;
 
   /// Its running and stopped services; may be empty.

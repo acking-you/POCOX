@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// An inset panel in the hosting editor: the ground shared by the Claude
 /// environment groups and the adapter preparation card.

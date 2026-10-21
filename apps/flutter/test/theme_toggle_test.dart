@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/theme_transition.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/theme_toggle.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/theme_transition.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/theme_toggle.dart';
 
 class _MemoryPrefs extends UiPrefsStore {
   @override

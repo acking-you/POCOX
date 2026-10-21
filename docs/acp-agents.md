@@ -101,7 +101,7 @@ add an agent-specific HTTP client or another `SessionEngine` implementation.
   result is withdrawn instead and never replaces a newer host's registration
   under the same name.
 - stderr is drained and discarded (it may contain secrets).
-- Tool lookup uses a child-only PATH (`pocket_codex_codex::external_tool_path()`,
+- Tool lookup uses a child-only PATH (`pocox_codex::external_tool_path()`,
   the macOS login-shell PATH); the controller's environment is not changed.
   An explicit program path is never replaced; a bare name is searched on
   PATH and then in the preset's fallback directories.
@@ -733,14 +733,14 @@ regardless.
 ## Verification status
 
 The tests use an in-repo mock agent
-(`crates/pocket-codex-host-svc/examples/mock_acp_agent.rs`) with three
+(`crates/pocox-host-svc/examples/mock_acp_agent.rs`) with three
 capability profiles (minimal; load + list + resume + options; list + resume
 without load). The extra profiles
 only show that the protocol layer is not tied to one agent; they are not
 real agents. It is a Cargo example: `cargo test` (and
 `cargo test --workspace`) builds it next to the test binaries, and it is
 never installed or shipped. The integration tests in
-`crates/pocket-codex-host-svc/tests/acp_host/` run it as a real
+`crates/pocox-host-svc/tests/acp_host/` run it as a real
 subprocess and fail with an explicit message, rather than skipping, when it
 was not built (for example `cargo test --test acp_host` alone; add
 `--examples`); so do the host unit tests that need it (the cancel/turn race
@@ -807,17 +807,17 @@ private directory with `fixture/`, an `agent.json` containing the configured
 Use an agent configuration with isolated storage, a working model provider,
 write permissions set to ask, and external-directory access disabled. Keep
 credentials out of the repository, arguments and logs. Use a fresh fixture
-and a unique `PCX_ACP_LIVE_NAME`; the test refuses to overwrite its two fixture
+and a unique `POCOX_ACP_LIVE_NAME`; the test refuses to overwrite its two fixture
 files. Hosting creates only that name's ACP session record in the ordinary
 host state directory; it never opens another host's records.
 
 Build the bridge test executable once with
-`cargo test -p pocket_codex_bridge --lib --locked --no-run`. Run that same
-executable in two independent processes, both with `PCX_ACP_LIVE_ROOT` and
-`PCX_ACP_LIVE_NAME`, and with the exact test filter
+`cargo test -p pocox_bridge --lib --locked --no-run`. Run that same
+executable in two independent processes, both with `POCOX_ACP_LIVE_ROOT` and
+`POCOX_ACP_LIVE_NAME`, and with the exact test filter
 `engine::acp::live_tests::acp_live_remote_control --ignored --exact --nocapture`.
-Start `PCX_ACP_LIVE_ROLE=host` first, wait for `ready.json`, then start
-`PCX_ACP_LIVE_ROLE=controller`. The controller requests shutdown on completion
+Start `POCOX_ACP_LIVE_ROLE=host` first, wait for `ready.json`, then start
+`POCOX_ACP_LIVE_ROLE=controller`. The controller requests shutdown on completion
 or panic; the host also has a ten-minute deadline. Preserve `acceptance.json`,
 `cleanup.json` and private process exit logs as evidence. Normal CI does not
 contact a paid model or real relay.

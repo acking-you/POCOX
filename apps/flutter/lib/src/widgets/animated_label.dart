@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// A one-line label that cross-fades, with a short rise, when its text
 /// changes. A picker chip saying "High" and then "Medium" shows that the

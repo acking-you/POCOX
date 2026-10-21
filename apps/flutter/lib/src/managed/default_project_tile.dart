@@ -4,15 +4,15 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/managed/management_failure.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/managed/management_failure.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/folder_tree_picker.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/app_dialog.dart';
 
 /// The host's default project folder: where a new conversation starts when
 /// nobody chose a folder. Shows the host's automatic folder (created only

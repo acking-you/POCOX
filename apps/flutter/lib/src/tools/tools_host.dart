@@ -7,22 +7,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/glass_recipe.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
-import 'package:pocket_codex/src/tools/share_card.dart';
-import 'package:pocket_codex/src/tools/tools_actions.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/agent_icon.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/glass_recipe.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
+import 'package:pocox/src/tools/share_card.dart';
+import 'package:pocox/src/tools/tools_actions.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/agent_icon.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/links.dart';
 
 /// The mark of the harness behind [owner].
 Widget ownerMark(ToolsOwner owner, {double size = 18}) {

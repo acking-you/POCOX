@@ -4,7 +4,7 @@
 
 **Goal:** A responsive, Material 3 Flutter app over the existing Rust engine: onboarding (relay+key, `pcx1:` base64 import/export, persisted), relay service discovery, API-service subscribe (local OpenAI-compatible endpoint), and settings — with the project logo wired as launcher icon / splash / onboarding hero.
 
-**Architecture:** The Rust bridge crate (`pocket_codex_bridge`) owns a global tokio runtime, config persistence (core `Config` serde struct → `<support_dir>/config.toml`), relay discovery (`pb::keys`), and an in-process subscription registry (spawned tokio tasks + abort handles — no `state.toml`, no child processes). Pure logic lives in non-bridged `engine::*` modules (unit-tested without FRB); thin FRB wrappers + DTOs live in `crate::api`. Dart is UI only: it talks to Rust through a `BridgeApi` Dart interface (real impl wraps the FRB-generated bindings; a fake backs widget tests), with Riverpod for state and go_router for navigation.
+**Architecture:** The Rust bridge crate (`pocox_bridge`) owns a global tokio runtime, config persistence (core `Config` serde struct → `<support_dir>/config.toml`), relay discovery (`pb::keys`), and an in-process subscription registry (spawned tokio tasks + abort handles — no `state.toml`, no child processes). Pure logic lives in non-bridged `engine::*` modules (unit-tested without FRB); thin FRB wrappers + DTOs live in `crate::api`. Dart is UI only: it talks to Rust through a `BridgeApi` Dart interface (real impl wraps the FRB-generated bindings; a fake backs widget tests), with Riverpod for state and go_router for navigation.
 
 **Tech Stack:** Rust (tokio, base64, serde/toml, flutter_rust_bridge 2.12.0) · Flutter 3.44 / Dart 3.12, Material 3, flutter_riverpod, go_router, path_provider, flutter_launcher_icons, flutter_native_splash.
 
@@ -14,8 +14,8 @@
 
 ## File Structure
 
-**Rust bridge (`crates/pocket-codex-bridge/`):**
-- `Cargo.toml` — add deps: `pocket-codex-core`, `pocket-codex-pb`, `tokio`, `once_cell`, `anyhow`, `base64`, `serde_json`, `toml`.
+**Rust bridge (`crates/pocox-bridge/`):**
+- `Cargo.toml` — add deps: `pocox-core`, `pocox-pb`, `tokio`, `once_cell`, `anyhow`, `base64`, `serde_json`, `toml`.
 - `src/lib.rs` — add `mod engine;` (keeps `pub mod api; mod frb_generated;`).
 - `src/engine/mod.rs` — `pub mod config; pub mod runtime; pub mod discovery;`.
 - `src/engine/config.rs` — load/save core `Config` at `<support_dir>/config.toml` (0600 on unix); `pcx1:` import/export. **Pure, unit-tested.**
@@ -39,13 +39,13 @@
 ---
 ## Task 1: Bridge crate dependencies
 
-**Files:** Modify `crates/pocket-codex-bridge/Cargo.toml`
+**Files:** Modify `crates/pocox-bridge/Cargo.toml`
 
 - [ ] **Step 1: Add the engine deps** under `[dependencies]` (after the `flutter_rust_bridge` line):
 
 ```toml
-pocket-codex-core = { workspace = true }
-pocket-codex-pb = { workspace = true }
+pocox-core = { workspace = true }
+pocox-pb = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
@@ -55,17 +55,17 @@ base64 = { workspace = true }
 once_cell = { workspace = true }
 ```
 
-- [ ] **Step 2: Add `pocket-codex-pb` to the workspace dep table** if missing. Check `Cargo.toml` root `[workspace.dependencies]` — it already lists `pocket-codex-core`, `pocket-codex-codex`, `pocket-codex-pb`. Confirm with: `rg -n "pocket-codex-pb" Cargo.toml`. Expected: a `pocket-codex-pb = { path = "crates/pocket-codex-pb" }` line. If absent, add it.
+- [ ] **Step 2: Add `pocox-pb` to the workspace dep table** if missing. Check `Cargo.toml` root `[workspace.dependencies]` — it already lists `pocox-core`, `pocox-codex`, `pocox-pb`. Confirm with: `rg -n "pocox-pb" Cargo.toml`. Expected: a `pocox-pb = { path = "crates/pocox-pb" }` line. If absent, add it.
 
 - [ ] **Step 3: Build to verify deps resolve**
 
-Run: `cargo build -p pocket_codex_bridge --locked`
+Run: `cargo build -p pocox_bridge --locked`
 Expected: compiles (bridge still only has `simple.rs`; new deps unused yet → may warn, that's fine for this task).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add crates/pocket-codex-bridge/Cargo.toml Cargo.toml Cargo.lock
+git add crates/pocox-bridge/Cargo.toml Cargo.toml Cargo.lock
 git commit -m "build(bridge): add core/pb/tokio/base64 deps for the mobile engine"
 ```
 
@@ -73,7 +73,7 @@ git commit -m "build(bridge): add core/pb/tokio/base64 deps for the mobile engin
 
 ## Task 2: `engine::config` — pcx1 import/export + load/save (pure)
 
-**Files:** Create `crates/pocket-codex-bridge/src/engine/mod.rs`, `crates/pocket-codex-bridge/src/engine/config.rs`; modify `crates/pocket-codex-bridge/src/lib.rs`.
+**Files:** Create `crates/pocox-bridge/src/engine/mod.rs`, `crates/pocox-bridge/src/engine/config.rs`; modify `crates/pocox-bridge/src/lib.rs`.
 
 - [ ] **Step 1: Register the module.** In `src/lib.rs`, add `mod engine;` so it reads:
 
@@ -102,7 +102,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use pocket_codex_core::config::Config;
+use pocox_core::config::Config;
 use serde::{Deserialize, Serialize};
 
 const PCX1_PREFIX: &str = "pcx1:";
@@ -222,18 +222,18 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Run tests** — `cargo test -p pocket_codex_bridge engine::config --locked` → 3 pass.
+- [ ] **Step 4: Run tests** — `cargo test -p pocox_bridge engine::config --locked` → 3 pass.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/pocket-codex-bridge/src/lib.rs crates/pocket-codex-bridge/src/engine/
+git add crates/pocox-bridge/src/lib.rs crates/pocox-bridge/src/engine/
 git commit -m "feat(bridge): engine::config — pcx1 codec + 0600 config load/save"
 ```
 
 ## Task 3: `engine::discovery` — resolve relay + list services
 
-**Files:** Create `crates/pocket-codex-bridge/src/engine/discovery.rs`.
+**Files:** Create `crates/pocox-bridge/src/engine/discovery.rs`.
 
 - [ ] **Step 1: Write the module:**
 
@@ -242,7 +242,7 @@ git commit -m "feat(bridge): engine::config — pcx1 codec + 0600 config load/sa
 use std::net::SocketAddr;
 
 use anyhow::{anyhow, Context, Result};
-use pocket_codex_core::service::ServiceId;
+use pocox_core::service::ServiceId;
 use tokio::net::lookup_host;
 
 /// One discovered POCOX service on the relay.
@@ -270,7 +270,7 @@ pub async fn resolve_relay(relay: &str) -> Result<SocketAddr> {
 /// List POCOX services registered on the relay (bare keys filtered).
 pub async fn discover(relay: &str) -> Result<Vec<DiscoveredService>> {
     let addr = resolve_relay(relay).await?;
-    let keys = pocket_codex_pb::keys(addr).await.context("querying relay keys")?;
+    let keys = pocox_pb::keys(addr).await.context("querying relay keys")?;
     Ok(keys
         .into_iter()
         .filter_map(|k| {
@@ -298,13 +298,13 @@ mod tests {
 
 - [ ] **Step 2: Build + test**
 
-Run: `cargo test -p pocket_codex_bridge engine::discovery --locked`
+Run: `cargo test -p pocox_bridge engine::discovery --locked`
 Expected: `resolve_relay_rejects_garbage` passes.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add crates/pocket-codex-bridge/src/engine/discovery.rs
+git add crates/pocox-bridge/src/engine/discovery.rs
 git commit -m "feat(bridge): engine::discovery — resolve relay + list pcx services"
 ```
 
@@ -312,7 +312,7 @@ git commit -m "feat(bridge): engine::discovery — resolve relay + list pcx serv
 
 ## Task 4: `engine::runtime` — global runtime + subscription registry
 
-**Files:** Create `crates/pocket-codex-bridge/src/engine/runtime.rs`.
+**Files:** Create `crates/pocox-bridge/src/engine/runtime.rs`.
 
 - [ ] **Step 1: Write the module.** Holds a global tokio `Runtime`, the support dir, and a registry of spawned subscription tasks (key → abort handle + local addr). `pb::subscribe` runs forever, so we spawn it and keep its `JoinHandle` to abort on unsubscribe.
 
@@ -326,7 +326,7 @@ use std::sync::Mutex;
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
-use pocket_codex_pb::{subscribe, SubscribeOptions};
+use pocox_pb::{subscribe, SubscribeOptions};
 use tokio::runtime::Runtime;
 use tokio::task::JoinHandle;
 
@@ -409,18 +409,18 @@ pub fn list_subscriptions() -> Vec<SubStatus> {
 }
 ```
 
-- [ ] **Step 2: Build** — `cargo build -p pocket_codex_bridge --locked` (no live-relay unit test; covered by api layer + manual).
+- [ ] **Step 2: Build** — `cargo build -p pocox_bridge --locked` (no live-relay unit test; covered by api layer + manual).
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add crates/pocket-codex-bridge/src/engine/runtime.rs
+git add crates/pocox-bridge/src/engine/runtime.rs
 git commit -m "feat(bridge): engine::runtime — global runtime + subscription registry"
 ```
 
 ## Task 5: `api::bridge` — FRB functions + DTOs, regenerate Dart bindings
 
-**Files:** Modify `crates/pocket-codex-bridge/src/api/mod.rs`; create `crates/pocket-codex-bridge/src/api/bridge.rs`.
+**Files:** Modify `crates/pocox-bridge/src/api/mod.rs`; create `crates/pocox-bridge/src/api/bridge.rs`.
 
 FRB note: these are **non-`sync`** `pub fn`s. FRB runs them on a worker thread and hands Dart a `Future`; inside we call `runtime().block_on(..)` for async engine calls. Do NOT mark them `async` — FRB's async executor has no tokio reactor; our own runtime provides it.
 
@@ -487,7 +487,7 @@ fn current_relay() -> Result<String> {
 fn apply_key() -> Result<()> {
     let cfg = config::load_config(&runtime::support_dir()?)?;
     if let Some(k) = cfg.relay_key() {
-        pocket_codex_pb::set_msg_header_key(Some(k)).map_err(|e| anyhow!("{e}"))?;
+        pocox_pb::set_msg_header_key(Some(k)).map_err(|e| anyhow!("{e}"))?;
     }
     Ok(())
 }
@@ -570,7 +570,7 @@ pub fn subscriptions() -> Vec<SubStatusDto> {
 }
 ```
 
-- [ ] **Step 3: Build the bridge** — `cargo build -p pocket_codex_bridge --locked`. Expected: compiles.
+- [ ] **Step 3: Build the bridge** — `cargo build -p pocox_bridge --locked`. Expected: compiles.
 
 - [ ] **Step 4: Regenerate Dart bindings.** From `apps/flutter/`:
 
@@ -582,7 +582,7 @@ Expected: regenerates `lib/src/rust/api/bridge.dart` + updates `frb_generated.*`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/pocket-codex-bridge/src/api/ apps/flutter/lib/src/rust/
+git add crates/pocox-bridge/src/api/ apps/flutter/lib/src/rust/
 git commit -m "feat(bridge): FRB api — config/import/export/discover/api-subscribe"
 ```
 
@@ -598,7 +598,7 @@ mkdir -p apps/flutter/assets/logo
 cp assets/logo/logo.png assets/logo/poster.png apps/flutter/assets/logo/
 ```
 
-- [ ] **Step 2: Add runtime deps + dev tools to `apps/flutter/pubspec.yaml`.** Under `dependencies:` (after the existing `flutter_rust_bridge: 2.12.0` / `pocket_codex_bridge` lines) add:
+- [ ] **Step 2: Add runtime deps + dev tools to `apps/flutter/pubspec.yaml`.** Under `dependencies:` (after the existing `flutter_rust_bridge: 2.12.0` / `pocox_bridge` lines) add:
 
 ```yaml
   flutter_riverpod: ^2.6.1
@@ -706,8 +706,8 @@ abstract interface class BridgeApi {
 - [ ] **Step 2: Write the real impl** `apps/flutter/lib/src/bridge_api_rust.dart` (maps FRB types ↔ the plain mirrors; import path matches `dart_output: lib/src/rust`):
 
 ```dart
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
 
 /// Real [BridgeApi] backed by the flutter_rust_bridge bindings.
 class RustBridgeApi implements BridgeApi {
@@ -758,7 +758,7 @@ class RustBridgeApi implements BridgeApi {
 - [ ] **Step 3: Write the fake** `apps/flutter/test/fake_bridge_api.dart` (in-memory, no native lib):
 
 ```dart
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// In-memory [BridgeApi] for widget/provider tests. Seed [services] and
 /// [config] per test; records subscribe/unsubscribe calls.
@@ -858,8 +858,8 @@ ThemeData darkTheme() => ThemeData(
 
 ```dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
 
 /// The engine API. Overridden with a FakeBridgeApi in tests.
 final bridgeApiProvider = Provider<BridgeApi>((ref) => const RustBridgeApi());
@@ -884,10 +884,10 @@ final subscriptionsProvider = FutureProvider<List<SubInfo>>((ref) async {
 
 ```dart
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/src/screens/onboarding_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/api_service_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
+import 'package:pocox/src/screens/onboarding_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/api_service_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
 
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
@@ -911,11 +911,11 @@ GoRouter buildRouter({required String initialLocation}) => GoRouter(
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/router.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
-import 'package:pocket_codex/src/rust/frb_generated.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/router.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/rust/frb_generated.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -924,13 +924,13 @@ Future<void> main() async {
   await frb.initBridge(supportDir: dir.path);
   final cfg = await frb.getConfig();
   final start = cfg.relay == null ? '/onboarding' : '/';
-  runApp(ProviderScope(child: PocketCodexApp(initialLocation: start)));
+  runApp(ProviderScope(child: PocoxApp(initialLocation: start)));
 }
 
 /// Root app: Material 3 light/dark following the system, go_router nav.
-class PocketCodexApp extends StatelessWidget {
+class PocoxApp extends StatelessWidget {
   /// [initialLocation] decides onboarding vs services on cold start.
-  const PocketCodexApp({super.key, required this.initialLocation});
+  const PocoxApp({super.key, required this.initialLocation});
 
   /// Route to open on launch.
   final String initialLocation;
@@ -971,7 +971,7 @@ All screens are `ConsumerWidget`/`ConsumerStatefulWidget` (Riverpod) using stock
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/src/providers.dart';
 
 /// First-run setup: import a `pcx1:` string or type relay + key.
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -1062,9 +1062,9 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/api_service_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/api_service_screen.dart';
 
 /// Home screen: lists discovered services on the configured relay.
 class ServicesScreen extends ConsumerWidget {
@@ -1189,8 +1189,8 @@ class _ErrorState extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
 
 /// API-service detail: subscribe and expose a local OpenAI-compatible port.
 class ApiServiceScreen extends ConsumerStatefulWidget {
@@ -1286,9 +1286,9 @@ class _ProviderSnippet extends StatelessWidget {
   final String localAddr;
   @override
   Widget build(BuildContext context) {
-    final snippet = 'model_provider = "pocket-codex-api"\n\n'
-        '[model_providers.pocket-codex-api]\n'
-        'name = "PocketCodex API"\n'
+    final snippet = 'model_provider = "pocox-api"\n\n'
+        '[model_providers.pocox-api]\n'
+        'name = "POCOX API"\n'
         'base_url = "http://$localAddr/v1"\n'
         'wire_api = "responses"\n'
         'requires_openai_auth = false\n'
@@ -1313,7 +1313,7 @@ class _ProviderSnippet extends StatelessWidget {
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/src/providers.dart';
 
 /// Settings: relay/key, subscription status, export, about.
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -1424,10 +1424,10 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
 import 'fake_bridge_api.dart';
 
 Widget _host(Widget child, BridgeApi api) => ProviderScope(
@@ -1497,9 +1497,9 @@ git commit -m "feat(flutter): onboarding, services, api-service, settings screen
 - [ ] **Step 1: Full Rust gate** (from repo root):
 
 ```bash
-cargo fmt -p pocket-codex-core -p pocket-codex-codex -p pocket-codex-pb -p pocket-codex-cli -p pocket_codex_bridge -- --check
-cargo +stable clippy -p pocket_codex_bridge --all-targets -- -D warnings
-cargo test -p pocket_codex_bridge --locked
+cargo fmt -p pocox-core -p pocox-codex -p pocox-pb -p pocox-cli -p pocox_bridge -- --check
+cargo +stable clippy -p pocox_bridge --all-targets -- -D warnings
+cargo test -p pocox_bridge --locked
 ```
 Expected: fmt clean, clippy clean, bridge tests pass (config + discovery).
 

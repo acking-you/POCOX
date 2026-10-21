@@ -1,0 +1,409 @@
+//! Background pb-mapper worker supervision used by high-level commands.
+//!
+//! ```text
+//!                    managed_pb::ensure(spec)
+//!                              │
+//!                              ▼
+//!                  state.find_pb(role, key)
+//!                              │
+//!              ┌───────────────┼───────────────┐
+//!              ▼               ▼               ▼
+//!       Some + alive    Some + dead          None
+//!              │               │               │
+//!              ▼               ▼               ▼
+//!       EnsureOutcome   remove_pb +      spawn_worker
+//!       ::Reused        spawn_worker     ::Spawned
+//!                       ::Replaced
+//!                       (stale_pid kept)
+//!
+//!   spawn_worker:
+//!     argv = [self_exe, "__worker", subcommand,
+//!             "--key", key, "--local-addr", addr, "--relay", relay,
+//!             ("--codec" if Register && codec)]
+//!     subcommand ∈ { pb-register, pb-subscribe }
+//!     stdout/stderr → paths::pb_log_file(role, key)
+//!     state.upsert_pb(PbSessionInfo { role, key, local_addr, relay_addr,
+//!                                     pid, log_file, codec, started_at })
+//! ```
+//!
+//! Sessions are keyed by `(role, key)`, so a single device can register
+//! one service and subscribe to a different one through the same relay
+//! without record collisions. [`stop_matching`] takes a [`StopFilter`]
+//! that narrows by `role`/`key`; an empty filter sweeps every entry.
+
+use std::{
+    path::PathBuf,
+    process::{Command, Stdio},
+};
+
+use anyhow::{bail, Context, Result};
+use chrono::Utc;
+use pocox_core::{
+    paths,
+    process::{pid_alive, send_sigterm},
+    state::{PbRole, PbSessionInfo, RuntimeState},
+};
+
+use crate::commands::{relay::CREDENTIAL_ENV, ui};
+
+/// A pb-mapper worker process POCOX should supervise.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PbWorkerSpec {
+    /// Register or subscribe.
+    pub role: PbRole,
+    /// Service key.
+    pub key: String,
+    /// Local `host:port` used by this worker.
+    pub local_addr: String,
+    /// The relay and the credential the worker should present to it.
+    ///
+    /// The credential reaches the spawned child through its environment, which
+    /// is why the session is carried rather than resolved again in the child:
+    /// resolving twice could pick different answers if the config changed in
+    /// between, and the child would then authenticate as something the parent
+    /// never checked.
+    pub session: pocox_pb::RelaySession,
+    /// Whether register mode should request pb-mapper encryption.
+    pub codec: bool,
+}
+
+/// Outcome of ensuring a worker is present.
+#[derive(Debug, Clone)]
+pub(crate) enum EnsureOutcome {
+    /// An existing live worker was reused.
+    Reused(PbSessionInfo),
+    /// A stale worker record was replaced.
+    Replaced {
+        /// Stale PID that was replaced.
+        stale_pid: u32,
+        /// Newly spawned session info.
+        session: PbSessionInfo,
+    },
+    /// A new worker was spawned.
+    Spawned(PbSessionInfo),
+}
+
+impl EnsureOutcome {
+    /// Render this outcome as a styled headline plus key/relay/log
+    /// fields and return the underlying session, so the four pb call
+    /// sites (`serve` / `connect` / `api serve` / `api connect`) share
+    /// one presentation. `verb` is the worker role phrase, e.g.
+    /// `"pb register"` or `"pb subscribe"`.
+    pub(crate) fn render(&self, verb: &str) -> &PbSessionInfo {
+        let session = match self {
+            EnsureOutcome::Reused(session) => {
+                ui::headline(ui::Tone::Ok, &format!("{verb} reused"));
+                session
+            },
+            EnsureOutcome::Replaced {
+                stale_pid,
+                session,
+            } => {
+                ui::headline(ui::Tone::Change, &format!("{verb} replaced"));
+                ui::field("stale pid", &stale_pid.to_string());
+                session
+            },
+            EnsureOutcome::Spawned(session) => {
+                ui::headline(ui::Tone::Ok, &format!("{verb} started"));
+                session
+            },
+        };
+        ui::field("pid", &session.pid.to_string());
+        ui::field("key", &session.key);
+        ui::field("relay", &session.relay_addr);
+        ui::field("log", &session.log_file.display().to_string());
+        session
+    }
+}
+
+/// Outcome of stopping one recorded worker.
+#[derive(Debug, Clone)]
+pub(crate) enum StopOutcome {
+    /// The process existed and was signalled.
+    Stopped(PbSessionInfo),
+    /// The state entry existed but the process was already gone.
+    Stale(PbSessionInfo),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct StopFilter {
+    pub role: Option<PbRole>,
+    pub key: Option<String>,
+}
+
+/// Start or reuse the worker described by `spec`.
+///
+/// Before SPAWNING a register worker (never on the same-machine reuse path),
+/// the relay is asked whether the key already has a live publisher — starting
+/// a second publisher for the same key would make the two evict each other on
+/// the relay in an endless leapfrog (the duplicate-name register storm), so a
+/// name that is already online elsewhere is refused up front.
+pub(crate) async fn ensure(spec: PbWorkerSpec) -> Result<EnsureOutcome> {
+    ensure_with_exe(spec, std::env::current_exe().context("locating current executable")?).await
+}
+
+/// Replace exactly one verified standalone worker, leaving its local service
+/// running.
+pub(crate) async fn restart(role: PbRole, key: &str) -> Result<PbSessionInfo> {
+    use std::time::Duration;
+
+    use pocox_core::{
+        config::{Config, Mode},
+        process::{pb_worker_identity, pid_running},
+    };
+    let existing = RuntimeState::load()?
+        .find_pb(role, key)
+        .cloned()
+        .context("no recorded network worker for this role and key")?;
+    let identity = pb_worker_identity(&existing).context(
+        "recorded PID is not the matching standalone network worker; refusing to signal it",
+    )?;
+    let config = Config::load()?;
+    // Resolve credentials before signalling. A failed backend lookup must leave
+    // an existing worker untouched, and must never silently change its relay.
+    let session = if config.account_mode() == Mode::Account && key.starts_with("pcxu:") {
+        let transport = crate::commands::transport::resolve_transport(None, None, &config).await?;
+        let namespace = transport.namespace.context("account namespace missing")?;
+        if !key.starts_with(&format!("pcxu:{namespace}:")) {
+            bail!("recorded worker belongs to a different account");
+        }
+        transport.session
+    } else {
+        crate::commands::relay::resolve_session(Some(&existing.relay_addr), &config)?
+    };
+    if session.relay_addr != existing.relay_addr {
+        bail!("configured relay changed; refusing to retarget an existing worker");
+    }
+    let exe = std::env::current_exe().context("locating current executable")?;
+    if pb_worker_identity(&existing) != Some(identity.clone()) {
+        bail!("worker process changed during preflight");
+    }
+    send_sigterm(existing.pid);
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while pid_running(existing.pid) {
+            if pb_worker_identity(&existing) != Some(identity.clone()) {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .context("worker did not stop; no replacement was started")?;
+    let spec = PbWorkerSpec {
+        role,
+        key: key.to_string(),
+        local_addr: existing.local_addr.clone(),
+        session,
+        codec: existing.codec,
+    };
+    let replacement = spawn_worker(&spec, exe)?;
+    // Reload after the wait so independent sessions saved meanwhile survive.
+    let mut state = RuntimeState::load()?;
+    if state
+        .find_pb(role, key)
+        .is_none_or(|record| record.pid != existing.pid)
+    {
+        send_sigterm(replacement.pid);
+        bail!("worker record changed during restart; replacement stopped");
+    }
+    state.upsert_pb(replacement.clone());
+    if let Err(error) = state.save() {
+        send_sigterm(replacement.pid);
+        return Err(error.into());
+    }
+    tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            if !pid_running(replacement.pid) {
+                bail!("replacement worker exited; inspect its log");
+            }
+            if crate::commands::worker_health::read(&replacement).is_some() {
+                return Ok(());
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .context("replacement is recorded but runtime diagnostics are not ready")??;
+    Ok(replacement)
+}
+
+async fn ensure_with_exe(spec: PbWorkerSpec, exe: PathBuf) -> Result<EnsureOutcome> {
+    let mut state = RuntimeState::load()?;
+    if let Some(existing) = state.find_pb(spec.role, &spec.key).cloned() {
+        if pid_alive(existing.pid) {
+            return Ok(EnsureOutcome::Reused(existing));
+        }
+        state.remove_pb(spec.role, &spec.key);
+        ensure_relay_key_free(&spec).await?;
+        let session = spawn_worker(&spec, exe)?;
+        state.upsert_pb(session.clone());
+        state.save()?;
+        return Ok(EnsureOutcome::Replaced {
+            stale_pid: existing.pid,
+            session,
+        });
+    }
+
+    ensure_relay_key_free(&spec).await?;
+    let session = spawn_worker(&spec, exe)?;
+    state.upsert_pb(session.clone());
+    state.save()?;
+    Ok(EnsureOutcome::Spawned(session))
+}
+
+/// Refuse to publish a register key that already has a LIVE publisher on the
+/// relay (another machine/process owns the name). Best-effort and
+/// fail-open: an unreachable relay or an unknown key proves nothing wrong, so
+/// only a positive "healthy publisher connected" answer refuses — the worker's
+/// own register loop handles every transient condition.
+async fn ensure_relay_key_free(spec: &PbWorkerSpec) -> Result<()> {
+    if spec.role != PbRole::Register {
+        return Ok(());
+    }
+    match pocox_pb::service_connections(&spec.session, &spec.key).await {
+        Ok(conns) if conns.iter().any(|c| c.healthy) => bail!(
+            "`{}` is already registered and online on relay {} — another machine or process owns \
+             this name; stop that publisher or serve under a different name (a just-stopped \
+             publisher frees the key within seconds)",
+            spec.key,
+            spec.session.relay_addr,
+        ),
+        _ => Ok(()),
+    }
+}
+
+fn spawn_worker(spec: &PbWorkerSpec, exe: PathBuf) -> Result<PbSessionInfo> {
+    let log_file = paths::pb_log_file(spec.role, &spec.key)?;
+    if let Some(parent) = log_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let log_handle = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_file)?;
+    let log_handle_dup = log_handle.try_clone()?;
+
+    let child = Command::new(exe)
+        .args(pb_worker_args(spec))
+        // The credential travels in the environment rather than argv, where it
+        // would be visible to any process listing on the machine. The child
+        // resolves it back through the same `MSG_HEADER_KEY` precedence the
+        // parent used, so an explicit `--relay` keeps behaving the same way in
+        // both.
+        .env(CREDENTIAL_ENV, &spec.session.credential)
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(log_handle))
+        .stderr(Stdio::from(log_handle_dup))
+        .spawn()
+        .with_context(|| format!("spawning pb-mapper {:?} worker", spec.role))?;
+    let pid = child.id();
+    drop(child);
+
+    Ok(PbSessionInfo {
+        role: spec.role,
+        key: spec.key.clone(),
+        local_addr: spec.local_addr.clone(),
+        relay_addr: spec.session.relay_addr.clone(),
+        pid,
+        log_file,
+        codec: spec.codec,
+        started_at: Utc::now().to_rfc3339(),
+    })
+}
+
+/// Build argv for a hidden pb worker.
+pub(crate) fn pb_worker_args(spec: &PbWorkerSpec) -> Vec<String> {
+    let subcommand = match spec.role {
+        PbRole::Register => "pb-register",
+        PbRole::Subscribe => "pb-subscribe",
+    };
+    let mut args = vec![
+        "__worker".to_string(),
+        subcommand.to_string(),
+        "--key".to_string(),
+        spec.key.clone(),
+        "--local-addr".to_string(),
+        spec.local_addr.clone(),
+        "--relay".to_string(),
+        spec.session.relay_addr.clone(),
+    ];
+    if spec.role == PbRole::Register && spec.codec {
+        args.push("--codec".to_string());
+    }
+    args
+}
+
+/// Stop pb-mapper sessions matching `filter` and remove their state records.
+pub(crate) fn stop_matching(filter: StopFilter) -> Result<Vec<StopOutcome>> {
+    let mut state = RuntimeState::load()?;
+    let mut kept = Vec::new();
+    let mut outcomes = Vec::new();
+
+    for session in std::mem::take(&mut state.pb) {
+        if matches_filter(&session, &filter) {
+            if pid_alive(session.pid) {
+                send_sigterm(session.pid);
+                outcomes.push(StopOutcome::Stopped(session));
+            } else {
+                outcomes.push(StopOutcome::Stale(session));
+            }
+        } else {
+            kept.push(session);
+        }
+    }
+
+    state.pb = kept;
+    state.save()?;
+    Ok(outcomes)
+}
+
+fn matches_filter(session: &PbSessionInfo, filter: &StopFilter) -> bool {
+    filter.role.is_none_or(|role| role == session.role)
+        && filter.key.as_ref().is_none_or(|key| key == &session.key)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pb_worker_args_include_codec_only_for_register() {
+        let session = pocox_pb::RelaySession::for_test("relay.example:7666");
+        let register = PbWorkerSpec {
+            role: PbRole::Register,
+            key: "codex".into(),
+            local_addr: "127.0.0.1:18080".into(),
+            session: session.clone(),
+            codec: true,
+        };
+        let subscribe = PbWorkerSpec {
+            role: PbRole::Subscribe,
+            key: "codex".into(),
+            local_addr: "127.0.0.1:28080".into(),
+            session,
+            codec: true,
+        };
+
+        assert_eq!(pb_worker_args(&register), vec![
+            "__worker",
+            "pb-register",
+            "--key",
+            "codex",
+            "--local-addr",
+            "127.0.0.1:18080",
+            "--relay",
+            "relay.example:7666",
+            "--codec"
+        ]);
+        assert_eq!(pb_worker_args(&subscribe), vec![
+            "__worker",
+            "pb-subscribe",
+            "--key",
+            "codex",
+            "--local-addr",
+            "127.0.0.1:28080",
+            "--relay",
+            "relay.example:7666"
+        ]);
+    }
+}

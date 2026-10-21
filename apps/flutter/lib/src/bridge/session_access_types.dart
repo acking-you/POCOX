@@ -43,20 +43,20 @@ class SessionAccess {
   /// `write`, `follow` or `blocked`.
   final String mode;
 
-  /// `this_host`, `none`, `pocket_host`, `native_client` or `unknown`.
+  /// `this_host`, `none`, `pocox_host`, `native_client` or `unknown`.
   final String writer;
 
   /// `idle`, `running`, `unfinished` or `unknown`.
   final String turn;
 
-  /// What a write here excludes: `engine`, `pocket` or `none`; empty unless
+  /// What a write here excludes: `engine`, `pocox` or `none`; empty unless
   /// [mode] is `write`.
   final String exclusion;
 
   /// Stable reason code: `owned`, `released`, `released_here`,
   /// `transition`, `host_stopped`, `external_idle`, `external_running`,
   /// `external_open` (a client has it open; turn unknown),
-  /// `external_source_open`, `source_unknown`, `pocket_host`, `unsupported`
+  /// `external_source_open`, `source_unknown`, `pocox_host`, `unsupported`
   /// or `not_found`.
   final String reason;
 
@@ -90,7 +90,7 @@ class AccessHolder {
     this.serviceKey,
   });
 
-  /// `claude_code`, `opencode`, `pocket_host` or `unknown`.
+  /// `claude_code`, `opencode`, `pocox_host` or `unknown`.
   final String client;
 
   /// Process id, when known.
@@ -99,10 +99,10 @@ class AccessHolder {
   /// Process start time in epoch milliseconds, when known.
   final int? startedAt;
 
-  /// The holding Pocket host's instance name, when known.
+  /// The holding POCOX host's instance name, when known.
   final String? hostName;
 
-  /// The holding Pocket host's session service key; only with it can the
+  /// The holding POCOX host's session service key; only with it can the
   /// view navigate there.
   final String? serviceKey;
 }

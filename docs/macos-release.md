@@ -49,8 +49,8 @@ For a local build, set `MACOS_SIGNING_IDENTITY`, `APPLE_TEAM_ID`, and an existin
 
 ```sh
 python3 scripts/package_macos.py \
-  --app apps/flutter/build/macos/Build/Products/Release/pocket_codex.app \
-  --architecture arm64 --output /absolute/output/pocket-codex-macos-arm64.dmg
+  --app apps/flutter/build/macos/Build/Products/Release/pocox.app \
+  --architecture arm64 --output /absolute/output/pocox-macos-arm64.dmg
 python3 -m unittest discover -s scripts -p 'test_package_macos.py'
 ```
 

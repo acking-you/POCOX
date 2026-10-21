@@ -13,12 +13,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
-import 'package:pocket_codex/src/screens/app_session/agent_permission_card.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/voice/dictation_widgets.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/screens/app_session/agent_permission_card.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/voice/dictation_widgets.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';

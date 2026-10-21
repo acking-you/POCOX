@@ -2,7 +2,7 @@
 /// read from local history.
 library;
 
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// The running host of [hosts] that serves native [provider] sessions
 /// (`opencode`: the OpenCode host on OpenCode's default database, not one

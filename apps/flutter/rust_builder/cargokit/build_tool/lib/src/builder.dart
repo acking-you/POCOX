@@ -17,7 +17,7 @@ import 'util.dart';
 
 final _log = Logger('builder');
 
-/// (pocket-codex patch) Reads the `channel` from the nearest `rust-toolchain.toml`
+/// (pocox patch) Reads the `channel` from the nearest `rust-toolchain.toml`
 /// (or `rust-toolchain`), walking up from [startDir], so cargokit builds with the
 /// repo-pinned toolchain that `rustup` auto-installs. Returns null if none found.
 String? _rustToolchainChannel(String startDir) {
@@ -169,7 +169,7 @@ class RustBuilder {
   ///      from the crate), else
   ///   3. `stable`.
   ///
-  /// (pocket-codex patch) Upstream cargokit always runs `rustup run stable`,
+  /// (pocox patch) Upstream cargokit always runs `rustup run stable`,
   /// which silently ignores `rust-toolchain.toml` and uses whatever `stable` the
   /// developer happens to have installed. Our embedded codex pins a minimum
   /// rustc (`deps/codex/codex-rs/rust-toolchain.toml`), so honouring the repo's

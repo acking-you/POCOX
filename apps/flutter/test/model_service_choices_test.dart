@@ -5,19 +5,19 @@
 // may wrap but never cuts a name short. Pointer and keyboard choose, the
 // choice is announced as selected, and a disabled section chooses nothing.
 //
-// Set PCX_UI_PREVIEW_DIR to also write each case as a PNG for review.
+// Set POCOX_UI_PREVIEW_DIR to also write each case as a PNG for review.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/model_service_section.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/model_service_section.dart';
+import 'package:pocox/src/theme.dart';
 
 import 'support/ui_preview.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 const _sizes = [
   ('phone320', Size(320, 640)),

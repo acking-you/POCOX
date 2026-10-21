@@ -10,8 +10,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -33,7 +33,7 @@ SessionAccess _access({
   mode: 'follow',
   writer: writer,
   turn: turn,
-  exclusion: 'pocket',
+  exclusion: 'pocox',
   reason: reason,
   recheck: true,
 );

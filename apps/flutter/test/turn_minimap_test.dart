@@ -5,7 +5,7 @@ import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/turn_minimap.dart';
+import 'package:pocox/src/widgets/turn_minimap.dart';
 
 List<TurnMinimapItem> _items(int count) => [
   for (var i = 0; i < count; i++)

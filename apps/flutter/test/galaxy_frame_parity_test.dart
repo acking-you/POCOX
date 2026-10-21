@@ -1,7 +1,7 @@
 // The galaxy's frames come from Rust in the app and from the Dart port in
 // tests; this compares the two on the built bridge library. Opt-in:
 //
-//   PCX_BRIDGE_LIBRARY=<path to libpocket_codex_bridge.{dylib,so} or .dll> \
+//   POCOX_BRIDGE_LIBRARY=<path to libpocox_bridge.{dylib,so} or .dll> \
 //     fvm flutter test test/galaxy_frame_parity_test.dart
 import 'dart:ffi' hide Size;
 import 'dart:io';
@@ -9,10 +9,10 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_backdrop.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_frame.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
 import 'galaxy_test.dart' show fixture;
 
@@ -49,11 +49,11 @@ ToolsOverview _overview(int extra) {
 }
 
 void main() {
-  final path = Platform.environment['PCX_BRIDGE_LIBRARY'];
+  final path = Platform.environment['POCOX_BRIDGE_LIBRARY'];
 
   test('Rust and Dart compute the same galaxy frames', () {
     if (path == null) {
-      markTestSkipped('set PCX_BRIDGE_LIBRARY to the built bridge library');
+      markTestSkipped('set POCOX_BRIDGE_LIBRARY to the built bridge library');
       return;
     }
     final scene = buildScene(_overview(14));

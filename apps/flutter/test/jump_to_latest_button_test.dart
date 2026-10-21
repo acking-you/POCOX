@@ -3,9 +3,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/jump_to_latest_button.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/jump_to_latest_button.dart';
 
 import 'support/ui_preview.dart';
 

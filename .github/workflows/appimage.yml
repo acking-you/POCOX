@@ -44,7 +44,7 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           mkdir input
           gh release download "$RELEASE_TAG" --dir input \
-            --pattern "pocket-codex-app-$RELEASE_TAG-linux-x64.zip" \
+            --pattern "pocox-app-$RELEASE_TAG-linux-x64.zip" \
             --pattern 'release-manifest.json*'
           python3 scripts/release_manifest.py verify input/release-manifest.json \
             --public scripts/update_signing_key.pub.pem
@@ -54,7 +54,7 @@ jobs:
           manifest = json.loads(Path('input/release-manifest.json').read_text())
           assert manifest['tag'] == os.environ['RELEASE_TAG']
           assert re.fullmatch(r'[0-9a-f]{40}', manifest['commit'])
-          archive = Path('input') / f"pocket-codex-app-{manifest['tag']}-linux-x64.zip"
+          archive = Path('input') / f"pocox-app-{manifest['tag']}-linux-x64.zip"
           entry, = [a for a in manifest['assets'] if a['name'] == archive.name]
           assert archive.stat().st_size == entry['size']
           assert hashlib.file_digest(archive.open('rb'), 'sha256').hexdigest() == entry['sha256']
@@ -65,7 +65,7 @@ jobs:
           gh api -H 'Accept: application/vnd.github.raw' \
             "repos/$GITHUB_REPOSITORY/contents/apps/flutter/icon/icon_glyph.png?ref=$source_commit" \
             > input/icon_glyph.png
-          unzip -q "input/pocket-codex-app-$RELEASE_TAG-linux-x64.zip" -d bundle
+          unzip -q "input/pocox-app-$RELEASE_TAG-linux-x64.zip" -d bundle
       - name: Install packaging dependencies
         run: |
           sudo apt-get update
@@ -75,9 +75,9 @@ jobs:
       - name: Package
         run: |
           bash scripts/package_appimage.sh bundle input/icon_glyph.png \
-            "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage"
+            "dist/pocox-app-$RELEASE_TAG-linux-x86_64.AppImage"
       - name: Verify dependencies and offline startup in a clean desktop
-        run: bash scripts/test_appimage.sh "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
+        run: bash scripts/test_appimage.sh "dist/pocox-app-$RELEASE_TAG-linux-x86_64.AppImage" "$RUNNER_TEMP/appimage-preview"
       - uses: actions/upload-artifact@v4
         with:
           name: appimage-preview
@@ -113,7 +113,7 @@ jobs:
           # Read the current manifest, not an earlier snapshot from the build.
           gh release download "$RELEASE_TAG" --dir dist --pattern 'release-manifest.json*'
           python3 scripts/release_manifest.py refresh-asset dist/release-manifest.json \
-            "dist/pocket-codex-app-$RELEASE_TAG-linux-x86_64.AppImage" \
+            "dist/pocox-app-$RELEASE_TAG-linux-x86_64.AppImage" \
             --public scripts/update_signing_key.pub.pem
           key=$(mktemp)
           trap 'rm -f "$key"' EXIT

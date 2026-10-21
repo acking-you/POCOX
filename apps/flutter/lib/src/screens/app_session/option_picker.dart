@@ -8,10 +8,10 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// At most this many values open as a plain menu; more open the searchable
 /// list.

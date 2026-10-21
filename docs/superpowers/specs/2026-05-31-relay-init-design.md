@@ -1,4 +1,4 @@
-# 设计:`pocket-codex init` + relay 配置持久化 + connect 超时修复
+# 设计:`pocox init` + relay 配置持久化 + connect 超时修复
 
 - 日期:2026-05-31
 - 分支:`feature/relay-init`
@@ -6,14 +6,14 @@
 
 ## 背景与动机
 
-`pocket-codex services list`（以及任何走 relay 发现/状态查询的命令）在某些
+`pocox services list`（以及任何走 relay 发现/状态查询的命令）在某些
 环境下会“卡死”。实测定位到两个互相叠加的根因:
 
 1. **默认 relay 指向死地址。** `PbRelayArgs.relay` 当前是 required，通过
    clap 的 `env = "PB_MAPPER_SERVER"` 回落。用户 shell 里
    `PB_MAPPER_SERVER=8.138.13.158:7666` 是一台**不可达**的 relay；活着的是
    `lb7666.top:7666`。不带 `--relay` 时就落到死地址。
-2. **代码缺连接超时。** `pocket-codex-pb::query_status` 里的
+2. **代码缺连接超时。** `pocox-pb::query_status` 里的
    `TcpStream::connect` 没有超时包裹。连不可达主机时卡满内核 TCP connect
    超时（`tcp_syn_retries=6` ≈ **123 秒**），对用户就是“卡死”。
 
@@ -47,7 +47,7 @@ A/B 实测（同机）:
 | 1 | relay 解析优先级 | `flag > config > env`（init 治本，不被陈旧 env 遮蔽） |
 | 2 | key 存储 | 写入 `config.toml` + `save()` 时 `chmod 0600`（unix） |
 | 3 | 是否修 connect 超时 | 修：给发现/状态查询加有界连接超时 |
-| 4 | 命令形态 | 顶层 `pocket-codex init` |
+| 4 | 命令形态 | 顶层 `pocox init` |
 | 5 | 可脚本化 | 交互优先 + `--relay`/`--key` flag 可跳过 |
 | 6 | init 校验 | 默认连通校验 + `--no-verify` 跳过 |
 | 7 | key 解析优先级 | `config > env`，与 relay 对称，init 一锤定音 |
@@ -56,7 +56,7 @@ A/B 实测（同机）:
 
 ### 1. 命令面（userspace 契约）
 
-新增顶层子命令 `pocket-codex init`，`InitArgs`:
+新增顶层子命令 `pocox init`，`InitArgs`:
 
 - `--relay <url>`（可选）— 省略且 stdin 为 TTY 时交互提示，默认值预填现有
   config 的 relay。
@@ -107,7 +107,7 @@ resolve_relay(flag: Option<&str>, config: &Config) -> Result<String>
   = flag(非空)
   > config.pb_mapper.relay
   > $PB_MAPPER_SERVER env
-  > Err("no relay configured; run `pocket-codex init` or pass --relay")
+  > Err("no relay configured; run `pocox init` or pass --relay")
 ```
 
 7 个命令文件、共 19 处 `args.relay.relay` 引用统一改调 `resolve_relay`
@@ -119,7 +119,7 @@ resolve_relay(flag: Option<&str>, config: &Config) -> Result<String>
 之前）加载 config:
 
 - `config.pb_mapper.key == Some(k)` → 调
-  `pocket_codex_pb::set_process_msg_header_key(Some(k))`。该上游函数同时:
+  `pocox_pb::set_process_msg_header_key(Some(k))`。该上游函数同时:
   ① `set_var(MSG_HEADER_KEY)`（供 spawn 的 worker 子进程继承——已确认
   `spawn_worker` 用 `Command::new(exe).args(...)` 且**无** `.env_clear()`，
   默认继承父 env）；② 更新本进程运行时 key（供进程内发现查询）。
@@ -127,13 +127,13 @@ resolve_relay(flag: Option<&str>, config: &Config) -> Result<String>
   （向后兼容）。
 
 即 key 优先级 **config > env**，与 relay 对称，init 一锤定音。
-`set_process_msg_header_key` 经 `pocket_codex_pb` 薄封装暴露，使
-`pocket-codex-pb` 仍是与 pb-mapper 交互的唯一边界；其内部 `set_var`/`unsafe`
+`set_process_msg_header_key` 经 `pocox_pb` 薄封装暴露，使
+`pocox-pb` 仍是与 pb-mapper 交互的唯一边界；其内部 `set_var`/`unsafe`
 封装在上游 crate，本仓库各 crate 的 `#![forbid(unsafe_code)]` 不受影响。
 
 ### 4. connect 无超时修复
 
-`pocket-codex-pb::query_status` 里的 `TcpStream::connect` 用
+`pocox-pb::query_status` 里的 `TcpStream::connect` 用
 `tokio::time::timeout` 包裹（默认 5s，时长可注入以便测试），超时给清晰错误
 `connecting to pb-mapper relay {addr} timed out after {d:?}`。覆盖
 `keys()` → `discover_services` → `services list`，以及
@@ -167,9 +167,9 @@ resolve_relay(flag: Option<&str>, config: &Config) -> Result<String>
 
 ## 验收标准
 
-- `pocket-codex init --relay lb7666.top:7666 --key <32B>` 写盘成功（0600），
+- `pocox init --relay lb7666.top:7666 --key <32B>` 写盘成功（0600），
   连通校验打印服务数。
-- 之后 `pocket-codex services list`（不带 `--relay`）走 config，秒回。
+- 之后 `pocox services list`（不带 `--relay`）走 config，秒回。
 - shell 里残留 `PB_MAPPER_SERVER=<死地址>` 时，config 仍优先，不再卡死。
 - 指向死 relay 时，命令在 ~5s 内报超时错误，而非挂 123s。
 - 既有 `--relay` 显式用法、`$PB_MAPPER_SERVER` 回落（无 config 时）保持可用。

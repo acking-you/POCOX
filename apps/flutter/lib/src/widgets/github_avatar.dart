@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/network/network_image.dart';
+import 'package:pocox/src/network/network_image.dart';
 import 'package:flutter/material.dart';
 
 /// When an account id's avatar fetch last failed. Flutter's image cache does not

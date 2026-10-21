@@ -6,7 +6,7 @@
 
 // Set in main.cpp: the RegisterWindowMessage id a second launch broadcasts to
 // ask this (already-running) instance to surface its window.
-extern UINT g_pocket_codex_show_msg;
+extern UINT g_pocox_show_msg;
 
 namespace {
 
@@ -91,7 +91,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               LPARAM const lparam) noexcept {
   // A second launch asked us to surface (see main.cpp). The id is unique to
   // this app, so only our own windows ever receive it.
-  if (message == g_pocket_codex_show_msg && g_pocket_codex_show_msg != 0) {
+  if (message == g_pocox_show_msg && g_pocox_show_msg != 0) {
     ForceForegroundWindow(GetHandle());
     return 0;
   }

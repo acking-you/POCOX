@@ -10,14 +10,14 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_backdrop.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_sprites.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_view.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_backdrop.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_frame.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_sprites.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_view.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
 
 /// The colours of one theme.
 class GalaxyPalette {

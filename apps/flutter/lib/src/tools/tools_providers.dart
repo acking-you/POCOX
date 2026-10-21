@@ -3,8 +3,8 @@
 library;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
 
 /// The live stream of updates from every device's catalog. Kept alive by the
 /// app-wide [ToolsHost], so every page reads the same subscription.

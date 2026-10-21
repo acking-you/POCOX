@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/services_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';
 
-const _manager = 'pcx:studio:host:pocket';
+const _manager = 'pcx:studio:host:pocox';
 const _windows = DeviceMetadata(
   os: 'windows',
   arch: 'x86_64',
@@ -48,7 +48,7 @@ FakeBridgeApi _sameNameWsl({bool localHost = false}) {
             ServiceEntry(
               device: 'studio',
               kind: 'host',
-              name: 'pocket',
+              name: 'pocox',
               key: _manager,
             ),
           ],
@@ -218,16 +218,11 @@ void main() {
         ?identity.source?.toLowerCase(),
       ].join('-');
       final device = '$source.studio.${id.replaceAll('-', '')}';
-      final manager = 'pcx:$device:host:pocket';
+      final manager = 'pcx:$device:host:pocox';
       devices.add(device);
       managers.add(manager);
       api.services.add(
-        ServiceEntry(
-          device: device,
-          kind: 'host',
-          name: 'pocket',
-          key: manager,
-        ),
+        ServiceEntry(device: device, kind: 'host', name: 'pocox', key: manager),
       );
       api.managedDevices[manager] = ManagedDevice(
         device: device,

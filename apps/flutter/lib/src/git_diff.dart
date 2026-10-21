@@ -2,7 +2,7 @@
 /// Avoids a heavy dependency — codex returns a standard `git diff`.
 library;
 
-import 'package:pocket_codex/src/lru_cache.dart';
+import 'package:pocox/src/lru_cache.dart';
 
 /// Diffs already parsed, by their text: a transcript rebuilds its edit cards
 /// and the review reads every edit again, and a long diff is costly to split.

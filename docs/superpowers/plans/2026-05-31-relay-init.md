@@ -1,10 +1,10 @@
-# `pocket-codex init` + relay config + connect timeout — Implementation Plan
+# `pocox init` + relay config + connect timeout — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add an interactive `pocket-codex init` that persists the relay URL + `MSG_HEADER_KEY` to `config.toml` (0600), make those the default for all commands (precedence `flag > config > env`), and bound the relay connect so a dead relay fails in ~5s instead of hanging ~123s.
+**Goal:** Add an interactive `pocox init` that persists the relay URL + `MSG_HEADER_KEY` to `config.toml` (0600), make those the default for all commands (precedence `flag > config > env`), and bound the relay connect so a dead relay fails in ~5s instead of hanging ~123s.
 
-**Architecture:** Three crates change. `pocket-codex-core` gains a `key` field on `PbMapperConfig`, 0600 save, and relay/key accessors. `pocket-codex-pb` wraps the upstream `set_process_msg_header_key` and adds a connect timeout to `query_status`. `pocket-codex-cli` adds the `init` command, a `relay` resolution module, a `dispatch` key-application hook, and switches every relay call site from a required arg to `resolve_relay(flag, &config)`.
+**Architecture:** Three crates change. `pocox-core` gains a `key` field on `PbMapperConfig`, 0600 save, and relay/key accessors. `pocox-pb` wraps the upstream `set_process_msg_header_key` and adds a connect timeout to `query_status`. `pocox-cli` adds the `init` command, a `relay` resolution module, a `dispatch` key-application hook, and switches every relay call site from a required arg to `resolve_relay(flag, &config)`.
 
 **Tech Stack:** Rust 2021, clap, tokio (`features=["full"]`), toml, anyhow, the vendored pb-mapper crate.
 
@@ -14,14 +14,14 @@
 
 ## File Structure
 
-- `crates/pocket-codex-core/src/config.rs` — add `PbMapperConfig.key`, accessors, 0600 save.
-- `crates/pocket-codex-pb/src/session.rs` — connect timeout in `query_status`; wrap `set_process_msg_header_key`.
-- `crates/pocket-codex-pb/src/lib.rs` — re-export the wrapper.
-- `crates/pocket-codex-cli/src/cli.rs` — `Init` command + `InitArgs`; `PbRelayArgs.relay` → `Option<String>`.
-- `crates/pocket-codex-cli/src/commands/relay.rs` — NEW: `resolve_relay`, `apply_configured_key`, `normalize_relay`, `validate_key`.
-- `crates/pocket-codex-cli/src/commands/init.rs` — NEW: interactive `init` flow.
-- `crates/pocket-codex-cli/src/commands/mod.rs` — register modules, dispatch hook + `Init` arm.
-- `crates/pocket-codex-cli/src/commands/{services,connect,pb,serve,api,worker,remote_hint}.rs` — call `resolve_relay` (all 7 relay call sites).
+- `crates/pocox-core/src/config.rs` — add `PbMapperConfig.key`, accessors, 0600 save.
+- `crates/pocox-pb/src/session.rs` — connect timeout in `query_status`; wrap `set_process_msg_header_key`.
+- `crates/pocox-pb/src/lib.rs` — re-export the wrapper.
+- `crates/pocox-cli/src/cli.rs` — `Init` command + `InitArgs`; `PbRelayArgs.relay` → `Option<String>`.
+- `crates/pocox-cli/src/commands/relay.rs` — NEW: `resolve_relay`, `apply_configured_key`, `normalize_relay`, `validate_key`.
+- `crates/pocox-cli/src/commands/init.rs` — NEW: interactive `init` flow.
+- `crates/pocox-cli/src/commands/mod.rs` — register modules, dispatch hook + `Init` arm.
+- `crates/pocox-cli/src/commands/{services,connect,pb,serve,api,worker,remote_hint}.rs` — call `resolve_relay` (all 7 relay call sites).
 - `README.md`, `docs/cli-verification.md` — document `init`, precedence, timeout.
 
 ---
@@ -29,8 +29,8 @@
 ### Task 1: `PbMapperConfig.key` + relay/key accessors + 0600 save
 
 **Files:**
-- Modify: `crates/pocket-codex-core/src/config.rs`
-- Test: `crates/pocket-codex-core/src/config.rs` (inline `#[cfg(test)] mod tests`)
+- Modify: `crates/pocox-core/src/config.rs`
+- Test: `crates/pocox-core/src/config.rs` (inline `#[cfg(test)] mod tests`)
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -67,7 +67,7 @@ Add to the existing `mod tests` block in `config.rs`:
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cargo test -p pocket-codex-core relay_and_key --locked`
+Run: `cargo test -p pocox-core relay_and_key --locked`
 Expected: FAIL — `no method named relay`/`set_relay` on `Config`.
 
 - [ ] **Step 3: Add the `key` field and accessors**
@@ -118,7 +118,7 @@ Add these methods inside `impl Config` (after `set_default_service`):
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `cargo test -p pocket-codex-core relay_and_key empty_relay_or_key --locked`
+Run: `cargo test -p pocox-core relay_and_key empty_relay_or_key --locked`
 Expected: PASS (both tests).
 
 - [ ] **Step 5: Tighten `save()` to 0600 on unix**
@@ -146,13 +146,13 @@ Replace the body of `Config::save` in `config.rs` with:
 
 - [ ] **Step 6: Verify the whole core crate still builds + tests**
 
-Run: `cargo test -p pocket-codex-core --locked`
+Run: `cargo test -p pocox-core --locked`
 Expected: PASS (all tests).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add crates/pocket-codex-core/src/config.rs
+git add crates/pocox-core/src/config.rs
 git commit -m "feat(core): add relay key to config, accessors, 0600 save"
 ```
 
@@ -161,8 +161,8 @@ git commit -m "feat(core): add relay key to config, accessors, 0600 save"
 ### Task 2: pb crate — connect timeout in `query_status`
 
 **Files:**
-- Modify: `crates/pocket-codex-pb/src/session.rs`
-- Test: `crates/pocket-codex-pb/src/session.rs` (inline `#[cfg(test)] mod tests`)
+- Modify: `crates/pocox-pb/src/session.rs`
+- Test: `crates/pocox-pb/src/session.rs` (inline `#[cfg(test)] mod tests`)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -192,7 +192,7 @@ mod tests {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test -p pocket-codex-pb connect_relay_errors_fast --locked`
+Run: `cargo test -p pocox-pb connect_relay_errors_fast --locked`
 Expected: FAIL — `cannot find function connect_relay`.
 
 - [ ] **Step 3: Add `connect_relay` and route `query_status` through it**
@@ -238,13 +238,13 @@ async fn query_status(relay_addr: SocketAddr, req: PbConnStatusReq) -> Result<Pb
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `cargo test -p pocket-codex-pb connect_relay_errors_fast --locked`
+Run: `cargo test -p pocox-pb connect_relay_errors_fast --locked`
 Expected: PASS (returns within 3s with an error).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add crates/pocket-codex-pb/src/session.rs
+git add crates/pocox-pb/src/session.rs
 git commit -m "fix(pb): bound relay connect so a dead relay fails fast"
 ```
 
@@ -253,9 +253,9 @@ git commit -m "fix(pb): bound relay connect so a dead relay fails fast"
 ### Task 3: pb crate — wrap and re-export `set_process_msg_header_key`
 
 **Files:**
-- Modify: `crates/pocket-codex-pb/src/session.rs`
-- Modify: `crates/pocket-codex-pb/src/lib.rs`
-- Test: `crates/pocket-codex-pb/src/session.rs` (extend the `mod tests` from Task 2)
+- Modify: `crates/pocox-pb/src/session.rs`
+- Modify: `crates/pocox-pb/src/lib.rs`
+- Test: `crates/pocox-pb/src/session.rs` (extend the `mod tests` from Task 2)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -272,7 +272,7 @@ Add to the `mod tests` block in `session.rs`:
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `cargo test -p pocket-codex-pb set_msg_header_key_rejects --locked`
+Run: `cargo test -p pocox-pb set_msg_header_key_rejects --locked`
 Expected: FAIL — `cannot find function set_msg_header_key`.
 
 - [ ] **Step 3: Add the wrapper**
@@ -309,13 +309,13 @@ pub use session::{
 
 - [ ] **Step 5: Run test to verify it passes**
 
-Run: `cargo test -p pocket-codex-pb set_msg_header_key_rejects --locked`
+Run: `cargo test -p pocox-pb set_msg_header_key_rejects --locked`
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add crates/pocket-codex-pb/src/session.rs crates/pocket-codex-pb/src/lib.rs
+git add crates/pocox-pb/src/session.rs crates/pocox-pb/src/lib.rs
 git commit -m "feat(pb): expose set_msg_header_key wrapper"
 ```
 
@@ -328,14 +328,14 @@ call sites at once, so they migrate together. The crate only compiles again
 after every site is updated — the green checkpoint is Step 11.
 
 **Files:**
-- Create: `crates/pocket-codex-cli/src/commands/relay.rs`
-- Modify: `crates/pocket-codex-cli/src/cli.rs` (PbRelayArgs + 4 test asserts)
-- Modify: `crates/pocket-codex-cli/src/commands/mod.rs` (register module + hook)
-- Modify: `crates/pocket-codex-cli/src/commands/{services,connect,pb,serve,api,worker,remote_hint}.rs`
+- Create: `crates/pocox-cli/src/commands/relay.rs`
+- Modify: `crates/pocox-cli/src/cli.rs` (PbRelayArgs + 4 test asserts)
+- Modify: `crates/pocox-cli/src/commands/mod.rs` (register module + hook)
+- Modify: `crates/pocox-cli/src/commands/{services,connect,pb,serve,api,worker,remote_hint}.rs`
 
 - [ ] **Step 1: Write the pure-resolution unit test**
 
-Put this in the new file `crates/pocket-codex-cli/src/commands/relay.rs` as its
+Put this in the new file `crates/pocox-cli/src/commands/relay.rs` as its
 `#[cfg(test)] mod tests` (implementation lands in Step 2):
 
 ```rust
@@ -376,7 +376,7 @@ mod tests {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cargo test -p pocket-codex-cli flag_wins_over_config --locked`
+Run: `cargo test -p pocox-cli flag_wins_over_config --locked`
 Expected: FAIL — `relay` module / `resolve_relay_from` not found (won't compile yet).
 
 - [ ] **Step 3: Implement `relay.rs` (resolution + key hook)**
@@ -384,7 +384,7 @@ Expected: FAIL — `relay` module / `resolve_relay_from` not found (won't compil
 Prepend this above the test module written in Step 1:
 
 ```rust
-//! Relay address + shared-key resolution for `pocket-codex` commands.
+//! Relay address + shared-key resolution for `pocox` commands.
 //!
 //! Precedence is `flag > config > $PB_MAPPER_SERVER`. The shared
 //! `MSG_HEADER_KEY` is applied once per process in [`apply_configured_key`]
@@ -392,7 +392,7 @@ Prepend this above the test module written in Step 1:
 //! on it.
 
 use anyhow::{anyhow, Result};
-use pocket_codex_core::config::Config;
+use pocox_core::config::Config;
 
 /// Environment variable pb-mapper and the CLI both read for the relay.
 const RELAY_ENV: &str = "PB_MAPPER_SERVER";
@@ -410,7 +410,7 @@ fn resolve_relay_from(
         .find(|s| !s.is_empty())
         .map(ToString::to_string)
         .ok_or_else(|| {
-            anyhow!("no relay configured; run `pocket-codex init` or pass --relay <host:port>")
+            anyhow!("no relay configured; run `pocox init` or pass --relay <host:port>")
         })
 }
 
@@ -436,7 +436,7 @@ pub(crate) fn apply_configured_key() {
         return;
     };
     if let Some(key) = config.relay_key() {
-        if let Err(err) = pocket_codex_pb::set_msg_header_key(Some(key)) {
+        if let Err(err) = pocox_pb::set_msg_header_key(Some(key)) {
             tracing::warn!("ignoring configured relay key: {err}");
         }
     }
@@ -446,7 +446,7 @@ pub(crate) fn apply_configured_key() {
 
 - [ ] **Step 5: Register the module + dispatch hook in `mod.rs`**
 
-In `crates/pocket-codex-cli/src/commands/mod.rs`, add `mod relay;` to the module
+In `crates/pocox-cli/src/commands/mod.rs`, add `mod relay;` to the module
 list (alphabetical, after `mod pb;`). Then change `dispatch` so the key hook runs
 before any command:
 
@@ -484,7 +484,7 @@ Replace the `PbRelayArgs` struct in `cli.rs`:
 #[derive(Debug, Args, Clone)]
 pub struct PbRelayArgs {
     /// `host:port` of the upstream pb-mapper relay. When omitted, falls
-    /// back to the configured relay (`pocket-codex init`) and then
+    /// back to the configured relay (`pocox init`) and then
     /// `$PB_MAPPER_SERVER`.
     #[arg(long)]
     pub relay: Option<String>,
@@ -509,7 +509,7 @@ In `services::list`, resolve before discovery:
 ```rust
 async fn list(args: ServicesListArgs) -> Result<()> {
     let kind = args.kind.map(ServiceKind::from);
-    let config = pocket_codex_core::config::Config::load()?;
+    let config = pocox_core::config::Config::load()?;
     let relay = crate::commands::relay::resolve_relay(args.relay.relay.as_deref(), &config)?;
     let mut services = discover_services(&relay).await?;
     services.retain(|id| kind.is_none_or(|kind| id.kind == kind));
@@ -550,7 +550,7 @@ Replace the body from the `let config = Config::load()?;` line through the
 
 - [ ] **Step 9: Update `pb.rs` call sites (register, subscribe, status)**
 
-In `pb.rs`, add `use pocket_codex_core::config::Config;` to the imports. Then
+In `pb.rs`, add `use pocox_core::config::Config;` to the imports. Then
 resolve the relay at the top of each handler.
 
 `register`:
@@ -598,8 +598,8 @@ async fn status(args: PbStatusArgs) -> Result<()> {
 
 - [ ] **Step 10: Update `serve.rs` call site**
 
-In `serve.rs`, add `config::Config` to the existing `pocket_codex_core::{...}`
-import group (so it reads `use pocket_codex_core::{config::Config,
+In `serve.rs`, add `config::Config` to the existing `pocox_core::{...}`
+import group (so it reads `use pocox_core::{config::Config,
 service::{...}, state::PbRole};`). In `run`, resolve the relay right after
 computing `key` (before `spawn`):
 
@@ -657,7 +657,7 @@ and the `managed_pb::ensure` `relay_addr: args.relay.relay` → `relay_addr: rel
 
 The parent always passes `--relay` to workers, but route through `resolve_relay`
 for one consistent path. In `worker.rs`, add
-`use pocket_codex_core::config::Config;` and resolve per arm:
+`use pocox_core::config::Config;` and resolve per arm:
 
 ```rust
         WorkerCmd::PbRegister(args) => {
@@ -694,7 +694,7 @@ relay into `remote_hint_lines` (which changes signature to take `relay: &str`).
 ```rust
 /// Print a copy-pasteable hint.
 pub fn run(args: RemoteHintArgs) -> Result<()> {
-    let config = pocket_codex_core::config::Config::load()?;
+    let config = pocox_core::config::Config::load()?;
     let relay = crate::commands::relay::resolve_relay(args.relay.relay.as_deref(), &config)?;
     for line in remote_hint_lines(&args, &relay) {
         if let Some(comment) = line.strip_prefix('#') {
@@ -712,7 +712,7 @@ fn remote_hint_lines(args: &RemoteHintArgs, relay: &str) -> Vec<String> {
     vec![
         "# On the client device, run:".into(),
         format!(
-            "pocket-codex connect --key {key} --local-addr {local} --relay {relay}",
+            "pocox connect --key {key} --local-addr {local} --relay {relay}",
             key = args.key,
             local = args.local_addr,
         ),
@@ -741,7 +741,7 @@ Update its test to pass `Some(..)` for the optional relay and the new
         );
 
         assert!(lines.iter().any(|line| line
-            == "pocket-codex connect --key codex --local-addr 127.0.0.1:28080 --relay \
+            == "pocox connect --key codex --local-addr 127.0.0.1:28080 --relay \
                 relay.example:7666"));
         assert!(lines
             .iter()
@@ -756,38 +756,38 @@ Expected: compiles clean (no `args.relay.relay` type errors remaining).
 
 - [ ] **Step 15: Run CLI + workspace tests**
 
-Run: `cargo test -p pocket-codex-cli --locked`
+Run: `cargo test -p pocox-cli --locked`
 Expected: PASS, including the four new `relay::tests` and the updated asserts.
 
 - [ ] **Step 16: Commit**
 
 ```bash
-git add crates/pocket-codex-cli/src/cli.rs \
-        crates/pocket-codex-cli/src/commands/relay.rs \
-        crates/pocket-codex-cli/src/commands/mod.rs \
-        crates/pocket-codex-cli/src/commands/services.rs \
-        crates/pocket-codex-cli/src/commands/connect.rs \
-        crates/pocket-codex-cli/src/commands/pb.rs \
-        crates/pocket-codex-cli/src/commands/serve.rs \
-        crates/pocket-codex-cli/src/commands/api.rs \
-        crates/pocket-codex-cli/src/commands/worker.rs \
-        crates/pocket-codex-cli/src/commands/remote_hint.rs
+git add crates/pocox-cli/src/cli.rs \
+        crates/pocox-cli/src/commands/relay.rs \
+        crates/pocox-cli/src/commands/mod.rs \
+        crates/pocox-cli/src/commands/services.rs \
+        crates/pocox-cli/src/commands/connect.rs \
+        crates/pocox-cli/src/commands/pb.rs \
+        crates/pocox-cli/src/commands/serve.rs \
+        crates/pocox-cli/src/commands/api.rs \
+        crates/pocox-cli/src/commands/worker.rs \
+        crates/pocox-cli/src/commands/remote_hint.rs
 git commit -m "feat(cli): resolve relay via flag>config>env, apply configured key"
 ```
 
 ---
 
-### Task 5: `pocket-codex init` command
+### Task 5: `pocox init` command
 
 **Files:**
-- Create: `crates/pocket-codex-cli/src/commands/init.rs`
-- Modify: `crates/pocket-codex-cli/src/cli.rs` (Init command + InitArgs)
-- Modify: `crates/pocket-codex-cli/src/commands/mod.rs` (mod + dispatch arm)
-- Test: `crates/pocket-codex-cli/src/commands/init.rs` (inline tests)
+- Create: `crates/pocox-cli/src/commands/init.rs`
+- Modify: `crates/pocox-cli/src/cli.rs` (Init command + InitArgs)
+- Modify: `crates/pocox-cli/src/commands/mod.rs` (mod + dispatch arm)
+- Test: `crates/pocox-cli/src/commands/init.rs` (inline tests)
 
 - [ ] **Step 1: Write failing tests for the pure helpers**
 
-Create `crates/pocket-codex-cli/src/commands/init.rs` containing only its test
+Create `crates/pocox-cli/src/commands/init.rs` containing only its test
 module for now (implementation lands in Step 3):
 
 ```rust
@@ -821,7 +821,7 @@ mod tests {
 
 - [ ] **Step 2: Run to verify it fails**
 
-Run: `cargo test -p pocket-codex-cli normalize_relay --locked`
+Run: `cargo test -p pocox-cli normalize_relay --locked`
 Expected: FAIL — `init` module / `normalize_relay` not found (won't compile).
 
 - [ ] **Step 3: Implement `init.rs` (header + pure helpers)**
@@ -829,7 +829,7 @@ Expected: FAIL — `init` module / `normalize_relay` not found (won't compile).
 Prepend above the test module:
 
 ```rust
-//! `pocket-codex init`: interactively persist the default relay + key.
+//! `pocox init`: interactively persist the default relay + key.
 //!
 //! Stores `host:port` and the shared `MSG_HEADER_KEY` in `config.toml`
 //! (0600) so later commands need neither `--relay` nor an exported
@@ -837,7 +837,7 @@ Prepend above the test module:
 //! `--no-verify` is passed.
 
 use anyhow::{anyhow, bail, Result};
-use pocket_codex_core::config::Config;
+use pocox_core::config::Config;
 
 use crate::{
     cli::InitArgs,
@@ -892,7 +892,7 @@ fn prompt(label: &str, default_hint: Option<&str>) -> Result<Option<String>> {
     Ok((!trimmed.is_empty()).then(|| trimmed.to_string()))
 }
 
-/// Run `pocket-codex init`.
+/// Run `pocox init`.
 pub async fn run(args: InitArgs) -> Result<()> {
     let mut config = Config::load()?;
 
@@ -918,7 +918,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
     if !args.no_verify {
         // Apply the new key to this process so discovery validates with it,
         // then probe the relay (bounded by the connect timeout from Task 2).
-        pocket_codex_pb::set_msg_header_key(Some(&key))?;
+        pocox_pb::set_msg_header_key(Some(&key))?;
         match discover_services(&relay).await {
             Ok(found) => ui::field("verified", &format!("reached relay, {} service(s)", found.len())),
             Err(err) => bail!(
@@ -935,7 +935,7 @@ pub async fn run(args: InitArgs) -> Result<()> {
     ui::headline(ui::Tone::Ok, "relay configured");
     ui::field("relay", &relay);
     ui::field("key", &format!("len={}", key.len()));
-    ui::field("config", &pocket_codex_core::paths::config_file()?.display().to_string());
+    ui::field("config", &pocox_core::paths::config_file()?.display().to_string());
     Ok(())
 }
 ```
@@ -954,7 +954,7 @@ the bootstrap step):
 Add the args struct (place it just above `ServeArgs`):
 
 ```rust
-/// Args for `pocket-codex init`.
+/// Args for `pocox init`.
 #[derive(Debug, Args)]
 pub struct InitArgs {
     /// Relay `host:port` (or `tcp://host:port`). Prompted when omitted
@@ -980,7 +980,7 @@ Add to `cli.rs`'s `mod tests`:
     #[test]
     fn init_parses_relay_key_and_no_verify() {
         let cli = Cli::parse_from([
-            "pocket-codex", "init", "--relay", "lb7666.top:7666", "--key",
+            "pocox", "init", "--relay", "lb7666.top:7666", "--key",
             "0123456789abcdef0123456789abcdef", "--no-verify",
         ]);
         let Command::Init(args) = cli.command else {
@@ -1003,16 +1003,16 @@ Add `mod init;` (after `mod connect;`). Add the dispatch arm inside the `match`
 
 - [ ] **Step 8: Build + run the new tests**
 
-Run: `cargo test -p pocket-codex-cli init_parses normalize_relay validate_key --locked`
+Run: `cargo test -p pocox-cli init_parses normalize_relay validate_key --locked`
 Expected: PASS (all three).
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add crates/pocket-codex-cli/src/cli.rs \
-        crates/pocket-codex-cli/src/commands/init.rs \
-        crates/pocket-codex-cli/src/commands/mod.rs
-git commit -m "feat(cli): add interactive pocket-codex init command"
+git add crates/pocox-cli/src/cli.rs \
+        crates/pocox-cli/src/commands/init.rs \
+        crates/pocox-cli/src/commands/mod.rs
+git commit -m "feat(cli): add interactive pocox init command"
 ```
 
 ---
@@ -1026,11 +1026,11 @@ git commit -m "feat(cli): add interactive pocket-codex init command"
 - [ ] **Step 1: Add `init` to the README command surface**
 
 Find the command list / status table in `README.md` and add a row documenting
-`pocket-codex init` (interactive relay+key setup; precedence flag>config>env).
+`pocox init` (interactive relay+key setup; precedence flag>config>env).
 Match the table's existing column shape. Example row:
 
 ```markdown
-| `pocket-codex init` | Persist the default relay `host:port` + `MSG_HEADER_KEY` to `config.toml` (0600). Later commands default to it; `--relay` still overrides. |
+| `pocox init` | Persist the default relay `host:port` + `MSG_HEADER_KEY` to `config.toml` (0600). Later commands default to it; `--relay` still overrides. |
 ```
 
 - [ ] **Step 2: Add an init section to `docs/cli-verification.md`**
@@ -1048,7 +1048,7 @@ $PCX init
 $PCX init --relay lb7666.top:7666 --key <32B> [--no-verify]
 ```
 
-写入 `~/.config/pocket-codex/config.toml`（unix 下 0600）。之后所有命令在不带
+写入 `~/.config/pocox/config.toml`（unix 下 0600）。之后所有命令在不带
 `--relay` 时默认走这份配置，且会自动应用其中的 key——无需再 `export
 MSG_HEADER_KEY`。
 
@@ -1068,17 +1068,17 @@ MSG_HEADER_KEY`。
 
 ```bash
 git add README.md docs/cli-verification.md
-git commit -m "docs: document pocket-codex init, relay precedence, connect timeout"
+git commit -m "docs: document pocox init, relay precedence, connect timeout"
 ```
 
 ---
 
 ## Final Verification (run before declaring done)
 
-- [ ] `cargo fmt -p pocket-codex-core -p pocket-codex-codex -p pocket-codex-pb -p pocket-codex-cli -p pocket_codex_bridge -- --check`
+- [ ] `cargo fmt -p pocox-core -p pocox-codex -p pocox-pb -p pocox-cli -p pocox_bridge -- --check`
 - [ ] `cargo +stable clippy --workspace --all-targets -- -D warnings`
 - [ ] `cargo test --workspace --locked`
-- [ ] Manual smoke: `pocket-codex init --relay lb7666.top:7666 --key <32B>` then
-      `pocket-codex services list` (no `--relay`) returns instantly; with a dead
+- [ ] Manual smoke: `pocox init --relay lb7666.top:7666 --key <32B>` then
+      `pocox services list` (no `--relay`) returns instantly; with a dead
       relay configured, `services list` errors in ~5s, not ~123s.
 

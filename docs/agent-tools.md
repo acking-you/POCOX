@@ -112,7 +112,7 @@ flowchart LR
   A second desktop app started on the same hosting state serves nothing and
   cannot change the tools' switch or tokens
   ([one desktop app per hosting state](remote-device-management.md#one-desktop-app-per-hosting-state)).
-  Code: `crates/pocket-codex-bridge/src/engine/agent_tools/`.
+  Code: `crates/pocox-bridge/src/engine/agent_tools/`.
 - **Endpoint.** Streamable HTTP on 127.0.0.1, built on the official Rust MCP
   SDK (`rmcp`), stateless (a harness keeps working across POCOX restarts). Its
   port is 17863 for the app and 17864 for the CLI host, or the next free one,

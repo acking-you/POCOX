@@ -37,15 +37,15 @@ fvm flutter test
 fvm flutter run     # boot the placeholder UI on a connected device
 ```
 
-The app depends on the `pocket_codex_bridge` Dart package, which wraps
+The app depends on the `pocox_bridge` Dart package, which wraps
 the Rust cdylib built from
-[`crates/pocket-codex-bridge`](../../crates/pocket-codex-bridge).
+[`crates/pocox-bridge`](../../crates/pocox-bridge).
 Generated bindings live under `lib/src/rust/` and must not be
 hand-edited.
 
 ## Regenerating the bridge
 
-After editing anything under `crates/pocket-codex-bridge/src/api/`,
+After editing anything under `crates/pocox-bridge/src/api/`,
 re-run the codegen from the repo root:
 
 ```bash

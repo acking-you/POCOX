@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// Bounded contiguous native pages. Gaps/replacements discard old windows
 /// instead of joining unrelated snapshots into an apparently complete history.

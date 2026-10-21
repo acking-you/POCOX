@@ -2,7 +2,7 @@
 // self-hosted and account-mode shapes.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocox/src/service_key.dart';
 
 void main() {
   test('installation devices read as hostname and source; others as is', () {
@@ -27,7 +27,7 @@ void main() {
       expect(installationOf(other), isNull, reason: other);
       expect(deviceLabel(other), other);
     }
-    expect(serviceKeyDevice('pcxu:user:$device:host:pocket'), device);
+    expect(serviceKeyDevice('pcxu:user:$device:host:pocox'), device);
     expect(
       serviceKeyLabel('pcxu:user:$device:app:default'),
       'studio (WSL Ubuntu-24.04) · default',

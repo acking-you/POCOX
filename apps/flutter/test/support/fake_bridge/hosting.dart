@@ -557,7 +557,7 @@ mixin _FakeHosting on _FakeBridgeState {
         !runtime.separateHistory &&
         serveHosts.any((h) => h.servesOpenCodeHistory)) {
       throw StateError(
-        'opencode_already_hosted: this native source already has a Pocket host',
+        'opencode_already_hosted: this native source already has a POCOX host',
       );
     }
     final previous = hostConfigs[n];

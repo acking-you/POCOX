@@ -2,27 +2,27 @@
 // an iOS target at the sizes that broke: the services device list (it did
 // not scroll), a host's session list with a takeover row, and the folder
 // picker's confirmation bar. Mounting and pumping is the overflow check: an
-// overflow is a FlutterError, which fails the test. Set PCX_UI_PREVIEW_DIR
+// overflow is a FlutterError, which fails the test. Set POCOX_UI_PREVIEW_DIR
 // to write the previews (`phone-pages-*`).
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/local_sessions_screen.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/folder_tree_picker.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/local_sessions_screen.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/folder_tree_picker.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
 
 const _device = 'ackingliu-macbook-pro-m3-max';
 const _app = 'pcx:$_device:app:default';
-const _root = '/Users/ackingliu/rust_pro/my_pro/pocket-codex-workspace';
+const _root = '/Users/ackingliu/rust_pro/my_pro/pocox-workspace';
 
 /// Mount [screen] on an iOS phone of [size] at text [scale].
 Future<void> _mount(
@@ -102,7 +102,7 @@ void main() {
       ]) {
         final api = FakeBridgeApi(
           config: const ConfigInfo(
-            relay: 'relay-ap-southeast-1.pocket-codex.example.com:17666',
+            relay: 'relay-ap-southeast-1.pocox.example.com:17666',
             hasKey: true,
           ),
           services: [
@@ -135,7 +135,7 @@ void main() {
         ..localSessions = const [
           LocalSession(
             threadId: 't1',
-            cwd: '/Users/ackingliu/rust_pro/my_pro/pocket-codex/apps/flutter',
+            cwd: '/Users/ackingliu/rust_pro/my_pro/pocox/apps/flutter',
             preview: 'Run the tests and explain why the services page fails',
             updatedAt: 1760000000,
             turnState: 'completed',

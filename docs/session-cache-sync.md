@@ -232,8 +232,8 @@ uses synthetic history and makes no model request or connection to a running use
 host:
 
 ```bash
-PCX_TEST_CODEX_BINARY=/absolute/path/to/native/codex \
-  cargo test -p pocket-codex-host-svc --locked --test history_sync_codex \
+POCOX_TEST_CODEX_BINARY=/absolute/path/to/native/codex \
+  cargo test -p pocox-host-svc --locked --test history_sync_codex \
   -- --ignored --nocapture
 ```
 
@@ -250,17 +250,17 @@ benchmarked by these tests.
 
 | File | Responsibility |
 | --- | --- |
-| `crates/pocket-codex-core/src/history_sync.rs` | Versioned documents, manifests, reconcile/apply and verification |
-| `crates/pocket-codex-host-svc/src/history_sync.rs` | Source trait, HTTP routes, Codex adapter and projections |
-| `crates/pocket-codex-host-svc/src/history_sync_revision.rs` | Durable bounded source revision indexes |
-| `crates/pocket-codex-bridge/src/engine/session_cache.rs` | App-wide disk quota, namespaces, atomic entries and eviction |
-| `crates/pocket-codex-bridge/src/engine/session_sync.rs` | Negotiation, synchronized reads, display snapshots and live checkpoints |
-| `crates/pocket-codex-bridge/src/engine/app_session_history_cache.rs` | Existing RAM snapshots and in-flight pagination invalidation |
+| `crates/pocox-core/src/history_sync.rs` | Versioned documents, manifests, reconcile/apply and verification |
+| `crates/pocox-host-svc/src/history_sync.rs` | Source trait, HTTP routes, Codex adapter and projections |
+| `crates/pocox-host-svc/src/history_sync_revision.rs` | Durable bounded source revision indexes |
+| `crates/pocox-bridge/src/engine/session_cache.rs` | App-wide disk quota, namespaces, atomic entries and eviction |
+| `crates/pocox-bridge/src/engine/session_sync.rs` | Negotiation, synchronized reads, display snapshots and live checkpoints |
+| `crates/pocox-bridge/src/engine/app_session_history_cache.rs` | Existing RAM snapshots and in-flight pagination invalidation |
 | `apps/flutter/lib/src/screens/home_screen.dart` | Cached last-session entry before discovery |
 | `apps/flutter/lib/src/screens/app_session_screen.dart` | Cached rendering, fresh-state reconciliation and status |
 | `apps/flutter/lib/src/providers.dart` | Foreground inventory and bounded running-session prefetch |
 | `apps/flutter/lib/src/screens/settings_screen.dart` | Disk budget and usage controls |
-| `crates/pocket-codex-host-svc/tests/history_sync_codex.rs` | Isolated real external Codex integration |
+| `crates/pocox-host-svc/tests/history_sync_codex.rs` | Isolated real external Codex integration |
 | `apps/flutter/test/history_disk_cache_test.dart` | Cached UI and prefetch lifecycle regression tests |
 
 ## Live retention and write accounting
@@ -284,5 +284,5 @@ directory syncs.
 Run the opt-in filesystem benchmark with:
 
 ```sh
-cargo test --locked -p pocket_codex_bridge benchmark_cache_rewrites -- --ignored --nocapture
+cargo test --locked -p pocox_bridge benchmark_cache_rewrites -- --ignored --nocapture
 ```

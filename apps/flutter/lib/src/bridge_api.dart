@@ -4,8 +4,8 @@ library;
 
 import 'dart:typed_data';
 
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/updates/update_api.dart';
 
 part 'bridge/capability_types.dart';
 part 'bridge/connection_types.dart';
@@ -110,7 +110,7 @@ abstract interface class BridgeApi implements UpdateApi {
 
   /// Begin a web (browser-redirect) GitHub login — the convenient default.
   /// [redirectUri] is the platform-specific callback the browser is sent back to
-  /// (the app's `pocketcodex://` scheme on mobile/macOS, a `http://localhost:…`
+  /// (the app's `pocox://` scheme on mobile/macOS, a `http://localhost:…`
   /// loopback on Windows/Linux). [backend] overrides the configured / default
   /// backend (remembered on a successful exchange). Open the returned
   /// `authorizeUrl`, then call [accountWebLoginExchange].

@@ -8,8 +8,8 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/ui_prefs.dart';
 
 const _a = AutoHostPrefs(port: 18080, name: 'a');
 const _b = AutoHostPrefs(port: 0, name: 'b');

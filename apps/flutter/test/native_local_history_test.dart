@@ -3,12 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/local_sessions_screen.dart';
-import 'package:pocket_codex/src/screens/local_session_view_screen.dart';
-import 'package:pocket_codex/src/screens/local_session_view/native_window.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/local_sessions_screen.dart';
+import 'package:pocox/src/screens/local_session_view_screen.dart';
+import 'package:pocox/src/screens/local_session_view/native_window.dart';
 import 'fake_bridge_api.dart';
 
 LocalSession session(String title) => LocalSession(

@@ -7,22 +7,18 @@
 # Downloads the `pocox` binary from the latest GitHub release, matching your
 # OS + CPU, installs it to a bin dir, and makes sure that dir is on your PATH
 # so `pocox` just works in new shells. If `pocox` is already installed it is
-# updated in place (the old and new versions are printed). An install of the
-# CLI under its former name, `pocket-codex`, is updated too and keeps that name
-# as an alias, so scripts and services written for it keep working.
+# updated in place (the old and new versions are printed).
 #
 # Environment overrides:
-#   POCKET_CODEX_VERSION        pin a release tag (e.g. v0.1.3); default: latest
-#   POCKET_CODEX_BIN_DIR        install dir; default: $HOME/.local/bin
-#   POCKET_CODEX_NO_MODIFY_PATH set to 1 to install but not touch any profile
+#   POCOX_VERSION        pin a release tag (e.g. v0.1.3); default: latest
+#   POCOX_BIN_DIR        install dir; default: $HOME/.local/bin
+#   POCOX_NO_MODIFY_PATH set to 1 to install but not touch any profile
 #
 # POSIX sh; no bashisms. Depends only on: curl or wget, tar, uname, mkdir, mv.
 set -eu
 
 REPO="acking-you/POCOX"
 BIN="pocox"
-# The CLI's former name.
-OLD_BIN="pocket-codex"
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$1"; }
 warn() { printf '\033[1;33mwarning:\033[0m %s\n' "$1" >&2; }
@@ -64,18 +60,18 @@ case "$os" in
 esac
 
 # --- resolve the download URL for this target -------------------------------
-# The release asset is `pocket-codex-cli-<tag>-<target>.tar.gz`. We match on the
+# The release asset is `pocox-cli-<tag>-<target>.tar.gz`. We match on the
 # full target triple so a Linux target can't collide with the Windows one.
-if [ -n "${POCKET_CODEX_VERSION:-}" ]; then
-  tag="$POCKET_CODEX_VERSION"
-  url="https://github.com/${REPO}/releases/download/${tag}/pocket-codex-cli-${tag}-${target}.tar.gz"
+if [ -n "${POCOX_VERSION:-}" ]; then
+  tag="$POCOX_VERSION"
+  url="https://github.com/${REPO}/releases/download/${tag}/pocox-cli-${tag}-${target}.tar.gz"
 else
   info "resolving the latest release for $target"
   # Parse the release JSON without jq: pick the matching browser_download_url.
   url="$(
     fetch "https://api.github.com/repos/${REPO}/releases/latest" |
       grep browser_download_url |
-      grep "pocket-codex-cli-" |
+      grep "pocox-cli-" |
       grep "${target}.tar.gz" |
       head -n 1 |
       cut -d '"' -f 4
@@ -89,31 +85,14 @@ fi
 # An explicit install dir without trailing slashes, so it compares equal to the
 # directory part of a path in it.
 override=""
-if [ -n "${POCKET_CODEX_BIN_DIR:-}" ]; then
-  override="$(printf '%s' "$POCKET_CODEX_BIN_DIR" | sed 's#//*$##')"
+if [ -n "${POCOX_BIN_DIR:-}" ]; then
+  override="$(printf '%s' "$POCOX_BIN_DIR" | sed 's#//*$##')"
   [ -n "$override" ] || override="/"
 fi
 existing="$(command -v "$BIN" 2>/dev/null || true)"
-# An install under the former name counts only as a regular file: the desktop
-# app's Linux package puts a `pocket-codex` symlink to the app on the PATH, and
-# that one is never run or replaced. An explicit install dir is looked at too,
-# since it need not be on the PATH.
-legacy() { [ -n "$1" ] && [ -f "$1" ] && [ ! -L "$1" ]; }
-old=""
-if [ -n "$override" ] && legacy "${override%/}/$OLD_BIN"; then
-  old="${override%/}/$OLD_BIN"
-else
-  old_path="$(command -v "$OLD_BIN" 2>/dev/null || true)"
-  if legacy "$old_path"; then
-    old="$old_path"
-  fi
-fi
 if [ -n "$existing" ]; then
   cur="$("$existing" --version 2>/dev/null | awk 'NR==1{print $NF}')"
   info "found $BIN ${cur:-(unknown version)} at $existing — updating to ${tag}"
-elif [ -n "$old" ]; then
-  cur="$("$old" --version 2>/dev/null | awk 'NR==1{print $NF}')"
-  info "found $OLD_BIN ${cur:-(unknown version)} at $old — updating to $BIN ${tag}"
 else
   info "installing $BIN ${tag}"
 fi
@@ -127,14 +106,10 @@ info "downloading $url"
 download "$url" "$tmp/cli.tar.gz" || err "download failed."
 tar -xzf "$tmp/cli.tar.gz" -C "$tmp" || err "unpack failed."
 
-# The archive holds one dir `pocket-codex-cli-.../` containing the binary.
-# Releases before the rename ship it as `pocket-codex`, and that program
-# recognizes its own workers only under that name, so it keeps it.
+# The archive holds one dir `pocox-cli-.../` containing the binary.
 src="$(find "$tmp" -type f -name "$BIN" | head -n 1)"
-[ -n "$src" ] || src="$(find "$tmp" -type f -name "$OLD_BIN" | head -n 1)"
 [ -n "$src" ] || err "the archive did not contain a '$BIN' binary."
 chmod +x "$src"
-name="$(basename "$src")"
 
 # --- install ----------------------------------------------------------------
 # When updating an install on the PATH, replace THAT copy so the user keeps
@@ -143,40 +118,21 @@ if [ -n "$override" ]; then
   bindir="$override"
 elif [ -n "$existing" ]; then
   bindir="$(dirname "$existing")"
-elif [ -n "$old" ]; then
-  bindir="$(dirname "$old")"
 else
   bindir="$HOME/.local/bin"
 fi
 mkdir -p "$bindir" || err "could not create install dir: $bindir"
-# A `pocket-codex` link there (the desktop app's, or the alias of a newer
-# `pocox`) is never replaced by an older CLI.
-if [ "$name" = "$OLD_BIN" ] && [ -L "$bindir/$OLD_BIN" ]; then
-  err "$bindir/$OLD_BIN is a link this release would replace; choose another POCKET_CODEX_BIN_DIR."
-fi
-mv -f "$src" "$bindir/$name" || err "could not write to $bindir (try POCKET_CODEX_BIN_DIR=/some/writable/dir)."
+mv -f "$src" "$bindir/$BIN" || err "could not write to $bindir (try POCOX_BIN_DIR=/some/writable/dir)."
 
-newver="$("$bindir/$name" --version 2>/dev/null | awk 'NR==1{print $NF}')"
-info "installed $name ${newver:-$tag} → $bindir/$name"
-
-if [ "$name" = "$OLD_BIN" ]; then
-  info "this release predates the $BIN name, so it installs as $OLD_BIN"
-  if [ -n "$existing" ]; then
-    warn "$existing is a newer $BIN and was left as it is"
-  fi
-# Keep the former name working for scripts and services written for it.
-elif [ -n "$old" ] && [ "$(dirname "$old")" = "$bindir" ]; then
-  ln -sf "$BIN" "$bindir/$OLD_BIN" && info "$OLD_BIN now runs $BIN"
-elif [ -n "$old" ]; then
-  warn "an older $OLD_BIN remains at $old; remove it, or point scripts at $bindir/$BIN"
-fi
+newver="$("$bindir/$BIN" --version 2>/dev/null | awk 'NR==1{print $NF}')"
+info "installed $BIN ${newver:-$tag} → $bindir/$BIN"
 
 # --- make sure the bin dir is on PATH (persist to the shell profile) --------
 add_to_path() {
   dir="$1"
   case ":$PATH:" in *":$dir:"*) return 0 ;; esac # already on PATH
-  [ "${POCKET_CODEX_NO_MODIFY_PATH:-0}" = "1" ] && {
-    warn "$dir is not on PATH (POCKET_CODEX_NO_MODIFY_PATH=1 — not changing any profile)."
+  [ "${POCOX_NO_MODIFY_PATH:-0}" = "1" ] && {
+    warn "$dir is not on PATH (POCOX_NO_MODIFY_PATH=1 — not changing any profile)."
     printf '  Add it yourself:  export PATH="%s:$PATH"\n' "$dir"
     return 0
   }
@@ -210,4 +166,4 @@ add_to_path() {
 }
 add_to_path "$bindir"
 
-info "done. Run '$name --help' to get started."
+info "done. Run '$BIN --help' to get started."

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// A small solid status dot used to convey availability at a glance (e.g. a
 /// service is online / a subscription is alive). [color] carries the meaning;

@@ -3,13 +3,13 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/code_highlight.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/widgets/code_block.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/code_highlight.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/widgets/code_block.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
 
 /// Extensions shown as a picture rather than as bytes.
 const previewImageExtensions = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'};

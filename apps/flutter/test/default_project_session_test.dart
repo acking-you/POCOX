@@ -8,15 +8,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/opencode_chat.dart';
 
 const _svc = openCodeService;
-const _auto = '/Users/me/PocketCodex';
+const _auto = '/Users/me/pocox';
 
 FakeBridgeApi _api({ProjectSettings? settings}) {
   final api = FakeBridgeApi()
@@ -37,7 +37,7 @@ void main() {
   testWidgets('with an automatic default a send goes straight out without '
       'a folder picker; the host chooses the folder', (t) async {
     final api = await mountChat(t, _api(settings: _automatic));
-    expect(find.text('PocketCodex (default)'), findsWidgets);
+    expect(find.text('pocox (default)'), findsWidgets);
     expect(api.projectSettingsSaves, isEmpty, reason: 'nothing is created');
     await typeMessage(t, 'hi');
     await tapSend(t);
@@ -87,7 +87,7 @@ void main() {
     await typeMessage(t, 'hi');
     await tapSend(t);
     expect(api.lastCwd, '/work/alpha');
-    expect(find.text('PocketCodex (default)'), findsNothing);
+    expect(find.text('pocox (default)'), findsNothing);
   });
 
   testWidgets('a failed session creation keeps the message in the '
@@ -118,7 +118,7 @@ void main() {
       );
     await mountChat(t, api, threadId: 't1');
     await newConversation(t);
-    expect(find.text('PocketCodex (default)'), findsWidgets);
+    expect(find.text('pocox (default)'), findsWidgets);
     // Back to the existing conversation; another device then chooses a
     // default while this screen stays open.
     await t.tap(find.byKey(const Key('conv-tile-t1')));
@@ -130,7 +130,7 @@ void main() {
       exists: true,
     );
     await newConversation(t);
-    expect(find.text('PocketCodex (default)'), findsNothing);
+    expect(find.text('pocox (default)'), findsNothing);
     await typeMessage(t, 'hi');
     await tapSend(t);
     expect(find.byKey(const Key('folder-picker-no-roots')), findsNothing);
@@ -166,7 +166,7 @@ void main() {
     api.threadListGate = null;
     gate.complete();
     await frames(t);
-    expect(find.text('PocketCodex (default)'), findsWidgets);
+    expect(find.text('pocox (default)'), findsWidgets);
     await typeMessage(t, 'next');
     await tapSend(t);
     expect(api.lastCwd, isNull, reason: 'still the automatic default');

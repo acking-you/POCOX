@@ -1,20 +1,20 @@
 import 'dart:io';
 
-import 'package:pocket_codex/src/file_exports.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocox/src/file_exports.dart';
+import 'package:pocox/src/widgets/links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/ide_context.dart';
-import 'package:pocket_codex/src/image_attachments.dart';
-import 'package:pocket_codex/src/lru_cache.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/image_viewer.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/attachment_refs.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/ide_context.dart';
+import 'package:pocox/src/image_attachments.dart';
+import 'package:pocox/src/lru_cache.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/image_viewer.dart';
 
-export 'package:pocket_codex/src/widgets/image_viewer.dart';
+export 'package:pocox/src/widgets/image_viewer.dart';
 
 /// A user attachment or generated image: decoded inline pixels, a host path
 /// loaded on demand, or a visible unavailable reference.

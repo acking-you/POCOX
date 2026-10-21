@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// Buffers captured runtime log lines and exposes them — with level + keyword
 /// filtering — to the log viewer.

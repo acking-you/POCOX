@@ -6,7 +6,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// A whole-window light/dark switch that spreads from where it was asked for.
 ///

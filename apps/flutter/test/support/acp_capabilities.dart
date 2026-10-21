@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// Negotiated ACP capabilities; native-only controls remain unavailable.
 AppCapabilities negotiatedAcpCapabilities({

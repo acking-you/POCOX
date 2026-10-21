@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/voice/voice_transport.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/voice/voice_transport.dart';
 
 /// Transport state is separate from Codex's backing text turns: a reply that
 /// finishes, or a task the voice delegated, says nothing about whether the

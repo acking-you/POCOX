@@ -7,7 +7,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_frame.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_frame.dart';
 
 /// The nebula program, loaded once; null where shaders are unavailable.
 Future<ui.FragmentProgram?> _program = ui.FragmentProgram.fromAsset(

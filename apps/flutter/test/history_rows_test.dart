@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/screens/app_session/history_rows.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/screens/app_session/history_rows.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
 
 void main() {
   test('a turn continuation and following unread turns form one gap', () {

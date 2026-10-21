@@ -23,7 +23,7 @@ runtime dependencies. File references below are relative to
 | Profile id | `grok` (mark: Grok's own, from lobe-icons 1.95.1, MIT) |
 | Command | `grok agent --no-leader stdio` (`--no-leader` keeps the agent in this one process instead of a shared leader socket) |
 | Located | the child `PATH`, then `~/.grok/bin` (the official installer's link) |
-| Code | `crates/pocket-codex-host-svc/src/acp/grok.rs`, `acp/spec.rs` |
+| Code | `crates/pocox-host-svc/src/acp/grok.rs`, `acp/spec.rs` |
 
 Grok's own CLI speaks ACP v1, so no adapter is involved. Grok negotiates
 `session/load`, `session/list`, `session/resume`, `session/close` and HTTP
@@ -262,7 +262,7 @@ that client closes it.
 POCOX's own host. POCOX cannot see an editor's ACP Grok on the same
 session: close it before continuing that session here. This is not a
 provider-wide lease. A POCOX host admits a Grok session only from a fresh
-check with no registered client and with the Pocket session claim (beside
+check with no registered client and with the POCOX session claim (beside
 Grok's home). Before every prompt it checks again that no client has
 registered and that its agent is still the process it launched. Grok's
 agent is the session's writer itself, unlike the Claude adapter's
@@ -358,7 +358,7 @@ On one Mac with Grok 1.0.4 (2026-10-20):
   lines, interjections, owner verification with a real process named
   `grok`), the custom-provider home (`acp/grok.rs`), spawn variable
   removal, and the model-service matrix.
-- The opt-in `tests/grok_live.rs` (`PCX_TEST_GROK=~/.grok/bin/grok`, run
+- The opt-in `tests/grok_live.rs` (`POCOX_TEST_GROK=~/.grok/bin/grok`, run
   with `--ignored`) runs the real `grok agent --no-leader stdio` under the
   preset with a custom provider, aimed at a loopback Chat Completions
   endpoint. A real turn answered, with the key reaching the endpoint only

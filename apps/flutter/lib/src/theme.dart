@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
-export 'package:pocket_codex/src/glass_recipe.dart';
+export 'package:pocox/src/glass_recipe.dart';
 
 /// Calm graphite neutrals, ink controls and one blue "signal".
 ///

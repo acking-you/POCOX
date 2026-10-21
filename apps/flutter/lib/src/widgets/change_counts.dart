@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/src/theme.dart';
 
 /// A change's size as "+added −removed" in the addition and removal colours,
 /// with tabular figures so counts line up and hold still as they change.

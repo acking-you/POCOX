@@ -32,7 +32,7 @@
 ## 2. 构建 CLI
 
 ```bash
-cargo build --release -p pocket-codex-cli
+cargo build --release -p pocox-cli
 # 产物：target/release/pocox
 ```
 
@@ -70,7 +70,7 @@ $PCX init
 $PCX init --relay lb7666.top:7666 --key <32B> [--no-verify]
 ```
 
-写入 `~/.config/pocket-codex/config.toml`（unix 下 0600）。之后所有命令在不带
+写入 `~/.config/pocox/config.toml`（unix 下 0600）。之后所有命令在不带
 `--relay` 时默认走这份配置，且会自动应用其中的 key——无需再 `export
 MSG_HEADER_KEY`。
 
@@ -194,7 +194,7 @@ POCOX runtime status · lb7666.top:7666
 │ pb register  ┆ alive ┆ ...   ┆ 127.0.0.1:18080      ┆ pcx:lb7666:app:default ┆ ...    │
 │ pb subscribe ┆ alive ┆ ...   ┆ 127.0.0.1:28080      ┆ pcx:lb7666:app:default ┆ ...    │
 └──────────────┴───────┴───────┴──────────────────────┴────────────────────────┴────────┘
-logs  ~/.local/state/pocket-codex/logs
+logs  ~/.local/state/pocox/logs
 ```
 
 `STATE` 列 alive 为绿、stale 为红；管道重定向或设了 `NO_COLOR` 时自动退化成无边框纯文本，方便脚本解析。
@@ -293,10 +293,10 @@ $PCX api connect --relay lb7666.top:7666
     log       ...
 → codex provider config
     paste into ~/.codex/config.toml:
-model_provider = "pocket-codex-api"
+model_provider = "pocox-api"
 
-[model_providers.pocket-codex-api]
-name = "Pocket-Codex API"
+[model_providers.pocox-api]
+name = "POCOX API"
 base_url = "http://127.0.0.1:28180/v1"
 wire_api = "responses"
 requires_openai_auth = false
@@ -322,7 +322,7 @@ $PCX services list --kind api --relay lb7666.top:7666     # 按 kind 过滤
 # 记录本地默认目标，之后 connect 不带 --device/--key 也能直接命中
 $PCX services default set --kind app --device lb7666 --name default
 $PCX services default set --kind api --device lb7666 --name default
-# 写入 ~/.config/pocket-codex/config.toml 的 [services.*] 段
+# 写入 ~/.config/pocox/config.toml 的 [services.*] 段
 ```
 
 ## 7. 低层 pb 命令（调试用，前台阻塞）
@@ -348,7 +348,7 @@ $PCX stop --role subscribe      # 只停订阅，保留注册
 $PCX stop --key pcx:lb7666:app:default   # 只停某个 key
 ```
 
-日志目录：`~/.local/state/pocket-codex/logs/`
+日志目录：`~/.local/state/pocox/logs/`
 （`codex-app-server.log`、`pb-{register,subscribe}-<key>.log`、`api-proxy-<key>.log`）。
 
 ## 9. 排错速查

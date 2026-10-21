@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/review/review_file_diff.dart';
-import 'package:pocket_codex/src/review/review_file_list.dart';
-import 'package:pocket_codex/src/review/review_file_view.dart';
-import 'package:pocket_codex/src/review/session_changes.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
-import 'package:pocket_codex/src/widgets/change_counts.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/review/review_file_diff.dart';
+import 'package:pocox/src/review/review_file_list.dart';
+import 'package:pocox/src/review/review_file_view.dart';
+import 'package:pocox/src/review/session_changes.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/change_counts.dart';
 
 /// Where the review reads its changes from.
 enum ReviewSource {

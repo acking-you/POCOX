@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/app_icons.dart';
 
 Widget _wrap(PreferredSizeWidget bar) => MaterialApp(
   locale: const Locale('en'),

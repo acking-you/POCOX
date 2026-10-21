@@ -1,8 +1,8 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/native_quit.dart';
+import 'package:pocox/src/native_quit.dart';
 
-const _channel = MethodChannel('pocket_codex/app_quit');
+const _channel = MethodChannel('pocox/app_quit');
 
 /// Delivers a native `quit` to the Dart handler, as the gate does.
 Future<void> _nativeQuit() async {

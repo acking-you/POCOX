@@ -36,8 +36,8 @@ Run the native checks on macOS (also required by the `macOS host environment`
 job in CI):
 
 ```sh
-cargo clippy -p pocket-codex-codex --all-targets --locked -- -D warnings
-cargo test -p pocket-codex-codex --locked
+cargo clippy -p pocox-codex --all-targets --locked -- -D warnings
+cargo test -p pocox-codex --locked
 ```
 
 The shared probe tests also run on Linux. They reproduce a sparse PATH and an

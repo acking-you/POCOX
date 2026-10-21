@@ -1,7 +1,7 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge.dart'
     show AnyhowException;
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocox/src/error_format.dart';
 
 void main() {
   test('unwraps AnyhowException and drops the backtrace', () {

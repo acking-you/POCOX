@@ -10,13 +10,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/managed/default_project_tile.dart';
-import 'package:pocket_codex/src/managed/device_management_switch.dart';
-import 'package:pocket_codex/src/managed/managed_device_panel.dart';
-import 'package:pocket_codex/src/managed/managed_host_editor.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/managed/default_project_tile.dart';
+import 'package:pocox/src/managed/device_management_switch.dart';
+import 'package:pocox/src/managed/managed_device_panel.dart';
+import 'package:pocox/src/managed/managed_host_editor.dart';
+import 'package:pocox/src/providers.dart';
 
 import 'fake_bridge_api.dart';
 

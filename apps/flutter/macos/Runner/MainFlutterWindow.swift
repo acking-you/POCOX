@@ -22,7 +22,7 @@ class MainFlutterWindow: NSWindow {
     // Dart hides the title bar (window_manager) after this runs, and then
     // asks for the buttons to be laid out against it.
     let chrome = FlutterMethodChannel(
-      name: "pocket_codex/window_chrome",
+      name: "pocox/window_chrome",
       binaryMessenger: flutterViewController.engine.binaryMessenger
     )
     chrome.setMethodCallHandler { [weak self] call, result in

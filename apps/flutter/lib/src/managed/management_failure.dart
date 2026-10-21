@@ -1,5 +1,5 @@
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/error_format.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/error_format.dart';
 
 /// A classified device-management failure.
 ///

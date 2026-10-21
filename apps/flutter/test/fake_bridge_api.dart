@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/updates/update_api.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/updates/update_api.dart';
 
 part 'support/fake_bridge/state.dart';
 part 'support/fake_bridge/connection.dart';

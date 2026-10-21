@@ -2,12 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/glass_recipe.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/glass_recipe.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
 /// Turn navigation that keeps out of the reader's way: at rest a slim, faint
 /// handle at the conversation's edge; touched, it opens into its [controls];

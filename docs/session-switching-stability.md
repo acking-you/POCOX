@@ -75,19 +75,19 @@ UI 打开 session 时先调用 `thread/resume`，再通过 `thread/read`、
 session 争抢 writer），然后运行：
 
 ```sh
-PCX_SOAK_WS=127.0.0.1:18880 \
-PCX_SOAK_THREAD_IDS='<thread-a>,<thread-b>,<thread-c>' \
-PCX_SOAK_ROUNDS=100 \
-cargo test -p pocket_codex_bridge real_session_switch_soak -- --ignored --nocapture
+POCOX_SOAK_WS=127.0.0.1:18880 \
+POCOX_SOAK_THREAD_IDS='<thread-a>,<thread-b>,<thread-c>' \
+POCOX_SOAK_ROUNDS=100 \
+cargo test -p pocox_bridge real_session_switch_soak -- --ignored --nocapture
 ```
 
-要覆盖 relay，将 `PCX_SOAK_WS` 改为本地订阅端口。测试要求样本有历史内容。
+要覆盖 relay，将 `POCOX_SOAK_WS` 改为本地订阅端口。测试要求样本有历史内容。
 它会 resume 指定 session，因此应使用独立副本或确认没有其他 writer 的会话。
 
 ## 接入与验证边界
 
 pb-mapper 修复已通过 [PR #10](https://github.com/acking-you/pb-mapper/pull/10)
-合入远端，并包含在供 POCOX 使用的 `pocket-codex` 分支中。
+合入远端，并包含在供 POCOX 使用的 `pocox` 分支中。
 POCOX 直接使用该 Git 分支，不再等待 crates.io 版本发布：
 
 ```sh
@@ -95,7 +95,7 @@ cargo test --workspace --locked
 ```
 
 `Cargo.toml` 使用 `git = "https://github.com/acking-you/pb-mapper"` 和
-`branch = "pocket-codex"`；`Cargo.lock` 固定到包含本次修复的
+`branch = "pocox"`；`Cargo.lock` 固定到包含本次修复的
 `f0ed4271de962b8759d11171bcf901aa6df458cc`。普通构建不会自动追随分支变化。
 以后将兼容修复推送到该分支，再在本仓库运行 `cargo update -p pb-mapper`，
 检查锁定提交并完成回归验证后提交 Cargo.lock。

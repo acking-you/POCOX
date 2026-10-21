@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 
 /// Where a sessions view reads from: this machine's `CODEX_HOME` directly
 /// ([SessionSource.local]), or a (possibly remote) host's CODEX_HOME over its

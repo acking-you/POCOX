@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/turn_navigation_handle.dart';
+import 'package:pocox/src/widgets/turn_navigation_handle.dart';
 
 void main() {
   testWidgets('the handle opens on touch and folds when the reader scrolls', (

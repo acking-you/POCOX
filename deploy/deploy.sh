@@ -6,21 +6,21 @@
 # the firewall — see the printed next steps (and deploy/README.md).
 #
 # Usage:
-#   sudo ./deploy.sh /path/to/pocket-codex-backend          # install a prebuilt binary
-#   sudo ./deploy.sh --build /path/to/pocket-codex-repo      # build from source then install
+#   sudo ./deploy.sh /path/to/pocox-backend          # install a prebuilt binary
+#   sudo ./deploy.sh --build /path/to/pocox-repo      # build from source then install
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BIN_DEST=/usr/local/bin/pocket-codex-backend
-ETC=/etc/pocket-codex
-VAR=/var/lib/pocket-codex
-UNIT=/etc/systemd/system/pocket-codex-backend.service
+BIN_DEST=/usr/local/bin/pocox-backend
+ETC=/etc/pocox
+VAR=/var/lib/pocox
+UNIT=/etc/systemd/system/pocox-backend.service
 
 if [[ "${1:-}" == "--build" ]]; then
   REPO="${2:?usage: sudo ./deploy.sh --build <repo-path>}"
   echo "==> building release backend from $REPO"
-  ( cd "$REPO" && cargo build --release -p pocket-codex-backend )
-  BIN_SRC="$REPO/target/release/pocket-codex-backend"
+  ( cd "$REPO" && cargo build --release -p pocox-backend )
+  BIN_SRC="$REPO/target/release/pocox-backend"
 else
   BIN_SRC="${1:?usage: sudo ./deploy.sh <binary-path> | --build <repo-path>}"
 fi
@@ -72,12 +72,12 @@ done
 
 if [[ -n "$RELAY_KEY" ]]; then
   WANT="$(tr -d '\n' < "$RELAY_KEY")"
-  HAVE="$(sed -n 's/^PCX_MSG_HEADER_KEY=//p' "$ETC/backend.env" | tail -1)"
+  HAVE="$(sed -n 's/^POCOX_MSG_HEADER_KEY=//p' "$ETC/backend.env" | tail -1)"
   if [[ "$WANT" != "$HAVE" ]]; then
     # Rewrite in place rather than appending: a second assignment would leave the
     # old one in the file, and which wins is up to the reader.
-    sed -i '/^PCX_MSG_HEADER_KEY=/d' "$ETC/backend.env"
-    echo "PCX_MSG_HEADER_KEY=$WANT" >> "$ETC/backend.env"
+    sed -i '/^POCOX_MSG_HEADER_KEY=/d' "$ETC/backend.env"
+    echo "POCOX_MSG_HEADER_KEY=$WANT" >> "$ETC/backend.env"
     chmod 0600 "$ETC/backend.env"
     chown pcx:pcx "$ETC/backend.env" 2>/dev/null || true
     if [[ -n "$HAVE" ]]; then
@@ -88,18 +88,18 @@ if [[ -n "$RELAY_KEY" ]]; then
   else
     echo "==> relay administrator key already current"
   fi
-elif ! grep -q '^PCX_MSG_HEADER_KEY=' "$ETC/backend.env"; then
+elif ! grep -q '^POCOX_MSG_HEADER_KEY=' "$ETC/backend.env"; then
   # Neither file is readable and nothing is configured: the backend exits with
   # "relay_credential is required", so say why now rather than after it fails.
   echo "  ⚠ could not read the relay administrator key ($ADMIN_KEY)."
-  echo "    Run this script with sudo, or set PCX_MSG_HEADER_KEY in $ETC/backend.env"
+  echo "    Run this script with sudo, or set POCOX_MSG_HEADER_KEY in $ETC/backend.env"
   echo "    by hand — the backend will not boot without it."
   NEEDS_SECRETS=1
 fi
 
 echo "==> binary + unit"
 install -m 0755 "$BIN_SRC" "$BIN_DEST"
-install -m 0644 "$HERE/pocket-codex-backend.service" "$UNIT"
+install -m 0644 "$HERE/pocox-backend.service" "$UNIT"
 systemctl daemon-reload
 
 echo
@@ -107,15 +107,15 @@ echo "==> done. Next steps:"
 if [[ "${NEEDS_SECRETS:-0}" == "1" ]]; then
   echo "  ⚠ SECRETS NOT SET — the backend will REFUSE TO BOOT until you fill these:"
   echo "  1. Fill secrets:  sudoedit $ETC/backend.env"
-  echo "     (PCX_JWT_SECRET = openssl rand -hex 32 (>=32 bytes);"
-  echo "      PCX_GITHUB_CLIENT_ID = your GitHub OAuth app client id."
-  echo "      PCX_MSG_HEADER_KEY is the relay's ADMINISTRATOR key, adopted automatically when"
+  echo "     (POCOX_JWT_SECRET = openssl rand -hex 32 (>=32 bytes);"
+  echo "      POCOX_GITHUB_CLIENT_ID = your GitHub OAuth app client id."
+  echo "      POCOX_MSG_HEADER_KEY is the relay's ADMINISTRATOR key, adopted automatically when"
   echo "      this script can read it — set it by hand only for a relay on another host.)"
 fi
 echo "  2. TLS certs readable by the pcx user in $ETC/ (tls_cert/tls_key in $ETC/backend.toml):"
 echo "     copy certbot/Caddy PEMs into $ETC/ (0640 pcx:pcx) via a renewal hook that restarts the unit."
 echo "  3. Deny the pre-v2 relay protocol (REQUIRED):  pb-mapper admin legacy-protocol set deny"
 echo "     Open API + relay:  sudo ufw allow 8443/tcp && sudo ufw allow 7666/tcp"
-echo "  4. Start:  sudo systemctl enable --now pocket-codex-backend"
-echo "     Watch:   journalctl -u pocket-codex-backend -f"
+echo "  4. Start:  sudo systemctl enable --now pocox-backend"
+echo "     Watch:   journalctl -u pocox-backend -f"
 echo "     Check:   curl -fsS https://lb7666.top:8443/healthz   # -> ok"

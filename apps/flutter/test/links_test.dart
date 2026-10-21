@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/widgets/links.dart';
+import 'package:pocox/src/widgets/links.dart';
 
 void main() {
   group('autolinkifyMarkdown', () {

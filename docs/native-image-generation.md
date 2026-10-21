@@ -62,16 +62,16 @@ another model request. Set these paths to your own capture and artifact:
 
 ```sh
 export CODEX_HOME=/path/to/isolated/codex-home
-export PCX_IMAGE_THREAD_ID=<generated-thread-id>
-export PCX_IMAGE_OUTPUT=/path/to/generated.png
-export PCX_IMAGE_CAPTURE=/path/to/app-server-events.jsonl
-cargo test -p pocket-codex-host-svc --test projects_http \
+export POCOX_IMAGE_THREAD_ID=<generated-thread-id>
+export POCOX_IMAGE_OUTPUT=/path/to/generated.png
+export POCOX_IMAGE_CAPTURE=/path/to/app-server-events.jsonl
+cargo test -p pocox-host-svc --test projects_http \
   native_generated_image_round_trips_over_meta_http -- --ignored --nocapture
-cargo test -p pocket_codex_bridge native_image_capture_maps_live_and_restored_artifacts \
+cargo test -p pocox_bridge native_image_capture_maps_live_and_restored_artifacts \
   -- --ignored
 cd apps/flutter
 fvm flutter test test/generated_image_card_test.dart \
-  --dart-define=PCX_IMAGE_OUTPUT="$PCX_IMAGE_OUTPUT"
+  --dart-define=POCOX_IMAGE_OUTPUT="$POCOX_IMAGE_OUTPUT"
 ```
 
 Normal tests cover live completion, history, remote monitoring, permission

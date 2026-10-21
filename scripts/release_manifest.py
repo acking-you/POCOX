@@ -4,7 +4,7 @@
 The app's updater downloads `release-manifest.json` and its signature
 `release-manifest.json.sig` from the newest release and installs nothing the
 signature does not cover, and no file whose size or SHA-256 differs from what
-the manifest lists (`crates/pocket-codex-bridge/src/engine/updates`).
+the manifest lists (`crates/pocox-bridge/src/engine/updates`).
 
     collect: release_manifest.py collect <assets-dir> <tag> <commit>
     sign:    release_manifest.py sign release-manifest.json --key private.pem

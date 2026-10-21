@@ -63,13 +63,13 @@ pb-mapper 订阅、Responses API 代理)接到前端。
 Dart UI  (go_router + Riverpod)
    │  FRB 调用 / StreamSink<SessionEvent>
    ▼
-Rust bridge (pocket_codex_bridge) ── 全局 tokio runtime + 订阅注册表
+Rust bridge (pocox_bridge) ── 全局 tokio runtime + 订阅注册表
    ├─ config:   Config (toml @ supportDir/config.toml, unix 0600)
    ├─ discover: pb::keys(relay) → ServiceId 列表 (5s 连接超时已在 pb 层)
    ├─ api 订阅:  pb::subscribe(api key)  → 本地端口            [P1]
    └─ app 订阅:  subscribe(app key) → 本地 ws → JSON-RPC client
                  → typed SessionEvent 流                      [P2]
-        ▼  relay (pb-mapper) → 宿主 pocket-codex serve / api serve
+        ▼  relay (pb-mapper) → 宿主 pocox serve / api serve
 ```
 
 **与 CLI 的关键差异**:CLI 通过 spawn `__worker` 子进程 + 写 PID 到
@@ -118,7 +118,7 @@ Rust bridge (pocket_codex_bridge) ── 全局 tokio runtime + 订阅注册表
 - `ServicesScreen`(首页) — 头部:设备名 + relay + 状态点(绿/红);分组列出
   API / App-server 服务;右上 ⚙;空态显示 logo mark + 引导文案。
 - `ApiServiceScreen` — 选本地端口(默认 18180,可改)→ 启动订阅 → 显示
-  `base_url`(复制按钮)+ `[model_providers.pocket-codex-api]` 配置片段 +
+  `base_url`(复制按钮)+ `[model_providers.pocox-api]` 配置片段 +
   运行状态 + 停止;无鉴权安全提示。
 - `SettingsScreen` — 改 relay、重导 key(掩码显示)、各服务状态、导出
   `pcx1:`、关于(版本 = `bridge_version`)。
@@ -214,6 +214,6 @@ Material 3 是骨架与设计语言;第三方包只用在 stock 控件做不好�
 - **前台限制**是移动端固有,非缺陷;P1 接受此边界,文档明示。
 - FRB 代码生成需 `flutter_rust_bridge_codegen`;接口面变动要重生成 + 重测,
   P1 接口刻意收敛以减少 churn。
-- 改动集中在 `apps/flutter` 与 `crates/pocket-codex-bridge`;核心 crate 零改动;
+- 改动集中在 `apps/flutter` 与 `crates/pocox-bridge`;核心 crate 零改动;
   不动 CLI / `state.toml` / `deps/`。回滚即 revert 分支。
 

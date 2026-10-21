@@ -11,12 +11,12 @@
 //
 // kSingleInstanceMutex: a named mutex whose pre-existence means an instance is
 //   already running.
-// g_pocket_codex_show_msg: a process-wide RegisterWindowMessage id. A second
+// g_pocox_show_msg: a process-wide RegisterWindowMessage id. A second
 //   launch broadcasts it (then exits) and the running instance, on receiving
 //   it, surfaces its window - even if it was hidden to the system tray.
 constexpr const wchar_t kSingleInstanceMutex[] =
-    L"io.github.acking_you.pocket_codex.singleton";
-UINT g_pocket_codex_show_msg = 0;
+    L"io.github.acking_you.pocox.singleton";
+UINT g_pocox_show_msg = 0;
 
 int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
                       _In_ wchar_t *command_line, _In_ int show_command) {
@@ -24,15 +24,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // exists, another copy is running: ask it to surface (a broadcast that only
   // our own windows recognise, since the message id is unique to this app) and
   // exit instead of spawning a second process / second tray icon.
-  g_pocket_codex_show_msg =
-      ::RegisterWindowMessageW(L"io.github.acking_you.pocket_codex.show");
+  g_pocox_show_msg =
+      ::RegisterWindowMessageW(L"io.github.acking_you.pocox.show");
   HANDLE single_instance_mutex =
       ::CreateMutexW(nullptr, TRUE, kSingleInstanceMutex);
   if (single_instance_mutex != nullptr &&
       ::GetLastError() == ERROR_ALREADY_EXISTS) {
     // Let the already-running instance steal focus, then nudge it to show.
     ::AllowSetForegroundWindow(ASFW_ANY);
-    ::PostMessageW(HWND_BROADCAST, g_pocket_codex_show_msg, 0, 0);
+    ::PostMessageW(HWND_BROADCAST, g_pocox_show_msg, 0, 0);
     ::CloseHandle(single_instance_mutex);
     return EXIT_SUCCESS;
   }

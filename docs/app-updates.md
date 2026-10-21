@@ -3,7 +3,7 @@
 POCOX checks GitHub Releases of `acking-you/POCOX` quietly and, when the user
 asks, installs the newer release in one step. The design follows the updater
 of the sibling project proxy-everything (a signed release manifest, per-platform
-installers), with the logic in Rust (`crates/pocket-codex-bridge/src/engine/updates`)
+installers), with the logic in Rust (`crates/pocox-bridge/src/engine/updates`)
 and only the app's own part in Flutter (`apps/flutter/lib/src/updates`).
 
 ## What the user sees
@@ -72,7 +72,7 @@ The app:
 4. on macOS, additionally requires the bundle inside the disk image to pass
    `codesign --verify --deep --strict`, carry the release team's identifier
    (`5T7QB722FM`), pass Gatekeeper (`spctl --assess`: Developer ID signed and
-   notarized), and be `io.github.ackingyou.pocketCodex` at exactly the
+   notarized), and be `io.github.ackingyou.pocox` at exactly the
    manifest's version.
 
 Android's package installer additionally refuses a package signed with another
@@ -124,3 +124,13 @@ test key.
 - Verified on macOS only (see the PR for the run). Windows, Linux and Android
   paths compile in the release workflow and are covered by unit tests of the
   shared logic, not by a run on those systems.
+
+## Naming baseline
+
+The fresh-install baseline uses `pocox-app-*` artifacts and `pocox` application
+identifiers. Earlier installations and data are not migrated. Both release
+packaging and the updater select the new names; no legacy asset fallback exists.
+Android uses the existing release signing key. `POCOX_ANDROID_KEY_ALIAS` (a
+repository variable forwarded to Gradle) selects its keystore entry, defaulting
+to `pocox` when unset or empty. A signing alias is independent of the application
+ID; renaming the app does not require replacing its private key.

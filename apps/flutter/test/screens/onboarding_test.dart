@@ -10,15 +10,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/account_onboarding_screen.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/codex_setup_screen.dart';
-import 'package:pocket_codex/src/screens/onboarding_screen.dart';
-import 'package:pocket_codex/src/screens/settings_screen.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/account_onboarding_screen.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/codex_setup_screen.dart';
+import 'package:pocox/src/screens/onboarding_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
+import 'package:pocox/src/ui_prefs.dart';
 
 import '../fake_bridge_api.dart';
 import '../support/screen_harness.dart';
@@ -429,7 +429,7 @@ void main() {
           uiPrefsProvider.overrideWith(_MemoryPrefs.new),
           webAuthenticatorProvider.overrideWithValue(
             FakeWebAuthenticator(
-              'pocketcodex://auth?exchange_code=xc1&state=fake-state',
+              'pocox://auth?exchange_code=xc1&state=fake-state',
             ),
           ),
         ],

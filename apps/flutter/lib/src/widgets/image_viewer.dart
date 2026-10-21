@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Uint8List;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/image_attachments.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/image_attachments.dart';
+import 'package:pocox/src/widgets/message_images.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 
 /// Fullscreen image viewer: swipe (PageView) between a message's images,
 /// pinch/scroll to zoom (InteractiveViewer), save-to-file on desktop.

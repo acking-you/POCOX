@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// A live waveform: a row of rounded bars driven by a sound [level] (0..1).
 ///

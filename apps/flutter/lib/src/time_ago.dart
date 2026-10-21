@@ -1,4 +1,4 @@
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
 
 /// Whether [unixSeconds] falls on the same calendar day as [now]. A `0`/absent
 /// timestamp is treated as not-today (so it buckets under "earlier").

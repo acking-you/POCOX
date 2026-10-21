@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/native_quit.dart';
-import 'package:pocket_codex/src/quit_status.dart';
-import 'package:pocket_codex/src/window_geometry.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/native_quit.dart';
+import 'package:pocox/src/quit_status.dart';
+import 'package:pocox/src/window_geometry.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 

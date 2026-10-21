@@ -92,7 +92,7 @@ relay-reachable Responses API endpoint for any device:
   native UI for Codex without re-implementing model logic.
 - **Two ways to connect.** *Self-host* — point every device at your own
   `pb-mapper` relay with a shared 32-byte key (the original flow).
-  *Hosted account* — run the optional `pocket-codex-backend` once on your
+  *Hosted account* — run the optional `pocox-backend` once on your
   server, then every device just signs in with **GitHub**
   (`pocox login`, or "Sign in with GitHub" in the app); the backend
   hands each account a short-lived relay credential scoped to its own
@@ -100,9 +100,11 @@ relay-reachable Responses API endpoint for any device:
   relay's administrator key is never handed to clients, accounts can't see each
   other, and the backend isn't in the middle of your traffic.
 
-The command is `pocox`; an install upgraded from the former `pocket-codex`
-keeps that name as an alias. Crates, packages and app identifiers keep their
-`pocket-codex` names, so existing installs, scripts and settings carry over.
+The command is `pocox`. Crates, packages, application identifiers, data paths
+and release assets now use `pocox`; environment variables use `POCOX_*`.
+This is a fresh-install baseline: configure the app and CLI again. Former
+names and settings are not migrated, and existing data is left untouched.
+The Linux desktop launcher is `pocox-app`, separate from the CLI.
 
 In short: **each computer keeps its agents and logins; every other device —
 the POCOX apps, a remote `codex` CLI, or any OpenAI-compatible tool —
@@ -116,7 +118,8 @@ or a per-account GitHub login (hosted).
 | Workspace / lints / CI         | bootstrapped                           |
 | `pocox` CLI                    | `login`, `logout`, `account`, `init`, `serve`, `connect`, `api {serve,connect}`, `services {list,default set,share,unshare,connect,disconnect}`, `open`, `tools`, top-level `status`/`stop`, `codex {start,stop,status}`, `pb {register,subscribe,status}`, `remote-hint`, `version` |
 | Agent tools + galaxy           | one `pocox` MCP server for every harness: see the user's devices and services, share a dev server with the phone (asking the user first), connect to another device's service. Hosted Codex, Claude and OpenCode get it by default, and so does Grok Build (it accepts HTTP MCP servers in each ACP session); other agents get a copied entry. The galaxy shows every device and service as a living star map, its per-frame geometry computed in Rust and its glows and spheres drawn from cached images ([details](docs/agent-tools.md), [frame geometry and drawing](docs/galaxy-geometry.md)) |
-| `pb-mapper` register/subscribe | SDK 0.6.0 from the `pocket-codex` branch, pinned by `Cargo.lock`; bounded recovery and data-v2 nonce separation without data-key derivation or extra frame bytes |
+| Unified pocox identifiers | Crates, native apps, data directories, auth callbacks, environment variables and release assets use the new name; fresh installs only, without legacy aliases or migration |
+| `pb-mapper` register/subscribe | SDK 0.6.0 from the `pocox` branch, pinned by `Cargo.lock`; bounded recovery and data-v2 nonce separation without data-key derivation or extra frame bytes |
 | `codex app-server` supervision | native process identity, upgrade-aware executable matching, and state.toml |
 | App-server protocol | synced to upstream main `8d9f6466f` (2026-10-18), fork merge `35eabb7013`; host session inventory, running state, liveness and resume follow the app-server's own `thread/list` and `Thread.status` (rollout probes only for writers it cannot see), controllers follow `thread/status/changed`, and compressed (`.jsonl.zst`) rollouts are read; verified aggregated command output, persisted truncation markers, unknown error variants, initialization and opaque history cursors ([audit](docs/app-server-protocol-sync.md)) |
 | macOS releases | Fixed blue Dock icon in light/dark mode, and a monochrome menu-bar icon in the menu bar's own colour. Developer ID signing, Apple notarization and stapled tickets for DMG/ZIP; required credential setup and release-only theme regression: [macOS distribution](docs/macos-release.md). |
@@ -126,7 +129,7 @@ or a per-account GitHub login (hosted).
 | Conversation history | child sessions start collapsed, including Active; manual folds survive live updates and inventory refresh; local-session availability and empty states; explicit loads reveal/highlight new content, scroll loads preserve position, and short pages accept edge gestures; bounded session cache, authoritative pagination end, and gaps at their actual position after timeline jumps; cached turn pages, explicit retry, stable reading position, and linear timeline grouping. The transcript is anchored at a centre row, so pages and gaps filled above never move what is on screen and a jump lands exactly in its first frame, with the turn above read ahead; a fully read turn is never fetched again. Codex Desktop automation runs show as compact capsules opening into their instructions, empty replies leave no row, and a pasted attachment whose temp file is gone is served from the rollout's inline copy |
 | Review | a review sidebar beside the conversation from 1100 px (an overlay panel below that, its own page with swipe-back on phones): this conversation's edits by file, every edit in order or one step opened from its change card, or the working tree against its upstream; lazy diffs with gap expansion and a whole-file view with the changes marked, read through the session's file route; a working tree not yet read says so with a retry |
 | Phone navigation | the sessions list lies under the conversation: a horizontal swipe anywhere on the chat moves it aside with the finger, rests where held, and on release completes the direction last moved (no distance threshold), with one light haptic when it settles open, and opening never raises the keyboard; back/Escape/close controls, system gesture cancellation, reduced motion, and the list's scroll and folds are preserved. Touch tablets give the inline sidebar its full default width. Covered by widget tests, and on an iPhone 15 / iOS 17.5 simulator: edge drag, release, reverse-drag cancel (earlier edge/threshold build), close, list touch scroll kept across close/reopen, a multiline draft kept, Chinese pinyin composition and Return inserting a newline without sending. The simulator has no haptic feel; haptics and system pointer cancellation are covered by widget tests only, and no physical phone or tablet has been checked. |
-| Provider-native local history | Desktop Local sessions selects Codex, Claude or OpenCode. Claude and OpenCode history opens without an ACP connection, with bounded older pages and foreground read-only following; browsing never resumes an external writer. Claude ownership is checked against native session metadata and process identity; unavailable evidence remains unknown. Browsing stays read-only; a session continues by opening it on a running Claude or OpenCode host, which resolves its access automatically (write when admitted, otherwise followed with the reason; no takeover step). Pocket hosts exclude each other; native clients do not honor that and must remain closed for the session. New ACP conversations prepare automatically for the selected folder; a first-run folder picker works without saved projects ([scope and limits](docs/native-agent-history.md)). |
+| Provider-native local history | Desktop Local sessions selects Codex, Claude or OpenCode. Claude and OpenCode history opens without an ACP connection, with bounded older pages and foreground read-only following; browsing never resumes an external writer. Claude ownership is checked against native session metadata and process identity; unavailable evidence remains unknown. Browsing stays read-only; a session continues by opening it on a running Claude or OpenCode host, which resolves its access automatically (write when admitted, otherwise followed with the reason; no takeover step). POCOX hosts exclude each other; native clients do not honor that and must remain closed for the session. New ACP conversations prepare automatically for the selected folder; a first-run folder picker works without saved projects ([scope and limits](docs/native-agent-history.md)). |
 | Mobile message actions | visible press feedback through menu dismissal; long-press menus for copy, text selection and native sharing in conversations and read-only views; edit user text into the current draft without losing existing text/attachments, sending automatically, or changing history |
 | Native image generation | live generation/loading feedback, inline previews and native file saving, retryable remote artifact reads, and restored/monitored/read-only results; uses the external Codex image tool ([verification](docs/native-image-generation.md)) |
 | Session file links | live and read-only session links with rendered Markdown, JSON, CSV/TSV and SVG previews plus a source view, image previews, streamed remote downloads with legacy Host Files support, mobile Save As, verified local reads, and pb-mapper guidance for remote localhost pages ([details](docs/session-file-links.md)) |
@@ -141,10 +144,10 @@ or a per-account GitHub login (hosted).
 | Grok Build | the installed `grok` hosted as a built-in ACP preset (`grok agent --no-leader stdio`); model service from Grok's own configuration, its Grok account (device sign-in, status and sign-out in the hosting editor, no host needed) or a custom provider (Responses, Anthropic Messages, Chat Completions) in a Grok home of the host's own, with the key only in the agent's environment and the gateway's models listed; Local sessions reads `~/.grok` sessions with Grok's own rewind and turn rules, and renames or deletes them through Grok while nothing else holds them; Grok terminal clients are recognised as holders. From Grok 1.0.45 the host uses Grok's own extensions: supplements to a running turn (`_x.ai/interject`), turns Grok starts by itself followed live, rename, context use, Grok's questions and plan approval, its `/` commands (with `/compact`), native tool rows, plan and permission modes, Fast, images and the account's usage window. Verified on one Mac with Grok 1.0.4 and 1.0.62 through opt-in live tests (a real turn via a loopback model, a merged supplement, native read-back, hand-back and reopen, rename/delete, a device sign-in up to its code) and in the macOS app on a Grok account (Grok 4.7: commands, context use, the weekly window, native tool rows and share cards, a supplement merged mid-thought, Fast). Not verified: Grok's real questions, plan approval and self-started turns (mock only) ([details](docs/grok-build.md)) |
 | Hosting configuration | one responsive editor creates and edits hosts; Start, Save, Restart and Stop show their progress on their own button, pin their outcome above the actions and confirm a finished start or stop with a toast; each host saves its model service: existing configuration, official Codex sign-in in place (no running host needed), or a custom provider (Codex: Responses; Claude preset: Anthropic Messages; native OpenCode: Responses, Anthropic Messages or Chat Completions; other ACP agents keep their own configuration). Keys stay on this device and reach the agent only through its environment; a keyed Codex host's raw output is never kept (its log and viewer show fixed notices only). Codex hosts and the sign-in server verify their effective route before use. A launch owns its endpoint only when the listening sockets its listen address reaches are held by the process it spawned (or that process's child), observed at fixed points; only owned processes are stopped, and one that does not exit stays listed, keeps its name and is stopped again by Stop or quit; a quit that cannot stop everything it owns keeps the app open. A running host's runtime (Codex binary/port/proxy, ACP program/args) and provider are saved without a restart and applied by an explicit, confirmed restart of the reviewed incarnation and revision, which restores the previous runtime on failure. The `api:<name>` service stays a separate official Responses proxy. Settings, Codex setup and the chat's setup banner open the same editor (a running host picked by its identity, the chat's own host, or a new one); Codex setup keeps only Codex's own sign-in and prompt option. At the editor's release (historical counts), the full Rust suite (743 passed, 14 ignored), Flutter suite (l10n, format, analyze; 1326 passed, 5 existing skips) and macOS profile build passed. Native UI checks covered Settings and Codex setup routing to running hosts or a new host, repeated selection, keyboard cancellation, return navigation and unsaved-change protection. Live on one Mac: native Codex custom Responses with two real models across save and apply, the since-removed OpenCode ACP preset's Responses and Anthropic Messages routes with real models, the official Responses proxy over HTTP/SSE and WebSocket through a public relay, and save/apply ownership for native and Claude hosts. That former ACP preset's Chat Completions route was checked only against a deterministic local fixture; native OpenCode's own evidence is in its row. Not exercised: completing an interactive OAuth sign-in, other platforms, hosted-account mode, effort options ([details](docs/hosting-configuration.md)) |
 | Direct Responses API proxy     | local HTTP/WS proxy registered through pb-mapper |
-| Hosted account (GitHub)        | optional `pocket-codex-backend`: GitHub login, then a short-lived per-account relay credential (`/v1/relay`) scoped to a `pcxu:<user>:…` namespace — clients register/connect against the relay **directly** and the administrator key never leaves the server; self-host preserved behind `--relay`. See [`deploy/`](deploy/README.md) |
+| Hosted account (GitHub)        | optional `pocox-backend`: GitHub login, then a short-lived per-account relay credential (`/v1/relay`) scoped to a `pcxu:<user>:…` namespace — clients register/connect against the relay **directly** and the administrator key never leaves the server; self-host preserved behind `--relay`. See [`deploy/`](deploy/README.md) |
 | Flutter UI (`apps/flutter`)    | chat-first home (opens straight into the latest session, cross-fading from the connecting splash; all sessions in the sidebar, behind a skeleton until the host first lists them, with neutral selection, animated running indicators, accessible hierarchy controls and stacked metadata at narrow widths or large text sizes; auto-connects to the explicit default / last-used / locally hosted / first reachable host, desktop auto-restores hosting); account onboarding ("Sign in with GitHub") + self-host onboarding (relay+key, `pcx1:` import/export); device-first service management, settings, sessions, and logs with shared secondary-page navigation; shared calm neutral design system with one blue signal colour (no purple), layered translucent (liquid-glass) surfaces, anchored desktop popovers, persistent utility navigation, adaptive desktop/tablet/phone layouts (light/dark), Markdown user and agent messages, a theme switch that spreads from the control pressed, a compact composer with automatic height, visible height reset, expanded editing with a live Markdown preview, conversation and per-project unsent drafts retained during the app session, minimal new-session views, project shortcuts revealed on hover/keyboard focus or touch long-press, separate Queue/Stop actions, mobile newline / desktop Enter-to-send, retryable attachments, a jump-to-latest button with a moving blue ring while the conversation runs (steady with reduced motion), and matching icons/artwork |
 | Live voice | WebRTC voice conversations on mobile and desktop through external Codex; distinct persisted voice-session markers, model/voice selection, a persistent call status with mute, hang-up and barge-in, paginated speech transcripts, and composer dictation on the same realtime path. Requires a host/account with realtime access. No system speech provider. See [voice controls](docs/live-voice.md). |
-| Remote device management | Stable installation identities and distinct default relay keys for Windows, WSL distributions and separate installations on one computer; host-reported OS, architecture and distribution metadata; independent local controls even before hosting starts, with no hostname-based locality guesses. CLI `serve --allow-remote-management` shares the desktop native engine without Flutter, publishes a management-only `host:pocket` entry, restores authoritative service choices and handles SIGINT/SIGTERM; a desktop can allow other devices (a phone included) to add, edit, apply and stop its Codex, native OpenCode, Claude and saved services through a management-only `host` entry, with revision/incarnation checks, write-only secrets, no automatic resend and authoritative restore; a per-host default project folder for new conversations; a concise status page with expandable diagnostics; Refresh services in the chat host switcher and compact Add service rows with path details. The host switcher reads remote ACP profiles before connecting, showing Claude/Grok marks and names as they arrive, including in an already-open phone sheet; unknown or unreachable agents keep the generic mark. Covered by widget tests; phone add/edit/apply verified against a real desktop host, and the current functionality accepted by the user on the installed desktop and iOS apps; no physical-phone haptics or other platforms claimed ([details](docs/remote-device-management.md)) |
+| Remote device management | Stable installation identities and distinct default relay keys for Windows, WSL distributions and separate installations on one computer; host-reported OS, architecture and distribution metadata; independent local controls even before hosting starts, with no hostname-based locality guesses. CLI `serve --allow-remote-management` shares the desktop native engine without Flutter, publishes a management-only `host:pocox` entry, restores authoritative service choices and handles SIGINT/SIGTERM; a desktop can allow other devices (a phone included) to add, edit, apply and stop its Codex, native OpenCode, Claude and saved services through a management-only `host` entry, with revision/incarnation checks, write-only secrets, no automatic resend and authoritative restore; a per-host default project folder for new conversations; a concise status page with expandable diagnostics; Refresh services in the chat host switcher and compact Add service rows with path details. The host switcher reads remote ACP profiles before connecting, showing Claude/Grok marks and names as they arrive, including in an already-open phone sheet; unknown or unreachable agents keep the generic mark. Covered by widget tests; phone add/edit/apply verified against a real desktop host, and the current functionality accepted by the user on the installed desktop and iOS apps; no physical-phone haptics or other platforms claimed ([details](docs/remote-device-management.md)) |
 | Harness connection lifecycle | Owned probe teardown and per-service idle reclamation bound abandoned relay connections, including older controllers. Local file/socket exhaustion is diagnosed accurately and does not restart healthy Codex or revoke management. See [recovery details](docs/harness-connection-lifecycle.md) |
 | Application network | Phone and desktop settings accept an HTTP(S) or SOCKS5 proxy for update checks/downloads, account requests, avatars and favicons. SOCKS5 resolves names remotely; changes apply to new requests, with credentials masked and no direct fallback. Relay and harness settings remain independent. Mobile Codex setup shows host guidance without reading a local `CODEX_HOME`. See [network settings](docs/app-updates.md#application-network-proxy). |
 | App updates | a quiet background check of GitHub Releases (20 s after start, then at most every six hours), one toast per new release, and **Settings › Updates** with a one-click update whose progress shows on its button. Releases carry an Ed25519-signed manifest of every file's size and SHA-256; macOS also requires the release team's Developer ID signature, notarization, bundle identifier and version. macOS swaps the bundle and reopens it, installed Windows runs its installer quietly, an AppImage replaces itself, a `.deb` opens in the package installer, portable archives are saved to Downloads, Android hands the package to the system installer, iOS opens the release page. Verified on macOS (a real notarized release swapped in and reopened; a mismatched bundle refused); other platforms by unit tests of the shared logic only ([details](docs/app-updates.md)) |
@@ -161,7 +164,7 @@ Multi-device CLI flows are usable in both modes:
   always selects (the escape hatch).
 - `pocox init [--relay <host:port>] [--key <32B>]` persists the
   default relay address and shared `MSG_HEADER_KEY` to
-  `~/.config/pocket-codex/config.toml` (0600 on Unix). All subsequent
+  `~/.config/pocox/config.toml` (0600 on Unix). All subsequent
   commands default to this config (precedence: `--relay` flag > config >
   `$PB_MAPPER_SERVER`); `--relay` still overrides per-invocation.
 - `pocox serve --relay <host:port>` starts or reuses the local
@@ -192,11 +195,11 @@ POCOX/
 ├── assets/
 │   └── logo/                    # Project artwork (poster, logo)
 ├── crates/
-│   ├── pocket-codex-core        # shared types, config, state, paths
-│   ├── pocket-codex-codex       # codex app-server process manager
-│   ├── pocket-codex-pb          # pb-mapper register/subscribe glue
-│   ├── pocket-codex-cli         # `pocox` binary
-│   └── pocket-codex-bridge      # cdylib consumed by flutter_rust_bridge
+│   ├── pocox-core        # shared types, config, state, paths
+│   ├── pocox-codex       # codex app-server process manager
+│   ├── pocox-pb          # pb-mapper register/subscribe glue
+│   ├── pocox-cli         # `pocox` binary
+│   └── pocox-bridge      # cdylib consumed by flutter_rust_bridge
 ├── deps/
 │   └── codex/                   # upstream codex (git submodule)
 ├── docs/                        # design notes & protocol references
@@ -224,8 +227,8 @@ curl -fsSL https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/insta
 irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 | iex
 ```
 
-Overrides (env vars): `POCKET_CODEX_VERSION` pins a tag (e.g. `v0.1.3`),
-`POCKET_CODEX_BIN_DIR` sets the install dir, `POCKET_CODEX_NO_MODIFY_PATH=1`
+Overrides (env vars): `POCOX_VERSION` pins a tag (e.g. `v0.1.3`),
+`POCOX_BIN_DIR` sets the install dir, `POCOX_NO_MODIFY_PATH=1`
 skips the PATH step. Prefer a package or a from-source build? See below.
 
 ### Rust workspace
@@ -242,7 +245,7 @@ git submodule update --init --recursive
 cargo build --workspace
 
 # Inspect the CLI surface.
-cargo run -p pocket-codex-cli -- --help
+cargo run -p pocox-cli -- --help
 ```
 
 A working `codex` binary is expected to exist on `$PATH`; POCOX
@@ -268,7 +271,7 @@ pocox version
 #### Hosted account (recommended)
 
 Sign in once with GitHub and every command works **without a relay address or
-shared key**. Requires a reachable `pocket-codex-backend` — run your own; see
+shared key**. Requires a reachable `pocox-backend` — run your own; see
 [`deploy/`](deploy/README.md).
 
 > **Full step-by-step guide (CLI + app):** [`docs/usage.md`](docs/usage.md)
@@ -332,7 +335,7 @@ fvm flutter analyze
 fvm flutter test
 ```
 
-If you change anything under `crates/pocket-codex-bridge/src/api/`,
+If you change anything under `crates/pocox-bridge/src/api/`,
 re-run the codegen:
 
 ```bash

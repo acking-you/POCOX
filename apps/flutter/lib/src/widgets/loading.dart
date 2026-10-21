@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/motion.dart';
 
 /// Drives the sweep for the skeleton shapes ([SkeletonBox]) beneath it, so a
 /// screen waiting on data reads as "content is coming" rather than as a frozen

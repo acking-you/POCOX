@@ -4,15 +4,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations_en.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/host_restore.dart';
-import 'package:pocket_codex/src/native_hosts.dart';
-import 'package:pocket_codex/src/screens/app_session/agent_permission_card.dart';
-import 'package:pocket_codex/src/screens/app_session/agent_session_options.dart';
-import 'package:pocket_codex/src/screens/app_session/command_palette.dart';
-import 'package:pocket_codex/src/screens/app_session/user_input_card.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/l10n/gen/app_localizations_en.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/host_restore.dart';
+import 'package:pocox/src/native_hosts.dart';
+import 'package:pocox/src/screens/app_session/agent_permission_card.dart';
+import 'package:pocox/src/screens/app_session/agent_session_options.dart';
+import 'package:pocox/src/screens/app_session/command_palette.dart';
+import 'package:pocox/src/screens/app_session/user_input_card.dart';
+import 'package:pocox/src/ui_prefs.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';

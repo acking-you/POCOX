@@ -10,13 +10,13 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/code_highlight.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/change_counts.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/code_highlight.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/change_counts.dart';
 
 /// Most diff lines rendered for one expanded file. Everything inside a
 /// [SingleChildScrollView] is laid out whether or not it is on screen, so this

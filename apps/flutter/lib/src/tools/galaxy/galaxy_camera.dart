@@ -5,7 +5,7 @@ library;
 import 'dart:math' as math;
 import 'dart:ui';
 
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
 /// One projected point.
 typedef Projected = ({Offset point, double scale, double depth});

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// A titled card whose rows are separated by hairlines — the app's standard way
 /// to group related settings or capabilities.

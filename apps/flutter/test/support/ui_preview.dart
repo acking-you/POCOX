@@ -1,5 +1,5 @@
 // Shared preview support for layout tests: real bundled fonts and optional
-// PNG export. Set PCX_UI_PREVIEW_DIR to write each captured layout as a PNG.
+// PNG export. Set POCOX_UI_PREVIEW_DIR to write each captured layout as a PNG.
 //
 // Fonts come from the test asset bundle (Google Sans Flex, Geist Mono,
 // Lucide and Material Icons) and, for Chinese, the desktop-only Noto Sans SC read from the
@@ -18,7 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 const previewKey = Key('ui-preview');
 
 /// Where previews are written, or null when they are not requested.
-String? get previewDir => Platform.environment['PCX_UI_PREVIEW_DIR'];
+String? get previewDir => Platform.environment['POCOX_UI_PREVIEW_DIR'];
 
 /// Load the app's real fonts. With [always] false (the default) this only
 /// happens when previews are requested, so ordinary runs keep the test

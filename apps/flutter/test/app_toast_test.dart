@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Mounts a button that raises a toast, so each test drives the real
 /// `ScaffoldMessenger` path rather than the builder in isolation.

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// A button's label that turns into a small spinner beside [busyLabel] while
 /// the button's own action runs, the button resizing smoothly between the

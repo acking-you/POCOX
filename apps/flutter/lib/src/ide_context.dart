@@ -212,7 +212,7 @@ bool isTruncatedIdeContext(String preview) {
 // that carries the user role but that codex wrote. Mirrors the wire constants
 // in `codex-rs/protocol/src/protocol.rs` and the fragments declaring their own
 // `type_markers()` under `codex-rs/core/src/context/`. The same list lives in
-// `crates/pocket-codex-codex/src/rollout.rs`, which filters rollouts we read
+// `crates/pocox-codex/src/rollout.rs`, which filters rollouts we read
 // ourselves; this copy covers previews that come from codex's app-server.
 //
 // Most fragments are `<tag>…</tag>`; the project's AGENTS.md is marked by prose

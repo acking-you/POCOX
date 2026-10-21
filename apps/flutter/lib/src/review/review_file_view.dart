@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/review/diff_rows.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/review/diff_rows.dart';
 import 'package:super_sliver_list/super_sliver_list.dart';
 
 /// The new-file numbers of the lines [file]'s diff added.

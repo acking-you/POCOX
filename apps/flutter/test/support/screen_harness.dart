@@ -17,10 +17,10 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:image/image.dart' as img;
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/web_authenticator.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/web_authenticator.dart';
 
 /// Fake browser hand-off: returns a canned redirect URL (or throws) instead of
 /// driving the real platform-channel plugin.

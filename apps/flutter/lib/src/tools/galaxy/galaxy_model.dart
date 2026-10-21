@@ -5,8 +5,8 @@ library;
 
 import 'dart:math' as math;
 
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/service_key.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/service_key.dart';
 
 /// A point or direction in the galaxy's world (the disk is the x–z plane,
 /// y points up out of it).

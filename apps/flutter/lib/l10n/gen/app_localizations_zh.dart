@@ -2989,7 +2989,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openCodeRuntimeHint =>
-      'Pocket 在这台电脑上启动并管理一个 opencode serve，只能通过这个主机访问。';
+      'POCOX 在这台电脑上启动并管理一个 opencode serve，只能通过这个主机访问。';
 
   @override
   String get openCodeDetecting => '正在查找 OpenCode…';
@@ -3083,7 +3083,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openCodeScopeNote =>
-      '所有 Pocket 设备都通过这一个服务写入，因此它们的回合不会重叠。这台电脑上的 OpenCode 窗口和其他 OpenCode 进程不受阻止。';
+      '所有 POCOX 设备都通过这一个服务写入，因此它们的回合不会重叠。这台电脑上的 OpenCode 窗口和其他 OpenCode 进程不受阻止。';
 
   @override
   String get refresh => '刷新';
@@ -3110,7 +3110,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get accessScopePocket => '由这个主机持有。其他 Pocket 主机不能写入；原生客户端不受阻止。';
+  String get accessScopePocox => '由这个主机持有。其他 POCOX 主机不能写入；原生客户端不受阻止。';
 
   @override
   String get accessScopeNone => '通过这个主机写入。其他客户端不受阻止。';
@@ -3122,7 +3122,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accessClientOpenCode => '另一个 OpenCode 进程';
 
   @override
-  String get accessClientPocketHost => '另一个 Pocket 主机';
+  String get accessClientPocoxHost => '另一个 POCOX 主机';
 
   @override
   String get accessClientOther => '另一个客户端';
@@ -3199,7 +3199,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accessSourceOpenDetail =>
-      'Pocket 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。';
+      'POCOX 无法判断它正在写入哪个会话或回合。请在那里关闭或释放它，然后立即检查。';
 
   @override
   String get accessOpenCodeServiceTitle => 'OpenCode 的后台服务打开了这个历史来源';
@@ -3216,15 +3216,15 @@ class AppLocalizationsZh extends AppLocalizations {
       'OpenCode 无法知道它正在显示哪些会话。请在那里关闭它（终端应用、桌面应用或浏览器标签页），然后立即检查。';
 
   @override
-  String accessPocketHostTitle(String client) {
+  String accessPocoxHostTitle(String client) {
     return '$client 正在写入这个会话';
   }
 
   @override
-  String get accessPocketHostRunning => '它正在运行一个回合。';
+  String get accessPocoxHostRunning => '它正在运行一个回合。';
 
   @override
-  String get accessPocketHostIdle => '那里没有正在运行的回合，但它仍持有这个会话。';
+  String get accessPocoxHostIdle => '那里没有正在运行的回合，但它仍持有这个会话。';
 
   @override
   String accessUnsupportedTitle(String agent) {
@@ -3379,7 +3379,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String managedComputerSummary(String os, String version) {
-    return '$os · Pocket $version';
+    return '$os · POCOX $version';
   }
 
   @override

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/network/network_settings.dart';
+import 'package:pocox/src/network/network_settings.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';

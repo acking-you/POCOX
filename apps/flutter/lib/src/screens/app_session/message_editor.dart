@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
 
 /// Edits a historical prompt without modifying history or the current draft.
 class MessageEditor extends StatefulWidget {

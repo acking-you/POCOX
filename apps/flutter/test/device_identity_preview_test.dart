@@ -5,17 +5,17 @@
 // 390 phone and a 1440 desktop, light and dark, Chinese and English. Each
 // scene must lay out without overflow.
 //
-// Set PCX_UI_PREVIEW_DIR to also write each scene as a PNG for review.
+// Set POCOX_UI_PREVIEW_DIR to also write each scene as a PNG for review.
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/theme.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/screen_harness.dart';
@@ -34,8 +34,8 @@ FakeBridgeApi _api() {
               ServiceEntry(
                 device: device,
                 kind: 'host',
-                name: 'pocket',
-                key: 'pcx:$device:host:pocket',
+                name: 'pocox',
+                key: 'pcx:$device:host:pocox',
               ),
             const ServiceEntry(
               device: _server,
@@ -71,7 +71,7 @@ FakeBridgeApi _api() {
     (_ubuntu, '2222aaaa-1234-4123-8123-123456789abc'),
     (_ubuntuCopy, '4444bbbb-1234-4123-8123-123456789abc'),
   ]) {
-    api.managedDevices['pcx:$device:host:pocket'] = ManagedDevice(
+    api.managedDevices['pcx:$device:host:pocox'] = ManagedDevice(
       device: device,
       os: 'linux',
       metadata: DeviceMetadata(

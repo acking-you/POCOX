@@ -13,7 +13,7 @@ class NativeQuitChannel {
   /// Binds [onQuit] to [channel].
   NativeQuitChannel({
     required this.onQuit,
-    this.channel = const MethodChannel('pocket_codex/app_quit'),
+    this.channel = const MethodChannel('pocox/app_quit'),
   });
 
   /// Runs (or joins) the app's quit.

@@ -1,6 +1,6 @@
 // Opt-in native regression using the configured local host and existing
 // sessions. No model turn, takeover, deletion, or message is sent.
-// Run with PCX_LIVE_UI=true and PCX_HISTORY_THREAD_IDS (comma-separated).
+// Run with POCOX_LIVE_UI=true and POCOX_HISTORY_THREAD_IDS (comma-separated).
 import 'dart:io';
 import 'dart:ui' show FrameTiming;
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
@@ -9,16 +9,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:pocket_codex/main.dart' as application;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/app_session_screen.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/loading.dart';
-import 'package:pocket_codex/src/widgets/turn_minimap.dart';
+import 'package:pocox/main.dart' as application;
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/loading.dart';
+import 'package:pocox/src/widgets/turn_minimap.dart';
 import 'package:window_manager/window_manager.dart';
 
 class _MemoryPrefs extends UiPrefsStore {
@@ -50,9 +50,9 @@ void main() {
   testWidgets(
     'native long-history opens, monitoring, navigation and resize',
     (tester) async {
-      const enabled = bool.fromEnvironment('PCX_LIVE_UI');
-      const ids = String.fromEnvironment('PCX_HISTORY_THREAD_IDS');
-      const gapTurn = String.fromEnvironment('PCX_HISTORY_GAP_TURN_ID');
+      const enabled = bool.fromEnvironment('POCOX_LIVE_UI');
+      const ids = String.fromEnvironment('POCOX_HISTORY_THREAD_IDS');
+      const gapTurn = String.fromEnvironment('POCOX_HISTORY_GAP_TURN_ID');
       if (!enabled || ids.isEmpty) {
         markTestSkipped('existing local-host sessions not configured');
         return;

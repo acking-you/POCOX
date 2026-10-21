@@ -4,7 +4,7 @@ import 'package:flutter/gestures.dart'
     show DragStartBehavior, PointerCancelEvent, PointerDeviceKind;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/src/motion.dart';
+import 'package:pocox/src/motion.dart';
 
 /// The phone's navigation: a full-screen sidebar lying underneath the page,
 /// revealed by sliding the page aside.

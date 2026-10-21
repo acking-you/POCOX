@@ -8,11 +8,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/theme.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
@@ -24,7 +24,7 @@ const _codexPath = '/opt/homebrew/bin/codex';
 const _openCodePath = '/Users/someone/.nvm/versions/node/v20.20.1/bin/opencode';
 const _claudePath =
     '/Users/someone/Library/Application Support/io.github.acking-you.'
-    'pocket-codex/acp-runtime/claude-agent-acp/node_modules/.bin/'
+    'pocox/acp-runtime/claude-agent-acp/node_modules/.bin/'
     'claude-agent-acp';
 
 const _runtimes = [

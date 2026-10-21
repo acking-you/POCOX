@@ -3,11 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/local_session_view_screen.dart';
-import 'package:pocket_codex/src/screens/local_sessions_screen.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/local_session_view_screen.dart';
+import 'package:pocox/src/screens/local_sessions_screen.dart';
 import 'fake_bridge_api.dart';
 
 /// Mount [child] with a fake bridge + localizations (Chinese, matching the

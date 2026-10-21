@@ -52,7 +52,7 @@ apps/flutter/**/pubspec.lock
 .worktrees/
 
 # Local note files (never committed)
-pocket-codex-codex-raw-dialogue.md
+pocox-codex-raw-dialogue.md
 
 # Visual-companion brainstorm scratch (not source)
 .superpowers/

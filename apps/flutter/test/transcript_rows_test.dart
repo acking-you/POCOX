@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_rows.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/transcript_rows.dart';
 
 void main() {
   test('a partial next turn cannot swallow the previous final answer', () {

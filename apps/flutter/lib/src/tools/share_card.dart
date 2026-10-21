@@ -5,15 +5,15 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
-import 'package:pocket_codex/src/tools/tools_actions.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
+import 'package:pocox/src/tools/tools_actions.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
 
 /// The reference for a live [share].
 ShareRef shareRefOf(ToolsShare share) => ShareRef(

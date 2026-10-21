@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-export 'package:pocket_codex/src/bridge_api.dart' show AgentIdentity;
+export 'package:pocox/src/bridge_api.dart' show AgentIdentity;
 
 /// Which bundled mark an agent shows.
 ///

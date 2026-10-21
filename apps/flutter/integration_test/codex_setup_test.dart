@@ -11,13 +11,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/codex_setup_screen.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
-import 'package:pocket_codex/src/rust/api/bridge/codex_setup.dart' as frb;
-import 'package:pocket_codex/src/rust/frb_generated.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/codex_setup_screen.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/codex_setup.dart' as frb;
+import 'package:pocox/src/rust/frb_generated.dart';
 
 /// True when CODEX_HOME is an isolated temp dir we may freely write to.
 bool get _isolatedCodexHome {
@@ -70,8 +70,8 @@ void main() {
     expect(afterProvider.needsSetup, isFalse);
 
     final config = await configFile.readAsString();
-    expect(config, contains('model_provider = "pocket"'));
-    expect(config, contains('[model_providers.pocket]'));
+    expect(config, contains('model_provider = "pocox"'));
+    expect(config, contains('[model_providers.pocox]'));
     expect(config, contains('base_url = "https://it.example.com/v1"'));
     expect(config, contains('experimental_bearer_token = "sk-it-secret"'));
 
@@ -88,7 +88,7 @@ void main() {
     expect(await frb.codexPromptVariant(), 'default');
     final back = await configFile.readAsString();
     expect(back.contains('model_instructions_file'), isFalse);
-    expect(back, contains('[model_providers.pocket]'));
+    expect(back, contains('[model_providers.pocox]'));
   });
 
   testWidgets('CodexSetupScreen reports the provider the real bridge reads, '

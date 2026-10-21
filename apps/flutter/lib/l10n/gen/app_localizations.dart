@@ -5573,7 +5573,7 @@ abstract class AppLocalizations {
   /// No description provided for @openCodeRuntimeHint.
   ///
   /// In en, this message translates to:
-  /// **'Pocket starts and owns one opencode serve on this computer, reachable only through this host.'**
+  /// **'POCOX starts and owns one opencode serve on this computer, reachable only through this host.'**
   String get openCodeRuntimeHint;
 
   /// No description provided for @openCodeDetecting.
@@ -5729,7 +5729,7 @@ abstract class AppLocalizations {
   /// No description provided for @openCodeScopeNote.
   ///
   /// In en, this message translates to:
-  /// **'Every Pocket device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.'**
+  /// **'Every POCOX device writes through this one server, so its turns never overlap. OpenCode windows and other OpenCode processes on this computer are not blocked.'**
   String get openCodeScopeNote;
 
   /// No description provided for @refresh.
@@ -5768,11 +5768,11 @@ abstract class AppLocalizations {
   /// **'Writing through this host. Other {agent} clients on this computer are not blocked.'**
   String accessScopeEngine(String agent);
 
-  /// No description provided for @accessScopePocket.
+  /// No description provided for @accessScopePocox.
   ///
   /// In en, this message translates to:
-  /// **'Held by this host. Other Pocket hosts cannot write; native clients are not blocked.'**
-  String get accessScopePocket;
+  /// **'Held by this host. Other POCOX hosts cannot write; native clients are not blocked.'**
+  String get accessScopePocox;
 
   /// No description provided for @accessScopeNone.
   ///
@@ -5792,11 +5792,11 @@ abstract class AppLocalizations {
   /// **'Another OpenCode process'**
   String get accessClientOpenCode;
 
-  /// No description provided for @accessClientPocketHost.
+  /// No description provided for @accessClientPocoxHost.
   ///
   /// In en, this message translates to:
-  /// **'Another Pocket host'**
-  String get accessClientPocketHost;
+  /// **'Another POCOX host'**
+  String get accessClientPocoxHost;
 
   /// No description provided for @accessClientOther.
   ///
@@ -5933,7 +5933,7 @@ abstract class AppLocalizations {
   /// No description provided for @accessSourceOpenDetail.
   ///
   /// In en, this message translates to:
-  /// **'Pocket cannot tell which session or turn it writes. Close or release it there, then check now.'**
+  /// **'POCOX cannot tell which session or turn it writes. Close or release it there, then check now.'**
   String get accessSourceOpenDetail;
 
   /// No description provided for @accessOpenCodeServiceTitle.
@@ -5960,23 +5960,23 @@ abstract class AppLocalizations {
   /// **'OpenCode cannot tell which sessions it shows. Close it there (the terminal app, desktop app or browser tab), then check now.'**
   String get accessOpenCodeClientDetail;
 
-  /// No description provided for @accessPocketHostTitle.
+  /// No description provided for @accessPocoxHostTitle.
   ///
   /// In en, this message translates to:
   /// **'{client} is writing this session'**
-  String accessPocketHostTitle(String client);
+  String accessPocoxHostTitle(String client);
 
-  /// No description provided for @accessPocketHostRunning.
+  /// No description provided for @accessPocoxHostRunning.
   ///
   /// In en, this message translates to:
   /// **'It is running a turn now.'**
-  String get accessPocketHostRunning;
+  String get accessPocoxHostRunning;
 
-  /// No description provided for @accessPocketHostIdle.
+  /// No description provided for @accessPocoxHostIdle.
   ///
   /// In en, this message translates to:
   /// **'No turn is running there, but it still holds the session.'**
-  String get accessPocketHostIdle;
+  String get accessPocoxHostIdle;
 
   /// No description provided for @accessUnsupportedTitle.
   ///
@@ -6233,7 +6233,7 @@ abstract class AppLocalizations {
   /// No description provided for @managedComputerSummary.
   ///
   /// In en, this message translates to:
-  /// **'{os} · Pocket {version}'**
+  /// **'{os} · POCOX {version}'**
   String managedComputerSummary(String os, String version);
 
   /// No description provided for @managedNoServices.

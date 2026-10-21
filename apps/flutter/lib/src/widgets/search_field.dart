@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// The app's filter box: a filled, borderless field on the control radius.
 ///

@@ -7,8 +7,8 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/automation_prompt.dart';
-import 'package:pocket_codex/src/screens/app_session/automation_prompt_card.dart';
+import 'package:pocox/src/automation_prompt.dart';
+import 'package:pocox/src/screens/app_session/automation_prompt_card.dart';
 import 'approval_review.dart';
 import 'async_questions.dart';
 import 'generated_image_card.dart';
@@ -17,22 +17,22 @@ import 'model_feedback.dart';
 import 'approval_review_card.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_modes.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/ide_context.dart';
-import 'package:pocket_codex/src/screens/app_session/activity_cards.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/realtime_delegation.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/tools/builtin_tools.dart';
-import 'package:pocket_codex/src/tools/share_card.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
-import 'package:pocket_codex/src/widgets/realtime_handoff_card.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_modes.dart';
+import 'package:pocox/src/attachment_refs.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/ide_context.dart';
+import 'package:pocox/src/screens/app_session/activity_cards.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/realtime_delegation.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/builtin_tools.dart';
+import 'package:pocox/src/tools/share_card.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
+import 'package:pocox/src/widgets/message_images.dart';
+import 'package:pocox/src/widgets/realtime_handoff_card.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// The "this reply is a plan" marker.
 Widget _planBadge(BuildContext context, ColorScheme scheme) => Row(

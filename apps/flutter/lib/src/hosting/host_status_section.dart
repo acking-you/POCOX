@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/acp_host_details.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/hosting/opencode_host_details.dart';
-import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/hosting/host_diagnostics.dart';
-import 'package:pocket_codex/src/managed/default_project_tile.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/provider_badge.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/acp_host_details.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/opencode_host_details.dart';
+import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/hosting/host_diagnostics.dart';
+import 'package:pocox/src/managed/default_project_tile.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/provider_badge.dart';
 
 /// What a running host is, most important first: its state, the default
 /// project folder and the key actions, with tunnels, keys and executables

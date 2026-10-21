@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/managed/managed_providers.dart';
-import 'package:pocket_codex/src/managed/management_failure.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/managed/managed_providers.dart';
+import 'package:pocox/src/managed/management_failure.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// This computer's own remote-management switch, plus its automatic-restore
 /// warnings. Only this computer can turn it on or off; managing services

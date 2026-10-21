@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/context_status.dart';
+import 'package:pocox/src/context_status.dart';
 
 void main() {
   group('ContextStatus.fromRaw', () {

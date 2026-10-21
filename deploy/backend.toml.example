@@ -1,9 +1,9 @@
-# Non-secret backend configuration. Install at /etc/pocket-codex/backend.toml.
+# Non-secret backend configuration. Install at /etc/pocox/backend.toml.
 # Secrets (msg_header_key, jwt_secret, github_client_id) come from the 0600
-# EnvironmentFile (backend.env) as PCX_-prefixed vars and override anything here.
+# EnvironmentFile (backend.env) as POCOX_-prefixed vars and override anything here.
 
 # SQLite identity/credential store.
-database_url = "sqlite:///var/lib/pocket-codex/backend.db"
+database_url = "sqlite:///var/lib/pocox/backend.db"
 
 # The pb-mapper relay. This is BOTH what the backend dials and what /v1/relay
 # tells clients to dial, so it must be an address that resolves for them too —
@@ -20,7 +20,7 @@ github_scope = "read:user"
 
 # Public base URL the browser reaches this backend at. ONLY needed to enable the
 # web (browser-redirect) login flow, and only together with
-# PCX_GITHUB_CLIENT_SECRET (backend.env). The OAuth callback is
+# POCOX_GITHUB_CLIENT_SECRET (backend.env). The OAuth callback is
 # `{public_url}/auth/web/callback`, which must EXACTLY match the GitHub OAuth
 # App's registered Authorization callback URL (scheme, host, port, path).
 # Uncomment + set when enabling web login:
@@ -34,9 +34,9 @@ data_idle_secs = 1800
 # TLS: "plain" (no TLS — local/smoke only) or "files" (static PEM, e.g. certbot).
 # Point at COPIES owned by the pcx service user: the non-root service cannot read
 # certbot's root-only /etc/letsencrypt/live/<host>/privkey.pem directly. Add a
-# certbot/Caddy renewal hook that copies fullchain/privkey into /etc/pocket-codex/
-# (0640 pcx:pcx) and runs `systemctl restart pocket-codex-backend` (certs are read
+# certbot/Caddy renewal hook that copies fullchain/privkey into /etc/pocox/
+# (0640 pcx:pcx) and runs `systemctl restart pocox-backend` (certs are read
 # once at startup, so a renewal needs a restart to take effect).
 tls_mode = "files"
-tls_cert = "/etc/pocket-codex/fullchain.pem"
-tls_key = "/etc/pocket-codex/privkey.pem"
+tls_cert = "/etc/pocox/fullchain.pem"
+tls_key = "/etc/pocox/privkey.pem"

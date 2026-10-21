@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_linkify/flutter_linkify.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 
 /// Session-specific routing for explicit file and host-local web links.
 class SessionLinkScope extends InheritedWidget {

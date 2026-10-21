@@ -1,0 +1,239 @@
+//! JSON-RPC 2.0 envelopes spoken by `codex app-server`.
+//!
+//! The on-the-wire format is JSON-RPC 2.0 framed as JSON Lines (one
+//! object per `\n`-terminated line) on stdio / unix sockets, and as
+//! WebSocket text frames over `ws://`. The `jsonrpc` field is *not*
+//! required on the wire — Codex omits it — but we tolerate either.
+//!
+//! Method payloads remain open-ended [`serde_json::Value`]s. The error
+//! envelope stays local so protocol-only clients do not link the upstream
+//! crate's transitive runtime dependencies. Its fields follow the pinned
+//! `deps/codex` schema, including optional `jsonrpc` and error data.
+
+use serde::{Deserialize, Serialize};
+
+/// Request id used to correlate requests with responses.
+///
+/// JSON-RPC allows either a string or a number; POCOX always
+/// emits strings (UUIDs) but we accept both inbound.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RequestId {
+    /// String id, e.g. a UUID.
+    String(String),
+    /// Numeric id.
+    Number(i64),
+}
+
+/// Top-level frame on the wire. Tagged externally as one of
+/// `request` / `response` / `error` / `notification` based on the
+/// presence of `id`/`method`/`result`/`error` fields.
+///
+/// The variant order matters because we use `serde(untagged)`: more
+/// specific shapes (those that *require* the `id` field) come first
+/// so the lighter [`Notification`] does not greedily swallow
+/// requests.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Message {
+    /// Successful response (has `id` + `result`).
+    Response(Response),
+    /// Error response (has `id` + `error`).
+    Error(ErrorResponse),
+    /// Request (has `id` + `method`).
+    Request(Request),
+    /// Notification (no `id`).
+    Notification(Notification),
+}
+
+/// A request awaiting a response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Request {
+    /// Optional `"jsonrpc": "2.0"` marker; Codex omits it but we keep
+    /// the field for round-tripping with strict peers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jsonrpc: Option<String>,
+
+    /// Correlation id.
+    pub id: RequestId,
+
+    /// Method name (e.g. `"initialize"`, `"thread/start"`).
+    pub method: String,
+
+    /// Method-specific parameters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
+}
+
+/// A fire-and-forget notification (no `id`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Notification {
+    /// Optional `"jsonrpc": "2.0"` marker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jsonrpc: Option<String>,
+
+    /// Method name (e.g. `"item/started"`).
+    pub method: String,
+
+    /// Method-specific parameters.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<serde_json::Value>,
+}
+
+/// A successful response to a request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Response {
+    /// Optional `"jsonrpc": "2.0"` marker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jsonrpc: Option<String>,
+
+    /// Correlation id matching the originating request.
+    pub id: RequestId,
+
+    /// Method-specific result payload.
+    pub result: serde_json::Value,
+}
+
+/// An error response for a request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    /// Optional `"jsonrpc": "2.0"` marker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jsonrpc: Option<String>,
+
+    /// Correlation id matching the originating request.
+    pub id: RequestId,
+
+    /// Error payload.
+    pub error: ErrorPayload,
+}
+
+/// JSON-RPC error object matching the upstream app-server wire schema.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorPayload {
+    /// Machine-readable JSON-RPC error code.
+    pub code: i64,
+    /// Human-readable failure message.
+    pub message: String,
+    /// Optional upstream details, preserved without interpreting them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<serde_json::Value>,
+}
+
+/// Image references from a native image-generation item (wire or rollout).
+/// Prefer the saved artifact so materialized transcripts do not duplicate
+/// base64 payloads. Hosts authorize this exact path against the typed rollout
+/// item. If saving failed, the inline result still makes the image available
+/// remotely.
+pub fn image_generation_images(item: &serde_json::Value) -> Vec<String> {
+    for field in ["savedPath", "saved_path"] {
+        if let Some(path) = item.get(field).and_then(serde_json::Value::as_str) {
+            if !path.is_empty() {
+                return vec![path.to_string()];
+            }
+        }
+    }
+    let Some(result) = item.get("result").and_then(serde_json::Value::as_str) else {
+        return Vec::new();
+    };
+    // Match the client's 8 MiB decoded-image budget before copying into a DTO.
+    const MAX_BASE64_BYTES: usize = (8 * 1024 * 1024_usize).div_ceil(3) * 4;
+    let payload = if result.starts_with("data:image/") {
+        let Some((header, payload)) = result.split_once(',') else {
+            return Vec::new();
+        };
+        if header.len() > 128 || !header.ends_with(";base64") {
+            return Vec::new();
+        }
+        payload
+    } else {
+        result
+    };
+    if payload.is_empty() || payload.len() > MAX_BASE64_BYTES {
+        return Vec::new();
+    }
+    let padding = payload
+        .as_bytes()
+        .iter()
+        .rev()
+        .take(2)
+        .take_while(|&&b| b == b'=')
+        .count();
+    if (payload.len() * 3 / 4).saturating_sub(padding) > 8 * 1024 * 1024 {
+        return Vec::new();
+    }
+    if result.starts_with("data:image/") {
+        return vec![result.to_string()];
+    }
+    vec![format!("data:image/png;base64,{result}")]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generated_images_are_bounded_before_materialization() {
+        let limit = (8 * 1024 * 1024_usize).div_ceil(3) * 4;
+        for prefix in ["", "data:image/png;base64,"] {
+            let mut item =
+                serde_json::json!({"result": format!("{prefix}{}=", "A".repeat(limit - 1))});
+            assert_eq!(image_generation_images(&item).len(), 1);
+            item["result"] = serde_json::json!(format!("{prefix}{}", "A".repeat(limit)));
+            assert!(image_generation_images(&item).is_empty());
+            item["result"] = serde_json::json!(format!("{prefix}{}", "A".repeat(limit + 4)));
+            assert!(image_generation_images(&item).is_empty());
+            item["savedPath"] = serde_json::json!("/host/artifact.png");
+            assert_eq!(image_generation_images(&item), ["/host/artifact.png"]);
+        }
+        for result in ["", "data:image/png", "data:image/png,not-base64"] {
+            assert!(image_generation_images(&serde_json::json!({"result": result})).is_empty());
+        }
+    }
+
+    #[test]
+    fn upstream_error_envelope_preserves_optional_details() {
+        for raw in [
+            serde_json::json!({"code": -32602, "message": "invalid request"}),
+            serde_json::json!({"code": -32002, "message": "busy", "data": {"retryAfter": 3}}),
+        ] {
+            let error: ErrorPayload = serde_json::from_value(raw.clone()).expect("wire error");
+            assert_eq!(serde_json::to_value(error).expect("wire error"), raw);
+        }
+    }
+
+    #[test]
+    fn parse_initialize_request() {
+        let raw = r#"{"id":"1","method":"initialize","params":{"client":"pocox"}}"#;
+        let msg: Message = serde_json::from_str(raw).expect("parse");
+        match msg {
+            Message::Request(req) => {
+                assert_eq!(req.method, "initialize");
+                assert_eq!(req.id, RequestId::String("1".into()));
+            },
+            other => panic!("expected request, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_notification() {
+        let raw = r#"{"method":"item/started","params":{}}"#;
+        let msg: Message = serde_json::from_str(raw).expect("parse");
+        assert!(matches!(msg, Message::Notification(_)));
+    }
+
+    #[test]
+    fn request_omits_params_when_none() {
+        // No-params methods (e.g. `account/rateLimits/read`) must serialize with
+        // no `params` key at all — an empty `{}` is rejected as invalid params.
+        let req = Request {
+            jsonrpc: None,
+            id: RequestId::String("1".into()),
+            method: "account/rateLimits/read".into(),
+            params: None,
+        };
+        let v = serde_json::to_value(&req).expect("serialize");
+        assert!(v.get("params").is_none(), "must omit params: {v}");
+        assert_eq!(v["method"], "account/rateLimits/read");
+    }
+}

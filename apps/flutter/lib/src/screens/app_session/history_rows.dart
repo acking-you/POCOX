@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/bridge_api.dart';
+import 'package:pocox/src/bridge_api.dart';
 import 'transcript_model.dart';
 import 'transcript_rows.dart';
 import 'activity_cards.dart' show TurnWork;

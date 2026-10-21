@@ -43,7 +43,7 @@
             </intent-filter>
         </activity>
         <!-- flutter_web_auth_2 callback: the browser-redirect login sends the
-             user back to `pocketcodex://…` after GitHub authorization; this
+             user back to `pocox://…` after GitHub authorization; this
              activity (provided by the plugin) catches that deep link and hands
              the result back to the awaiting authenticate() call. -->
         <activity
@@ -53,7 +53,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="pocketcodex" />
+                <data android:scheme="pocox" />
             </intent-filter>
         </activity>
         <!-- Hears the package installer's status and shows its

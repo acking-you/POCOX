@@ -1,6 +1,6 @@
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/ui_prefs.dart';
 
 /// Which saved hosting to bring back on a desktop cold start.
 ///

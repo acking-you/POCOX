@@ -4,16 +4,16 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_painter.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_panel.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
-import 'package:pocket_codex/src/tools/share_card.dart';
-import 'package:pocket_codex/src/tools/tools_actions.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_painter.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_panel.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
+import 'package:pocox/src/tools/share_card.dart';
+import 'package:pocox/src/tools/tools_actions.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
 
 /// Every share and service in [scene], as a list.
 class GalaxyList extends ConsumerWidget {

@@ -16,7 +16,7 @@ pocox serve --allow-remote-management --device my-computer \
 ```
 
 This explicit opt-in stays in the foreground in both account and self-host
-mode. It publishes the management-only `host:pocket` entry plus the initial
+mode. It publishes the management-only `host:pocox` entry plus the initial
 Codex host's `app`, `api` (Responses API) and `meta` services. The management
 routes, installed-runtime discovery, revision/incarnation checks, write-only
 secrets and process ownership are the desktop engine's existing implementation.
@@ -47,7 +47,7 @@ state changes. Failing to save that report is logged and never stops a service.
 An enabled but offline management registration is `pending`. For systemd,
 append `--allow-remote-management` to `ExecStart`; keep the service in the
 foreground and allow enough stop time for its owned agents to exit. A unit
-written for the former `pocket-codex` name keeps working through the alias the
+written for the former `pocox` name keeps working through the alias the
 installer leaves; new units can name `pocox`.
 
 ## Management entry

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/host_editor_page.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/widgets/agent_icon.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/widgets/app_dialog.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/host_editor_page.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/widgets/agent_icon.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/widgets/app_dialog.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// Open the hosting editor from a place that is not about one host (Settings,
 /// Codex setup): with no local host, the editor for a new one (nothing starts

@@ -86,7 +86,7 @@ and the view follows its answer.
 | `external_idle` | the named client still has the session open; no turn runs | close it there; an idle native Claude client still holds the session until it really closes or exits |
 | `external_open` | a Grok terminal client has the session open; whether a turn runs there is not recorded (`external_running` or `external_idle` while it is followed live through Grok's leader) | close it there; opens by itself when it is no longer registered |
 | `external_source_open` | another OpenCode process has this history source open; which session or turn it writes is unknown (turn unknown). The holder is `opencode_service` when it is OpenCode 2's background server beside this host's own server, and `opencode_client` when another client is connected to the background server this host attached to (the turn is then known) | close or release it there (`opencode service stop` for the background server; for a client, its terminal app, desktop app or browser tab), then **Check now** |
-| `pocket_host` | another Pocket host writes it | **Open in <host>** only when that host's service key is known |
+| `pocox_host` | another POCOX host writes it | **Open in <host>** only when that host's service key is known |
 | `transition` | the session is changing hands | wait; never taken as free; a later free answer opens by itself only where the host keeps an admission (see `not_opened`) |
 | `host_stopped` | this host is not running | **Open host** for a local host |
 | `released_here` | handed back by this host | **Continue here** is the only way back |
@@ -121,9 +121,9 @@ Rules the UI keeps:
   drafts and queues.
 - There is no "continue anyway" override.
 
-The scope of a write is stated once in the status tooltip: Pocket hosts
+The scope of a write is stated once in the status tooltip: POCOX hosts
 exclude each other; a native client of the same provider is not blocked by
-Pocket and must stay closed while Pocket writes.
+POCOX and must stay closed while POCOX writes.
 
 **This is not a provider-wide lease.** Installed Claude SDK/headless 2.1.296
 accepted two simultaneous same-UUID writers in an isolated test, and
@@ -133,14 +133,14 @@ copied branch is presented as an original-session takeover.
 
 ## Code and verification
 
-- `crates/pocket-codex-host-svc/src/native_history/`: concrete provider
+- `crates/pocox-host-svc/src/native_history/`: concrete provider
   readers, public projection, bounded helper execution and owner probes.
-- `crates/pocket-codex-host-svc/src/acp/host/native_history.rs`: foreign
+- `crates/pocox-host-svc/src/acp/host/native_history.rs`: foreign
   session inventory/history without ACP admission.
 - `apps/flutter/lib/src/screens/app_session/session_access.dart` and
   `session_access_panel.dart`: automatic open, follow, re-check and hand
   back.
-- `crates/pocket-codex-bridge/src/engine/native_sessions.rs` and
+- `crates/pocox-bridge/src/engine/native_sessions.rs` and
   `api/bridge/native_sessions.rs`: independent desktop source cache and
   typed list/page/revision APIs.
 - `apps/flutter/lib/src/screens/local_sessions/` and
@@ -173,7 +173,7 @@ and CLI 2.1.296, three task-owned adapters, isolated config/work directories and
 a deterministic loopback Messages endpoint. The application gateway released
 its original writer; two hosts competed for the same UUID, exactly one acquired,
 its verified native child replied, and the old host could not send. Final
-release removed the native owner and freed the Pocket claim. Regular regressions
+release removed the native owner and freed the POCOX claim. Regular regressions
 cover failed close, stale host/source, uncertain load, claim contention and
 process identity. This is not a claim of a provider-wide lock or arbitrary
 external-client termination.
@@ -184,7 +184,7 @@ installed Claude adapter and CLI, against a deterministic loopback model
 endpoint, released an original Claude session and let exactly
 one of two contending hosts acquire it. Against a real `opencode serve`, opt-in
 tests admitted the exact original session, detected another process holding
-the database, and refused a second Pocket server on the same source; a bridge
+the database, and refused a second POCOX server on the same source; a bridge
 test released and reopened a session and kept the original history across
 Apply. In the macOS app, a native OpenCode host reopened the same original
 session after Apply and after a quit and relaunch, and it answered each time

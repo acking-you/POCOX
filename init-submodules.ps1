@@ -66,7 +66,7 @@ git submodule status --recursive
 Write-Host ""
 if ($allGood) {
     Write-Host "子模块已就绪。下一步可以跑:" -ForegroundColor Green
-    Write-Host "    cargo build -p pocket_codex_bridge" -ForegroundColor Green
+    Write-Host "    cargo build -p pocox_bridge" -ForegroundColor Green
 } else {
     Write-Host "子模块初始化失败。请查看上面的完整错误输出。" -ForegroundColor Red
 }

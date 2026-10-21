@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/model_service_section.dart';
-import 'package:pocket_codex/src/hosting/claude_environment_section.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/model_service_section.dart';
+import 'package:pocox/src/hosting/claude_environment_section.dart';
+import 'package:pocox/src/theme.dart';
 import 'support/ui_preview.dart';
 
 const _variables = [

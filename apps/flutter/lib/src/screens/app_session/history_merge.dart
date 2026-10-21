@@ -1,4 +1,4 @@
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
 
 typedef _TurnKey = ({String turn, String? item});
 

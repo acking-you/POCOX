@@ -8,14 +8,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/managed/default_project_tile.dart';
-import 'package:pocket_codex/src/managed/managed_host_editor.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/screens/services_screen.dart';
-import 'package:pocket_codex/src/service_key.dart';
-import 'package:pocket_codex/src/theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/managed/default_project_tile.dart';
+import 'package:pocox/src/managed/managed_host_editor.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
@@ -422,11 +422,11 @@ void main() {
       final api = _fake()
         ..projectSettings[_mgmt] = const ProjectSettings(
           revision: '7',
-          effectiveDefault: '/Users/me/PocketCodex',
+          effectiveDefault: '/Users/me/pocox',
           automatic: true,
         );
       await pumpTile(t, api);
-      expect(find.text('/Users/me/PocketCodex'), findsOneWidget);
+      expect(find.text('/Users/me/pocox'), findsOneWidget);
       expect(
         find.byKey(const Key('default-project-automatic-label')),
         findsOneWidget,

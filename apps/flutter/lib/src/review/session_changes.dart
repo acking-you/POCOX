@@ -1,5 +1,5 @@
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
 
 /// One edit the agent made: a `fileChange` step of the conversation, as the
 /// transcript recorded it.

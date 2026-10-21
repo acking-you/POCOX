@@ -15,7 +15,7 @@ PODS:
   - FlutterMacOS (1.0.0)
   - pasteboard (0.0.1):
     - FlutterMacOS
-  - pocket_codex_bridge (0.0.1):
+  - pocox_bridge (0.0.1):
     - FlutterMacOS
   - screen_retriever_macos (0.0.1):
     - FlutterMacOS
@@ -43,7 +43,7 @@ DEPENDENCIES:
   - flutter_webrtc (from `Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
   - pasteboard (from `Flutter/ephemeral/.symlinks/plugins/pasteboard/macos`)
-  - pocket_codex_bridge (from `Flutter/ephemeral/.symlinks/plugins/pocket_codex_bridge/macos`)
+  - pocox_bridge (from `Flutter/ephemeral/.symlinks/plugins/pocox_bridge/macos`)
   - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
   - share_plus (from `Flutter/ephemeral/.symlinks/plugins/share_plus/macos`)
   - tray_manager (from `Flutter/ephemeral/.symlinks/plugins/tray_manager/macos`)
@@ -73,8 +73,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
   pasteboard:
     :path: Flutter/ephemeral/.symlinks/plugins/pasteboard/macos
-  pocket_codex_bridge:
-    :path: Flutter/ephemeral/.symlinks/plugins/pocket_codex_bridge/macos
+  pocox_bridge:
+    :path: Flutter/ephemeral/.symlinks/plugins/pocox_bridge/macos
   screen_retriever_macos:
     :path: Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos
   share_plus:
@@ -99,7 +99,7 @@ SPEC CHECKSUMS:
   flutter_webrtc: af708ba091a5d71e101f9f631a9f96c107581a3d
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
   pasteboard: b594eaf838d930b276d7a35a44a32b4f489170cb
-  pocket_codex_bridge: d6d9c490ad6f4a6bdeefc82ae6ad56c79c4e7e3e
+  pocox_bridge: 367e6e18fd32cadd6d37b747822236f1fd2a9609
   screen_retriever_macos: c5508cc3c66ff0d4db650480cf0ab691e220d933
   share_plus: 510bf0af1a42cd602274b4629920c9649c52f4cc
   tray_manager: 19c369010e59c073f13b82354d78a35f7972d609

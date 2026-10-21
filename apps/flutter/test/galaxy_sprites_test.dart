@@ -6,8 +6,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_sprites.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_sprites.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
 
 const _ratio = 2.0;
 const _size = Size(420, 260);

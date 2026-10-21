@@ -6,9 +6,9 @@
 // --dart-define so CI / offline runs skip it instead of failing:
 //
 //   fvm flutter test integration_test/remote_control_test.dart -d windows \
-//     --dart-define=PCX_RELAY=lb7666.top:7666 \
-//     --dart-define=PCX_KEY=<32-byte MSG_HEADER_KEY> \
-//     [--dart-define=PCX_PORT=28092]
+//     --dart-define=POCOX_RELAY=lb7666.top:7666 \
+//     --dart-define=POCOX_KEY=<32-byte MSG_HEADER_KEY> \
+//     [--dart-define=POCOX_PORT=28092]
 //
 // It drives the exact bridge surface the Flutter UI calls, so a pass proves
 // the remote-control UI path works against a real backend.
@@ -18,16 +18,16 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
-import 'package:pocket_codex/src/rust/api/bridge/connection.dart' as frb;
-import 'package:pocket_codex/src/rust/api/bridge/events.dart' as frb;
-import 'package:pocket_codex/src/rust/api/bridge/services.dart' as frb;
-import 'package:pocket_codex/src/rust/api/bridge/threads.dart' as frb;
-import 'package:pocket_codex/src/rust/frb_generated.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/connection.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/events.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/services.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/threads.dart' as frb;
+import 'package:pocox/src/rust/frb_generated.dart';
 
-const _relay = String.fromEnvironment('PCX_RELAY');
-const _key = String.fromEnvironment('PCX_KEY');
-const _port = int.fromEnvironment('PCX_PORT', defaultValue: 28092);
+const _relay = String.fromEnvironment('POCOX_RELAY');
+const _key = String.fromEnvironment('POCOX_KEY');
+const _port = int.fromEnvironment('POCOX_PORT', defaultValue: 28092);
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +38,9 @@ void main() {
   ) async {
     if (_relay.isEmpty || _key.isEmpty) {
       // No live backend configured — skip rather than fail.
-      markTestSkipped('PCX_RELAY / PCX_KEY not provided; skipping online test');
+      markTestSkipped(
+        'POCOX_RELAY / POCOX_KEY not provided; skipping online test',
+      );
       return;
     }
 

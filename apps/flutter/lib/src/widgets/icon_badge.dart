@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocox/src/desktop_theme.dart';
 
 /// A rounded tile carrying one icon — what heads a capability row, a settings
 /// row, a panel, a host card.

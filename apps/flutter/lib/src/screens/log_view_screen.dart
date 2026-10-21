@@ -2,17 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/log_manager.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/search_field.dart';
-import 'package:pocket_codex/src/widgets/status_dots.dart';
-import 'package:pocket_codex/src/widgets/utility_page.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/log_manager.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/search_field.dart';
+import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/utility_page.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Real-time viewer for the app's captured runtime logs (`tracing` events from
 /// the Rust bridge — hosting, tunnels, sessions, embedded codex, …). Reads the

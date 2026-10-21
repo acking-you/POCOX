@@ -5,13 +5,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/screens/app_session/generated_image_card.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_rows.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/screens/app_session/generated_image_card.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/transcript_rows.dart';
+import 'package:pocox/src/widgets/message_images.dart';
+import 'package:pocox/src/app_icons.dart';
 
 void main() {
   for (final width in [360.0, 800.0, 1280.0]) {
@@ -73,8 +73,8 @@ void main() {
   }
 
   // Opt-in visual proof using the output of an isolated, real Codex generation.
-  const nativePath = String.fromEnvironment('PCX_IMAGE_OUTPUT');
-  const captureDirectory = String.fromEnvironment('PCX_IMAGE_SCREENSHOTS');
+  const nativePath = String.fromEnvironment('POCOX_IMAGE_OUTPUT');
+  const captureDirectory = String.fromEnvironment('POCOX_IMAGE_SCREENSHOTS');
   if (nativePath.isNotEmpty) {
     for (final brightness in Brightness.values) {
       testWidgets('real native image decodes in $brightness', (t) async {

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
-import 'package:pocket_codex/src/widgets/markdown_view.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/markdown_view.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 
 /// What the expanded editor shows: the source, the rendered draft, or both
 /// side by side.

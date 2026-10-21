@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/git_diff.dart';
-import 'package:pocket_codex/src/review/review_file_diff.dart';
-import 'package:pocket_codex/src/review/review_panel.dart';
-import 'package:pocket_codex/src/review/session_changes.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/git_diff.dart';
+import 'package:pocox/src/review/review_file_diff.dart';
+import 'package:pocox/src/review/review_panel.dart';
+import 'package:pocox/src/review/session_changes.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
 
 Widget _host(Widget child, {Size size = const Size(900, 2000)}) => MaterialApp(
   locale: const Locale('zh'),

@@ -16,7 +16,7 @@ import WebRTC
 final class AudioSessionRelease: NSObject, RTCAudioDeviceModuleDelegate {
   static let shared = AudioSessionRelease()
 
-  private let queue = DispatchQueue(label: "pocket_codex.audio_session")
+  private let queue = DispatchQueue(label: "pocox.audio_session")
   // Bumped by every engine start and every release request; a pending release
   // only runs if it is still the latest. Guarded by `queue`.
   private var generation = 0

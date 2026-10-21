@@ -2,18 +2,18 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/hosting/claude_preparation_progress.dart';
-import 'package:pocket_codex/src/managed/managed_device_panel.dart';
-import 'package:pocket_codex/src/managed/managed_host_editor.dart';
-import 'package:pocket_codex/src/managed/managed_providers.dart';
-import 'package:pocket_codex/src/managed/management_failure.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/claude_preparation_progress.dart';
+import 'package:pocox/src/managed/managed_device_panel.dart';
+import 'package:pocox/src/managed/managed_host_editor.dart';
+import 'package:pocox/src/managed/managed_providers.dart';
+import 'package:pocox/src/managed/management_failure.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
 
 /// Pick a runtime installed on the remote computer behind [serviceKey], then
 /// open its editor for a new service. Only what the computer reports is

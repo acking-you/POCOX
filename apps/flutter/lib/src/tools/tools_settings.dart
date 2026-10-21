@@ -5,18 +5,18 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/hosting/hosting_owner.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/tools/tools_providers.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/widgets/group_card.dart';
-import 'package:pocket_codex/src/widgets/icon_badge.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/hosting/hosting_owner.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/widgets/icon_badge.dart';
 
 /// The Agent tools settings group (desktops: phones do not serve the tools).
 class AgentToolsSettings extends ConsumerStatefulWidget {

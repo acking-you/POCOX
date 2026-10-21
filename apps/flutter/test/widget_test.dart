@@ -4,8 +4,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/main.dart';
-import 'package:pocket_codex/src/providers.dart';
+import 'package:pocox/main.dart';
+import 'package:pocox/src/providers.dart';
 
 import 'fake_bridge_api.dart';
 
@@ -16,7 +16,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [bridgeApiProvider.overrideWithValue(FakeBridgeApi())],
-        child: const PocketCodexApp(initialLocation: '/'),
+        child: const PocoxApp(initialLocation: '/'),
       ),
     );
     await tester.pumpAndSettle();

@@ -15,7 +15,7 @@ PODS:
     - Flutter
   - pasteboard (0.0.1):
     - Flutter
-  - pocket_codex_bridge (0.0.1):
+  - pocox_bridge (0.0.1):
     - Flutter
   - share_plus (0.0.1):
     - Flutter
@@ -35,7 +35,7 @@ DEPENDENCIES:
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - pasteboard (from `.symlinks/plugins/pasteboard/ios`)
-  - pocket_codex_bridge (from `.symlinks/plugins/pocket_codex_bridge/ios`)
+  - pocox_bridge (from `.symlinks/plugins/pocox_bridge/ios`)
   - share_plus (from `.symlinks/plugins/share_plus/ios`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
   - webview_flutter_wkwebview (from `.symlinks/plugins/webview_flutter_wkwebview/darwin`)
@@ -61,8 +61,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/integration_test/ios"
   pasteboard:
     :path: ".symlinks/plugins/pasteboard/ios"
-  pocket_codex_bridge:
-    :path: ".symlinks/plugins/pocket_codex_bridge/ios"
+  pocox_bridge:
+    :path: ".symlinks/plugins/pocox_bridge/ios"
   share_plus:
     :path: ".symlinks/plugins/share_plus/ios"
   url_launcher_ios:
@@ -79,7 +79,7 @@ SPEC CHECKSUMS:
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   pasteboard: 3913b69d3f2be214970a8ae94e7e87fe76e47e98
-  pocket_codex_bridge: 20266188f068842b355c8449336c8669962ff521
+  pocox_bridge: 9788a318c34a6b1ea250f2241fbf031a764dd77f
   share_plus: 50da8cb520a8f0f65671c6c6a99b3617ed10a58a
   url_launcher_ios: 7a95fa5b60cc718a708b8f2966718e93db0cef1b
   WebRTC-SDK: 7dc931c64c00c735a614382f1a59cf65019c3c17

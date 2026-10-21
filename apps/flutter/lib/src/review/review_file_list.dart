@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/search_field.dart';
-import 'package:pocket_codex/src/widgets/change_counts.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/search_field.dart';
+import 'package:pocox/src/widgets/change_counts.dart';
 
 /// One file in the review's list.
 class ReviewFileEntry {

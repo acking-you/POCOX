@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/project_index.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/project_index.dart';
 
 const _remote = 'git@git.example.com:team/TSearchEngine.git';
 const _main = '/Users/me/CLionProjects/new_tsearch/TSearchEngine';

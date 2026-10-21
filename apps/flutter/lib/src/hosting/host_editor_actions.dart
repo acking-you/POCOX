@@ -2,17 +2,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/hosting/acp_host_form.dart';
-import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
-import 'package:pocket_codex/src/hosting/cancellable_delay.dart';
-import 'package:pocket_codex/src/hosting/host_editor_drafts.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/app_toast.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/hosting/acp_host_form.dart';
+import 'package:pocox/src/hosting/agent_choice_grid.dart';
+import 'package:pocox/src/hosting/cancellable_delay.dart';
+import 'package:pocox/src/hosting/host_editor_drafts.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/app_toast.dart';
 
 /// An operation of the hosting editor; its own control shows its progress.
 enum HostAction {

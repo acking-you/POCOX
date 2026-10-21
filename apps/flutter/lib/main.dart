@@ -4,21 +4,21 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api_rust.dart';
-import 'package:pocket_codex/src/desktop_tray.dart';
-import 'package:pocket_codex/src/log_manager.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/quit_status.dart';
-import 'package:pocket_codex/src/router.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/theme_transition.dart';
-import 'package:pocket_codex/src/tools/tools_host.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/updates/update_host.dart';
-import 'package:pocket_codex/src/widgets/popover.dart';
-import 'package:pocket_codex/src/rust/api/bridge.dart' as frb;
-import 'package:pocket_codex/src/rust/frb_generated.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api_rust.dart';
+import 'package:pocox/src/desktop_tray.dart';
+import 'package:pocox/src/log_manager.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/quit_status.dart';
+import 'package:pocox/src/router.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/theme_transition.dart';
+import 'package:pocox/src/tools/tools_host.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/updates/update_host.dart';
+import 'package:pocox/src/widgets/popover.dart';
+import 'package:pocox/src/rust/api/bridge.dart' as frb;
+import 'package:pocox/src/rust/frb_generated.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,7 +34,7 @@ Future<void> main() async {
     // Without the frames from our own code, a framework assertion logged here
     // cannot be traced back to the call that tripped it.
     final frames = stack.toString().split('\n');
-    final mine = frames.where((l) => l.contains('package:pocket_codex/'));
+    final mine = frames.where((l) => l.contains('package:pocox/'));
     // Framework-only stacks (a selection auto-scroll, say) still name the
     // widget that started it in their first frames.
     final ours = (mine.isEmpty ? frames : mine).take(6).join('\n');
@@ -71,9 +71,7 @@ Future<void> main() async {
   FlutterError.onError = (details) {
     // The innermost frames say what failed, ours which widget got there.
     final frames = (details.stack?.toString() ?? '').split('\n');
-    final mine = frames
-        .skip(4)
-        .where((l) => l.contains('package:pocket_codex/'));
+    final mine = frames.skip(4).where((l) => l.contains('package:pocox/'));
     LogManager.instance.record(
       'flutter',
       [
@@ -101,7 +99,7 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [localeProvider.overrideWith((ref) => locale)],
-      child: PocketCodexApp(initialLocation: start),
+      child: PocoxApp(initialLocation: start),
     ),
   );
 }
@@ -139,18 +137,18 @@ class _UnsupportedPlatformApp extends StatelessWidget {
 
 /// Root app: Material 3 light/dark (user-selectable in settings, following
 /// the system by default), go_router nav, locale driven by [localeProvider].
-class PocketCodexApp extends ConsumerStatefulWidget {
+class PocoxApp extends ConsumerStatefulWidget {
   /// [initialLocation] decides onboarding vs services on cold start.
-  const PocketCodexApp({super.key, required this.initialLocation});
+  const PocoxApp({super.key, required this.initialLocation});
 
   /// Route to open on launch.
   final String initialLocation;
 
   @override
-  ConsumerState<PocketCodexApp> createState() => _PocketCodexAppState();
+  ConsumerState<PocoxApp> createState() => _PocoxAppState();
 }
 
-class _PocketCodexAppState extends ConsumerState<PocketCodexApp>
+class _PocoxAppState extends ConsumerState<PocoxApp>
     with WidgetsBindingObserver {
   // Built once so a locale change (which rebuilds this widget) does not
   // recreate the router and reset the navigation stack.

@@ -6,10 +6,10 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/ide_context.dart';
-import 'package:pocket_codex/src/widgets/message_images.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/ide_context.dart';
+import 'package:pocox/src/widgets/message_images.dart';
+import 'package:pocox/src/app_icons.dart';
 
 Uint8List _png({int w = 8, int h = 8}) =>
     img.encodePng(img.Image(width: w, height: h, numChannels: 3));

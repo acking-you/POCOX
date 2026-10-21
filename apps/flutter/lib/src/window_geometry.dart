@@ -24,7 +24,7 @@ class WindowGeometry with WindowListener {
   /// Below this the sidebar and the transcript fight for width.
   static const minimumSize = Size(720, 480);
 
-  static const _chrome = MethodChannel('pocket_codex/window_chrome');
+  static const _chrome = MethodChannel('pocox/window_chrome');
 
   Timer? _saveDebounce;
   bool _attached = false;

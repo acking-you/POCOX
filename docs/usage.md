@@ -15,7 +15,7 @@ backend issues your devices a credential and they find each other on the relay.
 
 ## 0. Before you start
 
-- A **`pocket-codex-backend`** must be reachable. Someone runs it once (you, or
+- A **`pocox-backend`** must be reachable. Someone runs it once (you, or
   whoever owns your server). The CLI and app use a built-in default backend; to
   point at your own, pass `--backend https://your-host` to `login` (it is
   remembered) or set it in the app's advanced settings.

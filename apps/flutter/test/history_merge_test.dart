@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/screens/app_session/history_merge.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/history_merge.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
 
 TranscriptItem item(String id, String turn) =>
     TranscriptItem(id: id, type: 'agentMessage', turnId: turn);

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/relay_diagnosis.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/widgets/error_details.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/relay_diagnosis.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/error_details.dart';
 
 /// The relay could not be reached: what is wrong in words, a retry, and the
 /// raw error folded away, whole and copyable.

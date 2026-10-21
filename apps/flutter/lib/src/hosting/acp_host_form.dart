@@ -6,19 +6,19 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/hosting/agent_choice_grid.dart';
-import 'package:pocket_codex/src/hosting/editor_block.dart';
-import 'package:pocket_codex/src/hosting/host_names.dart';
-import 'package:pocket_codex/src/hosting/argv_editor.dart';
-import 'package:pocket_codex/src/widgets/field_help.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/text_measure.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/hosting/agent_choice_grid.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/host_names.dart';
+import 'package:pocox/src/hosting/argv_editor.dart';
+import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/text_measure.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// What the ACP form currently describes.
 class AcpFormValue {

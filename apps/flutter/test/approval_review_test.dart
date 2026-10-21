@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/screens/app_session/approval_review.dart';
-import 'package:pocket_codex/src/screens/app_session/approval_review_card.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_model.dart';
-import 'package:pocket_codex/src/screens/app_session/transcript_view.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/screens/app_session/approval_review.dart';
+import 'package:pocox/src/screens/app_session/approval_review_card.dart';
+import 'package:pocox/src/screens/app_session/transcript_model.dart';
+import 'package:pocox/src/screens/app_session/transcript_view.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/app_icons.dart';
 
 String request(String command) =>
     '''Retained context from previous steps.

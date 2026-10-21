@@ -228,7 +228,7 @@ class ManagedDeviceDto {
   /// Publisher identity and environment, absent on older hosts.
   final DeviceMetadataDto? metadata;
 
-  /// Pocket app version on the host.
+  /// POCOX app version on the host.
   final String appVersion;
 
   /// Its own running and stopped services.
@@ -268,7 +268,7 @@ class ManagedDeviceDto {
           restoreProblem == other.restoreProblem;
 }
 
-/// One host owned by the selected remote computer's Pocket app.
+/// One host owned by the selected remote computer's POCOX app.
 class ManagedHostDto {
   /// Canonical instance name.
   final String name;

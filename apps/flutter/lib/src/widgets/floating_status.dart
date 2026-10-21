@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/glass_recipe.dart';
-import 'package:pocket_codex/src/motion.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
+import 'package:pocox/src/glass_recipe.dart';
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
 /// A small status capsule floating over content (history syncing, a turn
 /// being read): it says what is happening without taking any room from what

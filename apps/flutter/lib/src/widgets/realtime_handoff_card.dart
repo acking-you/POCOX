@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/realtime_delegation.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/realtime_delegation.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// A Live voice exchange, rendered as its own kind of turn.
 ///

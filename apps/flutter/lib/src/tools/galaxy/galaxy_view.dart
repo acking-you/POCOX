@@ -6,8 +6,8 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_camera.dart';
-import 'package:pocket_codex/src/tools/galaxy/galaxy_model.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_camera.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
 /// A body drawn this frame, for hit testing and labels.
 class Hit {

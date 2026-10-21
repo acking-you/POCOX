@@ -11,7 +11,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:pocket_codex/src/tools/planet_glyph.dart';
+import 'package:pocox/src/tools/planet_glyph.dart';
 
 /// Paint a star's body in the dark sky: white at the core, its colour at
 /// the edge.

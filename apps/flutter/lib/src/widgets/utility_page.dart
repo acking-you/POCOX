@@ -6,17 +6,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/text_measure.dart';
-import 'package:pocket_codex/src/theme.dart';
-import 'package:pocket_codex/src/theme_transition.dart';
-import 'package:pocket_codex/src/ui_prefs.dart';
-import 'package:pocket_codex/src/widgets/window_title_bar.dart';
-import 'package:pocket_codex/src/widgets/glass.dart';
-import 'package:pocket_codex/src/widgets/workspace_navigation.dart';
-import 'package:pocket_codex/src/app_icons.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/text_measure.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/theme_transition.dart';
+import 'package:pocox/src/ui_prefs.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/workspace_navigation.dart';
+import 'package:pocox/src/app_icons.dart';
 
 /// Shared shell for secondary, full-window pages.
 ///

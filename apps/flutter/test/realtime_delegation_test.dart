@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocket_codex/src/realtime_delegation.dart';
+import 'package:pocox/src/realtime_delegation.dart';
 
 // The shape upstream writes (`wrap_realtime_delegation_input`), with the
 // `<source>` a session-tail flush adds.

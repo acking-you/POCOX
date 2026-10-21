@@ -16,17 +16,17 @@
 	<string>6.0</string>
 	<!-- flutter_web_auth_2 deep-link callback for the browser-redirect login:
 	     ASWebAuthenticationSession returns to the app when GitHub's backend
-	     callback redirects to pocketcodex://… -->
+	     callback redirects to pocox://… -->
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.pocketcodex.auth</string>
+			<string>com.pocox.auth</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>pocketcodex</string>
+				<string>pocox</string>
 			</array>
 		</dict>
 	</array>

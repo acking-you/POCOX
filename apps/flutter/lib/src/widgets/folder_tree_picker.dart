@@ -1,17 +1,17 @@
 import 'package:file_selector/file_selector.dart' show getDirectoryPath;
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as paths;
-import 'package:pocket_codex/src/desktop_theme.dart';
-import 'package:pocket_codex/src/fonts.dart';
-import 'package:pocket_codex/src/widgets/error_retry.dart';
-import 'package:pocket_codex/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/widgets/error_retry.dart';
+import 'package:pocox/src/widgets/adaptive_sheet.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:pocket_codex/l10n/gen/app_localizations.dart';
-import 'package:pocket_codex/src/bridge_api.dart';
-import 'package:pocket_codex/src/error_format.dart';
-import 'package:pocket_codex/src/providers.dart';
-import 'package:pocket_codex/src/app_icons.dart';
-import 'package:pocket_codex/src/attachment_refs.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/attachment_refs.dart';
 
 /// Show the host folder chooser and return the absolute host path the user
 /// picks, or null if they cancel.

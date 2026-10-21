@@ -1,6 +1,6 @@
 {
-    "name": "pocket_codex",
-    "short_name": "pocket_codex",
+    "name": "pocox",
+    "short_name": "pocox",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#FFFFFF",
