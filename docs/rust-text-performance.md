@@ -179,10 +179,14 @@ POCOX_BRIDGE_LIBRARY="$PWD/../../target/debug/libpocox_bridge.dylib" \
 ```
 
 The library filename is macOS-specific; supply the corresponding platform
-library elsewhere. Full first-party formatting, workspace clippy with warnings
-denied, workspace Rust tests (974 passed, 29 ignored), Flutter analyze and the
-full Flutter suite (1,662 passed, 11 skipped) pass after the namespace rebase.
-The three real-library test files above pass all four tests with the rebuilt
-`libpocox_bridge.dylib`. Ignored/skipped live-service tests were not exercised.
-FRB bindings were regenerated. Native acceptance and profile runs supplement
-these tests; none of them establishes mobile performance.
+library elsewhere. After the native Markdown path was removed (2026-10-22):
+first-party formatting, workspace clippy with warnings denied, bridge tests
+(391 passed, 12 ignored), Flutter analyze/format and the full Flutter suite
+(1,660 passed, 10 skipped) pass, and the three real-library test files above
+pass with the rebuilt `libpocox_bridge.dylib`. Because Oniguruma is a C
+dependency that ordinary CI builds only for Linux and macOS hosts, the app was
+also built through Cargokit on GitHub runners: Android debug APKs for
+arm64-v8a, armeabi-v7a and x86_64 (NDK r26d), iOS release without signing,
+and Windows release. Ignored/skipped live-service tests were not exercised.
+Native acceptance and profile runs supplement these tests; none of them
+establishes mobile performance.
