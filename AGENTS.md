@@ -1453,8 +1453,8 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
   The README poster is composed by `test/gen_poster_test.dart` from that mark,
   the POCOX wordmark and the app's own galaxy, Local sessions and chat screens
   rendered with fixture data (never a real session); rerun it with
-  `REGEN_ICONS=1` when the mark, the galaxy or the
-  chat design changes.
+  `REGEN_ICONS=1` when the mark, an agent mark (`widgets/agent_icon.dart`,
+  shown in its chips), the galaxy or the chat design changes.
 - Transcript rows must remain lazy and keyed. Preserve the visible message
   when prepending history (the centre anchor does this by construction, item
   34), and do not rescan the rest of a turn per item when grouping rows. Pagination failures require an explicit retry instead of a
