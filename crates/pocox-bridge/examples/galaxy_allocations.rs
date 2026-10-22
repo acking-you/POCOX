@@ -1,8 +1,10 @@
 //! Standalone native frame allocation probe; no runtime, host or model access.
-//! `rustc --edition=2021 -O
-//! crates/pocox-bridge/examples/galaxy_allocations.rs -o
-//! /tmp/galaxy-allocations` The fixture has three systems, three planets, one
-//! link and two background stars.
+//! The fixture has three systems, three planets, one link and two background
+//! stars. It includes only the geometry module, so it builds without the crate:
+//!
+//! ```sh
+//! rustc --edition=2021 -O crates/pocox-bridge/examples/galaxy_allocations.rs -o /tmp/probe
+//! ```
 use std::{
     alloc::{GlobalAlloc, Layout, System},
     sync::atomic::{AtomicUsize, Ordering},
@@ -76,7 +78,6 @@ fn scene() -> Vec<f64> {
 fn frame(time: f64) -> Vec<f64> {
     vec![1440.0, 900.0, 0.6, 0.52, 9.0, 0.0, 0.0, 0.0, time, 0.0, -1.0, -1.0, -1.0]
 }
-
 
 fn main() {
     let s = scene();
