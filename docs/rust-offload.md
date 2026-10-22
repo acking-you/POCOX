@@ -151,10 +151,11 @@ real-library `native_offload_test` passes against the rebuilt bridge.
 
 The follow-up [text and Galaxy measurements](rust-text-performance.md) cover
 macOS profile runs, complete text-processing round trips, native frame geometry,
-allocation counts and their limitations. Markdown/highlighting now use the
-native CPU lane, and Galaxy reuses bounded frame scratch. The whole Markdown
-widget did not get faster in the measured workload; no application-wide speedup
-is claimed. Mobile frame latency, RSS/GC, shipping release size and cross-platform
+allocation counts and their limitations. Syntax highlighting now uses the
+native CPU lane, and Galaxy reuses bounded frame scratch. A native Markdown
+parser was measured and not adopted: the whole Markdown widget did not get
+faster, and an asynchronous parse showed raw source first. No
+application-wide speedup is claimed. Mobile frame latency, RSS/GC, shipping release size and cross-platform
 acceptance still need measurement. Project indexing and business-preference
 persistence remain profiling-led follow-ups; UI rendering, audio tracks and
 platform permission flows stay in Flutter.

@@ -32,8 +32,6 @@ pub mod logging;
 pub mod management;
 pub mod management_client;
 pub mod management_runtimes;
-#[cfg(feature = "flutter")]
-pub mod markdown;
 pub mod meta;
 pub mod native_sessions;
 pub mod network;

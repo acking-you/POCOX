@@ -1666,15 +1666,16 @@ shared/cloned-state limits in `docs/remote-device-management.md`.
     stale-result checks and visible truncation; do not claim device performance
     from unit tests. See `docs/rust-offload.md` for limits and real-FRB tests.
 
-50. **Measured native text and Galaxy work (2026-10-21).** Comrak projects
-    GFM/CJK Markdown into the existing Flutter renderer's tree, and Syntect
-    batches semantic UTF-16 highlight runs on the bounded Rust CPU lane.
-    Flutter owns styles, layout, stale-result rejection and readable fallback;
-    short inline previews stay in Dart. Galaxy reuses thread-local frame scratch
-    with a 1 MiB retention threshold and preserves the geometry ABI. Keep queue,
-    input and projection bounds; the highlighting deadline is checked between
-    lines, not a hard regex timeout. macOS measurements show local parsing and
-    geometry gains, but no whole Markdown widget frame improvement. See
+50. **Measured native highlighting and Galaxy work (2026-10-21).** Syntect
+    batches semantic UTF-16 highlight runs on the bounded Rust CPU lane;
+    Flutter owns styles, layout, stale-result rejection and readable fallback.
+    Markdown parsing stays in Dart: a native Comrak parser was measured faster
+    in isolation, but whole widget frames were not, and an asynchronous parse
+    showed an uncached message's raw source first. Galaxy reuses thread-local
+    frame scratch with a 1 MiB retention threshold and preserves the geometry
+    ABI. Keep queue, input and projection bounds; the highlighting deadline is
+    checked between lines, not a hard regex timeout. Oniguruma is a native C
+    dependency of the Flutter bridge on every app platform. See
     `docs/rust-text-performance.md`; do not infer mobile or application-wide
     performance from these samples.
 

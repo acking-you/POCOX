@@ -1,10 +1,11 @@
 # Native text processing and Galaxy measurements
 
 Measured on 2026-10-21 after the [controller offload](rust-offload.md).
-Full Markdown parsing and syntax highlighting now run on Rust CPU workers;
-Galaxy reuses frame scratch. The measurements justify these local CPU changes,
-but **do not show faster whole Markdown widget frames**. Short inline previews,
-styles, layout, selection and platform interactions remain in Flutter.
+Syntax highlighting runs on Rust CPU workers and Galaxy reuses frame scratch.
+A native Markdown parser was measured too and **not adopted**: its parse was
+faster, but whole Markdown widget frames were not, and an asynchronous parse
+showed an uncached message's raw source for at least one frame. Markdown
+parsing, styles, layout, selection and platform interactions remain in Flutter.
 
 ## Method and results
 
@@ -23,15 +24,16 @@ that reported zero raster work are excluded. Both harnesses now require actual
 raster work and keep the profile window visible on top; they do not override
 the test view's pixel metrics.
 
-All times below are microseconds. Native Markdown includes the FRB request,
-Comrak parse, JSON return and adaptation into the existing renderer's nodes.
+All times below are microseconds. The rejected native Markdown candidate
+included the FRB request, Comrak parse, JSON return and adaptation into the
+existing renderer's nodes.
 Highlighting includes FRB, semantic token generation and Flutter TextSpan
 construction; it is not a Rust-only microbenchmark.
 Reported source sizes describe the reusable fixture before its per-sample
 suffix. Parsing uses 100 samples after 10 warm-ups; highlighting uses 50 after
 10 warm-ups. This excludes the one-time cold grammar-catalog initialization.
 
-| Markdown source (UTF-16 units) | Dart p50 / p95 | Native round trip p50 / p95 | Tree JSON bytes |
+| Markdown source (UTF-16 units) | Dart p50 / p95 | Rejected native round trip p50 / p95 | Tree JSON bytes |
 |---|---:|---:|---:|
 | 1,655 | 560 / 889 | 172 / 302 | 5,559 |
 | 8,359 | 2,404 / 2,584 | 598 / 700 | 28,366 |
@@ -54,15 +56,16 @@ memoizes its spans and can recolor tokens without another native parse.
 Syntect's pure-Rust fancy-regex backend was also tried: the 16,560-unit
 TypeScript sample took about 96 ms in the native candidate versus 55 ms in Dart.
 It was rejected. The chosen Oniguruma backend adds a native C dependency to the
-Flutter bridge. Comrak, Syntect and two-face are optional Flutter-feature
+Flutter bridge. Syntect and two-face are optional Flutter-feature
 dependencies; the headless CLI does not acquire them. A 62-unit inline preview
 already takes only 47 µs p50 / 74 µs p95 in Dart and stays there.
 
-### Whole Markdown widget
+### Whole Markdown widget (why Markdown stays in Dart)
 
 Both paths below use the same native highlighter, renderer, streaming workload
-and 2× display in one profile run. Waiting for a native result reuses the
-previous formatted widget tree; it does not rebuild that tree on every token.
+and 2× display in one profile run. The candidate reused the previous formatted
+tree while a streamed parse was pending, but a new or uncached message showed
+its raw source until the asynchronous parse returned.
 
 | Source units | Parser | Build p50 / p95 | Sum of build work per source update |
 |---|---|---:|---:|
@@ -73,11 +76,13 @@ previous formatted widget tree; it does not rebuild that tree on every token.
 
 Layout dominates this workload; the native path is roughly 3% higher at the
 large sample's median. Raster time remains about 0.5–1.1 ms. The parse gain
-therefore does **not** establish a whole-page, frame-rate or input-latency gain.
+does **not** establish a whole-page, frame-rate or input-latency gain, so the
+synchronous Dart parser stays: it formats a message on its first frame, and
+widget tests exercise the parser that ships.
 Driver update duration also does not measure when an async parse becomes
 visible. RSS samples include different cache/allocation histories, so they do
 not establish a memory reduction. The profile harness app grew from 107.2 MB
-to 111.6 MB with the native parsers; it contains both comparators and this is
+to 111.6 MB with both native parsers; it contained both comparators and this is
 not a shipping release-size measurement. Phones and other desktop platforms
 have not been profiled.
 
@@ -109,19 +114,6 @@ frame, with about 1,000 actual drawn frames per 8.3-second window. The earlier
 
 ## Ownership and bounds
 
-- `crates/pocox-bridge/src/engine/markdown.rs` uses Comrak GFM tables, tasks,
-  strikethrough, autolinks and CJK emphasis. It projects flat tuples
-  `(parent, tag, text, alternating attributes)` for `MarkdownBuilder`; raw HTML
-  remains text and is not executed or fetched. Source input is at most 1 MiB,
-  projected depth 128 and nodes 16,384. Comrak builds its AST before projection;
-  these are not hard total-allocation limits.
-- `apps/flutter/lib/src/native_markdown.dart` admits two running parses,
-  64 waiting entries and 4 MiB of source weight. A row submits at most one parse
-  at a time and skips intermediate streamed prefixes. New/unrelated content
-  shows its own selectable source while waiting; failed/oversized content
-  remains readable. Disposed/stale results are ignored and failed projections
-  are not put into the existing parsed-tree cache. That cache retains a
-  4-million-source-unit budget, not an exact AST heap-byte budget.
 - `engine/syntax.rs` returns exclusive UTF-16 ends and nine semantic roles with
   bold/italic bits. Flutter supplies theme colors. Input limits are 20,000
   UTF-16 units, 80,000 UTF-8 bytes and 4,096 bytes per line. Unknown grammars,
@@ -140,8 +132,7 @@ frame, with about 1,000 actual drawn frames per 8.3-second window. The earlier
   Plane runs stream into the caller's output; fixed link/particle temporaries
   use stack arrays. Depth/label ties retain their original ordering.
 
-Libraries: [Comrak 0.56](https://docs.rs/comrak/0.56.0/comrak/),
-[Syntect 5.3](https://docs.rs/syntect/5.3.0/syntect/) and
+Libraries: [Syntect 5.3](https://docs.rs/syntect/5.3.0/syntect/) and
 [two-face 0.5.2](https://docs.rs/two-face/0.5.2/two_face/).
 
 ## Reproduction and validation
@@ -168,13 +159,12 @@ rustc --edition=2021 -O crates/pocox-bridge/examples/galaxy_allocations.rs \
 /tmp/pocox-galaxy-allocations
 ```
 
-Rust tests cover projection budgets, GFM/CJK and all registered syntax names.
-Flutter tests cover shared batches, cancellation, bounds, failed workers,
-stale completions, theme changes and readable fallbacks. Ordinary widget tests
-inject the old Dart Markdown parser to remain independent of a host library.
-The opt-in `native_render_test.dart` loads the real library and checks native
-GFM/CJK renderer compatibility, incomplete fences, raw HTML, lists/tables,
-Unicode and actual highlighting. `galaxy_frame_parity_test.dart` compares
+Rust tests cover all registered syntax names, Unicode offsets and plain
+fallbacks for unknown, oversized and pathological input. Flutter tests cover
+shared batches, cancellation, bounds, failed workers, stale completions, theme
+changes and readable fallbacks. The opt-in `native_render_test.dart` loads the
+real library and checks that highlight tokens cross FRB and keep Unicode in
+the painted spans. `galaxy_frame_parity_test.dart` compares
 native output to the Dart geometry reference over 16 camera cases.
 
 Run those real-library checks together with the controller acceptance test:

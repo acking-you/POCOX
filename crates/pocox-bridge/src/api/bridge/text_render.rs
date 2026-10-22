@@ -1,17 +1,10 @@
-//! Bounded text transformations; Flutter owns styles and widget layout.
+//! Bounded syntax highlighting; Flutter owns styles and widget layout.
 use anyhow::Result;
 
 use crate::engine::{
     execution::{self, Lane},
     syntax,
 };
-
-/// Parse GFM with CJK emphasis into a bounded flat renderer tree.
-/// Nodes are JSON tuples `(parent, tag, text, attributes)`; -1 names a root,
-/// an empty tag names text, and attributes are alternating keys and values.
-pub async fn parse_markdown(source: String) -> Result<String> {
-    execution::run(Lane::Cpu, move || crate::engine::markdown::parse(&source)).await
-}
 
 /// One source and its explicitly selected grammar; no language guessing.
 pub struct HighlightInputDto {

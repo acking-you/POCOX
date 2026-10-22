@@ -1,4 +1,4 @@
-// Opt-in production-widget and parsing measurements; no host or model access.
+// Opt-in production-widget and highlighting measurements; no host or model access.
 // Run with flutter drive --profile -d macos and POCOX_RENDER_PERF=true.
 import 'dart:convert';
 import 'dart:io';
@@ -6,16 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/code_highlight.dart';
-import 'package:pocox/src/markdown_cjk.dart';
-import 'package:pocox/src/native_markdown.dart';
 import 'package:pocox/src/rust/frb_generated.dart';
-import 'package:pocox/src/rust/api/bridge/text_render.dart' as native;
 import 'fixtures/legacy_highlight.dart' as legacy;
 import 'package:pocox/src/theme.dart';
-import 'package:pocox/src/widgets/links.dart';
 import 'package:pocox/src/widgets/markdown_view.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -76,32 +71,6 @@ void main() {
     debugPrint(
       'RENDER_PERF ${jsonEncode({'stage': 'inline_preview', 'chars': preview.length, 'us': stats(previewTimes)})}',
     );
-    for (final paragraphs in [6, 30]) {
-      final source = document(paragraphs);
-      final parse = <int>[], nativeParse = <int>[];
-      for (var i = 0; i < 110; i++) {
-        final watch = Stopwatch()..start();
-        final nodes =
-            md.Document(
-              extensionSet: markdownExtensionSet,
-              encodeHtml: false,
-            ).parseLines(
-              const LineSplitter().convert(autolinkifyMarkdown('$source\n$i')),
-            );
-        if (i >= 10) parse.add(watch.elapsedMicroseconds);
-        expect(nodes, isNotEmpty);
-        watch.reset();
-        final nativeNodes = await parseNativeMarkdown('$source\n$i');
-        if (i >= 10) nativeParse.add(watch.elapsedMicroseconds);
-        expect(nativeNodes.length, nodes.length);
-      }
-      final treeBytes = utf8
-          .encode(await native.parseMarkdown(source: source))
-          .length;
-      debugPrint(
-        'RENDER_PERF ${jsonEncode({'stage': 'markdown_parse', 'tree_json_bytes': treeBytes, 'chars': source.length, 'dart_us': stats(parse), 'native_roundtrip_us': stats(nativeParse)})}',
-      );
-    }
     for (final (language, line) in [
       ('rust', 'fn compute(value: usize) -> usize { value + 1 } // 中文\n'),
       (
@@ -160,53 +129,39 @@ void main() {
         );
       }
     }
-    for (final parser in ['dart', 'rust']) {
-      MarkdownParsing.parse = parser == 'rust'
-          ? parseNativeMarkdown
-          : (source) =>
-                md.Document(
-                  extensionSet: markdownExtensionSet,
-                  encodeHtml: false,
-                ).parseLines(
-                  const LineSplitter().convert(autolinkifyMarkdown(source)),
-                );
-      for (final paragraphs in [6, 30]) {
-        final timings = <FrameTiming>[], updates = <int>[];
-        void record(List<FrameTiming> batch) => timings.addAll(batch);
-        final source = document(paragraphs);
-        for (var i = 0; i < 65; i++) {
-          if (i == 5) SchedulerBinding.instance.addTimingsCallback(record);
-          final watch = Stopwatch()..start();
-          // Same stateful row, changed streamed suffix and an incomplete fence.
-          await tester.pumpWidget(
-            app('$source\n```rust\n${'let n = 1;\n' * i}'),
-          );
-          if (i >= 5) updates.add(watch.elapsedMicroseconds);
-          await tester.pump(const Duration(milliseconds: 50));
-        }
-        await tester.pump(const Duration(milliseconds: 400));
-        SchedulerBinding.instance.removeTimingsCallback(record);
-        debugPrint(
-          'RENDER_PERF ${jsonEncode({
-            'stage': 'streaming_widget',
-            'parser': parser,
-            'build_work_per_update_us': timings.fold<int>(0, (sum, t) => sum + t.buildDuration.inMicroseconds) ~/ 60,
-            'chars': source.length,
-            'frames': timings.length,
-            'update_us': stats(updates),
-            'build_us': stats([for (final t in timings) t.buildDuration.inMicroseconds]),
-            'raster_us': stats([for (final t in timings) t.rasterDuration.inMicroseconds]),
-            'rss_bytes': ProcessInfo.currentRss,
-            'ratio': tester.view.devicePixelRatio,
-          })}',
-        );
-        expect(
-          timings.any((t) => t.rasterDuration.inMicroseconds > 100),
-          isTrue,
-          reason: 'profile window must actually rasterize',
-        );
-        expect(tester.takeException(), isNull);
+    for (final paragraphs in [6, 30]) {
+      final timings = <FrameTiming>[], updates = <int>[];
+      void record(List<FrameTiming> batch) => timings.addAll(batch);
+      final source = document(paragraphs);
+      for (var i = 0; i < 65; i++) {
+        if (i == 5) SchedulerBinding.instance.addTimingsCallback(record);
+        final watch = Stopwatch()..start();
+        // Same stateful row, changed streamed suffix and an incomplete fence.
+        await tester.pumpWidget(app('$source\n```rust\n${'let n = 1;\n' * i}'));
+        if (i >= 5) updates.add(watch.elapsedMicroseconds);
+        await tester.pump(const Duration(milliseconds: 50));
       }
+      await tester.pump(const Duration(milliseconds: 400));
+      SchedulerBinding.instance.removeTimingsCallback(record);
+      debugPrint(
+        'RENDER_PERF ${jsonEncode({
+          'stage': 'streaming_widget',
+          'build_work_per_update_us': timings.fold<int>(0, (sum, t) => sum + t.buildDuration.inMicroseconds) ~/ 60,
+          'chars': source.length,
+          'frames': timings.length,
+          'update_us': stats(updates),
+          'build_us': stats([for (final t in timings) t.buildDuration.inMicroseconds]),
+          'raster_us': stats([for (final t in timings) t.rasterDuration.inMicroseconds]),
+          'rss_bytes': ProcessInfo.currentRss,
+          'ratio': tester.view.devicePixelRatio,
+        })}',
+      );
+      expect(
+        timings.any((t) => t.rasterDuration.inMicroseconds > 100),
+        isTrue,
+        reason: 'profile window must actually rasterize',
+      );
+      expect(tester.takeException(), isNull);
     }
   });
 }

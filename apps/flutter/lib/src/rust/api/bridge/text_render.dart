@@ -6,12 +6,6 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-/// Parse GFM with CJK emphasis into a bounded flat renderer tree.
-/// Nodes are JSON tuples `(parent, tag, text, attributes)`; -1 names a root,
-/// an empty tag names text, and attributes are alternating keys and values.
-Future<String> parseMarkdown({required String source}) =>
-    RustLib.instance.api.crateApiBridgeTextRenderParseMarkdown(source: source);
-
 /// Highlight a bounded batch outside the UI thread and the async runtime.
 Future<List<HighlightTokensDto>> highlightBatch({
   required List<HighlightInputDto> inputs,
