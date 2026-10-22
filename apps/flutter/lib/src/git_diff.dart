@@ -32,7 +32,6 @@ class DiffModel {
     this.files, {
     this.added = 0,
     this.removed = 0,
-    this.revision = '',
     this.truncated = false,
   });
   factory DiffModel.fromNative(native.DiffDto value) => DiffModel(
@@ -45,7 +44,7 @@ class DiffModel {
           lines: [
             for (final line in file.lines)
               DiffLine(
-                DiffLineKind.values.byName(line.kind),
+                _kind(line.kind),
                 line.text,
                 oldLine: line.oldLine,
                 newLine: line.newLine,
@@ -55,15 +54,20 @@ class DiffModel {
     ],
     added: value.added,
     removed: value.removed,
-    revision: value.revision,
     truncated: value.truncated,
   );
   final List<DiffFile> files;
   final int added;
   final int removed;
-  final String revision;
   final bool truncated;
   bool get isEmpty => files.isEmpty;
+
+  static DiffLineKind _kind(native.DiffLineKind kind) => switch (kind) {
+    native.DiffLineKind.context => DiffLineKind.context,
+    native.DiffLineKind.added => DiffLineKind.added,
+    native.DiffLineKind.removed => DiffLineKind.removed,
+    native.DiffLineKind.hunk => DiffLineKind.hunk,
+  };
 }
 
 /// A path's extension, as a syntax-highlighter language hint. Empty for a

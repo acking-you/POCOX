@@ -73,7 +73,8 @@ pub use self::{
     },
     device_metadata::{local_device_metadata, service_device_metadata, DeviceMetadataDto},
     events::{
-        app_events, log_events, meta_retry_events, AppEventDto, LogLineDto, RetryProgressDto,
+        app_projected_events, event_feed_create, event_feed_follow, meta_retry_events, AppEventDto,
+        EventFeed, EventTopic, LogLineDto, RetryProgressDto,
     },
     grok::{
         grok_account_status, grok_sign_in_cancel, grok_sign_in_start, grok_sign_in_state,

@@ -2,10 +2,14 @@ part of '../app_session_screen.dart';
 
 extension _SessionRecovery on _AppSessionState {
   String? get _threadId => _selectedThreadId;
+
+  /// The running feed follows the shown conversation in place: replacing the
+  /// subscription would drop whatever the host sent in between, such as an
+  /// approval that history cannot reconstruct.
   set _threadId(String? value) {
     if (_selectedThreadId == value) return;
     _selectedThreadId = value;
-    if (_sub != null) _subscribe();
+    _feed?.follow(value);
   }
 
   void _subscribe() {
@@ -16,9 +20,11 @@ extension _SessionRecovery on _AppSessionState {
     // time reads as the app being slow. From here on `account/rateLimits/
     // updated` keeps it fresh, so this fetch happens once per connection.
     _loadQuota();
-    _sub = ref
+    final feed = ref
         .read(bridgeApiProvider)
-        .appEvents(widget.serviceKey, threadId: _threadId)
+        .appEventFeed(widget.serviceKey, threadId: _threadId);
+    _feed = feed;
+    _sub = feed.events
         // onError as well as onDone: the bridge errors the stream (rather than
         // closing it) when the service isn't connected yet, so treat both as a
         // dropped connection and auto-reconnect instead of waiting for the

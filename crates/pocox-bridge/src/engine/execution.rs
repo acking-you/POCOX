@@ -2,10 +2,9 @@
 //!
 //! Network waits must not occupy FRB's CPU-sized pool. Separate budgets keep
 //! background discovery and file transfers from delaying session controls.
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use anyhow::{anyhow, Result};
-use once_cell::sync::Lazy;
 use tokio::{runtime::Handle, sync::Semaphore};
 
 use super::{runtime, transport};
@@ -53,18 +52,36 @@ impl Queue {
         let active = self.active.clone().acquire_owned().await?;
         handle
             .spawn_blocking(move || {
-                let (_admitted, _active) = (admitted, active);
+                let _permits = (admitted, active);
                 work()
             })
             .await?
     }
 }
 
-static CONTROL: Lazy<Queue> = Lazy::new(|| Queue::new(8, 24));
-static READ: Lazy<Queue> = Lazy::new(|| Queue::new(8, 24));
-static BACKGROUND: Lazy<Queue> = Lazy::new(|| Queue::new(3, 45));
-static TRANSFER: Lazy<Queue> = Lazy::new(|| Queue::new(2, 6));
-static CPU: Lazy<Queue> = Lazy::new(|| Queue::new(2, 6));
+impl Lane {
+    fn queue(self) -> &'static Queue {
+        static CONTROL: LazyLock<Queue> = LazyLock::new(|| Queue::new(8, 24));
+        static READ: LazyLock<Queue> = LazyLock::new(|| Queue::new(8, 24));
+        static BACKGROUND: LazyLock<Queue> = LazyLock::new(|| Queue::new(3, 45));
+        static TRANSFER: LazyLock<Queue> = LazyLock::new(|| Queue::new(2, 6));
+        // Dart's CPU producers (images, history merges, review indexes, text
+        // rendering) are each bounded; together they fit without refusing an
+        // ordinary multi-image pick.
+        static CPU: LazyLock<Queue> = LazyLock::new(|| Queue::new(2, 30));
+        match self {
+            Lane::Control => &CONTROL,
+            Lane::Read => &READ,
+            Lane::Background => &BACKGROUND,
+            Lane::Transfer => &TRANSFER,
+            Lane::Cpu => &CPU,
+        }
+    }
+}
+
+fn handle() -> Handle {
+    Handle::try_current().unwrap_or_else(|_| runtime::runtime().handle().clone())
+}
 
 /// Run a synchronous engine operation outside FRB and Tokio async workers.
 /// Queued work is refused if its account/relay changed before it could start.
@@ -73,16 +90,8 @@ pub async fn run<T: Send + 'static>(
     work: impl FnOnce() -> Result<T> + Send + 'static,
 ) -> Result<T> {
     let epoch = transport::epoch();
-    let queue = match lane {
-        Lane::Control => &CONTROL,
-        Lane::Read => &READ,
-        Lane::Background => &BACKGROUND,
-        Lane::Transfer => &TRANSFER,
-        Lane::Cpu => &CPU,
-    };
-    let handle = Handle::try_current().unwrap_or_else(|_| runtime::runtime().handle().clone());
-    queue
-        .run(&handle, move || {
+    lane.queue()
+        .run(&handle(), move || {
             anyhow::ensure!(
                 transport::is_current(epoch),
                 "connection context changed; retry the operation"
@@ -90,6 +99,14 @@ pub async fn run<T: Send + 'static>(
             work()
         })
         .await
+}
+
+/// A pure transformation inside a native pipeline that is already bounded by
+/// its own subscription (one item in flight). It shares the CPU lane's running
+/// slots but is never refused, so a full Dart queue cannot close a live feed.
+pub async fn compute<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> Result<T> {
+    let _active = Lane::Cpu.queue().active.clone().acquire_owned().await?;
+    Ok(handle().spawn_blocking(work).await?)
 }
 
 #[cfg(test)]

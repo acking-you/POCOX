@@ -51,8 +51,9 @@ pub struct PreparedFile {
     _lease: tokio::sync::OwnedSemaphorePermit,
 }
 
-static FILE_HANDLES: once_cell::sync::Lazy<std::sync::Arc<tokio::sync::Semaphore>> =
-    once_cell::sync::Lazy::new(|| std::sync::Arc::new(tokio::sync::Semaphore::new(4)));
+/// Four handles of at most 32 MiB each.
+static FILE_HANDLES: std::sync::LazyLock<std::sync::Arc<tokio::sync::Semaphore>> =
+    std::sync::LazyLock::new(|| std::sync::Arc::new(tokio::sync::Semaphore::new(4)));
 
 /// Read an explicitly picked local file without moving its body through Dart.
 /// The caller must check its draft admission again before starting the upload.
@@ -77,14 +78,13 @@ pub async fn meta_upload_prepared_file(
     file: PreparedFile,
     expected_context: String,
 ) -> Result<String> {
+    // The lease is released when the upload ends, whatever its outcome.
     execution::run(Lane::Transfer, move || {
         let PreparedFile {
             bytes,
             _lease,
         } = file;
-        let result = meta::upload_file_scoped(&service_key, &file_name, bytes, &expected_context);
-        drop(_lease);
-        Ok(result?.path)
+        Ok(meta::upload_file_scoped(&service_key, &file_name, bytes, &expected_context)?.path)
     })
     .await
 }

@@ -417,12 +417,19 @@ abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
   /// than after a slower transient relay round-trip.
   Future<bool> apiProbeLocal(String localAddr);
 
-  /// Live event stream for [serviceKey] (turn/item notifications).
+  /// Live event stream for [serviceKey] (turn/item notifications), narrowed
+  /// to [threadId] and [topic]. Service-wide events (inventory changes,
+  /// resolved requests, other conversations' turn ends) pass the thread
+  /// filter.
   Stream<AppEvent> appEvents(
     String serviceKey, {
     String? threadId,
-    String topic = 'all',
+    EventTopic topic = EventTopic.all,
   });
+
+  /// Every event of [serviceKey] for a conversation that can move:
+  /// [AppEventFeed.follow] retargets the native filter in place.
+  AppEventFeed appEventFeed(String serviceKey, {String? threadId});
 
   /// Upstream realtime controls and marked voice thread creation.
   Future<String> appRealtimeRequest(

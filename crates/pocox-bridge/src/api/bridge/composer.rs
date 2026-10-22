@@ -63,6 +63,8 @@ pub struct ComposerViewDto {
     pub queue: Vec<QueuedCommandDto>,
 }
 
+#[frb(ignore)]
+#[derive(Default)]
 struct State {
     view: ComposerViewDto,
     next_token: u32,
@@ -79,7 +81,7 @@ pub struct ComposerController {
 #[frb(sync)]
 pub fn composer_create() -> ComposerController {
     ComposerController {
-        state: Mutex::new(State::new()),
+        state: Mutex::default(),
     }
 }
 
@@ -99,112 +101,101 @@ pub fn composer_apply(
 
 #[frb(ignore)]
 impl State {
-    fn new() -> Self {
-        Self {
-            view: ComposerViewDto::default(),
-            next_token: 0,
-        }
-    }
     fn apply(&mut self, action: ComposerAction, id: Option<u32>, token: Option<u32>) -> Result<()> {
         use ComposerAction::*;
+        let view = &mut self.view;
         match action {
             BeginSend => {
                 anyhow::ensure!(
-                    self.view.send_token.is_none(),
+                    view.send_token.is_none(),
                     "a send is already pending for this draft"
                 );
                 self.next_token = self
                     .next_token
                     .checked_add(1)
                     .context("composer lease exhausted")?;
-                self.view.send_token = Some(self.next_token);
+                view.send_token = Some(self.next_token);
             },
             EndSend => {
-                if token.is_some() && token == self.view.send_token {
-                    self.view.send_token = None;
+                if token.is_some() && token == view.send_token {
+                    view.send_token = None;
                 }
             },
-            Pause => self.view.queue_paused = true,
-            Resume => self.view.queue_paused = false,
+            Pause => view.queue_paused = true,
+            Resume => view.queue_paused = false,
             Revoke => {
-                self.view.admission = self
-                    .view
+                view.admission = view
                     .admission
                     .checked_add(1)
                     .context("composer generation exhausted")?
             },
             Enqueue | Prepend => {
                 let id = id.context("queued command requires an identity")?;
-                anyhow::ensure!(self.view.queue.len() < 1024, "conversation queue is full");
+                anyhow::ensure!(view.queue.len() < 1024, "conversation queue is full");
                 anyhow::ensure!(
-                    !self.view.queue.iter().any(|entry| entry.id == id),
+                    !view.queue.iter().any(|entry| entry.id == id),
                     "queued identity already exists"
                 );
                 let entry = QueuedCommandDto {
                     id,
                     ..Default::default()
                 };
-                if matches!(action, Prepend) {
+                if matches!(action, Enqueue) {
+                    view.queue.push(entry);
+                } else {
                     anyhow::ensure!(
-                        !self.view.queue.first().is_some_and(|head| head.in_flight),
+                        !view.queue.first().is_some_and(|head| head.in_flight),
                         "cannot prepend before a sending command"
                     );
-                    self.view.queue.insert(0, entry);
-                } else {
-                    self.view.queue.push(entry);
+                    view.queue.insert(0, entry);
                 }
             },
-            _ => {
+            Drop | Accept | BeginQueued | EndQueued | Unknown | Refused | RetryUnknown => {
                 let id = id.context("queue transition requires an identity")?;
-                let Some(at) = self.view.queue.iter().position(|entry| entry.id == id) else {
+                let Some(at) = view.queue.iter().position(|entry| entry.id == id) else {
+                    // Ending or dropping a command that already left is a no-op.
                     anyhow::ensure!(
                         matches!(action, EndQueued | Drop),
                         "queued command is no longer present"
                     );
                     return Ok(());
                 };
+                let (head, paused, leased) =
+                    (at == 0, view.queue_paused, view.send_token.is_some());
+                let entry = &mut view.queue[at];
                 match action {
                     Drop => {
-                        anyhow::ensure!(
-                            !self.view.queue[at].in_flight,
-                            "a sending command cannot be removed"
-                        );
-                        self.view.queue.remove(at);
+                        anyhow::ensure!(!entry.in_flight, "a sending command cannot be removed");
+                        view.queue.remove(at);
                     },
                     Accept => {
                         anyhow::ensure!(
-                            at == 0 && self.view.queue[at].in_flight,
+                            head && entry.in_flight,
                             "only the sending head may be accepted"
                         );
-                        self.view.queue.remove(at);
+                        view.queue.remove(at);
                     },
                     BeginQueued => {
-                        let head = &mut self.view.queue[at];
                         anyhow::ensure!(
-                            at == 0
-                                && !self.view.queue_paused
-                                && !head.uncertain
-                                && !head.in_flight,
+                            head && !paused && !entry.uncertain && !entry.in_flight,
                             "queued command is not ready for automatic sending"
                         );
-                        head.in_flight = true;
+                        entry.in_flight = true;
                     },
-                    EndQueued => self.view.queue[at].in_flight = false,
+                    EndQueued => entry.in_flight = false,
                     Unknown | Refused => {
-                        let entry = &mut self.view.queue[at];
                         entry.in_flight = false;
                         entry.uncertain = matches!(action, Unknown);
-                        self.view.queue_paused = true;
+                        view.queue_paused = true;
                     },
-                    RetryUnknown => {
-                        let entry = &mut self.view.queue[at];
+                    // RetryUnknown, the user's explicit retry.
+                    _ => {
                         anyhow::ensure!(
-                            at == 0 && !entry.in_flight && self.view.send_token.is_none(),
+                            head && !entry.in_flight && !leased,
                             "only an idle queue head may be retried"
                         );
                         entry.uncertain = false;
                     },
-                    _ => unreachable!(),
                 }
             },
         }
@@ -219,7 +210,7 @@ mod tests {
     use super::*;
     #[test]
     fn unknown_results_never_resume_automatically_and_active_commands_cannot_move() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.apply(Enqueue, Some(1), None).unwrap();
         state.apply(Enqueue, Some(2), None).unwrap();
         assert!(state.apply(BeginQueued, Some(2), None).is_err());
@@ -236,7 +227,7 @@ mod tests {
     }
     #[test]
     fn old_completions_never_release_a_new_send_or_attachment_generation() {
-        let mut state = State::new();
+        let mut state = State::default();
         state.apply(BeginSend, None, None).unwrap();
         let old = state.view.send_token;
         assert!(state.apply(BeginSend, None, None).is_err());

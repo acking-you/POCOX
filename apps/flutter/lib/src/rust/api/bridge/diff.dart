@@ -6,9 +6,12 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `dto`, `index_edits`
+// These functions are ignored because they are not marked as `pub`: `index_edits`, `item_diff`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
 
-/// Read and parse the working tree in Rust, returning a ready-to-render view.
+/// Read and parse the working tree in one admission, so the parsed view
+/// belongs to the same account/relay epoch as the read that produced it.
+/// Parsing is linear in the bytes the read already transferred.
 Future<DiffDto> appGitDiffParsed({
   required String serviceKey,
   required String cwd,
@@ -21,11 +24,8 @@ Future<DiffDto> appGitDiffParsed({
 Future<ReviewIndexDto> reviewIndex({required List<ReviewEditInputDto> edits}) =>
     RustLib.instance.api.crateApiBridgeDiffReviewIndex(edits: edits);
 
-/// Native parsed diff, reusable by its content revision.
+/// Native parsed diff.
 class DiffDto {
-  /// Content identity.
-  final String revision;
-
   /// Changed files in source order.
   final List<DiffFileDto> files;
 
@@ -39,7 +39,6 @@ class DiffDto {
   final bool truncated;
 
   const DiffDto({
-    required this.revision,
     required this.files,
     required this.added,
     required this.removed,
@@ -48,18 +47,13 @@ class DiffDto {
 
   @override
   int get hashCode =>
-      revision.hashCode ^
-      files.hashCode ^
-      added.hashCode ^
-      removed.hashCode ^
-      truncated.hashCode;
+      files.hashCode ^ added.hashCode ^ removed.hashCode ^ truncated.hashCode;
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is DiffDto &&
           runtimeType == other.runtimeType &&
-          revision == other.revision &&
           files == other.files &&
           added == other.added &&
           removed == other.removed &&
@@ -104,8 +98,8 @@ class DiffFileDto {
 
 /// A numbered diff row; the renderer only selects its colors and layout.
 class DiffLineDto {
-  /// `context`, `added`, `removed` or `hunk`.
-  final String kind;
+  /// What the row shows.
+  final DiffLineKind kind;
 
   /// Display text.
   final String text;
@@ -136,6 +130,21 @@ class DiffLineDto {
           text == other.text &&
           oldLine == other.oldLine &&
           newLine == other.newLine;
+}
+
+/// What a numbered diff row shows.
+enum DiffLineKind {
+  /// Unchanged context.
+  context,
+
+  /// Added in the new file.
+  added,
+
+  /// Removed from the old file.
+  removed,
+
+  /// A hunk header.
+  hunk,
 }
 
 /// One edit's files in their original diff order.

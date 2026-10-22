@@ -7,7 +7,8 @@ import '../../frb_generated.dart';
 import 'diff.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `forward_app_events`, `forward_projected_events`, `forward_retained_requests`, `send_projected`, `to_log_dto`
+// These functions are ignored because they are not marked as `pub`: `accepts`, `admits`, `forward_projected_events`, `forward_retained_requests`, `send_pending`, `send_projected`, `to_log_dto`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`
 
 /// Read logs only when a viewer needs them. Filtering runs off the UI thread.
 Future<LogViewDto> logQuery({String? level, required String keyword}) => RustLib
@@ -34,14 +35,6 @@ void logRecord({
 /// Clear the shared in-memory history; persisted logs remain available.
 void logClear() => RustLib.instance.api.crateApiBridgeEventsLogClear();
 
-/// Stream captured `tracing` events for the in-app log viewer: the retained
-/// recent history (oldest first) followed by every new event live, until the
-/// Dart side drops the stream. Subscribes before replaying history so nothing
-/// is missed in between (a line captured right at that boundary may appear
-/// twice — harmless for a log tail).
-Stream<LogLineDto> logEvents() =>
-    RustLib.instance.api.crateApiBridgeEventsLogEvents();
-
 /// Stream retry progress for host meta requests, so the UI can show "retrying
 /// 2/10" instead of appearing frozen through the backoff.
 ///
@@ -51,23 +44,33 @@ Stream<LogLineDto> logEvents() =>
 Stream<RetryProgressDto> metaRetryEvents() =>
     RustLib.instance.api.crateApiBridgeEventsMetaRetryEvents();
 
-/// Stream live app-server events (turn/item notifications) for `service_key`.
-/// The Dart side receives one [`AppEventDto`] per notification until the
-/// session is disconnected or the feed lags and requires history recovery.
-Stream<AppEventDto> appEvents({required String serviceKey}) =>
-    RustLib.instance.api.crateApiBridgeEventsAppEvents(serviceKey: serviceKey);
+/// A feed narrowed to `thread_id`; `None` follows every conversation.
+EventFeed eventFeedCreate({String? threadId}) => RustLib.instance.api
+    .crateApiBridgeEventsEventFeedCreate(threadId: threadId);
 
-/// Subscribe to a native controller projection. `topic` is `all`, `activity`
-/// or `realtime`; an optional thread filter still admits service-wide events.
+/// Retarget every stream of `feed` at once, without resubscribing.
+void eventFeedFollow({required EventFeed feed, String? threadId}) => RustLib
+    .instance
+    .api
+    .crateApiBridgeEventsEventFeedFollow(feed: feed, threadId: threadId);
+
+/// Stream live app-server events of `service_key` through a native
+/// projection narrowed by `feed` and `topic`. Service-wide events (inventory,
+/// resolved requests, other conversations' turn ends) still pass the thread
+/// filter. The stream closes when the session disconnects or the feed lags and
+/// requires history recovery.
 Stream<AppEventDto> appProjectedEvents({
   required String serviceKey,
-  String? threadId,
-  required String topic,
+  required EventFeed feed,
+  required EventTopic topic,
 }) => RustLib.instance.api.crateApiBridgeEventsAppProjectedEvents(
   serviceKey: serviceKey,
-  threadId: threadId,
+  feed: feed,
   topic: topic,
 );
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>
+abstract class EventFeed implements RustOpaqueInterface {}
 
 /// One app-server event mirrored for Dart. `kind` is the JSON-RPC method
 /// (e.g. `turn/started`, `item/agentMessage/delta`, `turn/completed`).
@@ -170,6 +173,18 @@ class AppEventDto {
           turnId == other.turnId &&
           sender == other.sender &&
           textIsSnapshot == other.textIsSnapshot;
+}
+
+/// Which events of its conversation a projected feed carries.
+enum EventTopic {
+  /// Everything.
+  all,
+
+  /// Turn starts, ends and thread status: what the session list shows.
+  activity,
+
+  /// Realtime voice signalling, plus turn starts a dictation must refuse.
+  realtime,
 }
 
 /// One captured runtime log line for the in-app log viewer.

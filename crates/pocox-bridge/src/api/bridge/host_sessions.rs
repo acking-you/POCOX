@@ -182,8 +182,7 @@ pub async fn app_local_session_transcript(thread_id: String) -> Result<Vec<Threa
         Ok(sessions::local_session_transcript(&thread_id)?
             .into_iter()
             .map(|i| ThreadItemDto {
-                diff: (i.item_type == "fileChange")
-                    .then(|| super::diff::dto(&crate::engine::git_diff::parse(&i.text))),
+                diff: super::diff::item_diff(&i.item_type, &i.text),
                 id: i.id,
                 item_type: i.item_type,
                 title: i.title,
@@ -252,8 +251,7 @@ pub(super) fn meta_liveness_dto(
 
 fn meta_thread_item_dto(value: pocox_host_svc::sessions::TranscriptItem) -> ThreadItemDto {
     ThreadItemDto {
-        diff: (value.item_type == "fileChange")
-            .then(|| super::diff::dto(&crate::engine::git_diff::parse(&value.text))),
+        diff: super::diff::item_diff(&value.item_type, &value.text),
         id: value.id,
         item_type: value.item_type,
         title: value.title,
@@ -355,7 +353,7 @@ pub fn meta_session_events(
         let result = meta::follow_session(&service_key, &thread_id, |update| {
             let sink = &sink;
             async move {
-                match execution::run(Lane::Cpu, move || Ok(meta_follow_update_dto(update))).await {
+                match execution::compute(move || meta_follow_update_dto(update)).await {
                     Ok(dto) => sink.add(dto).is_ok(),
                     Err(error) => {
                         let _ = sink.add_error(error.to_string());

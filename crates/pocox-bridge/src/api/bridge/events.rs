@@ -1,7 +1,17 @@
 //! Event streams for Dart: the bridge log, meta-service retry progress and
 //! app-server session events.
 
+use tokio::{
+    sync::{broadcast, broadcast::error::RecvError, watch},
+    time::{Duration, Instant},
+};
+
 use super::*;
+use crate::engine::{
+    execution::{self, Lane},
+    git_diff,
+    session_projection::{self as projection, ProjectedEvent, Projection},
+};
 
 /// One app-server event mirrored for Dart. `kind` is the JSON-RPC method
 /// (e.g. `turn/started`, `item/agentMessage/delta`, `turn/completed`).
@@ -72,7 +82,7 @@ pub struct LogViewDto {
 
 /// Read logs only when a viewer needs them. Filtering runs off the UI thread.
 pub async fn log_query(level: Option<String>, keyword: String) -> Result<LogViewDto> {
-    crate::engine::execution::run(crate::engine::execution::Lane::Read, move || {
+    execution::run(Lane::Read, move || {
         let view = logging::query(level.as_deref(), &keyword);
         Ok(LogViewDto {
             lines: view.lines.into_iter().map(to_log_dto).collect(),
@@ -113,37 +123,6 @@ pub fn log_clear() {
     logging::clear();
 }
 
-/// Stream captured `tracing` events for the in-app log viewer: the retained
-/// recent history (oldest first) followed by every new event live, until the
-/// Dart side drops the stream. Subscribes before replaying history so nothing
-/// is missed in between (a line captured right at that boundary may appear
-/// twice — harmless for a log tail).
-pub fn log_events(sink: StreamSink<LogLineDto>) -> Result<()> {
-    runtime::runtime().spawn(async move {
-        let Some(mut rx) = logging::subscribe() else {
-            return;
-        };
-        for line in logging::snapshot() {
-            if sink.add(to_log_dto(line)).is_err() {
-                return;
-            }
-        }
-        loop {
-            match rx.recv().await {
-                Ok(line) => {
-                    if sink.add(to_log_dto(line)).is_err() {
-                        break;
-                    }
-                },
-                // Dropped some lines under load — keep streaming the rest.
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-            }
-        }
-    });
-    Ok(())
-}
-
 /// One in-flight retry of a host meta request, mirrored for Dart.
 pub struct RetryProgressDto {
     /// Attempts made so far (1-based).
@@ -174,119 +153,104 @@ pub fn meta_retry_events(sink: StreamSink<RetryProgressDto>) -> Result<()> {
                         break;
                     }
                 },
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(RecvError::Lagged(_)) => continue,
+                Err(RecvError::Closed) => break,
             }
         }
     });
     Ok(())
 }
 
-/// Stream live app-server events (turn/item notifications) for `service_key`.
-/// The Dart side receives one [`AppEventDto`] per notification until the
-/// session is disconnected or the feed lags and requires history recovery.
-pub fn app_events(service_key: String, sink: StreamSink<AppEventDto>) -> Result<()> {
-    // Subscribe *inside* the task and always return `Ok` at setup. If the service
-    // isn't connected, the task returns immediately and dropping `sink` closes the
-    // Dart stream (`onDone`), which the UI's reconnect path already handles.
-    // Returning the error from here instead would be worse: flutter_rust_bridge
-    // delivers a stream function's setup `Err` on an *unawaited* Future, so it
-    // surfaces as an uncaught async error on the Dart side — fatal on desktop
-    // (no global handler) — rather than a catchable stream `onError`/`onDone`.
-    runtime::runtime().spawn(async move {
-        let subscribed = engine(&service_key).subscribe_events(&service_key);
-        let rx = match subscribed {
-            Ok(rx) => rx,
-            // Not connected: close the stream so Dart sees `onDone`.
-            Err(_) => return,
-        };
-        forward_app_events(rx, |ev| {
-            sink.add(AppEventDto {
-                diff: None,
-                running: None,
-                kind: ev.kind,
-                thread_id: ev.thread_id,
-                item_id: ev.item_id,
-                item_type: ev.item_type,
-                title: ev.title,
-                text: ev.text,
-                images: ev.images,
-                request_id: ev.request_id,
-                raw: ev.raw,
-                turn_id: None,
-                sender: None,
-                text_is_snapshot: false,
-            })
-            .is_ok()
-        })
-        .await;
-    });
-    Ok(())
+/// Which events of its conversation a projected feed carries.
+#[derive(Clone, Copy)]
+pub enum EventTopic {
+    /// Everything.
+    All,
+    /// Turn starts, ends and thread status: what the session list shows.
+    Activity,
+    /// Realtime voice signalling, plus turn starts a dictation must refuse.
+    Realtime,
 }
 
-pub(super) async fn forward_app_events(
-    mut rx: tokio::sync::broadcast::Receiver<app_session::AppEvent>,
-    mut send: impl FnMut(app_session::AppEvent) -> bool,
-) {
-    use tokio::sync::broadcast::error::RecvError;
-
-    loop {
-        match rx.recv().await {
-            Ok(event) => {
-                if !send(event) {
-                    break;
-                }
-            },
-            Err(RecvError::Lagged(skipped)) => {
-                // Missing final items or turn/completed cannot be recovered by
-                // later deltas. Close only this feed so Dart reloads history.
-                tracing::warn!(skipped, "app event feed lagged; closing for history recovery");
-                forward_retained_requests(&mut rx, &mut send);
-                break;
-            },
-            Err(RecvError::Closed) => break,
+impl EventTopic {
+    fn admits(self, kind: &str) -> bool {
+        match self {
+            EventTopic::All => true,
+            EventTopic::Activity => matches!(
+                kind,
+                "turn/started" | "turn/completed" | "turn/failed" | "thread/status/changed"
+            ),
+            // A dictation interrupts any turn its thread starts.
+            EventTopic::Realtime => kind.starts_with("thread/realtime/") || kind == "turn/started",
         }
     }
 }
 
-fn forward_retained_requests(
-    rx: &mut tokio::sync::broadcast::Receiver<app_session::AppEvent>,
-    send: &mut impl FnMut(app_session::AppEvent) -> bool,
-) {
-    // History cannot reconstruct request IDs. Preserve prompts in the retained
-    // tail before closing, without waiting for new data or chasing new events.
-    let retained = rx.len();
-    for _ in 0..retained {
-        match rx.try_recv() {
-            Ok(event) => {
-                if event.request_id.is_some() && !send(event) {
-                    return;
-                }
-            },
-            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {},
-            Err(_) => break,
-        }
+/// Filter at the native boundary before copying payloads into Dart. Inventory
+/// changes, resolved requests and turn ends concern every view: a turn ending
+/// elsewhere still refreshes that conversation's summary.
+fn accepts(event: &app_session::AppEvent, thread: Option<&str>, topic: EventTopic) -> bool {
+    let service_wide = matches!(
+        event.kind.as_str(),
+        "thread/deleted"
+            | "thread/name/updated"
+            | "thread/started"
+            | "thread/archived"
+            | "thread/unarchived"
+            | "session/access/changed"
+            | "serverRequest/resolved"
+            | "turn/completed"
+            | "turn/failed"
+    );
+    let in_thread = service_wide
+        || thread.is_none()
+        || event.thread_id.is_none()
+        || event.thread_id.as_deref() == thread;
+    in_thread && topic.admits(&event.kind)
+}
+
+/// The conversation a projected feed is narrowed to. Moving it retargets the
+/// running feed in place, so no event falls between two subscriptions.
+#[frb(opaque)]
+pub struct EventFeed {
+    thread: watch::Sender<Option<String>>,
+}
+
+/// A feed narrowed to `thread_id`; `None` follows every conversation.
+#[frb(sync)]
+pub fn event_feed_create(thread_id: Option<String>) -> EventFeed {
+    EventFeed {
+        thread: watch::channel(thread_id).0,
     }
 }
 
-#[cfg(test)]
-#[path = "bridge_events_tests.rs"]
-mod bridge_events_tests;
+/// Retarget every stream of `feed` at once, without resubscribing.
+#[frb(sync)]
+pub fn event_feed_follow(feed: &EventFeed, thread_id: Option<String>) {
+    feed.thread.send_replace(thread_id);
+}
 
-/// Subscribe to a native controller projection. `topic` is `all`, `activity`
-/// or `realtime`; an optional thread filter still admits service-wide events.
+/// Stream live app-server events of `service_key` through a native
+/// projection narrowed by `feed` and `topic`. Service-wide events (inventory,
+/// resolved requests, other conversations' turn ends) still pass the thread
+/// filter. The stream closes when the session disconnects or the feed lags and
+/// requires history recovery.
 pub fn app_projected_events(
     service_key: String,
-    thread_id: Option<String>,
-    topic: String,
+    feed: &EventFeed,
+    topic: EventTopic,
     sink: StreamSink<AppEventDto>,
 ) {
+    let thread = feed.thread.subscribe();
+    // Subscribe inside the task: a disconnected service closes the stream
+    // (`onDone`, which the UI's reconnect handles). A setup `Err` would reach
+    // Dart on an unawaited future instead of the stream.
     runtime::runtime().spawn(async move {
         let Ok(rx) = engine(&service_key).subscribe_events(&service_key) else { return };
-        forward_projected_events(rx, thread_id, topic, |update| {
+        forward_projected_events(rx, thread, topic, |update| {
             let ev = update.event;
             sink.add(AppEventDto {
-                diff: update.diff.as_deref().map(super::diff::dto),
+                diff: update.diff.map(Into::into),
                 running: update.running,
                 kind: ev.kind,
                 thread_id: ev.thread_id,
@@ -307,18 +271,15 @@ pub fn app_projected_events(
     });
 }
 
+/// Forward accepted events in order, coalescing adjacent text deltas for at
+/// most 16 ms. A lag closes the feed (after the retained requests history
+/// cannot reconstruct) so the controller reloads history.
 async fn forward_projected_events(
-    mut rx: tokio::sync::broadcast::Receiver<app_session::AppEvent>,
-    thread: Option<String>,
-    topic: String,
-    mut send: impl FnMut(crate::engine::session_projection::ProjectedEvent) -> bool,
+    mut rx: broadcast::Receiver<app_session::AppEvent>,
+    thread: watch::Receiver<Option<String>>,
+    topic: EventTopic,
+    mut send: impl FnMut(ProjectedEvent) -> bool,
 ) {
-    use tokio::{
-        sync::broadcast::error::RecvError,
-        time::{Duration, Instant},
-    };
-
-    use crate::engine::session_projection::{self as projection, Projection};
     let mut view = Projection::default();
     let mut pending: Option<app_session::AppEvent> = None;
     let mut deadline = Instant::now();
@@ -326,56 +287,49 @@ async fn forward_projected_events(
         let received = if pending.is_some() {
             tokio::select! {
                 event = rx.recv() => Some(event),
-                _ = tokio::time::sleep_until(deadline) => None,
+                () = tokio::time::sleep_until(deadline) => None,
             }
         } else {
             Some(rx.recv().await)
         };
-        let Some(received) = received else {
-            if let Some(event) = pending.take() {
-                if !send_projected(&mut view, &mut send, event).await {
+        let event = match received {
+            Some(Ok(event)) => event,
+            // The coalescing window closed.
+            None => {
+                if !send_pending(&mut view, &mut send, &mut pending).await {
                     break;
                 }
-            }
-            continue;
-        };
-        let event = match received {
-            Ok(event) => event,
-            Err(error) => {
-                if let Some(event) = pending.take() {
-                    if !send_projected(&mut view, &mut send, event).await {
-                        break;
+                continue;
+            },
+            Some(Err(error)) => {
+                if send_pending(&mut view, &mut send, &mut pending).await {
+                    if let RecvError::Lagged(skipped) = error {
+                        tracing::warn!(
+                            skipped,
+                            "controller projection lagged; closing for history recovery"
+                        );
+                        forward_retained_requests(&mut rx, &mut |event| {
+                            !accepts(&event, thread.borrow().as_deref(), topic)
+                                || send(view.apply(event))
+                        });
                     }
-                }
-                if let RecvError::Lagged(skipped) = error {
-                    tracing::warn!(
-                        skipped,
-                        "controller projection lagged; closing for history recovery"
-                    );
-                    forward_retained_requests(&mut rx, &mut |event| {
-                        !projection::accepts(&event, thread.as_deref(), &topic)
-                            || send(view.apply(event))
-                    });
                 }
                 break;
             },
         };
-        if !projection::accepts(&event, thread.as_deref(), &topic) {
+        if !accepts(&event, thread.borrow().as_deref(), topic) {
             continue;
         }
-        if let Some(previous) = &mut pending {
-            if projection::can_merge(previous, &event) {
-                previous
-                    .text
-                    .get_or_insert_default()
-                    .push_str(event.text.as_deref().unwrap_or_default());
-                continue;
-            }
+        if let Some(previous) = pending
+            .as_mut()
+            .filter(|p| projection::can_merge(p, &event))
+        {
+            let text = previous.text.get_or_insert_default();
+            text.push_str(event.text.as_deref().unwrap_or_default());
+            continue;
         }
-        if let Some(previous) = pending.take() {
-            if !send_projected(&mut view, &mut send, previous).await {
-                break;
-            }
+        if !send_pending(&mut view, &mut send, &mut pending).await {
+            break;
         }
         if projection::text_delta(&event) {
             deadline = Instant::now() + Duration::from_millis(16);
@@ -386,25 +340,60 @@ async fn forward_projected_events(
     }
 }
 
+async fn send_pending(
+    view: &mut Projection,
+    send: &mut impl FnMut(ProjectedEvent) -> bool,
+    pending: &mut Option<app_session::AppEvent>,
+) -> bool {
+    match pending.take() {
+        Some(event) => send_projected(view, send, event).await,
+        None => true,
+    }
+}
+
 async fn send_projected(
-    view: &mut crate::engine::session_projection::Projection,
-    send: &mut impl FnMut(crate::engine::session_projection::ProjectedEvent) -> bool,
+    view: &mut Projection,
+    send: &mut impl FnMut(ProjectedEvent) -> bool,
     event: app_session::AppEvent,
 ) -> bool {
     let mut update = view.apply(event);
     if update.event.item_type.as_deref() == Some("fileChange") {
-        let text = update.event.text.clone().unwrap_or_default();
-        match crate::engine::execution::run(crate::engine::execution::Lane::Cpu, move || {
-            Ok(crate::engine::git_diff::parse(&text))
-        })
-        .await
-        {
-            Ok(diff) => update.diff = Some(diff),
+        // The event moves to the parser and back; its text is never copied.
+        let parsed = execution::compute(move || {
+            let text = update.event.text.as_deref().unwrap_or_default();
+            update.diff = Some(git_diff::parse(text));
+            update
+        });
+        update = match parsed.await {
+            Ok(update) => update,
             Err(error) => {
-                tracing::warn!(%error, "diff projection unavailable; closing for history recovery");
+                tracing::warn!(%error, "diff projection failed; closing for history recovery");
                 return false;
             },
-        }
+        };
     }
     send(update)
 }
+
+fn forward_retained_requests(
+    rx: &mut broadcast::Receiver<app_session::AppEvent>,
+    send: &mut impl FnMut(app_session::AppEvent) -> bool,
+) {
+    // History cannot reconstruct request IDs. Preserve prompts in the retained
+    // tail before closing, without waiting for new data or chasing new events.
+    for _ in 0..rx.len() {
+        match rx.try_recv() {
+            Ok(event) => {
+                if event.request_id.is_some() && !send(event) {
+                    return;
+                }
+            },
+            Err(broadcast::error::TryRecvError::Lagged(_)) => {},
+            Err(_) => break,
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "bridge_events_tests.rs"]
+mod bridge_events_tests;

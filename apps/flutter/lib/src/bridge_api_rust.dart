@@ -1,33 +1,32 @@
-import 'package:pocox/src/rust/api/bridge/composer.dart' as frb;
-import 'package:pocox/src/rust/api/bridge/history_projection.dart' as frb;
-import 'package:pocox/src/git_diff.dart';
-import 'package:pocox/src/rust/api/bridge/diff.dart' as frb;
 import 'dart:typed_data';
-import 'package:pocox/src/rust/api/bridge/attachments.dart' as frb;
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart'
     show PlatformInt64Util;
-
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/git_diff.dart';
 import 'package:pocox/src/rust/api/bridge.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/agent_tools.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/attachments.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/codex_setup.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/composer.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/connection.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/device_management.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/device_metadata.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/diff.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/events.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/grok.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/history_projection.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_config.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_sessions.dart' as frb;
-import 'package:pocox/src/rust/api/bridge/native_sessions.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/hosted_account.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/hosting.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/native_sessions.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/network.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/services.dart' as frb;
-import 'package:pocox/src/rust/api/bridge/session_config.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/session_access.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/session_config.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/threads.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/updates.dart' as frb;
-import 'package:pocox/src/rust/api/bridge/network.dart' as frb;
 import 'package:pocox/src/updates/update_api.dart';
 
 part 'bridge/rust_hosting.dart';
@@ -38,6 +37,7 @@ part 'bridge/rust_tools.dart';
 part 'bridge/rust_grok.dart';
 part 'bridge/rust_updates.dart';
 part 'bridge/rust_composer.dart';
+part 'bridge/rust_events.dart';
 
 /// Real [BridgeApi] backed by generated Rust bindings.
 class RustBridgeApi
@@ -300,31 +300,12 @@ class RustBridgeApi
   Stream<AppEvent> appEvents(
     String serviceKey, {
     String? threadId,
-    String topic = 'all',
-  }) => frb
-      .appProjectedEvents(
-        serviceKey: serviceKey,
-        threadId: threadId,
-        topic: topic,
-      )
-      .map(
-        (e) => AppEvent(
-          kind: e.kind,
-          threadId: e.threadId,
-          itemId: e.itemId,
-          itemType: e.itemType,
-          title: e.title,
-          text: e.text,
-          images: e.images,
-          requestId: e.requestId,
-          raw: e.raw,
-          turnId: e.turnId,
-          sender: e.sender,
-          textIsSnapshot: e.textIsSnapshot,
-          running: e.running,
-          diff: e.diff == null ? null : DiffModel.fromNative(e.diff!),
-        ),
-      );
+    EventTopic topic = EventTopic.all,
+  }) => _NativeEventFeed(serviceKey, threadId, topic).events;
+
+  @override
+  AppEventFeed appEventFeed(String serviceKey, {String? threadId}) =>
+      _NativeEventFeed(serviceKey, threadId, EventTopic.all);
 
   @override
   Stream<void> logChanges() => frb.logChanges().map((_) {});

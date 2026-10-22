@@ -46,6 +46,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr;
 
   CrossPlatformFinalizerArg
+  get rust_arc_decrement_strong_count_EventFeedPtr => wire
+      ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeedPtr;
+
+  CrossPlatformFinalizerArg
   get rust_arc_decrement_strong_count_PreparedFilePtr => wire
       ._rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFilePtr;
 
@@ -55,6 +59,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   ComposerController
   dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    dynamic raw,
+  );
+
+  @protected
+  EventFeed
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
     dynamic raw,
   );
 
@@ -71,8 +81,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  EventFeed
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    dynamic raw,
+  );
+
+  @protected
   ComposerController
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    dynamic raw,
+  );
+
+  @protected
+  EventFeed
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
     dynamic raw,
   );
 
@@ -84,11 +106,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<AppEventDto> dco_decode_StreamSink_app_event_dto_Sse(
-    dynamic raw,
-  );
-
-  @protected
-  RustStreamSink<LogLineDto> dco_decode_StreamSink_log_line_dto_Sse(
     dynamic raw,
   );
 
@@ -288,7 +305,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DiffLineDto dco_decode_diff_line_dto(dynamic raw);
 
   @protected
+  DiffLineKind dco_decode_diff_line_kind(dynamic raw);
+
+  @protected
   DirEntryDto dco_decode_dir_entry_dto(dynamic raw);
+
+  @protected
+  EventTopic dco_decode_event_topic(dynamic raw);
 
   @protected
   FileEntryDto dco_decode_file_entry_dto(dynamic raw);
@@ -769,6 +792,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  EventFeed
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PreparedFile
   sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
     SseDeserializer deserializer,
@@ -781,8 +810,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  EventFeed
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   ComposerController
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  EventFeed
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
     SseDeserializer deserializer,
   );
 
@@ -794,11 +835,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<AppEventDto> sse_decode_StreamSink_app_event_dto_Sse(
-    SseDeserializer deserializer,
-  );
-
-  @protected
-  RustStreamSink<LogLineDto> sse_decode_StreamSink_log_line_dto_Sse(
     SseDeserializer deserializer,
   );
 
@@ -1060,7 +1096,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DiffLineDto sse_decode_diff_line_dto(SseDeserializer deserializer);
 
   @protected
+  DiffLineKind sse_decode_diff_line_kind(SseDeserializer deserializer);
+
+  @protected
   DirEntryDto sse_decode_dir_entry_dto(SseDeserializer deserializer);
+
+  @protected
+  EventTopic sse_decode_event_topic(SseDeserializer deserializer);
 
   @protected
   FileEntryDto sse_decode_file_entry_dto(SseDeserializer deserializer);
@@ -1666,6 +1708,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    EventFeed self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
     PreparedFile self,
     SseSerializer serializer,
@@ -1680,8 +1729,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    EventFeed self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
     ComposerController self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    EventFeed self,
     SseSerializer serializer,
   );
 
@@ -1695,12 +1758,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_StreamSink_app_event_dto_Sse(
     RustStreamSink<AppEventDto> self,
-    SseSerializer serializer,
-  );
-
-  @protected
-  void sse_encode_StreamSink_log_line_dto_Sse(
-    RustStreamSink<LogLineDto> self,
     SseSerializer serializer,
   );
 
@@ -2023,7 +2080,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_diff_line_dto(DiffLineDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_diff_line_kind(DiffLineKind self, SseSerializer serializer);
+
+  @protected
   void sse_encode_dir_entry_dto(DirEntryDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_event_topic(EventTopic self, SseSerializer serializer);
 
   @protected
   void sse_encode_file_entry_dto(FileEntryDto self, SseSerializer serializer);
@@ -2855,6 +2918,40 @@ class RustLibWire implements BaseWire {
       );
   late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController =
       _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerControllerPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeedPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed',
+      );
+  late final _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed =
+      _rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeedPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+
+  void
+  rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+    ffi.Pointer<ffi.Void> ptr,
+  ) {
+    return _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
+      ptr,
+    );
+  }
+
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeedPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
+        'frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed',
+      );
+  late final _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed =
+      _rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeedPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
   void

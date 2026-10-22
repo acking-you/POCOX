@@ -449,8 +449,7 @@ pub async fn app_thread_resume(service_key: String, thread_id: String) -> Result
 
 pub(super) fn item_dto(i: app_session::ThreadItem) -> ThreadItemDto {
     ThreadItemDto {
-        diff: (i.item_type == "fileChange")
-            .then(|| super::diff::dto(&crate::engine::git_diff::parse(&i.text))),
+        diff: super::diff::item_diff(&i.item_type, &i.text),
         id: i.id,
         item_type: i.item_type,
         title: i.title,

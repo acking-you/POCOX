@@ -67,15 +67,21 @@ void main() {
     // accumulate agent text and complete when the turn finishes.
     final reply = StringBuffer();
     final done = Completer<void>();
-    final sub = frb.appEvents(serviceKey: key).listen((e) {
-      if (e.itemType == 'agentMessage' && (e.text?.isNotEmpty ?? false)) {
-        reply.write(e.text);
-      }
-      if ((e.kind == 'turn/completed' || e.kind == 'turn/failed') &&
-          !done.isCompleted) {
-        done.complete();
-      }
-    });
+    final sub = frb
+        .appProjectedEvents(
+          serviceKey: key,
+          feed: frb.eventFeedCreate(),
+          topic: frb.EventTopic.all,
+        )
+        .listen((e) {
+          if (e.itemType == 'agentMessage' && (e.text?.isNotEmpty ?? false)) {
+            reply.write(e.text);
+          }
+          if ((e.kind == 'turn/completed' || e.kind == 'turn/failed') &&
+              !done.isCompleted) {
+            done.complete();
+          }
+        });
 
     // Start with explicit model + cwd + a non-blocking permission preset, to
     // prove those params reach the real app-server.

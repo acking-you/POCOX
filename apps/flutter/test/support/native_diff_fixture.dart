@@ -27,14 +27,12 @@ DiffModel diffFixture(
   ],
   added: added.length,
   removed: removed.length,
-  revision: '$path|$removed|$added',
 );
 
 DiffModel combineDiffFixtures(DiffModel first, DiffModel second) => DiffModel(
   [...first.files, ...second.files],
   added: first.added + second.added,
   removed: first.removed + second.removed,
-  revision: '${first.revision}|${second.revision}',
 );
 
 ReviewIndex reviewIndexFixture(List<DiffModel> edits) {

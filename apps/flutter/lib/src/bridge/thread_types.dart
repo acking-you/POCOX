@@ -62,6 +62,28 @@ class AppEvent {
   final bool? running;
 }
 
+/// Which events of its conversation a live feed carries.
+enum EventTopic {
+  /// Everything.
+  all,
+
+  /// Turn starts, ends and thread status: what the session list shows.
+  activity,
+
+  /// Realtime voice signalling, plus turn starts a dictation must refuse.
+  realtime,
+}
+
+/// A live event stream whose conversation can move in place.
+abstract interface class AppEventFeed {
+  /// The feed's events; listen once.
+  Stream<AppEvent> get events;
+
+  /// Narrow the running stream to [threadId] (null: every conversation)
+  /// without resubscribing, so no event falls between two subscriptions.
+  void follow(String? threadId);
+}
+
 /// A bounded log view queried from Rust, with native retention statistics.
 class LogView {
   const LogView({required this.lines, required this.total, this.diskLost = 0});

@@ -2,8 +2,7 @@
 //!
 //! Installs a `tracing` layer as the process-global subscriber. Every event is
 //! formatted into a [`LogLine`] and retained in a bounded native ring. The
-//! viewer queries filtered snapshots after coalesced revision notifications;
-//! the legacy line stream remains available for existing consumers.
+//! viewer queries filtered snapshots after coalesced revision notifications.
 mod disk;
 
 use std::{
@@ -15,7 +14,6 @@ use std::{
 
 use disk::DiskLog;
 use once_cell::sync::OnceCell;
-use tokio::sync::broadcast;
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::{layer::Context, prelude::*, registry::LookupSpan, EnvFilter, Layer};
 
@@ -34,14 +32,9 @@ pub struct LogLine {
 
 /// How many recent lines to retain for late-opening viewers.
 const RING_CAPACITY: usize = 2000;
-/// Broadcast backlog before slow subscribers start lagging (dropped lines are
-/// reported to Dart as a gap rather than blocking the logger).
-const CHANNEL_CAPACITY: usize = 1024;
-
 const RING_BYTES: usize = 2 << 20;
 const MESSAGE_BYTES: usize = 16 << 10;
 
-static CHANNEL: OnceCell<broadcast::Sender<LogLine>> = OnceCell::new();
 static RING: OnceCell<Mutex<LogBuffer>> = OnceCell::new();
 static REVISION: OnceCell<tokio::sync::watch::Sender<u64>> = OnceCell::new();
 static FILE: OnceCell<DiskLog> = OnceCell::new();
@@ -101,25 +94,23 @@ pub struct LogView {
     pub disk_lost: usize,
 }
 
-/// Query the native ring without retaining a second application-wide copy.
+/// Query the native ring, copying only the lines that match.
 pub fn query(level: Option<&str>, keyword: &str) -> LogView {
     let minimum = level.and_then(priority);
     let keyword = keyword.trim().to_lowercase();
-    let lines = snapshot();
-    let total = lines.len();
-    let lines = lines
-        .into_iter()
-        .filter(|line| {
-            let included = minimum
-                .zip(priority(&line.level))
-                .is_none_or(|(min, current)| current >= min);
-            included
-                && (keyword.is_empty()
-                    || format!("{} {} {}", line.level, line.target, line.message)
-                        .to_lowercase()
-                        .contains(&keyword))
-        })
-        .collect();
+    let matches = |line: &&LogLine| {
+        minimum
+            .zip(priority(&line.level))
+            .is_none_or(|(min, current)| current >= min)
+            && (keyword.is_empty()
+                || format!("{} {} {}", line.level, line.target, line.message)
+                    .to_lowercase()
+                    .contains(&keyword))
+    };
+    let (total, lines) = RING.get().map_or((0, Vec::new()), |ring| {
+        let ring = ring.lock().unwrap_or_else(|e| e.into_inner());
+        (ring.lines.len(), ring.lines.iter().filter(matches).cloned().collect())
+    });
     LogView {
         lines,
         total,
@@ -174,7 +165,6 @@ pub fn flush() -> bool {
 /// Install the capture layer as the global subscriber. Idempotent — safe to
 /// call once at boot; a second call (or codex's own `try_init`) is a no-op.
 pub fn init() {
-    CHANNEL.get_or_init(|| broadcast::channel(CHANNEL_CAPACITY).0);
     RING.get_or_init(|| Mutex::new(LogBuffer::default()));
     REVISION.get_or_init(|| tokio::sync::watch::channel(0).0);
     // Honour RUST_LOG when set, else a useful default: everything at info, our
@@ -185,26 +175,6 @@ pub fn init() {
         .with(filter)
         .with(CaptureLayer)
         .try_init();
-}
-
-/// A snapshot of the retained ring buffer (oldest first), for a viewer that
-/// just opened.
-pub fn snapshot() -> Vec<LogLine> {
-    RING.get()
-        .map(|r| {
-            r.lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .lines
-                .iter()
-                .cloned()
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-/// A live receiver for events captured after this call. `None` before [`init`].
-pub fn subscribe() -> Option<broadcast::Receiver<LogLine>> {
-    CHANNEL.get().map(broadcast::Sender::subscribe)
 }
 
 /// Feed a log line from an EXTERNAL source into the same stream — used to tail
@@ -282,18 +252,15 @@ fn emit(mut line: LogLine) {
     truncate(&mut line.level, 16);
     truncate(&mut line.target, 256);
     truncate(&mut line.message, MESSAGE_BYTES);
-    if let Some(ring) = RING.get() {
-        let mut ring = ring.lock().unwrap_or_else(|e| e.into_inner());
-        ring.push(line.clone());
-        if let Some(revision) = REVISION.get() {
-            revision.send_replace(ring.revision);
-        }
-    }
     if let Some(file) = FILE.get() {
         file.push(line.clone());
     }
-    if let Some(tx) = CHANNEL.get() {
-        let _ = tx.send(line);
+    if let Some(ring) = RING.get() {
+        let mut ring = ring.lock().unwrap_or_else(|e| e.into_inner());
+        ring.push(line);
+        if let Some(revision) = REVISION.get() {
+            revision.send_replace(ring.revision);
+        }
     }
 }
 

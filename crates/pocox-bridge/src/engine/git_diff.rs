@@ -1,18 +1,25 @@
 //! Display-oriented unified diff parsing. Partial hunks from streamed tool
 //! output remain readable; unlike an apply-patch parser, incomplete counts are
 //! not an error. Headers are only recognized outside an active hunk.
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-};
 
-use once_cell::sync::Lazy;
+/// What a numbered row shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LineKind {
+    /// Unchanged context.
+    Context,
+    /// Added in the new file.
+    Added,
+    /// Removed from the old file.
+    Removed,
+    /// A hunk header.
+    Hunk,
+}
 
 /// One numbered row in a unified diff.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Line {
-    /// `context`, `added`, `removed` or `hunk`.
-    pub kind: String,
+    /// What the row shows.
+    pub kind: LineKind,
     /// Content without the diff marker; hunk headers retain their marker.
     pub text: String,
     /// Old-file line number, or the old start for a hunk header.
@@ -21,7 +28,7 @@ pub struct Line {
     pub new_line: Option<u32>,
 }
 /// One changed file.
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct FileDiff {
     /// Decoded new path, or the old path for a deletion.
     pub path: String,
@@ -32,11 +39,9 @@ pub struct FileDiff {
     /// Removed lines.
     pub removed: u32,
 }
-/// Parsed display diff, cached by a content digest.
-#[derive(Clone, Debug, Default)]
+/// Parsed display diff.
+#[derive(Debug, Default)]
 pub struct Diff {
-    /// Content identity for controller view caches.
-    pub revision: String,
     /// Changed files, in source order.
     pub files: Vec<FileDiff>,
     /// Added lines across files.
@@ -49,54 +54,6 @@ pub struct Diff {
 
 const MAX_INPUT: usize = 16 << 20;
 const MAX_LINES: usize = 100_000;
-const CACHE_BYTES: usize = 8 << 20;
-type CacheEntry = (String, Arc<Diff>, usize);
-static CACHE: Lazy<Mutex<VecDeque<CacheEntry>>> = Lazy::new(|| Mutex::new(VecDeque::new()));
-
-/// Parse once per content revision, keeping only a bounded cache of results.
-pub fn parse(raw: &str) -> Arc<Diff> {
-    let revision = pocox_core::history_sync::digest_bytes(raw.as_bytes());
-    {
-        let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some(at) = cache.iter().position(|(key, _, _)| *key == revision) {
-            if let Some(entry) = cache.remove(at) {
-                let value = entry.1.clone();
-                cache.push_back(entry);
-                return value;
-            }
-        }
-    }
-    let mut result = parse_inner(raw);
-    result.revision = revision.clone();
-    let weight = std::mem::size_of::<Diff>()
-        + revision.len()
-        + result
-            .files
-            .iter()
-            .map(|file| {
-                file.path.capacity()
-                    + std::mem::size_of::<FileDiff>()
-                    + file.lines.capacity() * std::mem::size_of::<Line>()
-                    + file
-                        .lines
-                        .iter()
-                        .map(|line| line.text.capacity() + line.kind.capacity())
-                        .sum::<usize>()
-            })
-            .sum::<usize>();
-    let result = Arc::new(result);
-    if weight <= CACHE_BYTES {
-        let mut cache = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-        cache.retain(|(key, _, _)| *key != revision);
-        let mut total = cache.iter().map(|entry| entry.2).sum::<usize>() + weight;
-        while total > CACHE_BYTES || cache.len() >= 128 {
-            let Some((_, _, bytes)) = cache.pop_front() else { break };
-            total -= bytes;
-        }
-        cache.push_back((revision, result.clone(), weight));
-    }
-    result
-}
 
 fn range(token: &str, sign: char) -> Option<(u32, u32)> {
     let text = token.strip_prefix(sign)?;
@@ -113,7 +70,9 @@ fn hunk(line: &str) -> Option<((u32, u32), (u32, u32))> {
     (fields.next()? == "@@").then_some((old, new))
 }
 
-fn parse_inner(raw: &str) -> Diff {
+/// Parse a bounded display view of `raw`: input past the line or byte budget
+/// is never read, and the result says it was cut.
+pub fn parse(raw: &str) -> Diff {
     let mut result = Diff::default();
     let mut file = FileDiff::default();
     let mut old_path = None;
@@ -130,10 +89,8 @@ fn parse_inner(raw: &str) -> Diff {
         if line.starts_with("diff --git ") {
             flush(&mut result, &mut file);
             old_path = None;
-            old_no = None;
-            new_no = None;
-            old_left = 0;
-            new_left = 0;
+            (old_no, new_no) = (None, None);
+            (old_left, new_left) = (0, 0);
             continue;
         }
         if !active && line.starts_with("--- ") {
@@ -151,55 +108,49 @@ fn parse_inner(raw: &str) -> Diff {
             continue;
         }
         if let Some(((old, old_count), (new, new_count))) = hunk(line) {
-            old_no = Some(old);
-            new_no = Some(new);
-            old_left = old_count;
-            new_left = new_count;
+            (old_no, new_no) = (Some(old), Some(new));
+            (old_left, new_left) = (old_count, new_count);
             file.lines.push(Line {
-                kind: "hunk".into(),
+                kind: LineKind::Hunk,
                 text: line.into(),
                 old_line: old_no,
                 new_line: new_no,
             });
             continue;
         }
-        let (kind, old, new) = match line.as_bytes().first() {
-            Some(b'+') => {
-                file.added += 1;
-                ("added", None, new_no)
-            },
-            Some(b'-') => {
-                file.removed += 1;
-                ("removed", old_no, None)
-            },
-            Some(b' ') => ("context", old_no, new_no),
+        let kind = match line.as_bytes().first() {
+            Some(b'+') => LineKind::Added,
+            Some(b'-') => LineKind::Removed,
+            Some(b' ') => LineKind::Context,
             _ => continue,
         };
+        let (on_old, on_new) = (kind != LineKind::Added, kind != LineKind::Removed);
         file.lines.push(Line {
-            kind: kind.into(),
+            kind,
             text: line[1..].into(),
-            old_line: old,
-            new_line: new,
+            old_line: old_no.filter(|_| on_old),
+            new_line: new_no.filter(|_| on_new),
         });
-        if kind != "added" {
+        if on_old {
             old_no = old_no.map(|n| n.saturating_add(1));
             old_left = old_left.saturating_sub(1);
         }
-        if kind != "removed" {
+        if on_new {
             new_no = new_no.map(|n| n.saturating_add(1));
             new_left = new_left.saturating_sub(1);
         }
+        file.added += u32::from(kind == LineKind::Added);
+        file.removed += u32::from(kind == LineKind::Removed);
     }
     flush(&mut result, &mut file);
     result
 }
 fn flush(result: &mut Diff, file: &mut FileDiff) {
+    let file = std::mem::take(file);
     if !file.path.is_empty() && !file.lines.is_empty() {
         result.added += file.added;
         result.removed += file.removed;
-        result.files.push(std::mem::take(file));
-    } else {
-        *file = FileDiff::default();
+        result.files.push(file);
     }
 }
 
@@ -270,6 +221,7 @@ mod tests {
         );
         assert_eq!((diff.added, diff.removed), (1, 1));
         assert_eq!(diff.files[0].lines[1].text, "-- old");
+        assert_eq!(diff.files[0].lines[1].kind, LineKind::Removed);
         assert_eq!(diff.files[0].lines[2].new_line, Some(1));
     }
     #[test]

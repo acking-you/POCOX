@@ -489,7 +489,7 @@ final runningThreadsProvider = StreamProvider.autoDispose
       void connect() {
         if (disposed) return;
         subscription = api
-            .appEvents(serviceKey, topic: 'activity')
+            .appEvents(serviceKey, topic: EventTopic.activity)
             .listen(
               (event) {
                 final tid = event.threadId;

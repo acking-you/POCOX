@@ -301,6 +301,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   Object? _draftOptionsKey;
 
   StreamSubscription<AppEvent>? _sub;
+  AppEventFeed? _feed;
   int _subscriptionEpoch = 0;
 
   String? _selectedThreadId;

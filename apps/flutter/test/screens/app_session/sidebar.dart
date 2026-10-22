@@ -610,11 +610,15 @@ void _registerSidebar() {
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     expect(api.lastResumed, 't9');
+    // The live feed follows the conversation in place; replacing it would
+    // drop whatever the host sent in between (an approval, a turn end).
+    expect(api.followedThreads, ['t9']);
 
     // Tap "new conversation" (+) → clears to an empty conversation.
     await t.tap(find.byKey(const Key('new-conversation-btn')));
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
+    expect(api.followedThreads, ['t9', null]);
     // Tapping "new conversation" shows the new-session guidance.
     expect(
       find.byKey(const Key('project-switcher-btn')),

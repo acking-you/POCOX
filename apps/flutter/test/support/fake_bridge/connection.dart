@@ -317,11 +317,21 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<bool> apiProbeLocal(String localAddr) async =>
       reachableLocal[localAddr] ?? true;
 
+  /// Conversations each [appEventFeed] was moved to, in order.
+  final List<String?> followedThreads = [];
+
+  @override
+  AppEventFeed appEventFeed(String serviceKey, {String? threadId}) =>
+      _FakeEventFeed(
+        appEvents(serviceKey, threadId: threadId),
+        followedThreads,
+      );
+
   @override
   Stream<AppEvent> appEvents(
     String serviceKey, {
     String? threadId,
-    String topic = 'all',
+    EventTopic topic = EventTopic.all,
   }) => _appEvents
       .putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast)
       .stream
@@ -404,4 +414,13 @@ mixin _FakeConnection on _FakeBridgeState {
 
   @override
   Stream<RetryProgress> metaRetryEvents() => _retryEvents.stream;
+}
+
+class _FakeEventFeed implements AppEventFeed {
+  _FakeEventFeed(this.events, this._followed);
+  final List<String?> _followed;
+  @override
+  final Stream<AppEvent> events;
+  @override
+  void follow(String? threadId) => _followed.add(threadId);
 }

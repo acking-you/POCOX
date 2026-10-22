@@ -14,8 +14,8 @@ type Key = (String, String);
 pub struct ProjectedEvent {
     /// Native-decoded thread activity, absent when the event says nothing.
     pub running: Option<bool>,
-    /// Parsed file changes, prepared on the CPU lane before delivery.
-    pub diff: Option<std::sync::Arc<super::git_diff::Diff>>,
+    /// Parsed file changes, attached by the delivering feed.
+    pub diff: Option<super::git_diff::Diff>,
     /// Original event, with a coalesced delta or complete projected text.
     pub event: AppEvent,
     /// Explicit item turn; lifecycle events may also use `turn.id` or `id`.
@@ -57,35 +57,6 @@ pub fn can_merge(a: &AppEvent, b: &AppEvent) -> bool {
         && a.item_id == b.item_id
         && a.text.as_ref().map_or(0, String::len) + b.text.as_ref().map_or(0, String::len)
             <= 64 << 10
-}
-
-/// Filter at the native boundary before copying payloads into Dart.
-pub fn accepts(event: &AppEvent, thread: Option<&str>, topic: &str) -> bool {
-    let inventory = matches!(
-        event.kind.as_str(),
-        "thread/deleted"
-            | "thread/name/updated"
-            | "thread/started"
-            | "thread/archived"
-            | "thread/unarchived"
-            | "session/access/changed"
-            | "serverRequest/resolved"
-    );
-    if !inventory
-        && thread.is_some()
-        && event.thread_id.is_some()
-        && event.thread_id.as_deref() != thread
-    {
-        return false;
-    }
-    match topic {
-        "activity" => matches!(
-            event.kind.as_str(),
-            "turn/started" | "turn/completed" | "turn/failed" | "thread/status/changed"
-        ),
-        "realtime" => event.kind.starts_with("thread/realtime/"),
-        _ => true,
-    }
 }
 
 impl Projection {
@@ -205,6 +176,5 @@ mod tests {
         assert_eq!(update.turn_id.as_deref(), Some("turn"));
         assert_eq!(update.sender.as_deref(), Some(""));
         assert!(!can_merge(&event("item/agentMessage/delta", "x"), &event("item/completed", "x")));
-        assert!(!accepts(&event("item/agentMessage/delta", "x"), None, "activity"));
     }
 }

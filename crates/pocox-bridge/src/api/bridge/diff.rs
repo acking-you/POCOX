@@ -5,10 +5,21 @@ use crate::engine::{
     git_diff,
 };
 
+/// What a numbered diff row shows.
+pub enum DiffLineKind {
+    /// Unchanged context.
+    Context,
+    /// Added in the new file.
+    Added,
+    /// Removed from the old file.
+    Removed,
+    /// A hunk header.
+    Hunk,
+}
 /// A numbered diff row; the renderer only selects its colors and layout.
 pub struct DiffLineDto {
-    /// `context`, `added`, `removed` or `hunk`.
-    pub kind: String,
+    /// What the row shows.
+    pub kind: DiffLineKind,
     /// Display text.
     pub text: String,
     /// Old-file number or hunk start.
@@ -27,10 +38,8 @@ pub struct DiffFileDto {
     /// Removed lines.
     pub removed: u32,
 }
-/// Native parsed diff, reusable by its content revision.
+/// Native parsed diff.
 pub struct DiffDto {
-    /// Content identity.
-    pub revision: String,
     /// Changed files in source order.
     pub files: Vec<DiffFileDto>,
     /// Total added lines.
@@ -41,39 +50,51 @@ pub struct DiffDto {
     pub truncated: bool,
 }
 
-pub(super) fn dto(diff: &git_diff::Diff) -> DiffDto {
-    DiffDto {
-        revision: diff.revision.clone(),
-        added: diff.added,
-        removed: diff.removed,
-        truncated: diff.truncated,
-        files: diff
-            .files
-            .iter()
-            .map(|file| DiffFileDto {
-                path: file.path.clone(),
-                added: file.added,
-                removed: file.removed,
-                lines: file
-                    .lines
-                    .iter()
-                    .map(|line| DiffLineDto {
-                        kind: line.kind.clone(),
-                        text: line.text.clone(),
-                        old_line: line.old_line,
-                        new_line: line.new_line,
-                    })
-                    .collect(),
-            })
-            .collect(),
+impl From<git_diff::Diff> for DiffDto {
+    fn from(diff: git_diff::Diff) -> Self {
+        let line = |line: git_diff::Line| DiffLineDto {
+            kind: match line.kind {
+                git_diff::LineKind::Context => DiffLineKind::Context,
+                git_diff::LineKind::Added => DiffLineKind::Added,
+                git_diff::LineKind::Removed => DiffLineKind::Removed,
+                git_diff::LineKind::Hunk => DiffLineKind::Hunk,
+            },
+            text: line.text,
+            old_line: line.old_line,
+            new_line: line.new_line,
+        };
+        Self {
+            added: diff.added,
+            removed: diff.removed,
+            truncated: diff.truncated,
+            files: diff
+                .files
+                .into_iter()
+                .map(|file| DiffFileDto {
+                    path: file.path,
+                    added: file.added,
+                    removed: file.removed,
+                    lines: file.lines.into_iter().map(line).collect(),
+                })
+                .collect(),
+        }
     }
 }
 
-/// Read and parse the working tree in Rust, returning a ready-to-render view.
+/// The parsed edits of a history item; only `fileChange` items carry any.
+pub(super) fn item_diff(item_type: &str, text: &str) -> Option<DiffDto> {
+    (item_type == "fileChange").then(|| git_diff::parse(text).into())
+}
+
+/// Read and parse the working tree in one admission, so the parsed view
+/// belongs to the same account/relay epoch as the read that produced it.
+/// Parsing is linear in the bytes the read already transferred.
 pub async fn app_git_diff_parsed(service_key: String, cwd: String) -> Result<DiffDto> {
-    let raw = execution::run(Lane::Read, move || engine(&service_key).git_diff(&service_key, &cwd))
-        .await?;
-    execution::run(Lane::Cpu, move || Ok(dto(&git_diff::parse(&raw)))).await
+    execution::run(Lane::Read, move || {
+        let raw = engine(&service_key).git_diff(&service_key, &cwd)?;
+        Ok(git_diff::parse(&raw).into())
+    })
+    .await
 }
 
 /// File metadata for a conversation edit; diff bodies need no return trip.

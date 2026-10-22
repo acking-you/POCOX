@@ -94,11 +94,9 @@ pub fn update_start_background() {
 /// is older than the background interval.
 pub async fn update_check(force: bool) -> Result<UpdateStateDto> {
     execution::run(Lane::Background, move || {
-        Ok({
-            runtime::runtime()
-                .block_on(updates::updater().check(force))
-                .into()
-        })
+        Ok(runtime::runtime()
+            .block_on(updates::updater().check(force))
+            .into())
     })
     .await
 }
@@ -106,11 +104,9 @@ pub async fn update_check(force: bool) -> Result<UpdateStateDto> {
 /// Downloads and verifies the newest release's file for this installation.
 pub async fn update_download() -> Result<UpdateStateDto> {
     execution::run(Lane::Transfer, move || {
-        Ok({
-            runtime::runtime()
-                .block_on(updates::updater().download())
-                .into()
-        })
+        Ok(runtime::runtime()
+            .block_on(updates::updater().download())
+            .into())
     })
     .await
 }

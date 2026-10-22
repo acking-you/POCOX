@@ -19,10 +19,14 @@ discovery, transfers and CPU transformations have independent budgets:
 | Read | 8 | 24 |
 | Background | 3 | 45 |
 | Transfer | 2 | 6 |
-| CPU | 2 | 6 |
+| CPU | 2 | 30 |
 
 An overloaded queue refuses work before dispatch. Cancelled waiting futures
-release their admission; work already started finishes once. Queued calls
+release their admission; work already started finishes once. Transformations
+inside a native pipeline that is already bounded by its own subscription (a
+live file-change diff, a followed session's snapshot) share the CPU lane's
+running slots through `execution::compute` but are never refused, so Dart
+filling the CPU queue cannot close a live feed. Queued calls
 check the account/relay epoch again before execution. Existing engine checks
 still guard connection identity and scoped uploads. This separates slow
 discovery and uploads from interactive operations; it is not a claim that
@@ -43,8 +47,14 @@ failures; no logging failure recursively logs into its own sink.
 
 ## Session ownership
 
-`engine/session_projection.rs` filters subscriptions by thread and topic,
-decodes turn/client/activity metadata and combines adjacent compatible text
+`api/bridge/events.rs` filters each subscription by thread and topic
+(`EventTopic`) before copying payloads into Dart. Inventory changes, resolved
+requests and every conversation's turn end pass the thread filter; the
+realtime topic also carries turn starts, which a dictation interrupts. The
+thread is an `EventFeed` handle: the session screen moves it with
+`event_feed_follow` instead of resubscribing, so nothing the host sends while
+the user switches conversations falls between two subscriptions.
+`engine/session_projection.rs` decodes turn/client/activity metadata and combines adjacent compatible text
 deltas over at most 16 ms / 64 KiB. Lifecycle events and approval requests are
 ordering barriers. Complete item snapshots establish native text prefixes;
 a reconnect that begins with a delta stays partial until history arrives.
@@ -89,10 +99,13 @@ enter as bytes. Prepared images return preview bytes and their wire data URL.
 
 `engine/git_diff.rs` parses display diffs, including incomplete streaming
 hunks, Git-quoted UTF-8 paths, deletion paths and content starting with `---`
-or `+++`. It computes line numbers and counts once, caches by content digest
-within 8 MiB / 128 entries, and truncates display parsing at 16 MiB / 100,000
-lines with a visible notice. History, live file-change events and working-tree
-review share this representation. Native review indexing groups compact file
+or `+++`. It computes line numbers and counts once and truncates display
+parsing at 16 MiB / 100,000 lines with a visible notice; nothing past that
+budget is read. Line kinds cross FRB as an enum. History, live file-change
+events and working-tree review share this representation; the working-tree
+read and its parse run in one Read-lane admission, so the result belongs to
+the account/relay epoch that read it. Parsing is linear in bytes the same
+call already transferred, so history pages parse their edits in place. Native review indexing groups compact file
 metadata; Flutter materializes references to its existing parsed sections.
 The old Dart parser, history-ordering algorithm and image conversion pipeline
 are removed from production code.
@@ -128,6 +141,13 @@ checks; these results do not imply those services were exercised.
 After the final log-capacity correction and test-helper extraction, bridge
 clippy, four native log tests, Flutter analyze and 38 affected widget tests
 passed again.
+
+After the 2026-10-22 review fixes (in-place feed retargeting, service-wide
+turn ends, dictation turn starts, single-admission working-tree diffs, removed
+diff cache and unused streams): first-party format check, workspace clippy
+with warnings denied, bridge tests (389 passed, 12 ignored), CLI tests, Flutter
+analyze/format and the full Flutter suite (1,666 passed, 9 skipped) pass; the
+real-library `native_offload_test` passes against the rebuilt bridge.
 
 Real-device frame latency, RSS/GC, bridge byte counts, release size and
 cross-platform acceptance still need measurement. No end-to-end speedup is
