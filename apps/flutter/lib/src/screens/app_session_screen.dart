@@ -61,6 +61,7 @@ import 'package:pocox/src/screens/app_session/transcript_view.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/widgets/glass.dart';
 import 'package:pocox/src/widgets/floating_status.dart';
+import 'package:pocox/src/widgets/folding_panel.dart';
 import 'package:pocox/src/widgets/height_reporter.dart';
 import 'package:pocox/src/text_measure.dart';
 import 'package:pocox/src/theme.dart';
@@ -100,6 +101,7 @@ import 'package:pocox/src/widgets/app_dialog.dart';
 import 'package:pocox/src/widgets/change_counts.dart';
 
 part 'app_session/composer_drafts.dart';
+part 'app_session/composer_foot.dart';
 part 'app_session/session_access.dart';
 part 'app_session/session_agent_prepare.dart';
 part 'app_session/session_attachments.dart';
@@ -620,14 +622,8 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// turn's end, and their late item events add no rows.
   final List<String> _endedTurns = [];
   bool _atBottom = true; // is the list scrolled to the latest message?
-
-  /// The height of what floats over the transcript's foot — the composer
-  /// and the cards above it — which the transcript reserves as end padding
-  /// so its last message rests above them.
-  double _composerOverlay = 0;
-
-  /// The composer block's own height, inside [_composerOverlay].
-  double _composerBlock = 0;
+  /// What floats over the transcript's foot, and the phone composer's fold.
+  final _foot = _ComposerFoot();
   // Every turn of the open thread, oldest first — including turns whose items
   // aren't loaded. The rail shows the conversation's shape, so it reads this
   // rather than the loaded rows. Empty for a thread that arrived whole, whose
@@ -933,6 +929,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     _inputFocus.dispose();
     _convSearchFocus.dispose();
     _composerDragHeight.dispose();
+    _foot.dispose();
     _convScroll.dispose();
     _convListCtl.dispose();
     if (_isDesktop) HardwareKeyboard.instance.removeHandler(_onHardwareKey);

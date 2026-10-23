@@ -22,6 +22,9 @@ Engine wire details stay in [ACP agents](acp-agents.md#turns-and-permissions),
   `lib/src/ui_prefs.dart`) and has an explicit reset.
 - It grows and shrinks with wrapped text up to the viewport cap, then scrolls
   internally. Automatic sizing never overwrites the saved minimum.
+- On a phone it folds into a capsule while the reader reads and unfolds for
+  writing; folding never touches the draft, its attachments or a running
+  take ([phone layout](app-ui.md#phone-and-tablet-layout)).
 - Mobile Return inserts a newline. Desktop Enter sends and Shift+Enter inserts
   a newline. IME composition never submits.
 - Queue and Stop are separate controls.

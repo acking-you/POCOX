@@ -138,9 +138,10 @@ extension _SessionTranscript on _AppSessionState {
   /// Reserve [height] at the transcript's end for what floats over its foot,
   /// keeping the latest message in view when the reader was already there.
   void _setComposerOverlay(double height) {
-    if (!mounted || (height - _composerOverlay).abs() < 0.5) return;
+    if (!mounted || (height - _composerOverlay.value).abs() < 0.5) return;
     final follow = _atBottom;
-    _updateState(() => _composerOverlay = height);
+    // No rebuild: only what reserves this room listens to it.
+    _composerOverlay.value = height;
     if (follow) _scrollToEnd();
   }
 
@@ -148,7 +149,11 @@ extension _SessionTranscript on _AppSessionState {
   /// above it leave free.
   void _setComposerBlock(double height) {
     if (!mounted || (height - _composerBlock).abs() < 0.5) return;
-    _updateState(() => _composerBlock = height);
+    _foot.block = height;
+    // Only pending requests size themselves by it.
+    if (_approvals.isNotEmpty || _asyncQuestions.isNotEmpty) {
+      _updateState(() {});
+    }
   }
 
   /// The capsule over a turn the rail is reading: loading, or a retry, and
@@ -272,6 +277,7 @@ extension _SessionTranscript on _AppSessionState {
         event.metrics.pixels >= event.metrics.maxScrollExtent - 1) {
       _scroll.stickToEnd = true;
     }
+    _foldForScroll(event);
     // Short pages cannot move their scroll offset. An overscroll is
     // still a deliberate request to reach history beyond the edge.
     if (event is OverscrollNotification &&
@@ -340,11 +346,13 @@ extension _SessionTranscript on _AppSessionState {
               child: _transcriptStatus(l10n),
             ),
             if (runningPlan != null)
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 8 + _composerOverlay,
-                child: _turnProgress(runningPlan, l10n),
+              _aboveComposer(
+                (overlay) => Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 8 + overlay,
+                  child: _turnProgress(runningPlan, l10n),
+                ),
               ),
           ],
         ),
@@ -359,18 +367,21 @@ extension _SessionTranscript on _AppSessionState {
       // and readiness; an empty resumed thread keeps the plain hint. Either
       // sits in the room the composer leaves, never beneath it.
       final theme = Theme.of(context);
-      return Padding(
-        padding: EdgeInsets.only(bottom: _composerOverlay),
-        child: _threadId == null
-            ? _agentWelcome(l10n)
-            : Center(
-                child: Text(
-                  l10n.emptyConversation,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.outline,
-                  ),
+      final empty = _threadId == null
+          ? _agentWelcome(l10n)
+          : Center(
+              child: Text(
+                l10n.emptyConversation,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.outline,
                 ),
               ),
+            );
+      return _aboveComposer(
+        (overlay) => Padding(
+          padding: EdgeInsets.only(bottom: overlay),
+          child: empty,
+        ),
       );
     }
     // One SelectionArea over the whole conversation so text can be
@@ -395,10 +406,21 @@ extension _SessionTranscript on _AppSessionState {
         // it, click to jump. Narrower, and on touch, it stays the
         // bottom-right cluster, which also carries jump-to-latest in both
         // cases.
-        Positioned.fill(bottom: _composerOverlay, child: _turnNavOverlay()),
+        _aboveComposer(
+          (overlay) =>
+              Positioned.fill(bottom: overlay, child: _turnNavOverlay()),
+        ),
       ],
     );
   }
+
+  /// [build] placed against the composer's live height, rebuilt alone as it
+  /// grows or folds rather than with the whole conversation.
+  Widget _aboveComposer(Widget Function(double overlay) build) =>
+      ValueListenableBuilder<double>(
+        valueListenable: _composerOverlay,
+        builder: (context, overlay, _) => build(overlay),
+      );
 
   /// History syncing or shown from the cache, and a turn the rail is
   /// reading, floating over the transcript's top.

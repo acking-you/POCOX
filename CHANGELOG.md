@@ -17,6 +17,11 @@ breaking change goes.
   CLI defaults remain relay-only, and defaults are not written to
   `config.toml`, so older builds still read it. Rust now requires 1.99.1 or
   later; CI and release toolchains move together.
+- On phones the composer folds into a slim capsule while you read back
+  through a conversation and unfolds when you tap it, focus the field or
+  return to the latest message; the draft, attachments and Stop stay with it.
+  Composer growth, resizing and folding no longer rebuild the whole
+  conversation each frame.
 
 - Image attachments retain an optional copy in the host session's project and
   include its path for the agent's available image tools. Picking, dropping and

@@ -109,6 +109,21 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 - Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
   22 px composer radius with a quieter idle edge, 44 px sidebar heading
   buttons, two-line host switcher names.
+- Below 720 px on touch the composer folds into a capsule while the reader
+  reads (`screens/app_session/composer_foot.dart`, `widgets/folding_panel.dart`):
+  a drag of 56 px through the transcript more than 96 px from its end folds
+  it, unless the field is focused, a dictation take runs or the full editor
+  is open. The capsule is the same glass pane (radius, focus and streaming
+  edges) showing the draft's first line or the hint, attachments and Stop
+  while a turn runs. It unfolds on a tap (which focuses the field), on any
+  focus of the field, when a scroll comes to rest at the end, and on a forced
+  return to the end (send, jump to latest). The fold belongs to its
+  conversation; desktop, tablets and read-only views never fold. The full
+  composer stays mounted underneath, so draft, focus and options survive; the
+  height morphs while the forms cross-fade (`Motion.medium`, emphasized).
+- What floats over the transcript's foot is measured into a notifier
+  (`_ComposerFoot.overlay`): its growth, drag and fold move only the end
+  spacer and the overlays above it, never rebuild the conversation.
 - Layouts reflow by measured room instead of squeezing:
   - Service capability rows below 440 px (text-scaled) put status and actions
     under the title and provider; the action keeps its overflow beside it.

@@ -196,7 +196,9 @@ extension _TranscriptList on _AppSessionState {
                 );
               }
               // The end keeps clear of what floats over the transcript's foot.
-              return SizedBox(height: 12 + _composerOverlay);
+              return _aboveComposer(
+                (overlay) => SizedBox(height: 12 + overlay),
+              );
             },
             findChildIndexCallback: (key) {
               final at = list.rowOfAnchor[key];
@@ -355,6 +357,9 @@ extension _TranscriptList on _AppSessionState {
       });
       return;
     }
+    // Following the conversation again (a send, jump to latest): the reader
+    // is back where a reply starts.
+    _foldComposer(false);
     _scroll.stickToEnd = true;
     final rows = _rows;
     final last = rows.lastOrNull;
