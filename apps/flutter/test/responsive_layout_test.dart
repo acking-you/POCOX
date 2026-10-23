@@ -555,7 +555,8 @@ void main() {
       expect(key, findsOneWidget);
       expect(find.textContaining('\u001f'), findsNothing);
       expect(find.textContaining('#0eb093e3'), findsNothing);
-      expect(find.text('127.0.0.1:64001\n连接路径未知'), findsOneWidget);
+      expect(find.text('127.0.0.1:64001'), findsOneWidget);
+      expect(find.text('仅中继'), findsWidgets, reason: 'its live path');
       await capturePreview(t, 'responsive-settings-subscriptions');
     });
   });

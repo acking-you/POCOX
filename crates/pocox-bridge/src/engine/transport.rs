@@ -49,7 +49,7 @@ use std::sync::{Mutex, MutexGuard};
 use anyhow::{anyhow, Result};
 use pocox_account_proto::http::RelayCredentialResponse;
 use pocox_account_proto::NamespacedServiceId;
-use pocox_core::config::Mode;
+use pocox_core::config::{Mode, PbMapperConfig};
 use pocox_core::service::sanitize_component;
 use pocox_pb::RelaySession;
 // Re-exported so callers keep saying `engine::transport::Transport`: within the
@@ -196,10 +196,14 @@ pub fn context_changed() {
 }
 
 /// The account transport of one credential answer: relay, credential and
-/// namespace always come from the same answer.
-fn account_transport(credential: RelayCredentialResponse) -> Transport {
+/// namespace always come from the same answer; `preferences` only choose paths.
+fn account_transport(
+    credential: RelayCredentialResponse,
+    preferences: &PbMapperConfig,
+) -> Transport {
     Transport {
-        session: RelaySession::new(credential.relay_addr, credential.credential),
+        session: RelaySession::new(credential.relay_addr, credential.credential)
+            .with_preferences(preferences),
         namespace: Some(credential.namespace),
     }
 }
@@ -236,8 +240,7 @@ async fn resolve_once(support: &Path) -> Result<Result<Owned, Stale>> {
     if config.account_mode() == Mode::Account {
         let credential = account::relay_credential(support).await?;
         let expires_at = credential.expires_at;
-        let mut transport = account_transport(credential);
-        transport.session = transport.session.with_preferences(&config.pb_mapper);
+        let transport = account_transport(credential, &config.pb_mapper);
         // A registration outlives the call that made it, and the relay cancels a
         // lapsed credential's tunnels — so the refresher has to be running for
         // hosting to survive its TTL. Idempotent, hence unconditional here —
@@ -410,15 +413,25 @@ mod tests {
     /// one credential answer.
     #[test]
     fn an_account_transport_comes_from_one_credential_answer() {
-        let transport = account_transport(RelayCredentialResponse {
-            relay_addr: "relay.test:7".into(),
-            credential: "pbmt1_alice".into(),
-            expires_at: 1,
-            namespace: "alice".into(),
-        });
+        let preferences = PbMapperConfig {
+            path: pocox_core::config::ConnectionPath::Auto,
+            allow_direct: true,
+            ..PbMapperConfig::default()
+        };
+        let transport = account_transport(
+            RelayCredentialResponse {
+                relay_addr: "relay.test:7".into(),
+                credential: "pbmt1_alice".into(),
+                expires_at: 1,
+                namespace: "alice".into(),
+            },
+            &preferences,
+        );
         assert_eq!(transport.session.relay_addr, "relay.test:7");
         assert_eq!(transport.session.credential, "pbmt1_alice");
         assert_eq!(transport.namespace.as_deref(), Some("alice"));
+        assert_eq!(transport.session.path, preferences.path, "paths follow the saved choice");
+        assert!(transport.session.allow_direct);
     }
 
     fn transport(relay: &str, key: &str, namespace: Option<&str>) -> Transport {

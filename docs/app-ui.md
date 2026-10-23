@@ -51,11 +51,19 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 
 ## Home, connection and relay problems
 
-- Settings offers outgoing **Relay only / Prefer P2P direct** and, on desktop,
-  permission for incoming direct connections. Keep the default relay-only/off
-  behavior and the explanation of when saved changes apply. Subscription paths
-  come from local SDK observations, never from the preference. Poll only while
-  the page is visible; distinguish idle, unavailable and mixed paths. See
+- Settings › Connection path (`lib/src/network/connection_paths.dart`) is a
+  `GroupCard` in both layouts: outgoing **Relay only / P2P first** as a
+  `GlassSegmented` (under its title below 480 px) and, on desktop only, an
+  incoming switch. Choices save at once, optimistically; a failed write springs
+  the control back with a failed line. Its explanation sits behind the group's
+  info mark; the visible line under a control is only pending ("reconnect a
+  session", "restart hosting") or failed. Keep the default relay-only/off
+  behavior.
+- Subscription rows carry one `TunnelPathChip` (live path or dropped) and open
+  live details from the pressed row. Paths come from local SDK observations,
+  never from the preference; the polled list is watched by the subscription
+  widgets alone, so polling rebuilds them, not the settings page, and stops
+  with the last view. See
   [direct connections](relay-worker-recovery.md#direct-connections).
 
 - `/` is chat-first: it resolves a host (last used → locally hosted → first

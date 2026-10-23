@@ -20,7 +20,7 @@ use tokio::runtime::{Builder, Runtime};
 use tokio::task::JoinHandle;
 
 mod path_status;
-pub use path_status::PathStatus;
+pub use path_status::{PathStatus, TunnelPath};
 
 use crate::engine::transport::Transport;
 
@@ -108,7 +108,7 @@ impl SubEntry {
                     connection.status(),
                     pocox_pb::TunnelStatus::Stopped | pocox_pb::TunnelStatus::Failed(_)
                 ),
-                PathStatus::observe(*path, connection.diagnostics()),
+                PathStatus::observe(*path, connection.diagnostics().direct),
             ),
             #[cfg(test)]
             SubscriptionOwner::Task(task) => (!task.is_finished(), PathStatus::default()),
@@ -355,13 +355,14 @@ fn subscribe_ready_timeout() -> std::time::Duration {
     SUBSCRIBE_READY_TIMEOUT
 }
 
-/// Abort and forget the subscription for `key`. No-op if absent.
+/// Stop and forget the subscription for `key`. No-op if absent. The SDK
+/// handle is dropped after the registry lock is released.
 pub fn unsubscribe_service(key: &str) {
     let removed = registry().lock().expect("registry poisoned").remove(key);
     drop(removed);
 }
 
-/// Abort and forget every subscription whose registry key starts with
+/// Stop and forget every subscription whose registry key starts with
 /// `prefix` (a whole family, such as the meta tunnels of every context).
 /// No-op before [`init`].
 pub fn unsubscribe_prefix(prefix: &str) {

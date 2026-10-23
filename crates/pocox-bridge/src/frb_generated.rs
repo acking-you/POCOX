@@ -7393,17 +7393,15 @@ fn wire__crate__api__bridge__network__relay_set_preferences_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_path = <String>::sse_decode(&mut deserializer);
-            let api_allow_direct = <bool>::sse_decode(&mut deserializer);
+            let api_preferences =
+                <crate::api::bridge::network::RelayPreferencesDto>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || async move {
-                        let output_ok = crate::api::bridge::network::relay_set_preferences(
-                            api_path,
-                            api_allow_direct,
-                        )
-                        .await?;
+                        let output_ok =
+                            crate::api::bridge::network::relay_set_preferences(api_preferences)
+                                .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -9366,6 +9364,18 @@ impl SseDecode for crate::api::bridge::ConfigView {
     }
 }
 
+impl SseDecode for crate::api::bridge::network::ConnectionPathDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::bridge::network::ConnectionPathDto::RelayOnly,
+            1 => crate::api::bridge::network::ConnectionPathDto::Auto,
+            _ => unreachable!("Invalid variant for ConnectionPathDto: {}", inner),
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::hosted_account::DeviceCodeDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11055,7 +11065,8 @@ impl SseDecode for crate::api::bridge::composer::QueuedCommandDto {
 impl SseDecode for crate::api::bridge::network::RelayPreferencesDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
-        let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_path =
+            <crate::api::bridge::network::ConnectionPathDto>::sse_decode(deserializer);
         let mut var_allowDirect = <bool>::sse_decode(deserializer);
         return crate::api::bridge::network::RelayPreferencesDto {
             path: var_path,
@@ -11322,10 +11333,10 @@ impl SseDecode for crate::api::bridge::services::SubStatusDto {
         let mut var_key = <String>::sse_decode(deserializer);
         let mut var_localAddr = <String>::sse_decode(deserializer);
         let mut var_alive = <bool>::sse_decode(deserializer);
-        let mut var_path = <String>::sse_decode(deserializer);
-        let mut var_activeDirect = <u64>::sse_decode(deserializer);
-        let mut var_activeRelay = <u64>::sse_decode(deserializer);
-        let mut var_fallbacks = <u64>::sse_decode(deserializer);
+        let mut var_path = <crate::api::bridge::services::TunnelPathDto>::sse_decode(deserializer);
+        let mut var_activeDirect = <u32>::sse_decode(deserializer);
+        let mut var_activeRelay = <u32>::sse_decode(deserializer);
+        let mut var_fallbacks = <u32>::sse_decode(deserializer);
         let mut var_lastFallback = <Option<String>>::sse_decode(deserializer);
         return crate::api::bridge::services::SubStatusDto {
             key: var_key,
@@ -11734,6 +11745,21 @@ impl SseDecode for crate::api::bridge::agent_tools::ToolsUpdateDto {
         return crate::api::bridge::agent_tools::ToolsUpdateDto {
             overview: var_overview,
             added: var_added,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::services::TunnelPathDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::bridge::services::TunnelPathDto::RelayOnly,
+            1 => crate::api::bridge::services::TunnelPathDto::Idle,
+            2 => crate::api::bridge::services::TunnelPathDto::Direct,
+            3 => crate::api::bridge::services::TunnelPathDto::Relay,
+            4 => crate::api::bridge::services::TunnelPathDto::Mixed,
+            _ => unreachable!("Invalid variant for TunnelPathDto: {}", inner),
         };
     }
 }
@@ -13742,6 +13768,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::ConfigView>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::ConnectionPathDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::RelayOnly => 0.into_dart(),
+            Self::Auto => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::network::ConnectionPathDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::ConnectionPathDto>
+    for crate::api::bridge::network::ConnectionPathDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::network::ConnectionPathDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::hosted_account::DeviceCodeDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -15641,6 +15688,30 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::agent_tools::ToolsUpd
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::TunnelPathDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::RelayOnly => 0.into_dart(),
+            Self::Idle => 1.into_dart(),
+            Self::Direct => 2.into_dart(),
+            Self::Relay => 3.into_dart(),
+            Self::Mixed => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::services::TunnelPathDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::services::TunnelPathDto>
+    for crate::api::bridge::services::TunnelPathDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::services::TunnelPathDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::threads::TurnItemsPageDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -16256,6 +16327,22 @@ impl SseEncode for crate::api::bridge::ConfigView {
         <Option<String>>::sse_encode(self.account_login, serializer);
         <Option<String>>::sse_encode(self.account_id, serializer);
         <bool>::sse_encode(self.has_account_token, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::network::ConnectionPathDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::bridge::network::ConnectionPathDto::RelayOnly => 0,
+                crate::api::bridge::network::ConnectionPathDto::Auto => 1,
+                _ => {
+                    unimplemented!("");
+                },
+            },
+            serializer,
+        );
     }
 }
 
@@ -17512,7 +17599,7 @@ impl SseEncode for crate::api::bridge::composer::QueuedCommandDto {
 impl SseEncode for crate::api::bridge::network::RelayPreferencesDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
-        <String>::sse_encode(self.path, serializer);
+        <crate::api::bridge::network::ConnectionPathDto>::sse_encode(self.path, serializer);
         <bool>::sse_encode(self.allow_direct, serializer);
     }
 }
@@ -17684,10 +17771,10 @@ impl SseEncode for crate::api::bridge::services::SubStatusDto {
         <String>::sse_encode(self.key, serializer);
         <String>::sse_encode(self.local_addr, serializer);
         <bool>::sse_encode(self.alive, serializer);
-        <String>::sse_encode(self.path, serializer);
-        <u64>::sse_encode(self.active_direct, serializer);
-        <u64>::sse_encode(self.active_relay, serializer);
-        <u64>::sse_encode(self.fallbacks, serializer);
+        <crate::api::bridge::services::TunnelPathDto>::sse_encode(self.path, serializer);
+        <u32>::sse_encode(self.active_direct, serializer);
+        <u32>::sse_encode(self.active_relay, serializer);
+        <u32>::sse_encode(self.fallbacks, serializer);
         <Option<String>>::sse_encode(self.last_fallback, serializer);
     }
 }
@@ -17934,6 +18021,25 @@ impl SseEncode for crate::api::bridge::agent_tools::ToolsUpdateDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::bridge::agent_tools::ToolsOverviewDto>::sse_encode(self.overview, serializer);
         <Vec<crate::api::bridge::agent_tools::ToolsRefDto>>::sse_encode(self.added, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::services::TunnelPathDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::bridge::services::TunnelPathDto::RelayOnly => 0,
+                crate::api::bridge::services::TunnelPathDto::Idle => 1,
+                crate::api::bridge::services::TunnelPathDto::Direct => 2,
+                crate::api::bridge::services::TunnelPathDto::Relay => 3,
+                crate::api::bridge::services::TunnelPathDto::Mixed => 4,
+                _ => {
+                    unimplemented!("");
+                },
+            },
+            serializer,
+        );
     }
 }
 

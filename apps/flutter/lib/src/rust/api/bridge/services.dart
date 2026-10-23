@@ -6,7 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
 
 /// Discover the services this device can reach on the relay.
 ///
@@ -85,17 +85,17 @@ class SubStatusDto {
   /// Task still running.
   final bool alive;
 
-  /// Locally observed path: `relay_only`, `idle`, `direct`, `relay`, `mixed`, `unknown`.
-  final String path;
+  /// Locally observed path, never the saved preference.
+  final TunnelPathDto path;
 
   /// Active direct data connections.
-  final BigInt activeDirect;
+  final int activeDirect;
 
   /// Active relay data connections counted by auto mode.
-  final BigInt activeRelay;
+  final int activeRelay;
 
   /// Pre-commit fallbacks in this tunnel's lifetime.
-  final BigInt fallbacks;
+  final int fallbacks;
 
   /// SDK reason for its most recent fallback.
   final String? lastFallback;
@@ -135,4 +135,23 @@ class SubStatusDto {
           activeRelay == other.activeRelay &&
           fallbacks == other.fallbacks &&
           lastFallback == other.lastFallback;
+}
+
+/// What a subscription's data connections currently go through, mirrored
+/// for Dart.
+enum TunnelPathDto {
+  /// Opened with the relay-only preference.
+  relayOnly,
+
+  /// Ready, with no data connection open right now.
+  idle,
+
+  /// Every open data connection is direct.
+  direct,
+
+  /// Every open data connection uses the relay.
+  relay,
+
+  /// Direct and relay data connections are both open.
+  mixed,
 }

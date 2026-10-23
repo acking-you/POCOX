@@ -43,6 +43,8 @@ abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
 
   /// Preferences for newly created remote tunnels and local registrations.
   Future<RelayPreferences> relayPreferences();
+
+  /// Save [value] for new tunnels; open tunnels keep what they started with.
   Future<void> relaySetPreferences(RelayPreferences value);
 
   /// Validate and save the application proxy; blank restores the default.

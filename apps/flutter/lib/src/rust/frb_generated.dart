@@ -937,8 +937,7 @@ abstract class RustLibApi extends BaseApi {
   Future<RelayPreferencesDto> crateApiBridgeNetworkRelayPreferences();
 
   Future<void> crateApiBridgeNetworkRelaySetPreferences({
-    required String path,
-    required bool allowDirect,
+    required RelayPreferencesDto preferences,
   });
 
   Future<ReviewIndexDto> crateApiBridgeDiffReviewIndex({
@@ -7392,15 +7391,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @override
   Future<void> crateApiBridgeNetworkRelaySetPreferences({
-    required String path,
-    required bool allowDirect,
+    required RelayPreferencesDto preferences,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(path, serializer);
-          sse_encode_bool(allowDirect, serializer);
+          sse_encode_box_autoadd_relay_preferences_dto(preferences, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -7413,7 +7410,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_AnyhowException,
         ),
         constMeta: kCrateApiBridgeNetworkRelaySetPreferencesConstMeta,
-        argValues: [path, allowDirect],
+        argValues: [preferences],
         apiImpl: this,
       ),
     );
@@ -7422,7 +7419,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgeNetworkRelaySetPreferencesConstMeta =>
       const TaskConstMeta(
         debugName: "relay_set_preferences",
-        argNames: ["path", "allowDirect"],
+        argNames: ["preferences"],
       );
 
   @override
@@ -8989,6 +8986,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RelayPreferencesDto dco_decode_box_autoadd_relay_preferences_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_relay_preferences_dto(raw);
+  }
+
+  @protected
   SessionAccessDto dco_decode_box_autoadd_session_access_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_session_access_dto(raw);
@@ -9148,6 +9153,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       accountId: dco_decode_opt_String(arr[5]),
       hasAccountToken: dco_decode_bool(arr[6]),
     );
+  }
+
+  @protected
+  ConnectionPathDto dco_decode_connection_path_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ConnectionPathDto.values[raw as int];
   }
 
   @protected
@@ -10298,7 +10309,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (arr.length != 2)
       throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
     return RelayPreferencesDto(
-      path: dco_decode_String(arr[0]),
+      path: dco_decode_connection_path_dto(arr[0]),
       allowDirect: dco_decode_bool(arr[1]),
     );
   }
@@ -10516,10 +10527,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       key: dco_decode_String(arr[0]),
       localAddr: dco_decode_String(arr[1]),
       alive: dco_decode_bool(arr[2]),
-      path: dco_decode_String(arr[3]),
-      activeDirect: dco_decode_u_64(arr[4]),
-      activeRelay: dco_decode_u_64(arr[5]),
-      fallbacks: dco_decode_u_64(arr[6]),
+      path: dco_decode_tunnel_path_dto(arr[3]),
+      activeDirect: dco_decode_u_32(arr[4]),
+      activeRelay: dco_decode_u_32(arr[5]),
+      fallbacks: dco_decode_u_32(arr[6]),
       lastFallback: dco_decode_opt_String(arr[7]),
     );
   }
@@ -10821,6 +10832,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       overview: dco_decode_tools_overview_dto(arr[0]),
       added: dco_decode_list_tools_ref_dto(arr[1]),
     );
+  }
+
+  @protected
+  TunnelPathDto dco_decode_tunnel_path_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return TunnelPathDto.values[raw as int];
   }
 
   @protected
@@ -11641,6 +11658,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RelayPreferencesDto sse_decode_box_autoadd_relay_preferences_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_relay_preferences_dto(deserializer));
+  }
+
+  @protected
   SessionAccessDto sse_decode_box_autoadd_session_access_dto(
     SseDeserializer deserializer,
   ) {
@@ -11834,6 +11859,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       accountId: var_accountId,
       hasAccountToken: var_hasAccountToken,
     );
+  }
+
+  @protected
+  ConnectionPathDto sse_decode_connection_path_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return ConnectionPathDto.values[inner];
   }
 
   @protected
@@ -13522,7 +13556,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    var var_path = sse_decode_String(deserializer);
+    var var_path = sse_decode_connection_path_dto(deserializer);
     var var_allowDirect = sse_decode_bool(deserializer);
     return RelayPreferencesDto(path: var_path, allowDirect: var_allowDirect);
   }
@@ -13765,10 +13799,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_key = sse_decode_String(deserializer);
     var var_localAddr = sse_decode_String(deserializer);
     var var_alive = sse_decode_bool(deserializer);
-    var var_path = sse_decode_String(deserializer);
-    var var_activeDirect = sse_decode_u_64(deserializer);
-    var var_activeRelay = sse_decode_u_64(deserializer);
-    var var_fallbacks = sse_decode_u_64(deserializer);
+    var var_path = sse_decode_tunnel_path_dto(deserializer);
+    var var_activeDirect = sse_decode_u_32(deserializer);
+    var var_activeRelay = sse_decode_u_32(deserializer);
+    var var_fallbacks = sse_decode_u_32(deserializer);
     var var_lastFallback = sse_decode_opt_String(deserializer);
     return SubStatusDto(
       key: var_key,
@@ -14140,6 +14174,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_overview = sse_decode_tools_overview_dto(deserializer);
     var var_added = sse_decode_list_tools_ref_dto(deserializer);
     return ToolsUpdateDto(overview: var_overview, added: var_added);
+  }
+
+  @protected
+  TunnelPathDto sse_decode_tunnel_path_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return TunnelPathDto.values[inner];
   }
 
   @protected
@@ -14902,6 +14943,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_relay_preferences_dto(
+    RelayPreferencesDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_relay_preferences_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_session_access_dto(
     SessionAccessDto self,
     SseSerializer serializer,
@@ -15060,6 +15110,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_String(self.accountLogin, serializer);
     sse_encode_opt_String(self.accountId, serializer);
     sse_encode_bool(self.hasAccountToken, serializer);
+  }
+
+  @protected
+  void sse_encode_connection_path_dto(
+    ConnectionPathDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected
@@ -16457,7 +16516,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
-    sse_encode_String(self.path, serializer);
+    sse_encode_connection_path_dto(self.path, serializer);
     sse_encode_bool(self.allowDirect, serializer);
   }
 
@@ -16639,10 +16698,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.key, serializer);
     sse_encode_String(self.localAddr, serializer);
     sse_encode_bool(self.alive, serializer);
-    sse_encode_String(self.path, serializer);
-    sse_encode_u_64(self.activeDirect, serializer);
-    sse_encode_u_64(self.activeRelay, serializer);
-    sse_encode_u_64(self.fallbacks, serializer);
+    sse_encode_tunnel_path_dto(self.path, serializer);
+    sse_encode_u_32(self.activeDirect, serializer);
+    sse_encode_u_32(self.activeRelay, serializer);
+    sse_encode_u_32(self.fallbacks, serializer);
     sse_encode_opt_String(self.lastFallback, serializer);
   }
 
@@ -16901,6 +16960,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_tools_overview_dto(self.overview, serializer);
     sse_encode_list_tools_ref_dto(self.added, serializer);
+  }
+
+  @protected
+  void sse_encode_tunnel_path_dto(
+    TunnelPathDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
   }
 
   @protected

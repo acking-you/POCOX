@@ -10,10 +10,13 @@ breaking change goes.
 ## Unreleased — pocox naming baseline
 
 - Optional P2P direct connections using pb-mapper SDK 0.7.0 from the `pocox`
-  branch. Settings separates outgoing path preference from incoming permission,
-  displays actual data paths and relay fallbacks, and preserves existing tunnels
-  when preferences change. App and CLI defaults remain relay-only. Rust now
-  requires 1.99.1 or later; CI and release toolchains move together.
+  branch. Settings › Connection path separates outgoing path preference from
+  incoming permission and saves each as it is chosen; every subscription shows
+  its actual data path, with live counters and the last relay fallback in its
+  details. Existing tunnels keep their path when preferences change. App and
+  CLI defaults remain relay-only, and defaults are not written to
+  `config.toml`, so older builds still read it. Rust now requires 1.99.1 or
+  later; CI and release toolchains move together.
 
 - Image attachments retain an optional copy in the host session's project and
   include its path for the agent's available image tools. Picking, dropping and

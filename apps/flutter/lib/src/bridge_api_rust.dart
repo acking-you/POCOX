@@ -85,21 +85,41 @@ class RustBridgeApi
   @override
   Future<RelayPreferences> relayPreferences() async {
     final value = await frb.relayPreferences();
-    return RelayPreferences(path: value.path, allowDirect: value.allowDirect);
+    return RelayPreferences(
+      path: switch (value.path) {
+        frb.ConnectionPathDto.relayOnly => ConnectionPath.relayOnly,
+        frb.ConnectionPathDto.auto => ConnectionPath.auto,
+      },
+      allowDirect: value.allowDirect,
+    );
   }
 
   @override
   Future<void> relaySetPreferences(RelayPreferences value) =>
-      frb.relaySetPreferences(path: value.path, allowDirect: value.allowDirect);
+      frb.relaySetPreferences(
+        preferences: frb.RelayPreferencesDto(
+          path: switch (value.path) {
+            ConnectionPath.relayOnly => frb.ConnectionPathDto.relayOnly,
+            ConnectionPath.auto => frb.ConnectionPathDto.auto,
+          },
+          allowDirect: value.allowDirect,
+        ),
+      );
 
   static SubInfo _subscription(frb.SubStatusDto s) => SubInfo(
     key: s.key,
     localAddr: s.localAddr,
     alive: s.alive,
-    path: s.path,
-    activeDirect: s.activeDirect.toInt(),
-    activeRelay: s.activeRelay.toInt(),
-    fallbacks: s.fallbacks.toInt(),
+    path: switch (s.path) {
+      frb.TunnelPathDto.relayOnly => TunnelPath.relayOnly,
+      frb.TunnelPathDto.idle => TunnelPath.idle,
+      frb.TunnelPathDto.direct => TunnelPath.direct,
+      frb.TunnelPathDto.relay => TunnelPath.relay,
+      frb.TunnelPathDto.mixed => TunnelPath.mixed,
+    },
+    activeDirect: s.activeDirect,
+    activeRelay: s.activeRelay,
+    fallbacks: s.fallbacks,
     lastFallback: s.lastFallback,
   );
 

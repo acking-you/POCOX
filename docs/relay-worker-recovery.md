@@ -9,11 +9,13 @@ the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
 The relay server is a test-only dependency, never
 embedded into the shipping app or CLI.
 
-**Settings › Device connection path** has two independent preferences:
+**Settings › Connection path** has two independent preferences, saved as soon
+as they are chosen:
 
-- **Relay only** (the default) or **Prefer P2P direct** for outgoing subscriptions.
-- **Allow direct connections to this computer** (off by default, desktop only)
-  for incoming connections to newly published services.
+- **Connect to other devices**: **Relay only** (the default) or **P2P first**
+  for outgoing subscriptions.
+- **Accept direct connections** (off by default, desktop only) for incoming
+  connections to newly published services.
 
 The same preferences live in each installation's `config.toml` and apply to
 both account and self-host modes, including CLI workers:
@@ -24,12 +26,18 @@ path = "auto"              # or "relay_only" (default)
 allow_direct = true         # false by default
 ```
 
+Default values are not written, so a `config.toml` that never opted in still
+loads in builds that predate these fields (`PbMapperConfig` rejects unknown
+keys). Opting in and then downgrading needs the two lines removed by hand.
+
 Preferences are captured when a tunnel starts. Saving them does not interrupt
 active work. Reconnect a session (or restart the app for cached auxiliary
 tunnels) to apply a changed outgoing preference; restart hosting to republish
-services with changed incoming permission. CLI `pb restart` applies the saved
-preferences to exactly one selected worker. Share strings still carry only
-relay/key; importing one does not enable direct access.
+services with changed incoming permission. Settings says so under the control
+that changed, for as long as it differs from what the page opened with. CLI
+`pb restart` applies the saved preferences to exactly one selected worker.
+Share strings still carry only relay/key; importing one does not enable direct
+access.
 
 The relay must also support and enable direct coordination, with a public UDP
 STUN listener in addition to its TCP relay listener. For example:
@@ -50,12 +58,17 @@ credential revocation prevent new setups but do not terminate those connections.
 Stopping the owning subscription or host closes its direct data paths. Logout
 and account/relay changes retain their existing owner invalidation.
 
-Settings polls local SDK counters while visible. It distinguishes active direct,
-relay and mixed data paths from a tunnel that is waiting for data. A saved Auto
-preference or a historical direct success is never presented as a live direct
-connection. Relay-only tunnels display their policy without inventing active
-connection counts; auto tunnels also show cumulative fallbacks and the most
-recent SDK reason. CLI diagnostics include the same SDK `direct` counters.
+Settings polls local SDK counters while a subscription list or its details are
+on screen. Each subscription carries one status chip: **P2P direct**, **Via
+relay**, **Direct n · Relay m**, **Idle** (no data connection open), **Relay
+only** (opened with that preference) or dropped. A saved Auto preference or a
+historical direct success is never presented as a live direct connection.
+Relay-only tunnels display their policy without inventing active connection
+counts. Pressing a subscription opens its details (a popover on desktop, a
+sheet on touch): local address, active direct and relay connections,
+cumulative fallbacks and the most recent SDK reason. The bridge reports the
+path as a typed enum and the counters as `u32`. CLI diagnostics include the
+same SDK `direct` counters.
 
 Validation covers direct TCP, compatibility fallback without publisher/relay
 support, temporary-credential isolation, exactly one backend dial, coordinator

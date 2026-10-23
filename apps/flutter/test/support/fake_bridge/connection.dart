@@ -22,10 +22,14 @@ mixin _FakeConnection on _FakeBridgeState {
   Object? networkSaveError;
   int codexSetupReads = 0;
   RelayPreferences savedRelayPreferences = const RelayPreferences();
+  Object? relayReadError;
   Object? relaySaveError;
 
   @override
-  Future<RelayPreferences> relayPreferences() async => savedRelayPreferences;
+  Future<RelayPreferences> relayPreferences() async {
+    if (relayReadError case final error?) throw error;
+    return savedRelayPreferences;
+  }
 
   @override
   Future<void> relaySetPreferences(RelayPreferences value) async {

@@ -9,58 +9,86 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get relayPathTitle => 'Device connection path';
+  String get connectionPathTitle => 'Connection path';
 
   @override
-  String get relayPathRelayOnly => 'Relay only';
+  String get connectionPathInfo =>
+      'P2P direct needs a relay and a host that support it. When direct setup fails, the connection falls back to the relay before any data is sent, so nothing is replayed. An established direct connection keeps running if the relay goes offline or its credential is revoked, until a device at either end disconnects it.';
 
   @override
-  String get relayPathAuto => 'Prefer P2P direct';
+  String get connectionPathOutgoing => 'Connect to other devices';
 
   @override
-  String get relayAllowDirect => 'Allow direct connections to this computer';
+  String get connectionPathRelayOnly => 'Relay only';
 
   @override
-  String get relayAllowDirectHint =>
-      'For devices with access to your published services. Existing access rules still apply.';
+  String get connectionPathAuto => 'P2P first';
 
   @override
-  String get relayPathExplanation =>
-      'Direct connections require support from the relay and the host. If direct setup fails, the connection uses the relay before sending application data. A failed established connection is never replayed.';
+  String get connectionPathOutgoingPending =>
+      'New connections use this. Reconnect a session to switch it.';
 
   @override
-  String get relayPathApplyHint =>
-      'Applies to new tunnels. Reconnect a session to change its path preference; restart hosting to change incoming direct access. Existing connections stay open. Established direct connections continue if the relay goes offline or its credential is revoked; stop the local tunnel to close them.';
+  String get connectionPathIncoming => 'Accept direct connections';
 
   @override
-  String get relayPathReadFailed =>
-      'Could not read connection preferences. Tap to retry.';
+  String get connectionPathIncomingInfo =>
+      'Devices that can already reach this computer\'s services may connect to them directly. Who has access does not change.';
 
   @override
-  String get relayPathSaveFailed =>
-      'Could not save connection preferences. Try again.';
+  String get connectionPathIncomingPending => 'Restart hosting to apply.';
 
   @override
-  String get relayPathDirect => 'P2P direct';
+  String get connectionPathReadFailed =>
+      'Couldn\'t read connection preferences.';
 
   @override
-  String get relayPathRelayed => 'Via relay';
+  String get connectionPathSaveFailed =>
+      'Couldn\'t save. Your previous choice is kept.';
 
   @override
-  String get relayPathIdle => 'Waiting for a data connection';
+  String get tunnelPathIdle => 'Idle';
 
   @override
-  String get relayPathUnknown => 'Path unavailable';
+  String get tunnelPathDirect => 'P2P direct';
 
   @override
-  String relayPathMixed(int direct, int relay) {
-    return 'Direct: $direct · Relay: $relay';
+  String get tunnelPathRelay => 'Via relay';
+
+  @override
+  String tunnelPathMixed(int direct, int relay) {
+    return 'Direct $direct · Relay $relay';
   }
 
   @override
-  String relayPathFallbacks(int count) {
-    return 'Relay fallbacks: $count';
+  String tunnelFallbacks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relay fallbacks',
+      one: '1 relay fallback',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String get tunnelLocalAddress => 'Local address';
+
+  @override
+  String get tunnelActiveDirect => 'Direct connections';
+
+  @override
+  String get tunnelActiveRelay => 'Relay connections';
+
+  @override
+  String get tunnelFallbackCount => 'Relay fallbacks';
+
+  @override
+  String get tunnelLastFallback => 'Last fallback';
+
+  @override
+  String get tunnelRelayOnlyNote =>
+      'Opened with Relay only. Choose P2P first, then reconnect, to try a direct path.';
 
   @override
   String get appTitle => 'POCOX';

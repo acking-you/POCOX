@@ -1,10 +1,62 @@
 part of '../bridge_api.dart';
 
+/// Outgoing path preference for new subscriptions.
+enum ConnectionPath {
+  /// Every new subscription uses the relay (the default).
+  relayOnly,
+
+  /// Direct first, falling back to the relay before any data is sent.
+  auto,
+}
+
 /// Saved network preferences; existing tunnels keep their captured settings.
 class RelayPreferences {
-  const RelayPreferences({this.path = 'relay_only', this.allowDirect = false});
-  final String path;
+  /// Creates preferences; the defaults are the relay-only installation's.
+  const RelayPreferences({
+    this.path = ConnectionPath.relayOnly,
+    this.allowDirect = false,
+  });
+
+  /// Path preference for new subscriptions.
+  final ConnectionPath path;
+
+  /// Whether newly published local services accept direct setup.
   final bool allowDirect;
+
+  /// A copy with the given fields replaced.
+  RelayPreferences copyWith({ConnectionPath? path, bool? allowDirect}) =>
+      RelayPreferences(
+        path: path ?? this.path,
+        allowDirect: allowDirect ?? this.allowDirect,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is RelayPreferences &&
+      other.path == path &&
+      other.allowDirect == allowDirect;
+
+  @override
+  int get hashCode => Object.hash(path, allowDirect);
+}
+
+/// What a subscription's data connections go through right now: a local SDK
+/// observation, never the saved preference.
+enum TunnelPath {
+  /// Opened with the relay-only preference.
+  relayOnly,
+
+  /// Ready, with no data connection open.
+  idle,
+
+  /// Every open data connection is direct.
+  direct,
+
+  /// Every open data connection uses the relay.
+  relay,
+
+  /// Direct and relay data connections are both open.
+  mixed,
 }
 
 /// A discovered service on the relay.
@@ -38,7 +90,7 @@ class SubInfo {
     required this.key,
     required this.localAddr,
     required this.alive,
-    this.path = 'unknown',
+    this.path = TunnelPath.relayOnly,
     this.activeDirect = 0,
     this.activeRelay = 0,
     this.fallbacks = 0,
@@ -53,10 +105,20 @@ class SubInfo {
 
   /// Whether the subscription task is still running.
   final bool alive;
-  final String path;
+
+  /// What its data connections go through right now.
+  final TunnelPath path;
+
+  /// Open direct data connections.
   final int activeDirect;
+
+  /// Open relay data connections, counted when direct was preferred.
   final int activeRelay;
+
+  /// Pre-commit relay fallbacks in this tunnel's lifetime.
   final int fallbacks;
+
+  /// The SDK's reason for the most recent fallback.
   final String? lastFallback;
 }
 
