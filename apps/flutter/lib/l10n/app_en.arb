@@ -14,6 +14,8 @@
   "tunnelPathIdle": "Idle",
   "tunnelPathDirect": "P2P direct",
   "tunnelPathRelay": "Via relay",
+  "tunnelShortRelay": "Relay",
+  "tunnelShortMixed": "P2P + relay",
   "tunnelPathMixed": "Direct {direct} · Relay {relay}",
   "@tunnelPathMixed": {"placeholders": {"direct": {"type": "int"}, "relay": {"type": "int"}}},
   "tunnelFallbacks": "{count, plural, =1{1 relay fallback} other{{count} relay fallbacks}}",

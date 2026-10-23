@@ -9,6 +9,7 @@ import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/hosting/hosting_owner.dart';
 import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/managed/device_management_switch.dart';
 import 'package:pocox/src/managed/managed_device_panel.dart';
 import 'package:pocox/src/managed/managed_providers.dart';

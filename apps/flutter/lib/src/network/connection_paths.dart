@@ -104,6 +104,63 @@ String tunnelSubtitle(AppLocalizations l10n, SubInfo sub) => sub.fallbacks > 0
     ? '${sub.localAddr} · ${l10n.tunnelFallbacks(sub.fallbacks)}'
     : sub.localAddr;
 
+/// The live path of the tunnel subscribed as [serviceKey] itself (an app
+/// session's or an API's), if one is up and has been observed carrying data.
+TunnelPath? tunnelPathOf(List<SubInfo>? subs, String serviceKey) => switch (subs
+    ?.where((sub) => sub.alive && sub.key == serviceKey)
+    .firstOrNull
+    ?.path) {
+  TunnelPath.idle || null => null,
+  final path => path,
+};
+
+/// The few words that say how a connected service travels, after its state.
+String tunnelPathShort(AppLocalizations l10n, TunnelPath path) =>
+    switch (path) {
+      TunnelPath.direct => 'P2P',
+      TunnelPath.mixed => l10n.tunnelShortMixed,
+      TunnelPath.relay || TunnelPath.relayOnly => l10n.tunnelShortRelay,
+      TunnelPath.idle => l10n.tunnelPathIdle,
+    };
+
+/// A connected service's status chip that also says how its data travels
+/// once its tunnel carries any: "Connected · P2P". Watches only that path,
+/// so the polling rebuilds this chip alone, and only when the path changes.
+class ConnectedChip extends ConsumerWidget {
+  /// Creates the chip for [serviceKey] in [label] and [color].
+  const ConnectedChip({
+    super.key,
+    required this.serviceKey,
+    required this.label,
+    required this.color,
+  });
+
+  /// The service subscribed under its own key.
+  final String serviceKey;
+
+  /// Its state, such as Connected.
+  final String label;
+
+  /// The state's colour.
+  final Color color;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final path = ref.watch(
+      liveSubscriptionsProvider.select(
+        (subs) => tunnelPathOf(subs.valueOrNull, serviceKey),
+      ),
+    );
+    return StatusChip(
+      color: color,
+      label: path == null
+          ? label
+          : '$label · ${tunnelPathShort(AppLocalizations.of(context), path)}',
+      filled: true,
+    );
+  }
+}
+
 /// A subscription's one status mark: healthy with its live path, or dropped.
 class TunnelPathChip extends StatelessWidget {
   /// Creates the chip for [sub].

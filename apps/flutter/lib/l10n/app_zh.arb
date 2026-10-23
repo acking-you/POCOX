@@ -14,6 +14,8 @@
   "tunnelPathIdle": "空闲",
   "tunnelPathDirect": "P2P 直连",
   "tunnelPathRelay": "经中继",
+  "tunnelShortRelay": "中继",
+  "tunnelShortMixed": "P2P + 中继",
   "tunnelPathMixed": "直连 {direct} · 中继 {relay}",
   "@tunnelPathMixed": {"placeholders": {"direct": {"type": "int"}, "relay": {"type": "int"}}},
   "tunnelFallbacks": "回退中继 {count} 次",

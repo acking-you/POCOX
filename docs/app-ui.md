@@ -59,6 +59,13 @@ monitoring are in [Controller history cache](session-cache-sync.md).
   info mark; the visible line under a control is only pending ("reconnect a
   session", "restart hosting") or failed. Keep the default relay-only/off
   behavior.
+- How a connection travels has one visual language: in words, P2P direct /
+  Via relay / Direct n · Relay m / Idle / Relay only (`tunnelPathLabel`), and
+  after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,
+  the services hub's app and API rows); in the galaxy, a bright taut beam for
+  direct, a dashed high arc for the relay, both for mixed
+  ([connection paths](galaxy-geometry.md#connection-paths)). A local host
+  reached over loopback shows no path.
 - Subscription rows carry one `TunnelPathChip` (live path or dropped) and open
   live details from the pressed row. Paths come from local SDK observations,
   never from the preference; the polled list is watched by the subscription

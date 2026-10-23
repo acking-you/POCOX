@@ -52,6 +52,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tunnelPathRelay => '经中继';
 
   @override
+  String get tunnelShortRelay => '中继';
+
+  @override
+  String get tunnelShortMixed => 'P2P + 中继';
+
+  @override
   String tunnelPathMixed(int direct, int relay) {
     return '直连 $direct · 中继 $relay';
   }

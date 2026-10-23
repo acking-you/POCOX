@@ -11,15 +11,17 @@
 //! either draws the same picture; `galaxy_frame_parity_test.dart` compares
 //! them on the built library.
 pub mod ffi;
+mod links;
 mod scratch;
+use links::{Link, LinkPath};
 use scratch::Scratch;
 #[cfg(test)]
 mod tests;
 
 use std::f64::consts::PI;
 
-/// The buffer layouts' version; both ends name it.
-pub const VERSION: f64 = 1.0;
+/// The buffer layouts' version; both ends name it. 2: links carry their path.
+pub const VERSION: f64 = 2.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct V3 {
@@ -202,13 +204,13 @@ struct StarLayer {
 /// star layers; per system x, y, z, home, online, first planet, planet
 /// count, label width, label height; per planet system, ring, radius,
 /// phase, period, size, tilt axis, tilt, appeared, rippled, label width and
-/// height, strong label width and height; per link planet, system; per star
-/// layer parallax, buckets, then per bucket phase, count and the unit
-/// coordinates.
+/// height, strong label width and height; per link planet, system, path
+/// ([`LinkPath`] code); per star layer parallax, buckets, then per bucket
+/// phase, count and the unit coordinates.
 pub struct Scene<'a> {
     systems: Vec<System>,
     planets: Vec<Planet>,
-    links: Vec<(usize, usize)>,
+    links: Vec<Link>,
     layers: Vec<StarLayer>,
     stars: &'a [f64],
 }
@@ -283,11 +285,12 @@ impl<'a> Scene<'a> {
         }
         let mut links = Vec::with_capacity(n_links);
         for _ in 0..n_links {
-            let f = fields.take(2)?;
-            links.push((
-                count(f[0], n_planets.checked_sub(1)?)?,
-                count(f[1], n_systems.checked_sub(1)?)?,
-            ));
+            let f = fields.take(3)?;
+            links.push(Link {
+                planet: count(f[0], n_planets.checked_sub(1)?)?,
+                system: count(f[1], n_systems.checked_sub(1)?)?,
+                path: LinkPath::decode(f[2])?,
+            });
         }
         let mut layers = Vec::with_capacity(n_layers);
         for _ in 0..n_layers {
@@ -444,7 +447,8 @@ struct Hit {
 ///   radius, depth, opacity, back runs, front runs (each: count, then runs),
 ///   and its planets: count, then per planet index, x, y, radius, depth,
 ///   opacity, ripple progress (-1 none) and behind its star (0/1);
-/// - links: count, then per link its curve's points and its particles' points;
+/// - link strands: count, then per strand its [`LinkPath`] code (never mixed),
+///   its curve's points and its particles' points;
 /// - labels: count, then per label the body, strong (0/1), x, y.
 pub fn frame(scene: &Scene, frame: &Frame, out: &mut Out) {
     thread_local! {
@@ -455,7 +459,7 @@ pub fn frame(scene: &Scene, frame: &Frame, out: &mut Out) {
         stars(scene, frame, out);
         plane(scene, &camera, out, &scratch.circle);
         systems(scene, frame, &camera, out, scratch);
-        links(scene, frame, &camera, out);
+        links::draw(scene, frame, &camera, out);
         labels(scene, frame, out, scratch);
         scratch.trim();
     });
@@ -748,53 +752,6 @@ fn systems(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out, scratch
             }
         }
     }
-}
-
-fn links(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out) {
-    let count = out.hole();
-    let mut n = 0;
-    for &(planet, to) in &scene.links {
-        let p = &scene.planets[planet];
-        let from = scene.systems[p.system]
-            .position
-            .add(p.offset_at(frame.orbit_time()));
-        let to = scene.systems[to].position;
-        let rise = to.sub(from).length() * 0.42 + 0.4;
-        let control = from.lerp(to, 0.5).add(V3::new(0.0, rise, 0.0));
-        let at = |t: f64| {
-            from.mul((1.0 - t) * (1.0 - t))
-                .add(control.mul(2.0 * (1.0 - t) * t))
-                .add(to.mul(t * t))
-        };
-        let mut points = [(0.0, 0.0); 33];
-        let mut len = 0;
-        for i in 0..=32 {
-            if let Some(p) = camera.at(at(i as f64 / 32.0)) {
-                points[len] = (p.x, p.y);
-                len += 1;
-            }
-        }
-        if len < 2 {
-            continue;
-        }
-        out.points(&points[..len]);
-        let mut particles = [(0.0, 0.0); 3];
-        let mut len = 0;
-        for k in 0..3 {
-            let t = if frame.still {
-                (k + 1) as f64 / 4.0
-            } else {
-                (frame.time * 0.22 + k as f64 / 3.0).rem_euclid(1.0)
-            };
-            if let Some(p) = camera.at(at(t)) {
-                particles[len] = (p.x, p.y);
-                len += 1;
-            }
-        }
-        out.points(&particles[..len]);
-        n += 1;
-    }
-    out.fill(count, n as f64);
 }
 
 fn stars(scene: &Scene, frame: &Frame, out: &mut Out) {

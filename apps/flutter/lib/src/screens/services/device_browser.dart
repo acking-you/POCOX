@@ -296,11 +296,14 @@ class _DeviceFirstServices extends ConsumerWidget {
     ({Widget chip, String? reason}) appStatus(ServiceEntry service) {
       if (!observedDown.contains(service.key) &&
           bridge.appIsConnected(service.key)) {
-        return status(
-          unreachable: false,
-          label: l10n.statusConnected,
-          color: online,
-          reasonText: l10n.unreachableReason,
+        // Connected, and how: P2P or through the relay, once observed.
+        return (
+          chip: ConnectedChip(
+            serviceKey: service.key,
+            label: l10n.statusConnected,
+            color: online,
+          ),
+          reason: null,
         );
       }
       if (observedDown.contains(service.key)) {
@@ -322,6 +325,16 @@ class _DeviceFirstServices extends ConsumerWidget {
 
     ({Widget chip, String? reason}) apiStatus(ServiceEntry service) {
       final sub = subscriptions[service.key];
+      if (sub != null && sub.alive) {
+        return (
+          chip: ConnectedChip(
+            serviceKey: service.key,
+            label: l10n.subscribedAlive,
+            color: online,
+          ),
+          reason: null,
+        );
+      }
       if (sub != null) {
         return status(
           unreachable: !sub.alive,

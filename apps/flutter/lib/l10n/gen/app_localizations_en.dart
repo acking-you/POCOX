@@ -56,6 +56,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tunnelPathRelay => 'Via relay';
 
   @override
+  String get tunnelShortRelay => 'Relay';
+
+  @override
+  String get tunnelShortMixed => 'P2P + relay';
+
+  @override
   String tunnelPathMixed(int direct, int relay) {
     return 'Direct $direct · Relay $relay';
   }

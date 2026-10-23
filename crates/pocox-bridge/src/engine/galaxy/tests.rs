@@ -4,6 +4,11 @@ use super::VERSION;
 /// Home with two agents on one ring, a second device with a port, an
 /// offline device without services, a link and one star layer.
 fn scene() -> Vec<f64> {
+    scene_with(0.0)
+}
+
+/// [`scene`] with its link's path code.
+fn scene_with(path: f64) -> Vec<f64> {
     let mut s = vec![VERSION, 3.0, 3.0, 1.0, 1.0];
     // Systems: x, y, z, home, online, first planet, planet count, label.
     s.extend([0.0, 0.12, 0.0, 1.0, 1.0, 0.0, 2.0, 60.0, 15.0]);
@@ -33,7 +38,7 @@ fn scene() -> Vec<f64> {
     s.extend(planet(0.0, 0.0, 3.4));
     s.extend(planet(1.0, 0.0, 1.0));
     // A link from the second device's port to home.
-    s.extend([2.0, 0.0]);
+    s.extend([2.0, 0.0, path]);
     // One star layer with one bucket of two stars.
     s.extend([0.3, 1.0, 0.5, 2.0, 0.1, 0.2, 0.9, 0.8]);
     s
@@ -75,6 +80,37 @@ impl Cursor<'_> {
         let n = self.next() as usize;
         (0..n).map(|_| self.points()).collect()
     }
+}
+
+/// A drawn link strand: its path code, curve and particles.
+type Strand = (f32, Vec<(f32, f32)>, Vec<(f32, f32)>);
+
+/// Every link strand of a frame of [`scene_with`], past what comes before.
+fn strands(out: &[f32]) -> Vec<Strand> {
+    let mut c = Cursor(out, 0);
+    // One star layer with one bucket; the plane's glow and its rectangle.
+    c.next();
+    c.points();
+    for _ in 0..6 {
+        c.next();
+    }
+    for _ in 0..c.next() as usize {
+        c.next();
+        c.runs();
+    }
+    for _ in 0..c.next() as usize {
+        for _ in 0..6 {
+            c.next();
+        }
+        c.runs();
+        c.runs();
+        for _ in 0..c.next() as usize * 8 {
+            c.next();
+        }
+    }
+    (0..c.next() as usize)
+        .map(|_| (c.next(), c.points(), c.points()))
+        .collect()
 }
 
 #[test]
@@ -138,17 +174,38 @@ fn systems_come_far_to_near_with_orbits_split_at_their_star() {
         }
     }
     assert!(depths.windows(2).all(|d| d[0] >= d[1]), "{depths:?}");
-    // One link with its three particles.
+    // One link, not yet observed, with its three particles.
     assert_eq!(c.next(), 1.0);
+    assert_eq!(c.next(), 0.0);
     assert!(c.points().len() >= 2);
     assert_eq!(c.points().len(), 3);
+}
+
+#[test]
+fn a_link_draws_how_its_data_travels() {
+    let frame = frame(30.0);
+    let draw = |path: f64| {
+        let (written, out) = run(&scene_with(path), &frame, 1 << 16);
+        assert!(written > 0, "path {path}");
+        strands(&out[..written as usize])
+    };
+    let mixed = draw(3.0);
+    let kinds: Vec<f32> = mixed.iter().map(|s| s.0).collect();
+    assert_eq!(kinds, [2.0, 1.0], "a direct and a relay strand");
+    // Screen y grows downwards: the relay arc peaks above the direct beam.
+    let peak = |curve: &[(f32, f32)]| curve.iter().map(|p| p.1).fold(f32::INFINITY, f32::min);
+    assert!(peak(&mixed[1].1) < peak(&mixed[0].1), "the relay arc rises higher");
+    assert_eq!(mixed[0].2.len(), 3, "a direct strand carries particles");
+    let idle = draw(4.0);
+    assert_eq!((idle.len(), idle[0].0, idle[0].2.len()), (1, 4.0, 0), "idle carries none");
+    assert_eq!(run(&scene_with(5.0), &frame, 1 << 16).0, -1, "an unknown path is refused");
 }
 
 #[test]
 fn a_malformed_scene_or_frame_is_refused() {
     let good = scene();
     let mut wrong_version = good.clone();
-    wrong_version[0] = 2.0;
+    wrong_version[0] = super::VERSION + 1.0;
     let mut stray_planet = good.clone();
     // The third planet names a fourth system.
     stray_planet[5 + 3 * 9 + 2 * 14] = 3.0;

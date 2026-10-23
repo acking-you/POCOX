@@ -17,8 +17,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge.dart'
 import 'package:pocox/src/rust/frb_generated.dart' show RustLib;
 import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
-/// The layouts' version, the same on both ends.
-const double galaxyFrameVersion = 1;
+/// The layouts' version, the same on both ends. 2: links carry their path.
+const double galaxyFrameVersion = 2;
 
 /// The frame buffer's length.
 const int galaxyFrameFields = 13;
@@ -183,7 +183,8 @@ Float64List encodeScene(
         (bodies.indexOf(link.from.planet.id) - bodies.systems.length)
             .toDouble(),
       )
-      ..add(bodies.indexOf(link.to.id).toDouble());
+      ..add(bodies.indexOf(link.to.id).toDouble())
+      ..add(link.path.index.toDouble());
   }
   for (final layer in stars) {
     values
@@ -505,12 +506,15 @@ int computeFrameInDart(Float64List scene, Float64List frame, Float32List out) {
     planets.add(_Planet(f));
   }
   if (systems.any((s) => s.first + s.count > nPlanets)) return -1;
-  final links = <(int, int)>[];
+  final links = <(int, int, LinkPath)>[];
   for (var i = 0; i < nLinks; i++) {
-    final f = take(2);
-    if (f == null || !_count(f[0]) || !_count(f[1])) return -1;
+    final f = take(3);
+    if (f == null || !_count(f[0]) || !_count(f[1]) || !_count(f[2])) {
+      return -1;
+    }
     if (f[0] >= nPlanets || f[1] >= nSystems) return -1;
-    links.add((f[0].toInt(), f[1].toInt()));
+    if (f[2] >= LinkPath.values.length) return -1;
+    links.add((f[0].toInt(), f[1].toInt(), LinkPath.values[f[2].toInt()]));
   }
   final layers = <(double, List<(double, int, int)>)>[];
   for (var i = 0; i < nLayers; i++) {
@@ -764,30 +768,39 @@ int computeFrameInDart(Float64List scene, Float64List frame, Float32List out) {
     }
   }
 
-  // Links.
+  // Link strands.
   final linkCount = o.hole();
   var drawnLinks = 0;
-  for (final (planet, toIndex) in links) {
+  for (final (planet, toIndex, path) in links) {
     final p = planets[planet];
     final from = systems[p.system].position + p.offsetAt(orbitTime);
     final to = systems[toIndex].position;
-    final rise = (to - from).length * 0.42 + 0.4;
-    final control = from.lerp(to, 0.5) + Vec3(0, rise, 0);
-    Vec3 curve(double t) =>
-        from * ((1 - t) * (1 - t)) + control * (2 * (1 - t) * t) + to * (t * t);
-    final points = <(double, double)>[
-      for (var i = 0; i <= 32; i++)
-        if (camera.at(curve(i / 32)) case final q?) (q.x, q.y),
-    ];
-    if (points.length < 2) continue;
-    o.points(points);
-    o.points([
-      for (var k = 0; k < 3; k++)
-        if (camera.at(curve(still ? (k + 1) / 4 : (time * 0.22 + k / 3) % 1.0))
-            case final q?)
-          (q.x, q.y),
-    ]);
-    drawnLinks++;
+    final span = (to - from).length, middle = from.lerp(to, 0.5);
+    for (final strand in path.strands) {
+      final control = middle + Vec3(0, strand.rise(span), 0);
+      Vec3 curve(double t) =>
+          from * ((1 - t) * (1 - t)) +
+          control * (2 * (1 - t) * t) +
+          to * (t * t);
+      final points = <(double, double)>[
+        for (var i = 0; i <= 32; i++)
+          if (camera.at(curve(i / 32)) case final q?) (q.x, q.y),
+      ];
+      if (points.length < 2) continue;
+      o.push(strand.index.toDouble());
+      o.points(points);
+      final flow = strand.flow;
+      o.points([
+        if (flow != null)
+          for (var k = 0; k < 3; k++)
+            if (camera.at(
+                  curve(still ? (k + 1) / 4 : (time * flow + k / 3) % 1.0),
+                )
+                case final q?)
+              (q.x, q.y),
+      ]);
+      drawnLinks++;
+    }
   }
   o.fill(linkCount, drawnLinks.toDouble());
 

@@ -38,6 +38,20 @@ SubInfo _sub(
   lastFallback: reason,
 );
 
+extension on SubInfo {
+  /// This observation, tracked under [key].
+  SubInfo withKey(String key) => SubInfo(
+    key: key,
+    localAddr: localAddr,
+    alive: alive,
+    path: path,
+    activeDirect: activeDirect,
+    activeRelay: activeRelay,
+    fallbacks: fallbacks,
+    lastFallback: lastFallback,
+  );
+}
+
 Widget _settings(BridgeApi api, {ThemeData? theme}) => host(
   const Scaffold(body: SingleChildScrollView(child: ConnectionPathSettings())),
   api,
@@ -195,6 +209,38 @@ void main() {
       findsOneWidget,
     );
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a connected service says how it travels once observed', (
+    t,
+  ) async {
+    final api = _ObservedBridge()
+      ..observed = [_sub(TunnelPath.idle).withKey('pcx:studio:app:default')];
+    await t.pumpWidget(
+      host(
+        const Scaffold(
+          body: ConnectedChip(
+            serviceKey: 'pcx:studio:app:default',
+            label: '已连接',
+            color: Colors.green,
+          ),
+        ),
+        api,
+      ),
+    );
+    await t.pumpAndSettle();
+    expect(find.text('已连接'), findsOneWidget, reason: 'idle says nothing');
+    api.observed = [_sub(TunnelPath.direct).withKey('pcx:studio:app:default')];
+    await t.pump(const Duration(seconds: 3));
+    await t.pumpAndSettle();
+    expect(find.text('已连接 · P2P'), findsOneWidget);
+    api.observed = [
+      _sub(TunnelPath.relayOnly).withKey('pcx:studio:app:default'),
+    ];
+    await t.pump(const Duration(seconds: 3));
+    await t.pumpAndSettle();
+    expect(find.text('已连接 · 中继'), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
   });
 
   for (final width in [320.0, 390.0, 834.0, 1280.0]) {

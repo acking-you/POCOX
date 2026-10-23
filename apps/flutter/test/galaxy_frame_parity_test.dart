@@ -44,9 +44,28 @@ ToolsOverview _overview(int extra) {
           ],
         ),
     ],
-    connections: base.connections,
+    connections: [
+      ...base.connections,
+      // One connection per node API: every path kind, and one unobserved.
+      for (var i = 0; i < extra; i++)
+        ToolsConnection(
+          service: 'pcx:node-$i:api:default',
+          local: '127.0.0.1:${19000 + i}',
+          samePort: false,
+          owner: const ToolsOwner(kind: 'user', label: 'This device'),
+        ),
+    ],
   );
 }
+
+/// Observed paths for those connections, cycling through every kind and
+/// leaving every sixth unobserved.
+Map<String, TunnelPath> _paths(int extra) => {
+  for (var i = 0; i < extra; i++)
+    if (i % 6 != 5)
+      'pcx:node-$i:api:default':
+          TunnelPath.values[i % TunnelPath.values.length],
+};
 
 void main() {
   final path = Platform.environment['POCOX_BRIDGE_LIBRARY'];
@@ -56,7 +75,12 @@ void main() {
       markTestSkipped('set POCOX_BRIDGE_LIBRARY to the built bridge library');
       return;
     }
-    final scene = buildScene(_overview(14));
+    final scene = buildScene(_overview(14), paths: _paths(14));
+    expect(
+      scene.links.map((link) => link.path).toSet(),
+      LinkPath.values.toSet(),
+      reason: 'every path kind is drawn',
+    );
     final bodies = GalaxyBodies(scene);
     final first = bodies.planets.first.id;
     final encoded = encodeScene(

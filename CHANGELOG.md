@@ -13,8 +13,11 @@ breaking change goes.
   branch. Settings › Connection path separates outgoing path preference from
   incoming permission and saves each as it is chosen; every subscription shows
   its actual data path, with live counters and the last relay fallback in its
-  details. Existing tunnels keep their path when preferences change. App and
-  CLI defaults remain relay-only, and defaults are not written to
+  details. The galaxy draws each connection as it travels (a bright, taut beam
+  for P2P direct, a dashed arc through the relay, both when mixed) and the
+  services hub says "Connected · P2P" or "· Relay". Existing tunnels keep
+  their path when preferences change. App and CLI defaults remain relay-only,
+  and defaults are not written to
   `config.toml`, so older builds still read it. Rust now requires 1.99.1 or
   later; CI and release toolchains move together.
 - On phones the composer folds into a slim capsule while you read back

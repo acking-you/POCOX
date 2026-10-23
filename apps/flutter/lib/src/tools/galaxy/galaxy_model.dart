@@ -173,10 +173,60 @@ class StarSystem {
       : planets.map((p) => p.radius).reduce(math.max) + 0.2;
 }
 
+/// How a link's data travels, as its tunnel was observed. The order is the
+/// frame's code (`engine::galaxy::links::LinkPath`): a drawn strand names one of
+/// these, never [mixed], which draws a [direct] and a [relay] strand.
+enum LinkPath {
+  /// Not observed: drawn as links were before paths were known.
+  unknown,
+
+  /// Through the relay, by preference or after a fallback.
+  relay,
+
+  /// Peer to peer.
+  direct,
+
+  /// Direct and relay connections at once.
+  mixed,
+
+  /// Ready, with no data flowing.
+  idle;
+
+  /// The path of a live tunnel's [observation], unknown without one.
+  static LinkPath of(TunnelPath? observation) => switch (observation) {
+    null => unknown,
+    TunnelPath.relayOnly || TunnelPath.relay => relay,
+    TunnelPath.direct => direct,
+    TunnelPath.mixed => mixed,
+    TunnelPath.idle => idle,
+  };
+
+  /// The strands drawn for it.
+  List<LinkPath> get strands => this == mixed ? const [direct, relay] : [this];
+
+  /// How high a strand spanning [span] rises over the plane: a direct one
+  /// runs nearly straight between the two bodies; any other arcs up and back
+  /// down, as if by way of a relay above the disk.
+  double rise(double span) =>
+      this == direct ? span * 0.12 + 0.12 : span * 0.42 + 0.4;
+
+  /// How fast its particles run, in curves per second; idle carries none.
+  double? get flow => switch (this) {
+    direct => 0.42,
+    idle => null,
+    _ => 0.22,
+  };
+}
+
 /// A connection of this device to another device's service.
 class Link {
   /// Creates a link.
-  const Link({required this.connection, required this.to, required this.from});
+  const Link({
+    required this.connection,
+    required this.to,
+    required this.from,
+    this.path = LinkPath.unknown,
+  });
 
   /// The connection.
   final ToolsConnection connection;
@@ -186,7 +236,31 @@ class Link {
 
   /// The planet it reaches.
   final ({StarSystem system, Planet planet}) from;
+
+  /// How its data travels now.
+  final LinkPath path;
 }
+
+/// The registry family of agent tools' tunnels, as the bridge names them
+/// (`agent_tools::connections::FAMILY`): `tools␟<context>␟<service>`.
+const _toolsTunnels = 'tools\u001f';
+
+/// The live tunnel behind this device's tools connection to [service].
+SubInfo? toolsTunnelOf(Iterable<SubInfo> subs, String service) => subs
+    .where(
+      (sub) =>
+          sub.alive &&
+          sub.key.startsWith(_toolsTunnels) &&
+          subscriptionServiceKey(sub.key) == service,
+    )
+    .firstOrNull;
+
+/// The observed path of every live tools tunnel, by service key.
+Map<String, TunnelPath> toolsTunnelPaths(Iterable<SubInfo> subs) => {
+  for (final sub in subs)
+    if (sub.alive && sub.key.startsWith(_toolsTunnels))
+      subscriptionServiceKey(sub.key): sub.path,
+};
 
 /// Everything the galaxy shows.
 class GalaxyScene {
@@ -266,8 +340,12 @@ class GalaxyFilter {
 
 /// Lay [overview] out as a scene. Devices take spiral slots in the order of
 /// their names' hashes, so the same set of devices lands in the same places
-/// on every visit and on every device, and a few devices stay close.
-GalaxyScene buildScene(ToolsOverview overview) {
+/// on every visit and on every device, and a few devices stay close. Each
+/// link takes its live path from [paths] (by service key).
+GalaxyScene buildScene(
+  ToolsOverview overview, {
+  Map<String, TunnelPath> paths = const {},
+}) {
   final devices = [...overview.devices]
     ..sort((a, b) {
       final byHash = stableHash(a.name).compareTo(stableHash(b.name));
@@ -303,7 +381,12 @@ GalaxyScene buildScene(ToolsOverview overview) {
     if (home != null)
       for (final connection in overview.connections)
         if (scene.planetOf(connection.service) case final from?)
-          Link(connection: connection, to: home, from: from),
+          Link(
+            connection: connection,
+            to: home,
+            from: from,
+            path: LinkPath.of(paths[connection.service]),
+          ),
   ];
   return GalaxyScene(systems: systems, links: links);
 }
@@ -382,7 +465,12 @@ GalaxyScene filterScene(GalaxyScene scene, GalaxyFilter filter) {
     links: [
       for (final link in scene.links)
         if (filtered.planetOf(link.from.planet.id) case final from?)
-          Link(connection: link.connection, to: systems.first, from: from),
+          Link(
+            connection: link.connection,
+            to: systems.first,
+            from: from,
+            path: link.path,
+          ),
     ],
   );
 }

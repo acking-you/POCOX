@@ -182,6 +182,18 @@ abstract class AppLocalizations {
   /// **'Via relay'**
   String get tunnelPathRelay;
 
+  /// No description provided for @tunnelShortRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay'**
+  String get tunnelShortRelay;
+
+  /// No description provided for @tunnelShortMixed.
+  ///
+  /// In en, this message translates to:
+  /// **'P2P + relay'**
+  String get tunnelShortMixed;
+
   /// No description provided for @tunnelPathMixed.
   ///
   /// In en, this message translates to:
