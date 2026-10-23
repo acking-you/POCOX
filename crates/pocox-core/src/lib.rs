@@ -22,6 +22,9 @@ pub mod config;
 /// Well-known filesystem paths used by the CLI / daemon.
 pub mod paths;
 
+/// Owner-only file creation for persisted secrets and state.
+pub mod fs;
+
 /// Shared process inspection and signalling helpers.
 pub mod process;
 

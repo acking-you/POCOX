@@ -5,7 +5,7 @@
 //! it is decoded from its start whenever a range is needed.
 
 use std::collections::{BTreeMap, HashSet};
-use std::fs::{self, File, Metadata, OpenOptions};
+use std::fs::{self, File, Metadata};
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
@@ -281,22 +281,18 @@ impl RevisionMarker {
 }
 
 fn private_file(path: &Path, truncate: bool) -> Result<File> {
-    let mut options = OpenOptions::new();
-    options
+    Ok(pocox_core::fs::private_options()
         .create(true)
         .read(true)
         .write(true)
-        .truncate(truncate);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    Ok(options.open(path)?)
+        .truncate(truncate)
+        .open(path)?)
 }
 
 #[cfg(test)]
 mod tests {
+    use std::fs::OpenOptions;
+
     use super::*;
 
     #[test]

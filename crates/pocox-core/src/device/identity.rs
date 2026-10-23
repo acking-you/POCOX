@@ -1,6 +1,6 @@
 //! Stable hosting identities, independent of hostname and publisher lifetime.
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -127,17 +127,12 @@ fn label(raw: &str, limit: usize) -> String {
 }
 
 fn private_file(path: &Path, exclusive: bool) -> Result<File> {
-    let mut options = OpenOptions::new();
+    let mut options = crate::fs::private_options();
     options.read(true).write(true);
     if exclusive {
         options.create_new(true);
     } else {
         options.create(true).truncate(false);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
     }
     options
         .open(path)

@@ -4,11 +4,12 @@
 //! and replace under a cross-process lock; a legacy writer that does not take
 //! that lock retains its existing last-writer-wins behaviour.
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use pocox_core::fs::private_options;
 use serde::{Deserialize, Serialize};
 
 use crate::store::HostConfig;
@@ -286,18 +287,6 @@ impl HostStore {
         }
         result.context("writing host project settings")
     }
-}
-
-fn private_options() -> OpenOptions {
-    let options = OpenOptions::new();
-    #[cfg(unix)]
-    let options = {
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut options = options;
-        options.mode(0o600);
-        options
-    };
-    options
 }
 
 fn validate(config: &HostConfig) -> Result<()> {

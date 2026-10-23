@@ -162,14 +162,11 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
         fs::create_dir_all(parent)?;
     }
     let temporary = path.with_extension("tmp");
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut file = options.open(&temporary)?;
+    let mut file = pocox_core::fs::private_options()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&temporary)?;
     file.write_all(&bytes)?;
     drop(file);
     fs::rename(temporary, path)?;
