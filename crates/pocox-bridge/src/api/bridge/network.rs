@@ -101,14 +101,15 @@ mod tests {
             Ok(())
         })
         .expect("initial config");
+        // The defaults are on; an opt-out is what has to persist.
         save_relay_preferences(support.path(), RelayPreferencesDto {
-            path: ConnectionPathDto::Auto,
-            allow_direct: true,
+            path: ConnectionPathDto::RelayOnly,
+            allow_direct: false,
         })
         .expect("save preferences");
         let saved = config::load_config(support.path()).expect("read config");
-        assert_eq!(saved.pb_mapper.path, ConnectionPath::Auto);
-        assert!(saved.pb_mapper.allow_direct);
+        assert_eq!(saved.pb_mapper.path, ConnectionPath::RelayOnly);
+        assert!(!saved.pb_mapper.allow_direct);
         assert_eq!(saved.pb_mapper.key.as_deref(), Some("relay-key"));
         assert_eq!(saved.account.token.as_deref(), Some("account-token"));
     }

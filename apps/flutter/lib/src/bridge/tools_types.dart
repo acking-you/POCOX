@@ -292,6 +292,8 @@ class ToolsConnection {
     required this.samePort,
     required this.owner,
     this.expiresMs,
+    this.restoring = false,
+    this.restoreFailures = 0,
   });
 
   /// The remote service's key.
@@ -308,6 +310,12 @@ class ToolsConnection {
 
   /// When it ends on its own.
   final int? expiresMs;
+
+  /// Its tunnel ended and POCOX is reopening it where it was.
+  final bool restoring;
+
+  /// Failed attempts to reopen it so far.
+  final int restoreFailures;
 
   /// The local port.
   int? get localPort => int.tryParse(local.split(':').last);

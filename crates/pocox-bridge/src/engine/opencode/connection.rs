@@ -2,6 +2,7 @@
 
 use std::time::Duration;
 
+use super::super::connect_stage::{self, ConnectStage};
 use super::super::transport::Owned;
 use super::*;
 
@@ -30,10 +31,19 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
     {
         return Ok(());
     }
-    remove(&key);
+    // A stale connection goes, but its live tunnel stays for the new one: the
+    // SDK recovers it on its own. A failed attempt below releases it too.
+    let stale = lock(&CONNS).remove(&key);
+    if let Some(stale) = stale {
+        stale.task.abort();
+        let _ = stale.tx.send(projection::health(false));
+    }
     let subscription = format!("opencode\u{1f}{}\u{1f}{}", key.0, key.1);
     let address = match super::super::serve_opencode::local_gateway(&key.1, &context) {
-        Some(local) => local,
+        Some(local) => {
+            runtime::unsubscribe_service(&subscription);
+            local
+        },
         None => {
             runtime::subscribe_service_as(
                 subscription.clone(),
@@ -41,10 +51,12 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
                 port,
                 &owned.transport,
                 || transport::is_current(owned.epoch),
-            )?
+            )
+            .inspect_err(|_| runtime::unsubscribe_service(&subscription))?
             .local_addr
         },
     };
+    connect_stage::enter(service, ConnectStage::Session);
     let opened = runtime::runtime().block_on(async {
         let client = Gateway::new(&format!("http://{}/", address))?;
         let info = client.info().await?;

@@ -190,7 +190,13 @@ enum LinkPath {
   mixed,
 
   /// Ready, with no data flowing.
-  idle;
+  idle,
+
+  /// Trying a direct path: hole punching is under way.
+  probing,
+
+  /// Coming up, or recovering its link to the relay.
+  recovering;
 
   /// The path of a live tunnel's [observation], unknown without one.
   static LinkPath of(TunnelPath? observation) => switch (observation) {
@@ -204,41 +210,90 @@ enum LinkPath {
   /// The strands drawn for it.
   List<LinkPath> get strands => this == mixed ? const [direct, relay] : [this];
 
-  /// How high a strand spanning [span] rises over the plane: a direct one
-  /// runs nearly straight between the two bodies; any other arcs up and back
-  /// down, as if by way of a relay above the disk.
-  double rise(double span) =>
-      this == direct ? span * 0.12 + 0.12 : span * 0.42 + 0.4;
+  /// How high a strand spanning [span] rises over the plane: a direct one (or
+  /// one trying to be) runs nearly straight between the two bodies; any other
+  /// arcs up and back down, as if by way of a relay above the disk.
+  double rise(double span) => this == direct || this == probing
+      ? span * 0.12 + 0.12
+      : span * 0.42 + 0.4;
 
-  /// How fast its particles run, in curves per second; idle carries none.
+  /// How fast its particles run, in curves per second: quick while probing,
+  /// none while idle or recovering.
   double? get flow => switch (this) {
     direct => 0.42,
-    idle => null,
+    probing => 0.9,
+    idle || recovering => null,
     _ => 0.22,
   };
+
+  /// The path of the [tunnels] to one body: recovering while any is coming
+  /// up or recovering its relay link, probing while one tries a direct path,
+  /// else what their data goes through ([merge]).
+  static LinkPath ofTunnels(Iterable<SubInfo> tunnels) {
+    if (tunnels.any((tunnel) => tunnel.recovering)) return recovering;
+    if (tunnels.any((tunnel) => tunnel.attempt != null)) return probing;
+    return merge(tunnels.map((tunnel) => tunnel.path));
+  }
+
+  /// The path of several tunnels to one body: mixed once both kinds carry
+  /// data, idle only when none does, unknown without any.
+  static LinkPath merge(Iterable<TunnelPath> observed) {
+    var (direct, relay, idle) = (false, false, false);
+    for (final path in observed) {
+      switch (path) {
+        case TunnelPath.direct:
+          direct = true;
+        case TunnelPath.relay || TunnelPath.relayOnly:
+          relay = true;
+        case TunnelPath.mixed:
+          (direct, relay) = (true, true);
+        case TunnelPath.idle:
+          idle = true;
+      }
+    }
+    return switch ((direct, relay)) {
+      (true, true) => LinkPath.mixed,
+      (true, false) => LinkPath.direct,
+      (false, true) => LinkPath.relay,
+      _ => idle ? LinkPath.idle : LinkPath.unknown,
+    };
+  }
 }
 
-/// A connection of this device to another device's service.
+/// A connection of this device to another device: to one of its services (a
+/// planet), or to the device itself when the galaxy shows no planet for the
+/// service (a host's metadata tunnel).
 class Link {
   /// Creates a link.
   const Link({
-    required this.connection,
+    required this.service,
     required this.to,
     required this.from,
     this.path = LinkPath.unknown,
+    this.tunnels = const [],
+    this.connection,
   });
 
-  /// The connection.
-  final ToolsConnection connection;
+  /// The service key it reaches (the first, when several share the body).
+  final String service;
 
   /// The device using it (this one).
   final StarSystem to;
 
-  /// The planet it reaches.
-  final ({StarSystem system, Planet planet}) from;
+  /// The body it reaches: a planet, or the device's star.
+  final ({StarSystem system, Planet? planet}) from;
 
-  /// How its data travels now.
+  /// How its data travels now, over all of [tunnels].
   final LinkPath path;
+
+  /// The live tunnels behind it: a conversation's, an agent tool's, an API's.
+  final List<SubInfo> tunnels;
+
+  /// The agent tools connection that keeps it, if one does.
+  final ToolsConnection? connection;
+
+  /// The id of the body it reaches.
+  String get targetId => from.planet?.id ?? from.system.id;
 }
 
 /// The registry family of agent tools' tunnels, as the bridge names them
@@ -255,12 +310,12 @@ SubInfo? toolsTunnelOf(Iterable<SubInfo> subs, String service) => subs
     )
     .firstOrNull;
 
-/// The observed path of every live tools tunnel, by service key.
-Map<String, TunnelPath> toolsTunnelPaths(Iterable<SubInfo> subs) => {
+/// What of [subs] can change the galaxy's links: each live tunnel's key and
+/// path, in a stable order, comparable with `listEquals`.
+List<(String, LinkPath)> tunnelSignature(Iterable<SubInfo> subs) => [
   for (final sub in subs)
-    if (sub.alive && sub.key.startsWith(_toolsTunnels))
-      subscriptionServiceKey(sub.key): sub.path,
-};
+    if (sub.alive) (sub.key, LinkPath.ofTunnels([sub])),
+]..sort((a, b) => a.$1.compareTo(b.$1));
 
 /// Everything the galaxy shows.
 class GalaxyScene {
@@ -340,11 +395,16 @@ class GalaxyFilter {
 
 /// Lay [overview] out as a scene. Devices take spiral slots in the order of
 /// their names' hashes, so the same set of devices lands in the same places
-/// on every visit and on every device, and a few devices stay close. Each
-/// link takes its live path from [paths] (by service key).
+/// on every visit and on every device, and a few devices stay close.
+///
+/// Every live tunnel of [tunnels] to another device becomes a link: to the
+/// planet of its service, or to the device's star when the galaxy shows no
+/// planet for it. Tunnels reaching one body share one link, whose path merges
+/// theirs; an agent tools connection with no live tunnel keeps its link with
+/// an unknown path.
 GalaxyScene buildScene(
   ToolsOverview overview, {
-  Map<String, TunnelPath> paths = const {},
+  Iterable<SubInfo> tunnels = const [],
 }) {
   final devices = [...overview.devices]
     ..sort((a, b) {
@@ -377,18 +437,68 @@ GalaxyScene buildScene(
   systems.sort((a, b) => a.home == b.home ? 0 : (a.home ? -1 : 1));
   final scene = GalaxyScene(systems: systems, links: const []);
   final home = systems.where((s) => s.home).firstOrNull;
-  final links = <Link>[
-    if (home != null)
-      for (final connection in overview.connections)
-        if (scene.planetOf(connection.service) case final from?)
-          Link(
-            connection: connection,
-            to: home,
-            from: from,
-            path: LinkPath.of(paths[connection.service]),
-          ),
-  ];
-  return GalaxyScene(systems: systems, links: links);
+  if (home == null) return scene;
+  // One entry per body reached, in the order bodies are first reached.
+  final reached =
+      <
+        String,
+        ({
+          String service,
+          ({StarSystem system, Planet? planet}) from,
+          List<SubInfo> tunnels,
+          ToolsConnection? connection,
+        })
+      >{};
+  void reach(String service, {SubInfo? tunnel, ToolsConnection? connection}) {
+    final ({StarSystem system, Planet? planet})? from =
+        scene.planetOf(service) ??
+        switch (scene.systemOf('device:${serviceKeyDevice(service)}')) {
+          final system? => (system: system, planet: null),
+          null => null,
+        };
+    // Its own services are reached over loopback, never a link.
+    if (from == null || from.system.home) return;
+    final id = from.planet?.id ?? from.system.id;
+    final entry = reached.putIfAbsent(
+      id,
+      () => (
+        service: service,
+        from: from,
+        tunnels: <SubInfo>[],
+        connection: connection,
+      ),
+    );
+    if (tunnel != null) entry.tunnels.add(tunnel);
+    if (connection != null && entry.connection == null) {
+      reached[id] = (
+        service: entry.service,
+        from: entry.from,
+        tunnels: entry.tunnels,
+        connection: connection,
+      );
+    }
+  }
+
+  for (final connection in overview.connections) {
+    reach(connection.service, connection: connection);
+  }
+  for (final tunnel in tunnels) {
+    if (tunnel.alive) reach(subscriptionServiceKey(tunnel.key), tunnel: tunnel);
+  }
+  return GalaxyScene(
+    systems: systems,
+    links: [
+      for (final entry in reached.values)
+        Link(
+          service: entry.service,
+          to: home,
+          from: entry.from,
+          path: LinkPath.ofTunnels(entry.tunnels),
+          tunnels: List.unmodifiable(entry.tunnels),
+          connection: entry.connection,
+        ),
+    ],
+  );
 }
 
 List<Planet> _planetsOf(ToolsDevice device) {
@@ -460,16 +570,27 @@ GalaxyScene filterScene(GalaxyScene scene, GalaxyFilter filter) {
       ),
   ];
   final filtered = GalaxyScene(systems: systems, links: const []);
+  // A link to a kept planet stays, and so does one to a device itself.
+  ({StarSystem system, Planet? planet})? kept(Link link) =>
+      switch (link.from.planet) {
+        final planet? => filtered.planetOf(planet.id),
+        null => switch (filtered.systemOf(link.from.system.id)) {
+          final system? => (system: system, planet: null),
+          null => null,
+        },
+      };
   return GalaxyScene(
     systems: systems,
     links: [
       for (final link in scene.links)
-        if (filtered.planetOf(link.from.planet.id) case final from?)
+        if (kept(link) case final from?)
           Link(
-            connection: link.connection,
+            service: link.service,
             to: systems.first,
             from: from,
             path: link.path,
+            tunnels: link.tunnels,
+            connection: link.connection,
           ),
     ],
   );

@@ -81,16 +81,242 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tunnelLocalAddress => 'Local address';
 
   @override
-  String get tunnelActiveDirect => 'Direct connections';
+  String get tunnelSectionP2p => 'P2P';
 
   @override
-  String get tunnelActiveRelay => 'Relay connections';
+  String get tunnelSectionRelay => 'Relay link';
 
   @override
-  String get tunnelFallbackCount => 'Relay fallbacks';
+  String tunnelP2pAttempts(int direct, int fallbacks) {
+    return '$direct went direct · $fallbacks fell back to the relay';
+  }
+
+  @override
+  String get tunnelP2pNoAttempts => 'No data connection yet';
+
+  @override
+  String get tunnelOpenNow => 'Open now';
 
   @override
   String get tunnelLastFallback => 'Last fallback';
+
+  @override
+  String get tunnelFallbackNegotiation =>
+      'Direct couldn\'t be negotiated: the relay or the host doesn\'t offer it, or didn\'t answer within 3 s.';
+
+  @override
+  String get tunnelFallbackUnreachable =>
+      'The two ends couldn\'t reach each other directly (NAT, firewall or blocked UDP).';
+
+  @override
+  String get tunnelRelayState => 'State';
+
+  @override
+  String get tunnelRelayConnected => 'Connected';
+
+  @override
+  String tunnelRelayRetrying(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count failures',
+      one: '1 failure',
+    );
+    return 'Retrying after $_temp0';
+  }
+
+  @override
+  String get tunnelLastFailure => 'Last failure';
+
+  @override
+  String get tunnelFailureDns => 'Relay name didn\'t resolve';
+
+  @override
+  String get tunnelFailureTransport => 'Connection broke';
+
+  @override
+  String get tunnelFailureTimeout => 'No answer in time';
+
+  @override
+  String get tunnelFailureServiceUnavailable => 'Service not available';
+
+  @override
+  String get tunnelFailureRejected => 'Refused by the relay';
+
+  @override
+  String get tunnelFailureNetworkChanged => 'Network changed';
+
+  @override
+  String get tunnelSetupLatency => 'Setup time';
+
+  @override
+  String tunnelMilliseconds(int ms) {
+    return '$ms ms';
+  }
+
+  @override
+  String subscriptionsOnDevice(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count connections',
+      one: '1 connection',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get sessionShowInGalaxy => 'Show in galaxy';
+
+  @override
+  String get accountRedirectRejected =>
+      'This server\'s account backend is older than the app and doesn\'t accept its sign-in return link. Update the backend, or sign in with a device code below.';
+
+  @override
+  String get linkSheetTitle => 'Connection';
+
+  @override
+  String get linkStepRelay => 'Relay';
+
+  @override
+  String get linkStepP2p => 'P2P';
+
+  @override
+  String get linkStepSession => 'Session';
+
+  @override
+  String get linkRelayStarting => 'Starting';
+
+  @override
+  String get linkRelayQueued => 'Waiting for a free slot';
+
+  @override
+  String get linkRelayResolving => 'Looking up the relay';
+
+  @override
+  String get linkRelayConnecting => 'Connecting to the relay';
+
+  @override
+  String get linkRelayHandshake => 'Confirming the service';
+
+  @override
+  String get linkRelayReady => 'Relay ready';
+
+  @override
+  String get linkRelayReaching => 'Reaching the relay';
+
+  @override
+  String get linkDirectNegotiating => 'Negotiating a direct path';
+
+  @override
+  String get linkDirectDiscovering => 'Finding the public address';
+
+  @override
+  String get linkDirectPunching => 'Punching through NAT';
+
+  @override
+  String get linkDirectCommitting => 'Confirming the direct path';
+
+  @override
+  String get linkDirectUp => 'Direct';
+
+  @override
+  String get linkViaRelay => 'Via relay';
+
+  @override
+  String get linkP2pOff => 'Off';
+
+  @override
+  String get linkWaiting => 'Waiting';
+
+  @override
+  String get linkSessionOpening => 'Opening the session';
+
+  @override
+  String get linkSessionHandshake => 'Handshaking';
+
+  @override
+  String get linkSessionRestoring => 'Restoring history';
+
+  @override
+  String get linkSessionReady => 'Connected';
+
+  @override
+  String linkRetryIn(int seconds) {
+    return 'Retrying in ${seconds}s';
+  }
+
+  @override
+  String linkFellBackAt(String stage) {
+    return 'Fell back to the relay while $stage';
+  }
+
+  @override
+  String linkAttempt(int count) {
+    return 'Attempt $count';
+  }
+
+  @override
+  String get linkRetryNow => 'Retry now';
+
+  @override
+  String get linkRecent => 'Recent activity';
+
+  @override
+  String get linkNoActivity => 'Nothing has happened on this link yet.';
+
+  @override
+  String linkEventRelayReady(int ms) {
+    return 'Relay ready · $ms ms';
+  }
+
+  @override
+  String linkEventRelayFailed(String reason) {
+    return 'Relay: $reason';
+  }
+
+  @override
+  String linkEventDirect(int ms) {
+    return 'P2P direct · $ms ms';
+  }
+
+  @override
+  String linkEventFallback(String stage) {
+    return 'Fell back to the relay while $stage';
+  }
+
+  @override
+  String linkEventRepeats(int count) {
+    return '×$count';
+  }
+
+  @override
+  String linkAgoSeconds(int n) {
+    return '${n}s ago';
+  }
+
+  @override
+  String get linkStageNegotiating => 'negotiating';
+
+  @override
+  String get linkStageDiscovering => 'finding the public address';
+
+  @override
+  String get linkStagePunching => 'punching through NAT';
+
+  @override
+  String get linkStageCommitting => 'confirming';
+
+  @override
+  String get linkShowDetails => 'Connection details';
+
+  @override
+  String get toolsNoExpiry => 'No expiry';
+
+  @override
+  String toolsReopening(int count) {
+    return 'Reopening (attempt $count)';
+  }
 
   @override
   String get tunnelRelayOnlyNote =>

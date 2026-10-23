@@ -339,6 +339,62 @@ void _registerConnection() {
     },
   );
 
+  testWidgets('a lost link keeps reconnecting, says how far it got, and '
+      'tries at once on request', (t) async {
+    const service = 'pcx:lb7666:app:default';
+    final api = FakeBridgeApi(
+      config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
+    );
+    await api.appConnect(service, 28080);
+    await t.pumpWidget(host(const AppSessionScreen(serviceKey: service), api));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('session-link-mark')), findsOneWidget);
+    // The relay is out of reach: the tunnel is still coming up.
+    api
+      ..appConnectError = StateError('relay down')
+      ..putSubscription(
+        const SubInfo(
+          key: service,
+          localAddr: '127.0.0.1:28080',
+          alive: true,
+          ready: false,
+          relayPhase: RelayPhase.connecting,
+        ),
+      )
+      ..connectStages[service] = ConnectStage.tunnel;
+    await api.appDisconnect(service);
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('link-status-line')), findsOneWidget);
+    expect(find.byKey(const Key('link-dots')), findsOneWidget);
+    // Well past the four quick attempts it is still trying.
+    for (var i = 0; i < 40; i++) {
+      await t.pump(const Duration(seconds: 1));
+    }
+    expect(api.appConnectCount, greaterThan(6));
+    expect(find.byKey(const Key('link-status-line')), findsOneWidget);
+    // The status line opens the connection sheet, which retries at once.
+    await t.tap(find.byKey(const Key('link-status-line')));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('link-sheet')), findsOneWidget);
+    expect(find.byKey(const Key('link-pipeline')), findsOneWidget);
+    final before = api.appConnectCount;
+    api
+      ..appConnectError = null
+      ..connectStages.remove(service);
+    await t.tap(find.byKey(const Key('link-retry-now')));
+    await t.pump();
+    expect(api.appConnectCount, before + 1);
+    for (var i = 0; i < 10; i++) {
+      await t.pump(const Duration(milliseconds: 200));
+    }
+    expect(find.byKey(const Key('link-status-line')), findsNothing);
+    expect(t.takeException(), isNull);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('A reconnect stays disconnected when the first RPC times out', (
     t,
   ) async {

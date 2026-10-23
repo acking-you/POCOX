@@ -295,22 +295,56 @@ void main() {
     view.dispose();
   });
 
-  test('a link takes its own tunnel\'s path, not another tunnel\'s', () {
+  test('a link takes the path of every tunnel to its body, recovering and '
+      'probing first', () {
     const service = 'pcx:devbox:api:default';
-    SubInfo tunnel(String key, TunnelPath path) =>
-        SubInfo(key: key, localAddr: '127.0.0.1:1', alive: true, path: path);
-    final paths = toolsTunnelPaths([
-      tunnel('tools\u001fself:relay#00\u001f$service', TunnelPath.mixed),
-      // The same service subscribed for something else travels its own way.
-      tunnel(service, TunnelPath.relay),
-    ]);
-    expect(
-      buildScene(fixture(), paths: paths).links.single.path,
-      LinkPath.mixed,
+    SubInfo tunnel(
+      String key,
+      TunnelPath path, {
+      bool ready = true,
+      DirectAttempt? attempt,
+    }) => SubInfo(
+      key: key,
+      localAddr: '127.0.0.1:1',
+      alive: true,
+      path: path,
+      ready: ready,
+      attempt: attempt,
     );
+    LinkPath pathOf(List<SubInfo> tunnels) =>
+        buildScene(fixture(), tunnels: tunnels).links.single.path;
+    final tool = tunnel(
+      'tools\u001fself:relay#00\u001f$service',
+      TunnelPath.direct,
+    );
+    // A tool's tunnel and another one to the same service travel together.
+    expect(pathOf([tool, tunnel(service, TunnelPath.relay)]), LinkPath.mixed);
     expect(buildScene(fixture()).links.single.path, LinkPath.unknown);
+    // A direct attempt in flight shows as probing, a tunnel coming up or
+    // recovering its relay link as recovering, whatever the others carry.
+    const punching = DirectAttempt(stage: DirectStage.punching, elapsedMs: 900);
+    expect(
+      pathOf([tool, tunnel(service, TunnelPath.idle, attempt: punching)]),
+      LinkPath.probing,
+    );
+    expect(
+      pathOf([
+        tunnel(service, TunnelPath.idle, attempt: punching),
+        tunnel('tools\u001fx\u001f$service', TunnelPath.idle, ready: false),
+      ]),
+      LinkPath.recovering,
+    );
     expect(LinkPath.of(TunnelPath.relayOnly), LinkPath.relay);
     expect(LinkPath.mixed.strands, [LinkPath.direct, LinkPath.relay]);
+    expect(LinkPath.probing.flow, greaterThan(LinkPath.direct.flow!));
+    expect(LinkPath.recovering.flow, isNull);
+  });
+
+  test('a recovering or probing tunnel changes the galaxy\'s signature', () {
+    const key = 'pcx:devbox:api:default';
+    const steady = SubInfo(key: key, localAddr: 'a', alive: true);
+    const coming = SubInfo(key: key, localAddr: 'a', alive: true, ready: false);
+    expect(tunnelSignature([steady]), isNot(tunnelSignature([coming])));
   });
 
   testWidgets('the legend and the panel say how a connection travels', (

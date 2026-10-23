@@ -108,8 +108,13 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       // web_authenticator.dart) and a redirect that never arrived because the
       // browser opened a profile that isn't signed in. Lead with the remedy, but
       // keep the cause: a raw transport error is what makes a real bug
-      // diagnosable when someone reports it.
-      failure = '${l10n.accountWebTrouble}\n\n${friendlyError(e)}';
+      // diagnosable when someone reports it. An account backend older than the
+      // app refuses the app's return link before any browser opens; only a
+      // backend update fixes that, so say so instead.
+      final cause = friendlyError(e);
+      failure = cause.contains('redirect_uri is not allowed')
+          ? l10n.accountRedirectRejected
+          : '${l10n.accountWebTrouble}\n\n$cause';
     }
     if (mounted) {
       setState(() {

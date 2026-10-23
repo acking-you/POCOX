@@ -119,9 +119,76 @@ class RustBridgeApi
     },
     activeDirect: s.activeDirect,
     activeRelay: s.activeRelay,
+    directSessions: s.directSessions,
+    relaySessions: s.relaySessions,
     fallbacks: s.fallbacks,
     lastFallback: s.lastFallback,
+    retrying: s.retrying,
+    consecutiveFailures: s.consecutiveFailures,
+    lastFailure: _failure(s.lastFailure),
+    setupLatencyMs: s.setupLatencyMs,
+    ready: s.ready,
+    relayPhase: switch (s.relayPhase) {
+      frb.RelayPhaseDto.starting => RelayPhase.starting,
+      frb.RelayPhaseDto.queued => RelayPhase.queued,
+      frb.RelayPhaseDto.resolving => RelayPhase.resolving,
+      frb.RelayPhaseDto.connecting => RelayPhase.connecting,
+      frb.RelayPhaseDto.handshake => RelayPhase.handshake,
+      frb.RelayPhaseDto.ready => RelayPhase.ready,
+      frb.RelayPhaseDto.backoff => RelayPhase.backoff,
+      frb.RelayPhaseDto.stopped => RelayPhase.stopped,
+    },
+    nextRetryMs: s.nextRetryMs,
+    attempt: switch (s.attemptStage) {
+      null => null,
+      final stage => DirectAttempt(
+        stage: _stage(stage),
+        elapsedMs: s.attemptMs ?? 0,
+        inFlight: s.attemptsInFlight,
+      ),
+    },
+    events: [
+      for (final e in s.events)
+        LinkEvent(
+          seq: e.seq,
+          ageMs: e.ageMs,
+          repeats: e.repeats,
+          kind: switch (e.kind) {
+            frb.LinkEventKindDto.relayReady => LinkEventKind.relayReady,
+            frb.LinkEventKindDto.relayFailed => LinkEventKind.relayFailed,
+            frb.LinkEventKindDto.networkChanged => LinkEventKind.networkChanged,
+            frb.LinkEventKindDto.directEstablished =>
+              LinkEventKind.directEstablished,
+            frb.LinkEventKindDto.directFallback => LinkEventKind.directFallback,
+          },
+          failure: _failure(e.failure),
+          stage: switch (e.stage) {
+            null => null,
+            final stage => _stage(stage),
+          },
+          ms: e.ms,
+        ),
+    ],
   );
+
+  static TunnelFailure? _failure(frb.TunnelFailureDto? failure) =>
+      switch (failure) {
+        null => null,
+        frb.TunnelFailureDto.dns => TunnelFailure.dns,
+        frb.TunnelFailureDto.transport => TunnelFailure.transport,
+        frb.TunnelFailureDto.timeout => TunnelFailure.timeout,
+        frb.TunnelFailureDto.serviceUnavailable =>
+          TunnelFailure.serviceUnavailable,
+        frb.TunnelFailureDto.rejected => TunnelFailure.rejected,
+        frb.TunnelFailureDto.networkChanged => TunnelFailure.networkChanged,
+      };
+
+  static DirectStage _stage(frb.DirectStageDto stage) => switch (stage) {
+    frb.DirectStageDto.negotiating => DirectStage.negotiating,
+    frb.DirectStageDto.discovering => DirectStage.discovering,
+    frb.DirectStageDto.punching => DirectStage.punching,
+    frb.DirectStageDto.committing => DirectStage.committing,
+  };
 
   @override
   Future<void> networkSetProxy(String value) =>
@@ -310,6 +377,15 @@ class RustBridgeApi
   @override
   bool appIsConnected(String serviceKey) =>
       frb.appIsConnected(serviceKey: serviceKey);
+
+  @override
+  ConnectStage? appConnectStage(String serviceKey) =>
+      switch (frb.appConnectStage(serviceKey: serviceKey)) {
+        null => null,
+        frb.ConnectStageDto.tunnel => ConnectStage.tunnel,
+        frb.ConnectStageDto.session => ConnectStage.session,
+        frb.ConnectStageDto.handshake => ConnectStage.handshake,
+      };
 
   @override
   Future<void> appDisconnect(String serviceKey) =>

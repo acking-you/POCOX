@@ -31,13 +31,14 @@ images, strokes, text.
 
 ## Connection paths
 
-A link is this device's agent-tools connection to another device's service.
-Its path comes from its own tunnel (`tools␟<context>␟<service>` in the
-subscription registry), observed through the same polled
-`liveSubscriptionsProvider` as Settings, and never from the saved preference;
-another tunnel to the same service does not count. The scene (version 2)
-carries it per link (`engine::galaxy::links::LinkPath`: 0 unknown, 1 relay, 2 direct, 3 mixed,
-4 idle), and the frame emits one strand per path, each with its code:
+A link is any tunnel this device keeps to another device: an agent-tools
+connection or a conversation's, to a service the galaxy shows or, failing
+that, to the device's star (scene version 3 indexes systems, then planets).
+Its path comes from its own tunnels, observed through the same polled
+`liveSubscriptionsProvider` as Settings, and never from the saved preference.
+The scene (version 4) carries it per link (`engine::galaxy::links::LinkPath`:
+0 unknown, 1 relay, 2 direct, 3 mixed, 4 idle, 5 probing, 6 recovering), and
+the frame emits one strand per path, each with its code:
 
 - **P2P direct**: a low, taut curve (rise `0.12·span + 0.12`) drawn as a bright
   core over a soft halo, with quick particles (0.42 curves per second).
@@ -47,10 +48,15 @@ carries it per link (`engine::galaxy::links::LinkPath`: 0 unknown, 1 relay, 2 di
 - **Mixed**: both strands, the beam under the arc.
 - **Idle**: the high arc as one faint line, without particles.
 - **Unknown** (no live tunnel observed): the plain arc of before.
+- **Probing** (a direct attempt in flight): the low curve in short dashes, with
+  quick particles (0.9).
+- **Recovering** (a tunnel coming up, or its relay link failing): the high arc,
+  dashed in the caution colour, without particles. It wins over every other
+  path of the link's tunnels, and probing over the rest.
 
 The scene is laid out again only when a path changes. The legend explains the
-two strokes once a link is drawn, and a connected API's panel shows its
-`TunnelPathChip`.
+direct and relay strokes once a link is drawn, and probing or recovering while
+a link is; a connected API's panel shows its `TunnelPathChip`.
 
 ## The call
 

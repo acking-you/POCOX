@@ -9,18 +9,20 @@
 //! shared.
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::OnceCell;
 use pocox_core::config::ConnectionPath;
-use pocox_pb::{subscribe, Connection, RelaySession, SubscribeOptions};
+use pocox_pb::{
+    subscribe_background, subscribed, Connection, RelaySession, SubscribeOptions, TunnelEvent,
+};
 use tokio::runtime::{Builder, Runtime};
 #[cfg(test)]
 use tokio::task::JoinHandle;
 
 mod path_status;
-pub use path_status::{PathStatus, TunnelPath};
+pub use path_status::{PathStatus, TunnelHealth, TunnelPath};
 
 use crate::engine::transport::Transport;
 
@@ -81,7 +83,7 @@ struct SubEntry {
 
 enum SubscriptionOwner {
     Tunnel {
-        connection: Connection,
+        connection: Arc<Connection>,
         path: ConnectionPath,
     },
     #[cfg(test)]
@@ -99,25 +101,101 @@ impl Drop for SubscriptionOwner {
 
 impl SubEntry {
     fn status(&self, key: &str) -> SubStatus {
-        let (alive, path) = match &self.owner {
+        match &self.owner {
             SubscriptionOwner::Tunnel {
                 connection,
                 path,
-            } => (
-                !matches!(
-                    connection.status(),
-                    pocox_pb::TunnelStatus::Stopped | pocox_pb::TunnelStatus::Failed(_)
-                ),
-                PathStatus::observe(*path, connection.diagnostics().direct),
-            ),
+            } => observe(key, &self.local_addr, connection, *path, true),
             #[cfg(test)]
-            SubscriptionOwner::Task(task) => (!task.is_finished(), PathStatus::default()),
-        };
-        SubStatus {
-            key: key.into(),
-            local_addr: self.local_addr.clone(),
-            alive,
+            SubscriptionOwner::Task(task) => SubStatus {
+                key: key.into(),
+                local_addr: self.local_addr.clone(),
+                alive: !task.is_finished(),
+                ready: true,
+                path: PathStatus::default(),
+                health: TunnelHealth::default(),
+                events: Vec::new(),
+            },
+        }
+    }
+}
+
+/// The status of `connection`, a tunnel to `key` on `local_addr`.
+fn observe(
+    key: &str,
+    local_addr: &str,
+    connection: &Connection,
+    path: ConnectionPath,
+    ready: bool,
+) -> SubStatus {
+    // One snapshot for every view: the tunnel's health is read before its
+    // path counters and history are moved out of it.
+    let diagnostics = connection.diagnostics();
+    let health = TunnelHealth::observe(&diagnostics);
+    SubStatus {
+        key: key.into(),
+        local_addr: local_addr.into(),
+        alive: !matches!(
+            connection.status(),
+            pocox_pb::TunnelStatus::Stopped | pocox_pb::TunnelStatus::Failed(_)
+        ),
+        ready,
+        path: PathStatus::observe(path, diagnostics.direct),
+        health,
+        events: diagnostics.events,
+    }
+}
+
+/// A tunnel still coming up. It is listed with the registered ones, so its
+/// first connection can be followed as it happens rather than only once it
+/// is ready.
+struct Coming {
+    local_addr: String,
+    connection: Arc<Connection>,
+    path: ConnectionPath,
+}
+
+static COMING: LazyLock<Mutex<HashMap<String, Coming>>> = LazyLock::new(Mutex::default);
+
+fn coming() -> std::sync::MutexGuard<'static, HashMap<String, Coming>> {
+    COMING.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// Lists a tunnel while it comes up, until this guard is dropped: once it is
+/// ready (and registered) or given up.
+struct ShowComing {
+    key: String,
+    connection: Arc<Connection>,
+}
+
+impl ShowComing {
+    fn new(
+        key: &str,
+        local_addr: &str,
+        connection: &Arc<Connection>,
+        path: ConnectionPath,
+    ) -> Self {
+        coming().insert(key.into(), Coming {
+            local_addr: local_addr.into(),
+            connection: connection.clone(),
             path,
+        });
+        Self {
+            key: key.into(),
+            connection: connection.clone(),
+        }
+    }
+}
+
+impl Drop for ShowComing {
+    fn drop(&mut self) {
+        let mut coming = coming();
+        // A concurrent creation for the same key may have replaced it.
+        if coming
+            .get(&self.key)
+            .is_some_and(|shown| Arc::ptr_eq(&shown.connection, &self.connection))
+        {
+            coming.remove(&self.key);
         }
     }
 }
@@ -172,8 +250,14 @@ pub struct SubStatus {
     pub local_addr: String,
     /// Whether the SDK worker is still running.
     pub alive: bool,
+    /// Whether it has been ready; false while it is still coming up.
+    pub ready: bool,
     /// Locally observed data paths for this subscription.
     pub path: PathStatus,
+    /// How its tunnel's own link to the relay is doing.
+    pub health: TunnelHealth,
+    /// What happened to it lately, oldest first.
+    pub events: Vec<TunnelEvent>,
 }
 
 /// Start (or no-op if already live) an in-process subscription exposing
@@ -220,8 +304,9 @@ pub fn subscribe_service_as(
     // wants the namespaced form.
     let session = transport.session.clone();
     let relay_key = transport.relay_key(service_key);
+    let shown_as = registry_key.clone();
     subscribe_with(registry_key, owner_current, move || {
-        spawn_subscribe(session, relay_key, local_port)
+        spawn_subscribe(&shown_as, session, relay_key, local_port)
     })
 }
 
@@ -291,9 +376,15 @@ fn subscribe_with(
 ///
 /// The registry entry owns the SDK handle directly. Removing it cancels the
 /// listener and every data path, including established direct sessions.
-fn spawn_subscribe(session: RelaySession, key: String, local_port: u16) -> Result<SubEntry> {
+/// Until it is ready, the tunnel is listed under `shown_as`.
+fn spawn_subscribe(
+    shown_as: &str,
+    session: RelaySession,
+    key: String,
+    local_port: u16,
+) -> Result<SubEntry> {
     let path = session.path;
-    let (local_addr, connection) = open_subscription(session, key, local_port)?;
+    let (local_addr, connection) = open_subscription(Some(shown_as), session, key, local_port)?;
     Ok(SubEntry {
         local_addr,
         owner: SubscriptionOwner::Tunnel {
@@ -304,26 +395,32 @@ fn spawn_subscribe(session: RelaySession, key: String, local_port: u16) -> Resul
 }
 
 fn open_subscription(
+    shown_as: Option<&str>,
     session: RelaySession,
     key: String,
     local_port: u16,
-) -> Result<(String, Connection)> {
+) -> Result<(String, Arc<Connection>)> {
     let requested = format!("127.0.0.1:{local_port}");
     let reservation = std::net::TcpListener::bind(&requested)
         .with_context(|| format!("cannot bind {requested}"))?;
     let local_addr = reservation.local_addr()?.to_string();
     drop(reservation);
+    let opening = async {
+        let connection = Arc::new(
+            subscribe_background(&session, SubscribeOptions {
+                key: key.clone(),
+                local_addr: local_addr.clone(),
+            })
+            .await?,
+        );
+        let _shown = shown_as
+            .map(|shown_as| ShowComing::new(shown_as, &local_addr, &connection, session.path));
+        subscribed(&connection, &session, &key).await?;
+        anyhow::Ok(connection)
+    };
+    // Giving up drops the opening future, and with it the tunnel.
     let connection = runtime()
-        .block_on(async {
-            tokio::time::timeout(
-                subscribe_ready_timeout(),
-                subscribe(&session, SubscribeOptions {
-                    key,
-                    local_addr: local_addr.clone(),
-                }),
-            )
-            .await
-        })
+        .block_on(async { tokio::time::timeout(subscribe_ready_timeout(), opening).await })
         .map_err(|_| {
             anyhow!(
                 "the relay did not accept a subscription on `{requested}` within {}s",
@@ -382,7 +479,7 @@ pub fn unsubscribe_prefix(prefix: &str) {
 /// An isolated probe's tunnel. Dropping it cancels the SDK connection even
 /// when a probe returns early; explicit closure also waits for its streams.
 pub struct TransientSubscription {
-    connection: Connection,
+    connection: Arc<Connection>,
 }
 
 impl TransientSubscription {
@@ -402,20 +499,32 @@ pub fn subscribe_transient(
     transport: &Transport,
 ) -> Result<(String, TransientSubscription)> {
     let (address, connection) =
-        open_subscription(transport.session.clone(), transport.relay_key(&key), local_port)?;
+        open_subscription(None, transport.session.clone(), transport.relay_key(&key), local_port)?;
     Ok((address, TransientSubscription {
         connection,
     }))
 }
 
-/// Snapshot of all tracked subscriptions.
+/// Snapshot of all tracked subscriptions, those still coming up included
+/// (not yet [`SubStatus::ready`]). A tunnel coming up in place of a
+/// finished one is listed instead of it. None before [`init`].
 pub fn list_subscriptions() -> Vec<SubStatus> {
-    registry()
+    let Some(registry) = REGISTRY.get() else { return Vec::new() };
+    let coming: Vec<SubStatus> = coming()
+        .iter()
+        .map(|(key, tunnel)| {
+            observe(key, &tunnel.local_addr, &tunnel.connection, tunnel.path, false)
+        })
+        .collect();
+    let mut all: Vec<SubStatus> = registry
         .lock()
         .expect("registry poisoned")
         .iter()
+        .filter(|(key, _)| !coming.iter().any(|tunnel| tunnel.key == **key))
         .map(|(key, e)| e.status(key))
-        .collect()
+        .collect();
+    all.extend(coming);
+    all
 }
 
 /// Register a fake tunnel (tests of the code that owns tunnels).
@@ -614,6 +723,31 @@ mod tests {
         assert!(!list_subscriptions()
             .iter()
             .any(|s| s.key == "pcx:t:app:down"));
+    }
+
+    #[test]
+    fn a_tunnel_is_listed_while_it_comes_up_and_not_once_it_gives_up() {
+        init(std::env::temp_dir()).expect("init");
+        *TEST_READY_TIMEOUT.lock().unwrap_or_else(|p| p.into_inner()) =
+            Some(std::time::Duration::from_millis(600));
+        let key = "pcx:t:app:coming";
+        let opening = std::thread::spawn(|| subscribe_service(key.into(), 0, &test_transport()));
+        // How the first connection goes is what a reconnect shows, so the
+        // tunnel is visible before it is ready, not only after.
+        let seen = (0..500).find_map(|_| {
+            let seen = list_subscriptions().into_iter().find(|s| s.key == key);
+            if seen.is_none() {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            seen
+        });
+        let seen = seen.expect("a tunnel coming up is listed");
+        assert!(seen.alive && !seen.ready, "listed as coming up: {seen:?}");
+        assert!(opening.join().expect("subscribe thread").is_err());
+        assert!(
+            !list_subscriptions().iter().any(|s| s.key == key),
+            "a tunnel given up is no longer listed"
+        );
     }
 
     #[test]

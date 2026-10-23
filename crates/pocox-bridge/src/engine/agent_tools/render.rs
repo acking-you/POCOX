@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 
 use pocox_core::service::sanitize_component;
 
-use super::model::{ConnectionView, Overview, Shared};
+use super::model::{in_words, ConnectionView, LinkView, Overview, Shared};
 use super::state;
 
 /// What `services` narrows to.
@@ -136,7 +136,17 @@ pub fn table(overview: &Overview) -> String {
     if !overview.connections.is_empty() {
         out.push_str("\nConnected on this device:\n");
         for connection in &overview.connections {
-            let _ = writeln!(out, "  - {} → {}", connection.service, connection.local);
+            let _ = write!(
+                out,
+                "  - {} → {} ({}",
+                connection.service,
+                connection.local,
+                lasts(connection)
+            );
+            if let Some(link) = &connection.link {
+                let _ = write!(out, "; {}", path_in_words(link));
+            }
+            out.push_str(")\n");
         }
     }
     out
@@ -171,6 +181,77 @@ pub fn connected(view: &ConnectionView) -> String {
             " Its own port number was busy here, so absolute localhost URLs that name that port \
              will not reach it.",
         );
+    }
+    match view.expires_ms {
+        Some(at) => {
+            let _ = write!(
+                out,
+                " It ends {}; connect again to renew it.",
+                in_words(at - state::now_ms())
+            );
+        },
+        None => out.push_str(
+            " It has no expiry: it stays until disconnected, reconnecting on its own after \
+             network or relay outages.",
+        ),
+    }
+    if let Some(link) = &view.link {
+        let _ = write!(out, " {}.", travels(link));
+    }
+    out
+}
+
+/// How long a connection lasts, briefly.
+fn lasts(connection: &ConnectionView) -> String {
+    match connection.expires_ms {
+        Some(at) => format!("ends {}", in_words(at - state::now_ms())),
+        None => "no expiry".into(),
+    }
+}
+
+/// What a connection's traffic goes through, briefly.
+fn path_in_words(link: &LinkView) -> &'static str {
+    match (link.state.as_str(), link.path.as_str()) {
+        ("restoring", _) => "reopening its tunnel",
+        ("connecting", _) => "tunnel coming up",
+        ("reconnecting", _) => "relay link reconnecting",
+        (_, "direct") => "direct P2P",
+        (_, "relay") => "via the relay",
+        (_, "mixed") => "partly direct P2P, partly via the relay",
+        _ if link.policy == "relay_only" => "relay only",
+        _ => "P2P first, idle",
+    }
+}
+
+/// How a connection travels, in a sentence.
+pub fn travels(link: &LinkView) -> String {
+    let mut out = match link.path.as_str() {
+        "direct" => "Its traffic goes direct (P2P, hole-punched)".to_string(),
+        "relay" => "Its traffic goes through the relay".to_string(),
+        "mixed" => "Its traffic goes partly direct (P2P), partly through the relay".to_string(),
+        _ if link.policy == "relay_only" => {
+            "Its traffic will go through the relay: direct P2P is off on this device".to_string()
+        },
+        _ => "Each new connection through it tries a direct P2P path first, falling back to the \
+              relay"
+            .to_string(),
+    };
+    match link.state.as_str() {
+        "connecting" => out.push_str("; its tunnel is still coming up"),
+        "reconnecting" => out.push_str("; its link to the relay is reconnecting"),
+        "restoring" => out.push_str("; POCOX is reopening its tunnel, which ended"),
+        _ => {},
+    }
+    if link.direct_sessions + link.relay_sessions > 0 {
+        let _ = write!(
+            out,
+            " ({} direct, {} via the relay so far",
+            link.direct_sessions, link.relay_sessions
+        );
+        if let Some(stage) = &link.last_fallback_stage {
+            let _ = write!(out, "; the last fallback gave up while {stage}");
+        }
+        out.push(')');
     }
     out
 }

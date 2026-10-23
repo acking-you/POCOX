@@ -1,7 +1,8 @@
-//! The data path a subscription is observed to use, from the SDK's counters.
+//! The data path a subscription is observed to use, and how its tunnel to the
+//! relay is doing, from the SDK's counters.
 
 use pocox_core::config::ConnectionPath;
-use pocox_pb::PathDiagnostics;
+use pocox_pb::{DirectAttempt, PathDiagnostics, RecoveryFailure, RecoveryPhase, TunnelDiagnostics};
 
 /// What a subscription's data connections currently go through.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -28,10 +29,60 @@ pub struct PathStatus {
     pub active_direct: u64,
     /// Number of currently active relay data connections tracked by auto mode.
     pub active_relay: u64,
+    /// Data connections that went direct during this tunnel's lifetime.
+    pub direct_sessions: u64,
+    /// Data connections that used the relay during this tunnel's lifetime.
+    pub relay_sessions: u64,
     /// Pre-commit fallbacks observed during this tunnel's lifetime.
     pub fallbacks: u64,
     /// SDK diagnostic reason for the most recent fallback, if any.
     pub last_fallback: Option<String>,
+    /// The direct attempt in flight, if any: how far its hole punching got.
+    pub attempt: Option<DirectAttempt>,
+}
+
+/// How a tunnel's own link to the relay is doing, as the SDK reports it.
+#[derive(Debug, Clone, Copy)]
+pub struct TunnelHealth {
+    /// The phase its worker entered last.
+    pub phase: RecoveryPhase,
+    /// Time left before the next attempt, while waiting for one.
+    pub next_retry_ms: Option<u64>,
+    /// Waiting to try again after a failure.
+    pub retrying: bool,
+    /// Failures since the last success.
+    pub consecutive_failures: u64,
+    /// Why the most recent attempt failed, if one did.
+    pub last_failure: Option<RecoveryFailure>,
+    /// How long the last answered setup took, in milliseconds.
+    pub setup_latency_ms: Option<u64>,
+}
+
+impl Default for TunnelHealth {
+    fn default() -> Self {
+        Self {
+            phase: RecoveryPhase::Starting,
+            next_retry_ms: None,
+            retrying: false,
+            consecutive_failures: 0,
+            last_failure: None,
+            setup_latency_ms: None,
+        }
+    }
+}
+
+impl TunnelHealth {
+    /// Read from the SDK's snapshot of a tunnel.
+    pub(super) fn observe(diagnostics: &TunnelDiagnostics) -> Self {
+        Self {
+            phase: diagnostics.last_attempt_phase,
+            next_retry_ms: diagnostics.next_retry_in_ms,
+            retrying: diagnostics.last_attempt_phase == RecoveryPhase::Backoff,
+            consecutive_failures: diagnostics.consecutive_failures,
+            last_failure: diagnostics.last_failure,
+            setup_latency_ms: diagnostics.last_setup_latency_ms,
+        }
+    }
 }
 
 impl PathStatus {
@@ -58,8 +109,11 @@ impl PathStatus {
             path,
             active_direct: direct.active_direct,
             active_relay: direct.active_relay,
+            direct_sessions: direct.direct_sessions,
+            relay_sessions: direct.relay_sessions,
             fallbacks: direct.fallbacks,
             last_fallback: direct.last_fallback,
+            attempt: direct.attempt,
         }
     }
 }

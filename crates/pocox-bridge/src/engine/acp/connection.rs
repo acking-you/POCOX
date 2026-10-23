@@ -4,6 +4,7 @@
 //! probes.
 
 use super::*;
+use crate::engine::connect_stage::{self, ConnectStage};
 
 /// Where a connection reaches its gateway.
 struct Origin {
@@ -114,8 +115,26 @@ pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> 
     if is_current(&key, &context) {
         return Ok(());
     }
-    disconnect_inner(&key);
-    let origin = origin(&key, &context, local_port, owned, false)?;
+    // A stale connection goes, but its live tunnel stays for the new one: the
+    // SDK recovers it on its own. A failed attempt below releases it too.
+    let stale = conns().remove(&key);
+    if let Some(stale) = &stale {
+        close(stale);
+    }
+    let origin = origin(&key, &context, local_port, owned, false);
+    // A tunnel the new connection does not reuse (it failed, or the host is
+    // now reached on loopback) is the old one's alone.
+    let kept = origin
+        .as_ref()
+        .ok()
+        .and_then(|origin| origin.subscription.as_ref());
+    if let Some(old) = stale.as_ref().and_then(|stale| stale.subscription.as_ref()) {
+        if kept != Some(old) {
+            runtime::unsubscribe_service(old);
+        }
+    }
+    let origin = origin?;
+    connect_stage::enter(service_key, ConnectStage::Session);
     let client = match GatewayClient::new(&origin.url) {
         Ok(client) => client,
         Err(error) => {
@@ -218,10 +237,15 @@ pub(super) fn disconnect_inner(key: &Key) {
 }
 
 fn release(conn: Conn) {
-    conn.task.abort();
+    close(&conn);
     if let Some(subscription) = &conn.subscription {
         runtime::unsubscribe_service(subscription);
     }
+}
+
+/// Stop `conn`'s events, telling its listeners the host is out of reach.
+fn close(conn: &Conn) {
+    conn.task.abort();
     let _ = conn.tx.send(translate::host_unreachable());
 }
 

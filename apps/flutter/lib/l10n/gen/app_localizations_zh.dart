@@ -71,16 +71,228 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tunnelLocalAddress => '本地地址';
 
   @override
-  String get tunnelActiveDirect => '直连';
+  String get tunnelSectionP2p => 'P2P';
 
   @override
-  String get tunnelActiveRelay => '中继连接';
+  String get tunnelSectionRelay => '中继链路';
 
   @override
-  String get tunnelFallbackCount => '回退中继';
+  String tunnelP2pAttempts(int direct, int fallbacks) {
+    return '直连成功 $direct 次 · 回退中继 $fallbacks 次';
+  }
+
+  @override
+  String get tunnelP2pNoAttempts => '尚无数据连接';
+
+  @override
+  String get tunnelOpenNow => '当前连接';
 
   @override
   String get tunnelLastFallback => '最近回退原因';
+
+  @override
+  String get tunnelFallbackNegotiation => '无法协商直连：中继或对方主机不支持，或 3 秒内未应答。';
+
+  @override
+  String get tunnelFallbackUnreachable => '两端无法直接互通（NAT、防火墙或 UDP 被拦截）。';
+
+  @override
+  String get tunnelRelayState => '状态';
+
+  @override
+  String get tunnelRelayConnected => '已连接';
+
+  @override
+  String tunnelRelayRetrying(int count) {
+    return '重连中（已失败 $count 次）';
+  }
+
+  @override
+  String get tunnelLastFailure => '最近失败';
+
+  @override
+  String get tunnelFailureDns => '中继域名解析失败';
+
+  @override
+  String get tunnelFailureTransport => '连接中断';
+
+  @override
+  String get tunnelFailureTimeout => '应答超时';
+
+  @override
+  String get tunnelFailureServiceUnavailable => '服务不可用';
+
+  @override
+  String get tunnelFailureRejected => '被中继拒绝';
+
+  @override
+  String get tunnelFailureNetworkChanged => '网络已切换';
+
+  @override
+  String get tunnelSetupLatency => '建立耗时';
+
+  @override
+  String tunnelMilliseconds(int ms) {
+    return '$ms 毫秒';
+  }
+
+  @override
+  String subscriptionsOnDevice(int count) {
+    return '$count 个连接';
+  }
+
+  @override
+  String get sessionShowInGalaxy => '在星系中查看';
+
+  @override
+  String get accountRedirectRejected =>
+      '该服务器的账号后端版本早于应用，不接受应用的登录回调地址。请更新后端，或使用下方的设备码登录。';
+
+  @override
+  String get linkSheetTitle => '连接';
+
+  @override
+  String get linkStepRelay => '中继';
+
+  @override
+  String get linkStepP2p => 'P2P';
+
+  @override
+  String get linkStepSession => '会话';
+
+  @override
+  String get linkRelayStarting => '正在启动';
+
+  @override
+  String get linkRelayQueued => '等待空闲通道';
+
+  @override
+  String get linkRelayResolving => '正在解析中继地址';
+
+  @override
+  String get linkRelayConnecting => '正在连接中继';
+
+  @override
+  String get linkRelayHandshake => '正在确认服务';
+
+  @override
+  String get linkRelayReady => '中继就绪';
+
+  @override
+  String get linkRelayReaching => '正在连接中继';
+
+  @override
+  String get linkDirectNegotiating => '正在协商直连';
+
+  @override
+  String get linkDirectDiscovering => '正在探测公网地址';
+
+  @override
+  String get linkDirectPunching => '正在打洞';
+
+  @override
+  String get linkDirectCommitting => '正在确认直连';
+
+  @override
+  String get linkDirectUp => '直连';
+
+  @override
+  String get linkViaRelay => '经中继';
+
+  @override
+  String get linkP2pOff => '已关闭';
+
+  @override
+  String get linkWaiting => '等待中';
+
+  @override
+  String get linkSessionOpening => '正在打开会话';
+
+  @override
+  String get linkSessionHandshake => '正在握手';
+
+  @override
+  String get linkSessionRestoring => '正在恢复历史';
+
+  @override
+  String get linkSessionReady => '已连接';
+
+  @override
+  String linkRetryIn(int seconds) {
+    return '$seconds 秒后重试';
+  }
+
+  @override
+  String linkFellBackAt(String stage) {
+    return '在$stage时回退到中继';
+  }
+
+  @override
+  String linkAttempt(int count) {
+    return '第 $count 次尝试';
+  }
+
+  @override
+  String get linkRetryNow => '立即重试';
+
+  @override
+  String get linkRecent => '最近动态';
+
+  @override
+  String get linkNoActivity => '这条连接还没有任何动态。';
+
+  @override
+  String linkEventRelayReady(int ms) {
+    return '中继就绪 · $ms 毫秒';
+  }
+
+  @override
+  String linkEventRelayFailed(String reason) {
+    return '中继：$reason';
+  }
+
+  @override
+  String linkEventDirect(int ms) {
+    return 'P2P 直连 · $ms 毫秒';
+  }
+
+  @override
+  String linkEventFallback(String stage) {
+    return '在$stage时回退到中继';
+  }
+
+  @override
+  String linkEventRepeats(int count) {
+    return '×$count';
+  }
+
+  @override
+  String linkAgoSeconds(int n) {
+    return '$n 秒前';
+  }
+
+  @override
+  String get linkStageNegotiating => '协商';
+
+  @override
+  String get linkStageDiscovering => '探测公网地址';
+
+  @override
+  String get linkStagePunching => '打洞';
+
+  @override
+  String get linkStageCommitting => '确认';
+
+  @override
+  String get linkShowDetails => '连接详情';
+
+  @override
+  String get toolsNoExpiry => '永不过期';
+
+  @override
+  String toolsReopening(int count) {
+    return '正在重新建立（第 $count 次）';
+  }
 
   @override
   String get tunnelRelayOnlyNote => '以“仅中继”建立。选择“P2P 优先”后重新连接，即可尝试直连。';

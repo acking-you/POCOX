@@ -231,11 +231,25 @@ pub struct Connection {
     pub same_port: bool,
     /// Recorded owner: who made it, or the user once they took it over.
     pub owner: OwnerView,
-    /// The agents that keep it alive, each until its own lease ends. It ends
-    /// with the last of them, unless it is the user's.
-    pub holders: Vec<(OwnerKey, i64)>,
+    /// The agents that keep it alive, each until its own lease ends (`None`:
+    /// no expiry). It ends with the last of them, unless it is the user's.
+    pub holders: Vec<(OwnerKey, Option<i64>)>,
     /// The user's own: kept until the user ends it.
     pub user: bool,
+    /// Reopening its tunnel after it ended.
+    pub restore: Restore,
+}
+
+/// Reopening a connection whose tunnel ended: it is kept until it expires
+/// or is ended, so the address it was given keeps working.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Restore {
+    /// Attempts that failed since it was last up.
+    pub failures: u32,
+    /// No attempt before this (unix milliseconds).
+    pub next_ms: i64,
+    /// An attempt is running.
+    pub running: bool,
 }
 
 impl Connection {
@@ -246,11 +260,13 @@ impl Connection {
             local: self.local.clone(),
             same_port: self.same_port,
             owner: self.owner.clone(),
-            expires_ms: if self.user {
+            // A permanent hold keeps it for good, like the user's own.
+            expires_ms: if self.user || self.holders.iter().any(|(_, until)| until.is_none()) {
                 None
             } else {
-                self.holders.iter().map(|(_, until)| *until).max()
+                self.holders.iter().filter_map(|(_, until)| *until).max()
             },
+            link: None,
         }
     }
 

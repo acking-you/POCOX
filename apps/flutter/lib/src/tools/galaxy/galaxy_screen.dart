@@ -6,7 +6,7 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -16,6 +16,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/network/connection_paths.dart';
+import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_list.dart';
@@ -34,8 +35,11 @@ import 'package:pocox/src/widgets/utility_page.dart';
 
 /// The galaxy page.
 class GalaxyScreen extends ConsumerStatefulWidget {
-  /// Creates the page.
-  const GalaxyScreen({super.key});
+  /// Creates the page, selecting the service [focus] once it appears.
+  const GalaxyScreen({super.key, this.focus});
+
+  /// A service key to select and fly to (a conversation's "Show in galaxy").
+  final String? focus;
 
   @override
   ConsumerState<GalaxyScreen> createState() => _GalaxyScreenState();
@@ -68,8 +72,12 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   GalaxyFilter _filter = const GalaxyFilter();
   ToolsOverview? _source;
 
-  /// How each tools connection's data travels, as last observed.
-  Map<String, TunnelPath> _paths = const {};
+  /// The live tunnels the links are drawn from, and what of them was drawn.
+  List<SubInfo> _tunnels = const [];
+  List<(String, LinkPath)> _signature = const [];
+
+  /// The service to select once the scene holds it.
+  late String? _focusTarget = widget.focus;
 
   @override
   void initState() {
@@ -163,7 +171,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   void _rebuild(ToolsOverview overview) {
     _source = overview;
     final before = _full.systems.length;
-    _full = buildScene(overview, paths: _paths);
+    _full = buildScene(overview, tunnels: _tunnels);
     final scene = filterScene(_full, _filter);
     // Until the first catalog arrives nothing appears, so nothing animates in.
     _view.update(scene, first: _first);
@@ -171,6 +179,19 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
         (_first || before != _full.systems.length)) {
       _refit(entrance: _first);
       _first = false;
+    }
+    // Opened to look at one service (a conversation's): select it once it
+    // is in the scene, or its device when the galaxy shows no planet for it.
+    if (_focusTarget case final focus?) {
+      final target = scene.planetOf(focus) != null
+          ? focus
+          : 'device:${serviceKeyDevice(focus)}';
+      if (scene.planetOf(target) != null || scene.systemOf(target) != null) {
+        _focusTarget = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _select(target);
+        });
+      }
     }
     if (_view.selected case final id?) {
       if (scene.systemOf(id) == null && scene.planetOf(id) == null) {
@@ -261,13 +282,16 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
       _view.still = still;
       _wake();
     }
-    // Paths are polled while the page shows; the scene is laid out again only
-    // when one actually changed.
-    final paths = toolsTunnelPaths(
-      ref.watch(liveSubscriptionsProvider).valueOrNull ?? const [],
-    );
-    final repath = !mapEquals(paths, _paths);
-    if (repath) _paths = paths;
+    // Tunnels are polled while the page shows; the scene is laid out again
+    // only when one came, went or changed its path.
+    final tunnels =
+        ref.watch(liveSubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
+    final signature = tunnelSignature(tunnels);
+    final repath = !listEquals(signature, _signature);
+    if (repath) {
+      _signature = signature;
+      _tunnels = tunnels;
+    }
     if (repath || !identical(overview, _source)) _rebuild(overview);
     // A screen reader gets the list unless the user chose the galaxy.
     final list = _list ?? MediaQuery.accessibleNavigationOf(context);
@@ -427,7 +451,9 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                   Positioned(
                     left: 18,
                     bottom: 16,
-                    child: _Legend(links: _view.scene.links.isNotEmpty),
+                    child: _Legend(
+                      paths: {for (final link in _view.scene.links) link.path},
+                    ),
                   ),
                 if (selected != null && !list)
                   Positioned(
@@ -550,12 +576,14 @@ class _Bar extends StatelessWidget {
   }
 }
 
-/// What the colours mean, and, once there are links, what their strokes do.
+/// What the colours mean, and, once there are links, what their strokes do:
+/// direct and relay always, a link trying a direct path or recovering its
+/// relay link while one does.
 class _Legend extends StatelessWidget {
-  const _Legend({required this.links});
+  const _Legend({required this.paths});
 
-  /// Whether the scene draws links.
-  final bool links;
+  /// The paths the scene's links take.
+  final Set<LinkPath> paths;
 
   @override
   Widget build(BuildContext context) {
@@ -580,7 +608,12 @@ class _Legend extends StatelessWidget {
     Widget path(LinkPath path, String label) => entry(
       CustomPaint(
         size: const Size(22, 12),
-        painter: _StrokeMark(path, infoColor(scheme)),
+        painter: _StrokeMark(
+          path,
+          path == LinkPath.recovering
+              ? cautionColor(scheme)
+              : infoColor(scheme),
+        ),
       ),
       label,
     );
@@ -596,7 +629,7 @@ class _Legend extends StatelessWidget {
             status('starting'),
             status('unreachable'),
             status('offline'),
-            if (links) ...[
+            if (paths.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: SizedBox(
@@ -609,6 +642,10 @@ class _Legend extends StatelessWidget {
               ),
               path(LinkPath.direct, l10n.tunnelPathDirect),
               path(LinkPath.relay, l10n.tunnelPathRelay),
+              if (paths.contains(LinkPath.probing))
+                path(LinkPath.probing, l10n.linkDirectPunching),
+              if (paths.contains(LinkPath.recovering))
+                path(LinkPath.recovering, l10n.stateReconnecting),
             ],
           ],
         ),
@@ -618,7 +655,8 @@ class _Legend extends StatelessWidget {
 }
 
 /// A link stroke in small: a taut beam for a direct path, a dashed arc for
-/// one through the relay.
+/// one through the relay, short dashes on the beam while a direct
+/// path is punched through.
 class _StrokeMark extends CustomPainter {
   const _StrokeMark(this.path, this.color);
 
@@ -648,6 +686,22 @@ class _StrokeMark extends CustomPainter {
           paint..strokeWidth = 1.8,
         )
         ..drawCircle(Offset(size.width * 0.62, y), 2.1, Paint()..color = color);
+      return;
+    }
+    if (path == LinkPath.probing) {
+      paint.strokeWidth = 1.6;
+      for (var x = 1.0; x < size.width - 1; x += 5) {
+        canvas.drawLine(
+          Offset(x, y),
+          Offset(math.min(x + 2.5, size.width - 1), y),
+          paint,
+        );
+      }
+      canvas.drawCircle(
+        Offset(size.width * 0.7, y),
+        2.1,
+        Paint()..color = color,
+      );
       return;
     }
     // Dashes along a shallow arc.

@@ -89,6 +89,19 @@ extension _SessionStatus on _AppSessionState {
     );
   }
 
+  /// The connection sheet: how this session's link travels, a reconnect's
+  /// steps as they happen, and the link's recent history.
+  void _showLink() => unawaited(
+    showLinkSheet(
+      context,
+      serviceKey: widget.serviceKey,
+      reconnect: _relink.view,
+      connected: () =>
+          ref.read(bridgeApiProvider).appIsConnected(widget.serviceKey),
+      onRetry: _relink.retryNow,
+    ),
+  );
+
   /// Display name for a model id, falling back to the raw id when it isn't in
   /// the cached list (e.g. an unlisted config default). Null for null/empty.
   String? _modelDisplayLabel(String? id) {
@@ -173,21 +186,36 @@ extension _SessionStatus on _AppSessionState {
               const SizedBox(width: 6),
               // The state takes what the right side leaves, so the line
               // never overflows; [_statusFit] keeps it whole when it can.
+              // While the link is down it says, live, how far getting it
+              // back has come, and opens the connection sheet.
               Expanded(
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: _withAccessScope(
-                    l10n,
-                    Text(
-                      st.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: labelStyle,
-                    ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _reconnecting || _connectionLost ? _showLink : null,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: _reconnecting
+                        ? LinkStatusLine(
+                            serviceKey: widget.serviceKey,
+                            reconnect: _relink.view,
+                            style: labelStyle,
+                          )
+                        : _withAccessScope(
+                            l10n,
+                            Text(
+                              st.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: labelStyle,
+                            ),
+                          ),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
+              // How the session travels (P2P or relay); opens the same sheet.
+              LinkPathMark(serviceKey: widget.serviceKey, onTap: _showLink),
+              const SizedBox(width: 6),
               // The model actively handling this thread's requests — server
               // truth when confirmed, else the best-known effective value.
               // Tap for the full runtime configuration, so a model switch is
@@ -263,8 +291,10 @@ extension _SessionStatus on _AppSessionState {
                 '+${d.added} −${d.removed}',
                 const TextStyle(fontSize: 11.5, fontFeatures: figures),
               );
-    // Icon, gap, label, gap.
-    final state = 13 + 6 + line(label, labelStyle) + 12;
+    // Icon, gap, label (and the step dots while reconnecting), gap, then the
+    // link mark and its gap.
+    final state =
+        13 + 6 + line(label, labelStyle) + (_reconnecting ? 46 : 0) + 12 + 29;
     // Padding, glyph, gap, counts.
     final branchChip = branch == null ? 0.0 : 12 + 12 + 4 + counts;
     // Padding, gap, dot, gap after.

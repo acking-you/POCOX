@@ -10,6 +10,11 @@ enum GlassDepth {
   /// jump-to-latest pill. Blurs what scrolls beneath.
   floating,
 
+  /// Controls resting over text being read, such as the jump-to-latest
+  /// bubble on a phone: a faint body and no blur, so the words beneath stay
+  /// legible and the rim alone draws the control.
+  clear,
+
   /// Surfaces over the whole page: popovers and dialogs.
   overlay,
 }
@@ -94,6 +99,15 @@ GlassRecipe glassRecipe(
           shadow(0.09 * lift, 36 * lift, 14 * lift),
         ],
       ),
+      GlassDepth.clear => GlassRecipe(
+        fill: Colors.white.withValues(alpha: 0.16),
+        sheen: Colors.white.withValues(alpha: 0.22),
+        rimLight: Colors.white.withValues(alpha: 0.9),
+        rimShade: Colors.white.withValues(alpha: 0.25),
+        hairline: Colors.black.withValues(alpha: 0.1),
+        blur: 0,
+        shadows: [shadow(0.05, 3, 1)],
+      ),
       GlassDepth.overlay => GlassRecipe(
         fill: Colors.white.withValues(alpha: 0.80),
         sheen: Colors.white.withValues(alpha: 0.6),
@@ -126,6 +140,15 @@ GlassRecipe glassRecipe(
       hairline: Colors.black.withValues(alpha: 0.55),
       blur: 26,
       shadows: [shadow(0.4, 6, 2), shadow(0.5 * lift, 40 * lift, 16 * lift)],
+    ),
+    GlassDepth.clear => GlassRecipe(
+      fill: const Color(0xFF28282B).withValues(alpha: 0.2),
+      sheen: Colors.white.withValues(alpha: 0.04),
+      rimLight: Colors.white.withValues(alpha: 0.24),
+      rimShade: Colors.white.withValues(alpha: 0.06),
+      hairline: Colors.black.withValues(alpha: 0.35),
+      blur: 0,
+      shadows: [shadow(0.25, 4, 1)],
     ),
     GlassDepth.overlay => GlassRecipe(
       fill: const Color(0xFF252528).withValues(alpha: 0.84),

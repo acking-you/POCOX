@@ -386,6 +386,10 @@ abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
   /// Whether a live app-server session exists for [serviceKey].
   bool appIsConnected(String serviceKey);
 
+  /// The step a connect of [serviceKey] is at, or null when none is in
+  /// progress. Cheap enough to poll while a reconnect is on screen.
+  ConnectStage? appConnectStage(String serviceKey);
+
   /// Disconnect the app-server session and its pb-mapper subscription.
   Future<void> appDisconnect(String serviceKey);
 

@@ -251,6 +251,7 @@ fn local_routes(secret: Arc<str>) -> Router {
                     wait_ready_seconds: body.wait_ready_seconds,
                     secure: body.secure,
                     epoch: None,
+                    ..Default::default()
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),
@@ -282,6 +283,7 @@ fn local_routes(secret: Arc<str>) -> Router {
                 let request = ConnectRequest {
                     service: body.service,
                     local_port: body.local_port,
+                    ..Default::default()
                 };
                 match connections::connect(&caller, request).await {
                     Ok(Ok(view)) => Json(view).into_response(),

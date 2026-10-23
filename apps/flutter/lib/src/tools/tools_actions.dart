@@ -33,9 +33,13 @@ String statusLabel(AppLocalizations l10n, String status) => switch (status) {
 };
 
 /// When a share ends, in words.
-String endsLabel(AppLocalizations l10n, ToolsShare share) {
-  final expires = share.expiresMs;
-  if (expires == null) return l10n.toolsKept;
+String endsLabel(AppLocalizations l10n, ToolsShare share) =>
+    endsIn(l10n, share.expiresMs, never: l10n.toolsKept);
+
+/// When something that ends at [expires] (unix milliseconds) does, in words;
+/// [never] when it has no expiry.
+String endsIn(AppLocalizations l10n, int? expires, {required String never}) {
+  if (expires == null) return never;
   final left = DateTime.fromMillisecondsSinceEpoch(
     expires,
   ).difference(DateTime.now());

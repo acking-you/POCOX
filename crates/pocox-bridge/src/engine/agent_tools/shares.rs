@@ -23,8 +23,8 @@ use tokio::net::TcpStream;
 use super::consent;
 use super::error::{Pending, ToolError};
 use super::model::{
-    bounded, clean_path, open_link, scheme, OwnerKind, OwnerView, ShareView, Shared,
-    AGENT_LEASE_MS, APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
+    bounded, clean_path, in_words, open_link, scheme, Lifetime, OwnerKind, OwnerView, ShareView,
+    Shared, APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
 };
 use super::state::{self, now_ms, OwnerKey, Share, SharedPort, State};
 use super::tokens::{Kind, Principal};
@@ -112,6 +112,9 @@ pub struct ShareRequest {
     /// Only while the account or relay stays the one the request was
     /// admitted under (a request from another device's management entry).
     pub epoch: Option<u64>,
+    /// How long an agent's share lasts; the user's own lasts until they
+    /// stop it.
+    pub lifetime: Lifetime,
 }
 
 /// The loopback address answering on `port`, IPv4 first.
@@ -202,13 +205,17 @@ fn validate(request: &ShareRequest, own: &BTreeSet<u16>) -> Result<Vec<u16>, Too
     Ok(ports)
 }
 
-fn ends(expires_ms: Option<i64>, owner: &OwnerView) -> String {
-    match (expires_ms, owner.kind, owner.conversation.is_some()) {
-        (None, _, _) => "when the user stops sharing it".into(),
-        (Some(_), OwnerKind::Agent, true) => {
-            "when this conversation's harness stops, or in 24 hours".into()
-        },
-        (Some(_), _, _) => "when its owner stops, or in 24 hours".into(),
+/// When a share ends, in words: `held` is whether its owner still keeps it
+/// (rather than the user, who kept it).
+fn ends(expires_ms: Option<i64>, owner: &OwnerView, held: bool) -> String {
+    let with_owner = match (owner.kind, owner.conversation.is_some()) {
+        (OwnerKind::Agent, true) => "when this conversation's harness stops",
+        _ => "when its owner stops",
+    };
+    match (expires_ms, held) {
+        (None, false) => "when the user stops sharing it".into(),
+        (None, true) => format!("{with_owner} or when it is stopped; it has no expiry"),
+        (Some(at), _) => format!("{with_owner}, or {}", in_words(at - now_ms())),
     }
 }
 
@@ -220,10 +227,14 @@ pub fn shared(share: ShareView) -> Shared {
         .map(|port| port.port)
         .unwrap_or_default();
     let key = share.first_key().unwrap_or_default().to_string();
+    let held = state::lock()
+        .shares
+        .iter()
+        .any(|kept| kept.id == share.id && kept.key.is_some());
     Shared {
         on_this_machine: format!("{}://localhost:{first}{}", scheme(share.secure), share.path),
         open: open_link(&key, &share.path, share.secure),
-        ends: ends(share.expires_ms, &share.owner),
+        ends: ends(share.expires_ms, &share.owner, held),
         share,
     }
 }
@@ -245,9 +256,11 @@ pub async fn share(
     let key = caller.key();
     if existing(&ports).is_some() {
         // Shared already: the same answer, and the user's ask makes those
-        // shares theirs.
+        // shares theirs; an agent's renews its own.
         if caller.is_user() {
             take_over(&mut state::lock(), &ports, caller)?;
+        } else {
+            renew(&mut state::lock(), &ports, &key, request.lifetime);
         }
         return existing(&ports)
             .map(|done| Ok(shared(done)))
@@ -312,6 +325,7 @@ pub async fn share(
         title,
         path: clean_path(request.path.as_deref()),
         secure: request.secure,
+        lifetime: request.lifetime,
     };
     let (id, reserved) = reserve(caller, &key, page, &addrs, request.epoch)?;
     publish_reserved(&id, &reserved, request.epoch).await?;
@@ -402,6 +416,22 @@ fn take_over(state: &mut State, ports: &[u16], user: &Caller) -> Result<(), Tool
     Ok(())
 }
 
+/// Repeating a share renews the caller's own: its expiry starts again from
+/// now, with the lifetime this call asked for.
+fn renew(state: &mut State, ports: &[u16], key: &OwnerKey, lifetime: Lifetime) {
+    let until = lifetime.until(now_ms());
+    let mut renewed = false;
+    for share in state.shares.iter_mut().filter(|share| {
+        share.key.as_ref() == Some(key) && share.ports.iter().any(|p| ports.contains(&p.port))
+    }) {
+        share.expires_ms = until;
+        renewed = true;
+    }
+    if renewed {
+        state::changed(state);
+    }
+}
+
 /// The share that holds the requested page (the first port) when every
 /// requested port is shared already: shared again, same answer.
 fn existing(ports: &[u16]) -> Option<ShareView> {
@@ -424,6 +454,8 @@ struct Page {
     title: String,
     path: String,
     secure: bool,
+    /// How long it lasts, when it is an agent's.
+    lifetime: Lifetime,
 }
 
 /// Reserve the free ports of `addrs` for `caller`, checking once more that
@@ -504,7 +536,7 @@ fn reserve(
             owner,
             key: (!user).then(|| key.clone()),
             created_ms: now_ms(),
-            expires_ms: (!user).then(|| now_ms() + AGENT_LEASE_MS),
+            expires_ms: if user { None } else { page.lifetime.until(now_ms()) },
             ports: ports.collect(),
         });
         id
@@ -932,109 +964,5 @@ async fn recheck() {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn requests_name_real_ports_that_are_not_pocox_own() {
-        let request = |ports: Vec<u16>| ShareRequest {
-            ports,
-            ..ShareRequest::default()
-        };
-        let own = BTreeSet::from([17863, 41000]);
-        assert_eq!(validate(&request(vec![5173, 5173, 8000]), &own), Ok(vec![5173, 8000]));
-        assert!(validate(&request(vec![]), &own).is_err());
-        assert!(validate(&request(vec![0]), &own).is_err());
-        assert!(validate(&request(vec![5173, 41000]), &own).is_err());
-        assert!(validate(&request(vec![1, 2, 3, 4, 5]), &own).is_err());
-    }
-
-    #[test]
-    fn the_user_sharing_an_agents_port_makes_that_share_theirs() {
-        let mut state = State::default();
-        let addr = SocketAddr::from(([127, 0, 0, 1], 5173));
-        state.shares.push(Share {
-            id: "s1".into(),
-            title: "Landing".into(),
-            path: "/".into(),
-            secure: false,
-            owner: Caller::user("agent").owner(),
-            key: Some(OwnerKey {
-                token: "t1".into(),
-                conversation: Some("c1".into()),
-            }),
-            created_ms: 0,
-            expires_ms: Some(1),
-            ports: vec![SharedPort::new(5173, "pcx:studio:port:5173".into(), addr, true)],
-        });
-        take_over(&mut state, &[8000], &Caller::user("You")).expect("nothing to take");
-        assert!(state.shares[0].key.is_some(), "other ports are left alone");
-        take_over(&mut state, &[5173], &Caller::user("You")).expect("taken");
-        let share = &state.shares[0];
-        assert!(share.key.is_none() && share.expires_ms.is_none() && share.durable());
-    }
-
-    #[test]
-    fn a_page_and_its_other_ports_stay_one_share() {
-        let addr = |port| SocketAddr::from(([127, 0, 0, 1], port));
-        let agent = Caller {
-            principal: Principal {
-                id: "t1".into(),
-                kind: Kind::Hosted,
-                label: "Codex".into(),
-                harness: Some("codex".into()),
-                host: Some("default".into()),
-                session: None,
-            },
-            conversation: Some("c1".into()),
-        };
-        let share = |id: &str, key: Option<OwnerKey>, port: u16| Share {
-            id: id.into(),
-            title: "Page".into(),
-            path: "/".into(),
-            secure: false,
-            owner: agent.owner(),
-            key,
-            created_ms: 0,
-            expires_ms: None,
-            ports: vec![SharedPort::new(port, format!("pcx:studio:port:{port}"), addr(port), true)],
-        };
-        let mut state = State::default();
-        state.shares.push(share("mine", Some(agent.key()), 5173));
-        state.shares.push(share("theirs", None, 8000));
-        let user = Caller::user("You");
-        // Its own page takes more free ports; a port held apart does not join.
-        assert!(refuse_split(&state, &agent, &agent.key(), &[5173, 9000]).is_ok());
-        assert!(refuse_split(&state, &agent, &agent.key(), &[5173, 8000]).is_err());
-        assert!(refuse_split(&state, &agent, &agent.key(), &[3000, 8000]).is_err());
-        // Someone else's page takes no ports from an agent; the user's ask may.
-        assert!(refuse_split(&state, &agent, &agent.key(), &[8000, 9000]).is_err());
-        assert!(refuse_split(&state, &user, &user.key(), &[8000, 9000]).is_ok());
-    }
-
-    #[test]
-    fn only_published_ports_of_the_users_shares_are_saved() {
-        let addr = |port| SocketAddr::from(([127, 0, 0, 1], port));
-        let pending = |port| SharedPort {
-            confirmed: false,
-            ..SharedPort::new(port, format!("pcx:studio:port:{port}"), addr(port), true)
-        };
-        let mut share = Share {
-            id: "s1".into(),
-            title: "Landing".into(),
-            path: "/".into(),
-            secure: false,
-            owner: Caller::user("You").owner(),
-            key: None,
-            created_ms: 0,
-            expires_ms: None,
-            ports: vec![pending(5173)],
-        };
-        assert!(!share.durable(), "a share still publishing is not saved");
-        share
-            .ports
-            .insert(0, SharedPort::new(5173, "pcx:studio:port:5173".into(), addr(5173), true));
-        share.ports[1] = pending(8000);
-        assert_eq!(share.saved().ports, [5173], "its companion joins once published");
-    }
-}
+#[path = "shares_tests.rs"]
+mod tests;

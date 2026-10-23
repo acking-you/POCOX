@@ -506,6 +506,7 @@ pub fn share_on(
             wait_ready_seconds: Some(5),
             secure,
             epoch: None,
+            ..Default::default()
         };
         let shared =
             runtime::runtime().block_on(shares::share(&shares::Caller::user("You"), request));

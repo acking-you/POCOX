@@ -58,14 +58,30 @@ ToolsOverview _overview(int extra) {
   );
 }
 
-/// Observed paths for those connections, cycling through every kind and
-/// leaving every sixth unobserved.
-Map<String, TunnelPath> _paths(int extra) => {
+/// Tunnels for those connections, cycling through every observed path, one
+/// trying a direct path, one coming up and one unobserved in every eight;
+/// plus a conversation's tunnel to a device the galaxy shows no service of,
+/// which reaches its star.
+List<SubInfo> _tunnels(int extra) => [
   for (var i = 0; i < extra; i++)
-    if (i % 6 != 5)
-      'pcx:node-$i:api:default':
-          TunnelPath.values[i % TunnelPath.values.length],
-};
+    if (i % 8 != 5)
+      SubInfo(
+        key: 'tools001fctx001fpcx:node-$i:api:default',
+        localAddr: '127.0.0.1:${19000 + i}',
+        alive: true,
+        path: TunnelPath.values[i % TunnelPath.values.length],
+        ready: i % 8 != 7,
+        attempt: i % 8 == 6
+            ? const DirectAttempt(stage: DirectStage.punching, elapsedMs: 300)
+            : null,
+      ),
+  const SubInfo(
+    key: 'pcx:node-1:app:default',
+    localAddr: '127.0.0.1:18999',
+    alive: true,
+    path: TunnelPath.relay,
+  ),
+];
 
 void main() {
   final path = Platform.environment['POCOX_BRIDGE_LIBRARY'];
@@ -75,11 +91,16 @@ void main() {
       markTestSkipped('set POCOX_BRIDGE_LIBRARY to the built bridge library');
       return;
     }
-    final scene = buildScene(_overview(14), paths: _paths(14));
+    final scene = buildScene(_overview(14), tunnels: _tunnels(14));
     expect(
       scene.links.map((link) => link.path).toSet(),
       LinkPath.values.toSet(),
       reason: 'every path kind is drawn',
+    );
+    expect(
+      scene.links.any((link) => link.targetId == 'device:node-1'),
+      isTrue,
+      reason: 'a link reaches a device star',
     );
     final bodies = GalaxyBodies(scene);
     final first = bodies.planets.first.id;

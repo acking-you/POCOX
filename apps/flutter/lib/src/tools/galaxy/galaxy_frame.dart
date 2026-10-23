@@ -17,8 +17,10 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge.dart'
 import 'package:pocox/src/rust/frb_generated.dart' show RustLib;
 import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 
-/// The layouts' version, the same on both ends. 2: links carry their path.
-const double galaxyFrameVersion = 2;
+/// The layouts' version, the same on both ends. 2: links carry their path;
+/// 3: a link reaches any body, a device's star as well as a planet.
+/// 4: a link can be probing a direct path or recovering its relay link.
+const double galaxyFrameVersion = 4;
 
 /// The frame buffer's length.
 const int galaxyFrameFields = 13;
@@ -179,10 +181,8 @@ Float64List encodeScene(
   }
   for (final link in bodies.scene.links) {
     values
-      ..add(
-        (bodies.indexOf(link.from.planet.id) - bodies.systems.length)
-            .toDouble(),
-      )
+      // The body reached: systems first, then planets.
+      ..add(bodies.indexOf(link.targetId).toDouble())
       ..add(bodies.indexOf(link.to.id).toDouble())
       ..add(link.path.index.toDouble());
   }
@@ -512,7 +512,7 @@ int computeFrameInDart(Float64List scene, Float64List frame, Float32List out) {
     if (f == null || !_count(f[0]) || !_count(f[1]) || !_count(f[2])) {
       return -1;
     }
-    if (f[0] >= nPlanets || f[1] >= nSystems) return -1;
+    if (f[0] >= nSystems + nPlanets || f[1] >= nSystems) return -1;
     if (f[2] >= LinkPath.values.length) return -1;
     links.add((f[0].toInt(), f[1].toInt(), LinkPath.values[f[2].toInt()]));
   }
@@ -771,9 +771,14 @@ int computeFrameInDart(Float64List scene, Float64List frame, Float32List out) {
   // Link strands.
   final linkCount = o.hole();
   var drawnLinks = 0;
-  for (final (planet, toIndex, path) in links) {
-    final p = planets[planet];
-    final from = systems[p.system].position + p.offsetAt(orbitTime);
+  for (final (target, toIndex, path) in links) {
+    final Vec3 from;
+    if (target < nSystems) {
+      from = systems[target].position;
+    } else {
+      final p = planets[target - nSystems];
+      from = systems[p.system].position + p.offsetAt(orbitTime);
+    }
     final to = systems[toIndex].position;
     final span = (to - from).length, middle = from.lerp(to, 0.5);
     for (final strand in path.strands) {

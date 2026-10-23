@@ -11,11 +11,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/network/connection_paths.dart' show subscriptionTitle;
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/services_screen.dart';
 import 'package:pocox/src/screens/settings_screen.dart';
 import 'package:pocox/src/screens/welcome_guide_screen.dart';
+import 'package:pocox/src/service_key.dart' show deviceLabel;
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/share_card.dart';
 
@@ -549,10 +551,12 @@ void main() {
         size: const Size(393, 852),
         locale: const Locale('zh'),
       );
-      final key = find.text(_openCode);
+      // Under its device, by name and kind.
+      final key = find.text(subscriptionTitle(_openCode));
       await t.scrollUntilVisible(key, 200);
       await t.pump();
       expect(key, findsOneWidget);
+      expect(find.textContaining(deviceLabel(_device)), findsWidgets);
       expect(find.textContaining('\u001f'), findsNothing);
       expect(find.textContaining('#0eb093e3'), findsNothing);
       expect(find.text('127.0.0.1:64001'), findsOneWidget);

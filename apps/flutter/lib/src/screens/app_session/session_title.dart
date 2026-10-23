@@ -229,6 +229,12 @@ extension _SessionTitle on _AppSessionState {
               // Environment info lives in a popover off this button — a
               // desktop affordance, hidden when the window can't host it.
               if (width >= 900) _envButton(l10n),
+              _chromeButton(
+                key: const Key('session-show-in-galaxy'),
+                tooltip: l10n.sessionShowInGalaxy,
+                icon: AppIcons.orbit,
+                onPressed: _showInGalaxy,
+              ),
               // Appearance sits with the window's own controls rather than in
               // the sidebar footer: it acts on the whole window, and it was the
               // one frequently-used control that moved (or vanished) with the

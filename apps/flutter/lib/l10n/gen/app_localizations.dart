@@ -212,29 +212,395 @@ abstract class AppLocalizations {
   /// **'Local address'**
   String get tunnelLocalAddress;
 
-  /// No description provided for @tunnelActiveDirect.
+  /// No description provided for @tunnelSectionP2p.
   ///
   /// In en, this message translates to:
-  /// **'Direct connections'**
-  String get tunnelActiveDirect;
+  /// **'P2P'**
+  String get tunnelSectionP2p;
 
-  /// No description provided for @tunnelActiveRelay.
+  /// No description provided for @tunnelSectionRelay.
   ///
   /// In en, this message translates to:
-  /// **'Relay connections'**
-  String get tunnelActiveRelay;
+  /// **'Relay link'**
+  String get tunnelSectionRelay;
 
-  /// No description provided for @tunnelFallbackCount.
+  /// No description provided for @tunnelP2pAttempts.
   ///
   /// In en, this message translates to:
-  /// **'Relay fallbacks'**
-  String get tunnelFallbackCount;
+  /// **'{direct} went direct · {fallbacks} fell back to the relay'**
+  String tunnelP2pAttempts(int direct, int fallbacks);
+
+  /// No description provided for @tunnelP2pNoAttempts.
+  ///
+  /// In en, this message translates to:
+  /// **'No data connection yet'**
+  String get tunnelP2pNoAttempts;
+
+  /// No description provided for @tunnelOpenNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Open now'**
+  String get tunnelOpenNow;
 
   /// No description provided for @tunnelLastFallback.
   ///
   /// In en, this message translates to:
   /// **'Last fallback'**
   String get tunnelLastFallback;
+
+  /// No description provided for @tunnelFallbackNegotiation.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct couldn\'t be negotiated: the relay or the host doesn\'t offer it, or didn\'t answer within 3 s.'**
+  String get tunnelFallbackNegotiation;
+
+  /// No description provided for @tunnelFallbackUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'The two ends couldn\'t reach each other directly (NAT, firewall or blocked UDP).'**
+  String get tunnelFallbackUnreachable;
+
+  /// No description provided for @tunnelRelayState.
+  ///
+  /// In en, this message translates to:
+  /// **'State'**
+  String get tunnelRelayState;
+
+  /// No description provided for @tunnelRelayConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get tunnelRelayConnected;
+
+  /// No description provided for @tunnelRelayRetrying.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying after {count, plural, =1{1 failure} other{{count} failures}}'**
+  String tunnelRelayRetrying(int count);
+
+  /// No description provided for @tunnelLastFailure.
+  ///
+  /// In en, this message translates to:
+  /// **'Last failure'**
+  String get tunnelLastFailure;
+
+  /// No description provided for @tunnelFailureDns.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay name didn\'t resolve'**
+  String get tunnelFailureDns;
+
+  /// No description provided for @tunnelFailureTransport.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection broke'**
+  String get tunnelFailureTransport;
+
+  /// No description provided for @tunnelFailureTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'No answer in time'**
+  String get tunnelFailureTimeout;
+
+  /// No description provided for @tunnelFailureServiceUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Service not available'**
+  String get tunnelFailureServiceUnavailable;
+
+  /// No description provided for @tunnelFailureRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Refused by the relay'**
+  String get tunnelFailureRejected;
+
+  /// No description provided for @tunnelFailureNetworkChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Network changed'**
+  String get tunnelFailureNetworkChanged;
+
+  /// No description provided for @tunnelSetupLatency.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup time'**
+  String get tunnelSetupLatency;
+
+  /// No description provided for @tunnelMilliseconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{ms} ms'**
+  String tunnelMilliseconds(int ms);
+
+  /// No description provided for @subscriptionsOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 connection} other{{count} connections}}'**
+  String subscriptionsOnDevice(int count);
+
+  /// No description provided for @sessionShowInGalaxy.
+  ///
+  /// In en, this message translates to:
+  /// **'Show in galaxy'**
+  String get sessionShowInGalaxy;
+
+  /// No description provided for @accountRedirectRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'This server\'s account backend is older than the app and doesn\'t accept its sign-in return link. Update the backend, or sign in with a device code below.'**
+  String get accountRedirectRejected;
+
+  /// No description provided for @linkSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get linkSheetTitle;
+
+  /// No description provided for @linkStepRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay'**
+  String get linkStepRelay;
+
+  /// No description provided for @linkStepP2p.
+  ///
+  /// In en, this message translates to:
+  /// **'P2P'**
+  String get linkStepP2p;
+
+  /// No description provided for @linkStepSession.
+  ///
+  /// In en, this message translates to:
+  /// **'Session'**
+  String get linkStepSession;
+
+  /// No description provided for @linkRelayStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting'**
+  String get linkRelayStarting;
+
+  /// No description provided for @linkRelayQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a free slot'**
+  String get linkRelayQueued;
+
+  /// No description provided for @linkRelayResolving.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking up the relay'**
+  String get linkRelayResolving;
+
+  /// No description provided for @linkRelayConnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting to the relay'**
+  String get linkRelayConnecting;
+
+  /// No description provided for @linkRelayHandshake.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming the service'**
+  String get linkRelayHandshake;
+
+  /// No description provided for @linkRelayReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay ready'**
+  String get linkRelayReady;
+
+  /// No description provided for @linkRelayReaching.
+  ///
+  /// In en, this message translates to:
+  /// **'Reaching the relay'**
+  String get linkRelayReaching;
+
+  /// No description provided for @linkDirectNegotiating.
+  ///
+  /// In en, this message translates to:
+  /// **'Negotiating a direct path'**
+  String get linkDirectNegotiating;
+
+  /// No description provided for @linkDirectDiscovering.
+  ///
+  /// In en, this message translates to:
+  /// **'Finding the public address'**
+  String get linkDirectDiscovering;
+
+  /// No description provided for @linkDirectPunching.
+  ///
+  /// In en, this message translates to:
+  /// **'Punching through NAT'**
+  String get linkDirectPunching;
+
+  /// No description provided for @linkDirectCommitting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirming the direct path'**
+  String get linkDirectCommitting;
+
+  /// No description provided for @linkDirectUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct'**
+  String get linkDirectUp;
+
+  /// No description provided for @linkViaRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Via relay'**
+  String get linkViaRelay;
+
+  /// No description provided for @linkP2pOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get linkP2pOff;
+
+  /// No description provided for @linkWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting'**
+  String get linkWaiting;
+
+  /// No description provided for @linkSessionOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening the session'**
+  String get linkSessionOpening;
+
+  /// No description provided for @linkSessionHandshake.
+  ///
+  /// In en, this message translates to:
+  /// **'Handshaking'**
+  String get linkSessionHandshake;
+
+  /// No description provided for @linkSessionRestoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring history'**
+  String get linkSessionRestoring;
+
+  /// No description provided for @linkSessionReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get linkSessionReady;
+
+  /// No description provided for @linkRetryIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying in {seconds}s'**
+  String linkRetryIn(int seconds);
+
+  /// No description provided for @linkFellBackAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Fell back to the relay while {stage}'**
+  String linkFellBackAt(String stage);
+
+  /// No description provided for @linkAttempt.
+  ///
+  /// In en, this message translates to:
+  /// **'Attempt {count}'**
+  String linkAttempt(int count);
+
+  /// No description provided for @linkRetryNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry now'**
+  String get linkRetryNow;
+
+  /// No description provided for @linkRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent activity'**
+  String get linkRecent;
+
+  /// No description provided for @linkNoActivity.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has happened on this link yet.'**
+  String get linkNoActivity;
+
+  /// No description provided for @linkEventRelayReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay ready · {ms} ms'**
+  String linkEventRelayReady(int ms);
+
+  /// No description provided for @linkEventRelayFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay: {reason}'**
+  String linkEventRelayFailed(String reason);
+
+  /// No description provided for @linkEventDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'P2P direct · {ms} ms'**
+  String linkEventDirect(int ms);
+
+  /// No description provided for @linkEventFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Fell back to the relay while {stage}'**
+  String linkEventFallback(String stage);
+
+  /// No description provided for @linkEventRepeats.
+  ///
+  /// In en, this message translates to:
+  /// **'×{count}'**
+  String linkEventRepeats(int count);
+
+  /// No description provided for @linkAgoSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{n}s ago'**
+  String linkAgoSeconds(int n);
+
+  /// No description provided for @linkStageNegotiating.
+  ///
+  /// In en, this message translates to:
+  /// **'negotiating'**
+  String get linkStageNegotiating;
+
+  /// No description provided for @linkStageDiscovering.
+  ///
+  /// In en, this message translates to:
+  /// **'finding the public address'**
+  String get linkStageDiscovering;
+
+  /// No description provided for @linkStagePunching.
+  ///
+  /// In en, this message translates to:
+  /// **'punching through NAT'**
+  String get linkStagePunching;
+
+  /// No description provided for @linkStageCommitting.
+  ///
+  /// In en, this message translates to:
+  /// **'confirming'**
+  String get linkStageCommitting;
+
+  /// No description provided for @linkShowDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection details'**
+  String get linkShowDetails;
+
+  /// No description provided for @toolsNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry'**
+  String get toolsNoExpiry;
+
+  /// No description provided for @toolsReopening.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopening (attempt {count})'**
+  String toolsReopening(int count);
 
   /// No description provided for @tunnelRelayOnlyNote.
   ///

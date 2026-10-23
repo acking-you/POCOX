@@ -22,6 +22,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/session_tree.dart';
 import 'package:pocox/src/widgets/running_sheen.dart';
+import 'package:pocox/src/widgets/link_progress.dart';
 import 'package:pocox/src/widgets/session_tree_row.dart';
 import 'package:pocox/src/context_status.dart';
 import 'package:pocox/src/desktop_theme.dart';
@@ -665,10 +666,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   String? _historyEpoch;
   bool _historySyncing = false;
   bool _showingCachedHistory = false;
-  // True while an automatic reconnect is in progress (drives the status bar's
-  // "reconnecting" state). Auto-reconnect is attempted on stream close, on a
-  // periodic health check, and after a send fails on a dropped connection.
+  // True while an automatic reconnect runs (on stream close, a health check or
+  // a failed send); [_relink] shows how far it got, live, in the status bar.
   bool _reconnecting = false;
+  final _relink = _Relink();
   // Running for 3 s after an automatic reconnect began (its debounce); a
   // timer, so the window follows the app's clock rather than a stopwatch.
   Timer? _reconnectCooldown;
@@ -909,6 +910,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       ..dispose();
     _healthTimer?.cancel();
     _reconnectCooldown?.cancel();
+    _relink.dispose();
     _externalHistoryTimer?.cancel();
     _accessTimer?.cancel();
     _externalWriterReconnect?.cancel();

@@ -160,6 +160,8 @@ ToolsConnection _toolsConnection(frb.ToolsConnectionDto c) => ToolsConnection(
   samePort: c.samePort,
   owner: _toolsOwner(c.owner),
   expiresMs: c.expiresMs?.toInt(),
+  restoring: c.restoring,
+  restoreFailures: c.restoreFailures,
 );
 
 ToolsOverview _toolsOverview(frb.ToolsOverviewDto o) => ToolsOverview(
