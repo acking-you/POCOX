@@ -177,16 +177,23 @@ pub enum ConnectionPath {
     Auto,
 }
 
+/// Whether `value` is its type's default (serde `skip_serializing_if`).
+fn is_default<T: Default + PartialEq>(value: &T) -> bool {
+    *value == T::default()
+}
+
 /// Configuration for the `pb-mapper` integration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PbMapperConfig {
     /// Path preference for new subscriptions, in account and self-host modes.
-    #[serde(default)]
+    /// Written only once changed, so builds that predate it still load the
+    /// file.
+    #[serde(default, skip_serializing_if = "is_default")]
     pub path: ConnectionPath,
 
     /// Permit authenticated direct setup for newly published local services.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub allow_direct: bool,
 
     /// Bare `host:port` of the upstream `pb-mapper` relay
@@ -480,6 +487,7 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::service::ServiceKind;
 
     #[test]
     fn direct_preferences_are_opt_in_and_persist_without_changing_relay_identity() {
@@ -487,6 +495,15 @@ mod tests {
             .expect("old config");
         assert_eq!(old.pb_mapper.path, ConnectionPath::RelayOnly);
         assert!(!old.pb_mapper.allow_direct);
+        // Builds without these fields reject unknown keys, so a config that
+        // never opted in must keep loading after a downgrade.
+        let saved: toml::Table =
+            toml::from_str(&toml::to_string(&old).expect("serialize")).expect("table");
+        let written = saved["pb_mapper"].as_table().expect("pb_mapper table");
+        assert!(
+            !written.contains_key("path") && !written.contains_key("allow_direct"),
+            "defaults are not written: {written:?}"
+        );
         let mut updated = old;
         updated.pb_mapper.path = ConnectionPath::Auto;
         updated.pb_mapper.allow_direct = true;
@@ -498,7 +515,6 @@ mod tests {
         assert_eq!(restored.relay_key(), Some("test"));
         assert!(toml::from_str::<Config>("[pb_mapper]\npath = 'direct_only'").is_err());
     }
-    use crate::service::ServiceKind;
 
     #[test]
     fn service_default_roundtrips_in_config() {
