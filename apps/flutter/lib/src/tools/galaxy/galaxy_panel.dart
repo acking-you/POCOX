@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/error_format.dart';
+import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
@@ -266,6 +267,13 @@ class _PlanetDetail extends ConsumerWidget {
     final connection = ref
         .watch(toolsOverviewProvider)
         .connectionTo(service.key);
+    // How the connection's data travels now: its own tunnel's observation.
+    final tunnel = connection == null
+        ? null
+        : toolsTunnelOf(
+            ref.watch(liveSubscriptionsProvider).valueOrNull ?? const [],
+            service.key,
+          );
     final away =
         system.device.name != ref.watch(toolsOverviewProvider).thisDevice;
     return Column(
@@ -289,6 +297,10 @@ class _PlanetDetail extends ConsumerWidget {
               label: statusLabel(l10n, service.status),
               filled: true,
             ),
+            if (tunnel != null) ...[
+              const SizedBox(width: 8),
+              TunnelPathChip(tunnel, key: const Key('galaxy-connection-path')),
+            ],
           ],
         ),
         if (connection != null)

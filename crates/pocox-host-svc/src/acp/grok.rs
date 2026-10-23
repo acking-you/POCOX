@@ -278,15 +278,11 @@ fn write_private(home: &Path, path: &Path, contents: &str) -> Result<()> {
     }
     let temp = home.join(".config.toml.pocox");
     {
-        let mut options = fs::OpenOptions::new();
-        options.write(true).create(true).truncate(true);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::OpenOptionsExt;
-            options.mode(0o600);
-        }
         use std::io::Write;
-        let mut file = options
+        let mut file = pocox_core::fs::private_options()
+            .write(true)
+            .create(true)
+            .truncate(true)
             .open(&temp)
             .context("writing the host's Grok configuration")?;
         file.write_all(contents.as_bytes())?;

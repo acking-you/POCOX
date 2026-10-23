@@ -6,6 +6,8 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_list.dart';
+import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_screen.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_view.dart';
 import 'package:pocox/src/widgets/glass.dart';
@@ -292,4 +294,79 @@ void main() {
     expect(view.hitAt(const Offset(124, 116))?.id, 'pcx:studio:port:5173');
     view.dispose();
   });
+
+  test('a link takes its own tunnel\'s path, not another tunnel\'s', () {
+    const service = 'pcx:devbox:api:default';
+    SubInfo tunnel(String key, TunnelPath path) =>
+        SubInfo(key: key, localAddr: '127.0.0.1:1', alive: true, path: path);
+    final paths = toolsTunnelPaths([
+      tunnel('tools\u001fself:relay#00\u001f$service', TunnelPath.mixed),
+      // The same service subscribed for something else travels its own way.
+      tunnel(service, TunnelPath.relay),
+    ]);
+    expect(
+      buildScene(fixture(), paths: paths).links.single.path,
+      LinkPath.mixed,
+    );
+    expect(buildScene(fixture()).links.single.path, LinkPath.unknown);
+    expect(LinkPath.of(TunnelPath.relayOnly), LinkPath.relay);
+    expect(LinkPath.mixed.strands, [LinkPath.direct, LinkPath.relay]);
+  });
+
+  testWidgets('the legend and the panel say how a connection travels', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(1440, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final api = _Tunnels()..toolsOverviewValue = fixture();
+    await t.pumpWidget(_app(api, dark: true));
+    for (var i = 0; i < 30; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    // A drawn link brings the strokes' meaning into the legend.
+    expect(find.text('P2P direct'), findsOneWidget);
+    expect(find.text('Via relay'), findsOneWidget);
+    await capturePreview(t, 'galaxy-paths-dark');
+    await t.tap(find.byKey(const Key('galaxy-list-toggle')));
+    await t.pump();
+    final row = find.byKey(const Key('galaxy-list-pcx:devbox:api:default'));
+    await t.scrollUntilVisible(
+      row,
+      120,
+      scrollable: find
+          .descendant(
+            of: find.byType(GalaxyList),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await t.tap(row);
+    for (var i = 0; i < 10; i++) {
+      await t.pump(const Duration(milliseconds: 100));
+    }
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('galaxy-connection-path')),
+        matching: find.text('P2P direct'),
+      ),
+      findsOneWidget,
+    );
+    expect(t.takeException(), isNull);
+    await t.pumpWidget(const SizedBox());
+  });
+}
+
+/// The fixture's connection, carried peer to peer.
+class _Tunnels extends FakeBridgeApi {
+  @override
+  Future<List<SubInfo>> subscriptions() async => const [
+    SubInfo(
+      key: 'tools\u001fself:relay#00\u001fpcx:devbox:api:default',
+      localAddr: '127.0.0.1:18180',
+      alive: true,
+      path: TunnelPath.direct,
+      activeDirect: 1,
+    ),
+  ];
 }

@@ -9,6 +9,94 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get connectionPathTitle => 'Connection path';
+
+  @override
+  String get connectionPathInfo =>
+      'P2P direct needs a relay and a host that support it. When direct setup fails, the connection falls back to the relay before any data is sent, so nothing is replayed. An established direct connection keeps running if the relay goes offline or its credential is revoked, until a device at either end disconnects it.';
+
+  @override
+  String get connectionPathOutgoing => 'Connect to other devices';
+
+  @override
+  String get connectionPathRelayOnly => 'Relay only';
+
+  @override
+  String get connectionPathAuto => 'P2P first';
+
+  @override
+  String get connectionPathOutgoingPending =>
+      'New connections use this. Reconnect a session to switch it.';
+
+  @override
+  String get connectionPathIncoming => 'Accept direct connections';
+
+  @override
+  String get connectionPathIncomingInfo =>
+      'Devices that can already reach this computer\'s services may connect to them directly. Who has access does not change.';
+
+  @override
+  String get connectionPathIncomingPending => 'Restart hosting to apply.';
+
+  @override
+  String get connectionPathReadFailed =>
+      'Couldn\'t read connection preferences.';
+
+  @override
+  String get connectionPathSaveFailed =>
+      'Couldn\'t save. Your previous choice is kept.';
+
+  @override
+  String get tunnelPathIdle => 'Idle';
+
+  @override
+  String get tunnelPathDirect => 'P2P direct';
+
+  @override
+  String get tunnelPathRelay => 'Via relay';
+
+  @override
+  String get tunnelShortRelay => 'Relay';
+
+  @override
+  String get tunnelShortMixed => 'P2P + relay';
+
+  @override
+  String tunnelPathMixed(int direct, int relay) {
+    return 'Direct $direct · Relay $relay';
+  }
+
+  @override
+  String tunnelFallbacks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count relay fallbacks',
+      one: '1 relay fallback',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get tunnelLocalAddress => 'Local address';
+
+  @override
+  String get tunnelActiveDirect => 'Direct connections';
+
+  @override
+  String get tunnelActiveRelay => 'Relay connections';
+
+  @override
+  String get tunnelFallbackCount => 'Relay fallbacks';
+
+  @override
+  String get tunnelLastFallback => 'Last fallback';
+
+  @override
+  String get tunnelRelayOnlyNote =>
+      'Opened with Relay only. Choose P2P first, then reconnect, to try a direct path.';
+
+  @override
   String get appTitle => 'POCOX';
 
   @override

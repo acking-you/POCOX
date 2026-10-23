@@ -314,15 +314,11 @@ pub fn host_is_local(service: &str) -> Result<bool> {
     let id = uuid::Uuid::new_v4();
     let secret = uuid::Uuid::new_v4().to_string();
     let path = dir.join(id.to_string());
-    let mut options = std::fs::OpenOptions::new();
-    options.create_new(true).write(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
     let mut cleanup = RemoveFile(None);
-    let mut file = options.open(&path)?;
+    let mut file = pocox_core::fs::private_options()
+        .create_new(true)
+        .write(true)
+        .open(&path)?;
     cleanup.0 = Some(path);
     std::io::Write::write_all(&mut file, secret.as_bytes())?;
     drop(file);

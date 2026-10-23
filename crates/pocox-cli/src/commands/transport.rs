@@ -45,7 +45,8 @@ pub(crate) async fn resolve_transport(
             let mut config = config.clone();
             let relay = account::fetch_relay_credential(&mut config, &backend).await?;
             Ok(Transport {
-                session: pocox_pb::RelaySession::new(relay.relay_addr, relay.credential),
+                session: pocox_pb::RelaySession::new(relay.relay_addr, relay.credential)
+                    .with_preferences(&config.pb_mapper),
                 namespace: Some(relay.namespace),
             })
         },

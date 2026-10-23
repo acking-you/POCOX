@@ -452,7 +452,7 @@ fn message_id() -> String {
         .as_millis() as u64
         * 4096;
     let previous = LAST
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |last| Some(now.max(last + 1)))
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |last| Some(now.max(last + 1)))
         .unwrap_or_else(|value| value);
     let number = now.max(previous + 1) & 0xffff_ffff_ffff;
     format!("msg_{number:012x}{}", &uuid::Uuid::new_v4().simple().to_string()[..14])

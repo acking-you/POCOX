@@ -6,6 +6,7 @@ library;
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -14,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_list.dart';
@@ -65,6 +67,9 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   GalaxyScene _full = GalaxyScene.empty;
   GalaxyFilter _filter = const GalaxyFilter();
   ToolsOverview? _source;
+
+  /// How each tools connection's data travels, as last observed.
+  Map<String, TunnelPath> _paths = const {};
 
   @override
   void initState() {
@@ -158,7 +163,7 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
   void _rebuild(ToolsOverview overview) {
     _source = overview;
     final before = _full.systems.length;
-    _full = buildScene(overview);
+    _full = buildScene(overview, paths: _paths);
     final scene = filterScene(_full, _filter);
     // Until the first catalog arrives nothing appears, so nothing animates in.
     _view.update(scene, first: _first);
@@ -256,7 +261,14 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
       _view.still = still;
       _wake();
     }
-    if (!identical(overview, _source)) _rebuild(overview);
+    // Paths are polled while the page shows; the scene is laid out again only
+    // when one actually changed.
+    final paths = toolsTunnelPaths(
+      ref.watch(liveSubscriptionsProvider).valueOrNull ?? const [],
+    );
+    final repath = !mapEquals(paths, _paths);
+    if (repath) _paths = paths;
+    if (repath || !identical(overview, _source)) _rebuild(overview);
     // A screen reader gets the list unless the user chose the galaxy.
     final list = _list ?? MediaQuery.accessibleNavigationOf(context);
     if (list != _listShown) {
@@ -412,7 +424,11 @@ class _GalaxyScreenState extends ConsumerState<GalaxyScreen>
                   ),
                 ),
                 if (!list && wide)
-                  const Positioned(left: 18, bottom: 16, child: _Legend()),
+                  Positioned(
+                    left: 18,
+                    bottom: 16,
+                    child: _Legend(links: _view.scene.links.isNotEmpty),
+                  ),
                 if (selected != null && !list)
                   Positioned(
                     top: wide ? below + 16 : null,
@@ -534,27 +550,39 @@ class _Bar extends StatelessWidget {
   }
 }
 
-/// What the colours mean.
+/// What the colours mean, and, once there are links, what their strokes do.
 class _Legend extends StatelessWidget {
-  const _Legend();
+  const _Legend({required this.links});
+
+  /// Whether the scene draws links.
+  final bool links;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    Widget entry(String status) => Padding(
+    final style = TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant);
+    Widget entry(Widget mark, String label) => Padding(
       padding: const EdgeInsets.only(right: 12),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          PlanetGlyph(color: statusColor(scheme, status), size: 16),
+          mark,
           const SizedBox(width: 4),
-          Text(
-            statusLabel(l10n, status),
-            style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
-          ),
+          Text(label, style: style),
         ],
       ),
+    );
+    Widget status(String status) => entry(
+      PlanetGlyph(color: statusColor(scheme, status), size: 16),
+      statusLabel(l10n, status),
+    );
+    Widget path(LinkPath path, String label) => entry(
+      CustomPaint(
+        size: const Size(22, 12),
+        painter: _StrokeMark(path, infoColor(scheme)),
+      ),
+      label,
     );
     return ExcludeSemantics(
       child: Glass(
@@ -564,13 +592,78 @@ class _Legend extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            entry('online'),
-            entry('starting'),
-            entry('unreachable'),
-            entry('offline'),
+            status('online'),
+            status('starting'),
+            status('unreachable'),
+            status('offline'),
+            if (links) ...[
+              Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: SizedBox(
+                  height: 14,
+                  child: VerticalDivider(
+                    width: 1,
+                    color: scheme.outlineVariant,
+                  ),
+                ),
+              ),
+              path(LinkPath.direct, l10n.tunnelPathDirect),
+              path(LinkPath.relay, l10n.tunnelPathRelay),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// A link stroke in small: a taut beam for a direct path, a dashed arc for
+/// one through the relay.
+class _StrokeMark extends CustomPainter {
+  const _StrokeMark(this.path, this.color);
+
+  final LinkPath path;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..color = color;
+    final y = size.height * 0.75;
+    if (path == LinkPath.direct) {
+      canvas
+        ..drawLine(
+          Offset(1, y),
+          Offset(size.width - 1, y),
+          Paint()
+            ..strokeWidth = 4.5
+            ..strokeCap = StrokeCap.round
+            ..color = color.withValues(alpha: 0.18),
+        )
+        ..drawLine(
+          Offset(1, y),
+          Offset(size.width - 1, y),
+          paint..strokeWidth = 1.8,
+        )
+        ..drawCircle(Offset(size.width * 0.62, y), 2.1, Paint()..color = color);
+      return;
+    }
+    // Dashes along a shallow arc.
+    paint
+      ..strokeWidth = 1.3
+      ..color = color.withValues(alpha: 0.75);
+    for (var i = 0; i < 4; i++) {
+      final t0 = i / 4, t1 = t0 + 0.14;
+      Offset at(double t) => Offset(
+        1 + t * (size.width - 2),
+        y - math.sin(t * math.pi) * size.height * 0.62,
+      );
+      canvas.drawLine(at(t0), at(t1), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StrokeMark old) => old.path != path || old.color != color;
 }

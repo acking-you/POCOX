@@ -51,6 +51,28 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 
 ## Home, connection and relay problems
 
+- Settings › Connection path (`lib/src/network/connection_paths.dart`) is a
+  `GroupCard` in both layouts: outgoing **Relay only / P2P first** as a
+  `GlassSegmented` (under its title below 480 px) and, on desktop only, an
+  incoming switch. Choices save at once, optimistically; a failed write springs
+  the control back with a failed line. Its explanation sits behind the group's
+  info mark; the visible line under a control is only pending ("reconnect a
+  session", "restart hosting") or failed. Keep the default relay-only/off
+  behavior.
+- How a connection travels has one visual language: in words, P2P direct /
+  Via relay / Direct n · Relay m / Idle / Relay only (`tunnelPathLabel`), and
+  after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,
+  the services hub's app and API rows); in the galaxy, a bright taut beam for
+  direct, a dashed high arc for the relay, both for mixed
+  ([connection paths](galaxy-geometry.md#connection-paths)). A local host
+  reached over loopback shows no path.
+- Subscription rows carry one `TunnelPathChip` (live path or dropped) and open
+  live details from the pressed row. Paths come from local SDK observations,
+  never from the preference; the polled list is watched by the subscription
+  widgets alone, so polling rebuilds them, not the settings page, and stops
+  with the last view. See
+  [direct connections](relay-worker-recovery.md#direct-connections).
+
 - `/` is chat-first: it resolves a host (last used → locally hosted → first
   reachable), auto-connects and opens the latest session with all sessions in
   the sidebar; the services hub is `/manage` (`lib/src/router.dart`). The home
@@ -94,6 +116,21 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 - Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
   22 px composer radius with a quieter idle edge, 44 px sidebar heading
   buttons, two-line host switcher names.
+- Below 720 px on touch the composer folds into a capsule while the reader
+  reads (`screens/app_session/composer_foot.dart`, `widgets/folding_panel.dart`):
+  a drag of 56 px through the transcript more than 96 px from its end folds
+  it, unless the field is focused, a dictation take runs or the full editor
+  is open. The capsule is the same glass pane (radius, focus and streaming
+  edges) showing the draft's first line or the hint, attachments and Stop
+  while a turn runs. It unfolds on a tap (which focuses the field), on any
+  focus of the field, when a scroll comes to rest at the end, and on a forced
+  return to the end (send, jump to latest). The fold belongs to its
+  conversation; desktop, tablets and read-only views never fold. The full
+  composer stays mounted underneath, so draft, focus and options survive; the
+  height morphs while the forms cross-fade (`Motion.medium`, emphasized).
+- What floats over the transcript's foot is measured into a notifier
+  (`_ComposerFoot.overlay`): its growth, drag and fold move only the end
+  spacer and the overlays above it, never rebuild the conversation.
 - Layouts reflow by measured room instead of squeezing:
   - Service capability rows below 440 px (text-scaled) put status and actions
     under the title and provider; the action keeps its overflow beside it.

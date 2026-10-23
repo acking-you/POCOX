@@ -35,7 +35,7 @@ exclude = [
 [workspace.package]
 version = "0.6.1"
 edition = "2021"
-rust-version = "1.95"
+rust-version = "1.99.1"
 authors = ["POCOX Contributors"]
 license = "Apache-2.0"
 repository = "https://github.com/acking-you/POCOX"
@@ -48,7 +48,10 @@ readme = "README.md"
 [workspace.dependencies]
 # The dedicated branch carries the SDK fixes used by POCOX. Cargo.lock
 # pins its exact commit; update it deliberately with `cargo update -p pb-mapper`.
-pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox" }
+pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox", features = ["p2p"] }
+# Test fixtures only; production crates embed the client SDK.
+pb-mapper-testkit = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox" }
+pb-mapper-server = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox", features = ["p2p"] }
 
 # Internal crates
 pocox-core = { path = "crates/pocox-core" }

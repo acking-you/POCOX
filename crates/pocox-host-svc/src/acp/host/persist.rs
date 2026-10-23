@@ -39,7 +39,7 @@ impl Persist {
         matches!(tokio::time::timeout(limit, wait).await, Ok(Ok(())))
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, unix))]
     pub(super) fn pending(&self) -> usize {
         lock(&self.queue).0.len()
     }

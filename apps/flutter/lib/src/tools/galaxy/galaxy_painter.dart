@@ -573,9 +573,14 @@ class _Frame {
     }
   }
 
+  /// Each strand shows how its data travels: a direct one is a taut, bright
+  /// beam with quick particles; one through the relay a dashed arc with
+  /// slower, dimmer ones; an idle one a faint line with none. A link not yet
+  /// observed keeps the plain arc.
   void links() {
     final light = palette.signal;
     for (var n = reader.count(); n > 0; n--) {
+      final path = LinkPath.values[reader.count()];
       final curve = reader.points(reader.count());
       final particles = reader.points(reader.count());
       final last = curve.length - 2;
@@ -583,30 +588,89 @@ class _Frame {
         Offset(curve[0], curve[1]),
         Offset(curve[last], curve[last + 1]),
       ).inflate(1);
+      Shader fade(double from, double to) => LinearGradient(
+        colors: [
+          light.withValues(alpha: from),
+          light.withValues(alpha: to),
+        ],
+      ).createShader(bounds);
+      Paint stroke(double width) => Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = width
+        ..strokeCap = StrokeCap.round;
       sprites.flush();
-      canvas.drawPath(
-        _path(curve),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..strokeCap = StrokeCap.round
-          ..shader = LinearGradient(
-            colors: [
-              light.withValues(alpha: dark ? 0.15 : 0.12),
-              light.withValues(alpha: dark ? 0.7 : 0.55),
-            ],
-          ).createShader(bounds),
-      );
+      switch (path) {
+        case LinkPath.direct:
+          final line = _path(curve);
+          // A halo of the beam's own colour, then its bright core.
+          canvas
+            ..drawPath(
+              line,
+              stroke(5.5)..color = light.withValues(alpha: dark ? 0.13 : 0.1),
+            )
+            ..drawPath(
+              line,
+              stroke(1.9)..shader = dark ? fade(0.4, 0.95) : fade(0.32, 0.82),
+            );
+        case LinkPath.relay:
+          canvas.drawPath(
+            _dashes(curve),
+            stroke(1.3)..shader = dark ? fade(0.14, 0.6) : fade(0.12, 0.5),
+          );
+        case LinkPath.idle:
+          canvas.drawPath(
+            _path(curve),
+            stroke(1)..color = light.withValues(alpha: dark ? 0.22 : 0.18),
+          );
+        case LinkPath.unknown || LinkPath.mixed:
+          canvas.drawPath(
+            _path(curve),
+            stroke(1.6)..shader = dark ? fade(0.15, 0.7) : fade(0.12, 0.55),
+          );
+      }
       // Particles flow from the service to the device using it.
+      final (size, alpha) = switch (path) {
+        LinkPath.direct => (dark ? 2.6 : 2.1, 1.0),
+        LinkPath.relay => (dark ? 1.9 : 1.5, 0.75),
+        _ => (dark ? 2.2 : 1.8, 0.9),
+      };
       for (var i = 0; i < particles.length; i += 2) {
         sprites.softDisc(
           Offset(particles[i], particles[i + 1]),
-          dark ? 2.2 : 1.8,
-          dark ? 2.2 : 1,
-          light.withValues(alpha: 0.9),
+          size,
+          dark ? size : size * 0.55,
+          light.withValues(alpha: alpha),
         );
       }
     }
+  }
+
+  /// [run] as dashes of [on] pixels [off] apart, continuing across its
+  /// points so the pattern does not restart at each one.
+  static Path _dashes(Float32List run, {double on = 5, double off = 4}) {
+    final dashes = Path();
+    var walked = 0.0;
+    for (var i = 2; i < run.length; i += 2) {
+      final a = Offset(run[i - 2], run[i - 1]);
+      final b = Offset(run[i], run[i + 1]);
+      final length = (b - a).distance;
+      var at = 0.0;
+      while (at < length) {
+        final phase = walked % (on + off);
+        final drawing = phase < on;
+        final step = math.min(length - at, (drawing ? on : on + off) - phase);
+        if (drawing) {
+          final from = Offset.lerp(a, b, at / length)!;
+          final to = Offset.lerp(a, b, (at + step) / length)!;
+          dashes
+            ..moveTo(from.dx, from.dy)
+            ..lineTo(to.dx, to.dy);
+        }
+        at += step;
+        walked += step;
+      }
+    }
+    return dashes;
   }
 
   void ghosts() {

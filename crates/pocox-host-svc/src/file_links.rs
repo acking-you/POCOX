@@ -164,6 +164,10 @@ fn authorize_in(
 
 /// Finds a session's working directory for a provider without Codex rollouts.
 #[async_trait::async_trait]
+#[allow(
+    clippy::double_must_use,
+    reason = "async_trait adds must_use to its generated boxed Future"
+)]
 pub trait SessionDirResolver: Send + Sync {
     /// The absolute working directory of `session`, or `None` when the
     /// provider does not know that session.

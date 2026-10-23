@@ -20,13 +20,37 @@ Per frame, in drawing order (`engine::galaxy::frame`):
   behind and in front of its star;
 - every planet's orbit position (with the spiral-out entrance), projection,
   radius, opacity, ripple progress and whether it is behind its star;
-- the links' curves and particles;
+- the links' strands, curves and particles, shaped by how each link's data
+  travels ([below](#connection-paths));
 - label placement: ranking, collision with placed labels and stars, and the
   on-screen check.
 
 Dart keeps the camera's easing, hit testing on the drawn bodies, the fading
 ghosts of removed bodies (rare and short) and all painting: colours, cached
 images, strokes, text.
+
+## Connection paths
+
+A link is this device's agent-tools connection to another device's service.
+Its path comes from its own tunnel (`tools␟<context>␟<service>` in the
+subscription registry), observed through the same polled
+`liveSubscriptionsProvider` as Settings, and never from the saved preference;
+another tunnel to the same service does not count. The scene (version 2)
+carries it per link (`engine::galaxy::links::LinkPath`: 0 unknown, 1 relay, 2 direct, 3 mixed,
+4 idle), and the frame emits one strand per path, each with its code:
+
+- **P2P direct**: a low, taut curve (rise `0.12·span + 0.12`) drawn as a bright
+  core over a soft halo, with quick particles (0.42 curves per second).
+- **Via relay** (also relay-only tunnels): the high arc of before
+  (`0.42·span + 0.4`), as if by way of a relay above the disk, dashed, with
+  slower and dimmer particles (0.22).
+- **Mixed**: both strands, the beam under the arc.
+- **Idle**: the high arc as one faint line, without particles.
+- **Unknown** (no live tunnel observed): the plain arc of before.
+
+The scene is laid out again only when a path changes. The legend explains the
+two strokes once a link is drawn, and a connected API's panel shows its
+`TunnelPathChip`.
 
 ## The call
 

@@ -655,6 +655,12 @@ abstract final class AppIcons {
   /// A server.
   static const IconData server = LucideIcons.server300;
 
+  /// The route a connection takes between devices.
+  static const IconData route = LucideIcons.route300;
+
+  /// A direct (P2P) connection.
+  static const IconData direct = LucideIcons.zap300;
+
   /// Connect a service here.
   static const IconData plug = LucideIcons.plug300;
 

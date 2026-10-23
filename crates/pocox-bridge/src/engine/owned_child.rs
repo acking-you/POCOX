@@ -223,6 +223,7 @@ pub(super) mod tests {
     static REFUSED: Mutex<Vec<u32>> = Mutex::new(Vec::new());
 
     /// Make every stop of `child` fail (`refused`) or work again.
+    #[cfg(unix)]
     pub(in crate::engine) fn refuse_stops(child: OwnedChild, refused: bool) {
         let mut held = REFUSED.lock().unwrap_or_else(|p| p.into_inner());
         held.retain(|pid| *pid != child.main.pid);

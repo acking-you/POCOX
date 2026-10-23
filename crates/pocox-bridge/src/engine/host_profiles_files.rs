@@ -2,7 +2,7 @@
 //! names, the cross-process lock and unreferenced-key cleanup (see the
 //! parent module docs).
 
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
@@ -51,15 +51,7 @@ pub(in crate::engine) fn private_dir(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(in crate::engine) fn private_options() -> OpenOptions {
-    let mut options = OpenOptions::new();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt as _;
-        options.mode(0o600);
-    }
-    options
-}
+pub(in crate::engine) use pocox_core::fs::private_options;
 
 /// How far a successful [`write_private`] got.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

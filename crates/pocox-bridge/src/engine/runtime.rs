@@ -1,6 +1,6 @@
 //! Process-global tokio runtime, support-dir, and the in-process
 //! subscription registry. Mobile has no child processes / state.toml, so
-//! subscriptions are spawned tasks tracked here and aborted on unsubscribe.
+//! subscriptions own SDK handles tracked here and cancelled on unsubscribe.
 //!
 //! Account and self-host subscriptions are the same code path: both dial the
 //! relay directly and differ only in the [`RelaySession`] handed in. Account
@@ -13,9 +13,14 @@ use std::sync::Mutex;
 
 use anyhow::{anyhow, Context, Result};
 use once_cell::sync::OnceCell;
+use pocox_core::config::ConnectionPath;
 use pocox_pb::{subscribe, Connection, RelaySession, SubscribeOptions};
 use tokio::runtime::{Builder, Runtime};
+#[cfg(test)]
 use tokio::task::JoinHandle;
+
+mod path_status;
+pub use path_status::{PathStatus, TunnelPath};
 
 use crate::engine::transport::Transport;
 
@@ -71,12 +76,49 @@ pub(super) fn host_transport() -> Option<Transport> {
 /// tunnel ever outlives its registry slot detached.
 struct SubEntry {
     local_addr: String,
-    handle: JoinHandle<()>,
+    owner: SubscriptionOwner,
 }
 
-impl Drop for SubEntry {
+enum SubscriptionOwner {
+    Tunnel {
+        connection: Connection,
+        path: ConnectionPath,
+    },
+    #[cfg(test)]
+    Task(JoinHandle<()>),
+}
+
+#[cfg(test)]
+impl Drop for SubscriptionOwner {
     fn drop(&mut self) {
-        self.handle.abort();
+        if let Self::Task(handle) = self {
+            handle.abort();
+        }
+    }
+}
+
+impl SubEntry {
+    fn status(&self, key: &str) -> SubStatus {
+        let (alive, path) = match &self.owner {
+            SubscriptionOwner::Tunnel {
+                connection,
+                path,
+            } => (
+                !matches!(
+                    connection.status(),
+                    pocox_pb::TunnelStatus::Stopped | pocox_pb::TunnelStatus::Failed(_)
+                ),
+                PathStatus::observe(*path, connection.diagnostics().direct),
+            ),
+            #[cfg(test)]
+            SubscriptionOwner::Task(task) => (!task.is_finished(), PathStatus::default()),
+        };
+        SubStatus {
+            key: key.into(),
+            local_addr: self.local_addr.clone(),
+            alive,
+            path,
+        }
     }
 }
 
@@ -128,13 +170,15 @@ pub struct SubStatus {
     pub key: String,
     /// Local `host:port` the subscriber listener is bound on.
     pub local_addr: String,
-    /// Whether the spawned task is still running.
+    /// Whether the SDK worker is still running.
     pub alive: bool,
+    /// Locally observed data paths for this subscription.
+    pub path: PathStatus,
 }
 
 /// Start (or no-op if already live) an in-process subscription exposing
-/// `key` on `127.0.0.1:<local_port>`. `pb::subscribe` runs forever, so we
-/// spawn it and keep the handle for [`unsubscribe_service`] to abort.
+/// `key` on `127.0.0.1:<local_port>`. The registry retains the SDK handle
+/// until [`unsubscribe_service`] cancels the listener and its data paths.
 ///
 /// `local_port` may be `0` to let the OS assign a free port — needed so each
 /// subscribed service gets its own port and they can coexist (a fixed shared
@@ -183,11 +227,8 @@ pub fn subscribe_service_as(
 
 /// The status of a live registered tunnel.
 fn live_status(key: &str, entry: &SubEntry) -> Option<SubStatus> {
-    (!entry.handle.is_finished()).then(|| SubStatus {
-        key: key.to_string(),
-        local_addr: entry.local_addr.clone(),
-        alive: true,
-    })
+    let status = entry.status(key);
+    status.alive.then_some(status)
 }
 
 /// Reuse the live tunnel of `registry_key`, or `create` one and register
@@ -198,7 +239,7 @@ fn live_status(key: &str, entry: &SubEntry) -> Option<SubStatus> {
 fn subscribe_with(
     registry_key: String,
     owner_current: impl Fn() -> bool,
-    create: impl FnOnce() -> Result<(String, JoinHandle<()>)>,
+    create: impl FnOnce() -> Result<SubEntry>,
 ) -> Result<SubStatus> {
     let stale = || anyhow!("the account or relay changed while subscribing; try again");
     {
@@ -210,11 +251,7 @@ fn subscribe_with(
             return if owner_current() { Ok(live) } else { Err(stale()) };
         }
     }
-    let (local_addr, handle) = create()?;
-    let created = SubEntry {
-        local_addr,
-        handle,
-    };
+    let created = create()?;
     let mut reg = registry().lock().expect("registry poisoned");
     if !owner_current() {
         drop(reg);
@@ -229,11 +266,7 @@ fn subscribe_with(
         drop(created);
         return Ok(winner);
     }
-    let status = SubStatus {
-        key: registry_key.clone(),
-        local_addr: created.local_addr.clone(),
-        alive: true,
-    };
+    let status = created.status(&registry_key);
     // A finished entry it replaces is dropped (and so stopped) here.
     let replaced = reg.insert(registry_key, created);
     drop(reg);
@@ -256,20 +289,18 @@ fn subscribe_with(
 ///   publishing fails HERE, with the relay's reason, instead of looking like a
 ///   dead endpoint.
 ///
-/// The returned task owns the tunnel and parks forever holding it. Aborting the
-/// task (which is how [`unsubscribe_service`] stops one) drops the handle and
-/// with it the tunnel.
-fn spawn_subscribe(
-    session: RelaySession,
-    key: String,
-    local_port: u16,
-) -> Result<(String, JoinHandle<()>)> {
+/// The registry entry owns the SDK handle directly. Removing it cancels the
+/// listener and every data path, including established direct sessions.
+fn spawn_subscribe(session: RelaySession, key: String, local_port: u16) -> Result<SubEntry> {
+    let path = session.path;
     let (local_addr, connection) = open_subscription(session, key, local_port)?;
-    let handle = runtime().spawn(async move {
-        std::future::pending::<()>().await;
-        drop(connection);
-    });
-    Ok((local_addr, handle))
+    Ok(SubEntry {
+        local_addr,
+        owner: SubscriptionOwner::Tunnel {
+            connection,
+            path,
+        },
+    })
 }
 
 fn open_subscription(
@@ -324,14 +355,14 @@ fn subscribe_ready_timeout() -> std::time::Duration {
     SUBSCRIBE_READY_TIMEOUT
 }
 
-/// Abort and forget the subscription for `key`. No-op if absent.
+/// Stop and forget the subscription for `key`. No-op if absent. The SDK
+/// handle is dropped after the registry lock is released.
 pub fn unsubscribe_service(key: &str) {
-    if let Some(e) = registry().lock().expect("registry poisoned").remove(key) {
-        e.handle.abort();
-    }
+    let removed = registry().lock().expect("registry poisoned").remove(key);
+    drop(removed);
 }
 
-/// Abort and forget every subscription whose registry key starts with
+/// Stop and forget every subscription whose registry key starts with
 /// `prefix` (a whole family, such as the meta tunnels of every context).
 /// No-op before [`init`].
 pub fn unsubscribe_prefix(prefix: &str) {
@@ -345,9 +376,7 @@ pub fn unsubscribe_prefix(prefix: &str) {
             .collect();
         keys.iter().filter_map(|key| registry.remove(key)).collect()
     };
-    for entry in removed {
-        entry.handle.abort();
-    }
+    drop(removed);
 }
 
 /// An isolated probe's tunnel. Dropping it cancels the SDK connection even
@@ -385,11 +414,7 @@ pub fn list_subscriptions() -> Vec<SubStatus> {
         .lock()
         .expect("registry poisoned")
         .iter()
-        .map(|(key, e)| SubStatus {
-            key: key.clone(),
-            local_addr: e.local_addr.clone(),
-            alive: !e.handle.is_finished(),
-        })
+        .map(|(key, e)| e.status(key))
         .collect()
 }
 
@@ -401,7 +426,7 @@ pub(crate) fn insert_for_test(key: &str, handle: JoinHandle<()>) {
         .expect("registry poisoned")
         .insert(key.to_string(), SubEntry {
             local_addr: "127.0.0.1:9".into(),
-            handle,
+            owner: SubscriptionOwner::Task(handle),
         });
 }
 
@@ -425,9 +450,7 @@ mod tests {
     }
 
     /// A tunnel worker that owns a real listener and says when it stopped.
-    fn owned_tunnel(
-        stopped: std::sync::Arc<std::sync::atomic::AtomicBool>,
-    ) -> Result<(String, JoinHandle<()>)> {
+    fn owned_tunnel(stopped: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<SubEntry> {
         struct Stopped(std::sync::Arc<std::sync::atomic::AtomicBool>);
         impl Drop for Stopped {
             fn drop(&mut self) {
@@ -441,7 +464,10 @@ mod tests {
             let _owned = (listener, guard);
             std::future::pending::<()>().await;
         });
-        Ok((addr, handle))
+        Ok(SubEntry {
+            local_addr: addr,
+            owner: SubscriptionOwner::Task(handle),
+        })
     }
 
     fn eventually(what: &str, done: impl Fn() -> bool) {
@@ -482,7 +508,7 @@ mod tests {
                             || true,
                             || {
                                 let created = owned_tunnel(stopped)?;
-                                mine = created.0.clone();
+                                mine = created.local_addr.clone();
                                 // Neither registers before both have created.
                                 both_created.wait();
                                 Ok(created)
@@ -526,7 +552,7 @@ mod tests {
             || current.load(Ordering::SeqCst),
             || {
                 let created = owned_tunnel(stopped.clone())?;
-                addr = created.0.clone();
+                addr = created.local_addr.clone();
                 // The context changes while the relay is being dialled.
                 current.store(false, Ordering::SeqCst);
                 Ok(created)

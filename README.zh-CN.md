@@ -55,6 +55,8 @@ POCOX 把你的每一台设备都装进口袋。智能体照原厂的方式继�
 
 每台电脑在智能体旁运行 POCOX App 或 CLI，设备之间经 [pb-mapper](https://github.com/acking-you/pb-mapper) 中转访问彼此的服务，可用共享密钥（自建）或 GitHub 登录（托管账号）。详见[架构](docs/architecture.md)。
 
+设置中可启用优先 P2P 直连，无法建立时自动回退中继，并查看实际连接路径。旧配置默认仍仅使用中继（[连接路径](docs/relay-worker-recovery.md#direct-connections)）。
+
 ## 快速开始
 
 从 [Releases](https://github.com/acking-you/POCOX/releases) 下载 App，或安装 CLI：

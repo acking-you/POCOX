@@ -64,7 +64,7 @@ pub(crate) fn resolve_session(flag: Option<&str>, config: &Config) -> Result<Rel
         .ok_or_else(|| {
             anyhow!("no relay credential for {relay}; run `pocox init` or export {CREDENTIAL_ENV}")
         })?;
-    Ok(RelaySession::new(relay, credential))
+    Ok(RelaySession::new(relay, credential).with_preferences(&config.pb_mapper))
 }
 
 /// Whether the configured `MSG_HEADER_KEY` should be applied: only when the

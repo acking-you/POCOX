@@ -9,6 +9,23 @@ breaking change goes.
 
 ## Unreleased — pocox naming baseline
 
+- Optional P2P direct connections using pb-mapper SDK 0.7.0 from the `pocox`
+  branch. Settings › Connection path separates outgoing path preference from
+  incoming permission and saves each as it is chosen; every subscription shows
+  its actual data path, with live counters and the last relay fallback in its
+  details. The galaxy draws each connection as it travels (a bright, taut beam
+  for P2P direct, a dashed arc through the relay, both when mixed) and the
+  services hub says "Connected · P2P" or "· Relay". Existing tunnels keep
+  their path when preferences change. App and CLI defaults remain relay-only,
+  and defaults are not written to
+  `config.toml`, so older builds still read it. Rust now requires 1.99.1 or
+  later; CI and release toolchains move together.
+- On phones the composer folds into a slim capsule while you read back
+  through a conversation and unfolds when you tap it, focus the field or
+  return to the latest message; the draft, attachments and Stop stay with it.
+  Composer growth, resizing and folding no longer rebuild the whole
+  conversation each frame.
+
 - Image attachments retain an optional copy in the host session's project and
   include its path for the agent's available image tools. Picking, dropping and
   pasting share scoped uploads; failed copies can be retried without losing
@@ -23,7 +40,7 @@ breaking change goes.
   untouched. Install the new app and CLI and configure them again.
 - The CLI is `pocox`; the Linux desktop launcher is `pocox-app` so both can
   coexist. External Codex and pb-mapper fork branches are `pocox`; their pinned
-  commits are unchanged.
+  commits were unchanged by the naming migration.
 
 ## 0.6.0 — 2026-10-20
 

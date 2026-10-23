@@ -9,6 +9,83 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get connectionPathTitle => '连接路径';
+
+  @override
+  String get connectionPathInfo =>
+      'P2P 直连需要中继和主机都支持。直连建立失败时，会在发送任何数据之前改用中继，因此不会重放数据。已建立的直连在中继离线或凭据被撤销后仍会继续，直到任一端的设备将其断开。';
+
+  @override
+  String get connectionPathOutgoing => '连接其他设备';
+
+  @override
+  String get connectionPathRelayOnly => '仅中继';
+
+  @override
+  String get connectionPathAuto => 'P2P 优先';
+
+  @override
+  String get connectionPathOutgoingPending => '新连接将使用此设置；重新连接会话即可切换。';
+
+  @override
+  String get connectionPathIncoming => '接受直连';
+
+  @override
+  String get connectionPathIncomingInfo => '已能访问此电脑服务的设备可以直接连接这些服务，访问权限不变。';
+
+  @override
+  String get connectionPathIncomingPending => '重启托管后生效。';
+
+  @override
+  String get connectionPathReadFailed => '无法读取连接偏好。';
+
+  @override
+  String get connectionPathSaveFailed => '保存失败，已保留原设置。';
+
+  @override
+  String get tunnelPathIdle => '空闲';
+
+  @override
+  String get tunnelPathDirect => 'P2P 直连';
+
+  @override
+  String get tunnelPathRelay => '经中继';
+
+  @override
+  String get tunnelShortRelay => '中继';
+
+  @override
+  String get tunnelShortMixed => 'P2P + 中继';
+
+  @override
+  String tunnelPathMixed(int direct, int relay) {
+    return '直连 $direct · 中继 $relay';
+  }
+
+  @override
+  String tunnelFallbacks(int count) {
+    return '回退中继 $count 次';
+  }
+
+  @override
+  String get tunnelLocalAddress => '本地地址';
+
+  @override
+  String get tunnelActiveDirect => '直连';
+
+  @override
+  String get tunnelActiveRelay => '中继连接';
+
+  @override
+  String get tunnelFallbackCount => '回退中继';
+
+  @override
+  String get tunnelLastFallback => '最近回退原因';
+
+  @override
+  String get tunnelRelayOnlyNote => '以“仅中继”建立。选择“P2P 优先”后重新连接，即可尝试直连。';
+
+  @override
   String get appTitle => 'POCOX';
 
   @override

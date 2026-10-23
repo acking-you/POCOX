@@ -464,17 +464,12 @@ fn quarantine(path: &Path) {
 }
 
 fn create_private(path: &Path, bytes: &[u8], exclusive: bool) -> std::io::Result<()> {
-    let mut options = std::fs::OpenOptions::new();
+    let mut options = pocox_core::fs::private_options();
     options.write(true);
     if exclusive {
         options.create_new(true);
     } else {
         options.create(true).truncate(true);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
     }
     let mut file = options.open(path)?;
     file.write_all(bytes)?;

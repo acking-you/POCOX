@@ -240,6 +240,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RelayPreferencesDto dco_decode_box_autoadd_relay_preferences_dto(dynamic raw);
+
+  @protected
   SessionAccessDto dco_decode_box_autoadd_session_access_dto(dynamic raw);
 
   @protected
@@ -288,6 +291,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConfigView dco_decode_config_view(dynamic raw);
+
+  @protected
+  ConnectionPathDto dco_decode_connection_path_dto(dynamic raw);
 
   @protected
   DeviceCodeDto dco_decode_device_code_dto(dynamic raw);
@@ -669,6 +675,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   QueuedCommandDto dco_decode_queued_command_dto(dynamic raw);
 
   @protected
+  RelayPreferencesDto dco_decode_relay_preferences_dto(dynamic raw);
+
+  @protected
   RetryProgressDto dco_decode_retry_progress_dto(dynamic raw);
 
   @protected
@@ -766,6 +775,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ToolsUpdateDto dco_decode_tools_update_dto(dynamic raw);
+
+  @protected
+  TunnelPathDto dco_decode_tunnel_path_dto(dynamic raw);
 
   @protected
   TurnItemsPageDto dco_decode_turn_items_page_dto(dynamic raw);
@@ -1021,6 +1033,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  RelayPreferencesDto sse_decode_box_autoadd_relay_preferences_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   SessionAccessDto sse_decode_box_autoadd_session_access_dto(
     SseDeserializer deserializer,
   );
@@ -1087,6 +1104,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConfigView sse_decode_config_view(SseDeserializer deserializer);
+
+  @protected
+  ConnectionPathDto sse_decode_connection_path_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   DeviceCodeDto sse_decode_device_code_dto(SseDeserializer deserializer);
@@ -1580,6 +1602,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   QueuedCommandDto sse_decode_queued_command_dto(SseDeserializer deserializer);
 
   @protected
+  RelayPreferencesDto sse_decode_relay_preferences_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RetryProgressDto sse_decode_retry_progress_dto(SseDeserializer deserializer);
 
   @protected
@@ -1697,6 +1724,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ToolsUpdateDto sse_decode_tools_update_dto(SseDeserializer deserializer);
+
+  @protected
+  TunnelPathDto sse_decode_tunnel_path_dto(SseDeserializer deserializer);
 
   @protected
   TurnItemsPageDto sse_decode_turn_items_page_dto(SseDeserializer deserializer);
@@ -2007,6 +2037,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_relay_preferences_dto(
+    RelayPreferencesDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_session_access_dto(
     SessionAccessDto self,
     SseSerializer serializer,
@@ -2089,6 +2125,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_config_view(ConfigView self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_connection_path_dto(
+    ConnectionPathDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_device_code_dto(DeviceCodeDto self, SseSerializer serializer);
@@ -2721,6 +2763,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_relay_preferences_dto(
+    RelayPreferencesDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_retry_progress_dto(
     RetryProgressDto self,
     SseSerializer serializer,
@@ -2887,6 +2935,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     ToolsUpdateDto self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_tunnel_path_dto(TunnelPathDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_turn_items_page_dto(

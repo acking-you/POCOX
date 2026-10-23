@@ -405,18 +405,12 @@ fn read_header(reader: &mut BufReader<File>) -> Result<Header> {
 }
 
 fn private_file(path: &Path, truncate: bool) -> Result<File> {
-    let mut options = OpenOptions::new();
-    options
+    Ok(pocox_core::fs::private_options()
         .create(true)
         .read(true)
         .write(true)
-        .truncate(truncate);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    Ok(options.open(path)?)
+        .truncate(truncate)
+        .open(path)?)
 }
 
 #[cfg(test)]

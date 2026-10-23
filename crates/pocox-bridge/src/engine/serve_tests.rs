@@ -368,12 +368,14 @@ fn the_tailer_of_a_keyed_host_shows_nothing_of_its_raw_output() {
 }
 
 /// The status row of `name`, if any (Codex rows only: no relay recovery).
+#[cfg(unix)]
 fn row(name: &str) -> Option<ServeStatus> {
     codex_status().into_iter().find(|s| s.name == name)
 }
 
 /// While a codex kept for `name` may run, the name is listed with the
 /// reason (so its Stop stays reachable) and is not free for an ACP host.
+#[cfg(unix)]
 fn held_back(name: &str) {
     let row = row(name).expect("still listed");
     assert_eq!(row.agent_error.as_deref(), Some(lifecycle::NOT_EXITED));
@@ -388,6 +390,7 @@ fn held_back(name: &str) {
 
 /// The name is free again once its codex exited: no row, and an ACP host
 /// may take it.
+#[cfg(unix)]
 fn released(name: &str) {
     assert!(row(name).is_none(), "no longer listed");
     assert!(!is_hosting_codex(name));

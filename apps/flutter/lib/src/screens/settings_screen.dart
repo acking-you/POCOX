@@ -11,7 +11,7 @@ import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/hosting/host_picker.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/network/network_settings.dart';
-import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/tools/tools_settings.dart';
 import 'package:pocox/src/theme_transition.dart';
@@ -21,7 +21,6 @@ import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/github_avatar.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/icon_badge.dart';
-import 'package:pocox/src/widgets/status_dots.dart';
 import 'package:pocox/src/widgets/utility_page.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
@@ -139,15 +138,13 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     final api = ref.read(bridgeApiProvider);
     final config = ref.watch(configProvider).valueOrNull;
     final locale = ref.watch(localeProvider);
-    final subs =
-        ref.watch(subscriptionsProvider).valueOrNull ?? const <SubInfo>[];
     final themeMode = ref.watch(uiPrefsProvider).valueOrNull?.themeMode;
     return UtilityPage(
       route: '/settings',
       title: l10n.settingsTitle,
       body: _wide
-          ? _desktopBody(l10n, api, config, locale, subs, themeMode)
-          : _compactBody(l10n, api, config, locale, subs, themeMode),
+          ? _desktopBody(l10n, api, config, locale, themeMode)
+          : _compactBody(l10n, api, config, locale, themeMode),
     );
   }
 
@@ -156,7 +153,6 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     BridgeApi api,
     ConfigInfo? config,
     Locale? locale,
-    List<SubInfo> subs,
     String? themeMode,
   ) => ListView(
     padding: const EdgeInsets.all(16),
@@ -164,6 +160,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
       Card(child: _cacheTile(l10n)),
       const Card(child: UpdateRow()),
       const Card(child: NetworkProxyRow()),
+      const ConnectionPathSettings(),
+      const SizedBox(height: 4),
       Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -246,23 +244,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Text(l10n.activeSubscriptions),
             ),
-            if (subs.isEmpty)
-              ListTile(dense: true, title: Text(l10n.none))
-            else
-              ...subs.map(
-                (s) => ListTile(
-                  dense: true,
-                  leading: Icon(
-                    AppIcons.circle,
-                    size: 12,
-                    color: s.alive
-                        ? successColor(Theme.of(context).colorScheme)
-                        : Theme.of(context).colorScheme.error,
-                  ),
-                  title: Text(subscriptionServiceKey(s.key)),
-                  subtitle: Text(s.localAddr),
-                ),
-              ),
+            const _SubscriptionTiles(),
             const Divider(),
             ListTile(
               key: const Key('export-btn'),
@@ -300,7 +282,6 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     BridgeApi api,
     ConfigInfo? config,
     Locale? locale,
-    List<SubInfo> subs,
     String? themeMode,
   ) {
     final scheme = Theme.of(context).colorScheme;
@@ -406,32 +387,11 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  GroupCard(
-                    title: l10n.settingsServicesSubscriptions,
-                    children: [
-                      if (subs.isEmpty)
-                        _SettingsRow(
-                          icon: AppIcons.link_off_outlined,
-                          title: l10n.none,
-                        )
-                      else
-                        for (final sub in subs)
-                          _SettingsRow(
-                            icon: AppIcons.link_outlined,
-                            title: subscriptionServiceKey(sub.key),
-                            subtitle: sub.localAddr,
-                            status: StatusChip(
-                              color: sub.alive
-                                  ? successColor(scheme)
-                                  : scheme.error,
-                              label: sub.alive
-                                  ? l10n.subscribedAlive
-                                  : l10n.subscribedDead,
-                              filled: true,
-                            ),
-                          ),
-                    ],
-                  ),
+                  // How this device reaches the services below, then what
+                  // each subscription actually goes through.
+                  const ConnectionPathSettings(),
+                  const SizedBox(height: 10),
+                  const _SubscriptionsGroup(),
                   const SizedBox(height: 10),
                   GroupCard(
                     title: l10n.settingsAdvanced,
@@ -793,6 +753,62 @@ class _SettingsRow extends StatelessWidget {
     );
     if (onTap == null || actionLabel != null) return content;
     return InkWell(mouseCursor: clickable, onTap: onTap, child: content);
+  }
+}
+
+/// Desktop: each subscription with its live path; a row opens its details.
+/// Watching the polled list here rebuilds this group, never the whole page.
+class _SubscriptionsGroup extends ConsumerWidget {
+  const _SubscriptionsGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final subs =
+        ref.watch(liveSubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
+    return GroupCard(
+      title: l10n.settingsServicesSubscriptions,
+      children: [
+        if (subs.isEmpty)
+          _SettingsRow(icon: AppIcons.link_off_outlined, title: l10n.none)
+        else
+          for (final sub in subs)
+            _SettingsRow(
+              key: ValueKey('subscription-${sub.key}'),
+              icon: AppIcons.link_outlined,
+              title: subscriptionServiceKey(sub.key),
+              subtitle: tunnelSubtitle(l10n, sub),
+              status: TunnelPathChip(sub),
+              onTap: () => showTunnelDetails(context, sub.key),
+            ),
+      ],
+    );
+  }
+}
+
+/// Compact: the same list as rows of the settings card.
+class _SubscriptionTiles extends ConsumerWidget {
+  const _SubscriptionTiles();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context);
+    final subs =
+        ref.watch(liveSubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
+    if (subs.isEmpty) return ListTile(dense: true, title: Text(l10n.none));
+    return Column(
+      children: [
+        for (final sub in subs)
+          ListTile(
+            key: ValueKey('subscription-${sub.key}'),
+            dense: true,
+            title: Text(subscriptionServiceKey(sub.key)),
+            subtitle: Text(tunnelSubtitle(l10n, sub)),
+            trailing: TunnelPathChip(sub),
+            onTap: () => showTunnelDetails(context, sub.key),
+          ),
+      ],
+    );
   }
 }
 

@@ -7,8 +7,20 @@ extension _SessionComposer on _AppSessionState {
   void _onComposerFocus() {
     _repinForKeyboard();
     // Someone about to type may well dictate instead: have the line ready.
-    if (_inputFocus.hasFocus) _warmDictation();
+    if (_inputFocus.hasFocus) {
+      _foldComposer(false);
+      _warmDictation();
+    }
   }
+
+  /// What the empty field invites: a dictation take, a queued or steering
+  /// message while a turn runs, or a message.
+  String _composerHint(AppLocalizations l10n) =>
+      _dictationTake != DictationTake.idle
+      ? l10n.dictationListening
+      : _streaming
+      ? (_supplement ? l10n.steerMessage : l10n.queueNextTurn)
+      : l10n.messageHint;
 
   void _saveDraft() {
     _draft.value = _input.value;
@@ -328,11 +340,7 @@ extension _SessionComposer on _AppSessionState {
             cursorColor: scheme.onSurface,
             decoration: InputDecoration(
               filled: false,
-              hintText: _dictationTake != DictationTake.idle
-                  ? l10n.dictationListening
-                  : _streaming
-                  ? (_supplement ? l10n.steerMessage : l10n.queueNextTurn)
-                  : l10n.messageHint,
+              hintText: _composerHint(l10n),
               hintStyle: inputStyle.copyWith(color: scheme.onSurfaceVariant),
               border: InputBorder.none,
               enabledBorder: InputBorder.none,
@@ -479,9 +487,16 @@ extension _SessionComposer on _AppSessionState {
           child: child!,
         );
       },
-      child: LayoutBuilder(
-        builder: (context, box) =>
-            composerBody(doc && modeChips.isNotEmpty && box.maxWidth >= 640),
+      // On a phone the same pane folds into a capsule while the reader is
+      // reading (see [_foldForScroll]); the full composer keeps its draft,
+      // focus and options underneath.
+      child: FoldingPanel(
+        isFolded: _composerFolded,
+        folded: _foldedComposer(l10n),
+        child: LayoutBuilder(
+          builder: (context, box) =>
+              composerBody(doc && modeChips.isNotEmpty && box.maxWidth >= 640),
+        ),
       ),
     );
 
@@ -525,11 +540,11 @@ extension _SessionComposer on _AppSessionState {
 
   /// Interrupt the running turn. An ink square, the shape every player and
   /// recorder uses for stop, so it can't be mistaken for send beside it.
-  Widget _stopButton(AppLocalizations l10n) {
+  Widget _stopButton(AppLocalizations l10n, {Key key = const Key('stop-btn')}) {
     final scheme = Theme.of(context).colorScheme;
     final touch = !isDesktop;
     return IconButton.filled(
-      key: const Key('stop-btn'),
+      key: key,
       onPressed: _interrupt,
       tooltip: l10n.stop,
       style: IconButton.styleFrom(

@@ -363,7 +363,8 @@ void _registerDiscovery() {
     await t.pumpAndSettle();
     await openDevice(t);
 
-    expect(find.text('已订阅'), findsOneWidget); // subscribedAlive (zh)
+    // subscribedAlive (zh), and how it travels: a relay-only tunnel.
+    expect(find.text('已订阅 · 中继'), findsOneWidget);
     expect(find.text('在线'), findsWidgets); // relay + unsubscribed api + app
     expect(find.byType(StatusDot), findsWidgets); // availability dots render
     expect(find.byType(PulsingDot), findsNothing); // nothing running

@@ -83,6 +83,47 @@ class RustBridgeApi
   Future<String?> networkProxy() => frb.networkProxy();
 
   @override
+  Future<RelayPreferences> relayPreferences() async {
+    final value = await frb.relayPreferences();
+    return RelayPreferences(
+      path: switch (value.path) {
+        frb.ConnectionPathDto.relayOnly => ConnectionPath.relayOnly,
+        frb.ConnectionPathDto.auto => ConnectionPath.auto,
+      },
+      allowDirect: value.allowDirect,
+    );
+  }
+
+  @override
+  Future<void> relaySetPreferences(RelayPreferences value) =>
+      frb.relaySetPreferences(
+        preferences: frb.RelayPreferencesDto(
+          path: switch (value.path) {
+            ConnectionPath.relayOnly => frb.ConnectionPathDto.relayOnly,
+            ConnectionPath.auto => frb.ConnectionPathDto.auto,
+          },
+          allowDirect: value.allowDirect,
+        ),
+      );
+
+  static SubInfo _subscription(frb.SubStatusDto s) => SubInfo(
+    key: s.key,
+    localAddr: s.localAddr,
+    alive: s.alive,
+    path: switch (s.path) {
+      frb.TunnelPathDto.relayOnly => TunnelPath.relayOnly,
+      frb.TunnelPathDto.idle => TunnelPath.idle,
+      frb.TunnelPathDto.direct => TunnelPath.direct,
+      frb.TunnelPathDto.relay => TunnelPath.relay,
+      frb.TunnelPathDto.mixed => TunnelPath.mixed,
+    },
+    activeDirect: s.activeDirect,
+    activeRelay: s.activeRelay,
+    fallbacks: s.fallbacks,
+    lastFallback: s.lastFallback,
+  );
+
+  @override
   Future<void> networkSetProxy(String value) =>
       frb.networkSetProxy(value: value);
 
@@ -203,7 +244,7 @@ class RustBridgeApi
       serviceKey: serviceKey,
       localPort: localPort,
     );
-    return SubInfo(key: s.key, localAddr: s.localAddr, alive: s.alive);
+    return _subscription(s);
   }
 
   @override
@@ -213,9 +254,7 @@ class RustBridgeApi
   @override
   Future<List<SubInfo>> subscriptions() async {
     final list = await frb.subscriptions();
-    return list
-        .map((s) => SubInfo(key: s.key, localAddr: s.localAddr, alive: s.alive))
-        .toList();
+    return list.map(_subscription).toList();
   }
 
   @override
