@@ -41,6 +41,11 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 
 Run `pocox <command> --help` for every flag.
 
+New workers honor `[pb_mapper] path = "auto"` and `allow_direct = true` in
+`config.toml`; missing fields keep relay-only subscriptions and no incoming
+direct access. See [direct connections](relay-worker-recovery.md#direct-connections)
+for relay prerequisites, lifetime and restart behavior.
+
 ## Hosted account
 
 Sign in once on every device with the same GitHub account; no relay address or

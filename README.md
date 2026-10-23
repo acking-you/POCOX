@@ -72,6 +72,9 @@ Planned: agents that work with your other devices' shells and files directly.
 Each computer runs the POCOX app or CLI beside its agents, and devices reach
 each other's services through a [pb-mapper](https://github.com/acking-you/pb-mapper)
 relay, with a shared key (self-host) or a GitHub sign-in (hosted account).
+Settings can opt into P2P direct connections with relay fallback and show the
+actual path; existing installations remain relay-only by default
+([connection paths](docs/relay-worker-recovery.md#direct-connections)).
 See [architecture](docs/architecture.md).
 
 ## Get started

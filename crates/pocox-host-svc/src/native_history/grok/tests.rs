@@ -341,6 +341,7 @@ fn an_oversized_lines_event_id_releases_the_overlay() {
     }
 }
 
+#[cfg(unix)]
 pub(super) fn registry(home: &Path, pid: u32, opened_at: &str) {
     fs::write(
         home.join("active_sessions.json"),

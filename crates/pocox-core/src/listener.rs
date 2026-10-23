@@ -218,7 +218,7 @@ fn proc_address(hex: &str) -> Option<IpAddr> {
         8 => Some(IpAddr::from(word(0)?)),
         32 => {
             let mut bytes = [0u8; 16];
-            for (i, chunk) in bytes.chunks_exact_mut(4).enumerate() {
+            for (i, chunk) in bytes.as_chunks_mut::<4>().0.iter_mut().enumerate() {
                 chunk.copy_from_slice(&word(i)?);
             }
             Some(IpAddr::from(bytes))

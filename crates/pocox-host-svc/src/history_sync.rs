@@ -23,6 +23,10 @@ use crate::app_server::CodexReader;
 /// stable document ids, source generations and opaque cursors. They must never
 /// resume a session, take ownership, answer an approval or start model work.
 #[async_trait]
+#[allow(
+    clippy::double_must_use,
+    reason = "async_trait adds must_use to its generated boxed Future"
+)]
 pub trait SessionHistorySource: Send + Sync {
     /// Schema identifier advertised during capability negotiation.
     fn provider(&self) -> &'static str;

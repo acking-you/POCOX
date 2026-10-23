@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1149024226;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1066042074;
 
 
 // Section: executor
@@ -7336,6 +7336,82 @@ fn wire__crate__api__bridge__composer__queued_command_dto_default_impl(
         },
     )
 }
+fn wire__crate__api__bridge__network__relay_preferences_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "relay_preferences",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::bridge::network::relay_preferences().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__bridge__network__relay_set_preferences_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "relay_set_preferences",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_path = <String>::sse_decode(&mut deserializer);
+            let api_allow_direct = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::bridge::network::relay_set_preferences(
+                            api_path,
+                            api_allow_direct,
+                        )
+                        .await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__bridge__diff__review_index_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -10976,6 +11052,18 @@ impl SseDecode for crate::api::bridge::composer::QueuedCommandDto {
     }
 }
 
+impl SseDecode for crate::api::bridge::network::RelayPreferencesDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_allowDirect = <bool>::sse_decode(deserializer);
+        return crate::api::bridge::network::RelayPreferencesDto {
+            path: var_path,
+            allow_direct: var_allowDirect,
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::events::RetryProgressDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11234,10 +11322,20 @@ impl SseDecode for crate::api::bridge::services::SubStatusDto {
         let mut var_key = <String>::sse_decode(deserializer);
         let mut var_localAddr = <String>::sse_decode(deserializer);
         let mut var_alive = <bool>::sse_decode(deserializer);
+        let mut var_path = <String>::sse_decode(deserializer);
+        let mut var_activeDirect = <u64>::sse_decode(deserializer);
+        let mut var_activeRelay = <u64>::sse_decode(deserializer);
+        let mut var_fallbacks = <u64>::sse_decode(deserializer);
+        let mut var_lastFallback = <Option<String>>::sse_decode(deserializer);
         return crate::api::bridge::services::SubStatusDto {
             key: var_key,
             local_addr: var_localAddr,
             alive: var_alive,
+            path: var_path,
+            active_direct: var_activeDirect,
+            active_relay: var_activeRelay,
+            fallbacks: var_fallbacks,
+            last_fallback: var_lastFallback,
         };
     }
 }
@@ -12680,131 +12778,143 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        184 => wire__crate__api__bridge__diff__review_index_impl(port, ptr, rust_vec_len, data_len),
-        185 => wire__crate__api__bridge__device_metadata__service_device_metadata_impl(
+        184 => wire__crate__api__bridge__network__relay_preferences_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        186 => wire__crate__api__bridge__set_key_impl(port, ptr, rust_vec_len, data_len),
-        187 => wire__crate__api__bridge__set_locale_impl(port, ptr, rust_vec_len, data_len),
-        188 => wire__crate__api__bridge__set_relay_impl(port, ptr, rust_vec_len, data_len),
-        189 => wire__crate__api__bridge__services__subscriptions_impl(
+        185 => wire__crate__api__bridge__network__relay_set_preferences_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        190 => wire__crate__api__bridge__agent_tools__tools_answer_impl(
+        186 => wire__crate__api__bridge__diff__review_index_impl(port, ptr, rust_vec_len, data_len),
+        187 => wire__crate__api__bridge__device_metadata__service_device_metadata_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        191 => wire__crate__api__bridge__agent_tools__tools_connect_impl(
+        188 => wire__crate__api__bridge__set_key_impl(port, ptr, rust_vec_len, data_len),
+        189 => wire__crate__api__bridge__set_locale_impl(port, ptr, rust_vec_len, data_len),
+        190 => wire__crate__api__bridge__set_relay_impl(port, ptr, rust_vec_len, data_len),
+        191 => wire__crate__api__bridge__services__subscriptions_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        192 => wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
+        192 => wire__crate__api__bridge__agent_tools__tools_answer_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        193 => wire__crate__api__bridge__agent_tools__tools_grant_impl(
+        193 => wire__crate__api__bridge__agent_tools__tools_connect_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        194 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
+        194 => wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        195 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
+        195 => wire__crate__api__bridge__agent_tools__tools_grant_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        196 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
+        196 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        197 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
+        197 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        198 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
+        198 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        199 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
+        199 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        200 => wire__crate__api__bridge__agent_tools__tools_share_impl(
+        200 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        201 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
+        201 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        203 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+        202 => wire__crate__api__bridge__agent_tools__tools_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        205 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
+        203 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        207 => wire__crate__api__bridge__updates__update_announce_impl(
+        205 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        209 => {
+        207 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        209 => wire__crate__api__bridge__updates__update_announce_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        211 => {
             wire__crate__api__bridge__updates__update_check_impl(port, ptr, rust_vec_len, data_len)
         },
-        210 => wire__crate__api__bridge__updates__update_download_impl(
+        212 => wire__crate__api__bridge__updates__update_download_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        211 => wire__crate__api__bridge__updates__update_install_impl(
+        213 => wire__crate__api__bridge__updates__update_install_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        212 => {
+        214 => {
             wire__crate__api__bridge__updates__update_report_impl(port, ptr, rust_vec_len, data_len)
         },
-        215 => {
+        217 => {
             wire__crate__api__bridge__updates__update_watch_impl(port, ptr, rust_vec_len, data_len)
         },
         _ => unreachable!(),
@@ -12886,24 +12996,24 @@ fn pde_ffi_dispatcher_sync_impl(
         ),
         140 => wire__crate__api__bridge__events__log_clear_impl(ptr, rust_vec_len, data_len),
         142 => wire__crate__api__bridge__events__log_record_impl(ptr, rust_vec_len, data_len),
-        202 => {
+        204 => {
             wire__crate__api__bridge__agent_tools__tools_status_impl(ptr, rust_vec_len, data_len)
         },
-        204 => {
+        206 => {
             wire__crate__api__bridge__agent_tools__tools_tokens_impl(ptr, rust_vec_len, data_len)
         },
-        206 => wire__crate__api__bridge__composer__turn_error_is_refusal_impl(
+        208 => wire__crate__api__bridge__composer__turn_error_is_refusal_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        208 => wire__crate__api__bridge__updates__update_cancel_impl(ptr, rust_vec_len, data_len),
-        213 => wire__crate__api__bridge__updates__update_start_background_impl(
+        210 => wire__crate__api__bridge__updates__update_cancel_impl(ptr, rust_vec_len, data_len),
+        215 => wire__crate__api__bridge__updates__update_start_background_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        214 => wire__crate__api__bridge__updates__update_state_impl(ptr, rust_vec_len, data_len),
+        216 => wire__crate__api__bridge__updates__update_state_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -14713,6 +14823,24 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::composer::QueuedComma
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::RelayPreferencesDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [self.path.into_into_dart().into_dart(), self.allow_direct.into_into_dart().into_dart()]
+            .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::network::RelayPreferencesDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::RelayPreferencesDto>
+    for crate::api::bridge::network::RelayPreferencesDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::network::RelayPreferencesDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::events::RetryProgressDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [self.attempt.into_into_dart().into_dart(), self.max_attempts.into_into_dart().into_dart()]
@@ -15038,6 +15166,11 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::SubStatusDt
             self.key.into_into_dart().into_dart(),
             self.local_addr.into_into_dart().into_dart(),
             self.alive.into_into_dart().into_dart(),
+            self.path.into_into_dart().into_dart(),
+            self.active_direct.into_into_dart().into_dart(),
+            self.active_relay.into_into_dart().into_dart(),
+            self.fallbacks.into_into_dart().into_dart(),
+            self.last_fallback.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -17376,6 +17509,14 @@ impl SseEncode for crate::api::bridge::composer::QueuedCommandDto {
     }
 }
 
+impl SseEncode for crate::api::bridge::network::RelayPreferencesDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.path, serializer);
+        <bool>::sse_encode(self.allow_direct, serializer);
+    }
+}
+
 impl SseEncode for crate::api::bridge::events::RetryProgressDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -17543,6 +17684,11 @@ impl SseEncode for crate::api::bridge::services::SubStatusDto {
         <String>::sse_encode(self.key, serializer);
         <String>::sse_encode(self.local_addr, serializer);
         <bool>::sse_encode(self.alive, serializer);
+        <String>::sse_encode(self.path, serializer);
+        <u64>::sse_encode(self.active_direct, serializer);
+        <u64>::sse_encode(self.active_relay, serializer);
+        <u64>::sse_encode(self.fallbacks, serializer);
+        <Option<String>>::sse_encode(self.last_fallback, serializer);
     }
 }
 

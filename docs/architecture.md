@@ -21,7 +21,9 @@ moving parts; each subsystem's rules live in its own doc (see the
 - **Relay** — pb-mapper. Hosts register each service under a key; other
   devices subscribe to it and get a local TCP endpoint. The app reaches its
   own in-app hosts over loopback, never through the relay; a CLI `connect`
-  subscribes through the relay even on the same computer.
+  creates a network subscription even on the same computer. Remote subscriptions
+  default to the relay and can opt into authenticated P2P direct connections;
+  see [connection paths](relay-worker-recovery.md#direct-connections).
 - **Controllers** — the Flutter apps (iOS, Android, macOS, Windows, Linux),
   which reach Rust through `flutter_rust_bridge`, and the CLI (for example
   `pocox connect` followed by `codex --remote`).

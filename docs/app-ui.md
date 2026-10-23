@@ -51,6 +51,13 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 
 ## Home, connection and relay problems
 
+- Settings offers outgoing **Relay only / Prefer P2P direct** and, on desktop,
+  permission for incoming direct connections. Keep the default relay-only/off
+  behavior and the explanation of when saved changes apply. Subscription paths
+  come from local SDK observations, never from the preference. Poll only while
+  the page is visible; distinguish idle, unavailable and mixed paths. See
+  [direct connections](relay-worker-recovery.md#direct-connections).
+
 - `/` is chat-first: it resolves a host (last used → locally hosted → first
   reachable), auto-connects and opens the latest session with all sessions in
   the sidebar; the services hub is `/manage` (`lib/src/router.dart`). The home

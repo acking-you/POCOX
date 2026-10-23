@@ -132,6 +132,7 @@ fn a_quit_that_still_sees_an_attempt_opening_fails() {
 /// A minimal app-server on a socket this test process holds.
 struct FakeServer {
     url: String,
+    #[cfg(unix)]
     methods: Arc<Mutex<Vec<String>>>,
     /// Ends the server wherever it waits (accept, handshake or read).
     cancel: Option<tokio::sync::oneshot::Sender<()>>,
@@ -140,9 +141,10 @@ struct FakeServer {
     /// dropped its own (when its one connection closed), until [`finish`].
     ///
     /// [`finish`]: FakeServer::finish
-    bound: Option<std::net::TcpListener>,
+    _bound: Option<std::net::TcpListener>,
 }
 
+#[cfg(unix)]
 impl FakeServer {
     /// After the test's assertions: wait for the server thread (a panic in
     /// it fails the test), then unbind; returns every method it was sent.
@@ -151,7 +153,7 @@ impl FakeServer {
             server.join().expect("server");
         }
         let methods = self.methods.lock().expect("lock").clone();
-        self.bound.take();
+        self._bound.take();
         methods
     }
 }
@@ -228,10 +230,11 @@ fn fake_server(config: Value) -> FakeServer {
     });
     FakeServer {
         url,
+        #[cfg(unix)]
         methods,
         cancel: Some(cancel),
         server: Some(server),
-        bound: Some(bound),
+        _bound: Some(bound),
     }
 }
 
@@ -393,6 +396,7 @@ fn a_failed_close_is_retried_by_closing_again_and_counts_against_the_limit() {
 }
 
 /// A report for a server this test process holds the socket of.
+#[cfg(unix)]
 fn report_of(url: &str) -> SpawnReport {
     let me = pocox_codex::ProcessIdentity::of(std::process::id()).expect("runs");
     SpawnReport {
@@ -410,6 +414,7 @@ fn report_of(url: &str) -> SpawnReport {
     }
 }
 
+#[cfg(unix)]
 fn official_expected() -> ExpectedRoute {
     codex_launch(&CodexProviderMode::Official, "sign-in", "")
         .expect("official")

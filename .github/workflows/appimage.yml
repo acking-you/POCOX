@@ -82,7 +82,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         if: github.event_name == 'pull_request'
         with:
-          toolchain: nightly-2026-06-01
+          toolchain: nightly-2026-08-21
       - uses: Swatinem/rust-cache@v2
         if: github.event_name == 'pull_request'
         with:

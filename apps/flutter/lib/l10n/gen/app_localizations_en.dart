@@ -9,6 +9,60 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get relayPathTitle => 'Device connection path';
+
+  @override
+  String get relayPathRelayOnly => 'Relay only';
+
+  @override
+  String get relayPathAuto => 'Prefer P2P direct';
+
+  @override
+  String get relayAllowDirect => 'Allow direct connections to this computer';
+
+  @override
+  String get relayAllowDirectHint =>
+      'For devices with access to your published services. Existing access rules still apply.';
+
+  @override
+  String get relayPathExplanation =>
+      'Direct connections require support from the relay and the host. If direct setup fails, the connection uses the relay before sending application data. A failed established connection is never replayed.';
+
+  @override
+  String get relayPathApplyHint =>
+      'Applies to new tunnels. Reconnect a session to change its path preference; restart hosting to change incoming direct access. Existing connections stay open. Established direct connections continue if the relay goes offline or its credential is revoked; stop the local tunnel to close them.';
+
+  @override
+  String get relayPathReadFailed =>
+      'Could not read connection preferences. Tap to retry.';
+
+  @override
+  String get relayPathSaveFailed =>
+      'Could not save connection preferences. Try again.';
+
+  @override
+  String get relayPathDirect => 'P2P direct';
+
+  @override
+  String get relayPathRelayed => 'Via relay';
+
+  @override
+  String get relayPathIdle => 'Waiting for a data connection';
+
+  @override
+  String get relayPathUnknown => 'Path unavailable';
+
+  @override
+  String relayPathMixed(int direct, int relay) {
+    return 'Direct: $direct · Relay: $relay';
+  }
+
+  @override
+  String relayPathFallbacks(int count) {
+    return 'Relay fallbacks: $count';
+  }
+
+  @override
   String get appTitle => 'POCOX';
 
   @override

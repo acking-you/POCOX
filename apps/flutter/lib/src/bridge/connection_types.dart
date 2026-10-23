@@ -1,5 +1,12 @@
 part of '../bridge_api.dart';
 
+/// Saved network preferences; existing tunnels keep their captured settings.
+class RelayPreferences {
+  const RelayPreferences({this.path = 'relay_only', this.allowDirect = false});
+  final String path;
+  final bool allowDirect;
+}
+
 /// A discovered service on the relay.
 class ServiceEntry {
   /// Creates a service entry.
@@ -31,6 +38,11 @@ class SubInfo {
     required this.key,
     required this.localAddr,
     required this.alive,
+    this.path = 'unknown',
+    this.activeDirect = 0,
+    this.activeRelay = 0,
+    this.fallbacks = 0,
+    this.lastFallback,
   });
 
   /// Service key being subscribed to.
@@ -41,6 +53,11 @@ class SubInfo {
 
   /// Whether the subscription task is still running.
   final bool alive;
+  final String path;
+  final int activeDirect;
+  final int activeRelay;
+  final int fallbacks;
+  final String? lastFallback;
 }
 
 /// View of persisted config (relay/key presence, locale, account state).

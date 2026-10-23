@@ -811,7 +811,7 @@ fn stars(scene: &Scene, frame: &Frame, out: &mut Out) {
             out.push(twinkle);
             let units = &scene.stars[range.clone()];
             out.push((units.len() / 2) as f64);
-            for unit in units.chunks_exact(2) {
+            for unit in units.as_chunks::<2>().0 {
                 out.push((unit[0] * w + shift_x).rem_euclid(w));
                 out.push((unit[1] * h + shift_y).rem_euclid(h));
             }

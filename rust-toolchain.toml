@@ -10,7 +10,7 @@
 
 [toolchain]
 # Keep this verified pin in sync with CI and release builds.
-channel = "nightly-2026-06-01"
+channel = "nightly-2026-08-21"
 
 # Targets we want available out of the box. `wasm32-unknown-unknown` is
 # kept here in anticipation of the Flutter / Dart FFI layer eventually

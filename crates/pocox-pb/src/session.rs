@@ -41,6 +41,7 @@ use pb_mapper::{
     Client, ClientConfig, ConnectRequest, Connection, RegisterRequest, Registration,
     ServiceConnection, Transport,
 };
+use pocox_core::config::{ConnectionPath, PbMapperConfig};
 
 /// Relay address plus the credential to present to it.
 ///
@@ -60,6 +61,10 @@ pub struct RelaySession {
     pub credential: String,
     /// Whether to enable TCP keep-alive on relay connections.
     pub keep_alive: bool,
+    /// Path preference for new subscriptions.
+    pub path: ConnectionPath,
+    /// Whether new registrations accept authenticated direct setup.
+    pub allow_direct: bool,
 }
 
 impl std::fmt::Debug for RelaySession {
@@ -75,6 +80,8 @@ impl std::fmt::Debug for RelaySession {
                 "<admin>"
             })
             .field("keep_alive", &self.keep_alive)
+            .field("path", &self.path)
+            .field("allow_direct", &self.allow_direct)
             .finish()
     }
 }
@@ -91,7 +98,18 @@ impl RelaySession {
             relay_addr: relay_addr.into(),
             credential: credential.into(),
             keep_alive: true,
+            path: ConnectionPath::RelayOnly,
+            allow_direct: false,
         }
+    }
+
+    /// Apply this installation's preferences without changing credentials or
+    /// namespace.
+    #[must_use]
+    pub fn with_preferences(mut self, config: &PbMapperConfig) -> Self {
+        self.path = config.path;
+        self.allow_direct = config.allow_direct;
+        self
     }
 
     /// A session against `relay_addr` with a syntactically valid throwaway
@@ -190,10 +208,12 @@ pub async fn register_background(
         codec: opts.codec,
         force_namespace: false,
     };
-    let registration = match service_idle_timeout(&opts.key) {
-        Some(timeout) => client.register_with_idle_timeout(request, timeout).await,
-        None => client.register(request).await,
-    };
+    let registration = client
+        .register_with_options(request, pb_mapper::RegisterOptions {
+            allow_direct: session.allow_direct,
+            idle_timeout: service_idle_timeout(&opts.key),
+        })
+        .await;
     registration.with_context(|| format!("registering `{}` on {}", opts.key, session.relay_addr))
 }
 
@@ -245,11 +265,19 @@ pub async fn subscribe_background(
 ) -> Result<Connection> {
     session
         .client()?
-        .connect(ConnectRequest {
-            key: opts.key.clone(),
-            local_addr: opts.local_addr.clone(),
-            transport: Transport::Tcp,
-        })
+        .connect_with_options(
+            ConnectRequest {
+                key: opts.key.clone(),
+                local_addr: opts.local_addr.clone(),
+                transport: Transport::Tcp,
+            },
+            pb_mapper::ConnectOptions {
+                path: match session.path {
+                    ConnectionPath::RelayOnly => pb_mapper::PathPolicy::RelayOnly,
+                    ConnectionPath::Auto => pb_mapper::PathPolicy::Auto,
+                },
+            },
+        )
         .await
         .with_context(|| format!("subscribing to `{}` on {}", opts.key, session.relay_addr))
 }

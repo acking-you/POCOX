@@ -236,7 +236,8 @@ async fn resolve_once(support: &Path) -> Result<Result<Owned, Stale>> {
     if config.account_mode() == Mode::Account {
         let credential = account::relay_credential(support).await?;
         let expires_at = credential.expires_at;
-        let transport = account_transport(credential);
+        let mut transport = account_transport(credential);
+        transport.session = transport.session.with_preferences(&config.pb_mapper);
         // A registration outlives the call that made it, and the relay cancels a
         // lapsed credential's tunnels — so the refresher has to be running for
         // hosting to survive its TTL. Idempotent, hence unconditional here —
@@ -263,7 +264,7 @@ async fn resolve_once(support: &Path) -> Result<Result<Owned, Stale>> {
     }
     self_host(
         Transport {
-            session: RelaySession::new(relay, key),
+            session: RelaySession::new(relay, key).with_preferences(&config.pb_mapper),
             namespace: None,
         },
         revision,

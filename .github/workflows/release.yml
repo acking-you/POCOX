@@ -38,7 +38,7 @@ env:
   # Keep in sync with apps/flutter/.fvmrc, pubspec `environment.flutter`, and ci.yml.
   FLUTTER_VERSION: "3.44.0"
   # Match rust-toolchain.toml so cargo/cross build with the pinned toolchain.
-  RUST_TOOLCHAIN: nightly-2026-06-01
+  RUST_TOOLCHAIN: nightly-2026-08-21
   RELEASE_NAME: POCOX ${{ github.ref_name }}
   IS_DRAFT: ${{ github.event_name == 'workflow_dispatch' }}
   # The backend server the CLI + app default to, baked at build time from the

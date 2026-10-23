@@ -11,6 +11,7 @@ import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/hosting/host_picker.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/network/network_settings.dart';
+import 'package:pocox/src/network/relay_settings.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/tools/tools_settings.dart';
@@ -140,7 +141,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
     final config = ref.watch(configProvider).valueOrNull;
     final locale = ref.watch(localeProvider);
     final subs =
-        ref.watch(subscriptionsProvider).valueOrNull ?? const <SubInfo>[];
+        ref.watch(relaySubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
     final themeMode = ref.watch(uiPrefsProvider).valueOrNull?.themeMode;
     return UtilityPage(
       route: '/settings',
@@ -164,6 +165,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
       Card(child: _cacheTile(l10n)),
       const Card(child: UpdateRow()),
       const Card(child: NetworkProxyRow()),
+      const Card(child: RelaySettingsRow()),
       Card(
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -260,7 +262,10 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                         : Theme.of(context).colorScheme.error,
                   ),
                   title: Text(subscriptionServiceKey(s.key)),
-                  subtitle: Text(s.localAddr),
+                  subtitle: Tooltip(
+                    message: s.lastFallback ?? '',
+                    child: Text('${s.localAddr}\n${relayPathLabel(l10n, s)}'),
+                  ),
                 ),
               ),
             const Divider(),
@@ -334,6 +339,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   const UpdateSettings(),
                   const SizedBox(height: 10),
                   const Card(child: NetworkProxyRow()),
+                  const Card(child: RelaySettingsRow()),
                   const SizedBox(height: 10),
                   GroupCard(
                     title: l10n.settingsHosting,
@@ -419,7 +425,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                           _SettingsRow(
                             icon: AppIcons.link_outlined,
                             title: subscriptionServiceKey(sub.key),
-                            subtitle: sub.localAddr,
+                            subtitle:
+                                '${sub.localAddr} · ${relayPathLabel(l10n, sub)}',
                             status: StatusChip(
                               color: sub.alive
                                   ? successColor(scheme)

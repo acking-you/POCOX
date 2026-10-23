@@ -9,6 +9,12 @@ breaking change goes.
 
 ## Unreleased — pocox naming baseline
 
+- Optional P2P direct connections using pb-mapper SDK 0.7.0 from the `pocox`
+  branch. Settings separates outgoing path preference from incoming permission,
+  displays actual data paths and relay fallbacks, and preserves existing tunnels
+  when preferences change. App and CLI defaults remain relay-only. Rust now
+  requires 1.99.1 or later; CI and release toolchains move together.
+
 - Image attachments retain an optional copy in the host session's project and
   include its path for the agent's available image tools. Picking, dropping and
   pasting share scoped uploads; failed copies can be retried without losing
@@ -23,7 +29,7 @@ breaking change goes.
   untouched. Install the new app and CLI and configure them again.
 - The CLI is `pocox`; the Linux desktop launcher is `pocox-app` so both can
   coexist. External Codex and pb-mapper fork branches are `pocox`; their pinned
-  commits are unchanged.
+  commits were unchanged by the naming migration.
 
 ## 0.6.0 — 2026-10-20
 

@@ -98,6 +98,96 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @relayPathTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device connection path'**
+  String get relayPathTitle;
+
+  /// No description provided for @relayPathRelayOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay only'**
+  String get relayPathRelayOnly;
+
+  /// No description provided for @relayPathAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefer P2P direct'**
+  String get relayPathAuto;
+
+  /// No description provided for @relayAllowDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow direct connections to this computer'**
+  String get relayAllowDirect;
+
+  /// No description provided for @relayAllowDirectHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For devices with access to your published services. Existing access rules still apply.'**
+  String get relayAllowDirectHint;
+
+  /// No description provided for @relayPathExplanation.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct connections require support from the relay and the host. If direct setup fails, the connection uses the relay before sending application data. A failed established connection is never replayed.'**
+  String get relayPathExplanation;
+
+  /// No description provided for @relayPathApplyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applies to new tunnels. Reconnect a session to change its path preference; restart hosting to change incoming direct access. Existing connections stay open. Established direct connections continue if the relay goes offline or its credential is revoked; stop the local tunnel to close them.'**
+  String get relayPathApplyHint;
+
+  /// No description provided for @relayPathReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read connection preferences. Tap to retry.'**
+  String get relayPathReadFailed;
+
+  /// No description provided for @relayPathSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save connection preferences. Try again.'**
+  String get relayPathSaveFailed;
+
+  /// No description provided for @relayPathDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'P2P direct'**
+  String get relayPathDirect;
+
+  /// No description provided for @relayPathRelayed.
+  ///
+  /// In en, this message translates to:
+  /// **'Via relay'**
+  String get relayPathRelayed;
+
+  /// No description provided for @relayPathIdle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a data connection'**
+  String get relayPathIdle;
+
+  /// No description provided for @relayPathUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Path unavailable'**
+  String get relayPathUnknown;
+
+  /// No description provided for @relayPathMixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct: {direct} · Relay: {relay}'**
+  String relayPathMixed(int direct, int relay);
+
+  /// No description provided for @relayPathFallbacks.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay fallbacks: {count}'**
+  String relayPathFallbacks(int count);
+
   /// No description provided for @appTitle.
   ///
   /// In en, this message translates to:

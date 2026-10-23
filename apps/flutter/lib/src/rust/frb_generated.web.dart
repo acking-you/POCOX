@@ -669,6 +669,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   QueuedCommandDto dco_decode_queued_command_dto(dynamic raw);
 
   @protected
+  RelayPreferencesDto dco_decode_relay_preferences_dto(dynamic raw);
+
+  @protected
   RetryProgressDto dco_decode_retry_progress_dto(dynamic raw);
 
   @protected
@@ -1578,6 +1581,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   QueuedCommandDto sse_decode_queued_command_dto(SseDeserializer deserializer);
+
+  @protected
+  RelayPreferencesDto sse_decode_relay_preferences_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   RetryProgressDto sse_decode_retry_progress_dto(SseDeserializer deserializer);
@@ -2717,6 +2725,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_queued_command_dto(
     QueuedCommandDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_relay_preferences_dto(
+    RelayPreferencesDto self,
     SseSerializer serializer,
   );
 

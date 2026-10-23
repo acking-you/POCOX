@@ -6,6 +6,21 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `save_relay_preferences`
+
+/// Read this installation's relay preferences, shared by both account modes.
+Future<RelayPreferencesDto> relayPreferences() =>
+    RustLib.instance.api.crateApiBridgeNetworkRelayPreferences();
+
+/// Save preferences for new tunnels. Existing connections and hosts keep theirs.
+Future<void> relaySetPreferences({
+  required String path,
+  required bool allowDirect,
+}) => RustLib.instance.api.crateApiBridgeNetworkRelaySetPreferences(
+  path: path,
+  allowDirect: allowDirect,
+);
+
 /// Saved proxy URL for the explicit editor; may contain credentials.
 Future<String?> networkProxy() =>
     RustLib.instance.api.crateApiBridgeNetworkNetworkProxy();
@@ -17,3 +32,25 @@ Future<void> networkSetProxy({required String value}) =>
 /// Bounded avatar/favicon download using POCOX's network configuration.
 Future<Uint8List> networkImage({required String url}) =>
     RustLib.instance.api.crateApiBridgeNetworkNetworkImage(url: url);
+
+/// Preferences captured when a new network tunnel is created.
+class RelayPreferencesDto {
+  /// `relay_only` or `auto` (direct first, with pre-commit relay fallback).
+  final String path;
+
+  /// Allow direct setup for new local service registrations.
+  final bool allowDirect;
+
+  const RelayPreferencesDto({required this.path, required this.allowDirect});
+
+  @override
+  int get hashCode => path.hashCode ^ allowDirect.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is RelayPreferencesDto &&
+          runtimeType == other.runtimeType &&
+          path == other.path &&
+          allowDirect == other.allowDirect;
+}

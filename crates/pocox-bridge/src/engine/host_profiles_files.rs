@@ -52,12 +52,14 @@ pub(in crate::engine) fn private_dir(dir: &Path) -> Result<()> {
 }
 
 pub(in crate::engine) fn private_options() -> OpenOptions {
-    let mut options = OpenOptions::new();
+    let options = OpenOptions::new();
     #[cfg(unix)]
-    {
+    let options = {
         use std::os::unix::fs::OpenOptionsExt as _;
+        let mut options = options;
         options.mode(0o600);
-    }
+        options
+    };
     options
 }
 

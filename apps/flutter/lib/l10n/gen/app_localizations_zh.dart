@@ -9,6 +9,57 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get relayPathTitle => '设备连接路径';
+
+  @override
+  String get relayPathRelayOnly => '仅中继';
+
+  @override
+  String get relayPathAuto => '优先 P2P 直连';
+
+  @override
+  String get relayAllowDirect => '允许其他设备直连此电脑';
+
+  @override
+  String get relayAllowDirectHint => '仅适用于已有权访问所发布服务的设备，原有访问规则继续生效。';
+
+  @override
+  String get relayPathExplanation =>
+      '直连需要中继和主机共同支持。直连建立失败时，会在发送应用数据前回退到中继；已建立的连接中断后不会重放数据。';
+
+  @override
+  String get relayPathApplyHint =>
+      '对新建隧道生效。重新连接会话以应用路径偏好，重启托管以应用传入直连设置。已有连接保持运行。已建立的直连在中继离线或凭据撤销后仍会继续；停止本地隧道才会关闭它。';
+
+  @override
+  String get relayPathReadFailed => '无法读取连接偏好，点击重试。';
+
+  @override
+  String get relayPathSaveFailed => '无法保存连接偏好，请重试。';
+
+  @override
+  String get relayPathDirect => 'P2P 直连';
+
+  @override
+  String get relayPathRelayed => '经中继连接';
+
+  @override
+  String get relayPathIdle => '等待数据连接';
+
+  @override
+  String get relayPathUnknown => '连接路径未知';
+
+  @override
+  String relayPathMixed(int direct, int relay) {
+    return '直连：$direct · 中继：$relay';
+  }
+
+  @override
+  String relayPathFallbacks(int count) {
+    return '已回退中继 $count 次';
+  }
+
+  @override
   String get appTitle => 'POCOX';
 
   @override

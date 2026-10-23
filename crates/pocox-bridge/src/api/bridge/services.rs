@@ -24,6 +24,32 @@ pub struct SubStatusDto {
     pub local_addr: String,
     /// Task still running.
     pub alive: bool,
+    /// Locally observed path: `relay_only`, `idle`, `direct`, `relay`, `mixed`,
+    /// `unknown`.
+    pub path: String,
+    /// Active direct data connections.
+    pub active_direct: u64,
+    /// Active relay data connections counted by auto mode.
+    pub active_relay: u64,
+    /// Pre-commit fallbacks in this tunnel's lifetime.
+    pub fallbacks: u64,
+    /// SDK reason for its most recent fallback.
+    pub last_fallback: Option<String>,
+}
+
+impl From<runtime::SubStatus> for SubStatusDto {
+    fn from(s: runtime::SubStatus) -> Self {
+        Self {
+            key: s.key,
+            local_addr: s.local_addr,
+            alive: s.alive,
+            path: s.path.path,
+            active_direct: s.path.active_direct,
+            active_relay: s.path.active_relay,
+            fallbacks: s.path.fallbacks,
+            last_fallback: s.path.last_fallback,
+        }
+    }
 }
 
 /// Discover the services this device can reach on the relay.
@@ -55,11 +81,7 @@ pub async fn api_subscribe(service_key: String, local_port: u16) -> Result<SubSt
     execution::run(Lane::Control, move || {
         let transport = transport::resolve_blocking()?;
         let s = runtime::subscribe_service(service_key, local_port, &transport)?;
-        Ok(SubStatusDto {
-            key: s.key,
-            local_addr: s.local_addr,
-            alive: s.alive,
-        })
+        Ok(s.into())
     })
     .await
 }
@@ -73,10 +95,6 @@ pub fn api_unsubscribe(service_key: String) {
 pub fn subscriptions() -> Vec<SubStatusDto> {
     runtime::list_subscriptions()
         .into_iter()
-        .map(|s| SubStatusDto {
-            key: s.key,
-            local_addr: s.local_addr,
-            alive: s.alive,
-        })
+        .map(SubStatusDto::from)
         .collect()
 }

@@ -83,6 +83,27 @@ class RustBridgeApi
   Future<String?> networkProxy() => frb.networkProxy();
 
   @override
+  Future<RelayPreferences> relayPreferences() async {
+    final value = await frb.relayPreferences();
+    return RelayPreferences(path: value.path, allowDirect: value.allowDirect);
+  }
+
+  @override
+  Future<void> relaySetPreferences(RelayPreferences value) =>
+      frb.relaySetPreferences(path: value.path, allowDirect: value.allowDirect);
+
+  static SubInfo _subscription(frb.SubStatusDto s) => SubInfo(
+    key: s.key,
+    localAddr: s.localAddr,
+    alive: s.alive,
+    path: s.path,
+    activeDirect: s.activeDirect.toInt(),
+    activeRelay: s.activeRelay.toInt(),
+    fallbacks: s.fallbacks.toInt(),
+    lastFallback: s.lastFallback,
+  );
+
+  @override
   Future<void> networkSetProxy(String value) =>
       frb.networkSetProxy(value: value);
 
@@ -203,7 +224,7 @@ class RustBridgeApi
       serviceKey: serviceKey,
       localPort: localPort,
     );
-    return SubInfo(key: s.key, localAddr: s.localAddr, alive: s.alive);
+    return _subscription(s);
   }
 
   @override
@@ -213,9 +234,7 @@ class RustBridgeApi
   @override
   Future<List<SubInfo>> subscriptions() async {
     final list = await frb.subscriptions();
-    return list
-        .map((s) => SubInfo(key: s.key, localAddr: s.localAddr, alive: s.alive))
-        .toList();
+    return list.map(_subscription).toList();
   }
 
   @override

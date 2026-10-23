@@ -83,7 +83,7 @@ impl DiskLog {
         let reserved =
             self.counters
                 .queued
-                .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |used| {
+                .try_update(Ordering::Relaxed, Ordering::Relaxed, |used| {
                     used.checked_add(weight).filter(|next| *next <= QUEUE_BYTES)
                 });
         if reserved.is_err() {

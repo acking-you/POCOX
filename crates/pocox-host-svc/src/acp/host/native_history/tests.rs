@@ -1,12 +1,17 @@
+#[cfg(unix)]
 use futures::StreamExt;
 
 use super::*;
-use crate::acp::{api, ClientError, GatewayClient, SourceId};
+use crate::acp::SourceId;
+#[cfg(unix)]
+use crate::acp::{api, ClientError, GatewayClient};
 use crate::native_history::ClaudeHistory;
 
 const SESSION: &str = "00000000-0000-4000-8000-000000000001";
 
+#[cfg(unix)]
 struct ServerGuard(tokio::task::AbortHandle);
+#[cfg(unix)]
 impl Drop for ServerGuard {
     fn drop(&mut self) {
         self.0.abort();

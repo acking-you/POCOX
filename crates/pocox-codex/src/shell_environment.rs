@@ -136,7 +136,7 @@ fn resolve_variables(
     if fields.len() % 2 != 0 {
         bail!("invalid shell environment output");
     }
-    for pair in fields.chunks_exact(2) {
+    for pair in fields.as_chunks::<2>().0 {
         let [key, value] = [pair[0], pair[1]];
         if !names.iter().any(|name| name.as_bytes() == key)
             || values

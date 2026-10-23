@@ -31,7 +31,7 @@
 //!
 //! Only Unix sockets are followed; on Windows (named pipes) nothing
 //! connects and views keep polling the log.
-#![cfg_attr(not(unix), allow(dead_code))]
+#![cfg_attr(not(unix), allow(dead_code, reason = "live leader following requires Unix sockets"))]
 
 use std::collections::HashMap;
 use std::path::PathBuf;

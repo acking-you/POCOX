@@ -6,6 +6,8 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`
+
 /// Discover the services this device can reach on the relay.
 ///
 /// One query in both modes: an account credential sees only its own namespace,
@@ -83,14 +85,42 @@ class SubStatusDto {
   /// Task still running.
   final bool alive;
 
+  /// Locally observed path: `relay_only`, `idle`, `direct`, `relay`, `mixed`, `unknown`.
+  final String path;
+
+  /// Active direct data connections.
+  final BigInt activeDirect;
+
+  /// Active relay data connections counted by auto mode.
+  final BigInt activeRelay;
+
+  /// Pre-commit fallbacks in this tunnel's lifetime.
+  final BigInt fallbacks;
+
+  /// SDK reason for its most recent fallback.
+  final String? lastFallback;
+
   const SubStatusDto({
     required this.key,
     required this.localAddr,
     required this.alive,
+    required this.path,
+    required this.activeDirect,
+    required this.activeRelay,
+    required this.fallbacks,
+    this.lastFallback,
   });
 
   @override
-  int get hashCode => key.hashCode ^ localAddr.hashCode ^ alive.hashCode;
+  int get hashCode =>
+      key.hashCode ^
+      localAddr.hashCode ^
+      alive.hashCode ^
+      path.hashCode ^
+      activeDirect.hashCode ^
+      activeRelay.hashCode ^
+      fallbacks.hashCode ^
+      lastFallback.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -99,5 +129,10 @@ class SubStatusDto {
           runtimeType == other.runtimeType &&
           key == other.key &&
           localAddr == other.localAddr &&
-          alive == other.alive;
+          alive == other.alive &&
+          path == other.path &&
+          activeDirect == other.activeDirect &&
+          activeRelay == other.activeRelay &&
+          fallbacks == other.fallbacks &&
+          lastFallback == other.lastFallback;
 }

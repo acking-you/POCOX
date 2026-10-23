@@ -1,5 +1,69 @@
 # Relay worker recovery and maintenance
 
+## Direct connections
+
+POCOX follows pb-mapper's dedicated `pocox` branch, currently locked to
+`d8816360f618b7da077bd1ca6e6e2851fcc83701` (SDK 0.7.0), with its `p2p` feature.
+The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
+the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
+The relay server is a test-only dependency, never
+embedded into the shipping app or CLI.
+
+**Settings › Device connection path** has two independent preferences:
+
+- **Relay only** (the default) or **Prefer P2P direct** for outgoing subscriptions.
+- **Allow direct connections to this computer** (off by default, desktop only)
+  for incoming connections to newly published services.
+
+The same preferences live in each installation's `config.toml` and apply to
+both account and self-host modes, including CLI workers:
+
+```toml
+[pb_mapper]
+path = "auto"              # or "relay_only" (default)
+allow_direct = true         # false by default
+```
+
+Preferences are captured when a tunnel starts. Saving them does not interrupt
+active work. Reconnect a session (or restart the app for cached auxiliary
+tunnels) to apply a changed outgoing preference; restart hosting to republish
+services with changed incoming permission. CLI `pb restart` applies the saved
+preferences to exactly one selected worker. Share strings still carry only
+relay/key; importing one does not enable direct access.
+
+The relay must also support and enable direct coordination, with a public UDP
+STUN listener in addition to its TCP relay listener. For example:
+
+```sh
+pb-mapper server --port 7666 --enable-direct \
+  --direct-listen 0.0.0.0:10811 --direct-advertise PUBLIC_IP:10811
+```
+
+POCOX delegates negotiation, authenticated peer selection and fallback to the
+SDK. Older relays/hosts, blocked UDP and unsuitable NATs use the relay. Fallback
+happens only before direct commit; application requests are never replayed after
+commit. Existing service idle deadlines, namespace isolation, credential
+redaction and the app's own-host loopback shortcut remain in effect.
+
+Established direct connections belong to their endpoints: relay loss and
+credential revocation prevent new setups but do not terminate those connections.
+Stopping the owning subscription or host closes its direct data paths. Logout
+and account/relay changes retain their existing owner invalidation.
+
+Settings polls local SDK counters while visible. It distinguishes active direct,
+relay and mixed data paths from a tunnel that is waiting for data. A saved Auto
+preference or a historical direct success is never presented as a live direct
+connection. Relay-only tunnels display their policy without inventing active
+connection counts; auto tunnels also show cumulative fallbacks and the most
+recent SDK reason. CLI diagnostics include the same SDK `direct` counters.
+
+Validation covers direct TCP, compatibility fallback without publisher/relay
+support, temporary-credential isolation, exactly one backend dial, coordinator
+loss and endpoint stop. The automated fixtures run on loopback; they do not
+establish traversal between two independent Internet NATs.
+
+## Worker recovery
+
 Detached CLI network workers retain their SDK handles while the relay or DNS is
 unavailable, including when startup takes longer than the interactive 30-second
 readiness deadline. Their local service process is independent. A permanent relay
