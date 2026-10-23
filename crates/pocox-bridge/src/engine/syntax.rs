@@ -159,14 +159,15 @@ mod tests {
                 "{language}"
             );
             let mut previous = 0;
-            for pair in tokens.as_chunks::<2>().0 {
-                assert!(pair[0] > previous);
-                assert!(pair[1] & 255 <= 8);
-                previous = pair[0];
+            for &[end, style] in tokens.as_chunks::<2>().0 {
+                assert!(end > previous);
+                assert!(style & 255 <= 8);
+                previous = end;
             }
         }
         let comment = highlight("/* first\nsecond */", "rust");
-        assert!(comment.as_chunks::<2>().0.iter().any(|p| p[1] == 6));
+        let (tokens, _) = comment.as_chunks::<2>();
+        assert!(tokens.iter().any(|&[_, style]| style == 6));
     }
 
     #[test]

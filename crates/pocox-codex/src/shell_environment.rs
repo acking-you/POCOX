@@ -133,11 +133,10 @@ fn resolve_variables(
     let fields = bytes[..bytes.len() - 1]
         .split(|byte| *byte == 0)
         .collect::<Vec<_>>();
-    if fields.len() % 2 != 0 {
+    let (pairs, []) = fields.as_chunks::<2>() else {
         bail!("invalid shell environment output");
-    }
-    for pair in fields.as_chunks::<2>().0 {
-        let [key, value] = [pair[0], pair[1]];
+    };
+    for &[key, value] in pairs {
         if !names.iter().any(|name| name.as_bytes() == key)
             || values
                 .iter()

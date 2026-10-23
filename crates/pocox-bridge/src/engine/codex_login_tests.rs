@@ -141,7 +141,8 @@ struct FakeServer {
     /// dropped its own (when its one connection closed), until [`finish`].
     ///
     /// [`finish`]: FakeServer::finish
-    _bound: Option<std::net::TcpListener>,
+    #[cfg_attr(not(unix), expect(dead_code, reason = "only Unix tests call `finish`"))]
+    bound: Option<std::net::TcpListener>,
 }
 
 #[cfg(unix)]
@@ -153,7 +154,7 @@ impl FakeServer {
             server.join().expect("server");
         }
         let methods = self.methods.lock().expect("lock").clone();
-        self._bound.take();
+        self.bound.take();
         methods
     }
 }
@@ -234,7 +235,7 @@ fn fake_server(config: Value) -> FakeServer {
         methods,
         cancel: Some(cancel),
         server: Some(server),
-        _bound: Some(bound),
+        bound: Some(bound),
     }
 }
 
