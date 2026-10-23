@@ -9,6 +9,11 @@ breaking change goes.
 
 ## Unreleased — pocox naming baseline
 
+- Image attachments retain an optional copy in the host session's project and
+  include its path for the agent's available image tools. Picking, dropping and
+  pasting share scoped uploads; failed copies can be retried without losing
+  inline images. Ordinary file uploads retain their existing location.
+
 - Rename first-party crates and directories to `pocox-*`, the Rust/Flutter
   bridge to `pocox_bridge`, and the Flutter package to `pocox`. App identifiers,
   config/state paths, the default `pocox` project folder, `POCOX_*` variables,

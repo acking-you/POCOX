@@ -54,7 +54,11 @@ void _registerSendOwnership() {
       preparedImageFixture(red).dataUrl,
       preparedImageFixture(blue).dataUrl,
     ];
-    final secondWithFile = appendFileRefs('second', [notesPath]);
+    final secondWithFile = appendAttachmentRefs(
+      'second',
+      filePaths: [notesPath],
+      imagePaths: ['/host/uploads/123/red.png', '/host/uploads/123/blue.png'],
+    );
 
     for (final service in [codex, acp]) {
       final engine = service == codex ? 'Codex' : 'ACP';

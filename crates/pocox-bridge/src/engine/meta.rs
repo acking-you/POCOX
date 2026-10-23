@@ -36,7 +36,7 @@ mod files;
 use self::files::{download_file, download_response, upload_context_at};
 pub use self::files::{
     file_download, file_preview, host_is_local, list_dir, list_files, read_file, read_thread_image,
-    upload_context, upload_file, upload_file_scoped, write_file,
+    upload_context, upload_file, upload_file_scoped, upload_image_scoped, write_file,
 };
 #[allow(
     unused_imports,

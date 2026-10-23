@@ -49,6 +49,16 @@ abstract interface class ControllerBridgeApi {
   /// Capture the account/relay destination before reading attachment bytes.
   Future<String> metaUploadContext();
 
+  /// Copy an image to its host session or draft project, with scoped admission.
+  Future<String> metaUploadImageScoped(
+    String serviceKey,
+    String fileName,
+    Uint8List bytes,
+    String context, {
+    String? thread,
+    String? project,
+  });
+
   /// Reject a context change before transmitting attachment bytes.
   Future<String> metaUploadFileScoped(
     String serviceKey,

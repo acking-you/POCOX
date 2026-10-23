@@ -59,3 +59,6 @@ pocox-codex-raw-dialogue.md
 
 # Python bytecode cache (local script runs)
 __pycache__/
+
+# Host-side image attachments (agent inspection)
+.pocket-attachments/

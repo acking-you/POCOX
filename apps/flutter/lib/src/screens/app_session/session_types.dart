@@ -19,6 +19,14 @@ class _Attachment {
   Uint8List? sourceBytes;
   String? error;
 
+  /// Image mirroring in flight. Sending waits for it so the turn can carry the
+  /// host path; a failure is non-fatal (see [hostError]).
+  bool uploading = false;
+
+  /// Non-fatal host-mirror failure. A vision-capable model still receives the
+  /// inline data URL, so this never blocks the send.
+  String? hostError;
+
   /// The draft it was admitted into and the admission it holds; an upload
   /// re-checks it after reading the file (see [AttachmentTicket]).
   _ComposerDraft? draft;
@@ -26,7 +34,8 @@ class _Attachment {
 
   /// Whether this attachment is sendable.
   bool get ready =>
-      error == null && (isFile ? hostPath != null : processed != null);
+      error == null &&
+      (isFile ? hostPath != null : processed != null && !uploading);
 }
 
 /// A message the user composed while a turn was already running. It isn't sent

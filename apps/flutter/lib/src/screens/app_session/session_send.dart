@@ -63,6 +63,14 @@ extension _SessionSend on _AppSessionState {
               if (a.isFile) ?a.hostPath,
           ]
         : const <String>[];
+    // Images already carry their bytes inline; the host copy is a path the
+    // agent can inspect with its own vision tool.
+    final imagePaths = ordinary
+        ? [
+            for (final a in sendAttachments)
+              if (!a.isFile) ?a.hostPath,
+          ]
+        : const <String>[];
     // Built-in tools ride an ordinary send too, named for the agent at the
     // end of the text. A message sent again (a retry, a failed turn) carries
     // that block in its own text: the tools it names are granted again.
@@ -72,7 +80,7 @@ extension _SessionSend on _AppSessionState {
         ? splitBuiltinTools(typed).ids
         : const <String>[];
     final text = appendBuiltinTools(
-      appendFileRefs(typed, filePaths),
+      appendAttachmentRefs(typed, filePaths: filePaths, imagePaths: imagePaths),
       ordinary ? sendTools : const [],
       summaries: _hostToolSummaries(),
     );

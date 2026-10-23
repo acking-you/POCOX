@@ -230,8 +230,12 @@ class _MessageViewState extends State<MessageView> {
         ? splitBuiltinTools(ide.text)
         : (text: ide.text, ids: const <String>[]);
     final refs = isUser
-        ? splitFileRefs(picked.text)
-        : (text: ide.text, paths: const <String>[]);
+        ? splitAttachmentRefs(picked.text)
+        : (
+            text: ide.text,
+            filePaths: const <String>[],
+            imagePaths: const <String>[],
+          );
     // Reply passages the user annotated read as quotes ahead of the request.
     final shown = ideDisplayText(refs.text, ide.annotations);
     final images = [
@@ -242,7 +246,8 @@ class _MessageViewState extends State<MessageView> {
     final paths = [
       for (final f in ide.files)
         if (!looksLikeImagePath(f.path)) f.path,
-      ...refs.paths,
+      ...refs.filePaths,
+      if (item.images.isEmpty) ...refs.imagePaths,
     ];
     // Desktop reads as a document, not as a chat: a coding agent's transcript
     // is something you scan and scroll back through, so turns are blocks with

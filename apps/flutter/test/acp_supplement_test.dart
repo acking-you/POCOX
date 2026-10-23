@@ -19,6 +19,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/attachment_refs.dart';
 import 'package:pocox/src/image_attachments.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 
@@ -531,7 +532,13 @@ void main() {
       ended(api, 't1');
       await frames(t);
       expect(api.turnStartCount, 1);
-      expect(api.lastTurnText, 'same input');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs(
+          'same input',
+          imagePaths: ['/host/uploads/123/a.png'],
+        ),
+      );
       expect(api.lastTurnImages, hasLength(1));
     });
   });

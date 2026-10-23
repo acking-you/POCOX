@@ -156,8 +156,31 @@ Engine wire details stay in [ACP agents](acp-agents.md#turns-and-permissions),
 
 ## Attachments
 
+- Prepared images also have a best-effort host copy under
+  `<session cwd>/.pocket-attachments/<upload id>/<filename>`. A new draft uses
+  its selected project (within the host's configured roots), or the host's
+  validated default when none is selected. Existing sessions use the host's
+  verified cwd, including sessions outside the browse roots. Missing projects
+  and redirected attachment directories fail without writing elsewhere.
+- Picker paths, drop, platform URIs and clipboard bytes share this pipeline.
+  Capture the account/relay context before reading or processing; recheck the
+  original draft's admission before uploading. Send, Queue and Supplement wait
+  for the mirror. Upload failure preserves inline images, shows a retryable
+  warning, and allows sending without a host path; retrying just the mirror
+  does not decode the image again.
+- The additive `POST /uploads/images/{name}?thread=...` route resolves an
+  existing session; `?project=...` selects a new draft's directory. Omit both
+  to prepare the default. The legacy `/uploads/{name}` route retains its
+  configured uploads directory for every filename. Older hosts without the new
+  route keep inline-image sending, with the mirror warning.
+- The prompt carries the host paths in an `Attached images` block and refers
+  to available image tools, without assuming a particular skill is installed.
+  This does not add model vision or bypass negotiated image-input capabilities.
+  Live and read-only transcripts hide the block and avoid duplicate chips
+  beside inline thumbnails; path-only history retains explicit file actions.
+
 - Failed attachments stay removable and retryable and block sending until
-  resolved.
+  resolved, except the optional image mirror described above.
 - Picker, drop and paste pass one admission boundary (`AttachmentGate`,
   `attachment_gate.dart`), gated on negotiated capabilities. A late result
   (picker, clipboard, file read before upload) is re-admitted through its

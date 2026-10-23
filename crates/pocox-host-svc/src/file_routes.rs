@@ -161,12 +161,9 @@ pub(super) struct UploadResponse {
     pub(super) size: u64,
 }
 
-/// Store an uploaded attachment under `$CODEX_HOME/pocox-uploads/` and
-/// return its absolute host path. The controller then references that path in
-/// the turn text, and the agent reads it with its own tools — codex's native
-/// host-file workflow (its input protocol has no document slot). Only the
-/// authenticated account owner can reach this tunnel; the filename is
-/// sanitized to a single path component regardless.
+/// Store an attachment in the configured uploads directory and return its
+/// absolute host path. Keep this legacy route independent of the filename;
+/// project-scoped image copies use the separate image-upload route.
 pub(super) async fn upload_file(
     State(state): State<Arc<AppState>>,
     Path(name): Path<String>,
@@ -194,7 +191,7 @@ pub(super) async fn upload_file(
 /// prefix keeps the file's BASENAME exactly what the user attached — the path
 /// is quoted into the prompt and rendered as a chip, so `report.pdf` must not
 /// become `1735689…-report.pdf`.
-async fn save_upload(
+pub(super) async fn save_upload(
     dir: &std::path::Path,
     name: &str,
     bytes: &[u8],

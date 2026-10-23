@@ -76,6 +76,27 @@ fn upload_to(url: Url, bytes: Vec<u8>) -> Result<UploadedFile> {
     })
 }
 
+/// Copy an image into its session cwd or selected draft project. Older hosts
+/// refuse this new route; callers can retain their ordinary inline image.
+pub fn upload_image_scoped(
+    service_key: &str,
+    file_name: &str,
+    bytes: Vec<u8>,
+    expected: &str,
+    thread: Option<&str>,
+    project: Option<&str>,
+) -> Result<UploadedFile> {
+    anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
+    let mut url = endpoint(service_key, &["uploads", "images", file_name])?;
+    if let Some(thread) = thread {
+        url.query_pairs_mut().append_pair("thread", thread);
+    } else if let Some(project) = project {
+        url.query_pairs_mut().append_pair("project", project);
+    }
+    anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
+    upload_to(url, bytes)
+}
+
 /// `{ "path": ..., "entries": [...] }` — one directory's browsable children.
 #[derive(Deserialize)]
 struct ListDirResponse {

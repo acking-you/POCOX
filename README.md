@@ -44,6 +44,9 @@ Any other ACP agent can be hosted from a program and its arguments
 
 ## What it does
 
+- **Image attachments** — send images inline and keep a project-scoped host
+  copy for the agent's image tools ([attachments](docs/composer-turns.md#attachments)).
+
 - **Every session on the machine** — list and follow live the sessions Codex,
   Claude Code, Grok Build and OpenCode run, including ones started in their own
   apps and CLIs ([native history](docs/native-agent-history.md), with its

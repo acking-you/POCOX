@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/widgets/turn_minimap.dart';
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
+import 'package:pocox/src/attachment_refs.dart';
 import 'package:pocox/src/image_attachments.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -512,7 +513,13 @@ void main() {
       expect(draft(t), 'Queued goal');
       await send(t, draft(t));
       expect(api.turnStartCount, 2);
-      expect(api.lastTurnText, 'Queued goal');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs(
+          'Queued goal',
+          imagePaths: ['/host/uploads/123/queued.png'],
+        ),
+      );
       expect(api.lastTurnImages, hasLength(1));
     },
   );
@@ -540,7 +547,16 @@ void main() {
       await frames(t);
       expect(api.turnStartCount, 2);
       await send(t, draft(t));
-      expect(api.lastTurnText, 'Queued goal\n\nNew draft');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs(
+          'Queued goal\n\nNew draft',
+          imagePaths: [
+            '/host/uploads/123/queued.png',
+            '/host/uploads/123/new-draft.png',
+          ],
+        ),
+      );
       expect(api.lastTurnImages, hasLength(2));
     },
     variant: TargetPlatformVariant.only(TargetPlatform.linux),

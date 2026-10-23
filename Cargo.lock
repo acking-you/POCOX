@@ -2496,7 +2496,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-account-proto"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64 0.22.1",
  "pocox-core",
@@ -2509,7 +2509,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-api-proxy"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -2531,7 +2531,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-auth"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "base64 0.22.1",
  "jsonwebtoken",
@@ -2551,7 +2551,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-backend"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2581,7 +2581,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-cli"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2612,7 +2612,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-codex"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2640,7 +2640,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2660,7 +2660,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-host-svc"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2692,7 +2692,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-pb"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "pb-mapper",
@@ -2709,7 +2709,7 @@ dependencies = [
 
 [[package]]
 name = "pocox-store"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "sqlx",
  "thiserror 2.0.18",
@@ -2720,7 +2720,7 @@ dependencies = [
 
 [[package]]
 name = "pocox_bridge"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "async-trait",

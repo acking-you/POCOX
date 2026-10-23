@@ -179,6 +179,10 @@ only reproducible build artifacts.
 
 ## Roadmap
 
+Image attachment mirrors use the selected session/project, retain the legacy
+upload route and respect draft admission; see
+[attachment rules](docs/composer-turns.md#attachments).
+
 Shipped work lives in the changelog and git history. Open, described only as
 planned until it ships:
 

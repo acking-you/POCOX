@@ -75,43 +75,37 @@ extension _SessionAttachments on _AppSessionState {
 
   Future<void> _processAttachment(_Attachment att, XFile file) async {
     att.source = file;
-    try {
-      if (localAttachmentPath(file.path)) {
-        final image = await processImageFile(file.path);
-        if (!_drafts.containsAttachment(att)) return;
-        att.processed = image;
-        _drafts.attachmentChanged(att);
-      } else {
-        final bytes = await file.readAsBytes();
-        if (!_drafts.containsAttachment(att)) return;
-        await _processImageBytes(att, bytes);
-      }
-    } catch (e) {
-      att.error = friendlyError(e);
-      _drafts.attachmentChanged(att);
-    }
+    await _prepareAndUploadImage(
+      att,
+      () => localAttachmentPath(file.path)
+          ? processImageFile(file.path)
+          : file.readAsBytes().then(processImage),
+    );
   }
 
   Future<void> _processImageBytes(_Attachment att, Uint8List bytes) async {
     att.sourceBytes = bytes;
-    try {
-      att.processed = await processImage(bytes);
-      att.sourceBytes = null;
-    } catch (e) {
-      att.error = friendlyError(e);
-    }
-    _drafts.attachmentChanged(att);
+    await _prepareAndUploadImage(att, () => processImage(bytes));
   }
 
   void _retryAttachment(_Attachment att) {
-    if (att.error == null) return;
+    if (att.error == null && att.hostError == null) return;
     // A retry is a new action: it is admitted by the view as it is now.
     final draft = att.draft;
     if (draft != null && identical(draft, _draft)) {
       att.ticket = _ticketFor(draft);
     }
+    // Only the host mirror failed: the processed bytes are still good, so
+    // retry the upload instead of decoding the image again.
+    final retryHostOnly =
+        att.error == null && att.processed != null && att.hostPath == null;
     att.error = null;
+    att.hostError = null;
     _drafts.attachmentChanged(att);
+    if (retryHostOnly) {
+      unawaited(_prepareAndUploadImage(att, () async => att.processed!));
+      return;
+    }
     if (att.source case final file?) {
       unawaited(
         att.isFile
@@ -403,8 +397,13 @@ extension _SessionAttachments on _AppSessionState {
     // Disposal ends this view's ownership/connection subscriptions. A file
     // still being read cannot rely on that stale admission. Keep it retryable
     // in its original draft; an upload already dispatched may still finish.
-    if (!mounted || !identical(draft, _draft)) return false;
-    return _admitNow(draft, ticket).acceptsAny;
+    if (!mounted ||
+        !identical(draft, _draft) ||
+        !_drafts.containsAttachment(att)) {
+      return false;
+    }
+    final gate = _admitNow(draft, ticket);
+    return att.isFile ? gate.acceptsAny : gate.acceptsImages;
   }
 
   Future<void> _uploadAttachment(_Attachment att, XFile file) async {
@@ -451,6 +450,70 @@ extension _SessionAttachments on _AppSessionState {
       att.error = friendlyError(e);
     }
     _drafts.attachmentChanged(att);
+  }
+
+  /// Host filename for an image attachment: the picked basename when it has
+  /// one, otherwise a generic stem, always with the extension of the PROCESSED
+  /// bytes (a WebP re-encoded to JPEG must not land as `.webp`).
+  String _imageUploadName(_Attachment att, ProcessedImage processed) {
+    final basename = hostPathBasename(att.name).trim();
+    final name = basename.isEmpty ? 'image' : basename;
+    final dot = name.lastIndexOf('.');
+    final stem = dot > 0 ? name.substring(0, dot) : name;
+    return '$stem.${sniffImageExtension(processed.bytes)}';
+  }
+
+  /// Mirror a processed image onto the HOST so an agent whose model cannot
+  /// accept inline image input can still inspect it through a vision tool.
+  /// Non-fatal: the inline data URL remains the source of truth for the turn,
+  /// so a failed upload only drops the path reference.
+  Future<void> _prepareAndUploadImage(
+    _Attachment att,
+    Future<ProcessedImage> Function() prepare,
+  ) async {
+    final api = ref.read(bridgeApiProvider);
+    final drafts = _drafts;
+    final service = widget.serviceKey;
+    final thread = att.draft?.threadId;
+    final project = att.draft?.project ?? _cwd ?? _automaticProject;
+    final revoked = AppLocalizations.of(context).attachmentRevoked;
+    // No intermediate ready notification: queue draining must wait for the
+    // mirror even when native preparation finishes synchronously.
+    att.uploading = true;
+    att.hostError = null;
+    drafts.attachmentChanged(att);
+    try {
+      String? destination;
+      try {
+        destination = await api.metaUploadContext();
+      } catch (e) {
+        att.hostError = friendlyError(e);
+      }
+      if (!drafts.containsAttachment(att)) return;
+      try {
+        att.processed = await prepare();
+        att.sourceBytes = null;
+      } catch (e) {
+        att.error = friendlyError(e);
+        return;
+      }
+      if (!drafts.containsAttachment(att) || destination == null) return;
+      if (!_mayUpload(att)) throw StateError(revoked);
+      final processed = att.processed!;
+      att.hostPath = await api.metaUploadImageScoped(
+        service,
+        _imageUploadName(att, processed),
+        processed.bytes,
+        destination,
+        thread: thread,
+        project: project,
+      );
+    } catch (e) {
+      att.hostError = friendlyError(e);
+    } finally {
+      att.uploading = false;
+      drafts.attachmentChanged(att);
+    }
   }
 
   Widget _attachmentStrip(AppLocalizations l10n) {
@@ -545,13 +608,30 @@ extension _SessionAttachments on _AppSessionState {
               ),
             );
           } else if (att.processed case final processed?) {
-            body = Image.memory(
-              processed.bytes,
-              fit: BoxFit.cover,
-              // 2× the box so a landscape image's SHORT edge reaches the
-              // square cover box without upscaling.
-              cacheWidth: (kAttachmentTileSide * scale * 2).round(),
-              gaplessPlayback: true,
+            body = Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.memory(
+                  processed.bytes,
+                  fit: BoxFit.cover,
+                  // 2× the box so a landscape image's SHORT edge reaches the
+                  // square cover box without upscaling.
+                  cacheWidth: (kAttachmentTileSide * scale * 2).round(),
+                  gaplessPlayback: true,
+                ),
+                if (att.hostError != null)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Tooltip(
+                      message: att.hostError!,
+                      child: const Icon(
+                        AppIcons.warning_amber_rounded,
+                        size: 14,
+                      ),
+                    ),
+                  ),
+              ],
             );
           } else {
             // Unreachable: an image attachment is `ready` iff processed is
@@ -569,12 +649,12 @@ extension _SessionAttachments on _AppSessionState {
             // A staged image opens the same viewer a sent one does, so you can
             // check what you attached BEFORE sending it. A file has no pixels
             // to show, and an image still processing has none yet.
-            onTap: att.error != null
+            onTap: att.error != null || att.hostError != null
                 ? () => _retryAttachment(att)
                 : previewIndex < 0
                 ? null
                 : () => ImageViewerPage.show(context, staged, previewIndex),
-            tapTooltip: att.error != null
+            tapTooltip: att.error != null || att.hostError != null
                 ? l10n.retry
                 : previewIndex < 0
                 ? null

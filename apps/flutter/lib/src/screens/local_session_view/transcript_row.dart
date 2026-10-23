@@ -69,7 +69,7 @@ class _TranscriptRow extends StatelessWidget {
         // typed text (display-only — the rollout on disk is untouched).
         final ide = splitIdeContext(item.text);
         final picked = splitBuiltinTools(ide.text);
-        final refs = splitFileRefs(picked.text);
+        final refs = splitAttachmentRefs(picked.text);
         final text = ideDisplayText(refs.text, ide.annotations);
         final shown = [
           ...images,
@@ -79,7 +79,8 @@ class _TranscriptRow extends StatelessWidget {
         final paths = [
           for (final f in ide.files)
             if (!looksLikeImagePath(f.path)) f.path,
-          ...refs.paths,
+          ...refs.filePaths,
+          if (images.isEmpty) ...refs.imagePaths,
         ];
         // The live transcript's shape: attachments above a soft neutral
         // bubble with a tucked corner, both capped at the same width.

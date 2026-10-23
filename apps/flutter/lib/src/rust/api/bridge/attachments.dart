@@ -6,6 +6,24 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+/// Mirror an image into the host session's cwd or the selected draft project.
+/// The account/relay context must have been captured before preparing bytes.
+Future<String> metaUploadImageScoped({
+  required String serviceKey,
+  required String fileName,
+  required List<int> bytes,
+  required String context,
+  String? thread,
+  String? project,
+}) => RustLib.instance.api.crateApiBridgeAttachmentsMetaUploadImageScoped(
+  serviceKey: serviceKey,
+  fileName: fileName,
+  bytes: bytes,
+  context: context,
+  thread: thread,
+  project: project,
+);
+
 /// Prepare clipboard bytes or a selected local file, with exactly one source.
 Future<PreparedImageDto> attachmentPrepareImage({
   Uint8List? bytes,

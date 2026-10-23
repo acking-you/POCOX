@@ -249,6 +249,23 @@ mixin _RustHostSessions implements BridgeApi {
   Future<String> metaUploadContext() => frb.metaUploadContext();
 
   @override
+  Future<String> metaUploadImageScoped(
+    String serviceKey,
+    String fileName,
+    Uint8List bytes,
+    String context, {
+    String? thread,
+    String? project,
+  }) => frb.metaUploadImageScoped(
+    serviceKey: serviceKey,
+    fileName: fileName,
+    bytes: bytes,
+    context: context,
+    thread: thread,
+    project: project,
+  );
+
+  @override
   Future<String> metaUploadFileScoped(
     String serviceKey,
     String fileName,

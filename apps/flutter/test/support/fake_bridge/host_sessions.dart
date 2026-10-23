@@ -294,6 +294,21 @@ mixin _FakeHostSessions on _FakeBridgeState {
   Future<String> metaUploadContext() async => uploadContext;
 
   @override
+  Future<String> metaUploadImageScoped(
+    String serviceKey,
+    String fileName,
+    Uint8List bytes,
+    String context, {
+    String? thread,
+    String? project,
+  }) async {
+    lastImageUploadThread = thread;
+    lastImageUploadProject = project;
+    await imageUploadGate?.future;
+    return metaUploadFileScoped(serviceKey, fileName, bytes, context);
+  }
+
+  @override
   Future<ThreadConfig> metaThreadConfigGet(
     String serviceKey,
     String threadId,

@@ -55,8 +55,16 @@ Future<ProcessedImage> processImageNative(Uint8List bytes) async =>
     _processed(await native.attachmentPrepareImage(bytes: bytes, path: null));
 
 /// Picked local paths are read on the native worker too.
-Future<ProcessedImage> processImageFile(String path) async =>
+Future<ProcessedImage> processImageFileNative(String path) async =>
     _processed(await native.attachmentPrepareImage(bytes: null, path: path));
+
+/// Tests inject file preparation without loading a native library.
+@visibleForTesting
+Future<ProcessedImage> Function(String path) processImageFileImpl =
+    processImageFileNative;
+
+Future<ProcessedImage> processImageFile(String path) =>
+    processImageFileImpl(path);
 
 ProcessedImage _processed(native.PreparedImageDto image) => ProcessedImage(
   bytes: image.bytes,

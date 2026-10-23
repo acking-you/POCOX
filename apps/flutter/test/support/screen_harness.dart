@@ -224,11 +224,15 @@ Future<void> turnSetting(WidgetTester t, String value) async {
 }
 
 /// Open the composer's `+` attachment menu and tap the item keyed [key].
-Future<void> attachMenu(WidgetTester t, String key) async {
+Future<void> attachMenu(
+  WidgetTester t,
+  String key, {
+  bool settle = true,
+}) async {
   await t.tap(find.byKey(const Key('attach-menu-btn')));
   await t.pumpAndSettle();
   await t.tap(find.byKey(Key(key)));
-  await t.pumpAndSettle();
+  if (settle) await t.pumpAndSettle();
 }
 
 /// Every conversation row in the sessions pane. Rows carry no leading icon

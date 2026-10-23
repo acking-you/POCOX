@@ -958,6 +958,9 @@ abstract class _FakeBridgeState implements BridgeApi {
   Object? uploadError;
 
   String uploadContext = 'fixture-context';
+  String? lastImageUploadThread;
+  String? lastImageUploadProject;
+  Completer<void>? imageUploadGate;
 
   /// Seedable per-service project config returned by [metaProjectConfig].
   final Map<String, ProjectConfig> projectConfigs = {};

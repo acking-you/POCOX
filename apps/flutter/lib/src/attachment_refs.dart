@@ -30,6 +30,13 @@ import 'package:pocox/src/tools/builtin_tags.dart';
 const String kAttachedFilesHeader =
     "## Attached files (read them from this machine's filesystem):";
 
+/// Header line introducing the attached-images block. Images also travel
+/// inline as data URLs; this block only records where the HOST stored the
+/// bytes for the agent's available image tools. It never assumes a particular
+/// skill is installed. English on purpose — it is model-facing wire text.
+const String kAttachedImagesHeader =
+    "## Attached images (saved on the host; inspect with your available image tools):";
+
 /// The most files one message may carry (UI guard).
 const int kMaxFilesPerMessage = 4;
 
@@ -58,17 +65,35 @@ String appendFileRefs(String text, List<String> hostPaths) {
   return '$text\n\n$block';
 }
 
-/// Split a message's text back into the display text and the attached host
-/// paths. Returns the input unchanged (no paths) unless the text ends in a
-/// well-formed block: the header on its own line followed only by `- ` lines —
-/// anything else (user prose that merely resembles the header, trailing extra
-/// text) is left alone rather than mis-parsed into chips.
-({String text, List<String> paths}) splitFileRefs(String text) {
-  final at = text.lastIndexOf(kAttachedFilesHeader);
+/// Append the trailing attachment blocks for [filePaths] and [imagePaths].
+/// Files are written first and images second; [splitAttachmentRefs] strips
+/// them in reverse order.
+String appendAttachmentRefs(
+  String text, {
+  List<String> filePaths = const [],
+  List<String> imagePaths = const [],
+}) {
+  var out = appendFileRefs(text, filePaths);
+  if (imagePaths.isEmpty) return out;
+  final block = StringBuffer(kAttachedImagesHeader);
+  for (final p in imagePaths) {
+    block.write('\n- ${quotePathLikeCodex(p)}');
+  }
+  if (out.isEmpty) return block.toString();
+  return '$out\n\n$block';
+}
+
+/// One trailing `- path` block, or the input unchanged when it does not end in
+/// a well-formed block for [header].
+({String text, List<String> paths}) _splitTrailingBlock(
+  String text,
+  String header,
+) {
+  final at = text.lastIndexOf(header);
   if (at < 0) return (text: text, paths: const []);
   // The header must start its own line.
   if (at > 0 && text[at - 1] != '\n') return (text: text, paths: const []);
-  final after = text.substring(at + kAttachedFilesHeader.length);
+  final after = text.substring(at + header.length);
   final lines = after.split('\n');
   // First split element is the remainder of the header line — must be empty.
   if (lines.first.trim().isNotEmpty) return (text: text, paths: const []);
@@ -85,6 +110,24 @@ String appendFileRefs(String text, List<String> hostPaths) {
   }
   if (paths.isEmpty) return (text: text, paths: const []);
   return (text: text.substring(0, at).trimRight(), paths: paths);
+}
+
+/// Split a message's trailing attachment blocks back into display text and
+/// host paths. Images are stripped first because [appendAttachmentRefs]
+/// writes that block last.
+({String text, List<String> filePaths, List<String> imagePaths})
+splitAttachmentRefs(String text) {
+  final images = _splitTrailingBlock(text, kAttachedImagesHeader);
+  final files = _splitTrailingBlock(images.text, kAttachedFilesHeader);
+  return (text: files.text, filePaths: files.paths, imagePaths: images.paths);
+}
+
+/// Back-compat view of [splitAttachmentRefs]: every stripped path, files
+/// first. Callers that render chips should use [splitAttachmentRefs] so image
+/// paths are not drawn twice next to their inline thumbnails.
+({String text, List<String> paths}) splitFileRefs(String text) {
+  final split = splitAttachmentRefs(text);
+  return (text: split.text, paths: [...split.filePaths, ...split.imagePaths]);
 }
 
 /// Basename of a host path (either separator style), for chip labels.
@@ -116,6 +159,7 @@ String folderName(String path) {
 /// no title to derive from machinery, so callers fall back to "untitled".
 String previewWithoutFileRefs(String preview, String placeholder) {
   if (preview.trimLeft().startsWith(kAttachedFilesHeader)) return placeholder;
+  if (preview.trimLeft().startsWith(kAttachedImagesHeader)) return placeholder;
   if (isContextFragment(preview)) return '';
   if (isTruncatedIdeContext(preview)) return placeholder;
   // A voice handoff is the user's own turn, wrapped — show what they said.
@@ -125,6 +169,8 @@ String previewWithoutFileRefs(String preview, String placeholder) {
   final automation = AutomationPrompt.parse(preview);
   if (automation != null) return automation.instructions;
   final text = previewWithoutBuiltinTools(splitIdeContext(preview).text);
-  final split = splitFileRefs(text);
-  return split.paths.isEmpty ? text : split.text;
+  final split = splitAttachmentRefs(text);
+  return split.filePaths.isEmpty && split.imagePaths.isEmpty
+      ? text
+      : split.text;
 }

@@ -78,6 +78,47 @@ void main() {
     expect(previewWithoutFileRefs('hello', '[File]'), 'hello');
   });
 
+  test('image block round-trips alongside the files block', () {
+    final sent = appendAttachmentRefs(
+      'look',
+      filePaths: ['/host/up/1/a.pdf'],
+      imagePaths: ['/host/.pocket-attachments/2/shot.png'],
+    );
+    expect(
+      sent.indexOf(kAttachedFilesHeader),
+      lessThan(sent.indexOf(kAttachedImagesHeader)),
+      reason: 'files block is written first, images last',
+    );
+    final back = splitAttachmentRefs(sent);
+    expect(back.text, 'look');
+    expect(back.filePaths, ['/host/up/1/a.pdf']);
+    expect(back.imagePaths, ['/host/.pocket-attachments/2/shot.png']);
+  });
+
+  test('image-only message is just the image block', () {
+    final sent = appendAttachmentRefs(
+      '',
+      imagePaths: ['/host/.pocket-attachments/1/shot.png'],
+    );
+    expect(sent, startsWith(kAttachedImagesHeader));
+    final back = splitAttachmentRefs(sent);
+    expect(back.text, isEmpty);
+    expect(back.filePaths, isEmpty);
+    expect(back.imagePaths, ['/host/.pocket-attachments/1/shot.png']);
+  });
+
+  test('legacy splitFileRefs still sees image paths', () {
+    final sent = appendAttachmentRefs('x', imagePaths: ['/h/a.png']);
+    expect(splitFileRefs(sent).paths, ['/h/a.png']);
+  });
+
+  test('previews strip the image block too', () {
+    final imageOnly = appendAttachmentRefs('', imagePaths: ['/h/a.png']);
+    expect(previewWithoutFileRefs(imageOnly, '[Image]'), '[Image]');
+    final mixed = appendAttachmentRefs('why?', imagePaths: ['/h/a.png']);
+    expect(previewWithoutFileRefs(mixed, '[Image]'), 'why?');
+  });
+
   test('hostPathBasename handles both separators', () {
     expect(hostPathBasename(r'C:\a\b\report.pdf'), 'report.pdf');
     expect(hostPathBasename('/home/u/notes.md'), 'notes.md');

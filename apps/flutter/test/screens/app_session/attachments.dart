@@ -13,6 +13,7 @@ void _registerAttachments() {
     });
     tearDown(() {
       processImageImpl = processImageNative;
+      processImageFileImpl = processImageFileNative;
     });
 
     testWidgets('a failed image remains retryable without choosing it again', (
@@ -51,6 +52,7 @@ void _registerAttachments() {
     Future<FakeBridgeApi> pumpSession(
       WidgetTester t, {
       String? threadId,
+      String? cwd,
     }) async {
       final api = FakeBridgeApi(
         config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
@@ -65,6 +67,7 @@ void _registerAttachments() {
           AppSessionScreen(
             serviceKey: 'pcx:lb7666:app:default',
             threadId: threadId,
+            cwd: cwd,
           ),
           api,
         ),
@@ -72,6 +75,132 @@ void _registerAttachments() {
       await t.pumpAndSettle();
       return api;
     }
+
+    testWidgets('local image paths mirror into the selected draft project', (
+      t,
+    ) async {
+      final api = await pumpSession(t, cwd: '/host/project-b');
+      final prepared = preparedImageFixture(tinyPng());
+      String? readPath;
+      processImageFileImpl = (path) async {
+        readPath = path;
+        return prepared;
+      };
+      picker.files = [XFile('/controller/shot.webp')];
+      await attachMenu(t, 'attach-btn');
+      await t.pumpAndSettle();
+      expect(readPath, '/controller/shot.webp');
+      expect(api.lastImageUploadProject, '/host/project-b');
+      expect(api.lastImageUploadThread, isNull);
+      expect(api.lastUploadName, 'shot.png');
+      expect(api.lastUploadBytes, prepared.bytes);
+      await t.tap(find.byKey(const Key('send-btn')));
+      await t.pumpAndSettle();
+      expect(splitAttachmentRefs(api.lastTurnText!).imagePaths, [
+        '/host/uploads/123/shot.png',
+      ]);
+      expect(api.lastTurnImages, [prepared.dataUrl]);
+      expect(
+        find.text('shot.png'),
+        findsNothing,
+        reason: 'no duplicate file chip beside the image',
+      );
+    });
+
+    testWidgets(
+      'an existing session keeps its image destination and waits for upload',
+      (t) async {
+        final api = await pumpSession(t, threadId: 'thread-7');
+        final gate = Completer<void>();
+        api.imageUploadGate = gate;
+        picker.files = [MemXFile(tinyPng(), 'waiting.png')];
+        await attachMenu(t, 'attach-btn', settle: false);
+        for (var i = 0; i < 8; i++) {
+          await t.pump(const Duration(milliseconds: 50));
+        }
+        expect(api.lastImageUploadThread, 'thread-7');
+        expect(
+          t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
+          isNull,
+        );
+        expect(api.turnStartCount, 0);
+        gate.complete();
+        await t.pumpAndSettle();
+        expect(
+          t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
+          isNotNull,
+        );
+      },
+    );
+
+    testWidgets(
+      'a failed mirror can retry without decoding or block-free send inline',
+      (t) async {
+        final api = await pumpSession(t);
+        var preparations = 0;
+        processImageImpl = (bytes) async {
+          preparations++;
+          return preparedImageFixture(bytes);
+        };
+        api.uploadError = StateError('host unavailable');
+        picker.files = [MemXFile(tinyPng(), 'retry.png')];
+        await attachMenu(t, 'attach-btn');
+        await t.pumpAndSettle();
+        expect(find.byIcon(AppIcons.warning_amber_rounded), findsOneWidget);
+        expect(
+          t.widget<IconButton>(find.byKey(const Key('send-btn'))).onPressed,
+          isNotNull,
+        );
+        api.uploadError = null;
+        await t.tap(find.byKey(const Key('attachment-0')));
+        await t.pumpAndSettle();
+        expect(preparations, 1);
+        expect(find.byIcon(AppIcons.warning_amber_rounded), findsNothing);
+        expect(api.lastUploadName, 'retry.png');
+      },
+    );
+
+    testWidgets(
+      'a changed upload context never receives prepared image bytes',
+      (t) async {
+        final api = await pumpSession(t);
+        final prepared = Completer<ProcessedImage>();
+        processImageImpl = (_) => prepared.future;
+        picker.files = [MemXFile(tinyPng(), 'context.png')];
+        await attachMenu(t, 'attach-btn', settle: false);
+        for (var i = 0; i < 8; i++) {
+          await t.pump(const Duration(milliseconds: 50));
+        }
+        api.uploadContext = 'another-account';
+        prepared.complete(preparedImageFixture(tinyPng()));
+        await t.pumpAndSettle();
+        expect(api.lastUploadBytes, isNull);
+        expect(find.byIcon(AppIcons.warning_amber_rounded), findsOneWidget);
+        await t.tap(find.byKey(const Key('send-btn')));
+        await t.pumpAndSettle();
+        expect(api.lastTurnImages, hasLength(1));
+        expect(splitAttachmentRefs(api.lastTurnText!).imagePaths, isEmpty);
+      },
+    );
+
+    testWidgets(
+      'removing an image during native preparation prevents its upload',
+      (t) async {
+        final api = await pumpSession(t);
+        final prepared = Completer<ProcessedImage>();
+        processImageFileImpl = (_) => prepared.future;
+        picker.files = [XFile('/controller/removed.png')];
+        await attachMenu(t, 'attach-btn', settle: false);
+        for (var i = 0; i < 8; i++) {
+          await t.pump(const Duration(milliseconds: 50));
+        }
+        await t.tap(find.byKey(const Key('attachment-remove-0')));
+        prepared.complete(preparedImageFixture(tinyPng()));
+        await t.pumpAndSettle();
+        expect(api.lastUploadBytes, isNull);
+        expect(find.byKey(const Key('attachment-0')), findsNothing);
+      },
+    );
 
     testWidgets('attach shows a preview chip; send carries data URLs and '
         'renders bubble thumbnails', (t) async {
@@ -88,7 +217,13 @@ void _registerAttachments() {
       await t.pumpAndSettle();
 
       // The turn carried the processed image as a data URL…
-      expect(api.lastTurnText, 'what is this?');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs(
+          'what is this?',
+          imagePaths: ['/host/uploads/123/image.png'],
+        ),
+      );
       expect(api.lastTurnImages, hasLength(1));
       expect(api.lastTurnImages.single, startsWith('data:image/png;base64,'));
       // …the optimistic bubble shows the thumbnail, and the composer strip
@@ -143,7 +278,10 @@ void _registerAttachments() {
       await t.tap(find.byKey(const Key('send-btn')));
       await t.pumpAndSettle();
 
-      expect(api.lastTurnText, '');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs('', imagePaths: ['/host/uploads/123/image.png']),
+      );
       expect(api.lastTurnImages, hasLength(1));
       expect(find.byKey(const Key('msg-image-0')), findsOneWidget);
     });
@@ -496,8 +634,11 @@ void _registerAttachments() {
 
       expect(api.lastTurnImages, hasLength(1));
       expect(api.lastTurnImages.single, startsWith('data:image/png;base64,'));
-      expect(api.lastUploadName, isNull, reason: 'images are not uploaded');
-      expect(api.lastTurnText, isEmpty);
+      expect(api.lastUploadName, 'shot.png');
+      expect(
+        api.lastTurnText,
+        appendAttachmentRefs('', imagePaths: ['/host/uploads/123/shot.png']),
+      );
     });
 
     testWidgets('history restores document chips from the reference block', (

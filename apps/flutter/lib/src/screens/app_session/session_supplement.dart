@@ -19,10 +19,17 @@ extension _SessionSupplement on _AppSessionState {
     final tools = List<String>.of(_tools);
     if (draft.trim().isEmpty && attachments.isEmpty) return;
     final text = appendBuiltinTools(
-      appendFileRefs(draft.trim(), [
-        for (final attachment in attachments)
-          if (attachment.isFile) ?attachment.hostPath,
-      ]),
+      appendAttachmentRefs(
+        draft.trim(),
+        filePaths: [
+          for (final attachment in attachments)
+            if (attachment.isFile) ?attachment.hostPath,
+        ],
+        imagePaths: [
+          for (final attachment in attachments)
+            if (!attachment.isFile) ?attachment.hostPath,
+        ],
+      ),
       tools,
       summaries: _hostToolSummaries(),
     );

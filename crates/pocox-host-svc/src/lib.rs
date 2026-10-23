@@ -31,6 +31,7 @@ pub mod store;
 mod codex_inventory;
 mod codex_routes;
 mod file_routes;
+mod image_uploads;
 
 use std::convert::Infallible;
 use std::net::SocketAddr;
@@ -169,6 +170,10 @@ fn generic_routes() -> Router<Arc<AppState>> {
         .route(
             "/uploads/{name}",
             post(upload_file).layer(DefaultBodyLimit::max(UPLOAD_BODY_LIMIT)),
+        )
+        .route(
+            "/uploads/images/{name}",
+            post(image_uploads::upload).layer(DefaultBodyLimit::max(UPLOAD_BODY_LIMIT)),
         )
 }
 

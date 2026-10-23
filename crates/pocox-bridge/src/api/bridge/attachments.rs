@@ -4,6 +4,30 @@ use super::*;
 use crate::engine::attachments;
 use crate::engine::execution::{self, Lane};
 
+/// Mirror an image into the host session's cwd or the selected draft project.
+/// The account/relay context must have been captured before preparing bytes.
+pub async fn meta_upload_image_scoped(
+    service_key: String,
+    file_name: String,
+    bytes: Vec<u8>,
+    context: String,
+    thread: Option<String>,
+    project: Option<String>,
+) -> Result<String> {
+    execution::run(Lane::Transfer, move || {
+        Ok(meta::upload_image_scoped(
+            &service_key,
+            &file_name,
+            bytes,
+            &context,
+            thread.as_deref(),
+            project.as_deref(),
+        )?
+        .path)
+    })
+    .await
+}
+
 /// Encoded image ready to preview and send; no image algorithms run in Dart.
 pub struct PreparedImageDto {
     /// Encoded original or resized JPEG.
