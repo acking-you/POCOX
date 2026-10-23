@@ -9,18 +9,12 @@ const WAIT: Duration = Duration::from_secs(15);
 /// The example agent Cargo builds next to the test binaries.
 pub(super) fn mock_binary() -> PathBuf {
     let exe = std::env::current_exe().expect("test executable");
-    let dir = exe
-        .parent()
-        .and_then(|deps| deps.parent())
-        .expect("target dir");
-    let mock = dir.join("examples").join("mock_acp_agent");
-    assert!(
-        mock.is_file(),
-        "{} is missing: run the package tests (`cargo test -p pocox-host-svc`), which build \
-         examples",
-        mock.display()
-    );
-    mock
+    // Cargo may run tests from deps/ or a nested build/<crate>/<hash>/out/.
+    exe.ancestors()
+        .skip(1)
+        .map(|dir| dir.join("examples").join("mock_acp_agent"))
+        .find(|mock| mock.is_file())
+        .expect("mock_acp_agent is missing: run `cargo test -p pocox-host-svc` to build examples")
 }
 
 async fn mock_host() -> AgentHost {
