@@ -289,8 +289,9 @@ as an unsaved edit.
 - Claude Code settings-tier precedence is taken from the adapter source only;
   our session `settings` replace the adapter's `modelConfig` for that session.
 - A quit whose host operation outlives the lease bound fails instead of
-  stopping it; the app stays open. The quit itself is tested only in parts
-  (its state is process-wide).
+  stopping it; the app stays open. An isolated process fixture exercises failed
+  cleanup, retry, in-flight writes and ownership handoff without resetting the
+  process-wide quit fence.
 - Endpoint ownership is checked at the port wait, after `/readyz` and after
   the effective-route request, not continuously, and is not bound to the
   connection that carried the requests. On macOS another user's listener
