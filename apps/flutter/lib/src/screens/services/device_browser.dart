@@ -671,33 +671,42 @@ class _DeviceFirstServices extends ConsumerWidget {
           ],
         ),
       // What this device shares: dev servers and pages, agents' or the user's.
+      // A host that answers for itself takes a new one in the list's closing
+      // row, the quiet add row local hosting ends with too.
       if (shares.isNotEmpty || sharingDevice != null) ...[
         const SizedBox(height: 12),
         GroupCard(
           title: l10n.toolsSharedWithYou,
           info: l10n.toolsSavedShareHelp,
-          trailing: sharingDevice == null
-              ? null
-              : TextButton.icon(
-                  key: const Key('add-shared-service'),
-                  onPressed: () => showShareServiceForm(context, sharingDevice),
-                  icon: const Icon(AppIcons.add, size: 16),
-                  label: Text(l10n.toolsAddShare),
-                ),
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+              padding: EdgeInsets.fromLTRB(
+                10,
+                shares.isEmpty ? 4 : 8,
+                10,
+                sharingDevice == null ? 0 : 4,
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (shares.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(l10n.toolsNoShares),
-                    ),
                   for (final share in shares)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: ShareCard(share: shareRefOf(share), dense: true),
+                    ),
+                  if (sharingDevice != null)
+                    TextButton.icon(
+                      key: const Key('add-shared-service'),
+                      onPressed: () =>
+                          showShareServiceForm(context, sharingDevice),
+                      icon: const Icon(AppIcons.add, size: 18),
+                      label: Text(l10n.toolsAddShare),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size.fromHeight(44),
+                        alignment: Alignment.centerLeft,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        foregroundColor: scheme.onSurfaceVariant,
+                      ),
                     ),
                 ],
               ),

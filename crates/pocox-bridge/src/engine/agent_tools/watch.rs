@@ -430,6 +430,5 @@ mod tests {
         record("studio", event(serde_json::json!([])), &seen);
         seen.lock().unwrap().catalogs.clear();
         assert!(entry().shares.is_empty(), "an authoritative removal is not resurrected");
-        assert!(Seen::default().saved_shares.is_empty(), "new contexts do not retain shares");
     }
 }

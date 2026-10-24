@@ -817,7 +817,7 @@ void main() {
           _whole(t, card, l10n.toolsStatusOnline, 'status $at');
           for (final key in [
             'share-open-$service',
-            'share-copy-$service',
+            'share-keep-$service',
             'share-menu-$service',
           ]) {
             _reachable(

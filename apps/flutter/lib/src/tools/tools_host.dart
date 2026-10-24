@@ -353,10 +353,12 @@ class _ConsentCard extends StatelessWidget {
               ),
             ),
             if (keep) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 l10n.toolsKeepRequestDetail,
-                style: theme.textTheme.bodySmall,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ],
             const SizedBox(height: 10),

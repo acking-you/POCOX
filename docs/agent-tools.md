@@ -303,14 +303,15 @@ does not start or supervise the web server. POCOX hosting, the service and the
 source computer must remain running and connected; a sleeping/offline computer
 cannot serve videos. Saved mappings are restored when POCOX hosting resumes.
 
-In **Services**, select the source device and choose **Share a service**.
+In **Services**, select the source device and choose **Share a service** at
+the end of its shared list.
 Enter a port or local HTTP(S) URL, such as `http://localhost:5555/static/`, and
 an optional name. **Share and save** creates a persistent mapping on the
 selected device. Sign in to the same POCOX account on the other device, select
 that source device and press **Open**. The phone opens an in-app browser;
 desktop opens its browser after connecting. No public tunnel URL or router
-port forwarding is needed. Copy link retains the scheme, directory and URL
-parameters for reopening through POCOX.
+port forwarding is needed. **Copy link** in the card's menu retains the scheme,
+directory and URL parameters for reopening through POCOX.
 
 Agent equivalent (the normal consent rules still apply):
 

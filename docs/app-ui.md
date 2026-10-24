@@ -15,13 +15,16 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 - Shared colours, typography and control shapes live in `theme.dart` /
   `desktop_theme.dart`; secondary pages use `UtilityPage`
   (`widgets/utility_page.dart`).
-- Service cards show saved, temporary or unknown legacy lifetime even in
-  dense lists. Save share is a direct action; Open shows progress and shares
-  one pending operation across cards and links. Offline saved entries retain
-  their place and explain that the source device must be online. Services
-  offers Share a service for a selected online host with a catalog: a local
-  URL/port and optional name, saved through that host's management endpoint.
-  Use the standard adaptive panel, wrapping actions and inline form errors;
+- Service cards (`tools/share_card.dart`) show saved, temporary or unknown
+  legacy lifetime even in dense lists. One action line: Open and, while
+  temporary, Save share, both `BusyLabel`s; Copy link and Stop sharing sit
+  in the card's menu so the line fits a 320 px phone. Open shares one pending
+  operation across cards and links. Under the lifetime, one short state line
+  says what an offline device or a silent server waits for. Offline saved
+  entries keep their place. Services ends a selected online host's shared
+  list with a quiet Share a service row (like local hosting's add row): a
+  local URL/port and optional name in the standard adaptive panel, saved
+  through that host's management endpoint, errors inline above the action;
   see [long-term sharing](agent-tools.md#long-term-access-from-another-device).
 - Palette: calm graphite neutrals, ink-black primary actions, the logo's blue
   as the one, sparse signal colour. No purple, no hue cast in greys or

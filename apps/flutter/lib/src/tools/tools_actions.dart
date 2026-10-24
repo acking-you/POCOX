@@ -35,27 +35,37 @@ String statusLabel(AppLocalizations l10n, String status) => switch (status) {
 /// When a share ends, in words.
 String endsLabel(AppLocalizations l10n, ToolsShare share) {
   if (share.kept) return l10n.toolsKept;
-  if (!share.persistenceKnown && share.expiresMs == null) {
-    return l10n.toolsPersistenceUnknown;
+  final expires = share.expiresMs;
+  if (expires == null) {
+    return share.persistenceKnown
+        ? l10n.toolsSessionShare
+        : l10n.toolsPersistenceUnknown;
   }
-  if (share.expiresMs == null) return l10n.toolsSessionShare;
-  return l10n.toolsSessionShareTimed(
-    endsIn(l10n, share.expiresMs, never: l10n.toolsSessionShare),
-  );
+  return switch (_timeLeft(l10n, expires)) {
+    final time? => l10n.toolsSessionShareTimed(time),
+    null => l10n.toolsEnded,
+  };
 }
 
 /// When something that ends at [expires] (unix milliseconds) does, in words;
 /// [never] when it has no expiry.
 String endsIn(AppLocalizations l10n, int? expires, {required String never}) {
   if (expires == null) return never;
+  return switch (_timeLeft(l10n, expires)) {
+    final time? => l10n.toolsEndsIn(time),
+    null => l10n.toolsEnded,
+  };
+}
+
+/// The time until [expires] (unix milliseconds) in words; null once past.
+String? _timeLeft(AppLocalizations l10n, int expires) {
   final left = DateTime.fromMillisecondsSinceEpoch(
     expires,
   ).difference(DateTime.now());
-  if (left.isNegative) return l10n.toolsEnded;
-  final time = left.inHours >= 1
+  if (left.isNegative) return null;
+  return left.inHours >= 1
       ? l10n.toolsHours(left.inHours)
       : l10n.toolsMinutes(left.inMinutes);
-  return l10n.toolsEndsIn(time);
 }
 
 /// Reads a provider (a [WidgetRef]'s or a container's `read`).

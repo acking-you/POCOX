@@ -4324,8 +4324,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolsSessionShare => 'Temporary · ends when the agent stops';
 
   @override
-  String toolsSessionShareTimed(String expiry) {
-    return 'Temporary · $expiry or when the agent stops';
+  String toolsSessionShareTimed(String time) {
+    return 'Temporary · ends in $time or when the agent stops';
   }
 
   @override
@@ -4346,7 +4346,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolsKeepRequestDetail =>
-      'It will stay shared after the agent stops and restore when POCOX restarts. You can stop it from Services. The local server still needs to be running.';
+      'It stays shared after the agent stops and returns when POCOX restarts, while its server runs. Stop it any time in Services.';
 
   @override
   String get builtinToolKeepShare => 'Keep shared services';
@@ -4367,12 +4367,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String toolsDeviceOfflineDetail(String device) {
-    return '$device is offline. The service returns when that device and POCOX are online.';
+    return 'Returns when $device is back online.';
   }
 
   @override
   String toolsServerStoppedDetail(String device) {
-    return 'The server on $device is not responding. Start it there; this share will reconnect automatically.';
+    return 'Start the server on $device; this share reconnects on its own.';
   }
 
   @override
@@ -4395,9 +4395,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get toolsShareAndSave => 'Share and save';
-
-  @override
-  String get toolsNoShares => 'No shared services';
 
   @override
   String toolsStoppedToast(String title) {

@@ -7461,8 +7461,8 @@ abstract class AppLocalizations {
   /// No description provided for @toolsSessionShareTimed.
   ///
   /// In en, this message translates to:
-  /// **'Temporary · {expiry} or when the agent stops'**
-  String toolsSessionShareTimed(String expiry);
+  /// **'Temporary · ends in {time} or when the agent stops'**
+  String toolsSessionShareTimed(String time);
 
   /// No description provided for @toolsPersistenceUnknown.
   ///
@@ -7491,7 +7491,7 @@ abstract class AppLocalizations {
   /// No description provided for @toolsKeepRequestDetail.
   ///
   /// In en, this message translates to:
-  /// **'It will stay shared after the agent stops and restore when POCOX restarts. You can stop it from Services. The local server still needs to be running.'**
+  /// **'It stays shared after the agent stops and returns when POCOX restarts, while its server runs. Stop it any time in Services.'**
   String get toolsKeepRequestDetail;
 
   /// No description provided for @builtinToolKeepShare.
@@ -7527,13 +7527,13 @@ abstract class AppLocalizations {
   /// No description provided for @toolsDeviceOfflineDetail.
   ///
   /// In en, this message translates to:
-  /// **'{device} is offline. The service returns when that device and POCOX are online.'**
+  /// **'Returns when {device} is back online.'**
   String toolsDeviceOfflineDetail(String device);
 
   /// No description provided for @toolsServerStoppedDetail.
   ///
   /// In en, this message translates to:
-  /// **'The server on {device} is not responding. Start it there; this share will reconnect automatically.'**
+  /// **'Start the server on {device}; this share reconnects on its own.'**
   String toolsServerStoppedDetail(String device);
 
   /// No description provided for @toolsAddShare.
@@ -7571,12 +7571,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Share and save'**
   String get toolsShareAndSave;
-
-  /// No description provided for @toolsNoShares.
-  ///
-  /// In en, this message translates to:
-  /// **'No shared services'**
-  String get toolsNoShares;
 
   /// No description provided for @toolsStoppedToast.
   ///

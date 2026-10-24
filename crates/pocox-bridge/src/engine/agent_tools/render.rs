@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 
 use pocox_core::service::sanitize_component;
 
-use super::model::{in_words, ConnectionView, LinkView, Overview, ShareView, Shared};
+use super::model::{in_words, ConnectionView, LinkView, Overview, OwnerKind, ShareView, Shared};
 use super::state;
 
 /// What `services` narrows to.
@@ -228,7 +228,7 @@ pub fn connected(view: &ConnectionView) -> String {
     if let Some(link) = &view.link {
         let _ = write!(out, " {}.", travels(link));
     }
-    if view.owner.kind == super::model::OwnerKind::Agent {
+    if view.owner.kind == OwnerKind::Agent {
         out.push_str(" It also ends when its agent or POCOX stops; no expiry does not mean saved.");
     }
     out

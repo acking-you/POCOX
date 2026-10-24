@@ -11,6 +11,7 @@ import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/widgets/adaptive_sheet.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
 import 'package:pocox/src/widgets/field_help.dart';
 
 /// Normalize a port or host-local HTTP(S) URL, preserving query and fragment.
@@ -120,10 +121,10 @@ class _ShareServiceFormState extends ConsumerState<ShareServiceForm> {
               ),
               info: l10n.toolsSavedShareHelp,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               l10n.toolsShareOnDevice(deviceLabel(widget.device)),
-              style: theme.textTheme.bodySmall,
+              style: helpTextStyle(theme),
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -132,6 +133,9 @@ class _ShareServiceFormState extends ConsumerState<ShareServiceForm> {
               enabled: !_busy,
               autofocus: true,
               keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+              autocorrect: false,
+              enableSuggestions: false,
               decoration: InputDecoration(
                 labelText: l10n.toolsShareAddress,
                 hintText: 'http://localhost:5555/static/',
@@ -146,6 +150,7 @@ class _ShareServiceFormState extends ConsumerState<ShareServiceForm> {
               controller: _title,
               enabled: !_busy,
               maxLength: 80,
+              textInputAction: TextInputAction.done,
               decoration: InputDecoration(
                 labelText: l10n.toolsShareName,
                 counterText: '',
@@ -153,18 +158,32 @@ class _ShareServiceFormState extends ConsumerState<ShareServiceForm> {
               onFieldSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 16),
+            // The outcome sits above the action that caused it.
             if (_error != null) ...[
               Text(
                 _error!,
                 key: const Key('share-error'),
-                style: TextStyle(color: theme.colorScheme.error),
+                style: helpTextStyle(
+                  theme,
+                ).copyWith(color: theme.colorScheme.error),
               ),
               const SizedBox(height: 12),
             ],
             FilledButton(
               key: const Key('share-submit'),
+              // Its working colours while it saves, not greyed out.
+              style: _busy
+                  ? FilledButton.styleFrom(
+                      disabledBackgroundColor: theme.colorScheme.primary,
+                      disabledForegroundColor: theme.colorScheme.onPrimary,
+                    )
+                  : null,
               onPressed: _busy ? null : _submit,
-              child: Text(_busy ? l10n.toolsSaving : l10n.toolsShareAndSave),
+              child: BusyLabel(
+                busy: _busy,
+                label: l10n.toolsShareAndSave,
+                busyLabel: l10n.toolsSaving,
+              ),
             ),
           ],
         ),

@@ -4071,8 +4071,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolsSessionShare => '临时共享 · 智能体停止后结束';
 
   @override
-  String toolsSessionShareTimed(String expiry) {
-    return '临时共享 · $expiry，或智能体停止后结束';
+  String toolsSessionShareTimed(String time) {
+    return '临时共享 · $time后或智能体停止时结束';
   }
 
   @override
@@ -4093,7 +4093,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolsKeepRequestDetail =>
-      '共享会在智能体停止后保留，并在 POCOX 重启后恢复。你可在服务管理中停止共享。本地服务仍需保持运行。';
+      '智能体停止后仍保持共享，POCOX 重启后自动恢复（本地服务需保持运行）。可随时在服务管理中停止。';
 
   @override
   String get builtinToolKeepShare => '长期保留共享';
@@ -4113,12 +4113,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String toolsDeviceOfflineDetail(String device) {
-    return '$device 已离线；设备和 POCOX 上线后，服务将恢复。';
+    return '$device 重新上线后恢复。';
   }
 
   @override
   String toolsServerStoppedDetail(String device) {
-    return '$device 上的服务未响应。启动该服务后，共享会自动恢复连接。';
+    return '在 $device 上启动该服务后，共享会自动恢复。';
   }
 
   @override
@@ -4141,9 +4141,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get toolsShareAndSave => '共享并长期保留';
-
-  @override
-  String get toolsNoShares => '暂无共享服务';
 
   @override
   String toolsStoppedToast(String title) {
