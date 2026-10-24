@@ -223,7 +223,6 @@ pub(super) mod tests {
     static REFUSED: Mutex<Vec<u32>> = Mutex::new(Vec::new());
 
     /// Make every stop of `child` fail (`refused`) or work again.
-    #[cfg(unix)]
     pub(in crate::engine) fn refuse_stops(child: OwnedChild, refused: bool) {
         let mut held = REFUSED.lock().unwrap_or_else(|p| p.into_inner());
         held.retain(|pid| *pid != child.main.pid);
@@ -243,10 +242,8 @@ pub(super) mod tests {
     /// (an assertion's unwind included). Derefs to the [`std::process::Child`]
     /// for the test's own signals and waits; a process the test already
     /// reaped is not signalled again.
-    #[cfg(unix)]
     pub(in crate::engine) struct Fixture(std::process::Child);
 
-    #[cfg(unix)]
     impl Fixture {
         /// Spawn `command` and wait (up to 5 s) until it runs.
         pub(in crate::engine) fn start(command: &mut std::process::Command) -> (Self, OwnedChild) {
@@ -262,7 +259,6 @@ pub(super) mod tests {
         }
     }
 
-    #[cfg(unix)]
     impl std::ops::Deref for Fixture {
         type Target = std::process::Child;
 
@@ -271,14 +267,12 @@ pub(super) mod tests {
         }
     }
 
-    #[cfg(unix)]
     impl std::ops::DerefMut for Fixture {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
     }
 
-    #[cfg(unix)]
     impl Drop for Fixture {
         fn drop(&mut self) {
             let _ = self.0.kill();
@@ -287,8 +281,17 @@ pub(super) mod tests {
     }
 
     /// A fixture process, once it runs.
-    #[cfg(unix)]
     pub(in crate::engine) fn sleeper() -> (Fixture, OwnedChild) {
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            Fixture::start(
+                std::process::Command::new("powershell.exe")
+                    .args(["-NoProfile", "-NonInteractive", "-Command", "Start-Sleep -Seconds 60"])
+                    .creation_flags(0x0800_0000),
+            )
+        }
+        #[cfg(not(windows))]
         Fixture::start(std::process::Command::new("/bin/sh").args(["-c", "exec sleep 60"]))
     }
 

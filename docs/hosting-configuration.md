@@ -203,15 +203,20 @@ relaunch try it again first and refuse while it runs; readiness,
 effective-route, registration and commit failures keep their child there
 too. Apply never starts after a failed stop.
 
-Quitting sets a fence first: a start that has not recorded its host yet
-tears it down itself. Admission then closes (native OpenCode's too), ACP
-agents and sign-in servers stop, the quit waits up to the lease bound
-(120 s) for operations in progress, stops every native OpenCode and Codex
-host under its own lease, and stops what the ledger kept. An OpenCode
-startup still stopping counts as something that may still run. When anything it owns may still run (a host still busy, a kept
-codex, a sign-in child) the quit fails with what remains: the app stays
-open, shows the reason with "Quit again" (`quit_status.dart`), and a later
-quit retries. What it cannot see (a process this app never identified) is
+Quitting hides the desktop window immediately and sets a fence: a start that
+has not recorded its host yet tears it down itself. Admission then closes
+(native OpenCode's too). Agent tools, ACP agents, sign-in servers and native
+host cleanup run concurrently. Native cleanup waits up to the lease bound
+(120 s) for operations already in progress, then stops Codex hosts concurrently
+under their own leases alongside OpenCode cleanup, and stops what the ledger
+kept. Each Codex host aborts its local services immediately and stops its owned
+process while withdrawing its three relay registrations concurrently; its name
+stays claimed until both have finished. No process grace period is shortened.
+An OpenCode startup still stopping counts as something that may still run.
+When anything it owns may still run (a host still busy, a kept codex, a sign-in
+child) the quit fails with what remains: the app stays alive, restores its window
+with the reason and "Quit again" (`quit_status.dart`), and a later quit retries.
+What it cannot see (a process this app never identified) is
 not claimed.
 
 On macOS every native quit (Cmd+Q, the application menu, the Dock, an Apple

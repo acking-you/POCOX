@@ -176,8 +176,8 @@ fn owned_of(ls: &LocalServe) -> Option<OwnedChild> {
 }
 
 /// Stop every host (called on app quit so a real quit leaves no orphan
-/// codex). Owned ACP agents go first: their cleanup is bounded and closes
-/// the ACP start barrier. Sign-in servers next. Native hosts: fence, refuse
+/// codex). Independent providers and sign-in servers stop together. Native
+/// hosts: fence, refuse
 /// new operations, wait (bounded) for those in progress, then stop each
 /// under its lease — never around an operation still holding it — and try
 /// again every codex an earlier stop could not see exit.
@@ -187,35 +187,63 @@ fn owned_of(ls: &LocalServe) -> Option<OwnedChild> {
 /// exit as if everything had stopped. Calling it again repeats every step
 /// for what is left, and fails again while anything remains.
 pub fn serve_stop_all() -> Result<()> {
+    let started = Instant::now();
     {
         let _hosts = hosts_locked();
         QUITTING.store(true, Ordering::SeqCst);
     }
     host_lease::close_admission();
     super::super::management::stop();
-    super::super::agent_tools::stop();
     super::super::serve_opencode::close_admission();
-    super::super::serve_acp::stop_all();
-    let mut left = Vec::new();
-    if let Err(error) = super::super::codex_login::close_all() {
-        left.push(format!("{error:#}"));
+    // These owners have independent cleanup barriers. Start them together so
+    // one provider's process or network grace cannot delay stopping another.
+    let left = std::thread::scope(|scope| {
+        scope.spawn(super::super::agent_tools::stop);
+        scope.spawn(super::super::serve_acp::stop_all);
+        scope.spawn(super::super::grok_account::close_all);
+        let sign_ins = scope.spawn(super::super::codex_login::close_all);
+        let mut left = stop_native_hosts();
+        if let Err(error) = sign_ins.join().expect("sign-in cleanup worker panicked") {
+            left.push(format!("{error:#}"));
+        }
+        left
+    });
+    if left.is_empty() {
+        tracing::info!(elapsed_ms = started.elapsed().as_millis(), "hosting stopped for quit");
+        return Ok(());
     }
-    super::super::grok_account::close_all();
+    tracing::error!(left = %left.join("; "), "quitting could not stop everything yet");
+    bail!("still stopping: {}; try quitting again", left.join("; "))
+}
+
+fn stop_native_hosts() -> Vec<String> {
     // Held past the wait: those operations still own their processes (a
     // start records or tears down its host itself, behind the fence).
     let drained = host_lease::drain(QUIT_WAIT);
-    left.extend(super::super::serve_opencode::stop_all(drained));
     let names: Vec<String> = hosts_locked().keys().cloned().collect();
-    for name in names {
-        let wait = if drained { QUIT_WAIT } else { Duration::ZERO };
-        match host_lease::acquire_for_quit(&name, wait) {
-            Ok(lease) => {
-                stop_codex(&name);
-                drop(lease);
-            },
-            Err(_) => left.push(format!("`{name}` is still busy")),
+    let mut left = std::thread::scope(|scope| {
+        let opencode = scope.spawn(|| super::super::serve_opencode::stop_all(drained));
+        let stops: Vec<_> = names
+            .into_iter()
+            .map(|name| {
+                scope.spawn(move || {
+                    let wait = if drained { QUIT_WAIT } else { Duration::ZERO };
+                    let lease = host_lease::acquire_for_quit(&name, wait)
+                        .map_err(|_| format!("`{name}` is still busy"))?;
+                    stop_codex(&name);
+                    drop(lease);
+                    Ok(())
+                })
+            })
+            .collect();
+        let mut left = opencode.join().expect("OpenCode cleanup worker panicked");
+        for stop in stops {
+            if let Err(error) = stop.join().expect("Codex cleanup worker panicked") {
+                left.push(error);
+            }
         }
-    }
+        left
+    });
     left.extend(
         NATIVE
             .settle(|_| true, EXIT_WAIT)
@@ -225,39 +253,18 @@ pub fn serve_stop_all() -> Result<()> {
     if !drained && left.is_empty() {
         left.push("a host operation is still running".to_string());
     }
-    if left.is_empty() {
-        return Ok(());
-    }
-    tracing::error!(left = %left.join("; "), "quitting could not stop everything yet");
-    bail!("still stopping: {}; try quitting again", left.join("; "))
+    left
 }
 
 /// Abort a host's background tasks (all register tunnels, watchdog, API proxy,
 /// meta service) and stop its codex when this app started it: exactly that
-/// process, never whoever listens on its port now. Does not touch the relay
-/// (callers that need an immediate relay drop force-deregister separately).
+/// process, never whoever listens on its port now. Relay registrations withdraw
+/// concurrently with process cleanup, before the host name can be reused.
 /// `false` when its own codex was seen running after a forced stop (it is
 /// then kept in [`NATIVE`]).
 pub(super) fn stop_host_tasks(ls: LocalServe) -> bool {
     let owned = owned_of(&ls);
     super::super::agent_tools::inject::hosted_stopped(&ls.name);
-    // Awaited rather than dropped, so the relay releases all three keys NOW: an
-    // immediate re-host under the same name would otherwise race registrations
-    // this one abandoned but the relay still held.
-    runtime::runtime().block_on(async {
-        for published in [ls.app_register, ls.api_register, ls.meta_register]
-            .into_iter()
-            .flatten()
-        {
-            if let Err(e) = published.stop().await {
-                tracing::warn!(
-                    error = %format!("{e:#}"),
-                    service = %ls.name,
-                    "releasing a relay key on stop failed; it lingers until lease expiry"
-                );
-            }
-        }
-    });
     // A watchdog restart in progress holds the lease the caller holds now,
     // so none is running; aborting stops the next one.
     ls.watchdog.abort();
@@ -266,5 +273,37 @@ pub(super) fn stop_host_tasks(ls: LocalServe) -> bool {
     if let Some(h) = ls.log_tail {
         h.abort();
     }
-    owned.is_none_or(|child| NATIVE.stop(&ls.name, child, EXIT_WAIT))
+    // Stop local processes while all three registrations withdraw together.
+    // Still await every withdrawal before releasing the host's name, so Apply
+    // cannot race its old registration. The SDK bounds each individual stop.
+    finish_host_stop(&ls.name, owned, async {
+        let stops = [ls.app_register, ls.api_register, ls.meta_register]
+            .into_iter()
+            .flatten()
+            .map(Published::stop);
+        for result in futures::future::join_all(stops).await {
+            if let Err(error) = result {
+                tracing::warn!(
+                    error = %format!("{error:#}"),
+                    service = %ls.name,
+                    "releasing a relay key on stop failed; it lingers until lease expiry"
+                );
+            }
+        }
+    })
 }
+
+fn finish_host_stop(
+    name: &str,
+    owned: Option<OwnedChild>,
+    withdrawals: impl std::future::Future<Output = ()> + Send,
+) -> bool {
+    std::thread::scope(|scope| {
+        scope.spawn(|| runtime::runtime().block_on(withdrawals));
+        owned.is_none_or(|child| NATIVE.stop(name, child, EXIT_WAIT))
+    })
+}
+
+#[cfg(test)]
+#[path = "serve_shutdown_tests.rs"]
+mod tests;
