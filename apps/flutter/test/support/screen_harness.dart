@@ -213,6 +213,7 @@ final Uint8List onePixelPng = base64Decode(
 /// the row for [value] — 'model', 'effort', 'plan' or 'project'. Plan toggles
 /// from Advanced settings; the others open their own picker sheet.
 Future<void> turnSetting(WidgetTester t, String value) async {
+  await unfoldComposer(t);
   await t.tap(find.byKey(const Key('model-chip')));
   await t.pumpAndSettle();
   if (value == 'plan') {
@@ -223,12 +224,23 @@ Future<void> turnSetting(WidgetTester t, String value) async {
   await t.pumpAndSettle();
 }
 
+/// Open a phone's folded composer the way a person does before writing: a
+/// tap on its capsule focuses the field. Nothing to do where it never folds.
+Future<void> unfoldComposer(WidgetTester t) async {
+  final capsule = find.byKey(const Key('composer-folded'));
+  if (capsule.evaluate().isEmpty) return;
+  await t.tap(capsule);
+  await t.pump();
+  await t.pump(const Duration(milliseconds: 400));
+}
+
 /// Open the composer's `+` attachment menu and tap the item keyed [key].
 Future<void> attachMenu(
   WidgetTester t,
   String key, {
   bool settle = true,
 }) async {
+  await unfoldComposer(t);
   await t.tap(find.byKey(const Key('attach-menu-btn')));
   await t.pumpAndSettle();
   await t.tap(find.byKey(Key(key)));

@@ -6,11 +6,11 @@ extension _SessionComposer on _AppSessionState {
   /// while they're reading history would be worse than the keyboard.
   void _onComposerFocus() {
     _repinForKeyboard();
+    // On a phone the composer unfolds while the field has focus and folds
+    // when it lets go ([_composerFolded]).
+    if (_composerFoldable) _updateState(() {});
     // Someone about to type may well dictate instead: have the line ready.
-    if (_inputFocus.hasFocus) {
-      _foldComposer(false);
-      _warmDictation();
-    }
+    if (_inputFocus.hasFocus) _warmDictation();
   }
 
   /// What the empty field invites: a dictation take, a queued or steering
@@ -477,19 +477,26 @@ extension _SessionComposer on _AppSessionState {
             : _inputFocus.hasFocus
             ? scheme.onSurface.withValues(alpha: 0.16)
             : null;
-        return Glass(
-          depth: GlassDepth.floating,
-          borderRadius: BorderRadius.circular(
-            touch ? kTouchComposerRadius : kComposerRadius,
+        // Focus lifts it over the same time the pane unfolds, not at once.
+        return TweenAnimationBuilder<double>(
+          tween: Tween(end: _inputFocus.hasFocus ? 1 : 0.7),
+          duration: Motion.of(context, Motion.slow),
+          curve: Motion.emphasized,
+          child: child,
+          builder: (context, lift, child) => Glass(
+            depth: GlassDepth.floating,
+            borderRadius: BorderRadius.circular(
+              touch ? kTouchComposerRadius : kComposerRadius,
+            ),
+            lift: lift,
+            edge: edge,
+            child: child!,
           ),
-          lift: _inputFocus.hasFocus ? 1 : 0.7,
-          edge: edge,
-          child: child!,
         );
       },
-      // On a phone the same pane folds into a capsule while the reader is
-      // reading (see [_foldForScroll]); the full composer keeps its draft,
-      // focus and options underneath.
+      // On a phone the same pane is a capsule whenever no one is writing
+      // (see [_composerFolded]); the full composer keeps its draft and
+      // options underneath.
       child: FoldingPanel(
         isFolded: _composerFolded,
         folded: _foldedComposer(l10n),

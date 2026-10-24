@@ -42,6 +42,11 @@ breaking change goes.
 - A sign-in refused because the account backend predates the app's return link
   now says to update the backend (or use a device code) instead of showing a
   bare HTTP 400.
+- **The phone composer stays folded until you write.** Every conversation
+  opens with the slim capsule; it unfolds when you tap it to type and folds
+  again when you are done (putting the keyboard away counts), instead of
+  unfolding whenever you reach the latest message. The fold now travels with
+  the keyboard, the content fading in as the pane grows into it.
 - The phone's jump-to-latest button is clear glass, so the lines it rests on
   stay readable.
 

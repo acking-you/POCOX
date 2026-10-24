@@ -23,8 +23,10 @@ import 'package:pocox/src/tools/share_card.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
+import 'support/screen_harness.dart' show unfoldComposer;
 import 'support/ui_preview.dart';
 import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/folding_panel.dart';
 
 const _device = 'ackingliu-mc1';
 const _openCode = 'pcx:$_device:opencode:opencode';
@@ -291,6 +293,7 @@ void main() {
         final api = _api();
         await api.appConnect(_openCode, 1);
         await _mount(t, api, screen, size: size, scale: scale);
+        await unfoldComposer(t);
         final at = '$size ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
         final screenRect = Offset.zero & size;
@@ -326,6 +329,7 @@ void main() {
       final api = _api();
       await api.appConnect(_openCode, 1);
       await _mount(t, api, screen, size: const Size(393, 852));
+      await unfoldComposer(t);
       await t.tap(find.byKey(const Key('agent-config-variant')));
       await t.pumpAndSettle();
       await t.tap(
@@ -386,6 +390,7 @@ void main() {
         final api = _api();
         await api.appConnect(_codex, 1);
         await _mount(t, api, screen, size: size, scale: scale, locale: locale);
+        await unfoldComposer(t);
         final at = '$size ${locale.languageCode} ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
         final chip = find.byKey(const Key('model-chip'));
@@ -457,10 +462,9 @@ void main() {
         await _mount(t, api, screen, size: size, scale: scale, locale: locale);
         final at = '$size ${locale.languageCode} ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
-        // Nothing of the view lies under the composer's glass.
-        final composerTop = t
-            .getRect(find.byKey(const Key('composer-input')))
-            .top;
+        // Nothing of the view lies under the composer's glass, which is
+        // folded while nobody writes.
+        final composerTop = t.getRect(find.byType(FoldingPanel)).top;
         final above = Offset.zero & Size(size.width, composerTop);
         _reachable(
           t,

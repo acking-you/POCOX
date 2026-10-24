@@ -32,6 +32,7 @@ import 'package:pocox/src/widgets/local_host_dialog.dart';
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
 import 'support/agent_catalog_fixture.dart';
+import 'support/screen_harness.dart' show unfoldComposer;
 import 'support/ui_preview.dart';
 
 part 'hosting_preview/layout_assertions.dart';
@@ -340,6 +341,9 @@ Future<void> _openSession(
       brightness,
     ),
   );
+  await _frames(t);
+  // A phone's composer opens folded; its options show once it is opened.
+  await unfoldComposer(t);
   await _frames(t);
 }
 

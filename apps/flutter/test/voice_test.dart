@@ -16,6 +16,7 @@ import 'package:pocox/src/voice/voice_transport.dart';
 import 'package:pocox/src/voice/voice_widgets.dart';
 
 import 'fake_bridge_api.dart';
+import 'support/screen_harness.dart' show unfoldComposer;
 
 const _service = 'pcx:host:app:default';
 
@@ -568,6 +569,7 @@ void main() {
           ),
         );
         await t.pumpAndSettle();
+        await unfoldComposer(t);
         await t.tap(find.byKey(const Key('voice-start')));
         await t.pumpAndSettle();
         expect(find.text('cove'), findsOneWidget);

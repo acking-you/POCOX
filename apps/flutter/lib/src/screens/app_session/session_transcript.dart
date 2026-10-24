@@ -277,7 +277,6 @@ extension _SessionTranscript on _AppSessionState {
         event.metrics.pixels >= event.metrics.maxScrollExtent - 1) {
       _scroll.stickToEnd = true;
     }
-    _foldForScroll(event);
     // Short pages cannot move their scroll offset. An overscroll is
     // still a deliberate request to reach history beyond the edge.
     if (event is OverscrollNotification &&

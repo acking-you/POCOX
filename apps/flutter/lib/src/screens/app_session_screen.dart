@@ -950,7 +950,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// the transcript viewport a little more, so re-pin on every metrics change,
   /// for as long as the composer holds focus.
   @override
-  void didChangeMetrics() => _repinForKeyboard();
+  void didChangeMetrics() => _onMetrics();
 
   /// A post-frame check for the shown draft's agent session is pending (see
   /// [_scheduleAgentSessionCheck]).

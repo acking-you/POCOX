@@ -127,18 +127,22 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 - Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
   22 px composer radius with a quieter idle edge, 44 px sidebar heading
   buttons, two-line host switcher names.
-- Below 720 px on touch the composer folds into a capsule while the reader
-  reads (`screens/app_session/composer_foot.dart`, `widgets/folding_panel.dart`):
-  a drag of 56 px through the transcript more than 96 px from its end folds
-  it, unless the field is focused, a dictation take runs or the full editor
-  is open. The capsule is the same glass pane (radius, focus and streaming
-  edges) showing the draft's first line or the hint, attachments and Stop
-  while a turn runs. It unfolds on a tap (which focuses the field), on any
-  focus of the field, when a scroll comes to rest at the end, and on a forced
-  return to the end (send, jump to latest). The fold belongs to its
-  conversation; desktop, tablets and read-only views never fold. The full
-  composer stays mounted underneath, so draft, focus and options survive; the
-  height morphs while the forms cross-fade (`Motion.medium`, emphasized).
+- Below 720 px on touch the composer is a capsule whenever no one is writing
+  (`_composerFolded` in `screens/app_session/composer_foot.dart`,
+  `widgets/folding_panel.dart`): every conversation opens folded, and it
+  unfolds only while the field has focus, a dictation take runs or the full
+  editor is open. A tap on the capsule focuses the field; letting go folds it
+  again. Reaching the end, jumping to the latest message, sending and a reply
+  arriving leave it as it is. A keyboard put away while the field keeps focus
+  (Android's back button) releases the field after 250 ms, unless it came back,
+  another app is in front or a take runs. The capsule is the same glass pane
+  (radius, focus and streaming edges) showing the draft's first line or the
+  hint, attachments and Stop while a turn runs. Desktop, tablets and read-only
+  views never fold. The full composer stays mounted underneath, so draft and
+  options survive. The height morphs on the emphasized curve over
+  `Motion.slow`, roughly with the keyboard; both forms fade on that eased
+  progress (so the pane is never empty glass) and settle 6 px into place, and
+  the focus lift eases over the same time.
 - What floats over the transcript's foot is measured into a notifier
   (`_ComposerFoot.overlay`): its growth, drag and fold move only the end
   spacer and the overlays above it, never rebuild the conversation.

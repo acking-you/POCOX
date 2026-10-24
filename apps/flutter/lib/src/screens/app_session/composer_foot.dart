@@ -12,23 +12,22 @@ class _ComposerFoot {
   /// The composer block's own height, inside [overlay].
   double block = 0;
 
-  /// The conversation the composer was folded in; any other opens unfolded.
-  String? foldedThread;
-  bool folded = false;
+  /// The keyboard's height at the last metrics change, to see it go away.
+  double keyboard = 0;
 
-  /// How far the current drag has read through the transcript.
-  double travel = 0;
+  /// Confirms, a moment after the keyboard went away, that it stayed away.
+  Timer? keyboardGone;
 
-  void dispose() => overlay.dispose();
+  void dispose() {
+    keyboardGone?.cancel();
+    overlay.dispose();
+  }
 }
 
 extension _SessionComposerFoot on _AppSessionState {
-  /// How far a reader drags before the composer folds away. Below a finger's
-  /// jitter, above a nudge.
-  static const double _foldTravel = 56;
-
-  /// How close to the end still counts as "at the latest message": no fold.
-  static const double _foldMargin = 96;
+  /// How long the keyboard must stay away before the field lets go: an input
+  /// method switching layouts can hide it for a moment.
+  static const _keyboardSettle = Duration(milliseconds: 250);
 
   ValueNotifier<double> get _composerOverlay => _foot.overlay;
   double get _composerBlock => _foot.block;
@@ -40,48 +39,43 @@ extension _SessionComposerFoot on _AppSessionState {
       MediaQuery.sizeOf(context).width < 720 &&
       !_externalWriterMode;
 
-  /// Whether the composer shows as its capsule now.
+  /// Whether the composer shows as its capsule: on a phone, whenever no one
+  /// is writing — the field has no focus, no dictation take runs and the
+  /// full editor is closed. Reaching the end of the conversation, jumping to
+  /// it or a reply arriving leaves it folded; focusing the field (a tap on
+  /// the capsule) unfolds it, and letting go folds it again.
   bool get _composerFolded =>
-      _foot.folded && _foot.foldedThread == _threadId && _composerFoldable;
+      _composerFoldable &&
+      !_inputFocus.hasFocus &&
+      !_editorOpen &&
+      _dictationTake == DictationTake.idle;
 
-  /// Fold the composer away for reading, or unfold it for writing. Folding
-  /// waits while someone is writing: a focused field, a dictation take or
-  /// the full editor.
-  void _foldComposer(bool fold) {
-    if (!mounted || fold == _composerFolded) return;
-    if (fold &&
-        (!_composerFoldable ||
-            _inputFocus.hasFocus ||
-            _editorOpen ||
-            _dictationTake != DictationTake.idle)) {
-      return;
-    }
-    _updateState(() {
-      _foot
-        ..folded = fold
-        ..foldedThread = _threadId;
+  /// The window's metrics changed: keep the conversation's end in view as
+  /// the keyboard opens, and when it is put away while the field keeps focus
+  /// (Android's back button does that) let the field go, so the composer
+  /// folds as it would after any other end of typing.
+  void _onMetrics() {
+    _repinForKeyboard();
+    final view = View.maybeOf(context);
+    if (view == null || isDesktop) return;
+    final keyboard = view.viewInsets.bottom;
+    final hidden = _foot.keyboard > 0 && keyboard == 0;
+    _foot.keyboard = keyboard;
+    if (!hidden || !_inputFocus.hasFocus) return;
+    _foot.keyboardGone?.cancel();
+    _foot.keyboardGone = Timer(_keyboardSettle, () {
+      // Still away, in front, and nobody dictating: typing is over. Another
+      // app in front (a photo picker) hides the keyboard without that.
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (mounted &&
+          _composerFoldable &&
+          _inputFocus.hasFocus &&
+          _dictationTake == DictationTake.idle &&
+          (lifecycle == null || lifecycle == AppLifecycleState.resumed) &&
+          View.maybeOf(context)?.viewInsets.bottom == 0) {
+        _inputFocus.unfocus();
+      }
     });
-  }
-
-  /// Read the reader's intent from a transcript scroll: dragging through the
-  /// conversation away from its end folds the composer; coming to rest at the
-  /// end unfolds it, since that is where a reply starts.
-  void _foldForScroll(ScrollNotification event) {
-    if (!_composerFoldable) return;
-    final metrics = event.metrics;
-    final fromEnd = metrics.maxScrollExtent - metrics.pixels;
-    switch (event) {
-      case ScrollStartNotification():
-        _foot.travel = 0;
-      case ScrollUpdateNotification(:final scrollDelta?, dragDetails: _?):
-        _foot.travel += scrollDelta.abs();
-        if (_foot.travel >= _foldTravel && fromEnd > _foldMargin) {
-          _foldComposer(true);
-        }
-      case ScrollEndNotification() when fromEnd <= 1:
-        _foldComposer(false);
-      default:
-    }
   }
 
   /// The capsule the composer folds into: the draft's first line (or what

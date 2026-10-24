@@ -6,12 +6,15 @@ import 'package:pocox/src/motion.dart';
 
 /// Content that folds into a slim [folded] form and unfolds back to [child].
 ///
-/// The height morphs while the two cross-fade: the outgoing form fades in
-/// the first half and the incoming one in the second, so the pane never
-/// shows both at full strength. Whatever wraps this (a glass card) resizes
-/// with it, keeping one surface throughout. At rest the panel is exactly as
-/// tall as the form it shows, so the content's own size changes (a wrapped
-/// line, a chip row) stay immediate.
+/// The height morphs on a quick-start, slow-settle curve while the two forms
+/// cross-fade on that same eased progress: the outgoing form leaves while
+/// the pane is still mostly its size, and the incoming one arrives as the
+/// pane reaches its own, settling the last few pixels into place — so the
+/// glass is never an empty box and never shows both forms at full strength.
+/// Whatever wraps this (a glass card) resizes with it, keeping one surface
+/// throughout. At rest the panel is exactly as tall as the form it shows, so
+/// the content's own size changes (a wrapped line, a chip row) stay
+/// immediate.
 ///
 /// [child] stays mounted while folded: its state, controllers and focus
 /// survive, and focus moving into it is how an owner learns to unfold. It
@@ -46,18 +49,25 @@ class _FoldingPanelState extends State<FoldingPanel>
     value: widget.isFolded ? 1 : 0,
   )..addStatusListener(_settled);
 
-  /// The height: a quick start that settles, in both directions.
+  /// The height: a quick start that settles, in both directions. Long enough
+  /// to travel with the keyboard that opens as the composer unfolds.
   late final CurvedAnimation _height = CurvedAnimation(
     parent: _fold,
     curve: Motion.emphasized,
     reverseCurve: Motion.emphasized.flipped,
   );
-  late final Animation<double> _childOpacity = _fold
-      .drive(CurveTween(curve: const Interval(0, 0.5, curve: Curves.easeOut)))
+
+  // Both fades follow the eased height rather than the clock, so each form
+  // is present in proportion to the room it has.
+  late final Animation<double> _childOpacity = _height
+      .drive(CurveTween(curve: const Interval(0, 0.45, curve: Curves.easeOut)))
       .drive(Tween(begin: 1, end: 0));
-  late final Animation<double> _foldedOpacity = _fold.drive(
-    CurveTween(curve: const Interval(0.45, 1, curve: Curves.easeIn)),
+  late final Animation<double> _foldedOpacity = _height.drive(
+    CurveTween(curve: const Interval(0.55, 1, curve: Curves.easeIn)),
   );
+
+  /// How far a form sinks as it fades out, and rises from as it fades in.
+  static const double _settle = 6;
 
   /// Drops the slim form once fully unfolded.
   void _settled(AnimationStatus status) {
@@ -68,7 +78,7 @@ class _FoldingPanelState extends State<FoldingPanel>
   void didUpdateWidget(FoldingPanel old) {
     super.didUpdateWidget(old);
     if (old.isFolded == widget.isFolded) return;
-    final duration = Motion.of(context, Motion.medium);
+    final duration = Motion.of(context, Motion.slow);
     if (duration == Duration.zero) {
       _fold.value = widget.isFolded ? 1 : 0;
       return;
@@ -85,7 +95,8 @@ class _FoldingPanelState extends State<FoldingPanel>
     super.dispose();
   }
 
-  /// One form: shown, or on its way out (or gone) and inert.
+  /// One form: shown, or on its way out (or gone) and inert. It sinks a few
+  /// pixels as it fades and rises back as it returns.
   Widget _form(bool shown, Animation<double> opacity, Widget child) =>
       IgnorePointer(
         ignoring: !shown,
@@ -93,7 +104,14 @@ class _FoldingPanelState extends State<FoldingPanel>
           excluding: !shown,
           child: TickerMode(
             enabled: shown,
-            child: FadeTransition(opacity: opacity, child: child),
+            child: AnimatedBuilder(
+              animation: opacity,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(0, (1 - opacity.value) * _settle),
+                child: child,
+              ),
+              child: FadeTransition(opacity: opacity, child: child),
+            ),
           ),
         ),
       );
