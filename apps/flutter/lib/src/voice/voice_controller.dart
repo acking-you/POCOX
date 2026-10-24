@@ -23,9 +23,6 @@ enum VoicePhase {
   /// still held. Turns into [active] or [failed].
   reconnecting,
 
-  /// Hanging up: microphone released, host being told.
-  stopping,
-
   /// The call ended because something went wrong; see [VoiceController.error].
   failed,
 }
@@ -73,6 +70,11 @@ class VoiceController extends ChangeNotifier {
 
   /// The last call ended because the user hung up here.
   bool endedByUser = false;
+
+  /// When the current or last call's audio first flowed, and when that call
+  /// ended: how long it has run, or ran. Both clear when a call starts.
+  DateTime? connectedAt;
+  DateTime? endedAt;
   final List<VoiceTranscript> transcript = [];
   final Map<String, String> _partial = {};
   VoiceTransport? _transport;
@@ -189,7 +191,7 @@ class VoiceController extends ChangeNotifier {
   }
 
   Future<void> start(String id, {String? model, String? voice}) async {
-    if (_starting != null || _stopping != null || busy || _disposed) return;
+    if (_starting != null || busy || _disposed) return;
     final operation = _start(id, model: model, voice: voice);
     _starting = operation;
     try {
@@ -211,13 +213,20 @@ class VoiceController extends ChangeNotifier {
   }
 
   Future<void> _start(String id, {String? model, String? voice}) async {
-    if (_disposed) return;
     final generation = ++_generation;
     bool current() => !_disposed && generation == _generation;
+    // A call hung up a moment ago has ended for the person, but its media
+    // may still be closing and its host acknowledging the stop. The next
+    // call waits for that, so the two never share the microphone and the
+    // old stop cannot land on the new session.
+    if (_stopping case final previous?) await previous;
+    if (!current()) return;
     threadId = id;
     error = null;
     endedReason = null;
     endedByUser = false;
+    connectedAt = null;
+    endedAt = null;
     muted = false;
     transcript.clear();
     _partial.clear();
@@ -252,6 +261,7 @@ class VoiceController extends ChangeNotifier {
         onConnected: () {
           if (!current()) return;
           _timeout?.cancel();
+          connectedAt ??= DateTime.now();
           phase = VoicePhase.active;
           _startLevels(transport, generation);
           _changed();
@@ -448,16 +458,28 @@ class VoiceController extends ChangeNotifier {
     return stop();
   }
 
+  /// Completes once the last call's cleanup is done (at once when none is
+  /// running): its media released and its host told.
+  Future<void> get settled => _stopping ?? Future.value();
+
+  /// End the call. It ends for the person at once — the phase settles before
+  /// anything is awaited — while the media closes and the host is told in
+  /// the background; the returned future completes once both are done, and
+  /// a new [start] waits for it.
   Future<void> stop({bool failed = false}) {
+    // Invalidate a redial even while it is waiting for the previous cleanup.
+    ++_generation;
     if (_stopping case final pending?) return pending;
     if (_transport == null && _events == null) return Future.value();
-    final operation = _stop(failed);
-    _stopping = operation;
-    return operation.whenComplete(() => _stopping = null);
+    // Listeners observe the idle phase synchronously in _stop. Publish the
+    // cleanup future first so dictation and a redial cannot overtake it.
+    final completion = Completer<void>();
+    _stopping = completion.future;
+    completion.complete(_stop(failed).whenComplete(() => _stopping = null));
+    return completion.future;
   }
 
   Future<void> _stop(bool failed) async {
-    ++_generation;
     _timeout?.cancel();
     _stopLevels();
     _resetFloor();
@@ -466,21 +488,29 @@ class VoiceController extends ChangeNotifier {
     final id = threadId;
     _transport = null;
     _events = null;
-    phase = VoicePhase.stopping;
-    _changed();
-    try {
-      await transport?.close();
-    } catch (e) {
-      error ??= e.toString();
-    }
-    try {
-      await events?.cancel();
-    } catch (e) {
-      error ??= e.toString();
-    }
-    if (id != null) await _stopHost(id);
+    if (connectedAt != null) endedAt ??= DateTime.now();
+    // Over before anything is awaited: disposing the peer, closing the event
+    // stream and the host's acknowledgement over the relay (up to five
+    // seconds) all follow the call reading as ended, never precede it.
     phase = failed ? VoicePhase.failed : VoicePhase.idle;
     _changed();
+    final before = error;
+    Future<void> step(Future<void>? Function() run) async {
+      try {
+        await run();
+      } catch (e) {
+        error ??= e.toString();
+      }
+    }
+
+    // Side by side: the microphone goes dark without waiting on the
+    // network, and the host's acknowledgement does not queue behind media.
+    await Future.wait([
+      step(() => transport?.close()),
+      step(() => events?.cancel()),
+      if (id != null) _stopHost(id),
+    ]);
+    if (error != before) _changed();
   }
 
   @override

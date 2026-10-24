@@ -93,7 +93,11 @@ void main() {
     expect(api.lastSteerTurnId, 'turn-1');
     expect(api.turnStartCount, 0);
     expect(find.byKey(const Key('user-input-card')), findsNothing);
-    expect(find.text('unfinished draft'), findsOneWidget);
+    // The field keeps it (the folded capsule may show it too).
+    expect(
+      t.widget<TextField>(find.byType(TextField)).controller!.text,
+      'unfinished draft',
+    );
     await t.pumpWidget(const SizedBox());
   });
 

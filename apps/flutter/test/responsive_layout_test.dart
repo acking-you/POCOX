@@ -11,18 +11,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/network/connection_paths.dart' show subscriptionTitle;
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/services_screen.dart';
 import 'package:pocox/src/screens/settings_screen.dart';
 import 'package:pocox/src/screens/welcome_guide_screen.dart';
+import 'package:pocox/src/service_key.dart' show deviceLabel;
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/share_card.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
+import 'support/screen_harness.dart' show unfoldComposer;
 import 'support/ui_preview.dart';
 import 'package:pocox/src/widgets/adaptive_sheet.dart';
+import 'package:pocox/src/widgets/folding_panel.dart';
 
 const _device = 'ackingliu-mc1';
 const _openCode = 'pcx:$_device:opencode:opencode';
@@ -289,6 +293,7 @@ void main() {
         final api = _api();
         await api.appConnect(_openCode, 1);
         await _mount(t, api, screen, size: size, scale: scale);
+        await unfoldComposer(t);
         final at = '$size ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
         final screenRect = Offset.zero & size;
@@ -324,6 +329,7 @@ void main() {
       final api = _api();
       await api.appConnect(_openCode, 1);
       await _mount(t, api, screen, size: const Size(393, 852));
+      await unfoldComposer(t);
       await t.tap(find.byKey(const Key('agent-config-variant')));
       await t.pumpAndSettle();
       await t.tap(
@@ -384,6 +390,7 @@ void main() {
         final api = _api();
         await api.appConnect(_codex, 1);
         await _mount(t, api, screen, size: size, scale: scale, locale: locale);
+        await unfoldComposer(t);
         final at = '$size ${locale.languageCode} ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
         final chip = find.byKey(const Key('model-chip'));
@@ -455,10 +462,9 @@ void main() {
         await _mount(t, api, screen, size: size, scale: scale, locale: locale);
         final at = '$size ${locale.languageCode} ×$scale';
         expect(t.takeException(), isNull, reason: 'no overflow: $at');
-        // Nothing of the view lies under the composer's glass.
-        final composerTop = t
-            .getRect(find.byKey(const Key('composer-input')))
-            .top;
+        // Nothing of the view lies under the composer's glass, which is
+        // folded while nobody writes.
+        final composerTop = t.getRect(find.byType(FoldingPanel)).top;
         final above = Offset.zero & Size(size.width, composerTop);
         _reachable(
           t,
@@ -549,10 +555,12 @@ void main() {
         size: const Size(393, 852),
         locale: const Locale('zh'),
       );
-      final key = find.text(_openCode);
+      // Under its device, by name and kind.
+      final key = find.text(subscriptionTitle(_openCode));
       await t.scrollUntilVisible(key, 200);
       await t.pump();
       expect(key, findsOneWidget);
+      expect(find.textContaining(deviceLabel(_device)), findsWidgets);
       expect(find.textContaining('\u001f'), findsNothing);
       expect(find.textContaining('#0eb093e3'), findsNothing);
       expect(find.text('127.0.0.1:64001'), findsOneWidget);

@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/glass.dart';
 import 'package:pocox/src/widgets/jump_to_latest_button.dart';
 
 import 'support/ui_preview.dart';
@@ -73,6 +74,12 @@ void main() {
     final button = find.byKey(const Key('nav-to-bottom'));
     final target = t.getRect(button);
     expect(target.shortestSide, greaterThanOrEqualTo(44));
+    expect(
+      t.widget<Glass>(find.byType(Glass)).depth,
+      GlassDepth.clear,
+      reason: 'on a phone the lines being read show through the button',
+    );
+    expect(find.byType(BackdropFilter), findsNothing);
     final before = await pixels();
     await t.pump(const Duration(milliseconds: 600));
     expect(await pixels(), isNot(before));

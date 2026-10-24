@@ -250,12 +250,20 @@ class ToolsConnectionDto {
   /// When it ends on its own.
   final PlatformInt64? expiresMs;
 
+  /// Its tunnel ended and POCOX is reopening it.
+  final bool restoring;
+
+  /// Failed attempts to reopen it so far.
+  final int restoreFailures;
+
   const ToolsConnectionDto({
     required this.service,
     required this.local,
     required this.samePort,
     required this.owner,
     this.expiresMs,
+    required this.restoring,
+    required this.restoreFailures,
   });
 
   @override
@@ -264,7 +272,9 @@ class ToolsConnectionDto {
       local.hashCode ^
       samePort.hashCode ^
       owner.hashCode ^
-      expiresMs.hashCode;
+      expiresMs.hashCode ^
+      restoring.hashCode ^
+      restoreFailures.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -275,7 +285,9 @@ class ToolsConnectionDto {
           local == other.local &&
           samePort == other.samePort &&
           owner == other.owner &&
-          expiresMs == other.expiresMs;
+          expiresMs == other.expiresMs &&
+          restoring == other.restoring &&
+          restoreFailures == other.restoreFailures;
 }
 
 /// A share, or a connection to another device's Responses API, waiting for

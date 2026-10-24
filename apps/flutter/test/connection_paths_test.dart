@@ -71,7 +71,11 @@ void main() {
       final api = FakeBridgeApi();
       await t.pumpWidget(_settings(api));
       await t.pumpAndSettle();
-      expect(_shown(t), ConnectionPath.relayOnly);
+      expect(
+        _shown(t),
+        ConnectionPath.relayOnly,
+        reason: 'direct paths are opt-in',
+      );
       expect(find.byKey(const Key('connection-path-state')), findsNothing);
 
       await t.tap(find.byKey(const Key('connection-path-auto')));
@@ -90,6 +94,7 @@ void main() {
       final incoming = find.byKey(const Key('connection-path-incoming'));
       expect(incoming, isDesktop ? findsOneWidget : findsNothing);
       if (isDesktop) {
+        // Enabling incoming direct paths waits for hosting to restart.
         await t.tap(incoming);
         await t.pumpAndSettle();
         expect(find.text('重启托管后生效。'), findsOneWidget);
@@ -121,11 +126,11 @@ void main() {
     api
       ..relayReadError = null
       ..savedRelayPreferences = const RelayPreferences(
-        path: ConnectionPath.auto,
+        path: ConnectionPath.relayOnly,
       );
     await t.tap(find.byKey(const Key('connection-path-retry')));
     await t.pumpAndSettle();
-    expect(_shown(t), ConnectionPath.auto);
+    expect(_shown(t), ConnectionPath.relayOnly, reason: 'what is saved');
   });
 
   testWidgets('chips follow live observations; polling ends with the view', (

@@ -289,13 +289,17 @@ pub async fn subscribe_background(
 /// `opts.local_addr`.
 pub async fn subscribe(session: &RelaySession, opts: SubscribeOptions) -> Result<Connection> {
     let connection = subscribe_background(session, opts.clone()).await?;
+    subscribed(&connection, session, &opts.key).await?;
+    Ok(connection)
+}
+
+/// Wait until `connection`, a subscription to `key` started by
+/// [`subscribe_background`], is ready to be dialled.
+pub async fn subscribed(connection: &Connection, session: &RelaySession, key: &str) -> Result<()> {
     connection
         .wait_ready_timeout(TUNNEL_READY_TIMEOUT)
         .await
-        .with_context(|| {
-            format!("waiting for `{}` to subscribe on {}", opts.key, session.relay_addr)
-        })?;
-    Ok(connection)
+        .with_context(|| format!("waiting for `{key}` to subscribe on {}", session.relay_addr))
 }
 
 /// Query the service keys visible to this session's credential.

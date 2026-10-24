@@ -16,17 +16,24 @@ pub(super) enum LinkPath {
     Mixed,
     /// Ready, with no data flowing.
     Idle,
+    /// Trying a direct path: hole punching is under way.
+    Probing,
+    /// Coming up, or recovering its link to the relay.
+    Recovering,
 }
 
 impl LinkPath {
-    /// The scene's code: 0 unknown, 1 relay, 2 direct, 3 mixed, 4 idle.
+    /// The scene's code: 0 unknown, 1 relay, 2 direct, 3 mixed, 4 idle,
+    /// 5 probing, 6 recovering.
     pub(super) fn decode(code: f64) -> Option<Self> {
-        Some(match count(code, 4)? {
+        Some(match count(code, 6)? {
             0 => Self::Unknown,
             1 => Self::Relay,
             2 => Self::Direct,
             3 => Self::Mixed,
-            _ => Self::Idle,
+            4 => Self::Idle,
+            5 => Self::Probing,
+            _ => Self::Recovering,
         })
     }
 
@@ -37,6 +44,8 @@ impl LinkPath {
             Self::Direct => 2.0,
             Self::Mixed => 3.0,
             Self::Idle => 4.0,
+            Self::Probing => 5.0,
+            Self::Recovering => 6.0,
         }
     }
 
@@ -48,33 +57,40 @@ impl LinkPath {
             Self::Relay => &[Self::Relay],
             Self::Direct => &[Self::Direct],
             Self::Idle => &[Self::Idle],
+            Self::Probing => &[Self::Probing],
+            Self::Recovering => &[Self::Recovering],
         }
     }
 
     /// How high a strand spanning `span` rises over the plane: a direct one
-    /// runs nearly straight between the two bodies; any other arcs up and
-    /// back down, as if by way of a relay above the disk.
+    /// (or one trying to be) runs nearly straight between the two bodies;
+    /// any other arcs up and back down, as if by way of a relay above the
+    /// disk.
     fn rise(self, span: f64) -> f64 {
         match self {
-            Self::Direct => span * 0.12 + 0.12,
+            Self::Direct | Self::Probing => span * 0.12 + 0.12,
             _ => span * 0.42 + 0.4,
         }
     }
 
-    /// How fast its particles run, in curves per second; idle carries none.
+    /// How fast its particles run, in curves per second: quick while probing,
+    /// none while idle or recovering.
     fn flow(self) -> Option<f64> {
         match self {
             Self::Direct => Some(0.42),
-            Self::Idle => None,
+            Self::Probing => Some(0.9),
+            Self::Idle | Self::Recovering => None,
             _ => Some(0.22),
         }
     }
 }
 
-/// One link: the planet it reaches, the system using it, and its path.
+/// One link: the body it reaches, the system using it, and its path.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Link {
-    pub(super) planet: usize,
+    /// A body index: systems first, then planets. A device's star when the
+    /// connection reaches no service of it that the galaxy shows.
+    pub(super) target: usize,
     pub(super) system: usize,
     pub(super) path: LinkPath,
 }
@@ -83,10 +99,15 @@ pub(super) fn draw(scene: &Scene, frame: &Frame, camera: &Camera, out: &mut Out)
     let count = out.hole();
     let mut n = 0;
     for link in &scene.links {
-        let p = &scene.planets[link.planet];
-        let from = scene.systems[p.system]
-            .position
-            .add(p.offset_at(frame.orbit_time()));
+        let from = match link.target.checked_sub(scene.systems.len()) {
+            None => scene.systems[link.target].position,
+            Some(planet) => {
+                let p = &scene.planets[planet];
+                scene.systems[p.system]
+                    .position
+                    .add(p.offset_at(frame.orbit_time()))
+            },
+        };
         let to = scene.systems[link.system].position;
         let (span, middle) = (to.sub(from).length(), from.lerp(to, 0.5));
         for &strand in link.path.strands() {

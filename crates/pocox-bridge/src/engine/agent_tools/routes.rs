@@ -223,6 +223,7 @@ pub fn router(admitted: Admitted, epoch: u64) -> Router {
                     wait_ready_seconds: Some(5),
                     secure: body.secure,
                     epoch: Some(epoch),
+                    ..Default::default()
                 };
                 match shares::share(&caller, request).await {
                     Ok(Ok(shared)) => Json(shared).into_response(),

@@ -19,7 +19,7 @@ use serde_json::{json, Value};
 
 use super::connections::{self, ConnectRequest};
 use super::error::{Pending, ToolError};
-use super::model::{bounded, Overview, OwnerView};
+use super::model::{bounded, Lifetime, Overview, OwnerView, MAX_LIFETIME_MINUTES};
 use super::shares::{self, Caller, ShareRequest};
 use super::tokens::Principal;
 use super::{catalog, render};
@@ -86,9 +86,12 @@ fn connect_tool() -> Tool {
          server the user wants to preview on their phone), stop sharing it, or connect to a \
          service on another of the user's devices so it is reachable on this machine. \
          action=share needs `ports`; stop_sharing needs `service` (a key or port); connect and \
-         disconnect need `service` (a key, `device:kind:name` or `device/port`). A share, or a \
-         connection to another device's Responses API, may wait for the user's consent in \
-         POCOX; repeating the same call continues it.",
+         disconnect need `service` (a key, `device:kind:name` or `device/port`). A share or \
+         connection lasts 24 hours unless given `expires_in_minutes` or `permanent`; repeating \
+         the call renews it. A connection's result says how it travels (direct P2P or the \
+         relay), as `services` does for every connection. A share, or a connection to another \
+         device's Responses API, may wait for the user's consent in POCOX; repeating the same \
+         call continues it.",
         schema(json!({
             "type": "object",
             "properties": {
@@ -122,6 +125,19 @@ fn connect_tool() -> Tool {
                 "local_port": {
                     "type": "integer", "minimum": 1, "maximum": 65535,
                     "description": "connect: local port to use instead of the service's own."
+                },
+                "expires_in_minutes": {
+                    "type": "integer", "minimum": 1, "maximum": MAX_LIFETIME_MINUTES,
+                    "description": "share, connect: end it after this many minutes instead of \
+                                    the default 24 hours; repeating the call renews it."
+                },
+                "permanent": {
+                    "type": "boolean",
+                    "description": "share, connect: true keeps it with no expiry until it is \
+                                    stopped or disconnected (or this conversation's harness \
+                                    stops). A connection reconnects on its own after network or \
+                                    relay outages, trying a direct P2P path first when the \
+                                    device allows it."
                 }
             },
             "required": ["action"],
@@ -154,6 +170,26 @@ fn port(value: Option<&Value>) -> Option<u16> {
 
 fn text(value: Option<&Value>) -> Option<String> {
     value.and_then(Value::as_str).map(str::to_string)
+}
+
+/// The lifetime an agent asked for: `expires_in_minutes` or `permanent`.
+fn lifetime(args: &JsonObject) -> Result<Lifetime, ToolError> {
+    let minutes = args.get("expires_in_minutes").and_then(number);
+    let permanent = args
+        .get("permanent")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    match (minutes, permanent) {
+        (Some(_), true) => {
+            Err(ToolError::Invalid("Give `expires_in_minutes` or `permanent`, not both.".into()))
+        },
+        (Some(minutes @ 1..=MAX_LIFETIME_MINUTES), false) => Ok(Lifetime::Minutes(minutes)),
+        (Some(_), false) => Err(ToolError::Invalid(format!(
+            "`expires_in_minutes` is from 1 to {MAX_LIFETIME_MINUTES} (a week)."
+        ))),
+        (None, true) => Ok(Lifetime::Permanent),
+        (None, false) => Ok(Lifetime::Lease),
+    }
 }
 
 fn done(structured: Value, message: String) -> CallToolResult {
@@ -213,6 +249,10 @@ async fn services(caller: &Caller, args: &JsonObject) -> CallToolResult {
 async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
     let action = text(args.get("action")).unwrap_or_default();
     let service = text(args.get("service"));
+    let lifetime = match lifetime(args) {
+        Ok(lifetime) => lifetime,
+        Err(error) => return failed(&error),
+    };
     match action.as_str() {
         "share" => {
             let request = ShareRequest {
@@ -227,6 +267,7 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                 wait_ready_seconds: args.get("wait_ready_seconds").and_then(number),
                 secure: text(args.get("scheme")).as_deref() == Some("https"),
                 epoch: None,
+                lifetime,
             };
             match shares::share(caller, request).await {
                 Ok(Ok(mut shared)) => {
@@ -259,6 +300,7 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
                 let request = ConnectRequest {
                     service,
                     local_port: port(args.get("local_port")),
+                    lifetime,
                 };
                 match connections::connect(caller, request).await {
                     Ok(Ok(mut view)) => {
@@ -361,5 +403,16 @@ mod tests {
     fn the_served_tools_are_the_ones_harnesses_are_told_about() {
         let served: Vec<String> = tools().iter().map(|tool| tool.name.to_string()).collect();
         assert_eq!(served, super::super::builtin::MCP_TOOLS);
+    }
+
+    #[test]
+    fn an_agent_picks_a_lifetime_or_none_but_not_both() {
+        let args = |value: Value| value.as_object().cloned().unwrap_or_default();
+        assert_eq!(lifetime(&args(json!({}))), Ok(Lifetime::Lease));
+        assert_eq!(lifetime(&args(json!({"permanent": true}))), Ok(Lifetime::Permanent));
+        assert_eq!(lifetime(&args(json!({"expires_in_minutes": 90}))), Ok(Lifetime::Minutes(90)));
+        assert!(lifetime(&args(json!({"expires_in_minutes": 0}))).is_err());
+        assert!(lifetime(&args(json!({"expires_in_minutes": 20_000}))).is_err());
+        assert!(lifetime(&args(json!({"expires_in_minutes": 5, "permanent": true}))).is_err());
     }
 }

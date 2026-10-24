@@ -1,25 +1,35 @@
 //! Connecting a session to its app-server, probing endpoints and disconnecting.
 
 use super::*;
+use crate::engine::connect_stage::{self, ConnectStage};
 
 /// Subscribe to `service_key` (materialising the local ws endpoint), open a
 /// JSON-RPC client over it and run the `initialize` handshake. Idempotent: a
 /// live session for the same key is reused.
+///
+/// A reconnect keeps a live tunnel: the SDK recovers its relay link and
+/// direct paths on its own, so a dropped socket only needs a new one, and
+/// the tunnel's history stays with it. Only a failed attempt rebuilds the
+/// tunnel too, in case the tunnel itself is what failed.
 pub fn connect(service_key: String, local_port: u16, transport: &Transport) -> Result<()> {
     let lifecycle = lifecycle(&service_key);
     let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
     if reuse_live(&service_key) {
         return Ok(());
     }
-    // No live session: drop any stale one (and its subscription) so we reconnect
-    // cleanly rather than reusing a closed socket.
-    disconnect_inner(&service_key);
+    // No live session: drop any stale one rather than reuse a closed socket.
+    sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .remove(&service_key);
     if let Some((addr, _)) = crate::engine::serve::local_endpoints(&service_key) {
         return establish(service_key, &addr);
     }
     // Materialise the local ws endpoint via pb-mapper (kind-agnostic subscribe).
     let sub = runtime::subscribe_service(service_key.clone(), local_port, transport)?;
-    establish(service_key, &sub.local_addr)
+    establish(service_key.clone(), &sub.local_addr).inspect_err(|_| {
+        runtime::unsubscribe_service(&service_key);
+    })
 }
 
 /// Whether a live session already exists for `service_key`. The forwarder task
@@ -38,6 +48,7 @@ fn reuse_live(service_key: &str) -> bool {
 /// agnostic: the local endpoint is materialised by the caller's subscribe.
 pub(super) fn establish(service_key: String, local_addr: &str) -> Result<()> {
     let ws_url = format!("ws://{local_addr}");
+    connect_stage::enter(&service_key, ConnectStage::Session);
 
     let (client, mut notify_rx) = runtime::runtime().block_on(async {
         tokio::time::timeout(CONNECT_TIMEOUT, AppClient::connect(&ws_url))
@@ -47,6 +58,7 @@ pub(super) fn establish(service_key: String, local_addr: &str) -> Result<()> {
     })?;
     let client = Arc::new(client);
 
+    connect_stage::enter(&service_key, ConnectStage::Handshake);
     // Handshake. The app-server rejects every other method until initialized.
     // Bounded by CONNECT_TIMEOUT so a registered-but-dead backend (relay
     // registrant alive, codex app-server gone) fails fast instead of hanging

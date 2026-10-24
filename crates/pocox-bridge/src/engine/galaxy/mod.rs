@@ -20,8 +20,10 @@ mod tests;
 
 use std::f64::consts::PI;
 
-/// The buffer layouts' version; both ends name it. 2: links carry their path.
-pub const VERSION: f64 = 2.0;
+/// The buffer layouts' version; both ends name it. 2: links carry their path;
+/// 3: a link reaches any body, a device's star as well as a planet.
+/// 4: a link can be probing a direct path or recovering its relay link.
+pub const VERSION: f64 = 4.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 struct V3 {
@@ -204,9 +206,10 @@ struct StarLayer {
 /// star layers; per system x, y, z, home, online, first planet, planet
 /// count, label width, label height; per planet system, ring, radius,
 /// phase, period, size, tilt axis, tilt, appeared, rippled, label width and
-/// height, strong label width and height; per link planet, system, path
-/// ([`LinkPath`] code); per star layer parallax, buckets, then per bucket
-/// phase, count and the unit coordinates.
+/// height, strong label width and height; per link the body it reaches
+/// (systems, then planets), the system using it and its path ([`LinkPath`]
+/// code); per star layer parallax, buckets, then per bucket phase, count and
+/// the unit coordinates.
 pub struct Scene<'a> {
     systems: Vec<System>,
     planets: Vec<Planet>,
@@ -287,7 +290,7 @@ impl<'a> Scene<'a> {
         for _ in 0..n_links {
             let f = fields.take(3)?;
             links.push(Link {
-                planet: count(f[0], n_planets.checked_sub(1)?)?,
+                target: count(f[0], (n_systems + n_planets).checked_sub(1)?)?,
                 system: count(f[1], n_systems.checked_sub(1)?)?,
                 path: LinkPath::decode(f[2])?,
             });

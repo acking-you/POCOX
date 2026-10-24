@@ -32,6 +32,47 @@ pub const CLI_PORT: u16 = 17864;
 /// How long an agent's share or connection lives unless kept.
 pub const AGENT_LEASE_MS: i64 = 24 * 60 * 60 * 1000;
 
+/// The longest lifetime an agent may give a share or connection: a week.
+pub const MAX_LIFETIME_MINUTES: u64 = 7 * 24 * 60;
+
+/// How long an agent's share or connection lasts before it ends on its own.
+/// Whatever it is, it also ends with its owner (the conversation's harness).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Lifetime {
+    /// [`AGENT_LEASE_MS`].
+    #[default]
+    Lease,
+    /// This many minutes.
+    Minutes(u64),
+    /// No expiry: kept, renewing itself, until it is ended.
+    Permanent,
+}
+
+impl Lifetime {
+    /// When it ends, counted from `now` (unix milliseconds); `None` for never.
+    pub fn until(self, now: i64) -> Option<i64> {
+        let minutes =
+            |minutes: u64| i64::try_from(minutes.saturating_mul(60_000)).unwrap_or(i64::MAX);
+        match self {
+            Self::Lease => Some(now.saturating_add(AGENT_LEASE_MS)),
+            Self::Minutes(count) => Some(now.saturating_add(minutes(count))),
+            Self::Permanent => None,
+        }
+    }
+}
+
+/// `ms` from now in words: "in 5 minutes", "in 3 hours", "in 2 days".
+pub fn in_words(ms: i64) -> String {
+    let minutes = (ms.max(0) + 59_999) / 60_000;
+    let (count, unit) = match minutes {
+        ..120 => (minutes.max(1), "minute"),
+        120..2_880 => ((minutes + 30) / 60, "hour"),
+        _ => ((minutes + 720) / 1_440, "day"),
+    };
+    let plural = if count == 1 { "" } else { "s" };
+    format!("in {count} {unit}{plural}")
+}
+
 /// Characters that change how text around them is shown without being
 /// visible themselves: bidirectional controls (which can make "port 3715"
 /// read as "5173" in a consent prompt), zero-width and other format marks.
@@ -347,6 +388,43 @@ pub struct ConnectionView {
     /// When it ends on its own.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_ms: Option<i64>,
+    /// How it travels, when its tunnel is known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<LinkView>,
+}
+
+/// How a connection travels, as this device observes its tunnel.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkView {
+    /// `p2p_first` or `relay_only`: how this device opens tunnels.
+    pub policy: String,
+    /// What its open connections go through: `direct` (hole-punched),
+    /// `relay`, `mixed`, or `idle` while none is open.
+    pub path: String,
+    /// Its tunnel: `connecting`, `ready`, `reconnecting` (the relay link is
+    /// recovering) or `restoring` (POCOX is reopening a tunnel that ended).
+    pub state: String,
+    /// Connections that went direct since the tunnel opened.
+    pub direct_sessions: u64,
+    /// Connections that used the relay since the tunnel opened.
+    pub relay_sessions: u64,
+    /// Direct attempts that fell back to the relay.
+    pub fallbacks: u64,
+    /// Where the latest fallback gave up: `negotiating`, `discovering`,
+    /// `punching` or `committing`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_fallback_stage: Option<String>,
+    /// The stage of a direct attempt in flight.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attempting: Option<String>,
+    /// Failed attempts to reopen it, while `restoring`.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub restore_failures: u32,
+}
+
+fn is_zero(count: &u32) -> bool {
+    *count == 0
 }
 
 /// What a successful share returns.
@@ -410,6 +488,17 @@ pub fn clean_path(path: Option<&str>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lifetimes_end_when_asked_and_read_in_words() {
+        assert_eq!(Lifetime::Lease.until(1_000), Some(1_000 + AGENT_LEASE_MS));
+        assert_eq!(Lifetime::Minutes(90).until(0), Some(5_400_000));
+        assert_eq!(Lifetime::Permanent.until(0), None);
+        assert_eq!(in_words(30_000), "in 1 minute");
+        assert_eq!(in_words(90 * 60_000), "in 90 minutes");
+        assert_eq!(in_words(AGENT_LEASE_MS), "in 24 hours");
+        assert_eq!(in_words(7 * AGENT_LEASE_MS), "in 7 days");
+    }
 
     #[test]
     fn links_and_paths_never_carry_another_origin() {

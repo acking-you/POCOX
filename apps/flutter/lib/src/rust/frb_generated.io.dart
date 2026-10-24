@@ -209,10 +209,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool dco_decode_box_autoadd_bool(dynamic raw);
 
   @protected
+  ConnectStageDto dco_decode_box_autoadd_connect_stage_dto(dynamic raw);
+
+  @protected
   DeviceMetadataDto dco_decode_box_autoadd_device_metadata_dto(dynamic raw);
 
   @protected
   DiffDto dco_decode_box_autoadd_diff_dto(dynamic raw);
+
+  @protected
+  DirectStageDto dco_decode_box_autoadd_direct_stage_dto(dynamic raw);
 
   @protected
   HostActiveDto dco_decode_box_autoadd_host_active_dto(dynamic raw);
@@ -258,6 +264,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TunnelFailureDto dco_decode_box_autoadd_tunnel_failure_dto(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_u_16(dynamic raw);
 
   @protected
@@ -291,6 +300,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ConfigView dco_decode_config_view(dynamic raw);
 
   @protected
+  ConnectStageDto dco_decode_connect_stage_dto(dynamic raw);
+
+  @protected
   ConnectionPathDto dco_decode_connection_path_dto(dynamic raw);
 
   @protected
@@ -316,6 +328,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DirEntryDto dco_decode_dir_entry_dto(dynamic raw);
+
+  @protected
+  DirectStageDto dco_decode_direct_stage_dto(dynamic raw);
 
   @protected
   EventTopic dco_decode_event_topic(dynamic raw);
@@ -381,6 +396,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  LinkEventDto dco_decode_link_event_dto(dynamic raw);
+
+  @protected
+  LinkEventKindDto dco_decode_link_event_kind_dto(dynamic raw);
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw);
 
   @protected
@@ -428,6 +449,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<HostRestoreOverrideDto> dco_decode_list_host_restore_override_dto(
     dynamic raw,
   );
+
+  @protected
+  List<LinkEventDto> dco_decode_list_link_event_dto(dynamic raw);
 
   @protected
   List<LocalSessionDto> dco_decode_list_local_session_dto(dynamic raw);
@@ -601,12 +625,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool? dco_decode_opt_box_autoadd_bool(dynamic raw);
 
   @protected
+  ConnectStageDto? dco_decode_opt_box_autoadd_connect_stage_dto(dynamic raw);
+
+  @protected
   DeviceMetadataDto? dco_decode_opt_box_autoadd_device_metadata_dto(
     dynamic raw,
   );
 
   @protected
   DiffDto? dco_decode_opt_box_autoadd_diff_dto(dynamic raw);
+
+  @protected
+  DirectStageDto? dco_decode_opt_box_autoadd_direct_stage_dto(dynamic raw);
 
   @protected
   HostActiveDto? dco_decode_opt_box_autoadd_host_active_dto(dynamic raw);
@@ -641,6 +671,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TunnelFailureDto? dco_decode_opt_box_autoadd_tunnel_failure_dto(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_16(dynamic raw);
 
   @protected
@@ -671,6 +704,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   QueuedCommandDto dco_decode_queued_command_dto(dynamic raw);
+
+  @protected
+  RelayPhaseDto dco_decode_relay_phase_dto(dynamic raw);
 
   @protected
   RelayPreferencesDto dco_decode_relay_preferences_dto(dynamic raw);
@@ -773,6 +809,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ToolsUpdateDto dco_decode_tools_update_dto(dynamic raw);
+
+  @protected
+  TunnelFailureDto dco_decode_tunnel_failure_dto(dynamic raw);
 
   @protected
   TunnelPathDto dco_decode_tunnel_path_dto(dynamic raw);
@@ -990,12 +1029,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool sse_decode_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
+  ConnectStageDto sse_decode_box_autoadd_connect_stage_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   DeviceMetadataDto sse_decode_box_autoadd_device_metadata_dto(
     SseDeserializer deserializer,
   );
 
   @protected
   DiffDto sse_decode_box_autoadd_diff_dto(SseDeserializer deserializer);
+
+  @protected
+  DirectStageDto sse_decode_box_autoadd_direct_stage_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   HostActiveDto sse_decode_box_autoadd_host_active_dto(
@@ -1061,6 +1110,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TunnelFailureDto sse_decode_box_autoadd_tunnel_failure_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int sse_decode_box_autoadd_u_16(SseDeserializer deserializer);
 
   @protected
@@ -1104,6 +1158,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ConfigView sse_decode_config_view(SseDeserializer deserializer);
 
   @protected
+  ConnectStageDto sse_decode_connect_stage_dto(SseDeserializer deserializer);
+
+  @protected
   ConnectionPathDto sse_decode_connection_path_dto(
     SseDeserializer deserializer,
   );
@@ -1135,6 +1192,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DirEntryDto sse_decode_dir_entry_dto(SseDeserializer deserializer);
+
+  @protected
+  DirectStageDto sse_decode_direct_stage_dto(SseDeserializer deserializer);
 
   @protected
   EventTopic sse_decode_event_topic(SseDeserializer deserializer);
@@ -1216,6 +1276,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  LinkEventDto sse_decode_link_event_dto(SseDeserializer deserializer);
+
+  @protected
+  LinkEventKindDto sse_decode_link_event_kind_dto(SseDeserializer deserializer);
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer);
 
   @protected
@@ -1277,6 +1343,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<HostRestoreOverrideDto> sse_decode_list_host_restore_override_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<LinkEventDto> sse_decode_list_link_event_dto(
     SseDeserializer deserializer,
   );
 
@@ -1520,12 +1591,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   bool? sse_decode_opt_box_autoadd_bool(SseDeserializer deserializer);
 
   @protected
+  ConnectStageDto? sse_decode_opt_box_autoadd_connect_stage_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   DeviceMetadataDto? sse_decode_opt_box_autoadd_device_metadata_dto(
     SseDeserializer deserializer,
   );
 
   @protected
   DiffDto? sse_decode_opt_box_autoadd_diff_dto(SseDeserializer deserializer);
+
+  @protected
+  DirectStageDto? sse_decode_opt_box_autoadd_direct_stage_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   HostActiveDto? sse_decode_opt_box_autoadd_host_active_dto(
@@ -1566,6 +1647,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  TunnelFailureDto? sse_decode_opt_box_autoadd_tunnel_failure_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_16(SseDeserializer deserializer);
 
   @protected
@@ -1598,6 +1684,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   QueuedCommandDto sse_decode_queued_command_dto(SseDeserializer deserializer);
+
+  @protected
+  RelayPhaseDto sse_decode_relay_phase_dto(SseDeserializer deserializer);
 
   @protected
   RelayPreferencesDto sse_decode_relay_preferences_dto(
@@ -1722,6 +1811,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ToolsUpdateDto sse_decode_tools_update_dto(SseDeserializer deserializer);
+
+  @protected
+  TunnelFailureDto sse_decode_tunnel_failure_dto(SseDeserializer deserializer);
 
   @protected
   TunnelPathDto sse_decode_tunnel_path_dto(SseDeserializer deserializer);
@@ -1984,6 +2076,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_bool(bool self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_connect_stage_dto(
+    ConnectStageDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_device_metadata_dto(
     DeviceMetadataDto self,
     SseSerializer serializer,
@@ -1991,6 +2089,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_diff_dto(DiffDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_direct_stage_dto(
+    DirectStageDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_host_active_dto(
@@ -2071,6 +2175,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_tunnel_failure_dto(
+    TunnelFailureDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_u_16(int self, SseSerializer serializer);
 
   @protected
@@ -2125,6 +2235,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_config_view(ConfigView self, SseSerializer serializer);
 
   @protected
+  void sse_encode_connect_stage_dto(
+    ConnectStageDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_connection_path_dto(
     ConnectionPathDto self,
     SseSerializer serializer,
@@ -2159,6 +2275,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_dir_entry_dto(DirEntryDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_direct_stage_dto(
+    DirectStageDto self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_event_topic(EventTopic self, SseSerializer serializer);
@@ -2263,6 +2385,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_link_event_dto(LinkEventDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_link_event_kind_dto(
+    LinkEventKindDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer);
 
   @protected
@@ -2346,6 +2477,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_host_restore_override_dto(
     List<HostRestoreOverrideDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_link_event_dto(
+    List<LinkEventDto> self,
     SseSerializer serializer,
   );
 
@@ -2653,6 +2790,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_bool(bool? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_connect_stage_dto(
+    ConnectStageDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_device_metadata_dto(
     DeviceMetadataDto? self,
     SseSerializer serializer,
@@ -2661,6 +2804,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_diff_dto(
     DiffDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_direct_stage_dto(
+    DirectStageDto? self,
     SseSerializer serializer,
   );
 
@@ -2713,6 +2862,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_tunnel_failure_dto(
+    TunnelFailureDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_16(int? self, SseSerializer serializer);
 
   @protected
@@ -2759,6 +2914,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     QueuedCommandDto self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_relay_phase_dto(RelayPhaseDto self, SseSerializer serializer);
 
   @protected
   void sse_encode_relay_preferences_dto(
@@ -2931,6 +3089,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_tools_update_dto(
     ToolsUpdateDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_tunnel_failure_dto(
+    TunnelFailureDto self,
     SseSerializer serializer,
   );
 

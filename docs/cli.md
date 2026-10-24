@@ -41,9 +41,9 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 
 Run `pocox <command> --help` for every flag.
 
-New workers honor `[pb_mapper] path = "auto"` and `allow_direct = true` in
-`config.toml`; missing fields keep relay-only subscriptions and no incoming
-direct access. See [direct connections](relay-worker-recovery.md#direct-connections)
+New workers try direct (P2P) paths first and accept incoming direct connections
+unless `config.toml` opts out with `[pb_mapper] path = "relay_only"` or
+`allow_direct = false`. See [direct connections](relay-worker-recovery.md#direct-connections)
 for relay prerequisites, lifetime and restart behavior.
 
 ## Hosted account

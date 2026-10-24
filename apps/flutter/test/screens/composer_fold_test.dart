@@ -61,46 +61,44 @@ FocusNode _field(WidgetTester t) =>
 void main() {
   setUpAll(loadPreviewFonts);
 
-  testWidgets('reading folds the phone composer; tapping it unfolds to type', (
-    t,
-  ) async {
+  testWidgets('a phone composer starts folded, unfolds while the field has '
+      'focus and folds when it lets go', (t) async {
     await _open(t);
-    final open = _composerHeight(t);
-    expect(_folded, findsNothing);
-
-    // Reading back through the conversation.
-    await t.drag(_viewport, const Offset(0, 400));
-    await t.pumpAndSettle();
-    expect(_folded, findsOneWidget);
-    expect(
-      _composerHeight(t),
-      lessThan(open - 60),
-      reason: 'the transcript gets the room',
-    );
+    expect(_folded, findsOneWidget, reason: 'folded until someone writes');
+    final folded = _composerHeight(t);
     await capturePreview(t, 'composer-folded-phone');
 
     await t.tap(_folded);
+    // Mid-unfold: the full form arrives as the pane grows into it.
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 110));
+    await capturePreview(t, 'composer-unfolding-phone');
     await t.pumpAndSettle();
     expect(_folded, findsNothing);
-    expect(_composerHeight(t), open);
     expect(_field(t).hasFocus, isTrue, reason: 'a tap on it means typing');
+    final open = _composerHeight(t);
+    expect(open, greaterThan(folded + 60), reason: 'the field gets its room');
+    await capturePreview(t, 'composer-open-phone');
 
     // While someone is writing, reading never folds it away.
     await t.drag(_viewport, const Offset(0, 400));
     await t.pumpAndSettle();
     expect(_folded, findsNothing);
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    await t.pumpAndSettle();
+    expect(_folded, findsOneWidget, reason: 'done writing, it folds again');
+    expect(_composerHeight(t), folded);
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('the latest message unfolds it, and the draft survives', (
-    t,
-  ) async {
-    await _open(t);
+  testWidgets('the end of the conversation, jumping to it or a reply leave '
+      'it folded, with the draft on the capsule', (t) async {
+    final api = await _open(t);
     await t.enterText(find.byKey(const Key('composer-input')), 'Half a reply');
-    FocusManager.instance.primaryFocus?.unfocus();
     await t.pumpAndSettle();
-
-    await t.drag(_viewport, const Offset(0, 400));
+    expect(_folded, findsNothing);
+    FocusManager.instance.primaryFocus?.unfocus();
     await t.pumpAndSettle();
     expect(
       find.descendant(of: _folded, matching: find.text('Half a reply')),
@@ -108,19 +106,58 @@ void main() {
       reason: 'the capsule shows the draft',
     );
 
-    // Reading on to the end: where a reply starts.
-    await t.fling(_viewport, const Offset(0, -3000), 4000);
-    await t.pumpAndSettle();
-    expect(_folded, findsNothing);
-    expect(find.text('Half a reply'), findsOneWidget);
-
-    // Jumping to the latest message does the same.
+    // Reading on to the end is still reading.
     await t.drag(_viewport, const Offset(0, 400));
     await t.pumpAndSettle();
+    await t.fling(_viewport, const Offset(0, -3000), 4000);
+    await t.pumpAndSettle();
     expect(_folded, findsOneWidget);
+
+    // So is jumping to the latest message.
+    await t.drag(_viewport, const Offset(0, 400));
+    await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('nav-to-bottom')));
     await t.pumpAndSettle();
+    expect(_folded, findsOneWidget);
+
+    // And a reply arriving.
+    api.pushEvent(
+      _service,
+      const AppEvent(
+        kind: 'turn/started',
+        threadId: 'fold',
+        raw: '{"turn":{"id":"reply"}}',
+      ),
+    );
+    await t.pump(const Duration(milliseconds: 400));
+    expect(_folded, findsOneWidget);
+    expect(_field(t).hasFocus, isFalse);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('putting the keyboard away folds it; a keyboard that only '
+      'blinks does not', (t) async {
+    await _open(t);
+    await t.tap(_folded);
+    await t.pumpAndSettle();
+    t.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await t.pumpAndSettle();
     expect(_folded, findsNothing);
+
+    // An input method switching layouts hides the keyboard for a moment.
+    t.view.viewInsets = FakeViewPadding.zero;
+    await t.pump(const Duration(milliseconds: 100));
+    t.view.viewInsets = const FakeViewPadding(bottom: 300);
+    await t.pump(const Duration(milliseconds: 400));
+    expect(_field(t).hasFocus, isTrue);
+    expect(_folded, findsNothing);
+
+    // Android's back button hides it and leaves the field focused.
+    t.view.viewInsets = FakeViewPadding.zero;
+    await t.pump(const Duration(milliseconds: 400));
+    await t.pumpAndSettle();
+    expect(_field(t).hasFocus, isFalse, reason: 'typing is over');
+    expect(_folded, findsOneWidget);
     expect(t.takeException(), isNull);
   });
 
@@ -134,8 +171,6 @@ void main() {
         raw: '{"turn":{"id":"live"}}',
       ),
     );
-    await t.pump();
-    await t.drag(_viewport, const Offset(0, 400));
     for (var i = 0; i < 6; i++) {
       await t.pump(const Duration(milliseconds: 100));
     }
@@ -150,6 +185,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
       await _open(t, size: const Size(1200, 900));
+      expect(_folded, findsNothing);
       await t.drag(_viewport, const Offset(0, 400));
       await t.pumpAndSettle();
       expect(_folded, findsNothing);

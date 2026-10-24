@@ -1,6 +1,8 @@
 //! Services of the user's other devices made reachable on this device, at
 //! the same port number when it is free.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use pocox_account_proto::key::NamespacedServiceId;
@@ -8,9 +10,9 @@ use pocox_core::service::{sanitize_component, ServiceId, ServiceKind};
 
 use super::consent;
 use super::error::{Pending, ToolError};
-use super::model::{bounded, ConnectionView, AGENT_LEASE_MS};
+use super::model::{bounded, ConnectionView, Lifetime, LinkView};
 use super::shares::Caller;
-use super::state::{self, now_ms, Connection, OwnerKey};
+use super::state::{self, now_ms, Connection, OwnerKey, Restore};
 use crate::engine::{discovery, runtime, transport};
 
 /// Registry-key family of these tunnels; each is scoped to its transport
@@ -25,6 +27,9 @@ pub struct ConnectRequest {
     pub service: String,
     /// A local port to prefer over the service's own number.
     pub local_port: Option<u16>,
+    /// How long an agent's connection lasts; the user's own lasts until
+    /// they end it.
+    pub lifetime: Lifetime,
 }
 
 /// The kinds an agent may connect to: shared ports and Responses APIs.
@@ -74,12 +79,6 @@ pub fn resolve(wanted: &str, services: &[ServiceId]) -> Result<ServiceId, ToolEr
     }
 }
 
-fn alive(registry_key: &str) -> bool {
-    runtime::list_subscriptions()
-        .iter()
-        .any(|s| s.key == registry_key && s.alive)
-}
-
 /// Make `request.service` reachable on this device for `caller`. An agent
 /// connects another device's Responses API, which spends that device's
 /// model account, only with the user's consent: a pending result while the
@@ -124,13 +123,17 @@ pub async fn connect(
             return Ok(Err(waiting));
         }
     }
-    if let Some(existing) = reuse(caller, &key, owned.epoch)? {
-        return Ok(Ok(existing));
-    }
+    let until = request.lifetime.until(now_ms());
+    let kept_port = match reuse(caller, &key, owned.epoch, until)? {
+        Reused::Live(existing) => return Ok(Ok(*existing)),
+        Reused::Ended(port) => Some(port),
+        Reused::None => None,
+    };
     let own_port = (id.kind == ServiceKind::Port)
         .then(|| id.name.parse::<u16>().ok())
         .flatten();
-    let preferred = request.local_port.or(own_port).unwrap_or(0);
+    // A kept connection whose tunnel ended reopens where it was.
+    let preferred = kept_port.or(request.local_port).or(own_port).unwrap_or(0);
     let context = transport::Context::of(&owned.transport);
     let registry_key = format!("{FAMILY}{}\u{1f}{key}", context.id());
     let epoch = owned.epoch;
@@ -146,7 +149,7 @@ pub async fn connect(
             current,
         )
         .or_else(|error| {
-            if preferred == 0 {
+            if preferred == 0 || kept_port.is_some() {
                 return Err(error);
             }
             runtime::subscribe_service_as(registry, &service_key, 0, &transport, current)
@@ -163,14 +166,16 @@ pub async fn connect(
         .and_then(|p| p.parse::<u16>().ok())
         .is_some_and(|port| Some(port) == own_port);
     let user = caller.is_user();
+    let link = link_of(Some(&status), &Restore::default());
     let connection = Connection {
         service: key,
         registry_key,
         local: status.local_addr,
         same_port,
         owner: caller.owner(),
-        holders: if user { Vec::new() } else { vec![(caller.key(), now_ms() + AGENT_LEASE_MS)] },
+        holders: if user { Vec::new() } else { vec![(caller.key(), until)] },
         user,
+        restore: Restore::default(),
     };
     let mut state = state::lock();
     // The call may have waited for the relay: the switch, the token, or the
@@ -193,21 +198,18 @@ pub async fn connect(
         }
         return Err(error);
     }
-    let view = match state
+    let mut view = match state
         .connections
         .iter_mut()
         .find(|c| c.service == connection.service)
     {
-        // A concurrent connect made the same tunnel first: join it.
+        // A concurrent connect made the same tunnel first, or this one
+        // reopened a kept connection's: join it, where it now is.
         Some(existing) => {
-            if connection.user {
-                // The user's own connect takes it over, as in `reuse`.
-                existing.user = true;
-                existing.holders.clear();
-                existing.owner = connection.owner;
-            } else if !existing.user {
-                existing.holders.extend(connection.holders);
-            }
+            existing.local = connection.local;
+            existing.same_port = connection.same_port;
+            existing.restore = Restore::default();
+            hold(existing, caller, until);
             existing.view()
         },
         None => {
@@ -217,43 +219,124 @@ pub async fn connect(
         },
     };
     state::changed(&mut state);
+    view.link = link;
     tracing::info!(service = %view.service, local = %view.local, "connected");
     Ok(Ok(view))
 }
 
+/// What [`reuse`] found.
+enum Reused {
+    /// A live connection, now held by the caller too.
+    Live(Box<ConnectionView>),
+    /// A kept connection whose tunnel ended, at this port.
+    Ended(u16),
+    /// None.
+    None,
+}
+
 /// A live connection to `key`, shared with `caller`: an agent joins those
-/// keeping it alive (with its own lease), and the user's own connect takes
-/// it over.
-fn reuse(caller: &Caller, key: &str, epoch: u64) -> Result<Option<ConnectionView>, ToolError> {
+/// keeping it alive (with its own lease, renewed or changed to `until`), and
+/// the user's own connect takes it over.
+fn reuse(caller: &Caller, key: &str, epoch: u64, until: Option<i64>) -> Result<Reused, ToolError> {
     let mut state = state::lock();
     state.admits(caller)?;
     // A tunnel of an account or relay that changed is gone.
     if !transport::is_current(epoch) {
         return Err(ToolError::ContextChanged);
     }
-    let Some(index) = state.connections.iter().position(|c| c.service == key) else {
-        return Ok(None);
+    let Some(connection) = state.connections.iter_mut().find(|c| c.service == key) else {
+        return Ok(Reused::None);
     };
-    if !alive(&state.connections[index].registry_key) {
-        state.connections.remove(index);
-        state::changed(&mut state);
-        return Ok(None);
+    let statuses = runtime::list_subscriptions();
+    let status = statuses.iter().find(|s| s.key == connection.registry_key);
+    if !status.is_some_and(|s| s.alive) {
+        return Ok(Reused::Ended(port_of(&connection.local)));
     }
-    let connection = &mut state.connections[index];
+    hold(connection, caller, until);
+    let mut view = connection.view();
+    view.link = link_of(status, &connection.restore);
+    state::changed(&mut state);
+    Ok(Reused::Live(Box::new(view)))
+}
+
+/// Let `caller` hold `connection` until `until`: the user's own connect
+/// takes it over; an agent renews its hold, or joins those keeping it.
+fn hold(connection: &mut Connection, caller: &Caller, until: Option<i64>) {
     if caller.is_user() {
         connection.user = true;
         connection.holders.clear();
         connection.owner = caller.owner();
     } else if !connection.user {
-        let (owner, until) = (caller.key(), now_ms() + AGENT_LEASE_MS);
+        let owner = caller.key();
         match connection.holders.iter_mut().find(|(key, _)| *key == owner) {
             Some(holder) => holder.1 = until,
             None => connection.holders.push((owner, until)),
         }
     }
-    let view = connection.view();
-    state::changed(&mut state);
-    Ok(Some(view))
+}
+
+/// The port of a `host:port` address, or 0 for any.
+fn port_of(local: &str) -> u16 {
+    local
+        .rsplit(':')
+        .next()
+        .and_then(|port| port.parse().ok())
+        .unwrap_or(0)
+}
+
+/// How a connection travels, from its tunnel's live `status`. Without a
+/// live tunnel a kept connection is being reopened.
+fn link_of(status: Option<&runtime::SubStatus>, restore: &Restore) -> Option<LinkView> {
+    use runtime::TunnelPath;
+    let Some(status) = status.filter(|status| status.alive) else {
+        return Some(LinkView {
+            policy: String::new(),
+            path: "idle".into(),
+            state: "restoring".into(),
+            direct_sessions: 0,
+            relay_sessions: 0,
+            fallbacks: 0,
+            last_fallback_stage: None,
+            attempting: None,
+            restore_failures: restore.failures,
+        });
+    };
+    let path = &status.path;
+    let state = if !status.ready {
+        "connecting"
+    } else if status.health.retrying || status.health.consecutive_failures > 0 {
+        "reconnecting"
+    } else {
+        "ready"
+    };
+    Some(LinkView {
+        policy: if path.path == TunnelPath::RelayOnly { "relay_only" } else { "p2p_first" }.into(),
+        path: match path.path {
+            TunnelPath::RelayOnly | TunnelPath::Relay => "relay",
+            TunnelPath::Idle => "idle",
+            TunnelPath::Direct => "direct",
+            TunnelPath::Mixed => "mixed",
+        }
+        .into(),
+        state: state.into(),
+        direct_sessions: path.direct_sessions,
+        relay_sessions: path.relay_sessions,
+        fallbacks: path.fallbacks,
+        last_fallback_stage: status
+            .events
+            .iter()
+            .rev()
+            .find_map(|event| match event.kind {
+                pocox_pb::TunnelEventKind::DirectFallback {
+                    stage,
+                } => Some(stage.as_str().to_string()),
+                _ => None,
+            }),
+        attempting: path
+            .attempt
+            .map(|attempt| attempt.stage.as_str().to_string()),
+        restore_failures: 0,
+    })
 }
 
 /// End the connection to `service` (a key or its local address). An agent
@@ -289,6 +372,7 @@ pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionVi
         }
     }
     let connection = state.connections.remove(index);
+    connection.restore.cancel();
     state::changed(&mut state);
     drop(state);
     runtime::unsubscribe_service(&connection.registry_key);
@@ -297,8 +381,8 @@ pub fn disconnect(caller: Option<&Caller>, service: &str) -> Result<ConnectionVi
 }
 
 /// Let go of every hold `release` selects, ending the connections nobody
-/// holds any more and those `dead` selects.
-fn release_where(release: impl Fn(&OwnerKey, i64) -> bool, dead: impl Fn(&Connection) -> bool) {
+/// holds any more.
+fn release_where(release: impl Fn(&OwnerKey, Option<i64>) -> bool) {
     let mut state = state::lock();
     let mut changed = false;
     for connection in &mut state.connections {
@@ -310,8 +394,11 @@ fn release_where(release: impl Fn(&OwnerKey, i64) -> bool, dead: impl Fn(&Connec
     }
     let (gone, kept): (Vec<Connection>, Vec<Connection>) = std::mem::take(&mut state.connections)
         .into_iter()
-        .partition(|c| c.abandoned() || dead(c));
+        .partition(Connection::abandoned);
     state.connections = kept;
+    for connection in &gone {
+        connection.restore.cancel();
+    }
     if !changed && gone.is_empty() {
         return;
     }
@@ -324,30 +411,162 @@ fn release_where(release: impl Fn(&OwnerKey, i64) -> bool, dead: impl Fn(&Connec
 
 /// End the holds of the owners `ended` selects.
 pub fn end_owned(ended: impl Fn(&OwnerKey) -> bool) {
-    release_where(|key, _| ended(key), |_| false);
+    release_where(|key, _| ended(key));
 }
 
-/// Drop expired holds and dead connections.
+/// Drop expired holds, and reopen the tunnels of the connections kept that
+/// ended: a connection lasts until it expires or is ended, whatever happens
+/// to its tunnel meanwhile.
 pub fn prune() {
     let now = now_ms();
-    release_where(|_, until| until <= now, |c| !alive(&c.registry_key));
+    release_where(|_, until| until.is_some_and(|until| until <= now));
+    restore(now);
+}
+
+/// Wait before reopening a tunnel again after `failures` failed attempts:
+/// two seconds, doubling up to a minute.
+fn backoff_ms(failures: u32) -> i64 {
+    (1_000_i64 << failures.min(6)).min(60_000)
+}
+
+/// Start reopening each kept connection whose tunnel ended and whose
+/// backoff has passed, at the address it was given.
+fn restore(now: i64) {
+    for attempt in due(now, &runtime::list_subscriptions()) {
+        tracing::info!(service = %attempt.service, "reopening a kept connection whose tunnel ended");
+        runtime::runtime().spawn(async move {
+            let reopened = reopen(&attempt).await;
+            settle(&attempt, reopened);
+        });
+    }
+}
+
+/// One admitted restoration, bound to the connection and transport that queued
+/// it.
+#[derive(Clone)]
+struct Reopen {
+    service: String,
+    registry_key: String,
+    port: u16,
+    epoch: u64,
+    admitted: Arc<AtomicBool>,
+}
+
+impl Reopen {
+    fn current(&self) -> bool {
+        self.admitted.load(Ordering::Acquire) && transport::is_current(self.epoch)
+    }
+}
+
+/// The connections to reopen now, each
+/// marked as being reopened: no live tunnel in `statuses`, no attempt
+/// running, and its backoff passed.
+fn due(now: i64, statuses: &[runtime::SubStatus]) -> Vec<Reopen> {
+    let mut state = state::lock();
+    state
+        .connections
+        .iter_mut()
+        .filter(|c| {
+            c.restore.pending.is_none()
+                && c.restore.next_ms <= now
+                && !statuses.iter().any(|s| s.key == c.registry_key && s.alive)
+        })
+        .map(|c| {
+            let admitted = Arc::new(AtomicBool::new(true));
+            c.restore.pending = Some(admitted.clone());
+            Reopen {
+                service: c.service.clone(),
+                registry_key: c.registry_key.clone(),
+                port: port_of(&c.local),
+                epoch: transport::epoch(),
+                admitted,
+            }
+        })
+        .collect()
+}
+
+/// Reopen only at the promised address and only for the original owner.
+async fn reopen(attempt: &Reopen) -> anyhow::Result<String> {
+    anyhow::ensure!(attempt.current(), "connection ended before reopening");
+    let owned = transport::resolve_owned().await?;
+    let context = transport::Context::of(&owned.transport);
+    anyhow::ensure!(
+        owned.epoch == attempt.epoch
+            && attempt.registry_key == format!("{FAMILY}{}\u{1f}{}", context.id(), attempt.service),
+        "account or relay changed before reopening"
+    );
+    let attempt = attempt.clone();
+    tokio::task::spawn_blocking(move || open_restored(&attempt, &owned.transport)).await?
+}
+
+fn open_restored(attempt: &Reopen, transport: &transport::Transport) -> anyhow::Result<String> {
+    anyhow::ensure!(attempt.current(), "connection ended before reopening");
+    runtime::subscribe_service_as(
+        attempt.registry_key.clone(),
+        &attempt.service,
+        attempt.port,
+        transport,
+        || attempt.current(),
+    )
+    .map(|status| status.local_addr)
+}
+
+/// Record this attempt only; an ended connection may already have a
+/// replacement.
+fn settle(attempt: &Reopen, reopened: anyhow::Result<String>) {
+    let mut state = state::lock();
+    let Some(connection) = state.connections.iter_mut().find(|c| {
+        c.registry_key == attempt.registry_key
+            && c.restore
+                .pending
+                .as_ref()
+                .is_some_and(|pending| Arc::ptr_eq(pending, &attempt.admitted))
+    }) else {
+        return;
+    };
+    match reopened {
+        Ok(local) => {
+            connection.local = local;
+            connection.restore = Restore::default();
+        },
+        Err(error) => {
+            let failures = connection.restore.failures.saturating_add(1);
+            tracing::warn!(service = %connection.service, failures, error = %format!("{error:#}"), "reopening failed");
+            connection.restore = Restore {
+                failures,
+                next_ms: now_ms() + backoff_ms(failures),
+                pending: None,
+            };
+        },
+    }
+    state::changed(&mut state);
 }
 
 /// The account or relay changed: these tunnels belong to the old one.
 pub fn context_changed() {
     let gone = std::mem::take(&mut state::lock().connections);
+    for connection in &gone {
+        connection.restore.cancel();
+    }
     if !gone.is_empty() {
         state::changed(&mut state::lock());
     }
     runtime::unsubscribe_prefix(FAMILY);
 }
 
-/// This device's connections.
+/// This device's connections, each with how it travels now.
 pub fn list() -> Vec<ConnectionView> {
+    let statuses = runtime::list_subscriptions();
     state::lock()
         .connections
         .iter()
-        .map(Connection::view)
+        .map(|connection| ConnectionView {
+            link: link_of(
+                statuses.iter().find(|s| s.key == connection.registry_key),
+                &connection.restore,
+            ),
+            ..connection.view()
+        })
         .collect()
 }
 
@@ -390,8 +609,9 @@ mod tests {
             local: "127.0.0.1:7001".into(),
             same_port: true,
             owner: Caller::user("agent").owner(),
-            holders: vec![(a.clone(), i64::MAX), (b.clone(), i64::MAX)],
+            holders: vec![(a.clone(), Some(i64::MAX)), (b.clone(), None)],
             user: false,
+            restore: Restore::default(),
         });
         let held = |key: &OwnerKey| {
             state::lock()
@@ -406,5 +626,132 @@ mod tests {
             .connections
             .iter()
             .all(|c| c.service != service));
+    }
+
+    #[test]
+    fn a_kept_connection_outlives_its_tunnel_until_it_expires() {
+        runtime::init(std::env::temp_dir()).expect("test runtime");
+        let service = "pcx:keep-test:port:7002";
+        let expired = OwnerKey {
+            token: "keep-expired".into(),
+            conversation: None,
+        };
+        let permanent = OwnerKey {
+            token: "keep-permanent".into(),
+            conversation: None,
+        };
+        state::lock().connections.push(Connection {
+            service: service.into(),
+            registry_key: format!("{FAMILY}test\u{1f}{service}"),
+            local: "127.0.0.1:7002".into(),
+            same_port: true,
+            owner: Caller::user("agent").owner(),
+            holders: vec![(expired.clone(), Some(1)), (permanent.clone(), None)],
+            user: false,
+            restore: Restore::default(),
+        });
+        let now = now_ms();
+        release_where(|_, until| until.is_some_and(|until| until <= now));
+        // Its tunnel never existed: rather than drop the connection, it is
+        // reopened where it was, once, until that attempt settles.
+        let reopening = due(now, &[]);
+        assert!(reopening
+            .iter()
+            .any(|attempt| attempt.service == service && attempt.port == 7002));
+        assert!(
+            due(now, &[])
+                .iter()
+                .all(|attempt| attempt.service != service),
+            "one attempt at a time"
+        );
+        let mut state = state::lock();
+        let kept = state
+            .connections
+            .iter()
+            .find(|c| c.service == service)
+            .expect("a permanent hold keeps it");
+        assert!(kept.held_by(&permanent) && !kept.held_by(&expired));
+        assert_eq!(kept.view().expires_ms, None, "a permanent hold has no expiry");
+        let link = link_of(None, &kept.restore).expect("link");
+        assert_eq!(link.state, "restoring");
+        state.connections.retain(|c| c.service != service);
+    }
+
+    #[test]
+    fn reopening_backs_off_to_a_minute() {
+        assert_eq!(backoff_ms(1), 2_000);
+        assert_eq!(backoff_ms(3), 8_000);
+        assert_eq!(backoff_ms(40), 60_000);
+    }
+
+    #[test]
+    fn restoring_an_occupied_port_does_not_move_the_connection() {
+        runtime::init(std::env::temp_dir()).expect("test runtime");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("occupy port");
+        let attempt = Reopen {
+            service: "pcx:occupied-restore:port:7003".into(),
+            registry_key: "tools\u{1f}occupied-restore".into(),
+            port: listener.local_addr().expect("address").port(),
+            epoch: transport::epoch(),
+            admitted: Arc::new(AtomicBool::new(true)),
+        };
+        let transport = transport::Transport {
+            session: pocox_pb::RelaySession::for_test("127.0.0.1:1"),
+            namespace: None,
+        };
+        let error = open_restored(&attempt, &transport).expect_err("the promised port is occupied");
+        assert!(error.to_string().contains("cannot bind"), "fails at the original port: {error:#}");
+        assert!(runtime::list_subscriptions()
+            .iter()
+            .all(|s| s.key != attempt.registry_key));
+    }
+
+    #[test]
+    fn an_ended_restore_cannot_reuse_or_settle_its_replacement() {
+        runtime::init(std::env::temp_dir()).expect("test runtime");
+        let service = "pcx:replacement-restore:port:7004";
+        let registry_key = format!("{FAMILY}test\u{1f}{service}");
+        let admitted = Arc::new(AtomicBool::new(true));
+        let old = Restore {
+            pending: Some(admitted.clone()),
+            ..Restore::default()
+        };
+        let attempt = Reopen {
+            service: service.into(),
+            registry_key: registry_key.clone(),
+            port: 7004,
+            epoch: transport::epoch(),
+            admitted,
+        };
+        drop(old);
+        assert!(!attempt.current(), "dropping the old owner revokes its attempt");
+        state::lock().connections.push(Connection {
+            service: service.into(),
+            registry_key: registry_key.clone(),
+            local: "127.0.0.1:7004".into(),
+            same_port: true,
+            owner: Caller::user("You").owner(),
+            holders: Vec::new(),
+            user: true,
+            restore: Restore::default(),
+        });
+        runtime::insert_for_test(&registry_key, runtime::runtime().spawn(std::future::pending()));
+        let transport = transport::Transport {
+            session: pocox_pb::RelaySession::for_test("127.0.0.1:1"),
+            namespace: None,
+        };
+        assert!(
+            open_restored(&attempt, &transport).is_err(),
+            "a revoked task cannot reuse the new tunnel"
+        );
+        settle(&attempt, Ok("127.0.0.1:9999".into()));
+        settle(&attempt, Err(anyhow::anyhow!("late failure")));
+        let view = list()
+            .into_iter()
+            .find(|c| c.service == service)
+            .expect("replacement");
+        assert_eq!(view.local, "127.0.0.1:7004", "late success cannot change its address");
+        assert_eq!(view.link.expect("link").state, "ready", "late completion preserves the tunnel");
+        disconnect(None, service).expect("cleanup");
     }
 }

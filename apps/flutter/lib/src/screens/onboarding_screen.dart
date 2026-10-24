@@ -5,6 +5,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/widgets/brand_logo.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 
 /// First-run setup: import a `pcx1:` string or type relay + key.
 class OnboardingScreen extends ConsumerStatefulWidget {
@@ -55,7 +56,9 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
       // killing the app, and a user who opened "Advanced" to look around is
       // stranded. `go` rather than `pop` for the same reason: there is no
       // previous route to return to.
-      appBar: AppBar(
+      // The window's own title bar on a frameless desktop: it drags the window
+      // and carries the Windows caption buttons.
+      appBar: WindowTitleBar(
         leading: BackButton(
           key: const Key('self-host-back'),
           onPressed: _busy ? null : () => context.go('/onboarding'),

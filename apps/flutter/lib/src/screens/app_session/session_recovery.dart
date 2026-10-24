@@ -530,10 +530,13 @@ extension _SessionRecovery on _AppSessionState {
     ref.invalidate(appReachableProvider(widget.serviceKey));
   }
 
-  /// Re-establish the connection automatically, with a few backoff retries.
-  /// Shows a "reconnecting" state while trying; only surfaces the manual
-  /// "disconnected" banner if every attempt fails. Idempotent — concurrent
-  /// triggers (stream close + health tick) collapse into one attempt.
+  /// Re-establish the connection automatically, and keep at it while the
+  /// screen is in front: a link that comes back is picked up without the
+  /// user. The waits grow to [_retryDelay]'s cap; after [_quickAttempts]
+  /// failures the "disconnected" banner offers to try at once as well. Each
+  /// attempt's progress (and the wait before the next) goes to [_relink], so
+  /// the status bar and connection sheet show it as it happens. Idempotent —
+  /// concurrent triggers (stream close + health tick) collapse into one.
   /// [reload] re-reads the thread history after reconnecting (to catch events
   /// missed while the socket was down). Pass `false` from the send-failure path
   /// so the just-added optimistic message and a pending plan toggle survive for
@@ -567,96 +570,194 @@ extension _SessionRecovery on _AppSessionState {
       _publishLinkState(down: true);
     }
     final api = ref.read(bridgeApiProvider);
-    for (var attempt = 0; attempt < 4; attempt++) {
-      if (!current()) return;
-      try {
-        record('connect', attempt + 1);
-        // Let the bridge retain a live socket if only its event subscription ended.
-        await api.appConnect(widget.serviceKey, appLocalPort);
+    String? lastError;
+    try {
+      for (var attempt = 1; ; attempt++) {
         if (!current()) return;
-        _connectionLost = false;
-        // A reconnect may reach a different agent generation.
-        _invalidateCaps();
-        _subscribe();
-        if (reload && _threadId != null) {
-          if (_externalWriterMode) {
-            _externalHistoryDirty = true;
-            await _refreshExternalHistory(_threadId!, _externalWriterEpoch);
-          } else {
-            await _resumeAndLoad(propagateErrors: true);
-          }
-        }
-        if (!current()) return;
-        // The connection moved while its read was out (another generation,
-        // or lost/replaced): that read applied nothing, so this attempt is
-        // not ready — ask the current host again rather than report it.
-        if (reload &&
-            _threadId != null &&
-            !_externalWriterMode &&
-            _historyAppliedLink != _linkEpoch) {
-          throw StateError('history read outlived its host connection');
-        }
-        record('history-ready', attempt + 1);
-        // Re-list too, not just the open transcript. `_loadThreads` runs once at
-        // initState and is best-effort: if the host wasn't reachable then (it
-        // restarted, or the app opened first), the failure was swallowed and
-        // the pane stayed empty FOREVER — nothing else re-lists except sending
-        // a message. A reconnect is exactly the moment the data became
-        // available, so this is where it has to be retried.
-        unawaited(
-          _loadThreads().then((_) {
-            if (mounted &&
-                !_reconnecting &&
-                !api.appIsConnected(widget.serviceKey)) {
-              _onStreamClosed();
-            }
-          }),
+        final startedAt = DateTime.now();
+        _relink.publish(
+          epoch,
+          ReconnectState(
+            active: true,
+            attempt: attempt,
+            startedAt: startedAt,
+            lastError: lastError,
+          ),
         );
-        // Same reasoning for the other cold-open loads: a reconnect is the
-        // moment their data became reachable. Both are no-ops once settled —
-        // the cwd seed won't override a folder the user picked, and the quota
-        // just refreshes.
-        if (_openLoadRetries.containsKey(_kCwdSeed)) {
-          unawaited(_seedDefaultCwd());
-        }
-        if (_rate == null) unawaited(_loadQuota());
-        unawaited(_ensureModels());
-        _loadGit(); // the working tree may have moved on while we were away
-        // Content loaders retain old data on failure. A timed-out RPC can
-        // therefore close this new connection without throwing out of them.
-        if (_connectionLost || !api.appIsConnected(widget.serviceKey)) {
-          throw StateError('app-server event feed closed during reconnect');
-        }
-        if (mounted) {
-          _updateState(() {
-            _reconnecting = false;
-            _connectionLost = false;
-            _error = null;
-          });
-          _publishLinkState(down: false);
-        }
-        record('ready', attempt + 1);
-        _maybeFlushQueue();
-        _offerHeldQueue();
-        return;
-      } catch (error) {
-        if (!current()) return;
-        record('retry', attempt + 1, error);
-        if (attempt < 3) {
-          await Future<void>.delayed(Duration(seconds: 1 << attempt));
+        try {
+          record('connect', attempt);
+          // Let the bridge retain a live socket if only its event subscription ended.
+          await api.appConnect(widget.serviceKey, appLocalPort);
+          if (!current()) return;
+          _connectionLost = false;
+          // A reconnect may reach a different agent generation.
+          _invalidateCaps();
+          _subscribe();
+          if (reload && _threadId != null) {
+            _relink.publish(
+              epoch,
+              ReconnectState(
+                active: true,
+                attempt: attempt,
+                startedAt: startedAt,
+                restoring: true,
+              ),
+            );
+            if (_externalWriterMode) {
+              _externalHistoryDirty = true;
+              await _refreshExternalHistory(_threadId!, _externalWriterEpoch);
+            } else {
+              await _resumeAndLoad(propagateErrors: true);
+            }
+          }
+          if (!current()) return;
+          // The connection moved while its read was out (another generation,
+          // or lost/replaced): that read applied nothing, so this attempt is
+          // not ready — ask the current host again rather than report it.
+          if (reload &&
+              _threadId != null &&
+              !_externalWriterMode &&
+              _historyAppliedLink != _linkEpoch) {
+            throw StateError('history read outlived its host connection');
+          }
+          record('history-ready', attempt);
+          // Re-list too, not just the open transcript. `_loadThreads` runs once at
+          // initState and is best-effort: if the host wasn't reachable then (it
+          // restarted, or the app opened first), the failure was swallowed and
+          // the pane stayed empty FOREVER — nothing else re-lists except sending
+          // a message. A reconnect is exactly the moment the data became
+          // available, so this is where it has to be retried.
+          unawaited(
+            _loadThreads().then((_) {
+              if (mounted &&
+                  !_reconnecting &&
+                  !api.appIsConnected(widget.serviceKey)) {
+                _onStreamClosed();
+              }
+            }),
+          );
+          // Same reasoning for the other cold-open loads: a reconnect is the
+          // moment their data became reachable. Both are no-ops once settled —
+          // the cwd seed won't override a folder the user picked, and the quota
+          // just refreshes.
+          if (_openLoadRetries.containsKey(_kCwdSeed)) {
+            unawaited(_seedDefaultCwd());
+          }
+          if (_rate == null) unawaited(_loadQuota());
+          unawaited(_ensureModels());
+          _loadGit(); // the working tree may have moved on while we were away
+          // Content loaders retain old data on failure. A timed-out RPC can
+          // therefore close this new connection without throwing out of them.
+          if (_connectionLost || !api.appIsConnected(widget.serviceKey)) {
+            throw StateError('app-server event feed closed during reconnect');
+          }
+          if (mounted) {
+            _updateState(() {
+              _reconnecting = false;
+              _connectionLost = false;
+              _error = null;
+            });
+            _publishLinkState(down: false);
+          }
+          record('ready', attempt);
+          _maybeFlushQueue();
+          _offerHeldQueue();
+          return;
+        } catch (error) {
+          if (!current()) return;
+          record('retry', attempt, error);
+          lastError = friendlyError(error);
+          if (attempt == _quickAttempts) {
+            // Still trying, but say so: the user may want to try at once.
+            _updateState(() {
+              _connectionLost = true;
+              _error = AppLocalizations.of(context).connectionLost;
+              _retry = _relink.retryNow;
+            });
+            _publishLinkState(down: true);
+          }
+          final delay = _retryDelay(attempt);
+          _relink.publish(
+            epoch,
+            ReconnectState(
+              active: true,
+              attempt: attempt,
+              retryAt: DateTime.now().add(delay),
+              lastError: lastError,
+            ),
+          );
+          await _relink.wait(delay);
         }
       }
+    } finally {
+      _relink.end(epoch);
     }
-    // Out of retries: fall back to the manual banner.
-    if (current()) {
-      record('exhausted', 4);
-      _updateState(() {
-        _reconnecting = false;
-        _connectionLost = true;
-        _error = AppLocalizations.of(context).connectionLost;
-        _retry = _autoReconnect;
-      });
-      _publishLinkState(down: true);
-    }
+  }
+}
+
+/// Quick attempts before the banner offers to try at once.
+const _quickAttempts = 4;
+
+/// The wait after the [attempt]th failed attempt: short at first, then at
+/// most half a minute.
+Duration _retryDelay(int attempt) => Duration(
+  seconds: switch (attempt) {
+    1 => 1,
+    2 => 2,
+    3 => 4,
+    4 => 8,
+    5 => 15,
+    _ => 30,
+  },
+);
+
+/// The live side of a session's reconnect: what its status bar and
+/// connection sheet show, and the wait between attempts that "Retry now"
+/// cuts short.
+class _Relink {
+  /// Where the reconnect stands.
+  final view = ValueNotifier(ReconnectState.idle);
+
+  Completer<void>? _wake;
+  Timer? _timer;
+  int _owner = 0;
+  bool _disposed = false;
+
+  /// Show [state] of the reconnect [run].
+  void publish(int run, ReconnectState state) {
+    if (_disposed) return;
+    _owner = run;
+    view.value = state;
+  }
+
+  /// The reconnect [run] ended; a newer one may have taken over the view.
+  void end(int run) {
+    if (!_disposed && _owner == run) view.value = ReconnectState.idle;
+  }
+
+  /// Wait [delay] before the next attempt, or less if told to retry now.
+  Future<void> wait(Duration delay) {
+    if (_disposed) return Future.value();
+    retryNow();
+    final wake = _wake = Completer<void>();
+    _timer = Timer(delay, retryNow);
+    return wake.future;
+  }
+
+  /// End the wait for the next attempt now.
+  void retryNow() {
+    _timer?.cancel();
+    _timer = null;
+    final wake = _wake;
+    _wake = null;
+    if (wake != null && !wake.isCompleted) wake.complete();
+  }
+
+  /// Release the wait and the view; a reconnect still unwinding then
+  /// changes nothing.
+  void dispose() {
+    _disposed = true;
+    retryNow();
+    view.dispose();
   }
 }

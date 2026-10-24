@@ -6,7 +6,8 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `count`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`
 
 /// Discover the services this device can reach on the relay.
 ///
@@ -36,6 +37,124 @@ Future<void> apiUnsubscribe({required String serviceKey}) => RustLib
 /// List all active subscriptions.
 Future<List<SubStatusDto>> subscriptions() =>
     RustLib.instance.api.crateApiBridgeServicesSubscriptions();
+
+/// How far a direct (hole-punched) attempt got, mirrored for Dart.
+enum DirectStageDto {
+  /// Asking whether the other side offers direct.
+  negotiating,
+
+  /// Learning this device's public address and asking for a grant.
+  discovering,
+
+  /// Dialing the other side through both NATs.
+  punching,
+
+  /// The path is up; the other side is opening its service.
+  committing,
+}
+
+/// One entry of a tunnel's recent history, mirrored flat for Dart.
+class LinkEventDto {
+  /// Increases with every event, so new ones can be told from seen ones.
+  final int seq;
+
+  /// Milliseconds since it (last) happened.
+  final int ageMs;
+
+  /// Times it happened in a row.
+  final int repeats;
+
+  /// What happened.
+  final LinkEventKindDto kind;
+
+  /// `RelayFailed`: why.
+  final TunnelFailureDto? failure;
+
+  /// `DirectFallback`: the stage it gave up at.
+  final DirectStageDto? stage;
+
+  /// `RelayReady`: setup latency; `RelayFailed`: time to the next try;
+  /// `DirectEstablished`: setup time.
+  final int? ms;
+
+  const LinkEventDto({
+    required this.seq,
+    required this.ageMs,
+    required this.repeats,
+    required this.kind,
+    this.failure,
+    this.stage,
+    this.ms,
+  });
+
+  @override
+  int get hashCode =>
+      seq.hashCode ^
+      ageMs.hashCode ^
+      repeats.hashCode ^
+      kind.hashCode ^
+      failure.hashCode ^
+      stage.hashCode ^
+      ms.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LinkEventDto &&
+          runtimeType == other.runtimeType &&
+          seq == other.seq &&
+          ageMs == other.ageMs &&
+          repeats == other.repeats &&
+          kind == other.kind &&
+          failure == other.failure &&
+          stage == other.stage &&
+          ms == other.ms;
+}
+
+/// What a [`LinkEventDto`] records.
+enum LinkEventKindDto {
+  /// The relay answered, for the first time or after failures.
+  relayReady,
+
+  /// An attempt to reach the relay failed.
+  relayFailed,
+
+  /// The device's network changed.
+  networkChanged,
+
+  /// A connection went direct.
+  directEstablished,
+
+  /// A connection gave up on direct and used the relay.
+  directFallback,
+}
+
+/// The phase a tunnel's link to the relay entered last, mirrored for Dart.
+enum RelayPhaseDto {
+  /// Starting up.
+  starting,
+
+  /// Waiting for a free setup slot.
+  queued,
+
+  /// Looking up the relay's address.
+  resolving,
+
+  /// Connecting to the relay.
+  connecting,
+
+  /// Authenticating and confirming the service.
+  handshake,
+
+  /// Confirmed by the relay.
+  ready,
+
+  /// Waiting to try again after a failure.
+  backoff,
+
+  /// Stopped.
+  stopped,
+}
 
 /// A discovered service, mirrored for Dart.
 class ServiceIdDto {
@@ -85,6 +204,9 @@ class SubStatusDto {
   /// Task still running.
   final bool alive;
 
+  /// Has been ready; false while it is still coming up.
+  final bool ready;
+
   /// Locally observed path, never the saved preference.
   final TunnelPathDto path;
 
@@ -94,21 +216,70 @@ class SubStatusDto {
   /// Active relay data connections counted by auto mode.
   final int activeRelay;
 
+  /// Data connections that went direct in this tunnel's lifetime.
+  final int directSessions;
+
+  /// Data connections that used the relay in this tunnel's lifetime.
+  final int relaySessions;
+
   /// Pre-commit fallbacks in this tunnel's lifetime.
   final int fallbacks;
 
   /// SDK reason for its most recent fallback.
   final String? lastFallback;
 
+  /// Waiting to try the relay again after a failure.
+  final bool retrying;
+
+  /// Failures since the tunnel last reached the relay.
+  final int consecutiveFailures;
+
+  /// Why the most recent attempt failed, if one did.
+  final TunnelFailureDto? lastFailure;
+
+  /// How long the last answered setup took, in milliseconds.
+  final int? setupLatencyMs;
+
+  /// The phase its link to the relay entered last.
+  final RelayPhaseDto relayPhase;
+
+  /// Milliseconds before the next attempt, while waiting for one.
+  final int? nextRetryMs;
+
+  /// How far the direct attempt in flight got, if one is.
+  final DirectStageDto? attemptStage;
+
+  /// Milliseconds since that attempt began.
+  final int? attemptMs;
+
+  /// Direct attempts in flight.
+  final int attemptsInFlight;
+
+  /// What happened to it lately, oldest first.
+  final List<LinkEventDto> events;
+
   const SubStatusDto({
     required this.key,
     required this.localAddr,
     required this.alive,
+    required this.ready,
     required this.path,
     required this.activeDirect,
     required this.activeRelay,
+    required this.directSessions,
+    required this.relaySessions,
     required this.fallbacks,
     this.lastFallback,
+    required this.retrying,
+    required this.consecutiveFailures,
+    this.lastFailure,
+    this.setupLatencyMs,
+    required this.relayPhase,
+    this.nextRetryMs,
+    this.attemptStage,
+    this.attemptMs,
+    required this.attemptsInFlight,
+    required this.events,
   });
 
   @override
@@ -116,11 +287,24 @@ class SubStatusDto {
       key.hashCode ^
       localAddr.hashCode ^
       alive.hashCode ^
+      ready.hashCode ^
       path.hashCode ^
       activeDirect.hashCode ^
       activeRelay.hashCode ^
+      directSessions.hashCode ^
+      relaySessions.hashCode ^
       fallbacks.hashCode ^
-      lastFallback.hashCode;
+      lastFallback.hashCode ^
+      retrying.hashCode ^
+      consecutiveFailures.hashCode ^
+      lastFailure.hashCode ^
+      setupLatencyMs.hashCode ^
+      relayPhase.hashCode ^
+      nextRetryMs.hashCode ^
+      attemptStage.hashCode ^
+      attemptMs.hashCode ^
+      attemptsInFlight.hashCode ^
+      events.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -130,11 +314,45 @@ class SubStatusDto {
           key == other.key &&
           localAddr == other.localAddr &&
           alive == other.alive &&
+          ready == other.ready &&
           path == other.path &&
           activeDirect == other.activeDirect &&
           activeRelay == other.activeRelay &&
+          directSessions == other.directSessions &&
+          relaySessions == other.relaySessions &&
           fallbacks == other.fallbacks &&
-          lastFallback == other.lastFallback;
+          lastFallback == other.lastFallback &&
+          retrying == other.retrying &&
+          consecutiveFailures == other.consecutiveFailures &&
+          lastFailure == other.lastFailure &&
+          setupLatencyMs == other.setupLatencyMs &&
+          relayPhase == other.relayPhase &&
+          nextRetryMs == other.nextRetryMs &&
+          attemptStage == other.attemptStage &&
+          attemptMs == other.attemptMs &&
+          attemptsInFlight == other.attemptsInFlight &&
+          events == other.events;
+}
+
+/// Why a tunnel's attempt to reach the relay failed, mirrored for Dart.
+enum TunnelFailureDto {
+  /// The relay's name did not resolve.
+  dns,
+
+  /// The connection to the relay broke.
+  transport,
+
+  /// The relay did not answer in time.
+  timeout,
+
+  /// The service is not published, or its host is unavailable.
+  serviceUnavailable,
+
+  /// The relay refused the credential or the request.
+  rejected,
+
+  /// The device's network changed underneath it.
+  networkChanged,
 }
 
 /// What a subscription's data connections currently go through, mirrored

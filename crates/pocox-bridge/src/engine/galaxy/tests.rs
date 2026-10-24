@@ -9,6 +9,12 @@ fn scene() -> Vec<f64> {
 
 /// [`scene`] with its link's path code.
 fn scene_with(path: f64) -> Vec<f64> {
+    scene_linking(5.0, path)
+}
+
+/// [`scene`] whose link reaches body `target` (3 systems, then 3 planets)
+/// with path code `path`.
+fn scene_linking(target: f64, path: f64) -> Vec<f64> {
     let mut s = vec![VERSION, 3.0, 3.0, 1.0, 1.0];
     // Systems: x, y, z, home, online, first planet, planet count, label.
     s.extend([0.0, 0.12, 0.0, 1.0, 1.0, 0.0, 2.0, 60.0, 15.0]);
@@ -38,7 +44,7 @@ fn scene_with(path: f64) -> Vec<f64> {
     s.extend(planet(0.0, 0.0, 3.4));
     s.extend(planet(1.0, 0.0, 1.0));
     // A link from the second device's port to home.
-    s.extend([2.0, 0.0, path]);
+    s.extend([target, 0.0, path]);
     // One star layer with one bucket of two stars.
     s.extend([0.3, 1.0, 0.5, 2.0, 0.1, 0.2, 0.9, 0.8]);
     s
@@ -198,7 +204,27 @@ fn a_link_draws_how_its_data_travels() {
     assert_eq!(mixed[0].2.len(), 3, "a direct strand carries particles");
     let idle = draw(4.0);
     assert_eq!((idle.len(), idle[0].0, idle[0].2.len()), (1, 4.0, 0), "idle carries none");
-    assert_eq!(run(&scene_with(5.0), &frame, 1 << 16).0, -1, "an unknown path is refused");
+    // Trying a direct path runs low and quick; recovering arcs, carrying nothing.
+    let probing = draw(5.0);
+    assert_eq!((probing[0].0, probing[0].2.len()), (5.0, 3), "probing carries particles");
+    assert!(peak(&probing[0].1) >= peak(&mixed[1].1), "probing runs as low as direct");
+    let recovering = draw(6.0);
+    assert_eq!((recovering[0].0, recovering[0].2.len()), (6.0, 0), "recovering carries none");
+    assert_eq!(run(&scene_with(7.0), &frame, 1 << 16).0, -1, "an unknown path is refused");
+}
+
+#[test]
+fn a_link_can_reach_a_device_itself() {
+    let frame = frame(30.0);
+    // The second device's star, through the relay.
+    let (written, out) = run(&scene_linking(1.0, 1.0), &frame, 1 << 16);
+    assert!(written > 0);
+    let drawn = strands(&out[..written as usize]);
+    assert_eq!(drawn.len(), 1);
+    assert_eq!(drawn[0].0, 1.0);
+    assert!(drawn[0].1.len() >= 2);
+    // Six bodies: index 6 names none.
+    assert_eq!(run(&scene_linking(6.0, 1.0), &frame, 1 << 16).0, -1);
 }
 
 #[test]

@@ -1,10 +1,20 @@
 # Live voice through Codex app-server
 
-POCOX starts a dedicated voice conversation from the waveform button
-above the composer. An existing voice conversation can be reopened and started
-again explicitly. Its waveform icon and “Live voice” label survive renaming,
-restart and opening it from a different controller because Codex persists
-`threadSource: "pocox-voice"`.
+A call starts from the waveform button in the composer, or on a phone from the
+folded composer's capsule without opening the keyboard. In a typed conversation
+the start sheet asks where it goes:
+
+- **In this conversation**: realtime starts on the conversation's own thread.
+  The host gives the call that thread's recent history as context, and the work
+  it hands to Codex runs as ordinary turns in the thread, beside the typed ones.
+- **New voice conversation**: a separate thread made for talking. Its waveform
+  icon and “Live voice” label survive renaming, restart and opening it from a
+  different controller because Codex persists `threadSource: "pocox-voice"`.
+
+A conversation not started yet has nothing to join, so its call gets a voice
+conversation of its own; an existing voice conversation can be reopened and
+started again explicitly. Voices are chips from the host's own catalog, and the
+model sits under **More options**.
 
 The microphone, output audio, echo cancellation and encoding belong to the
 controller's native WebRTC implementation. Codex still runs externally on the
@@ -19,7 +29,9 @@ sequenceDiagram
     participant Voice as Realtime backend
     User->>UI: Start voice, choose model and voice
     UI->>Host: thread/realtime/listVoices
-    UI->>Host: thread/start (voice source, current permissions)
+    opt New voice conversation
+        UI->>Host: thread/start (voice source, current permissions)
+    end
     UI->>RTC: Request microphone, create SDP offer
     UI->>Host: thread/realtime/start (WebRTC offer, V3)
     Host->>Voice: Create authenticated call
@@ -39,6 +51,64 @@ realtime backend; the controller therefore needs network access to that backend.
 No host credential is copied into the controller. There is no continuous
 recording, automatic reconnect, or background microphone use. Capture ends on
 call stop, navigation, backgrounding, failure and disposal.
+
+## Voice and text in one conversation
+
+Upstream app-server supports it (checked at upstream `970111f6c`, 2026-10-23;
+the realtime protocol is unchanged since the pinned `8d9f6466f`):
+
+- `thread/realtime/start` accepts any loaded thread; nothing reserves realtime
+  for a thread created for it.
+- Unless `includeStartupContext` is false, the host prepends a startup context
+  whose **Current Thread** section is built from that thread's history (about
+  1,200 tokens), with recent work and a bounded workspace map.
+- Work the call delegates runs on the same thread, so its turns, tool activity
+  and approvals appear in the conversation like typed ones; the spoken
+  segments are persisted in the thread's timeline.
+
+The app keeps the two uses apart in its UI: the dock names the call
+(**Voice · this conversation** or **Voice conversation**), and only a voice
+conversation keeps the dock at rest, ready to talk again.
+
+## Call dock
+
+While a call belongs to the conversation on screen, its controls dock above the
+composer and as wide as it, on phones and desktops alike
+(`VoiceCallDock` in `voice/voice_call_dock.dart`). The dock is one glass capsule
+in the composer's shape, a single row:
+
+- **The orb.** Its lit core holds four bars that breathe while the line is open
+  and swell with the louder of the microphone and the assistant, with ripples
+  leaving it while anyone talks. A ring turns around it while connecting or
+  recovering; it rests as flat grey bars while muted.
+- **What is happening.** Who holds the floor and how long the call has run
+  (`m:ss`, from when audio first flowed), over the words being said: the latest
+  caption with who said it, its newest words kept in view as it streams, or the
+  call's mode before anyone speaks. A small icon always says which kind of call
+  it is. A tap opens the spoken history, or a failure's details.
+- **Controls.** Mute and Hang up as round buttons in thumb reach; History rides
+  along where the capsule has room.
+
+The call's colour washes in from behind the orb and glides between states: blue
+while live, violet while the user speaks, grey while muted, amber while the link
+recovers, red once it failed. After a call in a typed conversation ends, the dock
+lingers six seconds with how long it ran and **Talk again** (a failure until
+dismissed); a voice conversation keeps it at rest. Opening another conversation
+still ends the call, so the dock is the one place its controls live.
+
+## Hanging up
+
+A call ends the moment it is hung up: the phase settles before anything is
+awaited, so the dock reads as ended and the voice button is usable at once.
+Releasing the microphone and peer, closing the event stream and the host's
+`thread/realtime/stop` acknowledgement (up to five seconds over a relay) then run
+side by side behind it. Talking again before they finish waits for them, so the
+two calls never share the microphone and the old stop cannot land on the new
+session.
+
+A redial waiting for cleanup is cancelled by navigation, backgrounding or another
+stop. Cleanup is registered before the ended notification, so listeners that warm
+dictation wait for the old call to release its media and host session too.
 
 ## Protocol contract
 
@@ -141,8 +211,10 @@ Mouse text selection and reduced-motion behavior are preserved.
 - `apps/flutter/lib/src/voice/voice_transport.dart`: native media lifecycle.
 - `apps/flutter/lib/src/voice/voice_controller.dart`: cancellation, signaling,
   call status and bounded live transcripts.
-- `apps/flutter/lib/src/voice/voice_widgets.dart`: catalog/settings, call controls
-  and paginated canonical voice history.
+- `apps/flutter/lib/src/voice/voice_start_sheet.dart`: where the call goes,
+  the host's voice catalog and the model.
+- `apps/flutter/lib/src/voice/voice_widgets.dart`: the call dock and paginated
+  canonical voice history.
 - `apps/flutter/test/voice_test.dart`: media/controller fakes, lifecycle races,
   protocol values and phone/desktop layouts.
 - `apps/flutter/test/message_actions_test.dart`: scrolling must never activate

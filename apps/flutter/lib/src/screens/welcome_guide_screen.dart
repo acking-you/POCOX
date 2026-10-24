@@ -16,6 +16,7 @@ import 'package:pocox/src/widgets/brand_logo.dart';
 import 'package:pocox/src/widgets/links.dart';
 import 'package:pocox/src/widgets/local_host_dialog.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/window_title_bar.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/field_help.dart';
 
@@ -77,6 +78,11 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
+      // A frameless desktop window has no title bar but this one: without it
+      // the guide could not be dragged, and Windows had no caption buttons.
+      appBar: isFramelessDesktop
+          ? const WindowTitleBar(automaticallyImplyLeading: false)
+          : null,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 520),

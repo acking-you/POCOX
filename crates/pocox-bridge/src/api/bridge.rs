@@ -15,8 +15,8 @@ use crate::engine::session_engine::{
     self, engine, require_native, Protocol, StartOptions, TurnOptions,
 };
 use crate::engine::{
-    account, app_session, claude_setup, config, discovery, logging, meta, runtime, serve,
-    serve_acp, sessions, transport,
+    account, app_session, claude_setup, config, connect_stage, discovery, logging, meta, runtime,
+    serve, serve_acp, sessions, transport,
 };
 use crate::frb_generated::StreamSink;
 
@@ -58,9 +58,9 @@ pub use self::codex_setup::{
     CodexAuthStatusDto, CodexLoginStartDto, CodexSetupStatusDto,
 };
 pub use self::connection::{
-    api_probe, api_probe_local, app_agent_identity, app_capabilities, app_connect, app_disconnect,
-    app_is_connected, app_probe, app_probe_local, app_probe_reason, app_running_threads,
-    AgentIdentityDto, AppCapabilitiesDto,
+    api_probe, api_probe_local, app_agent_identity, app_capabilities, app_connect,
+    app_connect_stage, app_disconnect, app_is_connected, app_probe, app_probe_local,
+    app_probe_reason, app_running_threads, AgentIdentityDto, AppCapabilitiesDto, ConnectStageDto,
 };
 pub use self::device_management::{
     device_management_set_enabled, device_management_status, host_restore_overrides,
@@ -119,8 +119,8 @@ pub use self::native_sessions::{
     NativeSessionListDto, NativeSessionPageDto, NativeSessionRevisionDto,
 };
 pub use self::services::{
-    api_subscribe, api_unsubscribe, discover_services, subscriptions, ServiceIdDto, SubStatusDto,
-    TunnelPathDto,
+    api_subscribe, api_unsubscribe, discover_services, subscriptions, DirectStageDto, LinkEventDto,
+    LinkEventKindDto, RelayPhaseDto, ServiceIdDto, SubStatusDto, TunnelFailureDto, TunnelPathDto,
 };
 pub use self::session_config::{
     app_session_settings, app_set_session_config, app_set_session_mode, SessionConfigOptionDto,

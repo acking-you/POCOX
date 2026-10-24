@@ -8,6 +8,9 @@ import 'package:pocox/src/widgets/glass.dart';
 
 /// Return to the conversation's end, with a moving ring while work continues.
 /// The arrow and touch target stay still; reduced motion keeps a steady ring.
+///
+/// On a phone it rests over the very lines being read, so it is clear glass:
+/// the words show through and a halo keeps the arrow distinct from them.
 class JumpToLatestButton extends StatelessWidget {
   /// Creates a button whose action stays available even while [running].
   const JumpToLatestButton({
@@ -27,11 +30,12 @@ class JumpToLatestButton extends StatelessWidget {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final signal = signalColor(scheme);
+    final clear = !isDesktop;
     return Glass(
-      depth: GlassDepth.floating,
+      depth: clear ? GlassDepth.clear : GlassDepth.floating,
       borderRadius: BorderRadius.circular(24),
       lift: 0.6,
-      edge: running ? signal.withValues(alpha: 0.3) : null,
+      edge: running ? signal.withValues(alpha: clear ? 0.45 : 0.3) : null,
       padding: const EdgeInsets.all(2),
       child: Stack(
         alignment: Alignment.center,
@@ -50,9 +54,18 @@ class JumpToLatestButton extends StatelessWidget {
               minWidth: isDesktop ? 34 : 44,
               minHeight: isDesktop ? 34 : 44,
             ),
-            color: running ? signal : scheme.onSurfaceVariant,
+            color: running
+                ? signal
+                : clear
+                ? scheme.onSurface
+                : scheme.onSurfaceVariant,
             onPressed: onPressed,
-            icon: const Icon(AppIcons.vertical_align_bottom),
+            icon: Icon(
+              AppIcons.vertical_align_bottom,
+              shadows: clear
+                  ? [Shadow(color: scheme.surface, blurRadius: 6)]
+                  : null,
+            ),
           ),
           if (running)
             Positioned.fill(

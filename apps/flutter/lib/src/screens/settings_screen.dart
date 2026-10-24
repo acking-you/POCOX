@@ -766,21 +766,34 @@ class _SubscriptionsGroup extends ConsumerWidget {
     final l10n = AppLocalizations.of(context);
     final subs =
         ref.watch(liveSubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
-    return GroupCard(
-      title: l10n.settingsServicesSubscriptions,
+    // The section's name, then one group per device it reaches.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (subs.isEmpty)
-          _SettingsRow(icon: AppIcons.link_off_outlined, title: l10n.none)
-        else
-          for (final sub in subs)
-            _SettingsRow(
-              key: ValueKey('subscription-${sub.key}'),
-              icon: AppIcons.link_outlined,
-              title: subscriptionServiceKey(sub.key),
-              subtitle: tunnelSubtitle(l10n, sub),
-              status: TunnelPathChip(sub),
-              onTap: () => showTunnelDetails(context, sub.key),
-            ),
+        GroupCard(
+          title: l10n.settingsServicesSubscriptions,
+          children: [
+            if (subs.isEmpty)
+              _SettingsRow(icon: AppIcons.link_off_outlined, title: l10n.none),
+          ],
+        ),
+        for (final (:device, :subs) in subscriptionsByDevice(subs))
+          GroupCard(
+            key: ValueKey('subscriptions-$device'),
+            title: deviceLabel(device),
+            hint: l10n.subscriptionsOnDevice(subs.length),
+            children: [
+              for (final sub in subs)
+                _SettingsRow(
+                  key: ValueKey('subscription-${sub.key}'),
+                  icon: AppIcons.link_outlined,
+                  title: subscriptionTitle(sub.key),
+                  subtitle: tunnelSubtitle(l10n, sub),
+                  status: TunnelPathChip(sub),
+                  onTap: () => showTunnelDetails(context, sub.key),
+                ),
+            ],
+          ),
       ],
     );
   }
@@ -796,17 +809,34 @@ class _SubscriptionTiles extends ConsumerWidget {
     final subs =
         ref.watch(liveSubscriptionsProvider).valueOrNull ?? const <SubInfo>[];
     if (subs.isEmpty) return ListTile(dense: true, title: Text(l10n.none));
+    final theme = Theme.of(context);
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final sub in subs)
-          ListTile(
-            key: ValueKey('subscription-${sub.key}'),
-            dense: true,
-            title: Text(subscriptionServiceKey(sub.key)),
-            subtitle: Text(tunnelSubtitle(l10n, sub)),
-            trailing: TunnelPathChip(sub),
-            onTap: () => showTunnelDetails(context, sub.key),
+        for (final (:device, :subs) in subscriptionsByDevice(subs)) ...[
+          // The device, then the connections that reach it.
+          Padding(
+            key: ValueKey('subscriptions-$device'),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+            child: Text(
+              '${deviceLabel(device)} · '
+              '${l10n.subscriptionsOnDevice(subs.length)}',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
+          for (final sub in subs)
+            ListTile(
+              key: ValueKey('subscription-${sub.key}'),
+              dense: true,
+              title: Text(subscriptionTitle(sub.key)),
+              subtitle: Text(tunnelSubtitle(l10n, sub)),
+              trailing: TunnelPathChip(sub),
+              onTap: () => showTunnelDetails(context, sub.key),
+            ),
+        ],
       ],
     );
   }

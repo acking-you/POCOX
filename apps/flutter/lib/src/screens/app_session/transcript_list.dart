@@ -357,9 +357,7 @@ extension _TranscriptList on _AppSessionState {
       });
       return;
     }
-    // Following the conversation again (a send, jump to latest): the reader
-    // is back where a reply starts.
-    _foldComposer(false);
+    // Following the conversation again (a send, jump to latest).
     _scroll.stickToEnd = true;
     final rows = _rows;
     final last = rows.lastOrNull;

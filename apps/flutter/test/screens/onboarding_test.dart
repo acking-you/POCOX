@@ -552,6 +552,36 @@ void main() {
     });
   }
 
+  testWidgets('onboarding: a backend that refuses the return link says to '
+      'update it', (t) async {
+    final api =
+        FakeBridgeApi(config: const ConfigInfo(relay: '', hasKey: false))
+          ..webLoginStartError = StateError(
+            '/auth/web/start failed: HTTP 400 Bad Request: '
+            'redirect_uri is not allowed',
+          );
+    await t.pumpWidget(
+      routerHost(
+        api,
+        initial: '/onboarding',
+        routes: [
+          GoRoute(
+            path: '/onboarding',
+            builder: (_, _) => const AccountOnboardingScreen(),
+          ),
+          stub('/', 'HOME-ROUTE'),
+        ],
+      ),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('使用 GitHub 登录'));
+    await t.pumpAndSettle();
+
+    expect(find.text(_zh.accountRedirectRejected), findsOneWidget);
+    expect(find.textContaining(_zh.accountWebTrouble), findsNothing);
+    expect(find.text('设备码登录'), findsOneWidget);
+  });
+
   testWidgets('settings: account sign-out clears the user and returns to '
       'onboarding', (t) async {
     final api = FakeBridgeApi(

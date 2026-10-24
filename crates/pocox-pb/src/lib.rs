@@ -63,11 +63,14 @@ pub use admin::{
 };
 pub use keepalive::keep_credential_alive;
 /// Runtime tunnel state and diagnostics from the pinned pb-mapper SDK.
-pub use pb_mapper::{Connection, PathDiagnostics, TunnelDiagnostics, TunnelStatus, SDK_VERSION};
+pub use pb_mapper::{
+    Connection, DirectAttempt, DirectStage, PathDiagnostics, RecoveryFailure, RecoveryPhase,
+    TunnelDiagnostics, TunnelEvent, TunnelEventKind, TunnelStatus, SDK_VERSION,
+};
 pub use publish::{publish, publish_pending, PublishError, Published};
 pub use session::{
     keys, parse_relay_addr, register, register_background, remote_id, service_connections,
-    subscribe, subscribe_background, RegisterOptions, RelaySession, SubscribeOptions,
+    subscribe, subscribe_background, subscribed, RegisterOptions, RelaySession, SubscribeOptions,
     TUNNEL_READY_TIMEOUT,
 };
 pub use transport::Transport;

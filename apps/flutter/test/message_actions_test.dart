@@ -505,6 +505,8 @@ void main() {
       );
       await t.pumpAndSettle();
       await t.enterText(_input, 'Existing draft');
+      // Typing unfolds a phone's composer on the next frame.
+      await t.pumpAndSettle();
       final previousSelector = fsel.FileSelectorPlatform.instance;
       fsel.FileSelectorPlatform.instance = FakeFileSelector()
         ..files = [

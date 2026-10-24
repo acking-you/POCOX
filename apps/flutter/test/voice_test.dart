@@ -16,6 +16,8 @@ import 'package:pocox/src/voice/voice_transport.dart';
 import 'package:pocox/src/voice/voice_widgets.dart';
 
 import 'fake_bridge_api.dart';
+import 'support/screen_harness.dart' show unfoldComposer;
+import 'support/ui_preview.dart';
 
 const _service = 'pcx:host:app:default';
 
@@ -148,7 +150,16 @@ class _Media implements VoiceTransport {
 
 Future<void> _tick() => Future<void>.delayed(Duration.zero);
 
+/// Some frames of a live call, so its orb and captions settle into what a
+/// person would see rather than the first frame of each change.
+Future<void> _frames(WidgetTester t) async {
+  for (var i = 0; i < 15; i++) {
+    await t.pump(const Duration(milliseconds: 40));
+  }
+}
+
 void main() {
+  setUpAll(loadPreviewFonts);
   test('voice source survives renaming', () {
     const t = ThreadMeta(
       id: 'v',
@@ -405,15 +416,59 @@ void main() {
         createTransport: () => media,
       );
       await c.start('voice');
-      final stopping = c.stop();
+      media.connected();
+      var settled = false;
+      c.addListener(() {
+        if (!c.busy) unawaited(c.settled.then((_) => settled = true));
+      });
+      final stopping = c.hangUp();
+      // Ended the moment it is hung up, before anything is awaited.
+      expect(c.phase, VoicePhase.idle);
+      expect(c.busy, isFalse);
+      expect(c.endedByUser, isTrue);
+      expect(c.endedAt, isNotNull);
       await _tick();
       expect(media.closed, isTrue);
-      expect(c.phase, VoicePhase.stopping);
+      expect(settled, isFalse, reason: 'listeners must wait for host cleanup');
+      // Talking again at once waits for the host to let the last call go,
+      // so that stop cannot land on the new session.
+      final again = c.start('voice');
+      await _tick();
+      expect(api.calls.where((c) => c.$1.endsWith('/start')).length, 1);
       api.stopAck!.complete();
       await stopping;
+      await again;
+      expect(settled, isTrue);
+      expect(api.calls.map((c) => c.$1).toList().sublist(1), [
+        'thread/realtime/stop',
+        'thread/realtime/start',
+      ]);
+      expect(c.busy, isTrue);
       c.dispose();
     },
   );
+  test('leaving while a redial waits cancels the pending microphone', () async {
+    final api = _VoiceApi()..stopAck = Completer<void>();
+    var created = 0;
+    final c = VoiceController(
+      api: api,
+      serviceKey: _service,
+      createTransport: () {
+        created++;
+        return _Media();
+      },
+    );
+    await c.start('voice');
+    final stopping = c.hangUp();
+    final again = c.start('voice');
+    final leaving = c.stop();
+    api.stopAck!.complete();
+    await Future.wait([stopping, again, leaving]);
+    expect(created, 1, reason: 'navigation cancels a queued redial');
+    expect(c.busy, isFalse);
+    expect(api.calls.where((c) => c.$1.endsWith('/start')).length, 1);
+    c.dispose();
+  });
   test('cancelled microphone startup never starts a remote call', () async {
     final api = _VoiceApi();
     final media = _Media()..pendingOffer = Completer<String>();
@@ -568,6 +623,7 @@ void main() {
           ),
         );
         await t.pumpAndSettle();
+        await unfoldComposer(t);
         await t.tap(find.byKey(const Key('voice-start')));
         await t.pumpAndSettle();
         expect(find.text('cove'), findsOneWidget);
@@ -578,7 +634,10 @@ void main() {
           'no rollout found for thread id voice',
         );
         await t.tap(find.byKey(const Key('voice-start-confirm')));
-        await t.pumpAndSettle();
+        // The dock's connecting spinner turns until the call is up: pump
+        // frames rather than wait for a settle.
+        await t.pump();
+        await t.pump(const Duration(milliseconds: 300));
         expect(
           api.calls
               .firstWhere((c) => c.$1 == 'thread/start')
@@ -613,23 +672,18 @@ void main() {
       },
     );
   }
-  testWidgets('the sidebar keeps a live call visible and hangs it up', (
-    t,
-  ) async {
+  Future<void> mountVoice(
+    WidgetTester t,
+    _VoiceApi api,
+    _Media media,
+    AppSessionScreen screen, {
+    Size size = const Size(1280, 900),
+    bool dark = false,
+  }) async {
     AppSessionScreen.debugResetThreadMemory();
     t.view.devicePixelRatio = 1;
-    t.view.physicalSize = const Size(1280, 900);
+    t.view.physicalSize = size;
     addTearDown(t.view.reset);
-    final api = _VoiceApi();
-    api.appThreads.add(
-      const ThreadMeta(
-        id: 'other',
-        preview: 'another conversation',
-        cwd: '/repo',
-        updatedAt: 0,
-      ),
-    );
-    final media = _Media();
     await t.pumpWidget(
       ProviderScope(
         overrides: [
@@ -639,40 +693,236 @@ void main() {
         child: MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          theme: lightTheme(),
-          home: const AppSessionScreen(
-            serviceKey: _service,
-            cwd: '/repo',
-            home: true,
-          ),
+          theme: dark ? darkTheme() : lightTheme(),
+          builder: (context, child) =>
+              RepaintBoundary(key: previewKey, child: child),
+          home: screen,
         ),
       ),
     );
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('voice-status')), findsNothing);
+  }
+
+  Future<void> answer(
+    WidgetTester t,
+    _VoiceApi api, {
+    String thread = 'voice',
+  }) async {
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+    api.event('sdp', {'sdp': 'answer'}, thread: thread);
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 300));
+  }
+
+  testWidgets('a call docks above the composer, not in a corner, and hangs '
+      'up from there', (t) async {
+    final api = _VoiceApi();
+    final media = _Media();
+    await mountVoice(
+      t,
+      api,
+      media,
+      const AppSessionScreen(serviceKey: _service, cwd: '/repo', home: true),
+    );
+    expect(find.byKey(const Key('voice-dock')), findsNothing);
     await t.tap(find.byKey(const Key('voice-start')));
     await t.pumpAndSettle();
+    // A conversation not started yet has nothing to join.
+    expect(find.byKey(const Key('voice-target-here')), findsNothing);
+    expect(find.byKey(const Key('voice-voice-cove')), findsOneWidget);
+    await capturePreview(t, 'voice-start-sheet-desktop-light');
     await t.tap(find.byKey(const Key('voice-start-confirm')));
-    await t.pump();
+    await answer(t, api);
+    final dock = find.byKey(const Key('voice-dock'));
+    expect(dock, findsOneWidget);
+    expect(
+      t.getRect(dock).top,
+      greaterThan(900 / 2),
+      reason: 'the controls sit at the foot, where the composer is',
+    );
+    expect(
+      t.getRect(dock).height,
+      lessThan(96),
+      reason: 'one capsule row, not a panel of empty space',
+    );
+    expect(find.text('Voice conversation'), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-elapsed')), findsOneWidget);
+    expect(find.byKey(const Key('voice-mute')), findsOneWidget);
+    // The assistant answering: the orb takes up its voice.
+    media.level = (input: 0, output: 0.6);
+    api.event('transcript/delta', {
+      'itemId': 'a1',
+      'role': 'assistant',
+      'delta': 'The last commit docks the call above the composer.',
+    });
+    await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 300));
-    api.event('sdp', {'sdp': 'answer'});
-    await t.pump();
-    await t.pump(const Duration(milliseconds: 300));
-    expect(find.byKey(const Key('voice-status')), findsOneWidget);
-    // Collapsing the sidebar moves the entry into the window strip.
-    await t.tap(find.byKey(const Key('sidebar-collapse-btn')));
-    await t.pump();
-    await t.pump(const Duration(milliseconds: 400));
-    expect(find.byKey(const Key('voice-status-compact')), findsOneWidget);
-    await t.tap(find.byKey(const Key('voice-status-hangup')));
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-desktop-light');
+    await t.tap(find.byKey(const Key('voice-stop')));
     await t.pump();
     await t.runAsync(_tick);
     await t.pump(const Duration(milliseconds: 300));
     expect(media.closed, isTrue);
     expect(api.calls.last.$1, 'thread/realtime/stop');
+    // A voice conversation keeps its dock, ready to talk again, and says
+    // how long the call ran.
+    expect(find.byKey(const Key('voice-again')), findsOneWidget);
+    expect(find.text('Talk again'), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-elapsed')), findsOneWidget);
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-ended-desktop-light');
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 7));
   });
+
+  testWidgets('on a phone the folded composer starts a call without the '
+      'keyboard, and the call docks at the foot', (t) async {
+    final api = _VoiceApi()
+      ..appThreads.add(
+        const ThreadMeta(
+          id: 'typed',
+          preview: 'a typed conversation',
+          cwd: '/repo',
+          updatedAt: 0,
+        ),
+      );
+    final media = _Media();
+    await mountVoice(
+      t,
+      api,
+      media,
+      const AppSessionScreen(
+        serviceKey: _service,
+        threadId: 'typed',
+        cwd: '/repo',
+      ),
+      size: const Size(390, 844),
+      dark: true,
+    );
+    expect(find.byKey(const Key('composer-folded')), findsOneWidget);
+    await t.tap(find.byKey(const Key('folded-voice-start')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('voice-start-sheet')), findsOneWidget);
+    expect(
+      t
+          .widget<TextField>(find.byKey(const Key('composer-input')))
+          .focusNode!
+          .hasFocus,
+      isFalse,
+      reason: 'talking needs no keyboard',
+    );
+    await capturePreview(t, 'voice-start-sheet-phone-dark');
+    await t.tap(find.byKey(const Key('voice-start-confirm')));
+    await answer(t, api, thread: 'typed');
+    final dock = find.byKey(const Key('voice-dock'));
+    expect(dock, findsOneWidget);
+    expect(t.getRect(dock).bottom, greaterThan(844 * 0.75));
+    expect(t.getRect(dock).height, lessThan(96));
+    final hangUp = t.getRect(find.byKey(const Key('voice-stop')));
+    expect(hangUp.shortestSide, greaterThanOrEqualTo(48));
+    media.level = (input: 0.5, output: 0);
+    api.event('transcript/delta', {
+      'itemId': 'u1',
+      'role': 'user',
+      'delta': 'What changed in the last commit, and is it safe to ship?',
+    }, thread: 'typed');
+    await t.pump(const Duration(milliseconds: 600));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('voice-dock-caption')), findsOneWidget);
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-phone-dark');
+    // Muted: the call goes quiet grey, the microphone says why in red.
+    await t.tap(find.byKey(const Key('voice-mute')));
+    await _frames(t);
+    expect(media.muted, isTrue);
+    expect(find.text('Microphone muted'), findsOneWidget);
+    await capturePreview(t, 'voice-dock-muted-phone-dark');
+    await t.tap(find.byKey(const Key('voice-stop')));
+    // Ended at once, on the phone's narrow row too.
+    await t.pump();
+    expect(find.byKey(const Key('voice-again')), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-dismiss')), findsOneWidget);
+    await t.runAsync(_tick);
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-ended-phone-dark');
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 7));
+  });
+
+  testWidgets('a call joins the typed conversation on screen, or gets one '
+      'of its own', (t) async {
+    final api = _VoiceApi()
+      ..appThreads.add(
+        const ThreadMeta(
+          id: 'typed',
+          preview: 'a typed conversation',
+          cwd: '/repo',
+          updatedAt: 0,
+        ),
+      );
+    final media = _Media();
+    await mountVoice(
+      t,
+      api,
+      media,
+      const AppSessionScreen(
+        serviceKey: _service,
+        threadId: 'typed',
+        cwd: '/repo',
+      ),
+    );
+    await t.tap(find.byKey(const Key('voice-start')));
+    await t.pumpAndSettle();
+    // Both places, this conversation first.
+    expect(find.byKey(const Key('voice-target-here')), findsOneWidget);
+    expect(find.byKey(const Key('voice-target-new')), findsOneWidget);
+    await t.tap(find.byKey(const Key('voice-start-confirm')));
+    await answer(t, api, thread: 'typed');
+    expect(api.calls.map((c) => c.$1), isNot(contains('thread/start')));
+    expect(
+      api.calls
+          .firstWhere((c) => c.$1 == 'thread/realtime/start')
+          .$2['threadId'],
+      'typed',
+      reason: 'the call starts on the typed thread, which gives it context',
+    );
+    expect(find.text('Voice · this conversation'), findsOneWidget);
+    expect(find.byKey(const Key('voice-mute')), findsOneWidget, reason: 'live');
+    await t.tap(find.byKey(const Key('voice-stop')));
+    await t.pump();
+    await t.runAsync(_tick);
+    await t.pump(const Duration(milliseconds: 300));
+    expect(media.closed, isTrue);
+
+    // The other choice makes a voice conversation of its own.
+    api.calls.clear();
+    await t.tap(find.byKey(const Key('voice-start')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('voice-target-new')));
+    await t.pump();
+    await t.tap(find.byKey(const Key('voice-start-confirm')));
+    await answer(t, api);
+    expect(
+      api.calls.firstWhere((c) => c.$1 == 'thread/start').$2['threadSource'],
+      'pocox-voice',
+    );
+    expect(
+      api.calls
+          .firstWhere((c) => c.$1 == 'thread/realtime/start')
+          .$2['threadId'],
+      'voice',
+    );
+    expect(find.text('Voice conversation'), findsOneWidget);
+    await t.tap(find.byKey(const Key('voice-stop')));
+    await t.pump();
+    await t.runAsync(_tick);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 7));
+  });
+
   testWidgets('opening another conversation ends the call and its capture', (
     t,
   ) async {

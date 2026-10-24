@@ -214,12 +214,6 @@ extension _SessionTitle on _AppSessionState {
                   ),
                 ),
               ),
-              // With the sidebar hidden, the call's status and hang-up move
-              // into the window strip rather than disappearing with it.
-              if (!_leftOpen) ...[
-                _voiceStatus(l10n, compact: true),
-                const SizedBox(width: 6),
-              ],
               if (_ctx != null)
                 ContextGauge(
                   status: _ctx!,
@@ -229,6 +223,12 @@ extension _SessionTitle on _AppSessionState {
               // Environment info lives in a popover off this button — a
               // desktop affordance, hidden when the window can't host it.
               if (width >= 900) _envButton(l10n),
+              _chromeButton(
+                key: const Key('session-show-in-galaxy'),
+                tooltip: l10n.sessionShowInGalaxy,
+                icon: AppIcons.orbit,
+                onPressed: _showInGalaxy,
+              ),
               // Appearance sits with the window's own controls rather than in
               // the sidebar footer: it acts on the whole window, and it was the
               // one frequently-used control that moved (or vanished) with the

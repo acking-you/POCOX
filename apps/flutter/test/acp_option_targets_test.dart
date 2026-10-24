@@ -109,6 +109,7 @@ Future<void> _open(
 
 /// Open [option]'s menu or list; the caller completes the choice later.
 Future<void> _openChip(WidgetTester t, String option) async {
+  await unfoldComposer(t);
   await t.ensureVisible(find.byKey(Key('agent-config-$option')));
   await t.tap(find.byKey(Key('agent-config-$option')));
   await t.pumpAndSettle();
@@ -526,6 +527,7 @@ void main() {
         );
         await _frames(t);
         final chip = find.byKey(const Key('agent-config-model'));
+        await unfoldComposer(t);
         await t.ensureVisible(chip);
         await _frames(t);
         final shown = shownIn(t, chip);

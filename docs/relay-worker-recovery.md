@@ -3,7 +3,8 @@
 ## Direct connections
 
 POCOX follows pb-mapper's dedicated `pocox` branch, currently locked to
-`d8816360f618b7da077bd1ca6e6e2851fcc83701` (SDK 0.7.0), with its `p2p` feature.
+`e371902f8365a3c05c4d4c001b6ae1212bfc67d3` (SDK 0.7.0 plus live direct stages
+and recovery history), with its `p2p` feature.
 The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
 the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
 The relay server is a test-only dependency, never
@@ -12,23 +13,23 @@ embedded into the shipping app or CLI.
 **Settings › Connection path** has two independent preferences, saved as soon
 as they are chosen:
 
-- **Connect to other devices**: **Relay only** (the default) or **P2P first**
-  for outgoing subscriptions.
-- **Accept direct connections** (off by default, desktop only) for incoming
-  connections to newly published services.
+- **Connect to other devices**: **Relay only** (the default) or
+  **P2P first** for outgoing subscriptions.
+- **Accept direct connections** (off by default, desktop only) for
+  incoming connections to newly published services.
 
 The same preferences live in each installation's `config.toml` and apply to
 both account and self-host modes, including CLI workers:
 
 ```toml
 [pb_mapper]
-path = "auto"              # or "relay_only" (default)
-allow_direct = true         # false by default
+path = "auto"              # opt in; "relay_only" is the default
+allow_direct = true         # opt in; false is the default
 ```
 
-Default values are not written, so a `config.toml` that never opted in still
-loads in builds that predate these fields (`PbMapperConfig` rejects unknown
-keys). Opting in and then downgrading needs the two lines removed by hand.
+Default values are not written, so only an opt-in appears in `config.toml`.
+Existing configurations retain their path preferences, including installations
+that have never enabled direct connections.
 
 Preferences are captured when a tunnel starts. Saving them does not interrupt
 active work. Reconnect a session (or restart the app for cached auxiliary
@@ -69,6 +70,48 @@ sheet on touch): local address, active direct and relay connections,
 cumulative fallbacks and the most recent SDK reason. The bridge reports the
 path as a typed enum and the counters as `u32`. CLI diagnostics include the
 same SDK `direct` counters.
+
+### Watching a link recover
+
+Every tunnel reports how it is doing as it happens, not just "retrying". The
+SDK records, on control-path transitions only (never per packet):
+
+- the phase its relay link entered last (resolving, connecting, handshake,
+  ready, backoff) and the time to its next attempt;
+- the direct attempt in flight and its stage: **negotiating** (does the other
+  side offer direct), **discovering** (STUN for the public address, then the
+  session grant), **punching** (QUIC through both NATs) and **committing** (the
+  other side opens its service);
+- the last 16 events — relay ready, relay failed (and why), network changed,
+  P2P established (setup time) and fell back to the relay (the stage it left) —
+  with consecutive repeats folded into one entry.
+
+A tunnel is listed while it is still coming up (not yet *ready*), so its very
+first relay phases and P2P attempt are visible. Lists poll every 3 s, every
+500 ms while any tunnel is coming up, recovering or trying a direct path, and
+a connection sheet or tunnel details on screen every 400 ms.
+
+A session keeps reconnecting for as long as it is on screen, waiting 1, 2, 4,
+8, 15 and then 30 s between attempts; after four failures the banner also offers
+to try at once, and **Retry now** cuts any wait short. A reconnect keeps a live
+tunnel — the SDK recovers its relay link and direct paths itself — and only a
+failed attempt rebuilds the tunnel too. While it reconnects, the session's status
+bar says where it stands (for example *Punching through NAT*, *Fell back to
+the relay while punching*, *Retrying in 8s*) beside three dots for relay, P2P
+and session. Tapping the bar, or the small path mark beside it (P2P, relay or
+recovering), opens the connection sheet: the three steps live, the attempt
+number and last error, and the tunnel's recent events. Tunnel details show the
+same stage and history for any subscription, and the galaxy draws a link trying
+a direct path as a dashed beam and one recovering its relay link as an amber
+dashed arc.
+
+Agent-tool connections are kept until they expire or are ended: when one's
+tunnel ends, POCOX reopens it at the same local port (backing off from 2 s to a
+minute) instead of dropping it, and the galaxy says so. See
+[agent tools](agent-tools.md) for lifetimes.
+An occupied local port leaves the connection waiting for recovery; it never
+silently moves to another address. Ending the connection or changing accounts
+revokes pending recovery, and a late completion cannot replace a newer connection.
 
 Validation covers direct TCP, compatibility fallback without publisher/relay
 support, temporary-credential isolation, exactly one backend dial, coordinator

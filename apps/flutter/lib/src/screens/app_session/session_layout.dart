@@ -242,6 +242,12 @@ extension _SessionLayout on _AppSessionState {
               onTap: _showContextDetail,
               tooltip: _contextTooltip(l10n),
             ),
+          IconButton(
+            key: const Key('session-show-in-galaxy'),
+            tooltip: l10n.sessionShowInGalaxy,
+            icon: const Icon(AppIcons.orbit),
+            onPressed: _showInGalaxy,
+          ),
           // Same place as on desktop. It has to be here rather than in the
           // sessions pane, which on a phone lies under the conversation.
           const ThemeToggle(),
@@ -269,6 +275,12 @@ extension _SessionLayout on _AppSessionState {
       body: _dropWrap(_chatPane(l10n), l10n),
     );
   }
+
+  /// Open the galaxy on the service this conversation runs on, so its link
+  /// shows how the conversation reaches it.
+  void _showInGalaxy() => context.push(
+    '/galaxy?focus=${Uri.encodeQueryComponent(widget.serviceKey)}',
+  );
 
   /// A closed review, once it has slid away, stops being built.
   void _reviewSettled() {
@@ -425,7 +437,6 @@ extension _SessionLayout on _AppSessionState {
                   ],
                 ),
               ),
-              _voiceStatus(l10n),
               Expanded(child: _sessionsPane(l10n, inDrawer: true)),
             ],
           ),
@@ -497,9 +508,6 @@ extension _SessionLayout on _AppSessionState {
       child: Column(
         children: [
           strip,
-          // Pinned above the list, outside its scroll and its search filter:
-          // a live call is always one glance and one tap away.
-          _voiceStatus(l10n),
           Expanded(child: _sessionsPane(l10n)),
         ],
       ),

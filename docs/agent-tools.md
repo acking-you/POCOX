@@ -148,9 +148,9 @@ One `action` with its fields:
 
 | Action | Fields | Result |
 | --- | --- | --- |
-| `share` | `ports` (1–4, the page's first), `title`, `path`, `scheme` (`https` for a TLS page), `wait_ready_seconds` (≤ 20) | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
+| `share` | `ports` (1–4, the page's first), `title`, `path`, `scheme` (`https` for a TLS page), `wait_ready_seconds` (≤ 20), `expires_in_minutes` or `permanent` | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
 | `stop_sharing` | `service` (share id, port or key) | `stopped`; only what the caller's conversation shared |
-| `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port` | `connected` with the local address; shared ports and APIs only; or `waiting_for_user` for another device's Responses API, to repeat |
+| `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port`, `expires_in_minutes` or `permanent` | `connected` with the local address, when it ends, and how it travels (`link`); shared ports and APIs only; or `waiting_for_user` for another device's Responses API, to repeat |
 | `disconnect` | `service` | `disconnected`; only what the caller's conversation connected |
 
 - A share is published only after its first port answers on 127.0.0.1 or
@@ -165,6 +165,24 @@ One `action` with its fields:
   an unreachable relay is retried every 15 seconds.
 - Agent hosts cannot be connected to through the tools: they are for the
   user's controllers, not for other agents.
+- A share or connection lasts 24 hours unless the call gives
+  `expires_in_minutes` (1 to 10080, a week) or `permanent: true` (no expiry;
+  both together are refused). Repeating the call renews it with the lifetime
+  it gives. Results and `services` say when each ends.
+- A connection result carries `link`: the device's policy (`p2p_first` or
+  `relay_only`), what its open connections go through (`direct`, `relay`,
+  `mixed`, or `idle` while none is open), the tunnel's state (`connecting`,
+  `ready`, `reconnecting`, or `restoring` while POCOX reopens it), counts of
+  direct and relayed connections, the stage the last fallback gave up at, and
+  any direct attempt in flight. `services` lists every connection with the
+  same, in words for the model.
+- A connection is kept until it expires or is ended, whatever happens to its
+  tunnel: the SDK recovers the relay link (trying direct first when the device
+  allows it), and a tunnel that ends is reopened at the same local port,
+  backing off from 2 s to a minute. If another process takes that local port,
+  recovery waits instead of changing the address already given to callers.
+  Revocation and account changes cancel pending restores; their late results
+  cannot overwrite or tear down a replacement connection.
 - Every failure says what to do next (`tools_off`, `not_hosting`,
   `declined`, `name_conflict`, `relay_unavailable`, …).
 
@@ -245,8 +263,9 @@ as digests; the secret reaches its holder once, never through a command line.
 
 An agent's share or connection ends when the first of these happens: the agent
 stops it; its hosted instance stops or restarts (its tokens are revoked); its
-token is revoked in Settings; 24 hours pass; the switch goes off; the account
-or relay changes; POCOX quits. **Keep sharing** makes it the user's, with no
+token is revoked in Settings; its lifetime passes (24 hours unless the call
+gave `expires_in_minutes`, never with `permanent`); the switch goes off; the
+account or relay changes; POCOX quits. **Keep sharing** makes it the user's, with no
 expiry, and so does the user sharing the same port. The user's own shares
 (from the CLI or Share and open) survive restarts until stopped, and follow
 an account or relay change as hosts do.
@@ -317,7 +336,10 @@ the signal blue. Stable placement: devices take golden-angle spiral slots in
 the order of their names' hashes. Planets glow in their status colour; an
 agent's share carries a dashed orbit, a moon in its harness's colour and an arc
 that runs down with its lease. Connections rise as arcs of light with
-particles flowing from the service to the device using it. New services spiral
+particles flowing from the service to the device using it. A
+connection trying a direct path is a dashed beam with quick particles; one
+whose relay link is coming up or recovering, a dashed amber arc. A connection
+shows when it ends (or that it has no expiry), and while POCOX reopens it. New services spiral
 out of their star, a status change sends a ripple, a removed one fades.
 Offline devices are dim embers, drifting slightly outward.
 

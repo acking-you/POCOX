@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
+import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/providers.dart';
@@ -63,9 +64,21 @@ class GalaxyPanel extends ConsumerWidget {
     final planet = scene.planetOf(id);
     final Widget body;
     if (system != null) {
-      body = _SystemDetail(system: system, onPick: onPick);
+      body = _SystemDetail(
+        system: system,
+        // Every connection this device keeps to it, service by service.
+        links: [
+          for (final link in scene.links)
+            if (link.from.system.id == system.id) link,
+        ],
+        onPick: onPick,
+      );
     } else if (planet != null) {
-      body = _PlanetDetail(system: planet.system, planet: planet.planet);
+      body = _PlanetDetail(
+        system: planet.system,
+        planet: planet.planet,
+        link: scene.links.where((l) => l.targetId == id).firstOrNull,
+      );
     } else {
       body = const SizedBox.shrink();
     }
@@ -133,10 +146,65 @@ class _Header extends StatelessWidget {
   }
 }
 
+/// The live tunnels behind [links] as rows: what each reaches, where it
+/// listens, its path; a row opens the tunnel's details.
+List<Widget> _tunnelRows(BuildContext context, List<Link> links) {
+  final l10n = AppLocalizations.of(context);
+  return [
+    for (final link in links)
+      for (final tunnel in link.tunnels)
+        ListTile(
+          key: Key('galaxy-tunnel-${tunnel.key}'),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(
+            link.path == LinkPath.direct
+                ? AppIcons.direct
+                : AppIcons.link_outlined,
+            size: 18,
+          ),
+          title: Text(
+            subscriptionTitle(tunnel.key),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(tunnelSubtitle(l10n, tunnel)),
+          trailing: TunnelPathChip(tunnel),
+          onTap: () => showTunnelDetails(context, tunnel.key),
+        ),
+  ];
+}
+
+/// A quiet heading over a panel's list.
+class _ListHeading extends StatelessWidget {
+  const _ListHeading(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 10, bottom: 2),
+    child: Text(
+      text,
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+}
+
 class _SystemDetail extends ConsumerWidget {
-  const _SystemDetail({required this.system, required this.onPick});
+  const _SystemDetail({
+    required this.system,
+    required this.links,
+    required this.onPick,
+  });
 
   final StarSystem system;
+
+  /// This device's connections to the system.
+  final List<Link> links;
   final ValueChanged<String> onPick;
 
   @override
@@ -202,6 +270,14 @@ class _SystemDetail extends ConsumerWidget {
                   subtitle: Text(kindLabel(l10n, planet.kind)),
                   onTap: () => onPick(planet.id),
                 ),
+              if (links.any((link) => link.tunnels.isNotEmpty)) ...[
+                _ListHeading(
+                  l10n.subscriptionsOnDevice(
+                    links.fold(0, (n, link) => n + link.tunnels.length),
+                  ),
+                ),
+                ..._tunnelRows(context, links),
+              ],
             ],
           ),
         ),
@@ -220,10 +296,13 @@ class _SystemDetail extends ConsumerWidget {
 }
 
 class _PlanetDetail extends ConsumerWidget {
-  const _PlanetDetail({required this.system, required this.planet});
+  const _PlanetDetail({required this.system, required this.planet, this.link});
 
   final StarSystem system;
   final Planet planet;
+
+  /// This device's link to the service, with the tunnels behind it.
+  final Link? link;
 
   Future<void> _toggle(
     BuildContext context,
@@ -267,13 +346,8 @@ class _PlanetDetail extends ConsumerWidget {
     final connection = ref
         .watch(toolsOverviewProvider)
         .connectionTo(service.key);
-    // How the connection's data travels now: its own tunnel's observation.
-    final tunnel = connection == null
-        ? null
-        : toolsTunnelOf(
-            ref.watch(liveSubscriptionsProvider).valueOrNull ?? const [],
-            service.key,
-          );
+    // How each tunnel to it travels now: a conversation's, an agent tool's.
+    final tunnels = link?.tunnels ?? const <SubInfo>[];
     final away =
         system.device.name != ref.watch(toolsOverviewProvider).thisDevice;
     return Column(
@@ -297,9 +371,12 @@ class _PlanetDetail extends ConsumerWidget {
               label: statusLabel(l10n, service.status),
               filled: true,
             ),
-            if (tunnel != null) ...[
+            if (tunnels.length == 1) ...[
               const SizedBox(width: 8),
-              TunnelPathChip(tunnel, key: const Key('galaxy-connection-path')),
+              TunnelPathChip(
+                tunnels.single,
+                key: const Key('galaxy-connection-path'),
+              ),
             ],
           ],
         ),
@@ -307,12 +384,24 @@ class _PlanetDetail extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              l10n.galaxyConnected(connection.local),
+              [
+                l10n.galaxyConnected(connection.local),
+                if (connection.restoring)
+                  l10n.toolsReopening(connection.restoreFailures + 1)
+                else
+                  endsIn(l10n, connection.expiresMs, never: l10n.toolsNoExpiry),
+              ].join(' · '),
+              key: const Key('galaxy-connection-lasts'),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
             ),
           ),
+        // Every tunnel to it, each with its path and its details a tap away.
+        if (link case final link? when link.tunnels.isNotEmpty) ...[
+          _ListHeading(l10n.subscriptionsOnDevice(link.tunnels.length)),
+          ..._tunnelRows(context, [link]),
+        ],
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,

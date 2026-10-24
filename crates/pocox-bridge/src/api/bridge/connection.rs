@@ -41,9 +41,31 @@ pub async fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto>
 /// its event stream). Idempotent.
 pub async fn app_connect(service_key: String, local_port: u16) -> Result<()> {
     execution::run(Lane::Control, move || {
+        let _connecting = connect_stage::begin(&service_key);
         engine(&service_key).connect(service_key.clone(), local_port)
     })
     .await
+}
+
+/// A step of connecting a session, mirrored for Dart.
+pub enum ConnectStageDto {
+    /// Opening or reusing the tunnel to the service.
+    Tunnel,
+    /// Opening the session through the tunnel; a direct attempt happens here.
+    Session,
+    /// The session's protocol handshake.
+    Handshake,
+}
+
+/// The step the connect of `service_key` is at, or `None` when none is in
+/// progress. Cheap enough to poll while a reconnect is on screen.
+#[frb(sync)]
+pub fn app_connect_stage(service_key: String) -> Option<ConnectStageDto> {
+    connect_stage::current(&service_key).map(|stage| match stage {
+        connect_stage::ConnectStage::Tunnel => ConnectStageDto::Tunnel,
+        connect_stage::ConnectStage::Session => ConnectStageDto::Session,
+        connect_stage::ConnectStage::Handshake => ConnectStageDto::Handshake,
+    })
 }
 
 /// Whether a live app-server session exists for `service_key`.

@@ -24,6 +24,13 @@ Future<void> appConnect({required String serviceKey, required int localPort}) =>
       localPort: localPort,
     );
 
+/// The step the connect of `service_key` is at, or `None` when none is in
+/// progress. Cheap enough to poll while a reconnect is on screen.
+ConnectStageDto? appConnectStage({required String serviceKey}) => RustLib
+    .instance
+    .api
+    .crateApiBridgeConnectionAppConnectStage(serviceKey: serviceKey);
+
 /// Whether a live app-server session exists for `service_key`.
 bool appIsConnected({required String serviceKey}) => RustLib.instance.api
     .crateApiBridgeConnectionAppIsConnected(serviceKey: serviceKey);
@@ -349,4 +356,16 @@ class AppCapabilitiesDto {
           historyScope == other.historyScope &&
           runningInventory == other.runningInventory &&
           authRequired == other.authRequired;
+}
+
+/// A step of connecting a session, mirrored for Dart.
+enum ConnectStageDto {
+  /// Opening or reusing the tunnel to the service.
+  tunnel,
+
+  /// Opening the session through the tunnel; a direct attempt happens here.
+  session,
+
+  /// The session's protocol handshake.
+  handshake,
 }

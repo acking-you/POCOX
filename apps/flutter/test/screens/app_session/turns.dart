@@ -17,6 +17,8 @@ void _registerTurns() {
       host(const AppSessionScreen(serviceKey: 'pcx:lb7666:app:default'), api),
     );
     await t.pumpAndSettle();
+    // On a phone the composer opens folded; resizing starts from writing.
+    await unfoldComposer(t);
     final input = find.byKey(const Key('composer-input-area'));
     expect(t.getSize(input).height, 32);
     await t.drag(

@@ -159,6 +159,9 @@ async fn missing_or_unsupported_sources_fail_without_creating_empty_history() {
         .contains("legacy"));
 }
 
+// Native history is supported on Unix, where source identity includes the
+// inode.
+#[cfg(unix)]
 #[tokio::test]
 async fn replacing_a_database_invalidates_the_source_generation() {
     let temp = TempDir::new().expect("temp");

@@ -12,6 +12,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/service_key.dart';
+import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_backdrop.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_frame.dart';
 import 'package:pocox/src/tools/galaxy/galaxy_model.dart';
@@ -621,6 +622,22 @@ class _Frame {
           canvas.drawPath(
             _path(curve),
             stroke(1)..color = light.withValues(alpha: dark ? 0.22 : 0.18),
+          );
+        case LinkPath.probing:
+          // A beam being punched through: the direct line in short dashes,
+          // its quick particles running ahead.
+          canvas.drawPath(
+            _dashes(curve, on: 2.5, off: 3),
+            stroke(1.6)..shader = dark ? fade(0.3, 0.9) : fade(0.25, 0.8),
+          );
+        case LinkPath.recovering:
+          // Waiting on the relay: a faint dashed arc in the caution colour.
+          canvas.drawPath(
+            _dashes(curve, on: 3, off: 5),
+            stroke(1.2)
+              ..color = cautionColor(
+                palette.scheme,
+              ).withValues(alpha: dark ? 0.55 : 0.6),
           );
         case LinkPath.unknown || LinkPath.mixed:
           canvas.drawPath(

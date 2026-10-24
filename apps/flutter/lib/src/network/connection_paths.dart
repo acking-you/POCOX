@@ -6,6 +6,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/network/link_activity.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/service_key.dart';
@@ -15,6 +16,7 @@ import 'package:pocox/src/widgets/field_help.dart';
 import 'package:pocox/src/widgets/glass.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/icon_badge.dart';
+import 'package:pocox/src/widgets/link_progress.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 
 /// This installation's saved path preferences.
@@ -51,6 +53,10 @@ class RelayPreferencesStore extends AutoDisposeAsyncNotifier<RelayPreferences> {
 /// How often live path counters refresh while something shows them.
 const _pollInterval = Duration(seconds: 3);
 
+/// How often they refresh while a tunnel is coming up, recovering or trying
+/// a direct path: often enough to show a stage that lasts a second or two.
+const _busyPollInterval = Duration(milliseconds: 500);
+
 /// Active subscriptions with their live path counters, refreshed only while
 /// something watches them. The timer stops with the last listener, not at
 /// disposal: a container a test or caller owns can outlive its widgets.
@@ -61,9 +67,12 @@ final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
   Timer? next;
   var watched = true;
   var loaded = false;
+  var busy = false;
   void schedule() {
     next?.cancel();
-    next = watched && loaded ? Timer(_pollInterval, ref.invalidateSelf) : null;
+    next = watched && loaded
+        ? Timer(busy ? _busyPollInterval : _pollInterval, ref.invalidateSelf)
+        : null;
   }
 
   void stop() {
@@ -79,16 +88,29 @@ final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
       schedule();
     });
   try {
-    return await api.subscriptions();
+    final subs = await api.subscriptions();
+    busy = subs.any(
+      (sub) => sub.alive && (sub.recovering || sub.attempt != null),
+    );
+    return subs;
   } finally {
     loaded = true;
     schedule();
   }
 });
 
-/// What [sub]'s status chip says: dropped, or the path its data takes now.
+/// What [sub]'s status chip says: dropped, coming up or recovering, trying a
+/// direct path, or the path its data takes now.
 String tunnelPathLabel(AppLocalizations l10n, SubInfo sub) {
   if (!sub.alive) return l10n.subscribedDead;
+  if (sub.recovering) {
+    return sub.ready
+        ? l10n.stateReconnecting
+        : relayPhaseLabel(l10n, sub.relayPhase);
+  }
+  if (sub.attempt case final attempt?) {
+    return directStageLabel(l10n, attempt.stage);
+  }
   return switch (sub.path) {
     TunnelPath.relayOnly => l10n.connectionPathRelayOnly,
     TunnelPath.idle => l10n.tunnelPathIdle,
@@ -173,7 +195,13 @@ class TunnelPathChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return StatusChip(
-      color: sub.alive ? successColor(scheme) : scheme.error,
+      color: !sub.alive
+          ? scheme.error
+          : sub.recovering
+          ? cautionColor(scheme)
+          : sub.attempt != null
+          ? signalColor(scheme)
+          : successColor(scheme),
       label: tunnelPathLabel(AppLocalizations.of(context), sub),
       filled: true,
     );
@@ -191,6 +219,58 @@ Future<void> showTunnelDetails(BuildContext context, String subscriptionKey) =>
       builder: (_) => _TunnelDetails(subscriptionKey),
     );
 
+/// A subscription's name under its device's heading: the service's name and
+/// kind, such as `default · app`.
+String subscriptionTitle(String subscriptionKey) {
+  final service = subscriptionServiceKey(subscriptionKey);
+  final parsed = parseServiceKey(service);
+  return parsed.device.isEmpty ? service : '${parsed.name} · ${parsed.kind}';
+}
+
+/// [subs] by the device each reaches, devices in label order and each
+/// device's subscriptions in key order.
+List<({String device, List<SubInfo> subs})> subscriptionsByDevice(
+  Iterable<SubInfo> subs,
+) {
+  final byDevice = <String, List<SubInfo>>{};
+  for (final sub in subs) {
+    byDevice
+        .putIfAbsent(
+          serviceKeyDevice(subscriptionServiceKey(sub.key)),
+          () => [],
+        )
+        .add(sub);
+  }
+  final devices = byDevice.keys.toList()
+    ..sort((a, b) => deviceLabel(a).compareTo(deviceLabel(b)));
+  return [
+    for (final device in devices)
+      (
+        device: device,
+        subs: byDevice[device]!..sort((a, b) => a.key.compareTo(b.key)),
+      ),
+  ];
+}
+
+/// What the SDK's fallback [code] means, or the code itself when it is new.
+String fallbackReasonLabel(AppLocalizations l10n, String code) =>
+    switch (code) {
+      'direct_negotiation_unavailable' => l10n.tunnelFallbackNegotiation,
+      'direct_timeout_or_unreachable' => l10n.tunnelFallbackUnreachable,
+      _ => code,
+    };
+
+/// Why a tunnel's attempt to reach the relay failed, in words.
+String tunnelFailureLabel(AppLocalizations l10n, TunnelFailure failure) =>
+    switch (failure) {
+      TunnelFailure.dns => l10n.tunnelFailureDns,
+      TunnelFailure.transport => l10n.tunnelFailureTransport,
+      TunnelFailure.timeout => l10n.tunnelFailureTimeout,
+      TunnelFailure.serviceUnavailable => l10n.tunnelFailureServiceUnavailable,
+      TunnelFailure.rejected => l10n.tunnelFailureRejected,
+      TunnelFailure.networkChanged => l10n.tunnelFailureNetworkChanged,
+    };
+
 class _TunnelDetails extends ConsumerWidget {
   const _TunnelDetails(this.subscriptionKey);
 
@@ -200,11 +280,15 @@ class _TunnelDetails extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
+    // Refreshed quickly while open, so a stage is seen as it happens.
+    final live = ref.watch(linkWatchProvider(subscriptionKey)).valueOrNull;
     final subs = ref.watch(liveSubscriptionsProvider).valueOrNull;
     final sub =
+        live?.tunnel ??
         subs?.where((s) => s.key == subscriptionKey).firstOrNull ??
         // Gone since the row was pressed: it was unsubscribed or dropped.
         SubInfo(key: subscriptionKey, localAddr: '', alive: false);
+    final service = subscriptionServiceKey(subscriptionKey);
     return Padding(
       key: const Key('tunnel-details'),
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
@@ -215,11 +299,21 @@ class _TunnelDetails extends ConsumerWidget {
           Row(
             children: [
               Expanded(
-                child: Text(
-                  subscriptionServiceKey(subscriptionKey),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      deviceLabel(serviceKeyDevice(service)),
+                      style: helpTextStyle(theme),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 12),
@@ -227,23 +321,62 @@ class _TunnelDetails extends ConsumerWidget {
             ],
           ),
           if (sub.alive) ...[
-            const SizedBox(height: 14),
-            _Fact(l10n.tunnelLocalAddress, sub.localAddr, mono: true),
+            _Heading(l10n.tunnelSectionP2p),
             if (sub.path == TunnelPath.relayOnly)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  l10n.tunnelRelayOnlyNote,
-                  style: helpTextStyle(theme),
-                ),
-              )
+              Text(l10n.tunnelRelayOnlyNote, style: helpTextStyle(theme))
             else ...[
-              _Fact(l10n.tunnelActiveDirect, '${sub.activeDirect}'),
-              _Fact(l10n.tunnelActiveRelay, '${sub.activeRelay}'),
-              _Fact(l10n.tunnelFallbackCount, '${sub.fallbacks}'),
+              if (sub.attempt case final attempt?)
+                _Fact(
+                  l10n.tunnelRelayState,
+                  directStageLabel(l10n, attempt.stage),
+                ),
+              _AttemptBar(sub),
+              const SizedBox(height: 6),
+              Text(
+                sub.directAttempts == 0
+                    ? l10n.tunnelP2pNoAttempts
+                    : l10n.tunnelP2pAttempts(sub.directSessions, sub.fallbacks),
+                key: const Key('tunnel-attempts'),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 4),
+              _Fact(
+                l10n.tunnelOpenNow,
+                l10n.tunnelPathMixed(sub.activeDirect, sub.activeRelay),
+              ),
               if (sub.lastFallback case final reason?)
-                _Fact(l10n.tunnelLastFallback, reason, mono: true),
+                _Fact(
+                  l10n.tunnelLastFallback,
+                  fallbackReasonLabel(l10n, reason),
+                  detail: reason,
+                ),
             ],
+            _Heading(l10n.tunnelSectionRelay),
+            _Fact(
+              l10n.tunnelRelayState,
+              !sub.ready
+                  ? relayPhaseLabel(l10n, sub.relayPhase)
+                  : sub.retrying
+                  ? l10n.tunnelRelayRetrying(sub.consecutiveFailures)
+                  : l10n.tunnelRelayConnected,
+              detail: switch (sub.nextRetryMs) {
+                final ms? when sub.retrying => l10n.linkRetryIn(
+                  (ms + 999) ~/ 1000,
+                ),
+                _ => null,
+              },
+            ),
+            if (sub.lastFailure case final failure?
+                when sub.consecutiveFailures > 0)
+              _Fact(l10n.tunnelLastFailure, tunnelFailureLabel(l10n, failure)),
+            if (sub.setupLatencyMs case final ms?)
+              _Fact(l10n.tunnelSetupLatency, l10n.tunnelMilliseconds(ms)),
+            _Fact(l10n.tunnelLocalAddress, sub.localAddr, mono: true),
+            _Heading(l10n.linkRecent),
+            LinkTimeline(sub.events),
           ],
         ],
       ),
@@ -251,17 +384,82 @@ class _TunnelDetails extends ConsumerWidget {
   }
 }
 
-/// One labelled value of the details panel; long values wrap under the label.
-class _Fact extends StatelessWidget {
-  const _Fact(this.label, this.value, {this.mono = false});
+/// A section's quiet heading inside the details panel.
+class _Heading extends StatelessWidget {
+  const _Heading(this.text);
 
-  final String label;
-  final String value;
-  final bool mono;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 16, bottom: 6),
+    child: Text(
+      text,
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.2,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    ),
+  );
+}
+
+/// How this tunnel's direct setups went, as one bar: the part that went
+/// direct in the galaxy's link colour, the part that fell back muted.
+class _AttemptBar extends StatelessWidget {
+  const _AttemptBar(this.sub);
+
+  final SubInfo sub;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final total = sub.directAttempts;
+    return Semantics(
+      label: AppLocalizations.of(
+        context,
+      ).tunnelP2pAttempts(sub.directSessions, sub.fallbacks),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: SizedBox(
+          height: 6,
+          child: total == 0
+              ? ColoredBox(color: scheme.onSurface.withValues(alpha: 0.08))
+              : Row(
+                  children: [
+                    if (sub.directSessions > 0)
+                      Expanded(
+                        flex: sub.directSessions,
+                        child: ColoredBox(color: infoColor(scheme)),
+                      ),
+                    if (sub.fallbacks > 0)
+                      Expanded(
+                        flex: sub.fallbacks,
+                        child: ColoredBox(color: onSurfaceMuted(scheme)),
+                      ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One labelled value of the details panel; long values wrap beside the
+/// label. A [detail] (the raw SDK code behind words) goes small under it.
+class _Fact extends StatelessWidget {
+  const _Fact(this.label, this.value, {this.mono = false, this.detail});
+
+  final String label;
+  final String value;
+  final bool mono;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final detail = this.detail;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
@@ -273,15 +471,30 @@ class _Fact extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: SelectableText(
-              value,
-              textAlign: TextAlign.end,
-              style: TextStyle(
-                fontSize: mono ? 12.5 : 13,
-                fontFamily: mono ? monoFontFamily : null,
-                fontFeatures: const [FontFeature.tabularFigures()],
-                color: scheme.onSurface,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                SelectableText(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    fontSize: mono ? 12.5 : 13,
+                    fontFamily: mono ? monoFontFamily : null,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: scheme.onSurface,
+                  ),
+                ),
+                if (detail != null && detail != value)
+                  SelectableText(
+                    detail,
+                    textAlign: TextAlign.end,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontFamily: monoFontFamily,
+                      color: onSurfaceMuted(scheme),
+                    ),
+                  ),
+              ],
             ),
           ),
         ],

@@ -90,7 +90,10 @@ GoRouter buildRouter({
     GoRoute(path: '/welcome', builder: (c, s) => const WelcomeGuideScreen()),
     GoRoute(path: '/manage', builder: (c, s) => const ServicesScreen()),
     // Every device and service as a living galaxy.
-    GoRoute(path: '/galaxy', builder: (c, s) => const GalaxyScreen()),
+    GoRoute(
+      path: '/galaxy',
+      builder: (c, s) => GalaxyScreen(focus: s.uri.queryParameters['focus']),
+    ),
     // A page another device shared, in the in-app browser (phones).
     GoRoute(
       path: '/preview',

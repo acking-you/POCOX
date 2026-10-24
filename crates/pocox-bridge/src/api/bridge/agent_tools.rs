@@ -216,15 +216,22 @@ pub struct ToolsConnectionDto {
     pub owner: ToolsOwnerDto,
     /// When it ends on its own.
     pub expires_ms: Option<i64>,
+    /// Its tunnel ended and POCOX is reopening it.
+    pub restoring: bool,
+    /// Failed attempts to reopen it so far.
+    pub restore_failures: u32,
 }
 
 fn connection(c: model::ConnectionView) -> ToolsConnectionDto {
+    let restoring = c.link.as_ref().filter(|link| link.state == "restoring");
     ToolsConnectionDto {
         service: c.service,
         local: c.local,
         same_port: c.same_port,
         owner: owner(c.owner),
         expires_ms: c.expires_ms,
+        restoring: restoring.is_some(),
+        restore_failures: restoring.map_or(0, |link| link.restore_failures),
     }
 }
 
@@ -433,6 +440,7 @@ pub async fn tools_share(
             wait_ready_seconds: Some(5),
             secure: false,
             epoch: None,
+            ..Default::default()
         };
         let caller = shares::Caller::user("You");
         match runtime::runtime().block_on(shares::share(&caller, request)) {
@@ -478,6 +486,7 @@ pub async fn tools_connect(service: String, local_port: Option<u16>) -> Result<T
         let request = connections::ConnectRequest {
             service,
             local_port,
+            ..Default::default()
         };
         let caller = shares::Caller::user("This device");
         match runtime::runtime().block_on(connections::connect(&caller, request)) {

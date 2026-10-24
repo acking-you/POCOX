@@ -57,8 +57,8 @@ monitoring are in [Controller history cache](session-cache-sync.md).
   incoming switch. Choices save at once, optimistically; a failed write springs
   the control back with a failed line. Its explanation sits behind the group's
   info mark; the visible line under a control is only pending ("reconnect a
-  session", "restart hosting") or failed. Keep the default relay-only/off
-  behavior.
+  session", "restart hosting") or failed. Relay-only is the default and incoming
+  direct is disabled; only an opt-in is written.
 - How a connection travels has one visual language: in words, P2P direct /
   Via relay / Direct n · Relay m / Idle / Relay only (`tunnelPathLabel`), and
   after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,
@@ -72,6 +72,17 @@ monitoring are in [Controller history cache](session-cache-sync.md).
   widgets alone, so polling rebuilds them, not the settings page, and stops
   with the last view. See
   [direct connections](relay-worker-recovery.md#direct-connections).
+- Recovery is shown as it happens ([watching a link
+  recover](relay-worker-recovery.md#watching-a-link-recover)): the model is
+  `network/link_activity.dart` (`linkWatchProvider` polls one service every
+  400 ms while watched; `linkSteps` turns a tunnel, the connect stage and the
+  controller's `ReconnectState` into relay / P2P / session steps), drawn by
+  `widgets/link_progress.dart`: `LinkPipeline` (three nodes, the active one
+  turning, a failed one saying why), `LinkDots` for a status line,
+  `LinkTimeline` for recent events and `showLinkSheet`, a popover on desktop
+  and a sheet on touch. A reconnecting session's status bar shows
+  `LinkStatusLine` in place of its state and a `LinkPathMark` at all times; both
+  open the sheet, whose **Retry now** ends the wait between attempts.
 
 - `/` is chat-first: it resolves a host (last used → locally hosted → first
   reachable), auto-connects and opens the latest session with all sessions in
@@ -116,18 +127,22 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 - Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
   22 px composer radius with a quieter idle edge, 44 px sidebar heading
   buttons, two-line host switcher names.
-- Below 720 px on touch the composer folds into a capsule while the reader
-  reads (`screens/app_session/composer_foot.dart`, `widgets/folding_panel.dart`):
-  a drag of 56 px through the transcript more than 96 px from its end folds
-  it, unless the field is focused, a dictation take runs or the full editor
-  is open. The capsule is the same glass pane (radius, focus and streaming
-  edges) showing the draft's first line or the hint, attachments and Stop
-  while a turn runs. It unfolds on a tap (which focuses the field), on any
-  focus of the field, when a scroll comes to rest at the end, and on a forced
-  return to the end (send, jump to latest). The fold belongs to its
-  conversation; desktop, tablets and read-only views never fold. The full
-  composer stays mounted underneath, so draft, focus and options survive; the
-  height morphs while the forms cross-fade (`Motion.medium`, emphasized).
+- Below 720 px on touch the composer is a capsule whenever no one is writing
+  (`_composerFolded` in `screens/app_session/composer_foot.dart`,
+  `widgets/folding_panel.dart`): every conversation opens folded, and it
+  unfolds only while the field has focus, a dictation take runs or the full
+  editor is open. A tap on the capsule focuses the field; letting go folds it
+  again. Reaching the end, jumping to the latest message, sending and a reply
+  arriving leave it as it is. A keyboard put away while the field keeps focus
+  (Android's back button) releases the field after 250 ms, unless it came back,
+  another app is in front or a take runs. The capsule is the same glass pane
+  (radius, focus and streaming edges) showing the draft's first line or the
+  hint, attachments and Stop while a turn runs. Desktop, tablets and read-only
+  views never fold. The full composer stays mounted underneath, so draft and
+  options survive. The height morphs on the emphasized curve over
+  `Motion.slow`, roughly with the keyboard; both forms fade on that eased
+  progress (so the pane is never empty glass) and settle 6 px into place, and
+  the focus lift eases over the same time.
 - What floats over the transcript's foot is measured into a notifier
   (`_ComposerFoot.overlay`): its growth, drag and fold move only the end
   spacer and the overlays above it, never rebuild the conversation.
@@ -147,7 +162,8 @@ monitoring are in [Controller history cache](session-cache-sync.md).
   - The status bar measures its line (`_statusFit`,
     `screens/app_session/session_status.dart`): the model name shortens, then
     the branch, then the model chip and clock give way; state and change
-    counts always show.
+    counts always show. The link mark always shows, and the reconnect
+    line's dots are reserved while reconnecting.
   - The narrow services device list scrolls, local session rows stack status
     and action under a narrow title, picker footers use `OverflowBar`.
 - Every engine's new-conversation view (`screens/app_session/agent_welcome.dart`)

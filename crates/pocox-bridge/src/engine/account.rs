@@ -37,6 +37,35 @@ fn http_client(support_dir: &Path) -> Result<reqwest::Client> {
         .context("building account HTTP client")
 }
 
+/// The backend's refusal body, `{ "error": … }`.
+#[derive(serde::Deserialize)]
+struct Refusal {
+    error: String,
+}
+
+/// `resp` once the backend accepted the call to `what`. A refusal keeps the
+/// backend's own reason, which tells a rejected sign-in return link from a
+/// malformed request where the status alone (400 for both) cannot.
+async fn accepted(resp: reqwest::Response, what: &str) -> Result<reqwest::Response> {
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(resp);
+    }
+    match resp.json::<Refusal>().await {
+        Ok(refusal) => bail!("{what} failed: HTTP {status}: {}", refusal.error),
+        Err(_) => bail!("{what} failed: HTTP {status}"),
+    }
+}
+
+/// Send `request` for `what` and return its response once accepted.
+async fn call(request: reqwest::RequestBuilder, what: &str) -> Result<reqwest::Response> {
+    let resp = request
+        .send()
+        .await
+        .with_context(|| format!("calling {what}"))?;
+    accepted(resp, what).await
+}
+
 /// Compile-time default backend host, overridable at build time via the
 /// `POCOX_BACKEND_HOST` env var (the release pipeline injects the repo's
 /// configured server). An empty/unset value falls back to the bundled default.
@@ -102,17 +131,16 @@ pub async fn device_start(
 ) -> Result<DeviceStart> {
     let config = load_config(support_dir)?;
     let backend = resolve_backend(&config, backend_override)?;
-    let resp: DeviceStartResponse = http_client(support_dir)?
-        .post(format!("{backend}/auth/device/start"))
-        .json(&DeviceStartRequest::default())
-        .send()
-        .await
-        .context("calling /auth/device/start")?
-        .error_for_status()
-        .context("/auth/device/start failed")?
-        .json()
-        .await
-        .context("parsing device start response")?;
+    let resp: DeviceStartResponse = call(
+        http_client(support_dir)?
+            .post(format!("{backend}/auth/device/start"))
+            .json(&DeviceStartRequest::default()),
+        "/auth/device/start",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing device start response")?;
     Ok(DeviceStart {
         user_code: resp.user_code,
         verification_uri: resp.verification_uri,
@@ -148,19 +176,18 @@ pub async fn device_poll(
     backend: &str,
     poll_handle: String,
 ) -> Result<PollOutcome> {
-    let resp: DevicePollResponse = http_client(support_dir)?
-        .post(format!("{backend}/auth/device/poll"))
-        .json(&DevicePollRequest {
-            poll_handle,
-        })
-        .send()
-        .await
-        .context("calling /auth/device/poll")?
-        .error_for_status()
-        .context("/auth/device/poll failed")?
-        .json()
-        .await
-        .context("parsing device poll response")?;
+    let resp: DevicePollResponse = call(
+        http_client(support_dir)?
+            .post(format!("{backend}/auth/device/poll"))
+            .json(&DevicePollRequest {
+                poll_handle,
+            }),
+        "/auth/device/poll",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing device poll response")?;
     match resp.status {
         DevicePollStatus::Pending => Ok(PollOutcome::Pending),
         DevicePollStatus::SlowDown => Ok(PollOutcome::SlowDown),
@@ -216,22 +243,21 @@ pub async fn web_login_start(
     let backend = resolve_backend(&config, backend_override)?;
     let code_verifier = pkce::gen_verifier();
     let state = pkce::gen_state();
-    let resp: WebStartResponse = http_client(support_dir)?
-        .post(format!("{backend}/auth/web/start"))
-        .json(&WebStartRequest {
-            redirect_uri: redirect_uri.to_string(),
-            state: state.clone(),
-            code_challenge: pkce::challenge(&code_verifier),
-            device_label: None,
-        })
-        .send()
-        .await
-        .context("calling /auth/web/start")?
-        .error_for_status()
-        .context("/auth/web/start failed")?
-        .json()
-        .await
-        .context("parsing web start response")?;
+    let resp: WebStartResponse = call(
+        http_client(support_dir)?
+            .post(format!("{backend}/auth/web/start"))
+            .json(&WebStartRequest {
+                redirect_uri: redirect_uri.to_string(),
+                state: state.clone(),
+                code_challenge: pkce::challenge(&code_verifier),
+                device_label: None,
+            }),
+        "/auth/web/start",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing web start response")?;
     Ok(WebLoginStart {
         authorize_url: resp.authorize_url,
         state,
@@ -248,20 +274,19 @@ pub async fn web_login_exchange(
     exchange_code: String,
     code_verifier: String,
 ) -> Result<PollOutcome> {
-    let resp: WebExchangeResponse = http_client(support_dir)?
-        .post(format!("{backend}/auth/web/exchange"))
-        .json(&WebExchangeRequest {
-            exchange_code,
-            code_verifier,
-        })
-        .send()
-        .await
-        .context("calling /auth/web/exchange")?
-        .error_for_status()
-        .context("/auth/web/exchange failed")?
-        .json()
-        .await
-        .context("parsing web exchange response")?;
+    let resp: WebExchangeResponse = call(
+        http_client(support_dir)?
+            .post(format!("{backend}/auth/web/exchange"))
+            .json(&WebExchangeRequest {
+                exchange_code,
+                code_verifier,
+            }),
+        "/auth/web/exchange",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing web exchange response")?;
     let cred = resp.credential;
     let mut config = load_config(support_dir)?;
     config.set_account_session(
@@ -316,17 +341,16 @@ pub async fn current_user(support_dir: &Path) -> Result<Option<AccountUser>> {
     }
     let backend = backend_base(&config);
     let token = valid_token(support_dir, &mut config, &backend).await?;
-    let me: MeResponse = http_client(support_dir)?
-        .get(format!("{backend}/v1/me"))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .context("calling /v1/me")?
-        .error_for_status()
-        .context("/v1/me failed")?
-        .json()
-        .await
-        .context("parsing /v1/me")?;
+    let me: MeResponse = call(
+        http_client(support_dir)?
+            .get(format!("{backend}/v1/me"))
+            .bearer_auth(&token),
+        "/v1/me",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing /v1/me")?;
     Ok(Some(AccountUser {
         login: me.login,
         account_id: me.account_id,
@@ -367,19 +391,18 @@ pub async fn services(support_dir: &Path) -> Result<Vec<ServiceEntry>> {
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
     let token = valid_token(support_dir, &mut config, &backend).await?;
-    let body: pocox_account_proto::http::ServicesResponse = http_client(support_dir)?
-        // Older backends ignore `include_acp` and simply omit ACP services:
-        // discovery then falls back to services this app hosts itself.
-        .get(format!("{backend}/v1/services?include_acp=true&include_opencode=true"))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .context("calling /v1/services")?
-        .error_for_status()
-        .context("/v1/services failed")?
-        .json()
-        .await
-        .context("parsing /v1/services")?;
+    // Older backends ignore `include_acp` and simply omit ACP services:
+    // discovery then falls back to services this app hosts itself.
+    let body: pocox_account_proto::http::ServicesResponse = call(
+        http_client(support_dir)?
+            .get(format!("{backend}/v1/services?include_acp=true&include_opencode=true"))
+            .bearer_auth(&token),
+        "/v1/services",
+    )
+    .await?
+    .json()
+    .await
+    .context("parsing /v1/services")?;
     Ok(body.services)
 }
 
@@ -401,14 +424,13 @@ pub async fn deregister_service(
     // (the relay key was registered through the same sanitizer).
     let device = sanitize_component(device);
     let name = sanitize_component(name);
-    http_client(support_dir)?
-        .delete(format!("{backend}/v1/services/{device}/{kind}/{name}"))
-        .bearer_auth(&token)
-        .send()
-        .await
-        .context("calling DELETE /v1/services")?
-        .error_for_status()
-        .context("/v1/services deregister failed")?;
+    call(
+        http_client(support_dir)?
+            .delete(format!("{backend}/v1/services/{device}/{kind}/{name}"))
+            .bearer_auth(&token),
+        "DELETE /v1/services",
+    )
+    .await?;
     Ok(())
 }
 
@@ -456,9 +478,8 @@ async fn valid_token(support_dir: &Path, config: &mut Config, backend: &str) -> 
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
         bail!("session expired; sign in again");
     }
-    let body: RefreshResponse = resp
-        .error_for_status()
-        .context("/auth/refresh failed")?
+    let body: RefreshResponse = accepted(resp, "/auth/refresh")
+        .await?
         .json()
         .await
         .context("parsing refresh response")?;
@@ -625,8 +646,8 @@ async fn fetch_relay_credential(support_dir: &Path) -> Result<RelayCredentialRes
     if resp.status() == reqwest::StatusCode::NOT_FOUND {
         bail!("this backend does not support direct relay access yet; update the POCOX server");
     }
-    resp.error_for_status()
-        .context("/v1/relay failed")?
+    accepted(resp, "/v1/relay")
+        .await?
         .json()
         .await
         .context("parsing /v1/relay")
@@ -786,6 +807,33 @@ mod tests {
         let mut there = here.clone();
         there.set_account_backend("https://other.example");
         assert_ne!(CacheOwner::of(&here), CacheOwner::of(&there));
+    }
+
+    #[tokio::test]
+    async fn a_refusal_keeps_the_backends_reason() {
+        let response = |status: u16, body: &'static str| {
+            reqwest::Response::from(
+                axum::http::Response::builder()
+                    .status(status)
+                    .body(body)
+                    .expect("response"),
+            )
+        };
+        let refused = accepted(
+            response(400, r#"{"error":"redirect_uri is not allowed"}"#),
+            "/auth/web/start",
+        )
+        .await
+        .expect_err("400 is a refusal");
+        assert_eq!(
+            refused.to_string(),
+            "/auth/web/start failed: HTTP 400 Bad Request: redirect_uri is not allowed"
+        );
+        let opaque = accepted(response(502, "<html>"), "/v1/me")
+            .await
+            .expect_err("502");
+        assert_eq!(opaque.to_string(), "/v1/me failed: HTTP 502 Bad Gateway");
+        assert!(accepted(response(200, "{}"), "/v1/me").await.is_ok());
     }
 
     #[test]

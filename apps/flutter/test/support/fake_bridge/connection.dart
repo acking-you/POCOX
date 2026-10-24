@@ -1,6 +1,15 @@
 part of '../../fake_bridge_api.dart';
 
 mixin _FakeConnection on _FakeBridgeState {
+  /// Show [sub] among the subscriptions, as the bridge would.
+  void putSubscription(SubInfo sub) => _subs[sub.key] = sub;
+
+  /// When set, [appConnect] fails with it, as an unreachable host does.
+  Object? appConnectError;
+
+  /// When set, [accountWebLoginStart] fails with it, as a backend refusal does.
+  Object? webLoginStartError;
+
   @override
   Future<ThreadHistory?> appHistoryCached(
     String serviceKey,
@@ -184,6 +193,7 @@ mixin _FakeConnection on _FakeBridgeState {
     String? backend,
   }) async {
     lastWebRedirectUri = redirectUri;
+    if (webLoginStartError case final error?) throw error;
     return WebLoginStart(
       authorizeUrl: 'https://github.com/login/oauth/authorize?state=s',
       state: 'fake-state',
@@ -292,12 +302,19 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<void> appConnect(String serviceKey, int localPort) async {
     appConnectCount++;
     await appConnectGate;
+    if (appConnectError case final error?) throw error;
     _appConnected.add(serviceKey);
     _appEvents.putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast);
   }
 
   @override
   bool appIsConnected(String serviceKey) => _appConnected.contains(serviceKey);
+
+  /// The stage [appConnectStage] reports, per service key.
+  final Map<String, ConnectStage> connectStages = {};
+
+  @override
+  ConnectStage? appConnectStage(String serviceKey) => connectStages[serviceKey];
 
   @override
   Future<void> appDisconnect(String serviceKey) async {
