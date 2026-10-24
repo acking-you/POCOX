@@ -139,6 +139,7 @@ pub fn sanitize(mut catalog: Catalog) -> Catalog {
         consent.owner.label = bounded(&consent.owner.label);
         consent.ports.truncate(8);
         consent.service = consent.service.as_deref().map(bounded);
+        consent.keep_share = consent.keep_share.as_deref().map(bounded);
     }
     catalog.services.truncate(64);
     for service in &mut catalog.services {
@@ -371,6 +372,7 @@ mod tests {
             },
             created_ms: 1,
             expires_ms: Some(2),
+            persistent: Some(false),
         };
         let catalog = Catalog {
             protocol: PROTOCOL,

@@ -11,6 +11,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.capabilityCount,
     required this.onSelect,
     required this.filled,
+    this.offlineDevices = const {},
     this.relayDown = false,
   });
 
@@ -23,6 +24,7 @@ class _DeviceColumn extends StatelessWidget {
   /// This computer's name, for its own (independent) target.
   final String localName;
   final int Function(String device) capabilityCount;
+  final Set<String> offlineDevices;
   final ValueChanged<String> onSelect;
 
   /// Whether to take the height it is given and scroll the device list inside.
@@ -48,6 +50,7 @@ class _DeviceColumn extends StatelessWidget {
           subtitle: [
             if (device == _thisDevice) l10n.servicesLocalDevice,
             if (sameNamed.contains(device)) ?deviceShortId(device),
+            if (offlineDevices.contains(device)) l10n.toolsStatusOffline,
             l10n.servicesDeviceCapabilityCount(capabilityCount(device)),
           ].join(' · '),
           selected: device == activeDevice,

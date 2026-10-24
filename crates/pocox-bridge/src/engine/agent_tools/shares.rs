@@ -26,6 +26,7 @@ use super::model::{
     bounded, clean_path, in_words, open_link, scheme, Lifetime, OwnerKind, OwnerView, ShareView,
     Shared, APP_PORT, CLI_PORT, MAX_PORTS_PER_SHARE, MAX_SHARED_PORTS,
 };
+pub use super::persistence::keep;
 use super::state::{self, now_ms, OwnerKey, Share, SharedPort, State};
 use super::tokens::{Kind, Principal};
 use crate::engine::{management, runtime, transport};
@@ -227,10 +228,7 @@ pub fn shared(share: ShareView) -> Shared {
         .map(|port| port.port)
         .unwrap_or_default();
     let key = share.first_key().unwrap_or_default().to_string();
-    let held = state::lock()
-        .shares
-        .iter()
-        .any(|kept| kept.id == share.id && kept.key.is_some());
+    let held = share.persistence() != Some(true);
     Shared {
         on_this_machine: format!("{}://localhost:{first}{}", scheme(share.secure), share.path),
         open: open_link(&key, &share.path, share.secure),
@@ -477,6 +475,17 @@ fn reserve(
     if epoch.is_some_and(|epoch| !transport::is_current(epoch)) {
         return Err(ToolError::ContextChanged);
     }
+    reserve_in(&mut state, caller, key, page, addrs, &device)
+}
+
+fn reserve_in(
+    state: &mut State,
+    caller: &Caller,
+    key: &OwnerKey,
+    page: Page,
+    addrs: &[(u16, SocketAddr)],
+    device: &str,
+) -> Result<(String, Vec<u16>), ToolError> {
     let wanted = addrs;
     let addrs: Vec<(u16, SocketAddr)> = wanted
         .iter()
@@ -500,7 +509,7 @@ fn reserve(
     let reserved: Vec<u16> = addrs.iter().map(|(port, _)| *port).collect();
     let user = caller.is_user();
     let ports = addrs.iter().map(|(port, addr)| {
-        let key = ServiceId::new(&device, ServiceKind::Port, port.to_string()).key();
+        let key = ServiceId::new(device, ServiceKind::Port, port.to_string()).key();
         // Published by this call, not by the supervisor; the user's is saved
         // once published ([`confirm`]).
         SharedPort {
@@ -516,10 +525,9 @@ fn reserve(
             share.key.is_none() && share.ports.iter().any(|p| p.port == page.port)
         })
     } else {
-        state
-            .shares
-            .iter()
-            .position(|share| share.key.as_ref() == Some(key))
+        state.shares.iter().position(|share| {
+            share.key.as_ref() == Some(key) && share.ports.iter().any(|port| port.port == page.port)
+        })
     };
     let id = if let Some(index) = joined {
         let share = &mut state.shares[index];
@@ -541,7 +549,7 @@ fn reserve(
         });
         id
     };
-    state::changed(&mut state);
+    state::changed(state);
     Ok((id, reserved))
 }
 
@@ -756,29 +764,6 @@ pub fn stop(caller: Option<&Caller>, target: &str) -> Result<ShareView, ToolErro
     drop(state);
     release(share.ports);
     tracing::info!(share = %view.id, "stopped sharing");
-    Ok(view)
-}
-
-/// Keep a share until the user stops it (no owner lifetime, no expiry), once
-/// that is saved.
-pub fn keep(id: &str) -> Result<ShareView, ToolError> {
-    let mut state = state::lock();
-    let index = state
-        .shares
-        .iter()
-        .position(|share| share.id == id)
-        .ok_or_else(|| ToolError::NotFound(format!("The share `{}`", bounded(id))))?;
-    let unsaved = state.shares_unsaved;
-    let share = &mut state.shares[index];
-    let before = (share.key.take(), share.expires_ms.take());
-    if state.save_shares().is_err() {
-        let share = &mut state.shares[index];
-        (share.key, share.expires_ms) = before;
-        state.shares_unsaved = unsaved;
-        return Err(ToolError::NotSaved);
-    }
-    let view = state.shares[index].view();
-    state::changed(&mut state);
     Ok(view)
 }
 

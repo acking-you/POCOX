@@ -239,6 +239,8 @@ void main() {
   ) async {
     final api = FakeBridgeApi()..toolsOverviewValue = remoteShare();
     const menu = Key('share-menu-pcx:studio:port:5173');
+    const stop = Key('share-stop-pcx:studio:port:5173');
+    const keep = Key('share-keep-pcx:studio:port:5173');
     for (final (id, actions) in [('s1', true), ('an-earlier-share', false)]) {
       await t.pumpWidget(
         _host(
@@ -250,7 +252,17 @@ void main() {
         ),
       );
       await t.pump();
-      expect(find.byKey(menu), actions ? findsOneWidget : findsNothing);
+      expect(find.byKey(keep), actions ? findsOneWidget : findsNothing);
+      // Copying its link stays available; stopping only for its own share.
+      await t.tap(find.byKey(menu));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const Key('share-copy-pcx:studio:port:5173')),
+        findsOneWidget,
+      );
+      expect(find.byKey(stop), actions ? findsOneWidget : findsNothing);
+      await t.tapAt(Offset.zero);
+      await t.pumpAndSettle();
     }
   });
 

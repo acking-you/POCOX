@@ -38,6 +38,7 @@ String builtinToolTitle(AppLocalizations l10n, String id, {String? fallback}) =>
     switch (id) {
       'services' => l10n.builtinToolServices,
       'share' => l10n.builtinToolShare,
+      'keep_sharing' => l10n.builtinToolKeepShare,
       'connect' => l10n.builtinToolConnect,
       _ => fallback ?? id,
     };
@@ -46,6 +47,7 @@ String _summary(AppLocalizations l10n, ToolsBuiltinTool tool) =>
     switch (tool.id) {
       'services' => l10n.builtinToolServicesSummary,
       'share' => l10n.builtinToolShareSummary,
+      'keep_sharing' => l10n.builtinToolKeepShareSummary,
       'connect' => l10n.builtinToolConnectSummary,
       _ => tool.summary,
     };
@@ -54,6 +56,7 @@ String _summary(AppLocalizations l10n, ToolsBuiltinTool tool) =>
 IconData builtinToolIcon(String id) => switch (id) {
   'services' => AppIcons.devices_outlined,
   'share' => AppIcons.share_port,
+  'keep_sharing' => AppIcons.share_port,
   'connect' => AppIcons.plug,
   _ => AppIcons.extension,
 };

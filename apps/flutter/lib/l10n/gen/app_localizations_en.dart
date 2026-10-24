@@ -4315,10 +4315,86 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolsStopSharing => 'Stop sharing';
 
   @override
-  String get toolsKeepSharing => 'Keep sharing';
+  String get toolsKeepSharing => 'Save share';
 
   @override
-  String get toolsKeptToast => 'Kept until you stop it';
+  String get toolsKeptToast => 'Saved across restarts until you stop sharing';
+
+  @override
+  String get toolsSessionShare => 'Temporary · ends when the agent stops';
+
+  @override
+  String toolsSessionShareTimed(String time) {
+    return 'Temporary · ends in $time or when the agent stops';
+  }
+
+  @override
+  String get toolsPersistenceUnknown => 'Retention unknown · older host';
+
+  @override
+  String get toolsSavedShareHelp =>
+      'Saved shares stay in POCOX after the agent stops and restore when POCOX restarts. The source device, POCOX and the local server must be running. Saving a share does not start the server.';
+
+  @override
+  String get toolsTemporaryShareHelp =>
+      'An agent share ends with its agent or POCOX, even without an expiry timer. Save it for ongoing use on your devices.';
+
+  @override
+  String toolsKeepRequestTitle(String owner) {
+    return '$owner asks to save a share';
+  }
+
+  @override
+  String get toolsKeepRequestDetail =>
+      'It stays shared after the agent stops and returns when POCOX restarts, while its server runs. Stop it any time in Services.';
+
+  @override
+  String get builtinToolKeepShare => 'Keep shared services';
+
+  @override
+  String get builtinToolKeepShareSummary =>
+      'Let this conversation save its shared services across agent and POCOX restarts. The local server must keep running.';
+
+  @override
+  String get toolsOpening => 'Opening…';
+
+  @override
+  String get toolsSaving => 'Saving…';
+
+  @override
+  String get toolsBrowserUnavailable =>
+      'The browser could not open this service. Try opening it again.';
+
+  @override
+  String toolsDeviceOfflineDetail(String device) {
+    return 'Returns when $device is back online.';
+  }
+
+  @override
+  String toolsServerStoppedDetail(String device) {
+    return 'Start the server on $device; this share reconnects on its own.';
+  }
+
+  @override
+  String get toolsAddShare => 'Share a service';
+
+  @override
+  String toolsShareOnDevice(String device) {
+    return 'Service on $device';
+  }
+
+  @override
+  String get toolsShareAddress => 'Local address or port';
+
+  @override
+  String get toolsShareAddressInvalid =>
+      'Enter a local HTTP or HTTPS address, or a port from 1 to 65535.';
+
+  @override
+  String get toolsShareName => 'Name (optional)';
+
+  @override
+  String get toolsShareAndSave => 'Share and save';
 
   @override
   String toolsStoppedToast(String title) {
@@ -4359,7 +4435,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get toolsKept => 'Kept';
+  String get toolsKept => 'Saved · restores after restart';
 
   @override
   String toolsOpenFailed(String error) {
@@ -4394,7 +4470,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Codex, Claude, OpenCode and other agents can see your devices and services, share a port of this computer with your other devices, and connect to services elsewhere.';
 
   @override
-  String get toolsAsk => 'Ask before agents share or connect an API';
+  String get toolsAsk =>
+      'Ask before agents share, save shares or connect an API';
 
   @override
   String get toolsEndpoint => 'MCP endpoint';
