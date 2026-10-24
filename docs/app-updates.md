@@ -86,7 +86,7 @@ certificate.
 | Installation | File | How it applies |
 |---|---|---|
 | macOS app bundle | `…-macos-arm64.dmg` / `…-macos-x64.dmg` (this build's architecture) | Staged out of the disk image and verified; the app quits through its normal path (hosted services stop first); a helper swaps the bundle and reopens it. Restores the old bundle if the swap fails. A bundle the user cannot replace (another owner, App Translocation) opens the disk image instead. |
-| Windows, installed | `…-windows-x64-setup.exe` | The app quits; a helper runs the installer silently (elevated: UAC asks) and reopens the app. |
+| Windows, installed | `…-windows-x64-setup.exe` | A helper acknowledges startup before the app quits, runs the installer silently in the existing installation directory (elevated: UAC asks), and reopens the app. |
 | Windows, portable | `…-windows-x64.zip` | Saved to Downloads and shown in Explorer. |
 | Linux AppImage | `…-linux-x86_64.AppImage` | The app quits; a helper replaces the AppImage file (`$APPIMAGE`) and reopens it. |
 | Linux `.deb` | `…-linux-amd64.deb` | Opened in the desktop's package installer; restart POCOX after it finishes. |
@@ -105,6 +105,19 @@ If the app cannot quit (a hosted service did not stop), the quit banner says
 why; the helper waits up to two minutes for the process to exit and otherwise
 gives up without touching anything. **Retry** applies the same verified
 download again.
+
+On Windows, failure to start the helper keeps the app open. The helper uses
+`CREATE_NO_WINDOW` and a new process group, without `DETACHED_PROCESS`: with
+the latter, Windows PowerShell can exit successfully without executing its
+script. A per-download lock prevents concurrent helpers from running the same
+installer. Installer failure or UAC cancellation reopens the existing app and
+retains the verified package. Each attempt leaves `helper.log` and, once the
+installer runs, `installer.log` in `updates/work/<version>-<time>/handoff-<id>`
+under the app support directory. A subsequent download clears this directory.
+
+Windows installations of 0.7.0 and 0.7.1 contain the broken helper launch. They
+need one manual installation of 0.7.2 or later from the release page; an old
+client cannot acquire the updater fix through its own broken handoff.
 
 The CLI is not updated by the app: run the install script again, which updates
 `pocox` in place (`scripts/install.sh`, `scripts/install.ps1`).
@@ -128,9 +141,14 @@ test key.
 
 - Native macOS/Windows proxy settings and the system browser are outside the
   application proxy setting. Configure an explicit URL when needed.
-- Verified on macOS only (see the PR for the run). Windows, Linux and Android
-  paths compile in the release workflow and are covered by unit tests of the
-  shared logic, not by a run on those systems.
+- Windows CI runs Windows PowerShell subprocess tests for helper startup,
+  acknowledgement failures, concurrent handoffs, waiting for app exit,
+  successful installation, installer failure and reopening. These tests use
+  temporary installers/apps and replace only the interactive UAC boundary;
+  they do not validate an elevated installation into Program Files.
+- macOS has been exercised with a release build. Linux and Android paths
+  compile in the release workflow and have shared-logic tests, but have not
+  been exercised with their native installers.
 
 ## Naming baseline
 
