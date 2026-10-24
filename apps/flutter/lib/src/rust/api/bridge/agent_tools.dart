@@ -308,6 +308,9 @@ class ToolsConsentDto {
   /// The key of the service to connect; none for a share.
   final String? service;
 
+  /// The share to save across restarts, when this is a keep request.
+  final String? keepShare;
+
   /// Unix milliseconds.
   final PlatformInt64 createdMs;
 
@@ -320,6 +323,7 @@ class ToolsConsentDto {
     required this.title,
     required this.ports,
     this.service,
+    this.keepShare,
     required this.createdMs,
     required this.expiresMs,
   });
@@ -331,6 +335,7 @@ class ToolsConsentDto {
       title.hashCode ^
       ports.hashCode ^
       service.hashCode ^
+      keepShare.hashCode ^
       createdMs.hashCode ^
       expiresMs.hashCode;
 
@@ -344,6 +349,7 @@ class ToolsConsentDto {
           title == other.title &&
           ports == other.ports &&
           service == other.service &&
+          keepShare == other.keepShare &&
           createdMs == other.createdMs &&
           expiresMs == other.expiresMs;
 }
@@ -637,8 +643,11 @@ class ToolsShareDto {
   /// Unix milliseconds.
   final PlatformInt64 createdMs;
 
-  /// When it ends on its own; absent while kept.
+  /// When its timer ends; absence alone does not mean it is saved.
   final PlatformInt64? expiresMs;
+
+  /// Whether saved across restarts; absent from older hosts.
+  final bool? persistent;
 
   const ToolsShareDto({
     required this.id,
@@ -649,6 +658,7 @@ class ToolsShareDto {
     required this.owner,
     required this.createdMs,
     this.expiresMs,
+    this.persistent,
   });
 
   @override
@@ -660,7 +670,8 @@ class ToolsShareDto {
       ports.hashCode ^
       owner.hashCode ^
       createdMs.hashCode ^
-      expiresMs.hashCode;
+      expiresMs.hashCode ^
+      persistent.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -674,7 +685,8 @@ class ToolsShareDto {
           ports == other.ports &&
           owner == other.owner &&
           createdMs == other.createdMs &&
-          expiresMs == other.expiresMs;
+          expiresMs == other.expiresMs &&
+          persistent == other.persistent;
 }
 
 /// A share this device made.

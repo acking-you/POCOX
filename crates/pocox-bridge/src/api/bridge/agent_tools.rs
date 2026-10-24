@@ -94,8 +94,10 @@ pub struct ToolsShareDto {
     pub owner: ToolsOwnerDto,
     /// Unix milliseconds.
     pub created_ms: i64,
-    /// When it ends on its own; absent while kept.
+    /// When its timer ends; absence alone does not mean it is saved.
     pub expires_ms: Option<i64>,
+    /// Whether saved across restarts; absent from older hosts.
+    pub persistent: Option<bool>,
 }
 
 fn port_status(status: model::PortStatus) -> String {
@@ -109,6 +111,7 @@ fn port_status(status: model::PortStatus) -> String {
 }
 
 fn share(s: model::ShareView) -> ToolsShareDto {
+    let persistent = s.persistence();
     ToolsShareDto {
         id: s.id,
         title: s.title,
@@ -126,6 +129,7 @@ fn share(s: model::ShareView) -> ToolsShareDto {
         owner: owner(s.owner),
         created_ms: s.created_ms,
         expires_ms: s.expires_ms,
+        persistent,
     }
 }
 
@@ -142,6 +146,8 @@ pub struct ToolsConsentDto {
     pub ports: Vec<u16>,
     /// The key of the service to connect; none for a share.
     pub service: Option<String>,
+    /// The share to save across restarts, when this is a keep request.
+    pub keep_share: Option<String>,
     /// Unix milliseconds.
     pub created_ms: i64,
     /// When it lapses.
@@ -282,6 +288,7 @@ fn overview(o: model::Overview) -> ToolsOverviewDto {
                         title: c.title,
                         ports: c.ports,
                         service: c.service,
+                        keep_share: c.keep_share,
                         created_ms: c.created_ms,
                         expires_ms: c.expires_ms,
                     })

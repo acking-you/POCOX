@@ -7,7 +7,7 @@ use std::fmt::Write as _;
 
 use pocox_core::service::sanitize_component;
 
-use super::model::{in_words, ConnectionView, LinkView, Overview, Shared};
+use super::model::{in_words, ConnectionView, LinkView, Overview, ShareView, Shared};
 use super::state;
 
 /// What `services` narrows to.
@@ -123,6 +123,13 @@ pub fn table(overview: &Overview) -> String {
             if let Some(owner) = &service.owner {
                 let _ = write!(out, ", shared by {owner}");
             }
+            if let Some(share) = device
+                .shares
+                .iter()
+                .find(|share| Some(&share.id) == service.share.as_ref())
+            {
+                let _ = write!(out, "; {}", persistence_label(share));
+            }
             let _ = writeln!(out, "  [{}]", service.key);
         }
         for consent in &device.consents {
@@ -160,15 +167,38 @@ pub fn shared(shared: &Shared) -> String {
         .iter()
         .map(|p| p.port.to_string())
         .collect();
+    let lifecycle = match shared.share.persistence() {
+        Some(true) => "Saved across agent and POCOX restarts. The user manages it in POCOX.",
+        _ => {
+            "Not saved across restarts. For long-term use, call connect with action=keep_sharing \
+             and this service; POCOX asks for permission to save it."
+        },
+    };
     format!(
         "Shared \"{}\" (port {}). The user can open it in POCOX on any of their devices, where it \
-         appears under Shared with you: {}\nOn this machine: {}\nIt ends {}.",
+         appears under Shared with you: {}\nOn this machine: {}\nIt ends {}.\n{} POCOX and the \
+         server must be running on this device; sharing does not start the server or configure \
+         its autostart.",
         shared.share.title,
         ports.join(", "),
         shared.open,
         shared.on_this_machine,
-        shared.ends
+        shared.ends,
+        lifecycle
     )
+}
+
+fn persistence_label(share: &ShareView) -> String {
+    match share.persistence() {
+        Some(true) => "saved across restarts".into(),
+        Some(false) => match share.expires_ms {
+            Some(at) => {
+                format!("temporary, ends with its agent or {}", in_words(at - state::now_ms()))
+            },
+            None => "temporary, no timer, ends with its agent or POCOX".into(),
+        },
+        None => "persistence unknown (older host)".into(),
+    }
 }
 
 /// What a connection tells the model.
@@ -197,6 +227,9 @@ pub fn connected(view: &ConnectionView) -> String {
     }
     if let Some(link) = &view.link {
         let _ = write!(out, " {}.", travels(link));
+    }
+    if view.owner.kind == super::model::OwnerKind::Agent {
+        out.push_str(" It also ends when its agent or POCOX stops; no expiry does not mean saved.");
     }
     out
 }

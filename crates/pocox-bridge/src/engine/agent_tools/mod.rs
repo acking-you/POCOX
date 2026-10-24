@@ -20,6 +20,7 @@ pub mod error;
 pub mod harness;
 pub mod inject;
 pub mod model;
+mod persistence;
 pub mod render;
 pub mod routes;
 pub mod settings;

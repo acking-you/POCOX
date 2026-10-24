@@ -159,9 +159,15 @@ class _DeviceFirstServices extends ConsumerWidget {
     bool belongs(ServiceEntry service, String? target) => target == _thisDevice
         ? ownedKeys.contains(service.key)
         : !ownedKeys.contains(service.key) && service.device == target;
+    final overview = ref.watch(toolsOverviewProvider);
     final devices = <String>{
       for (final service in visible)
         if (!ownedKeys.contains(service.key)) service.device,
+      // A saved service remains a destination while its host is offline.
+      for (final device in overview.devices)
+        if (device.shares.isNotEmpty &&
+            !(_hostingSupported && device.name == overview.thisDevice))
+          device.name,
       if (_hostingSupported) _thisDevice,
     }.toList();
     final preferredKey = ref.watch(
@@ -560,7 +566,9 @@ class _DeviceFirstServices extends ConsumerWidget {
           .where((service) => belongs(service, device) && _capability(service))
           .toList();
       final appCount = entries.where((service) => service.kind == 'app').length;
-      return entries.length + (account ? appCount : 0);
+      return entries.length +
+          (account ? appCount : 0) +
+          _sharesOf(ref, device).length;
     }
 
     final managementKey = activeDevice == _thisDevice
@@ -581,6 +589,12 @@ class _DeviceFirstServices extends ConsumerWidget {
       activeDevice: activeDevice,
       localName: localName,
       capabilityCount: countFor,
+      offlineDevices: {
+        for (final device in overview.devices)
+          if (!device.online &&
+              !visible.any((service) => service.device == device.name))
+            device.name,
+      },
       onSelect: onSelectDevice,
       relayDown: relayDown,
       // Beside a detail pane the column owns the full height and scrolls its
@@ -588,6 +602,8 @@ class _DeviceFirstServices extends ConsumerWidget {
       filled: split,
     );
 
+    final shares = _sharesOf(ref, activeDevice);
+    final sharingDevice = _sharingDevice(ref, activeDevice);
     final detail = <Widget>[
       _DeviceDetailHeader(
         device: switch (activeDevice) {
@@ -655,16 +671,29 @@ class _DeviceFirstServices extends ConsumerWidget {
           ],
         ),
       // What this device shares: dev servers and pages, agents' or the user's.
-      if (_sharesOf(ref, activeDevice) case final shares
-          when shares.isNotEmpty) ...[
+      if (shares.isNotEmpty || sharingDevice != null) ...[
         const SizedBox(height: 12),
         GroupCard(
           title: l10n.toolsSharedWithYou,
+          info: l10n.toolsSavedShareHelp,
+          trailing: sharingDevice == null
+              ? null
+              : TextButton.icon(
+                  key: const Key('add-shared-service'),
+                  onPressed: () => showShareServiceForm(context, sharingDevice),
+                  icon: const Icon(AppIcons.add, size: 16),
+                  label: Text(l10n.toolsAddShare),
+                ),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               child: Column(
                 children: [
+                  if (shares.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(l10n.toolsNoShares),
+                    ),
                   for (final share in shares)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -767,6 +796,16 @@ class _DeviceFirstServices extends ConsumerWidget {
       for (final entry in overview.devices)
         if (entry.name == name) ...entry.shares,
     ];
+  }
+
+  /// Only a live catalog identifies a host that can accept a share request.
+  String? _sharingDevice(WidgetRef ref, String? device) {
+    final overview = ref.watch(toolsOverviewProvider);
+    final name = device == _thisDevice ? overview.thisDevice : device;
+    return overview.devices
+        .where((entry) => entry.name == name && entry.online && entry.catalog)
+        .firstOrNull
+        ?.name;
   }
 
   /// The selected remote device's platform line: what its publisher reports,

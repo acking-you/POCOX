@@ -14,6 +14,7 @@ import 'package:pocox/src/tools/planet_glyph.dart';
 import 'package:pocox/src/tools/tools_actions.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 
 /// The reference for a live [share].
 ShareRef shareRefOf(ToolsShare share) => ShareRef(
@@ -37,7 +38,11 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
     return (status: 'ended', device: live.device, share: null);
   }
   if (live != null) {
-    return (status: live.share.status, device: live.device, share: live.share);
+    return (
+      status: live.device.online ? live.share.status : 'offline',
+      device: live.device,
+      share: live.share,
+    );
   }
   ToolsDevice? device;
   for (final candidate in overview.devices) {
@@ -59,7 +64,7 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
 const double _inlineWidth = 300;
 
 /// One share, with Open, Copy link and (while it lives) Stop or Keep.
-class ShareCard extends ConsumerWidget {
+class ShareCard extends ConsumerStatefulWidget {
   /// The card for [share].
   const ShareCard({super.key, required this.share, this.dense = false});
 
@@ -70,7 +75,16 @@ class ShareCard extends ConsumerWidget {
   final bool dense;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShareCard> createState() => _ShareCardState();
+}
+
+class _ShareCardState extends ConsumerState<ShareCard> {
+  bool _saving = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final share = widget.share;
+    final dense = widget.dense;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -98,7 +112,8 @@ class ShareCard extends ConsumerWidget {
     final label = now.status == 'ended'
         ? l10n.toolsEnded
         : statusLabel(l10n, now.status);
-    final usable = now.status != 'ended' && now.status != 'offline';
+    final usable = now.status == 'online';
+    final opening = ref.watch(shareOpeningProvider).contains(share.service);
     // The status rides beside the title, and the actions line up under the
     // text, only where they fit; a phone with large text stacks them.
     final roomy = MediaQuery.textScalerOf(context).scale(_inlineWidth);
@@ -173,35 +188,72 @@ class ShareCard extends ConsumerWidget {
                       children: [
                         FilledButton.tonalIcon(
                           key: Key('share-open-${share.service}'),
-                          onPressed: usable
+                          onPressed: usable && !opening
                               ? () =>
                                     openShare(context, ref, share, title: title)
                               : null,
-                          icon: const Icon(AppIcons.open_in_new, size: 16),
-                          label: Text(l10n.toolsOpen),
+                          icon: opening
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(AppIcons.open_in_new, size: 16),
+                          label: Text(
+                            opening ? l10n.toolsOpening : l10n.toolsOpen,
+                          ),
                         ),
+                        if (live != null &&
+                            !live.kept &&
+                            now.device?.online == true)
+                          TextButton(
+                            key: Key('share-keep-${share.service}'),
+                            onPressed: _saving
+                                ? null
+                                : () async {
+                                    setState(() => _saving = true);
+                                    try {
+                                      await keepShare(
+                                        context,
+                                        ref,
+                                        now.device!.name,
+                                        live,
+                                      );
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _saving = false);
+                                      }
+                                    }
+                                  },
+                            child: Text(
+                              _saving
+                                  ? l10n.toolsSaving
+                                  : l10n.toolsKeepSharing,
+                            ),
+                          ),
                         TextButton(
                           key: Key('share-copy-${share.service}'),
-                          onPressed: () => copyShareLink(context, share),
+                          onPressed: () => copyShareLink(
+                            context,
+                            live == null ? share : shareRefOf(live),
+                          ),
                           child: Text(l10n.toolsCopyLink),
                         ),
                       ],
                     ),
                   ),
-                  if (live != null && now.device != null)
+                  if (live != null &&
+                      now.device?.online == true &&
+                      now.device?.catalog == true)
                     PopupMenuButton<String>(
                       key: Key('share-menu-${share.service}'),
                       icon: const Icon(AppIcons.more_horiz, size: 18),
                       tooltip: '',
-                      onSelected: (choice) => choice == 'stop'
-                          ? stopShare(context, ref, now.device!.name, live)
-                          : keepShare(context, ref, now.device!.name, live),
+                      onSelected: (_) =>
+                          stopShare(context, ref, now.device!.name, live),
                       itemBuilder: (context) => [
-                        if (!live.kept)
-                          PopupMenuItem(
-                            value: 'keep',
-                            child: Text(l10n.toolsKeepSharing),
-                          ),
                         PopupMenuItem(
                           value: 'stop',
                           child: Text(l10n.toolsStopSharing),
@@ -210,12 +262,29 @@ class ShareCard extends ConsumerWidget {
                     ),
                 ],
               ),
-              if (live != null && !dense)
+              if (live != null)
                 Padding(
                   padding: EdgeInsets.only(left: indent, top: 2),
+                  child: InfoTitle(
+                    title: Text(
+                      endsLabel(l10n, live),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    info: live.kept
+                        ? l10n.toolsSavedShareHelp
+                        : l10n.toolsTemporaryShareHelp,
+                  ),
+                ),
+              if (now.status == 'unreachable' || now.status == 'offline')
+                Padding(
+                  padding: EdgeInsets.only(left: indent, top: 4),
                   child: Text(
-                    endsLabel(l10n, live),
-                    style: theme.textTheme.labelSmall?.copyWith(
+                    now.status == 'offline'
+                        ? l10n.toolsDeviceOfflineDetail(device)
+                        : l10n.toolsServerStoppedDetail(device),
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
                   ),

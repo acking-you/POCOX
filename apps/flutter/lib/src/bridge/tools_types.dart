@@ -101,6 +101,7 @@ class ToolsShare {
     required this.createdMs,
     this.expiresMs,
     this.secure = false,
+    this.persistent,
   });
 
   /// Id on its device.
@@ -124,14 +125,21 @@ class ToolsShare {
   /// Unix milliseconds.
   final int createdMs;
 
-  /// When it ends on its own; null while the user keeps it.
+  /// When its timer ends; null does not imply persistence.
   final int? expiresMs;
+
+  /// Saved across host restarts; null when an older host cannot say.
+  final bool? persistent;
 
   /// The first port's key, the one a link opens.
   String? get firstKey => ports.isEmpty ? null : ports.first.key;
 
-  /// Whether the user keeps it (no expiry).
-  bool get kept => expiresMs == null;
+  /// Whether the user keeps it across restarts. Older user-owned shares
+  /// were saved; an older agent's no-expiry share is ambiguous.
+  bool get kept => persistent ?? !owner.isAgent;
+
+  /// Whether the host has explicitly reported the share's lifecycle.
+  bool get persistenceKnown => persistent != null || !owner.isAgent;
 
   /// The share's overall state: the first port's.
   String get status => ports.isEmpty ? 'starting' : ports.first.status;
@@ -147,6 +155,7 @@ class ToolsConsent {
     required this.title,
     required this.ports,
     this.service,
+    this.keepShare,
     required this.createdMs,
     required this.expiresMs,
   });
@@ -165,6 +174,9 @@ class ToolsConsent {
 
   /// The key of the service to connect; null for a share.
   final String? service;
+
+  /// The existing share to save across restarts, for a keep request.
+  final String? keepShare;
 
   /// Unix milliseconds.
   final int createdMs;

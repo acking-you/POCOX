@@ -7443,14 +7443,140 @@ abstract class AppLocalizations {
   /// No description provided for @toolsKeepSharing.
   ///
   /// In en, this message translates to:
-  /// **'Keep sharing'**
+  /// **'Save share'**
   String get toolsKeepSharing;
 
   /// No description provided for @toolsKeptToast.
   ///
   /// In en, this message translates to:
-  /// **'Kept until you stop it'**
+  /// **'Saved across restarts until you stop sharing'**
   String get toolsKeptToast;
+
+  /// No description provided for @toolsSessionShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary · ends when the agent stops'**
+  String get toolsSessionShare;
+
+  /// No description provided for @toolsSessionShareTimed.
+  ///
+  /// In en, this message translates to:
+  /// **'Temporary · {expiry} or when the agent stops'**
+  String toolsSessionShareTimed(String expiry);
+
+  /// No description provided for @toolsPersistenceUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Retention unknown · older host'**
+  String get toolsPersistenceUnknown;
+
+  /// No description provided for @toolsSavedShareHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved shares stay in POCOX after the agent stops and restore when POCOX restarts. The source device, POCOX and the local server must be running. Saving a share does not start the server.'**
+  String get toolsSavedShareHelp;
+
+  /// No description provided for @toolsTemporaryShareHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'An agent share ends with its agent or POCOX, even without an expiry timer. Save it for ongoing use on your devices.'**
+  String get toolsTemporaryShareHelp;
+
+  /// No description provided for @toolsKeepRequestTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{owner} asks to save a share'**
+  String toolsKeepRequestTitle(String owner);
+
+  /// No description provided for @toolsKeepRequestDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'It will stay shared after the agent stops and restore when POCOX restarts. You can stop it from Services. The local server still needs to be running.'**
+  String get toolsKeepRequestDetail;
+
+  /// No description provided for @builtinToolKeepShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep shared services'**
+  String get builtinToolKeepShare;
+
+  /// No description provided for @builtinToolKeepShareSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Let this conversation save its shared services across agent and POCOX restarts. The local server must keep running.'**
+  String get builtinToolKeepShareSummary;
+
+  /// No description provided for @toolsOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening…'**
+  String get toolsOpening;
+
+  /// No description provided for @toolsSaving.
+  ///
+  /// In en, this message translates to:
+  /// **'Saving…'**
+  String get toolsSaving;
+
+  /// No description provided for @toolsBrowserUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The browser could not open this service. Try opening it again.'**
+  String get toolsBrowserUnavailable;
+
+  /// No description provided for @toolsDeviceOfflineDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'{device} is offline. The service returns when that device and POCOX are online.'**
+  String toolsDeviceOfflineDetail(String device);
+
+  /// No description provided for @toolsServerStoppedDetail.
+  ///
+  /// In en, this message translates to:
+  /// **'The server on {device} is not responding. Start it there; this share will reconnect automatically.'**
+  String toolsServerStoppedDetail(String device);
+
+  /// No description provided for @toolsAddShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share a service'**
+  String get toolsAddShare;
+
+  /// No description provided for @toolsShareOnDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Service on {device}'**
+  String toolsShareOnDevice(String device);
+
+  /// No description provided for @toolsShareAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Local address or port'**
+  String get toolsShareAddress;
+
+  /// No description provided for @toolsShareAddressInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a local HTTP or HTTPS address, or a port from 1 to 65535.'**
+  String get toolsShareAddressInvalid;
+
+  /// No description provided for @toolsShareName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (optional)'**
+  String get toolsShareName;
+
+  /// No description provided for @toolsShareAndSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Share and save'**
+  String get toolsShareAndSave;
+
+  /// No description provided for @toolsNoShares.
+  ///
+  /// In en, this message translates to:
+  /// **'No shared services'**
+  String get toolsNoShares;
 
   /// No description provided for @toolsStoppedToast.
   ///
@@ -7515,7 +7641,7 @@ abstract class AppLocalizations {
   /// No description provided for @toolsKept.
   ///
   /// In en, this message translates to:
-  /// **'Kept'**
+  /// **'Saved · restores after restart'**
   String get toolsKept;
 
   /// No description provided for @toolsOpenFailed.
@@ -7569,7 +7695,7 @@ abstract class AppLocalizations {
   /// No description provided for @toolsAsk.
   ///
   /// In en, this message translates to:
-  /// **'Ask before agents share or connect an API'**
+  /// **'Ask before agents share, save shares or connect an API'**
   String get toolsAsk;
 
   /// No description provided for @toolsEndpoint.

@@ -22,11 +22,14 @@ use super::error::{Pending, ToolError};
 use super::model::{bounded, Lifetime, Overview, OwnerView, MAX_LIFETIME_MINUTES};
 use super::shares::{self, Caller, ShareRequest};
 use super::tokens::Principal;
-use super::{catalog, render};
+use super::{catalog, persistence, render};
 
 const INSTRUCTIONS: &str = "The user's devices and the services on them. Share a dev server or \
                             other local port with the user's phone and other devices, or connect \
-                            to a service running on another of their devices.";
+                            to a service running on another of their devices. Sharing maps an \
+                            already running server; it does not start it or install autostart. \
+                            For ongoing use, share first, then use action=keep_sharing to save it \
+                            across agent and POCOX restarts. Never treat permanent=true as saved.";
 
 fn schema(value: Value) -> Arc<JsonObject> {
     match value {
@@ -87,8 +90,12 @@ fn connect_tool() -> Tool {
          service on another of the user's devices so it is reachable on this machine. \
          action=share needs `ports`; stop_sharing needs `service` (a key or port); connect and \
          disconnect need `service` (a key, `device:kind:name` or `device/port`). A share or \
-         connection lasts 24 hours unless given `expires_in_minutes` or `permanent`; repeating \
-         the call renews it. A connection's result says how it travels (direct P2P or the \
+         connection lasts at most as long as its agent, with a default 24-hour timer. \
+         `expires_in_minutes` changes the timer; legacy `permanent=true` removes ONLY the timer. \
+         For long-term use, action=keep_sharing with `service` saves an existing share across \
+         agent and POCOX restarts, after separate user consent. The saved share is managed by \
+         the user, not the agent. POCOX and the local server still need to run. \
+         Repeating share renews the timer. A connection's result says how it travels (direct P2P or the \
          relay), as `services` does for every connection. A share, or a connection to another \
          device's Responses API, may wait for the user's consent in POCOX; repeating the same \
          call continues it.",
@@ -97,7 +104,7 @@ fn connect_tool() -> Tool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["share", "stop_sharing", "connect", "disconnect"],
+                    "enum": ["share", "keep_sharing", "stop_sharing", "connect", "disconnect"],
                     "description": "What to do."
                 },
                 "ports": {
@@ -120,7 +127,8 @@ fn connect_tool() -> Tool {
                 },
                 "service": {
                     "type": "string",
-                    "description": "stop_sharing, connect, disconnect: the service."
+                    "description": "keep_sharing, stop_sharing: share id, port or service key. \
+                                    connect, disconnect: the service."
                 },
                 "local_port": {
                     "type": "integer", "minimum": 1, "maximum": 65535,
@@ -133,11 +141,10 @@ fn connect_tool() -> Tool {
                 },
                 "permanent": {
                     "type": "boolean",
-                    "description": "share, connect: true keeps it with no expiry until it is \
-                                    stopped or disconnected (or this conversation's harness \
-                                    stops). A connection reconnects on its own after network or \
-                                    relay outages, trying a direct P2P path first when the \
-                                    device allows it."
+                    "description": "Legacy name: share, connect only. Removes the expiry \
+                                    timer but still ends when the agent or POCOX stops; does \
+                                    NOT save across restarts. To save a share, use action \
+                                    keep_sharing after sharing it."
                 }
             },
             "required": ["action"],
@@ -254,6 +261,21 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
         Err(error) => return failed(&error),
     };
     match action.as_str() {
+        "keep_sharing" => match service.as_deref() {
+            Some(service) => match persistence::request_keep(caller, service).await {
+                Ok(Ok(mut shared)) => {
+                    for_agent(caller, &mut shared.share.owner);
+                    let message = render::shared(&shared);
+                    let mut value = serde_json::to_value(&shared).unwrap_or_default();
+                    value["status"] = json!("shared");
+                    value["service"] = json!(shared.share.first_key());
+                    done(value, message)
+                },
+                Ok(Err(waiting)) => pending(&waiting),
+                Err(error) => failed(&error),
+            },
+            None => failed(&ToolError::Invalid("keep_sharing needs `service`.".into())),
+        },
         "share" => {
             let request = ShareRequest {
                 ports: args
@@ -327,7 +349,7 @@ async fn act(caller: &Caller, args: &JsonObject) -> CallToolResult {
             None => failed(&ToolError::Invalid("disconnect needs `service`.".into())),
         },
         other => failed(&ToolError::Invalid(format!(
-            "Unknown action `{}`; use share, stop_sharing, connect or disconnect.",
+            "Unknown action `{}`; use share, keep_sharing, stop_sharing, connect or disconnect.",
             bounded(other)
         ))),
     }

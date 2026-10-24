@@ -28,6 +28,10 @@ pub struct BuiltinTool {
 /// The capability that sharing a port needs the user's consent for.
 pub const SHARE: &str = "share";
 
+/// Permission to save an agent's shared service across agent and POCOX
+/// restarts. Ordinary sharing permission does not include this capability.
+pub const KEEP_SHARE: &str = "keep_sharing";
+
 /// The capability that connecting another device's Responses API needs the
 /// user's consent for: it spends that device's model account. Connecting a
 /// shared port needs none (it was shared with the user's devices).
@@ -53,6 +57,14 @@ pub fn catalog() -> Vec<BuiltinTool> {
             "Share a port",
             "Share a local port with the user's other devices (pocox `connect`, action `share`); \
              the user has allowed it for this conversation.",
+            true,
+        ),
+        tool(
+            KEEP_SHARE,
+            "Keep shared services",
+            "Save this conversation's shared services across agent and POCOX restarts (pocox \
+             `connect`, action `keep_sharing`); the user has allowed it for this conversation. \
+             This keeps the share, not the local server process.",
             true,
         ),
         tool(

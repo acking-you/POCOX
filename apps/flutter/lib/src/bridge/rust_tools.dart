@@ -152,6 +152,7 @@ ToolsShare _toolsShare(frb.ToolsShareDto s) => ToolsShare(
   owner: _toolsOwner(s.owner),
   createdMs: s.createdMs.toInt(),
   expiresMs: s.expiresMs?.toInt(),
+  persistent: s.persistent,
 );
 
 ToolsConnection _toolsConnection(frb.ToolsConnectionDto c) => ToolsConnection(
@@ -197,6 +198,7 @@ ToolsOverview _toolsOverview(frb.ToolsOverviewDto o) => ToolsOverview(
               title: c.title,
               ports: List.of(c.ports),
               service: c.service,
+              keepShare: c.keepShare,
               createdMs: c.createdMs.toInt(),
               expiresMs: c.expiresMs.toInt(),
             ),

@@ -1,6 +1,51 @@
 part of '../services_test.dart';
 
 void _registerDiscovery() {
+  testWidgets(
+    'a saved service keeps its device reachable in the UI through an outage',
+    (t) async {
+      const share = ToolsShare(
+        id: 'video',
+        title: 'Videos',
+        path: '/static/',
+        persistent: true,
+        owner: ToolsOwner(kind: 'agent', label: 'Codex'),
+        createdMs: 1,
+        ports: [
+          ToolsPort(port: 5555, key: 'pcx:studio:port:5555', status: 'online'),
+        ],
+      );
+      ToolsOverview overview(bool online) => ToolsOverview(
+        thisDevice: 'phone',
+        devices: [
+          ToolsDevice(
+            name: 'studio',
+            online: online,
+            catalog: online,
+            shares: [share],
+          ),
+        ],
+      );
+      final api = accountFake()..toolsOverviewValue = overview(false);
+      await t.pumpWidget(host(const ServicesScreen(), api));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('device-studio')), findsOneWidget);
+      await t.tap(find.byKey(const Key('device-studio')));
+      await t.pumpAndSettle();
+      final open = find.byKey(const Key('share-open-pcx:studio:port:5555'));
+      expect(t.widget<FilledButton>(open).onPressed, isNull);
+      api.pushToolsUpdate(ToolsUpdate(overview: overview(true)));
+      await t.pumpAndSettle();
+      expect(t.widget<FilledButton>(open).onPressed, isNotNull);
+      expect(find.text('Videos'), findsOneWidget);
+      expect(
+        api.toolsConnected,
+        isEmpty,
+        reason: 'returning online does not navigate by itself',
+      );
+    },
+  );
+
   testWidgets('a device lists every kind it exposes, plus the relay', (
     t,
   ) async {

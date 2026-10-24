@@ -10801,16 +10801,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsConsentDto dco_decode_tools_consent_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return ToolsConsentDto(
       id: dco_decode_String(arr[0]),
       owner: dco_decode_tools_owner_dto(arr[1]),
       title: dco_decode_String(arr[2]),
       ports: dco_decode_list_prim_u_16_strict(arr[3]),
       service: dco_decode_opt_String(arr[4]),
-      createdMs: dco_decode_i_64(arr[5]),
-      expiresMs: dco_decode_i_64(arr[6]),
+      keepShare: dco_decode_opt_String(arr[5]),
+      createdMs: dco_decode_i_64(arr[6]),
+      expiresMs: dco_decode_i_64(arr[7]),
     );
   }
 
@@ -10909,8 +10910,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ToolsShareDto dco_decode_tools_share_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 8)
-      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    if (arr.length != 9)
+      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return ToolsShareDto(
       id: dco_decode_String(arr[0]),
       title: dco_decode_String(arr[1]),
@@ -10920,6 +10921,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       owner: dco_decode_tools_owner_dto(arr[5]),
       createdMs: dco_decode_i_64(arr[6]),
       expiresMs: dco_decode_opt_box_autoadd_i_64(arr[7]),
+      persistent: dco_decode_opt_box_autoadd_bool(arr[8]),
     );
   }
 
@@ -14303,6 +14305,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_title = sse_decode_String(deserializer);
     var var_ports = sse_decode_list_prim_u_16_strict(deserializer);
     var var_service = sse_decode_opt_String(deserializer);
+    var var_keepShare = sse_decode_opt_String(deserializer);
     var var_createdMs = sse_decode_i_64(deserializer);
     var var_expiresMs = sse_decode_i_64(deserializer);
     return ToolsConsentDto(
@@ -14311,6 +14314,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       title: var_title,
       ports: var_ports,
       service: var_service,
+      keepShare: var_keepShare,
       createdMs: var_createdMs,
       expiresMs: var_expiresMs,
     );
@@ -14424,6 +14428,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_owner = sse_decode_tools_owner_dto(deserializer);
     var var_createdMs = sse_decode_i_64(deserializer);
     var var_expiresMs = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_persistent = sse_decode_opt_box_autoadd_bool(deserializer);
     return ToolsShareDto(
       id: var_id,
       title: var_title,
@@ -14433,6 +14438,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       owner: var_owner,
       createdMs: var_createdMs,
       expiresMs: var_expiresMs,
+      persistent: var_persistent,
     );
   }
 
@@ -17282,6 +17288,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.title, serializer);
     sse_encode_list_prim_u_16_strict(self.ports, serializer);
     sse_encode_opt_String(self.service, serializer);
+    sse_encode_opt_String(self.keepShare, serializer);
     sse_encode_i_64(self.createdMs, serializer);
     sse_encode_i_64(self.expiresMs, serializer);
   }
@@ -17373,6 +17380,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_tools_owner_dto(self.owner, serializer);
     sse_encode_i_64(self.createdMs, serializer);
     sse_encode_opt_box_autoadd_i_64(self.expiresMs, serializer);
+    sse_encode_opt_box_autoadd_bool(self.persistent, serializer);
   }
 
   @protected

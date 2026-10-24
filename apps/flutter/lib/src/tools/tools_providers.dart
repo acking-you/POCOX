@@ -33,6 +33,10 @@ final toolsStatusProvider = StateProvider.autoDispose<AgentToolsStatus>((ref) {
 /// share never leaves a tunnel to nothing behind.
 final shareConnectionsProvider = Provider<Map<String, String>>((ref) => {});
 
+/// Opening is shared by cards, notices and links so repeated taps make one
+/// connection and open one page, even while the relay is recovering.
+final shareOpeningProvider = StateProvider<Set<String>>((ref) => {});
+
 /// Every share across the user's devices, newest first.
 final toolsSharesProvider =
     Provider<List<({ToolsDevice device, ToolsShare share})>>(
