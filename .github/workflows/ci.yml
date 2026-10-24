@@ -164,6 +164,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.rust_mode != 'none'
     runs-on: windows-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -238,13 +239,13 @@ jobs:
   # any real failure or cancellation fails it.
   ci-result:
     name: CI result
-    needs: [changes, fmt, clippy, test, flutter, macos-host, macos-packaging-tests]
+    needs: [changes, fmt, clippy, test, flutter, macos-host, macos-packaging-tests, windows-updater]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed
         run: |
-          results="${{ needs.changes.result }} ${{ needs.fmt.result }} ${{ needs.clippy.result }} ${{ needs.test.result }} ${{ needs.flutter.result }} ${{ needs.macos-host.result }} ${{ needs.macos-packaging-tests.result }}"
+          results="${{ needs.changes.result }} ${{ needs.fmt.result }} ${{ needs.clippy.result }} ${{ needs.test.result }} ${{ needs.flutter.result }} ${{ needs.macos-host.result }} ${{ needs.macos-packaging-tests.result }} ${{ needs.windows-updater.result }}"
           echo "job results: $results"
           for r in $results; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then
