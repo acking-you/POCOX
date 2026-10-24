@@ -13,6 +13,8 @@ import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/planet_glyph.dart';
 import 'package:pocox/src/tools/tools_actions.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 
 /// The reference for a live [share].
@@ -37,7 +39,11 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
     return (status: 'ended', device: live.device, share: null);
   }
   if (live != null) {
-    return (status: live.share.status, device: live.device, share: live.share);
+    return (
+      status: live.device.online ? live.share.status : 'offline',
+      device: live.device,
+      share: live.share,
+    );
   }
   ToolsDevice? device;
   for (final candidate in overview.devices) {
@@ -58,8 +64,9 @@ ShareRef shareRefOf(ToolsShare share) => ShareRef(
 /// stack under the title instead of beside and below it.
 const double _inlineWidth = 300;
 
-/// One share, with Open, Copy link and (while it lives) Stop or Keep.
-class ShareCard extends ConsumerWidget {
+/// One share, with Open, Save share while it is temporary, and Copy link and
+/// (while it lives) Stop sharing in its menu.
+class ShareCard extends ConsumerStatefulWidget {
   /// The card for [share].
   const ShareCard({super.key, required this.share, this.dense = false});
 
@@ -70,7 +77,25 @@ class ShareCard extends ConsumerWidget {
   final bool dense;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShareCard> createState() => _ShareCardState();
+}
+
+class _ShareCardState extends ConsumerState<ShareCard> {
+  bool _saving = false;
+
+  Future<void> _save(String device, ToolsShare share) async {
+    setState(() => _saving = true);
+    try {
+      await keepShare(context, ref, device, share);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final share = widget.share;
+    final dense = widget.dense;
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -98,7 +123,18 @@ class ShareCard extends ConsumerWidget {
     final label = now.status == 'ended'
         ? l10n.toolsEnded
         : statusLabel(l10n, now.status);
-    final usable = now.status != 'ended' && now.status != 'offline';
+    final usable = now.status == 'online';
+    final opening = ref.watch(shareOpeningProvider).contains(share.service);
+    // Saving and stopping ask the sharing device, so only while it answers.
+    final answers = now.device?.online == true && now.device?.catalog == true;
+    final savable = live != null && !live.kept && answers;
+    final stoppable = live != null && answers;
+    final waiting = switch (now.status) {
+      'offline' => l10n.toolsDeviceOfflineDetail(device),
+      'unreachable' => l10n.toolsServerStoppedDetail(device),
+      _ => null,
+    };
+    final note = helpTextStyle(theme);
     // The status rides beside the title, and the actions line up under the
     // text, only where they fit; a phone with large text stacks them.
     final roomy = MediaQuery.textScalerOf(context).scale(_inlineWidth);
@@ -161,6 +197,9 @@ class ShareCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 6),
+              // Open and, for a temporary share, Save share: the two things
+              // done here. Copying the link and stopping wait in the menu, so
+              // the row stays one line on a phone with large text.
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -171,54 +210,90 @@ class ShareCard extends ConsumerWidget {
                       runSpacing: 4,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        FilledButton.tonalIcon(
+                        FilledButton.tonal(
                           key: Key('share-open-${share.service}'),
-                          onPressed: usable
+                          // Its working colours while it opens, not greyed.
+                          style: opening
+                              ? FilledButton.styleFrom(
+                                  disabledBackgroundColor:
+                                      scheme.secondaryContainer,
+                                  disabledForegroundColor:
+                                      scheme.onSecondaryContainer,
+                                )
+                              : null,
+                          onPressed: usable && !opening
                               ? () =>
                                     openShare(context, ref, share, title: title)
                               : null,
-                          icon: const Icon(AppIcons.open_in_new, size: 16),
-                          label: Text(l10n.toolsOpen),
+                          child: BusyLabel(
+                            busy: opening,
+                            icon: AppIcons.open_in_new,
+                            label: l10n.toolsOpen,
+                            busyLabel: l10n.toolsOpening,
+                          ),
                         ),
-                        TextButton(
-                          key: Key('share-copy-${share.service}'),
-                          onPressed: () => copyShareLink(context, share),
-                          child: Text(l10n.toolsCopyLink),
-                        ),
+                        if (savable)
+                          TextButton(
+                            key: Key('share-keep-${share.service}'),
+                            style: _saving
+                                ? TextButton.styleFrom(
+                                    disabledForegroundColor: scheme.primary,
+                                  )
+                                : null,
+                            onPressed: _saving
+                                ? null
+                                : () => _save(now.device!.name, live),
+                            child: BusyLabel(
+                              busy: _saving,
+                              label: l10n.toolsKeepSharing,
+                              busyLabel: l10n.toolsSaving,
+                            ),
+                          ),
                       ],
                     ),
                   ),
-                  if (live != null && now.device != null)
-                    PopupMenuButton<String>(
-                      key: Key('share-menu-${share.service}'),
-                      icon: const Icon(AppIcons.more_horiz, size: 18),
-                      tooltip: '',
-                      onSelected: (choice) => choice == 'stop'
-                          ? stopShare(context, ref, now.device!.name, live)
-                          : keepShare(context, ref, now.device!.name, live),
-                      itemBuilder: (context) => [
-                        if (!live.kept)
-                          PopupMenuItem(
-                            value: 'keep',
-                            child: Text(l10n.toolsKeepSharing),
+                  PopupMenuButton<String>(
+                    key: Key('share-menu-${share.service}'),
+                    icon: const Icon(AppIcons.more_horiz, size: 18),
+                    tooltip: '',
+                    onSelected: (choice) => choice == 'stop'
+                        ? stopShare(context, ref, now.device!.name, live!)
+                        : copyShareLink(
+                            context,
+                            live == null ? share : shareRefOf(live),
                           ),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        key: Key('share-copy-${share.service}'),
+                        value: 'copy',
+                        child: Text(l10n.toolsCopyLink),
+                      ),
+                      if (stoppable)
                         PopupMenuItem(
+                          key: Key('share-stop-${share.service}'),
                           value: 'stop',
                           child: Text(l10n.toolsStopSharing),
                         ),
-                      ],
-                    ),
+                    ],
+                  ),
                 ],
               ),
-              if (live != null && !dense)
+              // How long it lasts, then what it waits for: state lines only,
+              // their explanation behind the mark.
+              if (live != null)
                 Padding(
                   padding: EdgeInsets.only(left: indent, top: 2),
-                  child: Text(
-                    endsLabel(l10n, live),
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
+                  child: InfoTitle(
+                    title: Text(endsLabel(l10n, live), style: note),
+                    info: live.kept
+                        ? l10n.toolsSavedShareHelp
+                        : l10n.toolsTemporaryShareHelp,
                   ),
+                ),
+              if (waiting != null)
+                Padding(
+                  padding: EdgeInsets.only(left: indent, top: 2),
+                  child: Text(waiting, style: note),
                 ),
             ],
           );

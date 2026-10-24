@@ -203,6 +203,10 @@ class _ToolsHostState extends ConsumerState<ToolsHost> {
             device: device.name,
             thisDevice: overview.thisDevice,
             consent: consent,
+            shareTitle: device.shares
+                .where((share) => share.id == consent.keepShare)
+                .firstOrNull
+                ?.title,
             busy: _answering.contains(key),
             onAnswer: (decision) =>
                 _answer(context, device.name, consent, decision),
@@ -278,11 +282,13 @@ class _ConsentCard extends StatelessWidget {
     required this.consent,
     required this.busy,
     required this.onAnswer,
+    this.shareTitle,
   });
 
   final String device;
   final String thisDevice;
   final ToolsConsent consent;
+  final String? shareTitle;
   final bool busy;
   final void Function(String decision) onAnswer;
 
@@ -296,6 +302,7 @@ class _ConsentCard extends StatelessWidget {
         : deviceLabel(device);
     final known = consent.owner.conversation != null;
     final owner = ownerLabel(l10n, consent.owner);
+    final keep = consent.keepShare != null;
     final connect = switch (consent.service) {
       final service? => parseServiceKey(service),
       null => null,
@@ -316,7 +323,9 @@ class _ConsentCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    connect == null
+                    keep
+                        ? l10n.toolsKeepRequestTitle(owner)
+                        : connect == null
                         ? l10n.toolsRequestTitle(owner)
                         : l10n.toolsConnectRequestTitle(owner),
                     style: theme.textTheme.titleSmall?.copyWith(
@@ -330,7 +339,7 @@ class _ConsentCard extends StatelessWidget {
             Text(
               connect == null
                   ? l10n.toolsRequestDetail(
-                      consent.title,
+                      shareTitle ?? consent.title,
                       consent.ports.join(', '),
                       where,
                     )
@@ -343,6 +352,15 @@ class _ConsentCard extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+            if (keep) ...[
+              const SizedBox(height: 4),
+              Text(
+                l10n.toolsKeepRequestDetail,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
             const SizedBox(height: 10),
             Wrap(
               alignment: WrapAlignment.end,
@@ -365,7 +383,9 @@ class _ConsentCard extends StatelessWidget {
                 FilledButton(
                   key: Key('consent-allow-${consent.id}'),
                   onPressed: busy ? null : () => onAnswer('allow_once'),
-                  child: Text(l10n.toolsAllowOnce),
+                  child: Text(
+                    keep ? l10n.toolsKeepSharing : l10n.toolsAllowOnce,
+                  ),
                 ),
               ],
             ),

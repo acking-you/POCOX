@@ -44,7 +44,7 @@ pub enum Lifetime {
     Lease,
     /// This many minutes.
     Minutes(u64),
-    /// No expiry: kept, renewing itself, until it is ended.
+    /// No timer; still ends with its owner and is not saved across restarts.
     Permanent,
 }
 
@@ -180,12 +180,23 @@ pub struct ShareView {
     pub owner: OwnerView,
     /// Unix milliseconds.
     pub created_ms: i64,
-    /// When it ends on its own; `None` while kept by the user.
+    /// When it ends on its own. No expiry alone does not imply persistence.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_ms: Option<i64>,
+    /// Saved across host restarts, independently of the agent. Absent from
+    /// older catalogs, where an agent's no-expiry share is ambiguous.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub persistent: Option<bool>,
 }
 
 impl ShareView {
+    /// Whether persistence is known. Older user-owned shares were saved;
+    /// older agent-owned shares cannot be inferred from their expiry.
+    pub fn persistence(&self) -> Option<bool> {
+        self.persistent
+            .or_else(|| (self.owner.kind == OwnerKind::User).then_some(true))
+    }
+
     /// The first port's relay key.
     pub fn first_key(&self) -> Option<&str> {
         self.ports.first().map(|port| port.key.as_str())
@@ -235,6 +246,10 @@ pub struct ConsentView {
     /// which do not know it, show the request by its title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
+    /// The existing share to save across restarts. Distinct from permission
+    /// to publish ports temporarily, and bound to these exact ports and id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep_share: Option<String>,
     /// Unix milliseconds.
     pub created_ms: i64,
     /// Unanswered requests lapse.

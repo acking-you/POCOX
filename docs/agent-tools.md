@@ -149,13 +149,16 @@ One `action` with its fields:
 | Action | Fields | Result |
 | --- | --- | --- |
 | `share` | `ports` (1–4, the page's first), `title`, `path`, `scheme` (`https` for a TLS page), `wait_ready_seconds` (≤ 20), `expires_in_minutes` or `permanent` | `shared` with the share, a `pocox://open` link and the local URL; or `waiting_for_user` / `waiting_for_port`, to repeat |
+| `keep_sharing` | `service` (existing share id, port or key) | `shared` with `share.persistent: true` after separate consent and a successful disk write; or `waiting_for_user`, to repeat; only the caller's own temporary share can be saved |
 | `stop_sharing` | `service` (share id, port or key) | `stopped`; only what the caller's conversation shared |
 | `connect` | `service` (key, `device:kind:name` or `device/port`), `local_port`, `expires_in_minutes` or `permanent` | `connected` with the local address, when it ends, and how it travels (`link`); shared ports and APIs only; or `waiting_for_user` for another device's Responses API, to repeat |
 | `disconnect` | `service` | `disconnected`; only what the caller's conversation connected |
 
 - A share is published only after its first port answers on 127.0.0.1 or
   ::1 (a server listening on 0.0.0.0 is fine). Sharing ports the caller
-  already shares returns that share; more ports extend it. At most eight
+  already shares returns that share; more ports extend the share of the
+  requested first port. Different primary ports remain separate services,
+  even in the same conversation. At most eight
   ports per device are shared. A call that cannot publish all its ports
   shares none of them.
 - POCOX's own ports (its tool endpoints, its hosts' listeners, its
@@ -166,9 +169,11 @@ One `action` with its fields:
 - Agent hosts cannot be connected to through the tools: they are for the
   user's controllers, not for other agents.
 - A share or connection lasts 24 hours unless the call gives
-  `expires_in_minutes` (1 to 10080, a week) or `permanent: true` (no expiry;
+  `expires_in_minutes` (1 to 10080, a week) or `permanent: true` (no timer;
   both together are refused). Repeating the call renews it with the lifetime
-  it gives. Results and `services` say when each ends.
+  it gives. **No timer does not mean saved**: an agent-owned share still ends
+  with its owner or POCOX. For long-term access, share the running service,
+  then call `keep_sharing`. Results and `services` distinguish these lifetimes.
 - A connection result carries `link`: the device's policy (`p2p_first` or
   `relay_only`), what its open connections go through (`direct`, `relay`,
   `mixed`, or `idle` while none is open), the tunnel's state (`connecting`,
@@ -200,8 +205,11 @@ the user was shown:
 
 - **Allow once** admits that request, once; a call for other ports, or for
   some of them, is a request of its own.
-- **Allow in this conversation** lets the owner share, or connect APIs,
-  without asking again; sharing does not cover connecting, nor the reverse.
+- **Save share** admits saving exactly the existing share and ports shown;
+  the host rechecks ownership, token, ports and transport context after waiting.
+- **Allow in this conversation** lets the owner share, save shares, or connect
+  APIs without asking again within that capability. Ordinary sharing permission
+  never implies permission to save; each capability has its own grant.
 - **Deny** refuses the owner's sharing, or connecting, for ten minutes.
 
 The last two settle the owner's other waiting requests of the same kind too.
@@ -216,14 +224,14 @@ Harness prompts (MCP elicitation, multi round-trip requests) are deliberately
 not used: a harness may answer them itself — Codex accepts a plain
 confirmation by itself under full access and declines under its `never`
 policy — so they cannot carry the user's consent. POCOX enforces it for every
-harness and approval policy. **Ask before agents share or connect an API**
+harness and approval policy. **Ask before agents share, save shares or connect an API**
 can be switched off.
 
 ### Built-in tools in the composer
 
 The user can hand an agent POCOX's built-in tools with a message: **+ ›
 Built-in tools** in the composer offers what the conversation's host lists in
-its catalog (`builtin`: Devices and services, Share a port, Connect a service
+its catalog (`builtin`: Devices and services, Share a port, Keep shared services, Connect a service
 today; a newer host's tools appear by its own title), several at once. The
 picked tools show as chips above the field and go with the next message, like
 attachments:
@@ -232,7 +240,8 @@ attachments:
   (`<pocox_tools ids="share,services">…</pocox_tools>`; a tool this app does
   not know is described in the host's own words); transcripts and list
   previews, truncated ones included, show chips instead;
-- before the turn starts, a tool that needs consent (Share a port, and
+- before the turn starts, a tool that needs consent (Share a port,
+  Keep shared services (`keep_sharing`), and
   Connect a service for a Responses API) is granted to that conversation, as
   if the user had answered **Allow in this conversation** in advance, on the
   host itself or through its management entry (`POST /services/v1/grants`,
@@ -248,7 +257,7 @@ A grant names the hosted instance and the conversation its harness reports,
 exactly as its calls carry it (native OpenCode names none, so there it covers
 the instance, as its consent does). It ends with the instance or the session
 (a launch that adopts the running instance keeps it), when the switch or
-**Ask before agents share or connect an API** goes off, and when the account
+**Ask before agents share, save shares or connect an API** goes off, and when the account
 or relay changes. While asking is off nothing is recorded, so switching it on
 again asks as before. A host that cannot be reached keeps its consent prompt.
 
@@ -265,10 +274,18 @@ An agent's share or connection ends when the first of these happens: the agent
 stops it; its hosted instance stops or restarts (its tokens are revoked); its
 token is revoked in Settings; its lifetime passes (24 hours unless the call
 gave `expires_in_minutes`, never with `permanent`); the switch goes off; the
-account or relay changes; POCOX quits. **Keep sharing** makes it the user's, with no
+account or relay changes; POCOX quits. **Save share** makes it the user's, with no
 expiry, and so does the user sharing the same port. The user's own shares
-(from the CLI or Share and open) survive restarts until stopped, and follow
+(from the CLI, Share a service, or Share and open) survive restarts until stopped, and follow
 an account or relay change as hosts do.
+
+Catalog `ShareView.persistent` reports this independently of `expiresMs` and
+the original agent attribution. It is optional for wire compatibility: old
+user-owned shares are known saved, but old agent shares without this field
+have unknown persistence and still offer Save share. `ConsentView.keepShare`
+names the exact share being saved; older controllers also receive a title
+stating that it is saved across restarts. Saving removes agent ownership,
+preserves attribution and the stable service key/path, and is idempotent.
 
 A token is committed only when its harness has started: a launch that fails
 revokes it. A reopened ACP session gets a new token; once the agent accepts
@@ -277,6 +294,39 @@ the session can still stop its shares. A revocation from Settings is saved
 before it takes effect, so a restart cannot bring the token back. A share
 the user makes, keeps or stops, which outlives restarts, is reported only
 once it is saved; otherwise nothing changes and the call fails.
+
+### Long-term access from another device
+
+On the source device, start the service and arrange its normal OS startup or
+supervision if it must remain available. POCOX maps an existing listener; it
+does not start or supervise the web server. POCOX hosting, the service and the
+source computer must remain running and connected; a sleeping/offline computer
+cannot serve videos. Saved mappings are restored when POCOX hosting resumes.
+
+In **Services**, select the source device and choose **Share a service** at
+the end of its shared list.
+Enter a port or local HTTP(S) URL, such as `http://localhost:5555/static/`, and
+an optional name. **Share and save** creates a persistent mapping on the
+selected device. Sign in to the same POCOX account on the other device, select
+that source device and press **Open**. The phone opens an in-app browser;
+desktop opens its browser after connecting. No public tunnel URL or router
+port forwarding is needed. **Copy link** in the card's menu retains the scheme,
+directory and URL parameters for reopening through POCOX.
+
+Agent equivalent (the normal consent rules still apply):
+
+```json
+{"action":"share","ports":[5555],"title":"Videos","path":"/static/"}
+{"action":"keep_sharing","service":"<service from the share result>"}
+```
+
+The controller keeps previously seen saved entries through transient catalog
+or host outages for the current account/relay context. Offline entries show
+how to recover; a fresh catalog can remove a stopped share. This is an
+in-memory availability cache, not an independently persisted favorite list.
+Opening is deduplicated across cards and links and waits for all companion
+ports. A companion that cannot keep its required port prevents opening with
+an explanation, instead of navigating to a partially connected page.
 
 ## The switch
 

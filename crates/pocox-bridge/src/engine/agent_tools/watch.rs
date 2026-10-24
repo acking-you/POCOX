@@ -19,7 +19,7 @@ use pocox_core::service::{ServiceId, ServiceKind};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-use super::model::{Catalog, CatalogEvent, DeviceView, Overview};
+use super::model::{Catalog, CatalogEvent, DeviceView, Overview, PortStatus, ShareView};
 use super::{catalog, state};
 use crate::engine::{discovery, meta, runtime, transport};
 
@@ -47,6 +47,9 @@ struct Seen {
     /// a reconnected stream's first event is compared with them, so a share
     /// made in between is still announced.
     shares_seen: BTreeMap<String, Vec<String>>,
+    /// Saved services stay discoverable during an outage, without claiming
+    /// their last online status is current. Cleared with the transport context.
+    saved_shares: BTreeMap<String, Vec<ShareView>>,
 }
 
 fn stream_client() -> &'static reqwest::Client {
@@ -154,6 +157,15 @@ fn record(device: &str, event: CatalogEvent, seen: &Mutex<Seen>) {
     seen.added
         .extend(added.into_iter().map(|id| (device.to_string(), id)));
     seen.shares_seen.insert(device.to_string(), ids);
+    seen.saved_shares.insert(
+        device.to_string(),
+        catalog
+            .shares
+            .iter()
+            .filter(|share| share.persistence() == Some(true))
+            .cloned()
+            .collect(),
+    );
     seen.known
         .insert(device.to_string(), Some(catalog.platform.clone()).filter(|p| !p.is_empty()));
     seen.catalogs.insert(device.to_string(), catalog);
@@ -177,8 +189,8 @@ fn overview(seen: &mut Seen) -> Update {
         }
     }
     let mut overview = catalog::assemble(this_device, &seen.listed, &catalogs);
-    // Devices that left the relay stay, offline and without services (the
-    // galaxy's dim embers), until the account or relay changes.
+    // Devices that left the relay stay offline until the account or relay
+    // changes; saved shares below retain their entry without stale liveness.
     for (name, platform) in &seen.known {
         if overview.devices.iter().all(|device| &device.name != name) {
             overview.devices.push(DeviceView {
@@ -195,6 +207,20 @@ fn overview(seen: &mut Seen) -> Update {
         }
     }
     let this_device = overview.this_device.clone();
+    for device in &mut overview.devices {
+        if !device.catalog {
+            device.shares = seen
+                .saved_shares
+                .get(&device.name)
+                .cloned()
+                .unwrap_or_default();
+            for share in &mut device.shares {
+                for port in &mut share.ports {
+                    port.status = PortStatus::Starting;
+                }
+            }
+        }
+    }
     overview
         .devices
         .sort_by_key(|d| (d.name != this_device, d.name.clone()));
@@ -364,5 +390,45 @@ mod tests {
             .expect("kept");
         assert!(!devbox.online && devbox.services.is_empty());
         assert_eq!(devbox.platform.as_deref(), Some("linux"));
+    }
+
+    #[test]
+    fn saved_entries_survive_outages_but_a_fresh_catalog_can_remove_them() {
+        let event = |shares: serde_json::Value| -> CatalogEvent {
+            serde_json::from_value(serde_json::json!({
+                "catalog": {"protocol": 1, "device": "studio", "revision": 1,
+                    "tools": {"enabled": true, "askBeforeSharing": true},
+                    "shares": shares, "consents": []}, "added": []
+            }))
+            .unwrap()
+        };
+        let shares = serde_json::json!([
+            {"id":"video", "title":"Videos", "path":"/static/", "persistent":true,
+                "owner":{"kind":"agent", "label":"Codex"}, "createdMs":1,
+                "ports":[{"port":5555,"key":"pcx:studio:port:5555","status":"online"}]},
+            {"id":"preview", "title":"Preview", "path":"/", "persistent":false,
+                "owner":{"kind":"agent", "label":"Codex"}, "createdMs":1,"ports":[]}
+        ]);
+        let seen = Mutex::new(Seen::default());
+        record("studio", event(shares.clone()), &seen);
+        let entry = || {
+            overview(&mut seen.lock().unwrap())
+                .overview
+                .devices
+                .into_iter()
+                .find(|device| device.name == "studio")
+                .unwrap()
+        };
+        seen.lock().unwrap().catalogs.clear();
+        let offline = entry();
+        assert!(!offline.online);
+        assert_eq!(offline.shares.len(), 1);
+        assert_eq!(offline.shares[0].id, "video");
+        assert_eq!(offline.shares[0].ports[0].status, PortStatus::Starting);
+        record("studio", event(shares), &seen);
+        assert_eq!(entry().shares[0].ports[0].status, PortStatus::Online);
+        record("studio", event(serde_json::json!([])), &seen);
+        seen.lock().unwrap().catalogs.clear();
+        assert!(entry().shares.is_empty(), "an authoritative removal is not resurrected");
     }
 }

@@ -20,6 +20,17 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Shared colours, typography and control shapes live in `theme.dart` /
   `desktop_theme.dart`; secondary pages use `UtilityPage`
   (`widgets/utility_page.dart`).
+- Service cards (`tools/share_card.dart`) show saved, temporary or unknown
+  legacy lifetime even in dense lists. One action line: Open and, while
+  temporary, Save share, both `BusyLabel`s; Copy link and Stop sharing sit
+  in the card's menu so the line fits a 320 px phone. Open shares one pending
+  operation across cards and links. Under the lifetime, one short state line
+  says what an offline device or a silent server waits for. Offline saved
+  entries keep their place. Services ends a selected online host's shared
+  list with a quiet Share a service row (like local hosting's add row): a
+  local URL/port and optional name in the standard adaptive panel, saved
+  through that host's management endpoint, errors inline above the action;
+  see [long-term sharing](agent-tools.md#long-term-access-from-another-device).
 - Palette: calm graphite neutrals, ink-black primary actions, the logo's blue
   as the one, sparse signal colour. No purple, no hue cast in greys or
   shadows, a backdrop lit only by white (multi-hue backdrops and iris accents

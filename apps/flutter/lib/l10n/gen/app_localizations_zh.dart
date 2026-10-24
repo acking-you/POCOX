@@ -4062,10 +4062,85 @@ class AppLocalizationsZh extends AppLocalizations {
   String get toolsStopSharing => '停止共享';
 
   @override
-  String get toolsKeepSharing => '保持共享';
+  String get toolsKeepSharing => '长期保留';
 
   @override
-  String get toolsKeptToast => '将保持到你停止';
+  String get toolsKeptToast => '已保存，重启后恢复，直到你停止共享';
+
+  @override
+  String get toolsSessionShare => '临时共享 · 智能体停止后结束';
+
+  @override
+  String toolsSessionShareTimed(String time) {
+    return '临时共享 · $time后或智能体停止时结束';
+  }
+
+  @override
+  String get toolsPersistenceUnknown => '旧版主机 · 保留方式未知';
+
+  @override
+  String get toolsSavedShareHelp =>
+      '长期共享会在智能体停止后保留，并在 POCOX 重启后恢复。源设备、POCOX 和本地服务需保持运行；保存共享不会启动本地服务。';
+
+  @override
+  String get toolsTemporaryShareHelp =>
+      '智能体的临时共享会随智能体或 POCOX 停止而结束，即使没有到期时间。选择“长期保留”可在你的设备上持续使用。';
+
+  @override
+  String toolsKeepRequestTitle(String owner) {
+    return '$owner 请求长期保留共享';
+  }
+
+  @override
+  String get toolsKeepRequestDetail =>
+      '智能体停止后仍保持共享，POCOX 重启后自动恢复（本地服务需保持运行）。可随时在服务管理中停止。';
+
+  @override
+  String get builtinToolKeepShare => '长期保留共享';
+
+  @override
+  String get builtinToolKeepShareSummary =>
+      '允许此会话将共享服务保存为长期使用，智能体或 POCOX 重启后仍保留。本地服务需持续运行。';
+
+  @override
+  String get toolsOpening => '正在打开…';
+
+  @override
+  String get toolsSaving => '正在保存…';
+
+  @override
+  String get toolsBrowserUnavailable => '浏览器未能打开此服务，请重试。';
+
+  @override
+  String toolsDeviceOfflineDetail(String device) {
+    return '$device 重新上线后恢复。';
+  }
+
+  @override
+  String toolsServerStoppedDetail(String device) {
+    return '在 $device 上启动该服务后，共享会自动恢复。';
+  }
+
+  @override
+  String get toolsAddShare => '共享服务';
+
+  @override
+  String toolsShareOnDevice(String device) {
+    return '服务所在设备：$device';
+  }
+
+  @override
+  String get toolsShareAddress => '本地地址或端口';
+
+  @override
+  String get toolsShareAddressInvalid =>
+      '请输入本地 HTTP 或 HTTPS 地址，或 1 至 65535 的端口。';
+
+  @override
+  String get toolsShareName => '名称（可选）';
+
+  @override
+  String get toolsShareAndSave => '共享并长期保留';
 
   @override
   String toolsStoppedToast(String title) {
@@ -4106,7 +4181,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get toolsKept => '已保持';
+  String get toolsKept => '长期共享 · 重启后恢复';
 
   @override
   String toolsOpenFailed(String error) {
@@ -4140,7 +4215,7 @@ class AppLocalizationsZh extends AppLocalizations {
       'Codex、Claude、OpenCode 等智能体可以看到你的设备和服务，把这台电脑的端口共享给你的其他设备，并连接其他设备上的服务。';
 
   @override
-  String get toolsAsk => '智能体共享或连接 API 前先问我';
+  String get toolsAsk => '智能体共享、长期保留共享或连接 API 前先问我';
 
   @override
   String get toolsEndpoint => 'MCP 端点';

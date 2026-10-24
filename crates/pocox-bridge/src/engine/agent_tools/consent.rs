@@ -18,7 +18,7 @@ use std::time::Duration;
 
 use tokio::sync::Notify;
 
-use super::builtin::{CONNECT, SHARE};
+use super::builtin::{CONNECT, KEEP_SHARE, SHARE};
 use super::error::{Pending, ToolError};
 use super::model::{ConsentView, Decision};
 use super::shares::Caller;
@@ -48,6 +48,8 @@ enum Answer {
 enum Ask<'a> {
     /// Share `ports` of this device, as `title`.
     Share { title: &'a str, ports: &'a [u16] },
+    /// Save an existing share, with exactly the ports the user sees.
+    Keep { id: &'a str, title: &'a str, ports: &'a [u16] },
     /// Connect the Responses API with relay key `service`, named `title`.
     Connect { service: &'a str, title: &'a str },
 }
@@ -58,6 +60,9 @@ impl Ask<'_> {
             Self::Share {
                 ..
             } => SHARE,
+            Self::Keep {
+                ..
+            } => KEEP_SHARE,
             Self::Connect {
                 ..
             } => CONNECT,
@@ -71,7 +76,19 @@ impl Ask<'_> {
         match self {
             Self::Share {
                 ports, ..
-            } => consent.view.service.is_none() && set(&consent.view.ports) == set(ports),
+            } => {
+                consent.view.service.is_none()
+                    && consent.view.keep_share.is_none()
+                    && set(&consent.view.ports) == set(ports)
+            },
+            Self::Keep {
+                id,
+                ports,
+                ..
+            } => {
+                consent.view.keep_share.as_deref() == Some(id)
+                    && set(&consent.view.ports) == set(ports)
+            },
             Self::Connect {
                 service, ..
             } => consent.view.service.as_deref() == Some(service),
@@ -93,6 +110,16 @@ impl Ask<'_> {
             } => state.connections.iter().any(|connection| {
                 connection.service == service
                     && connection.holders.iter().any(|(holder, _)| holder == key)
+            }),
+            Self::Keep {
+                id,
+                ports,
+                ..
+            } => state.shares.iter().any(|share| {
+                share.id == id
+                    && share.key.is_none()
+                    && share.ports.len() == ports.len()
+                    && share.ports.iter().all(|port| ports.contains(&port.port))
             }),
         }
     }
@@ -151,22 +178,30 @@ fn look(
                 .into(),
         ));
     }
-    let (title, ports, service) = match ask {
+    let (title, ports, service, keep_share) = match ask {
         Ask::Share {
             title,
             ports,
-        } => (title, ports.to_vec(), None),
+        } => (title.to_string(), ports.to_vec(), None, None),
+        // The title also describes the effect to older controllers, which
+        // do not yet understand `keepShare`.
+        Ask::Keep {
+            id,
+            title,
+            ports,
+        } => (format!("Save across restarts: {title}"), ports.to_vec(), None, Some(id.to_string())),
         Ask::Connect {
             service,
             title,
-        } => (title, Vec::new(), Some(service.to_string())),
+        } => (title.to_string(), Vec::new(), Some(service.to_string()), None),
     };
     let view = ConsentView {
         id: uuid::Uuid::new_v4().simple().to_string()[..10].to_string(),
         owner: caller.owner(),
-        title: title.to_string(),
+        title,
         ports,
         service,
+        keep_share,
         created_ms: now,
         expires_ms: now + REQUEST_TTL_MS,
     };
@@ -208,6 +243,21 @@ pub async fn admit_connect(
     wait(caller, key, Ask::Connect {
         service,
         title,
+    })
+    .await
+}
+
+/// Whether the agent may save this exact existing share across restarts.
+pub async fn admit_keep(
+    caller: &Caller,
+    id: &str,
+    title: &str,
+    ports: &[u16],
+) -> Result<Result<(), Pending>, ToolError> {
+    wait(caller, &caller.key(), Ask::Keep {
+        id,
+        title,
+        ports,
     })
     .await
 }
@@ -467,6 +517,36 @@ mod tests {
             look(&mut state, &caller, &key, share("API", &[8000])),
             Ok(Answer::Allowed)
         ));
+    }
+
+    #[test]
+    fn saving_needs_its_own_permission_for_the_exact_share_and_ports() {
+        let (mut state, caller) = setup();
+        let key = caller.key();
+        let share_request = waiting(look(&mut state, &caller, &key, share("Videos", &[5555])));
+        answer_in(&mut state, &share_request.id, Decision::AllowConversation).unwrap();
+        let keep = Ask::Keep {
+            id: "video",
+            title: "Videos",
+            ports: &[5555],
+        };
+        let asked = waiting(look(&mut state, &caller, &key, keep));
+        assert_eq!(asked.keep_share.as_deref(), Some("video"));
+        answer_in(&mut state, &asked.id, Decision::AllowOnce).unwrap();
+        let changed = Ask::Keep {
+            id: "video",
+            title: "Videos",
+            ports: &[5555, 5556],
+        };
+        waiting(look(&mut state, &caller, &key, changed));
+        let replaced = Ask::Keep {
+            id: "replacement",
+            title: "Videos",
+            ports: &[5555],
+        };
+        waiting(look(&mut state, &caller, &key, replaced));
+        assert!(matches!(look(&mut state, &caller, &key, keep), Ok(Answer::Allowed)));
+        waiting(look(&mut state, &caller, &key, keep));
     }
 
     #[test]

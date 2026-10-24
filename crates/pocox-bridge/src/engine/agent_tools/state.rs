@@ -144,6 +144,7 @@ impl Share {
             owner: self.owner.clone(),
             created_ms: self.created_ms,
             expires_ms: self.expires_ms,
+            persistent: Some(self.durable()),
         }
     }
 
@@ -212,7 +213,9 @@ pub struct Consent {
 impl Consent {
     /// The capability it asks for ([`SHARE`] or [`CONNECT`]).
     pub fn tool(&self) -> &'static str {
-        if self.view.service.is_some() {
+        if self.view.keep_share.is_some() {
+            super::builtin::KEEP_SHARE
+        } else if self.view.service.is_some() {
             CONNECT
         } else {
             SHARE

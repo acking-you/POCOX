@@ -104,3 +104,53 @@ fn only_published_ports_of_the_users_shares_are_saved() {
     share.ports[1] = pending(8000);
     assert_eq!(share.saved().ports, [5173], "its companion joins once published");
 }
+
+#[test]
+fn independent_services_in_one_conversation_keep_their_own_entry() {
+    let mut state = State::default();
+    let (principal, _) = state
+        .tokens
+        .mint(Kind::Installed, "Codex", Some("codex"), None)
+        .unwrap();
+    let caller = Caller {
+        principal,
+        conversation: Some("setup".into()),
+    };
+    let mut reserve_page = |port, path: &str, ports: &[u16]| {
+        let addrs: Vec<_> = ports
+            .iter()
+            .map(|port| (*port, SocketAddr::from(([127, 0, 0, 1], *port))))
+            .collect();
+        reserve_in(
+            &mut state,
+            &caller,
+            &caller.key(),
+            Page {
+                port,
+                path: path.into(),
+                title: path.into(),
+                secure: false,
+                lifetime: Lifetime::Permanent,
+            },
+            &addrs,
+            "studio",
+        )
+        .unwrap()
+        .0
+    };
+    let video = reserve_page(5555, "/static/", &[5555]);
+    let docs = reserve_page(5173, "/docs/", &[5173]);
+    assert_ne!(video, docs);
+    assert_eq!(reserve_page(5173, "/docs/", &[5173, 8000]), docs);
+    assert_eq!(state.shares.len(), 2);
+    assert_eq!(state.shares[0].path, "/static/");
+    assert_eq!(state.shares[0].ports.len(), 1);
+    assert_eq!(
+        state.shares[1]
+            .ports
+            .iter()
+            .map(|p| p.port)
+            .collect::<Vec<_>>(),
+        [5173, 8000]
+    );
+}
