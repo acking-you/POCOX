@@ -140,6 +140,7 @@ static STORE: Mutex<()> = Mutex::new(());
 /// Both locks, for one read-modify-write.
 struct Locked {
     file: Option<FileLock>,
+    _owner: Option<super::host_owner::WriteGuard>,
     _process: MutexGuard<'static, ()>,
 }
 
@@ -165,12 +166,18 @@ fn lock(root: &Path, create: bool) -> Result<Locked> {
     // creates nothing (the file only ever appears by an atomic rename).
     let file =
         if create || profiles_path(root).exists() { Some(FileLock::acquire(root)?) } else { None };
+    // Take ownership after the store lock, as lifecycle and settings writers
+    // do in write_private. Reversing them can deadlock concurrent writers.
+    // Hold ownership through the transaction, including key cleanup; readers
+    // still inspect profiles without owning them.
+    let owner = if create { Some(super::host_owner::write_guard()?) } else { None };
     #[cfg(test)]
     if file.is_none() {
         files::after_absent_check(root);
     }
     Ok(Locked {
         file,
+        _owner: owner,
         _process: process,
     })
 }

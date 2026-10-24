@@ -1,10 +1,11 @@
 //! One process at a time hosts from a hosting state directory.
 //!
-//! The owner holds an exclusive lock on `<dir>/owner.lock` for as long as it
-//! runs. The operating system releases the lock when the process exits or
-//! crashes, so a dead owner never blocks the next one and nothing stale is
-//! left to clean up: the lock, never a recorded process id, decides who is
-//! alive. The id the owner writes into the file only names it in messages.
+//! The owner holds an exclusive lock on `<dir>/owner.lock` until its hosting
+//! cleanup succeeds. Desktop quit releases it explicitly: Rust statics are not
+//! dropped at exit, and Windows need not release a terminated process's file
+//! locks immediately. A failed cleanup keeps the lock for a retry. After a
+//! crash the operating system releases it; the lock, never a recorded process
+//! id, decides ownership. The id in the file only names it in messages.
 //! Rust opens files close-on-exec (not inheritable on Windows), so an agent
 //! the owner spawned and outlived never keeps the lock.
 //!
@@ -17,12 +18,13 @@
 //! ([`require`]). So it never starts, adopts, stops or re-registers the first
 //! app's services, nor changes what that app restores or serves.
 
+use std::cell::RefCell;
 use std::fs::{File, TryLockError};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use anyhow::{anyhow, Context, Result};
+use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use super::host_profiles::{self, files};
 
@@ -30,7 +32,7 @@ use super::host_profiles::{self, files};
 pub(super) const LOCK_FILE: &str = "owner.lock";
 
 /// A held owner lock; dropping it releases the directory.
-pub(super) struct OwnerLock(File);
+pub(super) struct OwnerLock(Option<File>);
 
 /// Another live process owns the directory.
 #[derive(Debug, Clone)]
@@ -84,14 +86,24 @@ impl OwnerLock {
         {
             tracing::debug!(%error, "the hosting owner lock does not name its process");
         }
-        Ok(Self(file))
+        Ok(Self(Some(file)))
+    }
+
+    /// Unlock before closing the file, retaining it when unlocking fails so
+    /// a failed desktop quit can retry without losing its ownership record.
+    fn release(&mut self) -> Result<()> {
+        if let Some(file) = &self.0 {
+            file.unlock().context("releasing the hosting owner lock")?;
+        }
+        self.0 = None;
+        Ok(())
     }
 }
 
 impl Drop for OwnerLock {
     fn drop(&mut self) {
         // At once rather than on close, which Windows may delay.
-        let _ = self.0.unlock();
+        let _ = self.release();
     }
 }
 
@@ -103,8 +115,10 @@ fn read_pid(path: &Path) -> Option<u32> {
 
 /// The desktop app's claim on its hosting state, made when it starts.
 enum Claim {
-    /// Held until the process exits.
-    Owned { _lock: OwnerLock },
+    /// Held until hosting cleanup succeeds.
+    Owned { lock: OwnerLock },
+    /// Cleanup succeeded; this process must never host or claim again.
+    Released,
     /// Another live app owned it.
     Elsewhere(HeldElsewhere),
     /// It could not be locked.
@@ -114,7 +128,7 @@ enum Claim {
 fn claim(dir: Result<PathBuf>) -> Claim {
     match dir.and_then(|dir| OwnerLock::try_acquire(&dir)) {
         Ok(lock) => Claim::Owned {
-            _lock: lock,
+            lock,
         },
         Err(error) => match error.downcast::<HeldElsewhere>() {
             Ok(held) => Claim::Elsewhere(held),
@@ -128,6 +142,7 @@ fn refusal(claim: &Claim) -> Result<()> {
         Claim::Owned {
             ..
         } => Ok(()),
+        Claim::Released => Err(anyhow!("the app has finished quitting; hosting is closed")),
         Claim::Elsewhere(held) => Err(held.clone().into()),
         Claim::Failed(reason) => Err(anyhow!("the hosting state could not be locked: {reason}")),
     }
@@ -135,20 +150,44 @@ fn refusal(claim: &Claim) -> Result<()> {
 
 /// `None` until [`claim_desktop`]: tests, phones and the CLI supervisor
 /// never claim the desktop state.
-static DESKTOP: Mutex<Option<Claim>> = Mutex::new(None);
+static DESKTOP: ReentrantMutex<RefCell<Option<Claim>>> = ReentrantMutex::new(RefCell::new(None));
 
-fn desktop() -> std::sync::MutexGuard<'static, Option<Claim>> {
-    DESKTOP.lock().unwrap_or_else(|p| p.into_inner())
+fn desktop() -> ReentrantMutexGuard<'static, RefCell<Option<Claim>>> {
+    DESKTOP.lock()
 }
 
-/// Own this computer's hosting state for the rest of the desktop app's life,
+/// Keeps desktop ownership through a hosting-state write. Profile transactions
+/// call the atomic-file writer while already guarded, so this gate is
+/// reentrant. CLI owners keep their separate process lock until their
+/// supervisor exits.
+#[must_use = "keep the guard until the hosting-state write finishes"]
+pub(in crate::engine) struct WriteGuard {
+    _claim: Option<ReentrantMutexGuard<'static, RefCell<Option<Claim>>>>,
+}
+
+/// Refuse writes by another or retired desktop, and prevent quit from releasing
+/// its ownership until this write finishes. The guard must stay on this thread.
+pub(in crate::engine) fn write_guard() -> Result<WriteGuard> {
+    let desktop = desktop();
+    let claimed = {
+        let claim = desktop.borrow();
+        claim.as_ref().map_or(Ok(()), refusal)?;
+        claim.is_some()
+    };
+    Ok(WriteGuard {
+        _claim: claimed.then_some(desktop),
+    })
+}
+
+/// Own this computer's hosting state until its successful quit cleanup,
 /// or note that another app does. Never fails the app's start; a second call
 /// changes nothing.
 pub fn claim_desktop() {
     if cfg!(any(target_os = "ios", target_os = "android")) {
         return;
     }
-    let mut desktop = desktop();
+    let gate = desktop();
+    let mut desktop = gate.borrow_mut();
     if desktop.is_none() {
         let claim = claim(host_profiles::root());
         if let Err(error) = refusal(&claim) {
@@ -158,15 +197,31 @@ pub fn claim_desktop() {
     }
 }
 
+/// Relinquish desktop hosting after quit fenced and drained its operations
+/// and stopped every owned service. A failed quit must not call this. Keep a
+/// terminal claim instead of `None`, which permits CLI and mobile operations.
+pub(super) fn release_desktop() -> Result<()> {
+    let gate = desktop();
+    let mut desktop = gate.borrow_mut();
+    if let Some(Claim::Owned {
+        lock,
+    }) = desktop.as_mut()
+    {
+        lock.release()?;
+        *desktop = Some(Claim::Released);
+    }
+    Ok(())
+}
+
 /// Ok when this process may host: it owns the hosting state, or never
 /// claimed it.
 pub(super) fn require() -> Result<()> {
-    desktop().as_ref().map_or(Ok(()), refusal)
+    desktop().borrow().as_ref().map_or(Ok(()), refusal)
 }
 
 /// Whether another app owned this app's hosting state when it started.
 pub fn owned_elsewhere() -> bool {
-    matches!(*desktop(), Some(Claim::Elsewhere(_)))
+    matches!(*desktop().borrow(), Some(Claim::Elsewhere(_)))
 }
 
 #[cfg(test)]

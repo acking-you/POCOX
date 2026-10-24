@@ -212,6 +212,14 @@ under their own leases alongside OpenCode cleanup, and stops what the ledger
 kept. Each Codex host aborts its local services immediately and stops its owned
 process while withdrawing its three relay registrations concurrently; its name
 stays claimed until both have finished. No process grace period is shortened.
+After successful cleanup, the app explicitly releases its hosting owner lock
+before the GUI exits, and its ownership claim stays permanently closed. A new
+app can restore hosting without waiting for Windows to reclaim a dead process's
+file locks. A failed cleanup retains ownership for its next quit attempt.
+Hosting-state writes and profile transactions retain an ownership guard until
+they finish; quit waits for those writes, and the retired process refuses later
+writes. The atomic writer shares the transaction's reentrant guard. Read-only
+profile inspection does not require ownership.
 An OpenCode startup still stopping counts as something that may still run.
 When anything it owns may still run (a host still busy, a kept codex, a sign-in
 child) the quit fails with what remains: the app stays alive, restores its window
@@ -281,8 +289,10 @@ as an unsaved edit.
 - Claude Code settings-tier precedence is taken from the adapter source only;
   our session `settings` replace the adapter's `modelConfig` for that session.
 - A quit whose host operation outlives the lease bound fails instead of
-  stopping it; the app stays open. The quit itself is tested only in parts
-  (its state is process-wide).
+  stopping it; the app stays open. An isolated process fixture exercises failed
+  cleanup, retry, in-flight writes and ownership handoff without resetting the
+  process-wide quit fence. CI runs these shutdown tests on Windows and macOS,
+  and in the full Rust suite on Linux.
 - Endpoint ownership is checked at the port wait, after `/readyz` and after
   the effective-route request, not continuously, and is not bound to the
   connection that carried the requests. On macOS another user's listener

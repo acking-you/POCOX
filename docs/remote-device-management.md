@@ -139,9 +139,13 @@ try to detect physical machines or split a deliberately shared installation.
 
 One desktop app at a time hosts from a hosting state directory. An app claims
 `<state-dir>/hosting/owner.lock` when it starts and holds that exclusive lock
-for as long as it runs. The operating system releases the lock when the app
-exits or crashes, so nothing stale ever blocks the next start; the process ID
-written in the file only names the holder in logs. A copy started while
+until quit has fenced and drained hosting operations and stopped its services.
+Successful desktop quit explicitly unlocks and closes it before the GUI exits;
+the retired process permanently refuses hosting. Failed cleanup keeps the lock
+for retry. Rust static state is not dropped at process exit, and Windows can
+delay reclaiming file locks, so relying on process termination alone can block
+an immediate reopen. After a crash the operating system reclaims the lock; the
+process ID written in the file only names the holder in logs. A copy started while
 another one runs (a second launch, or another build of the app) still opens
 and connects to services, but for its whole run it restores nothing, starts,
 restarts and applies no host, publishes no management entry and serves no
@@ -152,6 +156,10 @@ disabled. So it never adopts, stops or re-registers the first app's services,
 and the first app is unaffected. It does not take over when the first app
 quits: quit it and open POCOX again. The CLI supervisor keeps its own lock
 under `managed-host/` (see [CLI host](#cli-host)).
+
+On Windows the native single-instance handle also stays held until Flutter and
+its plugins have been destroyed, so another launch cannot enter during engine
+teardown. The app never deletes another process's lock file or takes its hosts.
 
 Code: `crates/pocox-bridge/src/engine/host_owner.rs`; Flutter reads the state
 as `hostingOwnedElsewhere`. Any new hosting service calls

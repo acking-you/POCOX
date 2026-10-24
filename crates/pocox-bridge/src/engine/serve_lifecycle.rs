@@ -209,6 +209,7 @@ pub fn serve_stop_all() -> Result<()> {
         left
     });
     if left.is_empty() {
+        super::super::host_owner::release_desktop()?;
         tracing::info!(elapsed_ms = started.elapsed().as_millis(), "hosting stopped for quit");
         return Ok(());
     }
