@@ -19,8 +19,9 @@ breaking change goes.
   it, or the new path mark beside it, opens a connection sheet with the three
   steps live, the attempt and last error, **Retry now**, and the tunnel's recent
   events. Tunnel details show the same stage and history; lists refresh every
-  500 ms while a tunnel is changing. Requires the pb-mapper SDK's live direct
-  stages and event history.
+  500 ms while a tunnel is changing. The pb-mapper SDK (`pocox` branch,
+  e371902) now reports the direct attempt in flight and the last 16 recovery
+  events.
 - **Steadier reconnects.** A session keeps reconnecting while it is on screen
   (1, 2, 4, 8, 15, then every 30 s; the banner appears after four tries but the
   retries go on), keeps a live tunnel across a reconnect, and rebuilds it only

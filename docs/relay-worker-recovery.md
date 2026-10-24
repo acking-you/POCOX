@@ -3,7 +3,8 @@
 ## Direct connections
 
 POCOX follows pb-mapper's dedicated `pocox` branch, currently locked to
-`d8816360f618b7da077bd1ca6e6e2851fcc83701` (SDK 0.7.0), with its `p2p` feature.
+`e371902f8365a3c05c4d4c001b6ae1212bfc67d3` (SDK 0.7.0 plus live direct stages
+and recovery history), with its `p2p` feature.
 The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
 the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
 The relay server is a test-only dependency, never
