@@ -2347,9 +2347,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceMuted => '麦克风已静音';
 
   @override
-  String get voiceStopping => '正在结束语音…';
-
-  @override
   String get voiceStop => '结束语音';
 
   @override

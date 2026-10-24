@@ -2466,9 +2466,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceMuted => 'Microphone muted';
 
   @override
-  String get voiceStopping => 'Ending voice…';
-
-  @override
   String get voiceStop => 'End voice';
 
   @override

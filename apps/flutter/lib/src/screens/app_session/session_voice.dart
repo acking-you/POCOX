@@ -132,7 +132,9 @@ extension _SessionVoice on _AppSessionState {
       // call has the microphone and the realtime quota to itself.
       unawaited(_dictation.close());
     } else {
-      _warmDictation();
+      // The call reads as ended before its host has let it go; the line
+      // reopens once it has, so the two sessions never overlap.
+      unawaited(_voice.settled.then((_) => _warmDictation()));
     }
   }
 
@@ -165,11 +167,9 @@ extension _SessionVoice on _AppSessionState {
       !_historySyncing &&
       !_showingCachedHistory &&
       !_connectionLost;
-  bool get _canStartVoice =>
-      _voiceAvailable &&
-      !_voiceStarting &&
-      !_voice.busy &&
-      _voice.phase != VoicePhase.stopping;
+  // A call just hung up can be followed at once: the controller holds the
+  // next one back until the last one's cleanup is done.
+  bool get _canStartVoice => _voiceAvailable && !_voiceStarting && !_voice.busy;
 
   /// Whether a call can join the typed conversation on screen: the host
   /// starts realtime on any loaded thread and hands it the thread's recent

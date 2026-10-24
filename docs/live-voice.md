@@ -74,14 +74,37 @@ conversation keeps the dock at rest, ready to talk again.
 
 While a call belongs to the conversation on screen, its controls dock above the
 composer and as wide as it, on phones and desktops alike
-(`VoiceCallDock` in `voice/voice_widgets.dart`): the mode, a large live
-waveform (a spinner while connecting), who holds the floor, the latest caption
-with who said it, and Mute and Hang up as large round buttons with their names
-under them. History opens from its header. After a call in a typed
-conversation ends, the dock lingers six seconds (a failure until dismissed);
-a voice conversation keeps it with **Talk again**. Opening another conversation
-still ends the call, so the dock is the one place its controls live; the former
-sidebar, drawer and window-strip status entries are gone.
+(`VoiceCallDock` in `voice/voice_call_dock.dart`). The dock is one glass capsule
+in the composer's shape, a single row:
+
+- **The orb.** Its lit core holds four bars that breathe while the line is open
+  and swell with the louder of the microphone and the assistant, with ripples
+  leaving it while anyone talks. A ring turns around it while connecting or
+  recovering; it rests as flat grey bars while muted.
+- **What is happening.** Who holds the floor and how long the call has run
+  (`m:ss`, from when audio first flowed), over the words being said: the latest
+  caption with who said it, its newest words kept in view as it streams, or the
+  call's mode before anyone speaks. A small icon always says which kind of call
+  it is. A tap opens the spoken history, or a failure's details.
+- **Controls.** Mute and Hang up as round buttons in thumb reach; History rides
+  along where the capsule has room.
+
+The call's colour washes in from behind the orb and glides between states: blue
+while live, violet while the user speaks, grey while muted, amber while the link
+recovers, red once it failed. After a call in a typed conversation ends, the dock
+lingers six seconds with how long it ran and **Talk again** (a failure until
+dismissed); a voice conversation keeps it at rest. Opening another conversation
+still ends the call, so the dock is the one place its controls live.
+
+## Hanging up
+
+A call ends the moment it is hung up: the phase settles before anything is
+awaited, so the dock reads as ended and the voice button is usable at once.
+Releasing the microphone and peer, closing the event stream and the host's
+`thread/realtime/stop` acknowledgement (up to five seconds over a relay) then run
+side by side behind it. Talking again before they finish waits for them, so the
+two calls never share the microphone and the old stop cannot land on the new
+session.
 
 ## Protocol contract
 

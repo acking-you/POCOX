@@ -47,11 +47,15 @@ breaking change goes.
   conversation's recent history, so the start sheet now offers **In this
   conversation** (what you ask runs there, beside the typed turns) or **New
   voice conversation**, with voices as one-tap chips and the model under More
-  options. A call's controls dock above the composer on phones and desktops —
-  live waveform, who is speaking, the latest caption, large Mute and Hang up —
-  instead of a small strip in the sidebar's corner, and a phone starts a call
-  from the folded composer without the keyboard. The voice button is usable
-  again as soon as a call ends.
+  options. A call's controls dock above the composer on phones and desktops,
+  instead of a small strip in the sidebar's corner: one glass capsule with a
+  living orb that swells with whoever talks, who holds the floor and the call's
+  running time, the words being said, and Mute and Hang up in thumb reach. A
+  phone starts a call from the folded composer without the keyboard.
+- **Hanging up is instant.** A call used to sit on "Ending voice…" until the
+  host acknowledged the stop over the relay (up to five seconds); it now ends
+  the moment you hang up, the cleanup finishing behind it, and you can talk
+  again right away.
 - **The phone composer stays folded until you write.** Every conversation
   opens with the slim capsule; it unfolds when you tap it to type and folds
   again when you are done (putting the keyboard away counts), instead of

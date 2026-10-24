@@ -4394,12 +4394,6 @@ abstract class AppLocalizations {
   /// **'Microphone muted'**
   String get voiceMuted;
 
-  /// No description provided for @voiceStopping.
-  ///
-  /// In en, this message translates to:
-  /// **'Ending voice…'**
-  String get voiceStopping;
-
   /// No description provided for @voiceStop.
   ///
   /// In en, this message translates to:

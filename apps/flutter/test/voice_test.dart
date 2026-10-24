@@ -150,6 +150,14 @@ class _Media implements VoiceTransport {
 
 Future<void> _tick() => Future<void>.delayed(Duration.zero);
 
+/// Some frames of a live call, so its orb and captions settle into what a
+/// person would see rather than the first frame of each change.
+Future<void> _frames(WidgetTester t) async {
+  for (var i = 0; i < 15; i++) {
+    await t.pump(const Duration(milliseconds: 40));
+  }
+}
+
 void main() {
   setUpAll(loadPreviewFonts);
   test('voice source survives renaming', () {
@@ -408,12 +416,28 @@ void main() {
         createTransport: () => media,
       );
       await c.start('voice');
-      final stopping = c.stop();
+      media.connected();
+      final stopping = c.hangUp();
+      // Ended the moment it is hung up, before anything is awaited.
+      expect(c.phase, VoicePhase.idle);
+      expect(c.busy, isFalse);
+      expect(c.endedByUser, isTrue);
+      expect(c.endedAt, isNotNull);
       await _tick();
       expect(media.closed, isTrue);
-      expect(c.phase, VoicePhase.stopping);
+      // Talking again at once waits for the host to let the last call go,
+      // so that stop cannot land on the new session.
+      final again = c.start('voice');
+      await _tick();
+      expect(api.calls.where((c) => c.$1.endsWith('/start')).length, 1);
       api.stopAck!.complete();
       await stopping;
+      await again;
+      expect(api.calls.map((c) => c.$1).toList().sublist(1), [
+        'thread/realtime/stop',
+        'thread/realtime/start',
+      ]);
+      expect(c.busy, isTrue);
       c.dispose();
     },
   );
@@ -689,9 +713,24 @@ void main() {
       greaterThan(900 / 2),
       reason: 'the controls sit at the foot, where the composer is',
     );
+    expect(
+      t.getRect(dock).height,
+      lessThan(96),
+      reason: 'one capsule row, not a panel of empty space',
+    );
     expect(find.text('Voice conversation'), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-elapsed')), findsOneWidget);
     expect(find.byKey(const Key('voice-mute')), findsOneWidget);
+    // The assistant answering: the orb takes up its voice.
+    media.level = (input: 0, output: 0.6);
+    api.event('transcript/delta', {
+      'itemId': 'a1',
+      'role': 'assistant',
+      'delta': 'The last commit docks the call above the composer.',
+    });
+    await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 300));
+    await _frames(t);
     await capturePreview(t, 'voice-dock-desktop-light');
     await t.tap(find.byKey(const Key('voice-stop')));
     await t.pump();
@@ -699,8 +738,13 @@ void main() {
     await t.pump(const Duration(milliseconds: 300));
     expect(media.closed, isTrue);
     expect(api.calls.last.$1, 'thread/realtime/stop');
-    // A voice conversation keeps its dock, ready to talk again.
+    // A voice conversation keeps its dock, ready to talk again, and says
+    // how long the call ran.
     expect(find.byKey(const Key('voice-again')), findsOneWidget);
+    expect(find.text('Talk again'), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-elapsed')), findsOneWidget);
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-ended-desktop-light');
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 7));
   });
@@ -747,19 +791,35 @@ void main() {
     final dock = find.byKey(const Key('voice-dock'));
     expect(dock, findsOneWidget);
     expect(t.getRect(dock).bottom, greaterThan(844 * 0.75));
+    expect(t.getRect(dock).height, lessThan(96));
     final hangUp = t.getRect(find.byKey(const Key('voice-stop')));
-    expect(hangUp.shortestSide, greaterThanOrEqualTo(56));
+    expect(hangUp.shortestSide, greaterThanOrEqualTo(48));
+    media.level = (input: 0.5, output: 0);
     api.event('transcript/delta', {
       'itemId': 'u1',
       'role': 'user',
-      'delta': 'What changed in the last commit?',
+      'delta': 'What changed in the last commit, and is it safe to ship?',
     }, thread: 'typed');
+    await t.pump(const Duration(milliseconds: 600));
     await t.pump(const Duration(milliseconds: 300));
     await t.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('voice-dock-caption')), findsOneWidget);
+    await _frames(t);
     await capturePreview(t, 'voice-dock-phone-dark');
+    // Muted: the call goes quiet grey, the microphone says why in red.
+    await t.tap(find.byKey(const Key('voice-mute')));
+    await _frames(t);
+    expect(media.muted, isTrue);
+    expect(find.text('Microphone muted'), findsOneWidget);
+    await capturePreview(t, 'voice-dock-muted-phone-dark');
     await t.tap(find.byKey(const Key('voice-stop')));
+    // Ended at once, on the phone's narrow row too.
     await t.pump();
+    expect(find.byKey(const Key('voice-again')), findsOneWidget);
+    expect(find.byKey(const Key('voice-dock-dismiss')), findsOneWidget);
     await t.runAsync(_tick);
+    await _frames(t);
+    await capturePreview(t, 'voice-dock-ended-phone-dark');
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 7));
   });

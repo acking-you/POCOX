@@ -854,7 +854,6 @@
   "voiceConnecting": "正在连接语音…",
   "voiceListening": "语音已连接 · 正在聆听",
   "voiceMuted": "麦克风已静音",
-  "voiceStopping": "正在结束语音…",
   "voiceStop": "结束语音",
   "voiceMute": "静音",
   "voiceUnmute": "取消静音",
