@@ -180,7 +180,7 @@ jobs:
         run: cargo test --locked -p pocox-codex process::windows_tests
       - name: Exercise Windows PowerShell handoff and installer lifecycle
         run: cargo test --locked -p pocox_bridge --no-default-features engine::updates::apply::tests
-      - name: Exercise owned-process shutdown with a stalled relay
+      - name: Exercise desktop shutdown and hosting ownership handoff
         run: cargo test --locked -p pocox_bridge --no-default-features engine::serve::lifecycle::tests
 
   flutter:
@@ -244,6 +244,9 @@ jobs:
 
       - name: Test native host and shell process cleanup
         run: cargo test -p pocox-codex --locked
+
+      - name: Exercise desktop shutdown and hosting ownership handoff
+        run: cargo test --locked -p pocox_bridge --no-default-features engine::serve::lifecycle::tests
 
   # Single required status that reflects the whole run. Always runs, so a
   # skipped Rust/Flutter job (path-filtered out) keeps the gate green, while

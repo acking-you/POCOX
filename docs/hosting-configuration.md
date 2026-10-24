@@ -291,7 +291,8 @@ as an unsaved edit.
 - A quit whose host operation outlives the lease bound fails instead of
   stopping it; the app stays open. An isolated process fixture exercises failed
   cleanup, retry, in-flight writes and ownership handoff without resetting the
-  process-wide quit fence.
+  process-wide quit fence. CI runs these shutdown tests on Windows and macOS,
+  and in the full Rust suite on Linux.
 - Endpoint ownership is checked at the port wait, after `/readyz` and after
   the effective-route request, not continuously, and is not bound to the
   connection that carried the requests. On macOS another user's listener
