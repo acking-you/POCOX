@@ -8,6 +8,21 @@ use crate::native_history::{ClaimError, ClaudeHistory, SessionClaim};
 const SESSION: &str = "00000000-0000-4000-8000-000000000001";
 const SOURCE: &str = "original-source";
 
+async fn assert_claim_released(root: &Path) {
+    // Concurrent process tests can fork while the claim is held. Closing our
+    // descriptor does not release a flock until inherited copies close on exec.
+    // A leaked host claim must still fail within the normal fixture deadline.
+    eventually(
+        || match SessionClaim::acquire(root, SESSION) {
+            Ok(_) => true,
+            Err(ClaimError::Busy) => false,
+            Err(error) => panic!("released claim storage must remain usable: {error}"),
+        },
+        "released claim becomes available",
+    )
+    .await;
+}
+
 fn script(root: &Path, name: &str, value: &Value) -> PathBuf {
     let path = root.join(name);
     let text = value.to_string().replace('\'', "'\\''");
@@ -83,7 +98,7 @@ async fn unverified_loaded_writer_stays_blocked_until_verified_release() {
         .await
         .expect("verified close");
     assert!(!host.state().sessions.contains_key(SESSION));
-    assert!(SessionClaim::acquire(root.path(), SESSION).is_ok());
+    assert_claim_released(root.path()).await;
     host.stop().await;
 }
 
@@ -112,7 +127,7 @@ async fn stopping_pending_acquire_reaps_before_releasing_its_claim() {
         .expect("bounded stop");
     assert_eq!(acquire.await.expect("acquire task"), Err(HostError::NotReady));
     assert!(host.state().sessions.is_empty());
-    assert!(SessionClaim::acquire(root.path(), SESSION).is_ok());
+    assert_claim_released(root.path()).await;
 }
 
 #[tokio::test]
