@@ -180,6 +180,8 @@ jobs:
         run: cargo test --locked -p pocox-codex process::windows_tests
       - name: Exercise Windows PowerShell handoff and installer lifecycle
         run: cargo test --locked -p pocox_bridge --no-default-features engine::updates::apply::tests
+      - name: Exercise owned-process shutdown with a stalled relay
+        run: cargo test --locked -p pocox_bridge --no-default-features engine::serve::lifecycle::tests
 
   flutter:
     name: flutter analyze + test

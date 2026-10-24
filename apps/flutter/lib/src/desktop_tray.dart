@@ -50,7 +50,13 @@ class TrayMenuLabels {
 /// left-click on the icon bring it back. Quit is the only path that terminates
 /// the process.
 class DesktopTray with TrayListener, WindowListener {
-  DesktopTray._();
+  DesktopTray._() : _stopHosting = const RustBridgeApi().appServeStopAll;
+
+  /// Creates an isolated quit controller with a controllable native cleanup.
+  @visibleForTesting
+  DesktopTray.forTesting(this._stopHosting);
+
+  final Future<void> Function() _stopHosting;
 
   /// Process-wide singleton (the tray is a single OS resource).
   static final DesktopTray instance = DesktopTray._();
@@ -189,16 +195,20 @@ class DesktopTray with TrayListener, WindowListener {
       _quitting ??= _quit().whenComplete(() => _quitting = null);
 
   Future<void> _quit() async {
+    // A quit should dismiss the window immediately. Cleanup still owns the
+    // process; a failed stop brings the window back with the retry action.
+    try {
+      await windowManager.hide();
+    } catch (_) {
+      // Window dismissal is best-effort; it must not prevent cleanup.
+    }
     // Stop every locally-hosted service first so a real quit leaves no orphan
     // processes (closing to the tray, by contrast, keeps the app alive and
     // therefore keeps hosting). The bridge bounds its own work (in-flight
     // operations, sign-in servers, each owned process's stop) and fails
     // when an owned process may still run: then the app stays open, shows
     // why and offers to quit again, instead of exiting over the cleanup.
-    if (!await stopHostingForQuit(
-      const RustBridgeApi().appServeStopAll,
-      quitStatus,
-    )) {
+    if (!await stopHostingForQuit(_stopHosting, quitStatus)) {
       await _show();
       return;
     }

@@ -88,8 +88,10 @@ add an agent-specific HTTP client or another `SessionEngine` implementation.
   second, overlapping quit) returns only once every owned process was
   cleaned up. Agent processes are stopped first; relay keys of the hosts the
   quit drained are withdrawn afterwards within 2 s, so a slow relay never
-  delays process cleanup. The desktop tray waits for this (capped at 20 s)
-  before destroying the window; closing the window to the tray keeps hosting
+  delays process cleanup. The desktop hides its window when Quit is requested,
+  then waits for owned-process cleanup alongside the other providers before
+  exiting; a failed cleanup restores the window with its reason. Closing the
+  window to the tray keeps hosting
   as before. This is exercised against the production table with agents
   that are created but never launched (a quit overlapping a paused
   retirement, two overlapping quits, a start racing the barrier) and by a
