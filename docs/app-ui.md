@@ -57,8 +57,8 @@ monitoring are in [Controller history cache](session-cache-sync.md).
   incoming switch. Choices save at once, optimistically; a failed write springs
   the control back with a failed line. Its explanation sits behind the group's
   info mark; the visible line under a control is only pending ("reconnect a
-  session", "restart hosting") or failed. P2P first and incoming direct are the
-  defaults; only an opt-out is written.
+  session", "restart hosting") or failed. Relay-only is the default and incoming
+  direct is disabled; only an opt-in is written.
 - How a connection travels has one visual language: in words, P2P direct /
   Via relay / Direct n · Relay m / Idle / Relay only (`tunnelPathLabel`), and
   after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,

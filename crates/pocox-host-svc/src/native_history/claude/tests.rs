@@ -2,15 +2,25 @@ use super::*;
 
 #[test]
 fn reader_requires_host_absolute_paths() {
-    assert!(ClaudeHistory::new("node".into(), "/sdk.mjs".into(), "/config".into()).is_err());
-    assert!(ClaudeHistory::new("/node".into(), "sdk.mjs".into(), "/config".into()).is_err());
-    assert!(ClaudeHistory::new("/node".into(), "/sdk.mjs".into(), "config".into()).is_err());
+    let root = tempfile::tempdir().expect("fixture");
+    let node = root.path().join("node");
+    let sdk = root.path().join("sdk.mjs");
+    let config = root.path().join("config");
+    assert!(ClaudeHistory::new(node.clone(), sdk.clone(), config.clone()).is_ok());
+    assert!(ClaudeHistory::new("node".into(), sdk.clone(), config.clone()).is_err());
+    assert!(ClaudeHistory::new(node.clone(), "sdk.mjs".into(), config).is_err());
+    assert!(ClaudeHistory::new(node, sdk, "config".into()).is_err());
 }
 
 #[tokio::test]
 async fn invalid_session_and_cursor_are_rejected_before_executing_a_reader() {
-    let reader = ClaudeHistory::new("/no-node".into(), "/sdk.mjs".into(), "/config".into())
-        .expect("configuration");
+    let root = tempfile::tempdir().expect("fixture");
+    let reader = ClaudeHistory::new(
+        root.path().join("no-node"),
+        root.path().join("sdk.mjs"),
+        root.path().join("config"),
+    )
+    .expect("configuration");
     assert!(reader
         .read_page("../../private", None, 20)
         .await

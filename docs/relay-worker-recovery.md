@@ -13,9 +13,9 @@ embedded into the shipping app or CLI.
 **Settings › Connection path** has two independent preferences, saved as soon
 as they are chosen:
 
-- **Connect to other devices**: **P2P first** (the default since 0.7.1) or
-  **Relay only** for outgoing subscriptions.
-- **Accept direct connections** (on by default since 0.7.1, desktop only) for
+- **Connect to other devices**: **Relay only** (the default) or
+  **P2P first** for outgoing subscriptions.
+- **Accept direct connections** (off by default, desktop only) for
   incoming connections to newly published services.
 
 The same preferences live in each installation's `config.toml` and apply to
@@ -23,14 +23,13 @@ both account and self-host modes, including CLI workers:
 
 ```toml
 [pb_mapper]
-path = "relay_only"        # opt out; "auto" (P2P first) is the default
-allow_direct = false        # opt out; true is the default
+path = "auto"              # opt in; "relay_only" is the default
+allow_direct = true         # opt in; false is the default
 ```
 
-Default values are not written, so only an opt-out appears in `config.toml`.
-A file that opted in under 0.7.0 (`path = "auto"`, `allow_direct = true`) still
-loads and keeps those values. Builds that predate these fields reject unknown
-keys, so downgrading after opting out needs the two lines removed by hand.
+Default values are not written, so only an opt-in appears in `config.toml`.
+Existing configurations retain their path preferences, including installations
+that have never enabled direct connections.
 
 Preferences are captured when a tunnel starts. Saving them does not interrupt
 active work. Reconnect a session (or restart the app for cached auxiliary
@@ -110,6 +109,9 @@ Agent-tool connections are kept until they expire or are ended: when one's
 tunnel ends, POCOX reopens it at the same local port (backing off from 2 s to a
 minute) instead of dropping it, and the galaxy says so. See
 [agent tools](agent-tools.md) for lifetimes.
+An occupied local port leaves the connection waiting for recovery; it never
+silently moves to another address. Ending the connection or changing accounts
+revokes pending recovery, and a late completion cannot replace a newer connection.
 
 Validation covers direct TCP, compatibility fallback without publisher/relay
 support, temporary-credential isolation, exactly one backend dial, coordinator

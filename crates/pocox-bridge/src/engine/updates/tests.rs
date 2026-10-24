@@ -111,9 +111,15 @@ impl Feed {
     }
 }
 
-const PORTABLE_LINUX: Host = Host {
+const PORTABLE_X64: Host = Host {
     install: Install::Portable,
     arch: "x86_64",
+};
+
+const PORTABLE_PACKAGE: &str = if cfg!(windows) {
+    "pocox-app-v0.7.0-windows-x64.zip"
+} else {
+    "pocox-app-v0.7.0-linux-x64.zip"
 };
 
 fn updater(feed: &Feed, key: &Key, dir: PathBuf, current: &str) -> Updater {
@@ -124,7 +130,7 @@ fn updater(feed: &Feed, key: &Key, dir: PathBuf, current: &str) -> Updater {
             public_key: key.public(),
             replace_self: true,
         },
-        PORTABLE_LINUX,
+        PORTABLE_X64,
         move || Some(dir.clone()),
     )
 }
@@ -178,7 +184,7 @@ fn each_installation_takes_its_own_file() {
 async fn a_newer_release_downloads_only_as_the_manifest_names_it() {
     let (feed, key) = (Feed::start().await, Key::new());
     let dir = tempfile::tempdir().expect("dir");
-    let name = "pocox-app-v0.7.0-linux-x64.zip";
+    let name = PORTABLE_PACKAGE;
     let package = b"the real package".to_vec();
     feed.publish(&key, manifest_for("0.7.0", &[(name, &package)]));
     // Served bytes that differ from what the manifest names.
@@ -229,7 +235,7 @@ async fn background_checks_stay_rare_and_survive_a_restart() {
     let (feed, key) = (Feed::start().await, Key::new());
     let dir = tempfile::tempdir().expect("dir");
     let package = b"zip".to_vec();
-    feed.publish(&key, manifest_for("0.7.0", &[("pocox-app-v0.7.0-linux-x64.zip", &package)]));
+    feed.publish(&key, manifest_for("0.7.0", &[(PORTABLE_PACKAGE, &package)]));
 
     let first = updater(&feed, &key, dir.path().into(), "0.6.0");
     assert_eq!(first.check(false).await.phase, Phase::Available);
@@ -257,7 +263,7 @@ async fn checks_and_downloads_follow_the_current_app_proxy_and_verify_bytes() {
     let proxy_url = feed.url.clone();
     set_proxy(dir.path(), &proxy_url).expect("proxy setting");
     feed.url = "http://release.invalid/".into();
-    let name = "pocox-app-v0.7.0-linux-x64.zip";
+    let name = PORTABLE_PACKAGE;
     let package = b"verified package";
     let manifest = manifest_for("0.7.0", &[(name, package)]);
     feed.put("http://release.invalid/release-manifest.json.sig", key.sign(&manifest).into_bytes());

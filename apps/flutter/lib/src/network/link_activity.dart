@@ -324,7 +324,9 @@ String linkHeadline(
     final left = retryAt.difference(now ?? DateTime.now()).inMilliseconds;
     return l10n.linkRetryIn(_seconds(left));
   }
-  for (final step in [steps.session, steps.p2p, steps.relay]) {
+  // Session opening waits on the transport: show the actual network work
+  // while it is in flight instead of hiding it behind "Opening the session".
+  for (final step in [steps.relay, steps.p2p, steps.session]) {
     if (step.state == LinkStepState.active) return step.label;
   }
   for (final step in [steps.relay, steps.p2p, steps.session]) {

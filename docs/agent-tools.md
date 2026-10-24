@@ -179,7 +179,10 @@ One `action` with its fields:
 - A connection is kept until it expires or is ended, whatever happens to its
   tunnel: the SDK recovers the relay link (trying direct first when the device
   allows it), and a tunnel that ends is reopened at the same local port,
-  backing off from 2 s to a minute.
+  backing off from 2 s to a minute. If another process takes that local port,
+  recovery waits instead of changing the address already given to callers.
+  Revocation and account changes cancel pending restores; their late results
+  cannot overwrite or tear down a replacement connection.
 - Every failure says what to do next (`tools_off`, `not_hosting`,
   `declined`, `name_conflict`, `relay_unavailable`, …).
 

@@ -6,6 +6,7 @@
 use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use once_cell::sync::Lazy;
@@ -242,14 +243,29 @@ pub struct Connection {
 
 /// Reopening a connection whose tunnel ended: it is kept until it expires
 /// or is ended, so the address it was given keeps working.
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Default)]
 pub struct Restore {
     /// Attempts that failed since it was last up.
     pub failures: u32,
     /// No attempt before this (unix milliseconds).
     pub next_ms: i64,
-    /// An attempt is running.
-    pub running: bool,
+    /// Admission shared with the running attempt; revoked before teardown.
+    pub pending: Option<Arc<AtomicBool>>,
+}
+
+impl Restore {
+    /// Prevent a pending attempt from publishing or reusing a tunnel.
+    pub fn cancel(&self) {
+        if let Some(pending) = &self.pending {
+            pending.store(false, Ordering::Release);
+        }
+    }
+}
+
+impl Drop for Restore {
+    fn drop(&mut self) {
+        self.cancel();
+    }
 }
 
 impl Connection {

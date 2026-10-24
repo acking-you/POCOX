@@ -487,6 +487,13 @@ mod tests {
         SourceId::with_key(&"k".repeat(32), Path::new("/bin/agent"), &args)
     }
 
+    fn cwd(name: &str) -> String {
+        std::env::temp_dir()
+            .join(name)
+            .to_string_lossy()
+            .into_owned()
+    }
+
     #[test]
     fn dot_names_are_encoded_and_cannot_escape() {
         assert_eq!(encoded_component(".."), "2e2e");
@@ -494,7 +501,7 @@ mod tests {
         let root = tempfile::tempdir().expect("tempdir");
         let id = source(&[]);
         let store = SessionStore::open(root.path(), "..", id.clone());
-        store.record("s1", "/work", None, None);
+        store.record("s1", &cwd("work"), None, None);
         assert!(root
             .path()
             .join("2e2e")
@@ -526,10 +533,10 @@ mod tests {
         let root = tempfile::tempdir().expect("tempdir");
         let alpha = source(&["--profile", "alpha"]);
         let store = SessionStore::open(root.path(), "work", alpha.clone());
-        store.record("s1", "/w/one", Some("First".into()), None);
-        store.record("s1", "/elsewhere", None, Some("2026-10-10T00:00:00Z".into()));
+        store.record("s1", &cwd("w/one"), Some("First".into()), None);
+        store.record("s1", &cwd("elsewhere"), None, Some("2026-10-10T00:00:00Z".into()));
         let entry = store.lookup("s1").expect("entry");
-        assert_eq!(entry.cwd, "/w/one");
+        assert_eq!(entry.cwd, cwd("w/one"));
         assert_eq!(entry.title.as_deref(), Some("First"));
         assert_eq!(SessionStore::open(root.path(), "work", alpha).lookup("s1"), Some(entry));
         let changed = source(&["--profile", "beta"]);
@@ -553,7 +560,7 @@ mod tests {
                     barrier.wait();
                     for n in 0..40 {
                         let session = format!("s{t}-{n}");
-                        store.record(&session, "/w", None, None);
+                        store.record(&session, &cwd("w"), None, None);
                         store.set_title(&session, Some(format!("title {t}-{n}")));
                     }
                 })
@@ -585,11 +592,11 @@ mod tests {
         let id = source(&[]);
         let mut pending = Pending::default();
         pending.title("s", Some("early".into()));
-        pending.record("s", "/w", None);
+        pending.record("s", &cwd("w"), None);
         for n in 0..10_000 {
             pending.title("t", Some(format!("v{n}")));
         }
-        pending.record("t", "/w2", None);
+        pending.record("t", &cwd("w2"), None);
         assert_eq!(pending.len(), 2, "one change per session");
         let store = SessionStore::open(root.path(), "titles", id.clone());
         store.apply(&pending.take());
@@ -597,9 +604,9 @@ mod tests {
         let reopened = SessionStore::open(root.path(), "titles", id);
         assert_eq!(reopened.lookup("s").and_then(|e| e.title).as_deref(), Some("early"));
         assert_eq!(reopened.lookup("t").and_then(|e| e.title).as_deref(), Some("v9999"));
-        assert_eq!(reopened.lookup("t").map(|e| e.cwd).as_deref(), Some("/w2"));
+        assert_eq!(reopened.lookup("t").map(|e| e.cwd), Some(cwd("w2")));
 
-        pending.record("admitted", "/k", None);
+        pending.record("admitted", &cwd("k"), None);
         for n in 0..MAX_PENDING * 3 {
             pending.title(&format!("x{n}"), None);
         }
@@ -616,11 +623,11 @@ mod tests {
         let id = source(&[]);
         let store = SessionStore::open(root.path(), "clear", id.clone());
         let mut pending = Pending::default();
-        pending.record("cleared", "/w", Some(Some("old".into())));
-        pending.record("kept", "/w", Some(Some("old".into())));
+        pending.record("cleared", &cwd("w"), Some(Some("old".into())));
+        pending.record("kept", &cwd("w"), Some(Some("old".into())));
         store.apply(&pending.take());
-        pending.record("cleared", "/w", Some(None));
-        pending.record("kept", "/w", None);
+        pending.record("cleared", &cwd("w"), Some(None));
+        pending.record("kept", &cwd("w"), None);
         store.apply(&pending.take());
         let reopened = SessionStore::open(root.path(), "clear", id);
         assert_eq!(reopened.lookup("cleared").map(|e| e.title), Some(None));
@@ -651,7 +658,7 @@ mod tests {
         let root = tempfile::tempdir().expect("tempdir");
         let id = source(&[]);
         let store = SessionStore::open(root.path(), "format", id.clone());
-        store.record("s", "/w", Some("Title".into()), Some("2026-10-10T00:00:00Z".into()));
+        store.record("s", &cwd("w"), Some("Title".into()), Some("2026-10-10T00:00:00Z".into()));
         let path = root
             .path()
             .join(encoded_component("format"))
@@ -665,7 +672,7 @@ mod tests {
             serde_json::json!({
                 "version": 2,
                 "source": id.as_str(),
-                "sessions": [{"sessionId": "s", "cwd": "/w", "title": "Title",
+                "sessions": [{"sessionId": "s", "cwd": cwd("w"), "title": "Title",
                     "updatedAt": "2026-10-10T00:00:00Z", "admittedAt": admitted}],
             })
         );

@@ -179,9 +179,9 @@ only reproducible build artifacts.
 
 ## Roadmap
 
-P2P paths use the SDK's negotiation and pre-commit fallback. Both settings are
-on by default (the user opts out), retain endpoint-owned teardown, report actual
-paths rather than preferences, and show every recovery stage as it happens; see [direct connections](docs/relay-worker-recovery.md#direct-connections).
+Opt-in P2P paths use the SDK's negotiation and pre-commit fallback. Keep both
+settings disabled by default, retain endpoint-owned teardown, report actual
+paths rather than preferences, and show recovery stages as they happen; see [direct connections](docs/relay-worker-recovery.md#direct-connections).
 
 Image attachment mirrors use the selected session/project, retain the legacy
 upload route and respect draft admission; see

@@ -213,14 +213,14 @@ class VoiceController extends ChangeNotifier {
   }
 
   Future<void> _start(String id, {String? model, String? voice}) async {
+    final generation = ++_generation;
+    bool current() => !_disposed && generation == _generation;
     // A call hung up a moment ago has ended for the person, but its media
     // may still be closing and its host acknowledging the stop. The next
     // call waits for that, so the two never share the microphone and the
     // old stop cannot land on the new session.
     if (_stopping case final previous?) await previous;
-    if (_disposed) return;
-    final generation = ++_generation;
-    bool current() => !_disposed && generation == _generation;
+    if (!current()) return;
     threadId = id;
     error = null;
     endedReason = null;
@@ -467,15 +467,19 @@ class VoiceController extends ChangeNotifier {
   /// the background; the returned future completes once both are done, and
   /// a new [start] waits for it.
   Future<void> stop({bool failed = false}) {
+    // Invalidate a redial even while it is waiting for the previous cleanup.
+    ++_generation;
     if (_stopping case final pending?) return pending;
     if (_transport == null && _events == null) return Future.value();
-    final operation = _stop(failed);
-    _stopping = operation;
-    return operation.whenComplete(() => _stopping = null);
+    // Listeners observe the idle phase synchronously in _stop. Publish the
+    // cleanup future first so dictation and a redial cannot overtake it.
+    final completion = Completer<void>();
+    _stopping = completion.future;
+    completion.complete(_stop(failed).whenComplete(() => _stopping = null));
+    return completion.future;
   }
 
   Future<void> _stop(bool failed) async {
-    ++_generation;
     _timeout?.cancel();
     _stopLevels();
     _resetFloor();

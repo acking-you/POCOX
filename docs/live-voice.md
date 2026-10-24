@@ -106,6 +106,10 @@ side by side behind it. Talking again before they finish waits for them, so the
 two calls never share the microphone and the old stop cannot land on the new
 session.
 
+A redial waiting for cleanup is cancelled by navigation, backgrounding or another
+stop. Cleanup is registered before the ended notification, so listeners that warm
+dictation wait for the old call to release its media and host session too.
+
 ## Protocol contract
 
 The implementation follows `deps/codex` upstream `afb436df8b`:

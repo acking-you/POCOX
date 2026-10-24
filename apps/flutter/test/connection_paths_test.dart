@@ -71,36 +71,40 @@ void main() {
       final api = FakeBridgeApi();
       await t.pumpWidget(_settings(api));
       await t.pumpAndSettle();
-      expect(_shown(t), ConnectionPath.auto, reason: 'P2P first by default');
+      expect(
+        _shown(t),
+        ConnectionPath.relayOnly,
+        reason: 'direct paths are opt-in',
+      );
       expect(find.byKey(const Key('connection-path-state')), findsNothing);
 
-      await t.tap(find.byKey(const Key('connection-path-relay-only')));
+      await t.tap(find.byKey(const Key('connection-path-auto')));
       await t.pumpAndSettle();
-      expect(api.savedRelayPreferences.path, ConnectionPath.relayOnly);
+      expect(api.savedRelayPreferences.path, ConnectionPath.auto);
       expect(find.text('新连接将使用此设置；重新连接会话即可切换。'), findsOneWidget);
 
       api.relaySaveError = StateError('write failed');
-      await t.tap(find.byKey(const Key('connection-path-auto')));
+      await t.tap(find.byKey(const Key('connection-path-relay-only')));
       await t.pumpAndSettle();
-      expect(api.savedRelayPreferences.path, ConnectionPath.relayOnly);
-      expect(_shown(t), ConnectionPath.relayOnly, reason: 'springs back');
+      expect(api.savedRelayPreferences.path, ConnectionPath.auto);
+      expect(_shown(t), ConnectionPath.auto, reason: 'springs back');
       expect(find.text('保存失败，已保留原设置。'), findsOneWidget);
 
       api.relaySaveError = null;
       final incoming = find.byKey(const Key('connection-path-incoming'));
       expect(incoming, isDesktop ? findsOneWidget : findsNothing);
       if (isDesktop) {
-        // On by default; turning it off is what waits for hosting.
+        // Enabling incoming direct paths waits for hosting to restart.
         await t.tap(incoming);
         await t.pumpAndSettle();
         expect(find.text('重启托管后生效。'), findsOneWidget);
       }
-      expect(api.savedRelayPreferences.allowDirect, !isDesktop);
+      expect(api.savedRelayPreferences.allowDirect, isDesktop);
 
       // Back to what the page opened with: nothing is pending any more.
-      await t.tap(find.byKey(const Key('connection-path-auto')));
+      await t.tap(find.byKey(const Key('connection-path-relay-only')));
       await t.pumpAndSettle();
-      expect(api.savedRelayPreferences.path, ConnectionPath.auto);
+      expect(api.savedRelayPreferences.path, ConnectionPath.relayOnly);
       expect(find.text('新连接将使用此设置；重新连接会话即可切换。'), findsNothing);
       expect(t.takeException(), isNull);
     },

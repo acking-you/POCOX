@@ -169,11 +169,11 @@ pub struct CodexConfig {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionPath {
-    /// Every subscription uses the relay.
+    /// Use the relay, preserving compatibility with existing installations.
+    #[default]
     RelayOnly,
     /// Try authenticated direct setup, with the SDK's pre-commit relay
-    /// fallback. The default since 0.7.1.
-    #[default]
+    /// fallback.
     Auto,
 }
 
@@ -182,28 +182,18 @@ fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
 }
 
-/// The default of [`PbMapperConfig::allow_direct`]: on.
-fn allow_direct_default() -> bool {
-    true
-}
-
-/// Whether `allow` is [`allow_direct_default`] (serde `skip_serializing_if`).
-fn is_allow_direct_default(allow: &bool) -> bool {
-    *allow == allow_direct_default()
-}
-
 /// Configuration for the `pb-mapper` integration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PbMapperConfig {
     /// Path preference for new subscriptions, in account and self-host modes.
-    /// Only a choice that differs from the default is written.
+    /// Written only once changed, so builds that predate it still load the
+    /// file.
     #[serde(default, skip_serializing_if = "is_default")]
     pub path: ConnectionPath,
 
     /// Permit authenticated direct setup for newly published local services.
-    /// On unless turned off; only `false` is written.
-    #[serde(default = "allow_direct_default", skip_serializing_if = "is_allow_direct_default")]
+    #[serde(default, skip_serializing_if = "is_default")]
     pub allow_direct: bool,
 
     /// Bare `host:port` of the upstream `pb-mapper` relay
@@ -215,17 +205,6 @@ pub struct PbMapperConfig {
     /// exported environment variable. Length validation (32 bytes) lives in
     /// the CLI layer; this field stores the value verbatim.
     pub key: Option<String>,
-}
-
-impl Default for PbMapperConfig {
-    fn default() -> Self {
-        Self {
-            path: ConnectionPath::default(),
-            allow_direct: allow_direct_default(),
-            relay: None,
-            key: None,
-        }
-    }
 }
 
 /// User-configured service preferences.
@@ -511,35 +490,27 @@ mod tests {
     use crate::service::ServiceKind;
 
     #[test]
-    fn direct_paths_are_on_by_default_and_only_an_opt_out_is_written() {
+    fn direct_preferences_are_opt_in_and_persist_without_changing_relay_identity() {
         let old: Config = toml::from_str("[pb_mapper]\nrelay = 'relay:7666'\nkey = 'test'\n")
             .expect("old config");
-        assert_eq!(old.pb_mapper.path, ConnectionPath::Auto);
-        assert!(old.pb_mapper.allow_direct);
-        assert!(Config::default().pb_mapper.allow_direct, "a fresh config agrees");
-        let written = |config: &Config| {
-            let saved: toml::Table =
-                toml::from_str(&toml::to_string(config).expect("serialize")).expect("table");
-            saved["pb_mapper"]
-                .as_table()
-                .expect("pb_mapper table")
-                .clone()
-        };
-        let defaults = written(&old);
+        assert_eq!(old.pb_mapper.path, ConnectionPath::RelayOnly);
+        assert!(!old.pb_mapper.allow_direct);
+        // Builds without these fields reject unknown keys, so a config that
+        // never opted in must keep loading after a downgrade.
+        let saved: toml::Table =
+            toml::from_str(&toml::to_string(&old).expect("serialize")).expect("table");
+        let written = saved["pb_mapper"].as_table().expect("pb_mapper table");
         assert!(
-            !defaults.contains_key("path") && !defaults.contains_key("allow_direct"),
-            "defaults are not written: {defaults:?}"
+            !written.contains_key("path") && !written.contains_key("allow_direct"),
+            "defaults are not written: {written:?}"
         );
-        let mut opted_out = old;
-        opted_out.pb_mapper.path = ConnectionPath::RelayOnly;
-        opted_out.pb_mapper.allow_direct = false;
-        let out = written(&opted_out);
-        assert_eq!(out["path"].as_str(), Some("relay_only"));
-        assert_eq!(out["allow_direct"].as_bool(), Some(false));
+        let mut updated = old;
+        updated.pb_mapper.path = ConnectionPath::Auto;
+        updated.pb_mapper.allow_direct = true;
         let restored: Config =
-            toml::from_str(&toml::to_string(&opted_out).expect("serialize")).expect("restore");
-        assert_eq!(restored.pb_mapper.path, ConnectionPath::RelayOnly);
-        assert!(!restored.pb_mapper.allow_direct);
+            toml::from_str(&toml::to_string(&updated).expect("serialize")).expect("restore");
+        assert_eq!(restored.pb_mapper.path, ConnectionPath::Auto);
+        assert!(restored.pb_mapper.allow_direct);
         assert_eq!(restored.relay(), Some("relay:7666"));
         assert_eq!(restored.relay_key(), Some("test"));
         assert!(toml::from_str::<Config>("[pb_mapper]\npath = 'direct_only'").is_err());

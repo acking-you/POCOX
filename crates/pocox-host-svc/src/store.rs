@@ -212,21 +212,23 @@ mod tests {
     async fn host_config_round_trips_and_persists() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("host.json");
+        let work = dir.path().join("work").to_string_lossy().into_owned();
+        let project = dir.path().join("project").to_string_lossy().into_owned();
         {
             let store = HostStore::open(path.clone()).await.expect("open");
             assert_eq!(store.get().await, HostConfig::default());
             store
                 .put(HostConfig {
-                    project_roots: vec!["/home/u/work".to_string(), "/srv/proj".to_string()],
-                    default_project: Some("/home/u/work".to_string()),
+                    project_roots: vec![work.clone(), project.clone()],
+                    default_project: Some(work.clone()),
                 })
                 .await
                 .expect("put");
         }
         let reopened = HostStore::open(path).await.expect("reopen");
         let cfg = reopened.get().await;
-        assert_eq!(cfg.project_roots.len(), 2);
-        assert_eq!(cfg.default_project.as_deref(), Some("/home/u/work"));
+        assert_eq!(cfg.project_roots, vec![work.clone(), project]);
+        assert_eq!(cfg.default_project.as_deref(), Some(work.as_str()));
     }
 
     #[tokio::test]

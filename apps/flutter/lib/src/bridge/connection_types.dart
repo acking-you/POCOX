@@ -2,21 +2,19 @@ part of '../bridge_api.dart';
 
 /// Outgoing path preference for new subscriptions.
 enum ConnectionPath {
-  /// Every new subscription uses the relay.
+  /// Every new subscription uses the relay (the default).
   relayOnly,
 
-  /// Direct first, falling back to the relay before any data is sent (the
-  /// default).
+  /// Direct first, falling back to the relay before any data is sent.
   auto,
 }
 
 /// Saved network preferences; existing tunnels keep their captured settings.
 class RelayPreferences {
-  /// Creates preferences; the defaults are a fresh installation's: P2P first
-  /// and direct connections accepted.
+  /// Creates preferences; direct paths require an explicit opt-in.
   const RelayPreferences({
-    this.path = ConnectionPath.auto,
-    this.allowDirect = true,
+    this.path = ConnectionPath.relayOnly,
+    this.allowDirect = false,
   });
 
   /// Path preference for new subscriptions.

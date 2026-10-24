@@ -391,6 +391,8 @@ mod tests {
         assert!(parse_sockets(b"p10\nf7\nn*:49374\n").is_none());
     }
 
+    // Admission requires Unix file/process identity; other hosts fail closed.
+    #[cfg(unix)]
     #[test]
     fn a_replaced_database_invalidates_old_admission() {
         let dir = tempfile::tempdir().expect("temp dir");
@@ -401,5 +403,14 @@ mod tests {
         std::fs::write(&next, b"new").expect("replacement");
         std::fs::rename(next, &path).expect("replace");
         assert!(validate_generation(&identity(&path).expect("new identity"), &old).is_err());
+    }
+
+    #[cfg(not(unix))]
+    #[test]
+    fn unsupported_hosts_cannot_establish_database_identity() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let path = dir.path().join("opencode.db");
+        std::fs::write(&path, b"database").expect("file");
+        assert!(identity(&path).is_none());
     }
 }

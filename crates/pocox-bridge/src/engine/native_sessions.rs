@@ -148,21 +148,30 @@ mod tests {
     use super::*;
     #[test]
     fn source_paths_respect_explicit_roots_without_creating_them() {
-        let home = PathBuf::from("/fixture-home");
+        let root = tempfile::tempdir().expect("fixture");
+        let home = root.path().join("home");
+        let data = root.path().join("custom-data");
+        let database = root.path().join("explicit/test.db");
         assert_eq!(
             opencode_path_with(&home, None, None).expect("default"),
             home.join(".local/share/opencode/opencode.db")
         );
         assert_eq!(
-            opencode_path_with(&home, Some("/custom-data".into()), Some("custom.db".into()))
-                .expect("relative"),
-            PathBuf::from("/custom-data/opencode/custom.db")
+            opencode_path_with(
+                &home,
+                Some(data.clone().into_os_string()),
+                Some("custom.db".into())
+            )
+            .expect("relative"),
+            data.join("opencode/custom.db")
         );
         assert_eq!(
-            opencode_path_with(&home, None, Some("/explicit/test.db".into())).expect("absolute"),
-            PathBuf::from("/explicit/test.db")
+            opencode_path_with(&home, None, Some(database.clone().into_os_string()))
+                .expect("absolute"),
+            database
         );
         assert!(opencode_path_with(&home, None, Some(":memory:".into())).is_err());
+        assert!(!home.exists() && !data.exists() && !database.exists());
     }
 
     #[test]

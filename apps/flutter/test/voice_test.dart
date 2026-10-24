@@ -417,6 +417,10 @@ void main() {
       );
       await c.start('voice');
       media.connected();
+      var settled = false;
+      c.addListener(() {
+        if (!c.busy) unawaited(c.settled.then((_) => settled = true));
+      });
       final stopping = c.hangUp();
       // Ended the moment it is hung up, before anything is awaited.
       expect(c.phase, VoicePhase.idle);
@@ -425,6 +429,7 @@ void main() {
       expect(c.endedAt, isNotNull);
       await _tick();
       expect(media.closed, isTrue);
+      expect(settled, isFalse, reason: 'listeners must wait for host cleanup');
       // Talking again at once waits for the host to let the last call go,
       // so that stop cannot land on the new session.
       final again = c.start('voice');
@@ -433,6 +438,7 @@ void main() {
       api.stopAck!.complete();
       await stopping;
       await again;
+      expect(settled, isTrue);
       expect(api.calls.map((c) => c.$1).toList().sublist(1), [
         'thread/realtime/stop',
         'thread/realtime/start',
@@ -441,6 +447,28 @@ void main() {
       c.dispose();
     },
   );
+  test('leaving while a redial waits cancels the pending microphone', () async {
+    final api = _VoiceApi()..stopAck = Completer<void>();
+    var created = 0;
+    final c = VoiceController(
+      api: api,
+      serviceKey: _service,
+      createTransport: () {
+        created++;
+        return _Media();
+      },
+    );
+    await c.start('voice');
+    final stopping = c.hangUp();
+    final again = c.start('voice');
+    final leaving = c.stop();
+    api.stopAck!.complete();
+    await Future.wait([stopping, again, leaving]);
+    expect(created, 1, reason: 'navigation cancels a queued redial');
+    expect(c.busy, isFalse);
+    expect(api.calls.where((c) => c.$1.endsWith('/start')).length, 1);
+    c.dispose();
+  });
   test('cancelled microphone startup never starts a remote call', () async {
     final api = _VoiceApi();
     final media = _Media()..pendingOffer = Completer<String>();

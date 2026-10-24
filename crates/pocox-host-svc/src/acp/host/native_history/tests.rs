@@ -43,8 +43,14 @@ fn host(reader: ClaudeHistory) -> AgentHost {
 
 #[tokio::test]
 async fn browsing_cannot_admit_a_foreign_session_even_without_a_running_agent() {
+    let root = tempfile::tempdir().expect("fixture");
     let host = host(
-        ClaudeHistory::new("/node".into(), "/sdk.mjs".into(), "/root".into()).expect("source"),
+        ClaudeHistory::new(
+            root.path().join("node"),
+            root.path().join("sdk.mjs"),
+            root.path().join("config"),
+        )
+        .expect("source"),
     );
     assert_eq!(host.open_session(SESSION, None).await, Err(HostError::ReadOnly));
     assert_eq!(host.info()["nativeHistory"], true);

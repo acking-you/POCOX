@@ -102,8 +102,8 @@ void main() {
     expect(s.session.label, 'Opening the session');
     expect(
       linkHeadline(l10n, s, const ReconnectState(active: true)),
-      'Opening the session',
-      reason: 'the furthest step under way leads',
+      'Punching through NAT',
+      reason: 'the session is waiting on the direct attempt',
     );
   });
 
