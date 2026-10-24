@@ -140,6 +140,7 @@ static STORE: Mutex<()> = Mutex::new(());
 /// Both locks, for one read-modify-write.
 struct Locked {
     file: Option<FileLock>,
+    _owner: Option<super::host_owner::WriteGuard>,
     _process: MutexGuard<'static, ()>,
 }
 
@@ -161,6 +162,9 @@ impl Locked {
 
 fn lock(root: &Path, create: bool) -> Result<Locked> {
     let process = STORE.lock().unwrap_or_else(|p| p.into_inner());
+    // Writers keep desktop ownership through their entire transaction, including
+    // key cleanup. Read-only copies still inspect profiles without owning them.
+    let owner = if create { Some(super::host_owner::write_guard()?) } else { None };
     // A read with no record file has nothing to be consistent with, so it
     // creates nothing (the file only ever appears by an atomic rename).
     let file =
@@ -171,6 +175,7 @@ fn lock(root: &Path, create: bool) -> Result<Locked> {
     }
     Ok(Locked {
         file,
+        _owner: owner,
         _process: process,
     })
 }

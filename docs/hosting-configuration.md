@@ -212,6 +212,14 @@ under their own leases alongside OpenCode cleanup, and stops what the ledger
 kept. Each Codex host aborts its local services immediately and stops its owned
 process while withdrawing its three relay registrations concurrently; its name
 stays claimed until both have finished. No process grace period is shortened.
+After successful cleanup, the app explicitly releases its hosting owner lock
+before the GUI exits, and its ownership claim stays permanently closed. A new
+app can restore hosting without waiting for Windows to reclaim a dead process's
+file locks. A failed cleanup retains ownership for its next quit attempt.
+Hosting-state writes and profile transactions retain an ownership guard until
+they finish; quit waits for those writes, and the retired process refuses later
+writes. The atomic writer shares the transaction's reentrant guard. Read-only
+profile inspection does not require ownership.
 An OpenCode startup still stopping counts as something that may still run.
 When anything it owns may still run (a host still busy, a kept codex, a sign-in
 child) the quit fails with what remains: the app stays alive, restores its window

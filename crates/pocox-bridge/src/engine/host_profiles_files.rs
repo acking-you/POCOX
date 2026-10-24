@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 
+use crate::engine::host_owner;
+
 fn hex(name: &str) -> String {
     name.bytes().map(|b| format!("{b:02x}")).collect()
 }
@@ -67,6 +69,7 @@ pub(in crate::engine) enum Committed {
 /// the file was not replaced; once the rename happened the result is
 /// [`Committed`], never an error.
 pub(in crate::engine) fn write_private(file: &Path, bytes: &[u8]) -> Result<Committed> {
+    let _owner = host_owner::write_guard()?;
     let dir = file
         .parent()
         .ok_or_else(|| anyhow!("no parent directory"))?;
