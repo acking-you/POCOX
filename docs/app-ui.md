@@ -12,6 +12,11 @@ monitoring are in [Controller history cache](session-cache-sync.md).
 
 ## Design system
 
+Windows release/profile builds do not attach to a launcher's console. The GUI
+must survive a terminal or update helper being closed; only debug builds attach
+for Flutter diagnostics. Native console lifetime tests live in
+`windows/runner/tests` and run in the Windows CI job.
+
 - Shared colours, typography and control shapes live in `theme.dart` /
   `desktop_theme.dart`; secondary pages use `UtilityPage`
   (`widgets/utility_page.dart`).

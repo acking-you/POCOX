@@ -878,3 +878,7 @@ fn _proto_anchor(_msg: _ProtocolMessage) {}
 #[cfg(test)]
 #[path = "process_tests.rs"]
 mod tests;
+
+#[cfg(all(test, windows))]
+#[path = "process_windows_tests.rs"]
+mod windows_tests;

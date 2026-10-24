@@ -115,6 +115,13 @@ retains the verified package. Each attempt leaves `helper.log` and, once the
 installer runs, `installer.log` in `updates/work/<version>-<time>/handoff-<id>`
 under the app support directory. A subsequent download clears this directory.
 
+The Windows release/profile GUI never attaches to the launcher's console;
+closing a shell or updater console cannot terminate it. Only debug builds
+attach for Flutter diagnostics. The helper reopens the app without creating a
+console and passes `/NORESTARTAPPLICATIONS` to Inno Setup so only the helper
+owns the restart. POCOX does not install a task that reopens it after Quit;
+external scheduled watchdogs must be disabled separately if they do so.
+
 Windows installations of 0.7.0 and 0.7.1 contain the broken helper launch. They
 need one manual installation of 0.7.2 or later from the release page; an old
 client cannot acquire the updater fix through its own broken handoff.
@@ -146,6 +153,10 @@ test key.
   successful installation, installer failure and reopening. These tests use
   temporary installers/apps and replace only the interactive UAC boundary;
   they do not validate an elevated installation into Program Files.
+- Native Windows CI closes an owned launcher's console and verifies that a GUI
+  using the release runner's console policy survives. It also exercises the
+  Codex launcher through a batch shim and nested PowerShell command, checking
+  that the command executes without a console window and retains its output.
 - macOS has been exercised with a release build. Linux and Android paths
   compile in the release workflow and have shared-logic tests, but have not
   been exercised with their native installers.

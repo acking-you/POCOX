@@ -160,15 +160,22 @@ jobs:
         run: python3 scripts/ci_affected.py run-test
 
   windows-updater:
-    name: Windows updater process tests
+    name: Windows process lifecycle tests
     needs: changes
-    if: needs.changes.outputs.rust_mode != 'none'
+    if: needs.changes.outputs.rust_mode != 'none' || needs.changes.outputs.flutter == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Exercise release GUI console independence
+        run: |
+          cmake -S apps/flutter/windows/runner/tests -B target/windows-console-tests -A x64
+          cmake --build target/windows-console-tests --config Release
+          ctest --test-dir target/windows-console-tests -C Release --output-on-failure
+      - name: Exercise Codex batch launcher and nested command
+        run: cargo test --locked -p pocox-codex process::windows_tests
       - name: Exercise Windows PowerShell handoff and installer lifecycle
         run: cargo test --locked -p pocox_bridge --no-default-features engine::updates::apply::tests
 
