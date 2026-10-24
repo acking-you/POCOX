@@ -330,11 +330,11 @@ try {
   if (!(Test-Path -LiteralPath $App -PathType Leaf)) { throw 'The installed app is missing' }
   [IO.File]::WriteAllText($Ready, 'ready')
   if (!$parent.WaitForExit(120000)) { throw 'The app did not exit within two minutes' }
+  $installDir = Split-Path -LiteralPath $App
   $reopen = $true
   $installLog = Join-Path (Split-Path -LiteralPath $Ready) 'installer.log'
-  $installDir = Split-Path -LiteralPath $App
   $setup = Start-Process -FilePath $Installer -Verb RunAs -Wait -PassThru `
-    -ArgumentList '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-', `
+    -ArgumentList '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/NORESTARTAPPLICATIONS', '/SP-', `
       ('/LOG="' + $installLog + '"'), ('/DIR="' + $installDir + '"')
   if ($setup.ExitCode -ne 0) { throw "The installer exited with code $($setup.ExitCode)" }
   $installed = $true
@@ -342,7 +342,7 @@ try {
   [Console]::Error.WriteLine($_.ToString())
 } finally {
   if ($reopen) {
-    try { Start-Process -FilePath $App }
+    try { Start-Process -FilePath $App -WorkingDirectory $installDir -NoNewWindow }
     catch { [Console]::Error.WriteLine($_.ToString()); $installed = $false }
   }
   if ($lock) { $lock.Dispose() }
@@ -483,7 +483,29 @@ mod tests {
         )
         .unwrap();
         let app = install_dir.join("app.cmd");
-        fs::write(&app, "@echo off\r\n>\"%~dp0reopened\" echo done\r\n").unwrap();
+        fs::write(
+            &app,
+            "@echo off\r\npowershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \
+             \"%~dp0app.ps1\"\r\n",
+        )
+        .unwrap();
+        fs::write(
+            install_dir.join("app.ps1"),
+            r#"$ErrorActionPreference = 'Stop'
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class AppConsole {
+  [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();
+}
+'@
+if ([AppConsole]::GetConsoleWindow() -ne [IntPtr]::Zero) { exit 9 }
+# The reopened child must outlive its helper and start in the install directory.
+Start-Sleep -Milliseconds 1000
+[IO.File]::WriteAllText((Join-Path (Get-Location) 'reopened'), 'done')
+"#,
+        )
+        .unwrap();
         let ready = work.join("ready");
         let script = work.join("test-update.ps1");
         let (params, body) = WINDOWS_SCRIPT.split_once('\n').unwrap();
@@ -491,8 +513,11 @@ mod tests {
         // still waits on a real process and runs real installer/app subprocesses.
         let elevation = r#"
 function Start-Process {
-  param($FilePath, $Verb, [switch]$Wait, [switch]$PassThru, $ArgumentList)
-  $options = @{ FilePath = $FilePath; NoNewWindow = $true; Wait = $Wait; PassThru = $PassThru }
+  param($FilePath, $Verb, [switch]$Wait, [switch]$PassThru, $ArgumentList,
+        $WorkingDirectory, [switch]$NoNewWindow)
+  $options = @{ FilePath = $FilePath; Wait = $Wait; PassThru = $PassThru }
+  if ($Verb -eq 'RunAs' -or $NoNewWindow) { $options.NoNewWindow = $true }
+  if ($WorkingDirectory) { $options.WorkingDirectory = $WorkingDirectory }
   if ($ArgumentList) { $options.ArgumentList = $ArgumentList }
   Microsoft.PowerShell.Management\Start-Process @options
 }
