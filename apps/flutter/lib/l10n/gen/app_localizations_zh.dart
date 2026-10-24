@@ -2374,6 +2374,30 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceNewSession => '新建语音会话';
 
   @override
+  String get voiceHereTitle => '在当前对话中';
+
+  @override
+  String get voiceHereBody => '语音会接着这里已经说过的内容，你说的任务也在这里执行，和文字消息放在一起。';
+
+  @override
+  String get voiceNewBody => '单独开一个只用来说话的对话，当前对话保持不变。';
+
+  @override
+  String get voiceStartTalking => '开始说话';
+
+  @override
+  String get voiceModeHere => '语音 · 当前对话';
+
+  @override
+  String get voiceModeConversation => '语音对话';
+
+  @override
+  String get voiceTalkAgain => '再次通话';
+
+  @override
+  String get voiceMoreOptions => '更多选项';
+
+  @override
   String get restoringSessionSettings => '正在恢复会话设置…';
 
   @override

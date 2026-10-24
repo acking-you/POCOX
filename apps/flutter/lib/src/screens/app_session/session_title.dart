@@ -214,12 +214,6 @@ extension _SessionTitle on _AppSessionState {
                   ),
                 ),
               ),
-              // With the sidebar hidden, the call's status and hang-up move
-              // into the window strip rather than disappearing with it.
-              if (!_leftOpen) ...[
-                _voiceStatus(l10n, compact: true),
-                const SizedBox(width: 6),
-              ],
               if (_ctx != null)
                 ContextGauge(
                   status: _ctx!,

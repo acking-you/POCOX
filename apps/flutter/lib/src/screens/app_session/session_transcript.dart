@@ -556,13 +556,18 @@ extension _SessionTranscript on _AppSessionState {
       // restart since it's derived from the trailing plan item).
       if (!_externalWriterMode && _planReady) _implementBar(l10n),
       if (_error != null) _errorBanner(l10n),
-      if (_isVoiceThread)
-        _voiceBar(l10n)
-      // A call running in another conversation stays reachable from here in
-      // the narrow layout, where the sidebar is a closed drawer.
-      else if (MediaQuery.sizeOf(context).width < 720 &&
-          _voice.threadId != _threadId)
-        _voiceStatus(l10n),
+      // A call's controls dock here, above the composer and as wide as it,
+      // on every layout.
+      if (_caps.voice)
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              maxWidth: _AppSessionState._kColumnWidth + 48,
+            ),
+            child: _voiceDock(),
+          ),
+        ),
       DecoratedBox(
         // What scrolls under the glass fades into the sheet below it, so the
         // line under the card never sits on a sentence.

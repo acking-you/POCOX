@@ -171,6 +171,12 @@ extension _SessionVoice on _AppSessionState {
       !_voice.busy &&
       _voice.phase != VoicePhase.stopping;
 
+  /// Whether a call can join the typed conversation on screen: the host
+  /// starts realtime on any loaded thread and hands it the thread's recent
+  /// history, so voice and text share it. A conversation not started yet
+  /// has no thread to join.
+  bool get _canTalkHere => _threadId != null && !_isVoiceThread;
+
   Future<void> _startVoice() async {
     if (!_canStartVoice) return;
     final generation = _threadLoadGeneration;
@@ -183,13 +189,20 @@ extension _SessionVoice on _AppSessionState {
     _updateState(() => _voiceStarting = true);
     try {
       final api = ref.read(bridgeApiProvider);
-      final settings = await showAppDialog<VoiceSettings>(
-        context: context,
-        builder: (_) =>
-            VoiceSetupDialog(api: api, serviceKey: widget.serviceKey),
+      final choice = await showVoiceStartSheet(
+        context,
+        api: api,
+        serviceKey: widget.serviceKey,
+        canTalkHere: _canTalkHere,
       );
-      if (!current() || settings == null) return;
-      var id = _isVoiceThread ? _threadId : null;
+      if (!current() || choice == null) return;
+      final settings = choice.settings;
+      // A voice conversation talks again in itself; a typed one takes the
+      // call when chosen (the host gives the call its recent history), and
+      // otherwise the call gets a conversation of its own.
+      var id = _isVoiceThread || choice.target == VoiceTarget.here
+          ? _threadId
+          : null;
       if (id == null) {
         final result = await _voice.request('thread/start', {
           'threadSource': 'pocox-voice',
@@ -259,59 +272,17 @@ extension _SessionVoice on _AppSessionState {
     );
   }
 
-  /// The live call's pinned status entry (sidebar, or the window strip when
-  /// the sidebar is collapsed). Names the conversation the call belongs to
-  /// and, when that is not the one on screen, taps through to it.
-  Widget _voiceStatus(AppLocalizations l10n, {bool compact = false}) {
-    final id = _voice.threadId;
-    final thread = id == null
-        ? null
-        : _threads.where((t) => t.id == id).firstOrNull ??
-              _discoveredThreads[id];
-    final title = thread == null
-        ? null
-        : (thread.title?.trim().isNotEmpty ?? false)
-        ? thread.title!.trim()
-        : thread.preview.trim().isNotEmpty
-        ? thread.preview.trim().split('\n').first
-        : l10n.voiceLive;
-    return VoiceStatusEntry(
-      controller: _voice,
-      compact: compact,
-      title: title,
-      onOpen: id == null || id == _threadId
-          ? null
-          : () => _openThread(id, thread?.cwd ?? _cwd),
-    );
-  }
-
-  Widget _voiceBar(AppLocalizations l10n) => AnimatedBuilder(
+  /// The call's dock above the composer: its controls and live state where
+  /// the eye and thumb already are. A voice conversation keeps it at rest,
+  /// ready to talk again; a typed one shows it for its call.
+  Widget _voiceDock() => AnimatedBuilder(
     animation: _voice,
-    builder: (context, _) => _voice.threadId == _threadId
-        ? VoicePanel(
-            controller: _voice,
-            onHistory: _voiceHistory,
-            onRetry: _canStartVoice ? _startVoice : null,
-          )
-        : Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                const Icon(AppIcons.graphic_eq),
-                const SizedBox(width: 8),
-                Expanded(child: Text(l10n.voiceLive)),
-                IconButton(
-                  tooltip: l10n.voiceHistory,
-                  onPressed: _voiceHistory,
-                  icon: const Icon(AppIcons.history),
-                ),
-                IconButton(
-                  tooltip: l10n.voiceStart,
-                  onPressed: _canStartVoice ? _startVoice : null,
-                  icon: const Icon(AppIcons.play_arrow),
-                ),
-              ],
-            ),
-          ),
+    builder: (context, _) => VoiceCallDock(
+      controller: _voice,
+      owned: _voice.threadId != null && _voice.threadId == _threadId,
+      here: !_isVoiceThread,
+      onHistory: _voiceHistory,
+      onStart: _canStartVoice ? _startVoice : null,
+    ),
   );
 }

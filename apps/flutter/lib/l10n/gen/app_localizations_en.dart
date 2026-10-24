@@ -2493,6 +2493,32 @@ class AppLocalizationsEn extends AppLocalizations {
   String get voiceNewSession => 'New voice conversation';
 
   @override
+  String get voiceHereTitle => 'In this conversation';
+
+  @override
+  String get voiceHereBody =>
+      'Voice picks up what has been said here, and what you ask runs here beside the typed turns.';
+
+  @override
+  String get voiceNewBody =>
+      'A conversation just for talking; this one stays as it is.';
+
+  @override
+  String get voiceStartTalking => 'Start talking';
+
+  @override
+  String get voiceModeHere => 'Voice · this conversation';
+
+  @override
+  String get voiceModeConversation => 'Voice conversation';
+
+  @override
+  String get voiceTalkAgain => 'Talk again';
+
+  @override
+  String get voiceMoreOptions => 'More options';
+
+  @override
   String get restoringSessionSettings => 'Restoring session settings…';
 
   @override

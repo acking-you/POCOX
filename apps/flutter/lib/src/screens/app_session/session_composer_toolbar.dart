@@ -153,22 +153,25 @@ extension _SessionComposerToolbar on _AppSessionState {
             ],
             // Native live voice only; absent rather than disabled elsewhere.
             if (_caps.voice)
-              IconButton(
-                key: const Key('voice-start'),
-                tooltip: _isVoiceThread
-                    ? l10n.voiceStart
-                    : l10n.voiceNewSession,
-                // A take in progress finishes first; the call needs the mic.
-                onPressed: _canStartVoice && !_dictation.taking
-                    ? _startVoice
-                    : null,
-                icon: Icon(AppIcons.graphic_eq, size: touch ? 22 : 18),
-                // 40 px on touch: two buttons beside send must still leave
-                // the model pill room on a 320 px phone.
-                style: IconButton.styleFrom(
-                  minimumSize: Size.square(touch ? 40 : 32),
-                  fixedSize: Size.square(touch ? 40 : 32),
-                  padding: EdgeInsets.zero,
+              // Follows the call itself: a call that has just ended makes it
+              // available again without the rest of the screen redrawing.
+              ListenableBuilder(
+                listenable: _voice,
+                builder: (context, _) => IconButton(
+                  key: const Key('voice-start'),
+                  tooltip: l10n.voiceStart,
+                  // A take in progress finishes first; the call needs the mic.
+                  onPressed: _canStartVoice && !_dictation.taking
+                      ? _startVoice
+                      : null,
+                  icon: Icon(AppIcons.graphic_eq, size: touch ? 22 : 18),
+                  // 40 px on touch: two buttons beside send must still leave
+                  // the model pill room on a 320 px phone.
+                  style: IconButton.styleFrom(
+                    minimumSize: Size.square(touch ? 40 : 32),
+                    fixedSize: Size.square(touch ? 40 : 32),
+                    padding: EdgeInsets.zero,
+                  ),
                 ),
               ),
             const SizedBox(width: 4),

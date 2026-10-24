@@ -8,197 +8,12 @@ import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/voice/voice_controller.dart';
 import 'package:pocox/src/voice/waveform.dart';
 import 'package:pocox/src/app_icons.dart';
-import 'package:pocox/src/widgets/field_help.dart';
 
-/// Session-only speech settings; an empty model preserves the host default.
-class VoiceSettings {
-  const VoiceSettings({this.model, this.voice});
-  final String? model;
-  final String? voice;
-}
+import 'package:pocox/src/motion.dart';
+import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/glass.dart';
 
-/// Loads the host's actual catalog, keeping unsupported hosts retryable.
-class VoiceSetupDialog extends StatefulWidget {
-  const VoiceSetupDialog({
-    super.key,
-    required this.api,
-    required this.serviceKey,
-  });
-  final BridgeApi api;
-  final String serviceKey;
-  @override
-  State<VoiceSetupDialog> createState() => _VoiceSetupDialogState();
-}
-
-/// Realtime models offered in the setup dialog.
-///
-/// The app-server has no model catalogue for realtime (only voices), so this
-/// is the list the protocol itself names for the version POCOX speaks
-/// (V3, `gpt-live-1-codex` is its built-in default). "Host default" sends no
-/// model and lets the host's `experimental_realtime_ws_model` decide; a custom
-/// id stays available for a host configured with something else.
-const voiceModels = <String>['gpt-live-1-codex'];
-
-/// Sentinel for the "custom model id" entry in the model dropdown.
-const _customModel = '__custom__';
-
-class _VoiceSetupDialogState extends State<VoiceSetupDialog> {
-  final _model = TextEditingController();
-  // Null = host default; [_customModel] = typed id in [_model].
-  String? _modelChoice;
-  List<String>? _voices;
-  String? _voice;
-  String? _error;
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _voices = null;
-      _error = null;
-    });
-    try {
-      final raw = await widget.api.appRealtimeRequest(
-        widget.serviceKey,
-        'thread/realtime/listVoices',
-        '{}',
-      );
-      final voices = (jsonDecode(raw) as Map)['voices'] as Map;
-      // Upstream V3 uses the V1 voice catalog; V2 names are not interchangeable.
-      final names = (voices['v1'] as List).cast<String>();
-      if (names.isEmpty) {
-        throw StateError('The host returned no compatible voices');
-      }
-      if (mounted) {
-        setState(() {
-          _voices = names;
-          _voice = names.contains(voices['defaultV1'])
-              ? voices['defaultV1'] as String
-              : names.first;
-        });
-      }
-    } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
-    }
-  }
-
-  @override
-  void dispose() {
-    _model.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(l.voiceLive),
-      content: SizedBox(
-        width: 400,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l.voiceStartHint),
-              const SizedBox(height: 16),
-              if (_error != null) ...[
-                Text(
-                  l.voiceUnavailable,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-                Text(_error!, style: helpTextStyle(Theme.of(context))),
-                TextButton(onPressed: _load, child: Text(l.retry)),
-              ] else if (_voices == null)
-                const LinearProgressIndicator()
-              else ...[
-                DropdownButtonFormField<String>(
-                  initialValue: _voice,
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: l.voiceVoice),
-                  items: [
-                    for (final voice in _voices!)
-                      DropdownMenuItem(value: voice, child: Text(voice)),
-                  ],
-                  onChanged: (value) => setState(() => _voice = value),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String?>(
-                  key: const Key('voice-model'),
-                  initialValue: _modelChoice,
-                  isExpanded: true,
-                  decoration: InputDecoration(labelText: l.voiceModel),
-                  items: [
-                    DropdownMenuItem(child: Text(l.voiceModelDefault)),
-                    for (final model in voiceModels)
-                      DropdownMenuItem(
-                        value: model,
-                        child: Text(
-                          model == 'gpt-live-1-codex'
-                              ? l.voiceModelFrameless
-                              : model,
-                        ),
-                      ),
-                    DropdownMenuItem(
-                      value: _customModel,
-                      child: Text(l.voiceModelCustom),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _modelChoice = value),
-                ),
-                if (_modelChoice == _customModel) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    key: const Key('voice-model-custom'),
-                    controller: _model,
-                    autofocus: true,
-                    // Empty falls back to the host's model: the placeholder
-                    // says so; the length limit needs no counter.
-                    decoration: InputDecoration(
-                      labelText: l.voiceModelCustomLabel,
-                      hintText: l.voiceModelHint,
-                      counterText: '',
-                    ),
-                    maxLength: 128,
-                  ),
-                ],
-                const SizedBox(height: 14),
-                Text(
-                  l.voiceTaskContinues,
-                  style: helpTextStyle(Theme.of(context)),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l.cancel),
-        ),
-        FilledButton(
-          key: const Key('voice-start-confirm'),
-          onPressed: _voices == null
-              ? null
-              : () => Navigator.pop(
-                  context,
-                  VoiceSettings(
-                    model: switch (_modelChoice) {
-                      _customModel => _model.text.trim(),
-                      final choice => choice,
-                    },
-                    voice: _voice,
-                  ),
-                ),
-          child: Text(l.voiceStart),
-        ),
-      ],
-    );
-  }
-}
+export 'package:pocox/src/voice/voice_start_sheet.dart';
 
 /// What the call is doing, in one line: connection state first, then who
 /// holds the floor. Shared by the panel above the composer and the sidebar
@@ -220,246 +35,6 @@ String voiceStatusLabel(AppLocalizations l, VoiceController c) =>
         null => c.endedByUser ? l.voiceEndedByUser : l.voiceSessionEnded,
       },
     };
-
-/// The call's persistent status entry: a pinned strip outside any scrolling
-/// list, present for as long as a call is up (and briefly after it ends, so
-/// the outcome is seen), with mute and hang-up one tap away.
-///
-/// [compact] is the icon-only form for the window strip when the sidebar is
-/// collapsed. [title] names the conversation the call belongs to; [onOpen]
-/// switches to it.
-class VoiceStatusEntry extends StatefulWidget {
-  const VoiceStatusEntry({
-    super.key,
-    required this.controller,
-    this.title,
-    this.onOpen,
-    this.compact = false,
-  });
-  final VoiceController controller;
-  final String? title;
-  final VoidCallback? onOpen;
-  final bool compact;
-
-  @override
-  State<VoiceStatusEntry> createState() => _VoiceStatusEntryState();
-}
-
-class _VoiceStatusEntryState extends State<VoiceStatusEntry> {
-  // An ended call lingers this long, so its outcome registers.
-  static const _linger = Duration(seconds: 6);
-  Timer? _hide;
-  bool _showEnded = false;
-  VoicePhase? _last;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.controller.addListener(_phase);
-  }
-
-  @override
-  void didUpdateWidget(VoiceStatusEntry old) {
-    super.didUpdateWidget(old);
-    if (!identical(old.controller, widget.controller)) {
-      old.controller.removeListener(_phase);
-      widget.controller.addListener(_phase);
-    }
-  }
-
-  @override
-  void dispose() {
-    _hide?.cancel();
-    widget.controller.removeListener(_phase);
-    super.dispose();
-  }
-
-  void _phase() {
-    final phase = widget.controller.phase;
-    if (phase == _last) return;
-    final wasLive = _last != null && _last != VoicePhase.idle;
-    _last = phase;
-    _hide?.cancel();
-    final ended = phase == VoicePhase.idle || phase == VoicePhase.failed;
-    if (ended && wasLive) {
-      setState(() => _showEnded = true);
-      // A failure stays until the user dismisses it or starts again: it is
-      // the one outcome they must not miss.
-      if (phase == VoicePhase.idle) {
-        _hide = Timer(_linger, () {
-          if (mounted) setState(() => _showEnded = false);
-        });
-      }
-    } else if (!ended) {
-      setState(() => _showEnded = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: widget.controller,
-    builder: (context, _) {
-      final c = widget.controller;
-      final visible = c.busy || c.phase == VoicePhase.stopping || _showEnded;
-      return AnimatedSize(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.topCenter,
-        child: visible
-            ? _body(context, c)
-            : widget.compact
-            ? const SizedBox.shrink()
-            : const SizedBox(width: double.infinity),
-      );
-    },
-  );
-
-  Widget _body(BuildContext context, VoiceController c) {
-    final l = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final failed = c.phase == VoicePhase.failed;
-    final live = c.phase == VoicePhase.active;
-    final tone = failed
-        ? scheme.error
-        : c.phase == VoicePhase.reconnecting
-        ? (scheme.brightness == Brightness.light
-              ? const Color(0xFF9A5B00)
-              : const Color(0xFFE0A647))
-        : c.busy
-        ? scheme.tertiary
-        : scheme.onSurfaceVariant;
-    final label = voiceStatusLabel(l, c);
-    final canMute = live || c.phase == VoicePhase.reconnecting;
-    Widget action({
-      required Key key,
-      required String tooltip,
-      required IconData icon,
-      required VoidCallback onPressed,
-      Color? color,
-      Color? background,
-    }) => IconButton(
-      key: key,
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 16),
-      style: IconButton.styleFrom(
-        minimumSize: const Size(28, 28),
-        fixedSize: const Size(28, 28),
-        padding: EdgeInsets.zero,
-        foregroundColor: color ?? scheme.onSurfaceVariant,
-        backgroundColor: background,
-      ),
-    );
-    final controls = [
-      if (canMute)
-        action(
-          key: const Key('voice-status-mute'),
-          tooltip: c.muted ? l.voiceUnmute : l.voiceMute,
-          icon: c.muted ? AppIcons.mic_off_rounded : AppIcons.mic_none_rounded,
-          onPressed: c.toggleMuted,
-          color: c.muted ? scheme.error : null,
-        ),
-      if (c.busy)
-        action(
-          key: const Key('voice-status-hangup'),
-          tooltip: l.voiceHangUp,
-          icon: AppIcons.call_end_rounded,
-          onPressed: c.hangUp,
-          color: Colors.white,
-          background: const Color(0xFFD93A3A),
-        )
-      else
-        action(
-          key: const Key('voice-status-dismiss'),
-          tooltip: MaterialLocalizations.of(context).closeButtonLabel,
-          icon: AppIcons.close_rounded,
-          onPressed: () => setState(() => _showEnded = false),
-        ),
-    ];
-    final indicator = live
-        ? CallWaveform(
-            controller: c,
-            color: tone,
-            bars: widget.compact ? 7 : 12,
-            height: 16,
-            barWidth: 2,
-            gap: 1.5,
-          )
-        : _VoiceLevel(color: tone, active: false, speaking: false);
-    if (widget.compact) {
-      return Tooltip(
-        message: [label, ?widget.title].join('\n'),
-        child: Container(
-          key: const Key('voice-status-compact'),
-          height: 30,
-          padding: const EdgeInsets.only(left: 8, right: 2),
-          decoration: BoxDecoration(
-            color: tone.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [indicator, const SizedBox(width: 4), ...controls],
-          ),
-        ),
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-      child: Material(
-        key: const Key('voice-status'),
-        color: tone.withValues(alpha: 0.09),
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: widget.onOpen,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
-            child: Row(
-              children: [
-                indicator,
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 160),
-                        child: Text(
-                          label,
-                          key: ValueKey(label),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: failed ? scheme.error : scheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      if (widget.title case final title?)
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                ...controls,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// A call's live waveform: the louder of the microphone and the assistant,
 /// so the bars move with whoever is talking. Flat while muted.
@@ -540,172 +115,376 @@ class _CallWaveformState extends State<CallWaveform> {
   );
 }
 
-/// Three still bars for a call that is not live (connecting, ended).
-class _VoiceLevel extends StatefulWidget {
-  const _VoiceLevel({
-    required this.color,
-    required this.active,
-    required this.speaking,
+/// A call's controls and live state, docked above the composer where the
+/// eye and thumb already are, on a phone and a desktop alike: what the call
+/// is (a voice conversation, or voice inside the typed one), who holds the
+/// floor, what was just said, and mute and hang-up as large round buttons.
+///
+/// [owned] is whether the controller's call belongs to the conversation on
+/// screen. A voice conversation keeps the dock at rest, ready to talk again;
+/// in a typed one ([here]) it shows for the call and lingers briefly after
+/// it ends, so the outcome registers — a failure until it is dismissed.
+class VoiceCallDock extends StatefulWidget {
+  /// Creates the dock for [controller].
+  const VoiceCallDock({
+    super.key,
+    required this.controller,
+    required this.owned,
+    required this.here,
+    required this.onHistory,
+    required this.onStart,
   });
-  final Color color;
-  final bool active;
-  final bool speaking;
+
+  /// The call.
+  final VoiceController controller;
+
+  /// Whether the call belongs to the conversation on screen.
+  final bool owned;
+
+  /// Whether that conversation is a typed one the call joined.
+  final bool here;
+
+  /// Open the spoken history.
+  final VoidCallback onHistory;
+
+  /// Start (again); null while that is not possible.
+  final VoidCallback? onStart;
 
   @override
-  State<_VoiceLevel> createState() => _VoiceLevelState();
+  State<VoiceCallDock> createState() => _VoiceCallDockState();
 }
 
-class _VoiceLevelState extends State<_VoiceLevel>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _t = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1400),
-  );
+class _VoiceCallDockState extends State<VoiceCallDock> {
+  // An ended call in a typed conversation lingers this long.
+  static const _linger = Duration(seconds: 6);
+  Timer? _hide;
+  bool _showEnded = false;
+  VoicePhase? _last;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sync();
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_phase);
   }
 
   @override
-  void didUpdateWidget(_VoiceLevel old) {
+  void didUpdateWidget(VoiceCallDock old) {
     super.didUpdateWidget(old);
-    _sync();
-  }
-
-  void _sync() {
-    final animate = widget.active && !MediaQuery.disableAnimationsOf(context);
-    _t.duration = Duration(milliseconds: widget.speaking ? 700 : 1400);
-    if (animate && !_t.isAnimating) {
-      _t.repeat();
-    } else if (!animate && _t.isAnimating) {
-      _t.stop();
-      _t.value = 0;
+    if (!identical(old.controller, widget.controller)) {
+      old.controller.removeListener(_phase);
+      widget.controller.addListener(_phase);
     }
   }
 
   @override
   void dispose() {
-    _t.dispose();
+    _hide?.cancel();
+    widget.controller.removeListener(_phase);
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 16,
-    height: 16,
-    child: AnimatedBuilder(
-      animation: _t,
-      builder: (context, _) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          for (var i = 0; i < 3; i++)
-            Container(
-              width: 3,
-              height: widget.active
-                  ? 5 +
-                        9 *
-                            (0.5 +
-                                    0.5 *
-                                        math.sin(
-                                          (_t.value + i / 3) * 2 * math.pi,
-                                        ))
-                                .abs()
-                  : (i == 1 ? 9 : 6),
-              decoration: BoxDecoration(
-                color: widget.color,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-        ],
-      ),
-    ),
-  );
-}
+  void _phase() {
+    final phase = widget.controller.phase;
+    if (phase == _last) return;
+    final wasLive = _last != null && _last != VoicePhase.idle;
+    _last = phase;
+    _hide?.cancel();
+    final ended = phase == VoicePhase.idle || phase == VoicePhase.failed;
+    if (ended && wasLive) {
+      setState(() => _showEnded = true);
+      if (phase == VoicePhase.idle) {
+        _hide = Timer(_linger, () {
+          if (mounted) setState(() => _showEnded = false);
+        });
+      }
+    } else if (!ended) {
+      setState(() => _showEnded = false);
+    }
+  }
 
-/// Compact controls leave the transcript and approval cards accessible.
-class VoicePanel extends StatelessWidget {
-  const VoicePanel({
-    super.key,
-    required this.controller,
-    required this.onHistory,
-    required this.onRetry,
-  });
-  final VoiceController controller;
-  final VoidCallback onHistory;
-  final VoidCallback? onRetry;
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
+    animation: widget.controller,
     builder: (context, _) {
-      final l = AppLocalizations.of(context);
-      final c = controller;
-      final label = voiceStatusLabel(l, c);
-      final last = c.partial.entries.lastOrNull;
-      final text = last?.value ?? c.transcript.lastOrNull?.text;
-      return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(AppIcons.graphic_eq, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(label, maxLines: 2)),
-                  IconButton(
-                    tooltip: l.voiceHistory,
-                    onPressed: onHistory,
-                    icon: const Icon(AppIcons.history),
-                  ),
-                  if (c.phase == VoicePhase.active ||
-                      c.phase == VoicePhase.reconnecting)
-                    IconButton(
-                      key: const Key('voice-mute'),
-                      tooltip: c.muted ? l.voiceUnmute : l.voiceMute,
-                      onPressed: c.toggleMuted,
-                      icon: Icon(c.muted ? AppIcons.mic_off : AppIcons.mic),
-                    ),
-                  if (c.busy)
-                    IconButton(
-                      key: const Key('voice-stop'),
-                      tooltip: l.voiceStop,
-                      onPressed: c.hangUp,
-                      icon: const Icon(AppIcons.call_end),
-                    )
-                  else if (c.phase != VoicePhase.stopping)
-                    IconButton(
-                      tooltip: l.voiceStart,
-                      onPressed: onRetry,
-                      icon: const Icon(AppIcons.play_arrow),
-                    ),
-                ],
-              ),
-              if (text != null && text.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text(
-                    text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              if (c.error != null)
-                ExpansionTile(
-                  title: Text(l.voiceErrorDetails),
-                  tilePadding: EdgeInsets.zero,
-                  children: [SelectableText(c.error!)],
-                ),
-            ],
-          ),
-        ),
+      final c = widget.controller;
+      final live = widget.owned && (c.busy || c.phase == VoicePhase.stopping);
+      final visible =
+          live ||
+          (widget.owned && _showEnded) ||
+          // A voice conversation always offers to talk.
+          !widget.here;
+      return AnimatedSize(
+        duration: Motion.of(context, Motion.medium),
+        curve: Motion.emphasized,
+        alignment: Alignment.bottomCenter,
+        child: visible
+            ? _body(context, c)
+            : const SizedBox(width: double.infinity),
       );
     },
   );
+
+  Widget _body(BuildContext context, VoiceController c) {
+    final l = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final owned = widget.owned;
+    final phase = owned ? c.phase : VoicePhase.idle;
+    final failed = phase == VoicePhase.failed;
+    final connecting =
+        phase == VoicePhase.connecting || phase == VoicePhase.reconnecting;
+    final busy = owned && c.busy;
+    final tone = failed
+        ? scheme.error
+        : phase == VoicePhase.reconnecting
+        ? cautionColor(scheme)
+        : busy
+        ? signalColor(scheme)
+        : scheme.onSurfaceVariant;
+    // A voice conversation opened from the list has had no call here yet.
+    final label = owned ? voiceStatusLabel(l, c) : l.voiceLive;
+    final caption = owned ? _caption(l, c) : null;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
+      child: Glass(
+        key: const Key('voice-dock'),
+        depth: GlassDepth.floating,
+        borderRadius: BorderRadius.circular(24),
+        edge: busy || failed ? tone.withValues(alpha: 0.45) : null,
+        padding: const EdgeInsets.fromLTRB(16, 10, 8, 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  widget.here
+                      ? AppIcons.chat_bubble_outline
+                      : AppIcons.graphic_eq,
+                  size: 14,
+                  color: scheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    widget.here ? l.voiceModeHere : l.voiceModeConversation,
+                    key: const Key('voice-dock-mode'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  key: const Key('voice-history'),
+                  tooltip: l.voiceHistory,
+                  onPressed: widget.onHistory,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    AppIcons.history,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                if (!busy && widget.here)
+                  IconButton(
+                    key: const Key('voice-dock-dismiss'),
+                    tooltip: MaterialLocalizations.of(context).closeButtonLabel,
+                    onPressed: () => setState(() => _showEnded = false),
+                    visualDensity: VisualDensity.compact,
+                    icon: Icon(
+                      AppIcons.close_rounded,
+                      size: 18,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Column(
+                children: [
+                  const SizedBox(height: 2),
+                  SizedBox(
+                    height: 40,
+                    child: Center(
+                      child: connecting
+                          ? SizedBox.square(
+                              dimension: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: tone,
+                              ),
+                            )
+                          : CallWaveform(
+                              controller: c,
+                              color: tone,
+                              bars: 28,
+                              height: 36,
+                              barWidth: 3,
+                              gap: 3,
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  AnimatedSwitcher(
+                    duration: Motion.of(context, Motion.fast),
+                    child: Text(
+                      label,
+                      key: ValueKey(label),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: failed ? scheme.error : scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  if (caption != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      caption,
+                      key: const Key('voice-dock-caption'),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (owned && c.error != null)
+                    Theme(
+                      data: theme.copyWith(dividerColor: Colors.transparent),
+                      child: ExpansionTile(
+                        title: Text(
+                          l.voiceErrorDetails,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        tilePadding: EdgeInsets.zero,
+                        dense: true,
+                        children: [SelectableText(c.error!)],
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  if (busy)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _RoundAction(
+                          key: const Key('voice-mute'),
+                          icon: c.muted ? AppIcons.mic_off : AppIcons.mic,
+                          label: c.muted ? l.voiceUnmute : l.voiceMute,
+                          size: 52,
+                          foreground: c.muted ? scheme.error : scheme.onSurface,
+                          background: c.muted
+                              ? scheme.error.withValues(alpha: 0.14)
+                              : scheme.onSurface.withValues(alpha: 0.08),
+                          onPressed:
+                              phase == VoicePhase.active ||
+                                  phase == VoicePhase.reconnecting
+                              ? c.toggleMuted
+                              : null,
+                        ),
+                        const SizedBox(width: 28),
+                        _RoundAction(
+                          key: const Key('voice-stop'),
+                          icon: AppIcons.call_end,
+                          label: l.voiceHangUp,
+                          size: 60,
+                          foreground: Colors.white,
+                          background: const Color(0xFFD93A3A),
+                          onPressed: c.hangUp,
+                        ),
+                      ],
+                    )
+                  else if (phase != VoicePhase.stopping)
+                    FilledButton.icon(
+                      key: const Key('voice-again'),
+                      onPressed: widget.onStart,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(200, 46),
+                      ),
+                      icon: const Icon(AppIcons.mic, size: 20),
+                      label: Text(
+                        owned && phase != VoicePhase.idle || _showEnded
+                            ? l.voiceTalkAgain
+                            : l.voiceStartTalking,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The last thing said, by whom: the line being spoken, else the last
+  /// finished one.
+  String? _caption(AppLocalizations l, VoiceController c) {
+    final last = c.partial.entries.lastOrNull;
+    final text = (last?.value ?? c.transcript.lastOrNull?.text)?.trim();
+    if (text == null || text.isEmpty) return null;
+    final role = last?.key ?? c.transcript.lastOrNull?.role;
+    final who = role == 'user' ? l.voiceYou : l.voiceAgent;
+    return '$who · $text';
+  }
+}
+
+/// A large round call button with its name under it, as on a phone call.
+class _RoundAction extends StatelessWidget {
+  const _RoundAction({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.size,
+    required this.foreground,
+    required this.background,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final double size;
+  final Color foreground;
+  final Color background;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: label,
+          onPressed: onPressed,
+          icon: Icon(icon, size: size * 0.42),
+          style: IconButton.styleFrom(
+            fixedSize: Size.square(size),
+            minimumSize: Size.square(size),
+            padding: EdgeInsets.zero,
+            foregroundColor: foreground,
+            backgroundColor: background,
+            disabledBackgroundColor: background.withValues(alpha: 0.4),
+          ),
+        ),
+        const SizedBox(height: 6),
+        ExcludeSemantics(
+          child: Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 /// Canonical persisted speech history, loaded in bounded upstream pages.

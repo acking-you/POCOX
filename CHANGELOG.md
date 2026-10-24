@@ -42,6 +42,16 @@ breaking change goes.
 - A sign-in refused because the account backend predates the app's return link
   now says to update the backend (or use a device code) instead of showing a
   bare HTTP 400.
+- **Talk in a conversation, or in one of its own.** Upstream app-server lets a
+  voice call start on an existing conversation and gives it that
+  conversation's recent history, so the start sheet now offers **In this
+  conversation** (what you ask runs there, beside the typed turns) or **New
+  voice conversation**, with voices as one-tap chips and the model under More
+  options. A call's controls dock above the composer on phones and desktops —
+  live waveform, who is speaking, the latest caption, large Mute and Hang up —
+  instead of a small strip in the sidebar's corner, and a phone starts a call
+  from the folded composer without the keyboard. The voice button is usable
+  again as soon as a call ends.
 - **The phone composer stays folded until you write.** Every conversation
   opens with the slim capsule; it unfolds when you tap it to type and folds
   again when you are done (putting the keyboard away counts), instead of

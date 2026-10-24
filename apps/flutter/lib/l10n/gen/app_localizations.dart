@@ -4448,6 +4448,54 @@ abstract class AppLocalizations {
   /// **'New voice conversation'**
   String get voiceNewSession;
 
+  /// No description provided for @voiceHereTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'In this conversation'**
+  String get voiceHereTitle;
+
+  /// No description provided for @voiceHereBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice picks up what has been said here, and what you ask runs here beside the typed turns.'**
+  String get voiceHereBody;
+
+  /// No description provided for @voiceNewBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A conversation just for talking; this one stays as it is.'**
+  String get voiceNewBody;
+
+  /// No description provided for @voiceStartTalking.
+  ///
+  /// In en, this message translates to:
+  /// **'Start talking'**
+  String get voiceStartTalking;
+
+  /// No description provided for @voiceModeHere.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice · this conversation'**
+  String get voiceModeHere;
+
+  /// No description provided for @voiceModeConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice conversation'**
+  String get voiceModeConversation;
+
+  /// No description provided for @voiceTalkAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk again'**
+  String get voiceTalkAgain;
+
+  /// No description provided for @voiceMoreOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'More options'**
+  String get voiceMoreOptions;
+
   /// No description provided for @restoringSessionSettings.
   ///
   /// In en, this message translates to:

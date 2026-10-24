@@ -130,6 +130,30 @@ extension _SessionComposerFoot on _AppSessionState {
                   ),
                 ],
                 const SizedBox(width: 6),
+                // Talking needs no keyboard: the call starts from here.
+                if (_caps.voice && !_streaming)
+                  ListenableBuilder(
+                    listenable: _voice,
+                    builder: (context, _) => IconButton(
+                      key: const Key('folded-voice-start'),
+                      tooltip: l10n.voiceStart,
+                      onPressed: _canStartVoice && !_dictation.taking
+                          ? _startVoice
+                          : null,
+                      icon: Icon(
+                        AppIcons.graphic_eq,
+                        size: 20,
+                        color: _canStartVoice
+                            ? signalColor(scheme)
+                            : scheme.onSurfaceVariant,
+                      ),
+                      style: IconButton.styleFrom(
+                        fixedSize: const Size.square(40),
+                        minimumSize: const Size.square(40),
+                        padding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
                 if (_streaming)
                   _stopButton(l10n, key: const Key('folded-stop-btn'))
                 else

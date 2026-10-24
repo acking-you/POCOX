@@ -437,7 +437,6 @@ extension _SessionLayout on _AppSessionState {
                   ],
                 ),
               ),
-              _voiceStatus(l10n),
               Expanded(child: _sessionsPane(l10n, inDrawer: true)),
             ],
           ),
@@ -509,9 +508,6 @@ extension _SessionLayout on _AppSessionState {
       child: Column(
         children: [
           strip,
-          // Pinned above the list, outside its scroll and its search filter:
-          // a live call is always one glance and one tap away.
-          _voiceStatus(l10n),
           Expanded(child: _sessionsPane(l10n)),
         ],
       ),
