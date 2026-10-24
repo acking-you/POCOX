@@ -159,6 +159,18 @@ jobs:
           CRATES: ${{ needs.changes.outputs.test_crates }}
         run: python3 scripts/ci_affected.py run-test
 
+  windows-updater:
+    name: Windows updater process tests
+    needs: changes
+    if: needs.changes.outputs.rust_mode != 'none'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Exercise Windows PowerShell handoff and installer lifecycle
+        run: cargo test --locked -p pocox_bridge --no-default-features engine::updates::apply::tests
+
   flutter:
     name: flutter analyze + test
     needs: changes
