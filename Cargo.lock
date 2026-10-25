@@ -2454,7 +2454,7 @@ checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 [[package]]
 name = "pb-mapper"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "pb-mapper-client",
 ]
@@ -2462,7 +2462,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-auth"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "parking_lot",
  "pb-mapper-core",
@@ -2479,7 +2479,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-client"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "if-addrs",
  "if-watch",
@@ -2503,7 +2503,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-core"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "base64 0.23.1",
  "clap",
@@ -2521,7 +2521,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-protocol"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "bytes",
  "parking_lot",
@@ -2541,7 +2541,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-server"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "hashbrown 0.17.1",
  "kanal-plus",
@@ -2559,7 +2559,7 @@ dependencies = [
 [[package]]
 name = "pb-mapper-testkit"
 version = "0.7.0"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "pb-mapper-auth",
  "pb-mapper-client",
@@ -3076,7 +3076,7 @@ dependencies = [
 [[package]]
 name = "quinn"
 version = "0.11.12"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "bytes",
  "cfg_aliases",
@@ -3116,7 +3116,7 @@ dependencies = [
 [[package]]
 name = "quinn-proto"
 version = "0.11.19"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "bytes",
  "getrandom 0.4.2",
@@ -3151,7 +3151,7 @@ dependencies = [
 [[package]]
 name = "quinn-udp"
 version = "0.5.16"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "cfg_aliases",
  "libc",
@@ -3290,7 +3290,7 @@ dependencies = [
 [[package]]
 name = "rcgen"
 version = "0.14.10"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -4136,7 +4136,7 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 [[package]]
 name = "stun-proto"
 version = "2.0.3"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "base64 0.22.1",
  "byteorder",
@@ -4153,7 +4153,7 @@ dependencies = [
 [[package]]
 name = "stun-types"
 version = "2.0.3"
-source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#e371902f8365a3c05c4d4c001b6ae1212bfc67d3"
+source = "git+https://github.com/acking-you/pb-mapper?branch=pocox#ec76b82ea142071a110135c58ec4d666a7b0fa6a"
 dependencies = [
  "byteorder",
  "crc",

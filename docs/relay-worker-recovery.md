@@ -3,8 +3,8 @@
 ## Direct connections
 
 POCOX follows pb-mapper's dedicated `pocox` branch, currently locked to
-`e371902f8365a3c05c4d4c001b6ae1212bfc67d3` (SDK 0.7.0 plus live direct stages
-and recovery history), with its `p2p` feature.
+`ec76b82ea142071a110135c58ec4d666a7b0fa6a` (SDK 0.7.0 plus live direct stages,
+recovery history and the Windows UDP source-hint fix), with its `p2p` feature.
 The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
 the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
 The relay server is a test-only dependency, never
@@ -117,6 +117,32 @@ Validation covers direct TCP, compatibility fallback without publisher/relay
 support, temporary-credential isolation, exactly one backend dial, coordinator
 loss and endpoint stop. The automated fixtures run on loopback; they do not
 establish traversal between two independent Internet NATs.
+
+### Windows UDP source selection
+
+`direct_timeout_or_unreachable` while punching can also mean the local host
+failed to send its QUIC handshake response. Check the host log for
+`quinn_udp sendmsg error` with Windows error `10022` (`WSAEINVAL`) and a
+nonempty `src_ip`. On the affected Windows host, an IPv4 packet sent from a
+wildcard-bound socket failed when `IP_PKTINFO` specified the Wi-Fi address,
+while the same packet without that hint, a source-bound socket, self-connections
+and some IPv6 paths worked. ECN on/off did not change the failure. This is not
+evidence that UDP is blocked by the firewall, and another service's direct
+connection does not describe the phone's app-server connection.
+
+The Quinn dependency retries this specific send failure once without the
+redundant IPv4 source hint, only when the socket binding or a fresh Windows
+route lookup confirms the requested address (including an explicit outgoing
+interface, if set). It keeps the original socket/port, payload, destination,
+ECN and segmentation metadata. A different route source, failed lookup, IPv6
+or another error keeps the original behavior. Healthy sends do not perform
+route lookups; there is no interface cache to become stale after network changes.
+
+The fix belongs to the host's transport dependency; updating the phone alone
+does not replace a running Windows host's code. Both POCOX 0.7.5 and 0.7.7 used
+the earlier SDK pin, so success on a Linux host does not establish a version
+regression. The WSAEINVAL reproduction and socket tests run on Windows;
+phone-to-host acceptance still requires a host built with the corrected pin.
 
 ## Worker recovery
 
