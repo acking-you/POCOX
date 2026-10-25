@@ -10,7 +10,14 @@ use super::{Route, Source};
 
 /// The system's proxy now, if any.
 pub(super) fn detect() -> Option<Route> {
-    from_environment(|name| std::env::var(name).ok()).or_else(platform)
+    from_environment(|name| std::env::var(name).ok()).or_else(|| {
+        let (proxy, bypass) = platform()?;
+        Some(Route {
+            proxy: Some(proxy),
+            bypass,
+            source: Source::System,
+        })
+    })
 }
 
 /// The proxy the environment names, with `NO_PROXY` as its bypass list.
@@ -85,8 +92,9 @@ pub(super) fn windows_server(value: &str) -> Option<String> {
         .or_else(|| entry("socks").map(|address| with_scheme(&address, "socks5h")))
 }
 
+/// Windows' proxy setting: its proxy URL and the hosts that bypass it.
 #[cfg(windows)]
-fn platform() -> Option<Route> {
+fn platform() -> Option<(String, Vec<String>)> {
     let settings = windows_registry::CURRENT_USER
         .open("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
         .ok()?;
@@ -98,18 +106,14 @@ fn platform() -> Option<Route> {
         .get_string("ProxyOverride")
         .map(|list| hosts(list.split(';')))
         .unwrap_or_default();
-    Some(Route {
-        proxy: Some(proxy),
-        bypass,
-        source: Source::System,
-    })
+    Some((proxy, bypass))
 }
 
 /// macOS' network proxies (System Settings › Network › Proxies), HTTPS
-/// first, then HTTP, then SOCKS. Its exceptions list is not read; loopback
-/// always connects directly.
+/// first, then HTTP, then SOCKS, with no bypass hosts: its exceptions list
+/// is not read; loopback always connects directly.
 #[cfg(target_os = "macos")]
-fn platform() -> Option<Route> {
+fn platform() -> Option<(String, Vec<String>)> {
     use system_configuration::core_foundation::number::CFNumber;
     use system_configuration::core_foundation::string::CFString;
     use system_configuration::dynamic_store::SCDynamicStoreBuilder;
@@ -147,14 +151,11 @@ fn platform() -> Option<Route> {
                 None => format!("{scheme}://{host}"),
             })
         })?;
-    Some(Route {
-        proxy: Some(proxy),
-        bypass: Vec::new(),
-        source: Source::System,
-    })
+    Some((proxy, Vec::new()))
 }
 
+/// Linux and phones have no proxy setting beyond the environment.
 #[cfg(not(any(windows, target_os = "macos")))]
-fn platform() -> Option<Route> {
+fn platform() -> Option<(String, Vec<String>)> {
     None
 }
