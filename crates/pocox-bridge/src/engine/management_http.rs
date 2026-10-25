@@ -7,13 +7,13 @@ use axum::extract::{DefaultBodyLimit, Path, Query, Request, State};
 use axum::http::{header, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use pocox_host_svc::projects::{ProjectError, ProjectsUpdate};
 use serde::Deserialize;
 
 use super::{runtime, server, ApplyRequest, SaveRequest, StartRequest, StopRequest};
-use crate::engine::host_services;
+use crate::engine::{harnesses, host_services};
 
 #[derive(Clone, Copy)]
 pub(super) struct AdmissionToken {
@@ -41,6 +41,8 @@ pub(super) enum Fault {
     PreparationRequired,
     InvalidConfiguration,
     OutsideRoots,
+    UpdateRunning,
+    UpdateUnavailable,
 }
 impl Fault {
     fn details(&self) -> (StatusCode, &'static str, &'static str) {
@@ -91,6 +93,17 @@ impl Fault {
                 "outside_project_roots",
                 "Choose a folder within the host's configured project folders.",
             ),
+            Self::UpdateRunning => (
+                StatusCode::CONFLICT,
+                "update_running",
+                "Another agent update is running on this computer. Refresh when it finishes.",
+            ),
+            Self::UpdateUnavailable => (
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "update_unavailable",
+                "This agent is not installed on this computer, or its installation cannot be \
+                 updated from here.",
+            ),
         }
     }
 }
@@ -106,7 +119,18 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let mut current = None;
         let mut revision = None;
+        let refused = self
+            .0
+            .downcast_ref::<harnesses::Refusal>()
+            .map(|refusal| match refusal {
+                harnesses::Refusal::Running => Fault::UpdateRunning,
+                harnesses::Refusal::Unavailable | harnesses::Refusal::Unsupported => {
+                    Fault::UpdateUnavailable
+                },
+            });
         let (status, code, message) = if let Some(fault) = self.0.downcast_ref::<Fault>() {
+            fault.details()
+        } else if let Some(fault) = refused {
             fault.details()
         } else if let Some(conflict) = self
             .0
@@ -224,6 +248,30 @@ pub(in crate::engine) fn router(epoch: u64, generation: u64) -> Router {
             }),
         )
         .route("/manage/v1/device", get(|State(s): State<Admission>| run(s, |_| super::device())))
+        // Harness updates name a kind only; this computer owns the installer.
+        .route("/manage/v1/harnesses", get(|State(s): State<Admission>| run(s, |_| harnesses::overview())))
+        .route(
+            "/manage/v1/harnesses/check",
+            post(|State(s): State<Admission>, Json(_): Json<serde_json::Value>| {
+                run(s, |_| harnesses::check())
+            }),
+        )
+        .route(
+            "/manage/v1/harnesses/settings",
+            put(|State(s): State<Admission>, Json(body): Json<harnesses::SettingsChange>| {
+                run(s, move |_| harnesses::set(&body))
+            }),
+        )
+        .route(
+            "/manage/v1/harnesses/{kind}/update",
+            post(
+                |State(s): State<Admission>,
+                 Path(kind): Path<harnesses::Kind>,
+                 Json(_): Json<serde_json::Value>| {
+                    run(s, move |_| harnesses::update(kind))
+                },
+            ),
+        )
         .route(
             "/manage/v1/hosts",
             post(|State(s): State<Admission>, Json(body): Json<StartRequest>| {
@@ -407,6 +455,12 @@ mod tests {
             client
                 .post(format!("{url}/manage/v1/hosts/stale/stop"))
                 .json(&serde_json::json!({"expectedIncarnation":"old"})),
+            client
+                .post(format!("{url}/manage/v1/harnesses/codex/update"))
+                .json(&serde_json::json!({})),
+            client
+                .put(format!("{url}/manage/v1/harnesses/settings"))
+                .json(&serde_json::json!({"kind":"codex","autoUpdate":true})),
         ] {
             let response = request.send().await.expect("response");
             assert_eq!(response.status(), StatusCode::FORBIDDEN);
@@ -441,6 +495,12 @@ mod tests {
                 .into(),
                 StatusCode::CONFLICT,
                 "configuration_changed",
+            ),
+            (harnesses::Refusal::Running.into(), StatusCode::CONFLICT, "update_running"),
+            (
+                harnesses::Refusal::Unavailable.into(),
+                StatusCode::UNPROCESSABLE_ENTITY,
+                "update_unavailable",
             ),
         ];
         for (error, status, code) in cases {

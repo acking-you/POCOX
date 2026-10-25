@@ -207,6 +207,10 @@ as `hostingOwnedElsewhere`. Any new hosting service calls
   are never offered for saving, and Stop stays available.
 - Restore-persistence warnings are shown beside, never instead of, the
   start or apply result.
+- **Agents on this computer**, under the panel, shows that computer's
+  installed harness versions and updates them there, restarting its services
+  on the new version; its settings are its own
+  ([harness updates](harness-updates.md)).
 
 ## Automatic restore
 

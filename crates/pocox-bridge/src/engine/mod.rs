@@ -17,6 +17,7 @@ pub mod execution;
 pub mod galaxy;
 pub mod git_diff;
 pub mod grok_account;
+pub mod harnesses;
 pub mod history_projection;
 pub mod host_apply;
 mod host_lease;

@@ -225,6 +225,47 @@ pub fn claude_prepare(key: &str, start: bool) -> Result<super::management_runtim
     )
 }
 
+/// Read the selected computer's harnesses; `None` for an older host without
+/// harness management.
+pub fn harnesses(key: &str) -> Result<Option<super::harnesses::Overview>> {
+    check_key(key)?;
+    match request(key, Method::GET, &["manage", "v1", "harnesses"], None::<&()>) {
+        Ok(overview) => Ok(Some(overview)),
+        Err(error)
+            if error
+                .downcast_ref::<RemoteError>()
+                .is_some_and(|error| matches!(error.status, 404 | 405)) =>
+        {
+            Ok(None)
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// Look up the selected computer's installed and newest harness versions now.
+pub fn harnesses_check(key: &str) -> Result<super::harnesses::Overview> {
+    check_key(key)?;
+    request(key, Method::POST, &["manage", "v1", "harnesses", "check"], None::<&()>)
+}
+
+/// Start updating one harness on the selected computer; it runs on there.
+pub fn harness_update(
+    key: &str,
+    kind: super::harnesses::Kind,
+) -> Result<super::harnesses::Overview> {
+    check_key(key)?;
+    request(key, Method::POST, &["manage", "v1", "harnesses", kind.label(), "update"], None::<&()>)
+}
+
+/// Change the selected computer's own harness update settings.
+pub fn harness_settings(
+    key: &str,
+    change: &super::harnesses::SettingsChange,
+) -> Result<super::harnesses::Overview> {
+    check_key(key)?;
+    request(key, Method::PUT, &["manage", "v1", "harnesses", "settings"], Some(change))
+}
+
 /// Start the exact saved configuration without exposing its private fields.
 pub fn start_saved(key: &str, name: &str, revision: u64) -> Result<management::HostView> {
     check_key(key)?;

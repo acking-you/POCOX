@@ -15,6 +15,7 @@ import 'package:pocox/src/rust/api/bridge/device_metadata.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/diff.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/events.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/grok.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/harnesses.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/history_projection.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_config.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_sessions.dart' as frb;
@@ -35,6 +36,7 @@ part 'bridge/rust_host_sessions.dart';
 part 'bridge/rust_management.dart';
 part 'bridge/rust_tools.dart';
 part 'bridge/rust_grok.dart';
+part 'bridge/rust_harnesses.dart';
 part 'bridge/rust_updates.dart';
 part 'bridge/rust_composer.dart';
 part 'bridge/rust_events.dart';
@@ -48,6 +50,7 @@ class RustBridgeApi
         _RustManagement,
         _RustTools,
         _RustGrok,
+        _RustHarnesses,
         _RustUpdates
     implements BridgeApi {
   /// Creates the real bridge.

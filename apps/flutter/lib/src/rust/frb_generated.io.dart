@@ -14,6 +14,7 @@ import 'api/bridge/device_metadata.dart';
 import 'api/bridge/diff.dart';
 import 'api/bridge/events.dart';
 import 'api/bridge/grok.dart';
+import 'api/bridge/harnesses.dart';
 import 'api/bridge/history_projection.dart';
 import 'api/bridge/host_config.dart';
 import 'api/bridge/host_sessions.dart';
@@ -221,6 +222,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DirectStageDto dco_decode_box_autoadd_direct_stage_dto(dynamic raw);
 
   @protected
+  HarnessJobDto dco_decode_box_autoadd_harness_job_dto(dynamic raw);
+
+  @protected
+  HarnessOverviewDto dco_decode_box_autoadd_harness_overview_dto(dynamic raw);
+
+  @protected
   HostActiveDto dco_decode_box_autoadd_host_active_dto(dynamic raw);
 
   @protected
@@ -351,6 +358,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GrokSignInDto dco_decode_grok_sign_in_dto(dynamic raw);
 
   @protected
+  HarnessDto dco_decode_harness_dto(dynamic raw);
+
+  @protected
+  HarnessJobDto dco_decode_harness_job_dto(dynamic raw);
+
+  @protected
+  HarnessOverviewDto dco_decode_harness_overview_dto(dynamic raw);
+
+  @protected
+  HarnessSkipDto dco_decode_harness_skip_dto(dynamic raw);
+
+  @protected
   HighlightInputDto dco_decode_highlight_input_dto(dynamic raw);
 
   @protected
@@ -430,6 +449,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<FileEntryDto> dco_decode_list_file_entry_dto(dynamic raw);
+
+  @protected
+  List<HarnessDto> dco_decode_list_harness_dto(dynamic raw);
+
+  @protected
+  List<HarnessSkipDto> dco_decode_list_harness_skip_dto(dynamic raw);
 
   @protected
   List<HighlightInputDto> dco_decode_list_highlight_input_dto(dynamic raw);
@@ -637,6 +662,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DirectStageDto? dco_decode_opt_box_autoadd_direct_stage_dto(dynamic raw);
+
+  @protected
+  HarnessJobDto? dco_decode_opt_box_autoadd_harness_job_dto(dynamic raw);
+
+  @protected
+  HarnessOverviewDto? dco_decode_opt_box_autoadd_harness_overview_dto(
+    dynamic raw,
+  );
 
   @protected
   HostActiveDto? dco_decode_opt_box_autoadd_host_active_dto(dynamic raw);
@@ -1047,6 +1080,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HarnessJobDto sse_decode_box_autoadd_harness_job_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HarnessOverviewDto sse_decode_box_autoadd_harness_overview_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HostActiveDto sse_decode_box_autoadd_host_active_dto(
     SseDeserializer deserializer,
   );
@@ -1217,6 +1260,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   GrokSignInDto sse_decode_grok_sign_in_dto(SseDeserializer deserializer);
 
   @protected
+  HarnessDto sse_decode_harness_dto(SseDeserializer deserializer);
+
+  @protected
+  HarnessJobDto sse_decode_harness_job_dto(SseDeserializer deserializer);
+
+  @protected
+  HarnessOverviewDto sse_decode_harness_overview_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HarnessSkipDto sse_decode_harness_skip_dto(SseDeserializer deserializer);
+
+  @protected
   HighlightInputDto sse_decode_highlight_input_dto(
     SseDeserializer deserializer,
   );
@@ -1320,6 +1377,14 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<FileEntryDto> sse_decode_list_file_entry_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<HarnessDto> sse_decode_list_harness_dto(SseDeserializer deserializer);
+
+  @protected
+  List<HarnessSkipDto> sse_decode_list_harness_skip_dto(
     SseDeserializer deserializer,
   );
 
@@ -1605,6 +1670,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   DirectStageDto? sse_decode_opt_box_autoadd_direct_stage_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HarnessJobDto? sse_decode_opt_box_autoadd_harness_job_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  HarnessOverviewDto? sse_decode_opt_box_autoadd_harness_overview_dto(
     SseDeserializer deserializer,
   );
 
@@ -2097,6 +2172,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_harness_job_dto(
+    HarnessJobDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_harness_overview_dto(
+    HarnessOverviewDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_host_active_dto(
     HostActiveDto self,
     SseSerializer serializer,
@@ -2313,6 +2400,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_harness_dto(HarnessDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_harness_job_dto(HarnessJobDto self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_harness_overview_dto(
+    HarnessOverviewDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_harness_skip_dto(
+    HarnessSkipDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_highlight_input_dto(
     HighlightInputDto self,
     SseSerializer serializer,
@@ -2447,6 +2552,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_file_entry_dto(
     List<FileEntryDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_harness_dto(
+    List<HarnessDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_harness_skip_dto(
+    List<HarnessSkipDto> self,
     SseSerializer serializer,
   );
 
@@ -2810,6 +2927,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_box_autoadd_direct_stage_dto(
     DirectStageDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_harness_job_dto(
+    HarnessJobDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_harness_overview_dto(
+    HarnessOverviewDto? self,
     SseSerializer serializer,
   );
 

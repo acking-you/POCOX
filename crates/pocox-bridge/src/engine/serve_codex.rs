@@ -227,8 +227,7 @@ pub(super) fn restart_guard(name: &str, incarnation: &str, wait: Duration) -> Op
 /// recover without the user intervening. Mirrors the CLI watchdog; logs via
 /// `tracing`.
 /// A respawn gets the same child-only `secret_env` as the first start.
-pub(super) async fn health_watchdog(watched: Watched) {
-    let watched = Arc::new(watched);
+pub(super) async fn health_watchdog(watched: Arc<Watched>) {
     let local_addr = watched.local_addr.clone();
     let Some(client) = probe_client() else {
         return;
@@ -313,85 +312,123 @@ async fn restart_codex(watched: Arc<Watched>) -> Result<bool> {
         else {
             return Ok(false);
         };
-        let spawn_opts = watched.spawn_opts.clone();
-        // Nothing launches beside an earlier codex of this host still running.
-        settle_retained(&watched.name)?;
-        // Exactly the process this host runs now (the lease keeps it this
-        // incarnation), never whoever listens on its port; one that does
-        // not exit stays owned (by the record and the ledger).
-        let old = hosts_locked().get(&watched.name).and_then(|ls| ls.child);
-        if old.is_some_and(|old| !NATIVE.stop(&watched.name, old, EXIT_WAIT)) {
-            bail!("the unresponsive codex did not exit; the restart was not attempted");
-        }
-        if let Some(ls) = hosts_locked().get_mut(&watched.name) {
-            ls.child = None;
-        }
-        let report =
-            spawn_ready_redacted(spawn_opts, &watched.secret_env, &watched.redactor, READY_TIMEOUT)
-                .map_err(|err| match err {
-                    SpawnReadyError::Spawn(e) => {
-                        anyhow::Error::new(e).context("respawning the codex app-server")
-                    },
-                    // An adopted (reused) listener means spawn found the OLD process
-                    // still bound — the restart did not take effect; report that
-                    // precisely rather than as a readiness failure. Otherwise a
-                    // respawn that dies on boot (e.g. something else grabbed the
-                    // port while codex was down) must count as a FAILED restart, so
-                    // the watchdog's restart backoff engages instead of resetting and
-                    // hammering a bind that can never succeed. The fresh child is
-                    // stopped, and kept owned if it does not exit.
-                    SpawnReadyError::NotReady {
-                        report,
-                        failure,
-                    } => {
-                        if report.reused {
-                            anyhow::anyhow!(
-                                "codex is still holding the listen port; restart did not take \
-                                 effect"
-                            )
-                        } else {
-                            let exited = OwnedChild::of_report(&report)
-                                .is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
-                            let error = startup_failure_error(*failure);
-                            if exited {
-                                error
-                            } else {
-                                error.context("the respawned codex did not exit")
-                            }
-                        }
-                    },
-                })?;
-        // Adopted-and-ready reads the same way: the old process survived, so
-        // the restart did not take effect.
-        anyhow::ensure!(
-            !report.reused,
-            "codex is still holding the listen port; restart did not take effect"
-        );
-        let child = OwnedChild::of_report(&report);
-        if let Some(expected) = &watched.expected {
-            let checked = pocox_codex::provider_launch::check_effective_blocking(
-                &report.info.listen,
-                expected,
-                READY_TIMEOUT,
-            );
-            if let Err(refusal) = checked {
-                let exited = child.is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
-                bail!("{refusal}{}", not_exited(exited));
-            }
-        }
-        if !pocox_codex::still_owned(&report) {
-            let exited = child.is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
-            bail!("the port is no longer served by the respawned codex{}", not_exited(exited));
-        }
-        // The lease is still held, so the host is still this incarnation.
-        if let Some(ls) = hosts_locked().get_mut(&watched.name) {
-            ls.pid = report.info.pid;
-            ls.child = child;
-        }
+        stop_owned(&watched, "the unresponsive codex")?;
+        spawn_again(&watched)?;
         Ok(true)
     })
     .await
     .context("codex restart task panicked")?
+}
+
+/// A Codex host whose app-server [`stop_in_place`] stopped: the host, its
+/// port and its relay keys stay, and [`start_in_place`] spawns it again.
+pub(in crate::engine) struct Stopped(Arc<Watched>);
+
+/// Stop the app-server of `lease`'s host, keeping the host, while it is still
+/// `incarnation`. `Ok(None)` when it is no longer that incarnation or not one
+/// this app may restart (an adopted app-server).
+pub(in crate::engine) fn stop_in_place(
+    lease: &Lease,
+    incarnation: &str,
+) -> Result<Option<Stopped>> {
+    let watched = hosts_locked()
+        .values()
+        .find(|ls| host_names::same(&ls.name, lease.name()) && ls.incarnation == incarnation)
+        .and_then(|ls| ls.watched.clone());
+    let Some(watched) = watched else { return Ok(None) };
+    stop_owned(&watched, "its codex")?;
+    Ok(Some(Stopped(watched)))
+}
+
+/// Spawn a [`Stopped`] app-server again on its port, exactly as it ran
+/// (executable path, arguments, environment, effective-route check). Under
+/// the lease [`stop_in_place`] was given.
+pub(in crate::engine) fn start_in_place(_lease: &Lease, stopped: Stopped) -> Result<()> {
+    spawn_again(&stopped.0)
+}
+
+/// Stop exactly the process this host runs now (the held lease keeps it this
+/// incarnation), never whoever listens on its port; one that does not exit
+/// stays owned (by the record and the ledger). `what` names it in the error.
+fn stop_owned(watched: &Watched, what: &str) -> Result<()> {
+    // Nothing launches beside an earlier codex of this host still running.
+    settle_retained(&watched.name)?;
+    let old = hosts_locked().get(&watched.name).and_then(|ls| ls.child);
+    if old.is_some_and(|old| !NATIVE.stop(&watched.name, old, EXIT_WAIT)) {
+        bail!("{what} did not exit; the restart was not attempted");
+    }
+    if let Some(ls) = hosts_locked().get_mut(&watched.name) {
+        ls.child = None;
+    }
+    Ok(())
+}
+
+/// Spawn the host's app-server again on its port after [`stop_owned`], under
+/// the instance's lease.
+fn spawn_again(watched: &Watched) -> Result<()> {
+    let spawn_opts = watched.spawn_opts.clone();
+    let report =
+        spawn_ready_redacted(spawn_opts, &watched.secret_env, &watched.redactor, READY_TIMEOUT)
+            .map_err(|err| match err {
+                SpawnReadyError::Spawn(e) => {
+                    anyhow::Error::new(e).context("respawning the codex app-server")
+                },
+                // An adopted (reused) listener means spawn found the OLD process
+                // still bound — the restart did not take effect; report that
+                // precisely rather than as a readiness failure. Otherwise a
+                // respawn that dies on boot (e.g. something else grabbed the
+                // port while codex was down) must count as a FAILED restart, so
+                // the watchdog's restart backoff engages instead of resetting and
+                // hammering a bind that can never succeed. The fresh child is
+                // stopped, and kept owned if it does not exit.
+                SpawnReadyError::NotReady {
+                    report,
+                    failure,
+                } => {
+                    if report.reused {
+                        anyhow::anyhow!(
+                            "codex is still holding the listen port; restart did not take effect"
+                        )
+                    } else {
+                        let exited = OwnedChild::of_report(&report)
+                            .is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
+                        let error = startup_failure_error(*failure);
+                        if exited {
+                            error
+                        } else {
+                            error.context("the respawned codex did not exit")
+                        }
+                    }
+                },
+            })?;
+    // Adopted-and-ready reads the same way: the old process survived, so
+    // the restart did not take effect.
+    anyhow::ensure!(
+        !report.reused,
+        "codex is still holding the listen port; restart did not take effect"
+    );
+    let child = OwnedChild::of_report(&report);
+    if let Some(expected) = &watched.expected {
+        let checked = pocox_codex::provider_launch::check_effective_blocking(
+            &report.info.listen,
+            expected,
+            READY_TIMEOUT,
+        );
+        if let Err(refusal) = checked {
+            let exited = child.is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
+            bail!("{refusal}{}", not_exited(exited));
+        }
+    }
+    if !pocox_codex::still_owned(&report) {
+        let exited = child.is_none_or(|child| NATIVE.stop(&watched.name, child, EXIT_WAIT));
+        bail!("the port is no longer served by the respawned codex{}", not_exited(exited));
+    }
+    // The lease is still held, so the host is still this incarnation.
+    if let Some(ls) = hosts_locked().get_mut(&watched.name) {
+        ls.pid = report.info.pid;
+        ls.child = child;
+    }
+    Ok(())
 }
 
 /// The caller's phrasing of the pick-another-port remedy (the hosting form's

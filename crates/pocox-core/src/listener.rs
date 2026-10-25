@@ -39,7 +39,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::time::{Duration, Instant};
 
 #[cfg(any(not(target_os = "linux"), test))]
-mod probe;
+use crate::process::bounded;
 
 /// How long the listing tools of one check may run before they are stopped
 /// (and the answer cannot be told); each run's cleanup may add 0.5 s more.
@@ -231,7 +231,7 @@ fn proc_address(hex: &str) -> Option<IpAddr> {
 fn platform(requested: &[IpAddr], port: u16, _tree: &[u32]) -> Option<Listening> {
     let mut lsof = std::process::Command::new("lsof");
     lsof.args(["-nP", "-w", &format!("-iTCP:{port}"), "-sTCP:LISTEN", "-Fftn"]);
-    let run = probe::run(&mut lsof, Instant::now() + PROBE_BUDGET, PROBE_CAP)?;
+    let run = bounded::run(&mut lsof, Instant::now() + PROBE_BUDGET, PROBE_CAP).ok()?;
     Some(Listening {
         pids: lsof_listing(&run, requested, port)?,
         unattributed: false,
@@ -242,7 +242,7 @@ fn platform(requested: &[IpAddr], port: u16, _tree: &[u32]) -> Option<Listening>
 /// no-match outcome: exit 1 with nothing printed. Any other exit, output on
 /// standard error, or a listing [`lsof_pids`] cannot read is `None`.
 #[cfg(any(all(unix, not(target_os = "linux")), test))]
-fn lsof_listing(run: &probe::Probed, requested: &[IpAddr], port: u16) -> Option<Vec<u32>> {
+fn lsof_listing(run: &bounded::Output, requested: &[IpAddr], port: u16) -> Option<Vec<u32>> {
     match run.code {
         Some(0) if !run.stdout.is_empty() && run.stderr.is_empty() => {
             lsof_pids(std::str::from_utf8(&run.stdout).ok()?, requested, port)
@@ -359,7 +359,7 @@ fn platform(requested: &[IpAddr], port: u16, _tree: &[u32]) -> Option<Listening>
         netstat
             .args(["-ano", "-p", proto])
             .creation_flags(CREATE_NO_WINDOW);
-        let run = probe::run(&mut netstat, deadline, PROBE_CAP)?;
+        let run = bounded::run(&mut netstat, deadline, PROBE_CAP).ok()?;
         if run.code != Some(0) || !run.stderr.is_empty() {
             return None;
         }

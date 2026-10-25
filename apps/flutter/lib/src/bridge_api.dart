@@ -24,9 +24,11 @@ part 'bridge/management_types.dart';
 part 'bridge/device_metadata.dart';
 part 'bridge/tools_types.dart';
 part 'bridge/grok_types.dart';
+part 'bridge/harness_types.dart';
 part 'bridge/controller_api.dart';
 
-abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
+abstract interface class BridgeApi
+    implements UpdateApi, ControllerBridgeApi, HarnessBridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
   Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
   Future<bool> appHistorySyncPrepare(String serviceKey);

@@ -644,6 +644,12 @@ class _DeviceFirstServices extends ConsumerWidget {
           onOpen: (key) => _openInChat(context, ref, key),
         ),
         const SizedBox(height: 12),
+        // Its agents' versions and updates; it ends with its own gap, and
+        // an older computer without them shows nothing.
+        HarnessPanel(
+          key: ValueKey('harness-panel-$managementKey'),
+          serviceKey: managementKey,
+        ),
       ],
       // Every capability may be one of this computer's hosts, listed under
       // hosting below; then there is nothing left to say here.
@@ -759,6 +765,12 @@ class _DeviceFirstServices extends ConsumerWidget {
             ),
           ],
         ),
+        // This computer's agents; another app hosting from the same state
+        // owns them, so this one leaves them alone.
+        if (!elsewhere) ...[
+          const SizedBox(height: 12),
+          const HarnessPanel(key: ValueKey('harness-panel-local')),
+        ],
       ],
     ];
 

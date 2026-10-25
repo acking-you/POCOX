@@ -343,14 +343,27 @@ fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
 /// Restart the agent of host `name` (a fresh process and generation).
 pub fn restart(name: &str) -> Result<()> {
     let lease = host_lease::acquire(name, Op::Restart)?;
+    if !restart_locked(&lease, None)? {
+        bail!("`{name}` is not hosting an ACP agent");
+    }
+    Ok(())
+}
+
+/// Restart the agent of `lease`'s host in place, from the exact launch it
+/// runs (its executable path is not looked up again), while the host is
+/// still `incarnation` (any, when `None`). `Ok(false)`: it is not hosting,
+/// or is another incarnation.
+pub(super) fn restart_locked(lease: &Lease, incarnation: Option<&str>) -> Result<bool> {
     // The table is keyed canonically, like the lease.
     let host = hosts()
         .get(lease.name())
-        .map(|h| h.host.clone())
-        .ok_or_else(|| anyhow!("`{name}` is not hosting an ACP agent"))?;
+        .filter(|h| incarnation.is_none_or(|seen| h.host.host_id() == seen))
+        .map(|h| h.host.clone());
+    let Some(host) = host else { return Ok(false) };
     runtime::runtime()
         .block_on(host.restart())
-        .map_err(|error| anyhow!("{error}"))
+        .map_err(|error| anyhow!("{error}"))?;
+    Ok(true)
 }
 
 /// How a running ACP host was launched, for restarting it in place.

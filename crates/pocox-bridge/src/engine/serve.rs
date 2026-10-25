@@ -64,6 +64,7 @@ use self::codex::{
 };
 #[cfg(test)]
 use self::codex::{over_log_cap, truncate_host_log, MAX_HOST_LOG_BYTES};
+pub(super) use self::codex::{start_in_place, stop_in_place, Stopped};
 #[cfg(test)]
 pub use self::lifecycle::serve_stop;
 use self::lifecycle::{
@@ -97,6 +98,8 @@ struct LocalServe {
     /// Holding it IS the publication — dropping it unpublishes.
     app_register: Option<Published>,
     watchdog: JoinHandle<()>,
+    /// What the watchdog respawns; `None` for an adopted app-server.
+    watched: Option<Arc<Watched>>,
     /// Tails the external codex log into the in-app viewer. Aborted on stop.
     log_tail: Option<JoinHandle<()>>,
     // in-process Responses API proxy.
@@ -579,7 +582,7 @@ fn launch_codex(
     // startup-failure hint both promise 0 works.
     let port = if port == 0 { free_loopback_port()? } else { port };
 
-    let (app_local, pid, child, watchdog, log_tail, adopted) = {
+    let (app_local, pid, child, (watchdog, watched), log_tail, adopted) = {
         let spawn_opts = SpawnOptions {
             binary,
             listen: ListenSpec::WebSocket {
@@ -676,10 +679,8 @@ fn launch_codex(
             port: app_local.port(),
         };
         // An adopted app-server is not this app's to restart.
-        let watchdog = if report.reused {
-            runtime::runtime().spawn(async {})
-        } else {
-            runtime::runtime().spawn(health_watchdog(Watched {
+        let watched = (!report.reused).then(|| {
+            Arc::new(Watched {
                 name: name.clone(),
                 incarnation: incarnation.clone(),
                 local_addr: app_local.to_string(),
@@ -687,14 +688,18 @@ fn launch_codex(
                 secret_env,
                 expected,
                 redactor: redactor.clone(),
-            }))
+            })
+        });
+        let watchdog = match &watched {
+            Some(watched) => runtime::runtime().spawn(health_watchdog(watched.clone())),
+            None => runtime::runtime().spawn(async {}),
         };
         // Surface the spawned codex's own logs in the in-app viewer by tailing
         // the file its stdout/stderr are redirected to, from this run's offset,
         // with every line holding the key withheld.
         let log_tail =
             tail_codex_log(report.info.log_file.clone(), report.log_offset, name.clone(), redactor);
-        (app_local, report.info.pid, child, watchdog, Some(log_tail), report.reused)
+        (app_local, report.info.pid, child, (watchdog, watched), Some(log_tail), report.reused)
     };
 
     // The rest of the start can still fail (loopback listener binds, relay
@@ -760,6 +765,7 @@ fn launch_codex(
         // Filled in immediately below.
         app_register: None,
         watchdog,
+        watched,
         log_tail,
         api_key: api_key.clone(),
         api_local,

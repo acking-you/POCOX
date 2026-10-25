@@ -23,6 +23,7 @@ must keep. Start with [architecture](architecture.md); contributor rules are in
 | [Grok Build](grok-build.md) | the Grok preset, its account, extensions and leader following |
 | [Hosting configuration](hosting-configuration.md) | the hosting editor, model services, keys, apply and restore |
 | [Remote device management](remote-device-management.md) | managing another computer, the CLI managed host, device identity |
+| [Harness updates](harness-updates.md) | each computer's agent versions, updating them and restarting their services |
 | [macOS shell PATH](macos-shell-path.md) | how GUI hosts find Codex and Node on macOS |
 
 ## Sessions and history

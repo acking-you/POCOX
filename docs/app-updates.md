@@ -45,9 +45,12 @@ variables such as `HTTPS_PROXY` apply, but native OS proxy settings are not
 read. Proxy credentials are masked in the editor and omitted from summaries
 and debug output; the app's config remains private (0600 on Unix).
 
-This setting does not configure relay TCP transports, hosted harnesses, the
-Responses API service's upstream proxy, or pages opened in the system browser.
-Their existing network configuration remains authoritative. Automatic checks
+This setting does not configure relay TCP transports, hosted harnesses' own
+requests, the Responses API service's upstream proxy, or pages opened in the
+system browser. Their existing network configuration remains authoritative.
+Checking and updating a computer's harnesses does use it: version lookups go
+through the app's client, and installers get it in their environment only
+([harness updates](harness-updates.md#network-proxy)). Automatic checks
 still fetch only release metadata; package downloading starts when the user
 chooses Update. Signature and package verification remain mandatory.
 

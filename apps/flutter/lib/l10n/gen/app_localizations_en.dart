@@ -4842,7 +4842,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkProxyScope =>
-      'Used by POCOX for update checks, downloads, account requests and web images. Hosted agents, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.';
+      'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.';
 
   @override
   String get networkProxyDefault => 'Default network';
@@ -4871,6 +4871,186 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkProxyHide => 'Hide proxy URL';
+
+  @override
+  String get harnessesTitle => 'Agents on this computer';
+
+  @override
+  String get harnessesInfo =>
+      'POCOX checks which version of each agent is installed on this computer and whether a newer one is out, and updates it with the agent\'s own installer. Checks and installers use this computer\'s application network proxy. Each computer keeps its own settings.';
+
+  @override
+  String get harnessCheckNow => 'Check for updates';
+
+  @override
+  String get harnessChecking => 'Checking for updates…';
+
+  @override
+  String harnessCheckedAgo(String ago) {
+    return 'Checked $ago';
+  }
+
+  @override
+  String get harnessNotChecked => 'Not checked yet';
+
+  @override
+  String get harnessNotInstalled => 'Not installed';
+
+  @override
+  String get harnessVersionUnknown => 'Version unknown';
+
+  @override
+  String get harnessUpToDate => 'Up to date';
+
+  @override
+  String harnessUpdateTo(String version) {
+    return 'Update to $version';
+  }
+
+  @override
+  String get harnessUpdate => 'Update';
+
+  @override
+  String get harnessStageStopping => 'Stopping services…';
+
+  @override
+  String get harnessStageUpdating => 'Updating…';
+
+  @override
+  String get harnessStageRestarting => 'Restarting services…';
+
+  @override
+  String get harnessMethodBrew => 'Homebrew';
+
+  @override
+  String get harnessMethodStandalone => 'standalone install';
+
+  @override
+  String harnessUsedBy(String names) {
+    return 'Used by $names';
+  }
+
+  @override
+  String get harnessAutoUpdate => 'Update automatically';
+
+  @override
+  String get harnessRestartTitle => 'Restart services after updating';
+
+  @override
+  String get harnessRestartOn =>
+      'Services that use an updated agent restart on the new version. Their conversations reconnect; drafts are kept.';
+
+  @override
+  String get harnessRestartOff =>
+      'Services keep running the previous version until they restart.';
+
+  @override
+  String harnessConfirmTitle(String name, String version) {
+    return 'Update $name to $version?';
+  }
+
+  @override
+  String harnessConfirmRestart(String names) {
+    return 'It updates with its own installer on that computer. Then $names restart on the new version: open conversations reconnect and a running turn is interrupted. Drafts are kept.';
+  }
+
+  @override
+  String harnessConfirmKeep(String names) {
+    return 'It updates with its own installer on that computer. $names keep running the current version until they restart.';
+  }
+
+  @override
+  String get harnessConfirmPlain =>
+      'It updates with its own installer on that computer.';
+
+  @override
+  String harnessUpdated(String version) {
+    return 'Updated to $version.';
+  }
+
+  @override
+  String harnessUpdatedAutomatically(String version) {
+    return 'Updated automatically to $version.';
+  }
+
+  @override
+  String harnessUnchanged(String version) {
+    return 'The installer finished, but $version is still installed.';
+  }
+
+  @override
+  String harnessRestarted(String names) {
+    return 'Restarted: $names.';
+  }
+
+  @override
+  String harnessNotRestarted(String items) {
+    return 'Not restarted: $items.';
+  }
+
+  @override
+  String get harnessSkipDisabled => 'restarting is off';
+
+  @override
+  String get harnessSkipAdopted => 'not started by POCOX';
+
+  @override
+  String get harnessSkipShared => 'follows OpenCode\'s own server';
+
+  @override
+  String get harnessSkipChanged => 'restarted meanwhile';
+
+  @override
+  String get harnessSkipBusy => 'busy';
+
+  @override
+  String get harnessSkipFailed => 'its restart failed; check it';
+
+  @override
+  String get harnessFailedToolMissing =>
+      'Update failed: its installer was not found on that computer.';
+
+  @override
+  String get harnessFailedInUse =>
+      'Update failed: its files are in use. Close other running copies of it on that computer and try again.';
+
+  @override
+  String get harnessFailedPermission =>
+      'Update failed: the installation needs administrator rights. Update it in a terminal on that computer.';
+
+  @override
+  String get harnessFailedTimeout =>
+      'Update failed: the installer did not finish in time.';
+
+  @override
+  String get harnessFailed =>
+      'Update failed. That computer\'s diagnostics have the installer\'s output.';
+
+  @override
+  String get harnessProblemUnmanaged =>
+      'Installed in a way POCOX cannot update. Update it yourself.';
+
+  @override
+  String get harnessProblemWinget =>
+      'Installed with WinGet. Update it with WinGet.';
+
+  @override
+  String get harnessProblemBundled =>
+      'Uses the Claude Code bundled with its adapter, which updates with POCOX.';
+
+  @override
+  String get harnessProblemVersion => 'Its version could not be read.';
+
+  @override
+  String get harnessProblemCheck => 'Could not look up its newest version.';
+
+  @override
+  String get harnessUpdateRunning =>
+      'Another agent update is running on that computer. Wait for it to finish.';
+
+  @override
+  String get harnessUpdateUnavailable =>
+      'This agent is not installed or cannot be updated on that computer. Refresh to see its state.';
 
   @override
   String logsDiskLost(int count) {
