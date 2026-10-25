@@ -264,6 +264,7 @@ extension _SessionLoading on _AppSessionState {
       _historyLoad = null;
       _historyGeneration++;
       _historyArrivalRow = null;
+      _turnFlashRow = null;
       _approvals.clear();
       _asyncQuestions.clear();
       _ctx = null;

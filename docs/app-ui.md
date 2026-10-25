@@ -233,9 +233,17 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Sync and navigation status float over the transcript top
   (`widgets/floating_status.dart`) and fade in. The turn clock and sidebar
   motion do not rebuild the transcript.
-- Minimap tick density is limited by available height (`widgets/turn_minimap.dart`);
-  the exact active marker stays, and every turn is reachable through a lazy,
-  searchable directory and the keyboard (`widgets/turn_outline.dart`). Narrow
+- The turn rail (`widgets/turn_minimap.dart`) follows ChatGPT's: one 2 px
+  mark per turn at a 10 px pitch, 6 px at rest, the turns on screen inked
+  darker. The pointed-at mark grows to 26 px with its neighbours at 20, 14 and
+  10 px (a 160 ms spring; ink switches at once), and its card opens after
+  200 ms, then follows the pointer without waiting. A click jumps and flashes
+  the landed message's bubble; press and drag scrubs through loaded turns,
+  fetching an unloaded one only where the press ends. Past 70% of the height
+  (640 px at most) the marks scroll, with edge fades, and keep the turn on
+  screen in view unless the pointer is on them. Every turn is also reachable
+  through a lazy, searchable directory and the keyboard
+  (`widgets/turn_outline.dart`), whose button shows with the card. Narrow
   and touch layouts fold navigation into a faint `TurnNavigationHandle` (opens
   on touch, folds after 5 s or a scroll); wide desktops keep the rail.
 - Above the latest message, the jump-to-latest button

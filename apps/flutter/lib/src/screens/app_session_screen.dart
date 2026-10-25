@@ -75,7 +75,7 @@ import 'package:pocox/src/widgets/centered_scroll.dart';
 import 'package:pocox/src/review/review_panel.dart';
 import 'package:pocox/src/review/session_changes.dart';
 import 'package:pocox/src/widgets/draggable_navigation.dart';
-import 'package:pocox/src/widgets/history_arrival.dart';
+import 'package:pocox/src/widgets/arrival_pulse.dart';
 import 'package:pocox/src/widgets/agent_icon.dart';
 import 'package:pocox/src/widgets/host_switcher.dart';
 import 'package:pocox/src/widgets/jump_to_latest_button.dart';
@@ -658,6 +658,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _historyFromTop = false;
   Key? _historyArrivalRow;
   int _historyArrivalRevision = 0;
+  // The user message a turn jump landed on, flashed once.
+  Key? _turnFlashRow;
+  int _turnFlashRevision = 0;
   Locale? _minimapLocale;
   String? _error;
   VoidCallback? _retry; // action for the error banner's retry button

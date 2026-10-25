@@ -32,7 +32,7 @@ import 'package:pocox/src/widgets/message_images.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 import 'package:pocox/src/widgets/turn_minimap.dart';
 import 'package:pocox/src/widgets/middle_click_scroll.dart';
-import 'package:pocox/src/widgets/history_arrival.dart';
+import 'package:pocox/src/widgets/arrival_pulse.dart';
 
 import '../fake_bridge_api.dart';
 import '../support/screen_harness.dart';
