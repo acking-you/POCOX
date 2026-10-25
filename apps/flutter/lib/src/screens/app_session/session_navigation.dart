@@ -268,7 +268,7 @@ extension _SessionNavigation on _AppSessionState {
         _navigatingTurn = null;
         _navigationLoading = false;
       });
-      _scrollToRow(item.rowIndex);
+      _landOnTurn(item.rowIndex);
       return;
     }
     _updateState(() {
@@ -290,7 +290,25 @@ extension _SessionNavigation on _AppSessionState {
       _navigationLoading = false;
       if (row != null && row.rowIndex >= 0) _navigatingTurn = null;
     });
-    if (row != null && row.rowIndex >= 0) _scrollToRow(row.rowIndex);
+    if (row != null && row.rowIndex >= 0) _landOnTurn(row.rowIndex);
+  }
+
+  /// Scroll a selected turn's user message to the top and flash it, so the
+  /// eye finds where the jump landed.
+  void _landOnTurn(int rowIndex) {
+    final rows = _rows;
+    if (rowIndex < 0 || rowIndex >= rows.length) return;
+    final flash = _turnFlashRevision + 1;
+    _updateState(() {
+      _turnFlashRow = _rowKey(rows[rowIndex]);
+      _turnFlashRevision = flash;
+    });
+    // The flash plays once: a row scrolled away and back is not a new landing
+    // (no rebuild needed to forget it).
+    Timer(const Duration(milliseconds: 1600), () {
+      if (_turnFlashRevision == flash) _turnFlashRow = null;
+    });
+    _scrollToRow(rowIndex);
   }
 
   Future<void> _openTurnOutline() async {

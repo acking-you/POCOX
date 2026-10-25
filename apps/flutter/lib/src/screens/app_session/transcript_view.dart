@@ -29,6 +29,7 @@ import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/builtin_tools.dart';
 import 'package:pocox/src/tools/share_card.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/arrival_pulse.dart';
 import 'package:pocox/src/widgets/markdown_view.dart';
 import 'package:pocox/src/widgets/message_images.dart';
 import 'package:pocox/src/widgets/realtime_handoff_card.dart';
@@ -63,6 +64,7 @@ class MessageView extends StatefulWidget {
     this.imageCacheScope,
     this.onEdit,
     this.errorActions,
+    this.flash,
   });
   final TranscriptItem item;
 
@@ -75,6 +77,10 @@ class MessageView extends StatefulWidget {
 
   /// Reuses the visible user prompt in the conversation's draft editor.
   final ValueChanged<String>? onEdit;
+
+  /// Each new value flashes the user's bubble, marking the message a turn
+  /// jump landed on; null for none.
+  final int? flash;
 
   @override
   State<MessageView> createState() => _MessageViewState();
@@ -305,10 +311,6 @@ class _MessageViewState extends State<MessageView> {
               if (shown.isNotEmpty)
                 Container(
                   constraints: const BoxConstraints(maxWidth: 640),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 11,
-                  ),
                   // A soft neutral bubble with a tucked corner on the
                   // speaker's side, so the user's turns read as theirs
                   // without a colour of their own.
@@ -316,13 +318,29 @@ class _MessageViewState extends State<MessageView> {
                     color: userBubbleColor(scheme),
                     borderRadius: kUserBubbleShape,
                   ),
-                  // Typed Markdown renders as Markdown — a pasted snippet in
-                  // backticks or a short list reads the way it was written
-                  // — while every line break the user typed is kept.
-                  child: MarkdownView(
-                    data: shown,
-                    dense: true,
-                    keepLineBreaks: true,
+                  // A jump's landing darkens the bubble by a step of ink,
+                  // holds it a moment and lets it settle back.
+                  child: ArrivalPulse(
+                    revision: widget.flash,
+                    color: scheme.onSurface.withValues(alpha: 0.09),
+                    borderRadius: kUserBubbleShape,
+                    hold: 0.35,
+                    curve: const Cubic(0.23, 1, 0.32, 1),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 11,
+                      ),
+                      // Typed Markdown renders as Markdown — a pasted snippet
+                      // in backticks or a short list reads the way it was
+                      // written — while every line break the user typed is
+                      // kept.
+                      child: MarkdownView(
+                        data: shown,
+                        dense: true,
+                        keepLineBreaks: true,
+                      ),
+                    ),
                   ),
                 ),
             ],

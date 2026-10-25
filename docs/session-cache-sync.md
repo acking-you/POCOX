@@ -177,7 +177,8 @@ from the retained raw page chain without a cache migration.
 Timeline jumps open independent ascending turn windows, and missing history
 between them shows at its real position. A tail cursor does not mean history
 above a fully loaded first turn; the exhausted turn-summary cursor confirms the
-oldest boundary. Hovering the timeline reads nothing; selecting a turn or
+oldest boundary. Hovering the timeline reads nothing, and scrubbing it shows
+only turns already loaded; selecting a turn (or ending a scrub on one) or
 approaching a gap loads one bounded page, reusing cached pages and in-flight
 requests. Adjacent missing ranges coalesce into one action without losing the
 next cursor.

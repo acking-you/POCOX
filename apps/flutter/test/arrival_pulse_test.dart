@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pocox/src/widgets/history_arrival.dart';
+import 'package:pocox/src/widgets/arrival_pulse.dart';
 
 void main() {
   testWidgets('history feedback preserves row state on replay and removal', (
@@ -8,7 +8,7 @@ void main() {
   ) async {
     Widget host(int? revision) => MaterialApp(
       home: Scaffold(
-        body: HistoryArrival(revision: revision, child: const TextField()),
+        body: ArrivalPulse(revision: revision, child: const TextField()),
       ),
     );
     await t.pumpWidget(host(null));
