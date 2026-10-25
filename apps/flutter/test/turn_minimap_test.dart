@@ -271,6 +271,46 @@ void main() {
     expect(t.getCenter(_tick(150)).dy, before + 30);
   });
 
+  testWidgets('a shorter window keeps the turn on screen on the rail', (
+    t,
+  ) async {
+    final items = _items(200);
+    final visible = (items[150].rowIndex, items[150].rowIndex);
+    await _pump(t, items: items, visible: visible);
+    await _pump(t, items: items, visible: visible, height: 300);
+    final rail = t.getRect(find.byKey(const Key('turn-minimap-rail')));
+    expect(rail.height, 210);
+    expect(t.getCenter(_tick(150)).dy, inInclusiveRange(rail.top, rail.bottom));
+  });
+
+  testWidgets('the keyboard keeps its turn when the rail scrolls under a '
+      'resting pointer', (t) async {
+    final items = _items(200);
+    final selected = await _pump(t, items: items, height: 300);
+    final mouse = await _mouse(t);
+    await mouse.moveTo(
+      t.getRect(find.byKey(const Key('turn-minimap-rail'))).center,
+    );
+    await t.pumpAndSettle();
+    t
+        .widget<Focus>(
+          find
+              .descendant(
+                of: find.byType(TurnMinimap),
+                matching: find.byType(Focus),
+              )
+              .first,
+        )
+        .focusNode!
+        .requestFocus();
+    await t.pumpAndSettle();
+    await t.sendKeyEvent(LogicalKeyboardKey.end);
+    await t.pumpAndSettle();
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    expect(selected.single, same(items.last));
+  });
+
   for (final count in [4, 12]) {
     testWidgets('$count turns: padded rail ends remain clickable', (t) async {
       final items = _items(count);

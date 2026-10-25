@@ -218,8 +218,9 @@ class _TurnMinimapState extends State<TurnMinimap> {
   /// Whether the pointer is anywhere over the rail, its card or its button.
   bool _hovering = false;
 
-  /// Where the pointer rests over the marks, so a wheel turning them under a
-  /// still pointer moves [_active] along.
+  /// Where the pointer rests over the marks, so the wheel turning them under
+  /// a still pointer moves [_active] along. Only the wheel: a reveal for the
+  /// keyboard must not hand its target to the pointer.
   double? _hoverY;
   _Press? _press;
   TurnMinimapItem? _pressedCard;
@@ -251,7 +252,6 @@ class _TurnMinimapState extends State<TurnMinimap> {
     super.initState();
     _indexLoadedRows();
     widget.visibleRange.addListener(_scheduleReveal);
-    _rail.addListener(_followWheel);
     _scheduleReveal();
   }
 
@@ -423,11 +423,6 @@ class _TurnMinimapState extends State<TurnMinimap> {
     if (_press == null) _point(_indexAt(y));
   }
 
-  void _followWheel() {
-    final y = _hoverY;
-    if (y != null && _press == null) _point(_indexAt(y));
-  }
-
   /// Keep the first turn on screen in view on the rail, after the frame so a
   /// scroll published mid-layout never moves the marks during it.
   void _scheduleReveal() {
@@ -530,6 +525,8 @@ class _TurnMinimapState extends State<TurnMinimap> {
           position.maxScrollExtent,
         ),
       );
+      final y = _hoverY;
+      if (y != null && _press == null) _point(_indexAt(y));
     });
   }
 
@@ -607,7 +604,13 @@ class _TurnMinimapState extends State<TurnMinimap> {
         );
         final railHeight = math.min(widget.items.length * _kRowExtent, cap);
         final railTop = (constraints.maxHeight - railHeight) / 2;
-        _railHeight = railHeight;
+        if (railHeight != _railHeight) {
+          // A resize keeps the marks' offset, which can leave the turn on
+          // screen outside a shorter rail: reveal it again after layout.
+          _railHeight = railHeight;
+          _revealed = null;
+          _scheduleReveal();
+        }
         final engaged = _hovering || _active != null || _focus.hasFocus;
         return Focus(
           focusNode: _focus,
