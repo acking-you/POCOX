@@ -9,6 +9,12 @@ breaking change goes.
 
 ## Unreleased
 
+- **Windows P2P handshake replies recover from a rejected UDP source hint.**
+  Some Windows network stacks reject the source-address control message with
+  error 10022, causing a phone to fall back to the relay even while the host's
+  self-connections work. The transport retries only when the system would use
+  the same source address, preserving the socket, encryption and path policy.
+
 - **The turn rail works like ChatGPT's.** One mark per turn at a fixed
   pitch; the turns on screen are inked darker instead of one blue mark. The
   pointed-at mark and its neighbours grow with a quick spring, and the
