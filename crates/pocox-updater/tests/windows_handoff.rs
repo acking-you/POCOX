@@ -18,14 +18,16 @@ use ring::digest;
 use serde_json::{json, Value};
 
 /// A stand-in app reporting `version`: it records that it started (in its
-/// working directory) and runs until its input closes.
+/// working directory). Started by a test, it runs until told to quit on its
+/// piped input; reopened by the helper (a hidden console, no pipe), it exits
+/// at once rather than outliving the test.
 fn app_source(version: &str) -> String {
     format!(
         r#"using System; using System.IO; using System.Reflection;
 [assembly: AssemblyInformationalVersion("{version}")]
 class App {{ static void Main() {{
   File.WriteAllText(Path.Combine(Environment.CurrentDirectory, "started-{version}"), "");
-  Console.ReadLine();
+  if (Console.IsInputRedirected) Console.ReadLine();
 }} }}"#
     )
 }
@@ -105,9 +107,10 @@ impl Drop for App {
 /// One handoff: a copy of the old app running from `app_dir`, and the
 /// release file in its own handoff directory.
 struct Handoff {
-    root: tempfile::TempDir,
+    // Dropped first: a running app would keep its folder from being removed.
     app: App,
     request: PathBuf,
+    root: tempfile::TempDir,
 }
 
 impl Handoff {
