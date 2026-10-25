@@ -40,8 +40,8 @@ pub fn open_verified(path: &Path, size: u64, sha256: &str) -> Result<File> {
 #[cfg(windows)]
 fn open_pinned(path: &Path) -> std::io::Result<File> {
     use std::os::windows::fs::OpenOptionsExt;
-
-    use windows_sys::Win32::Storage::FileSystem::FILE_SHARE_READ;
+    /// Win32's `FILE_SHARE_READ`.
+    const FILE_SHARE_READ: u32 = 0x1;
     // Others may read (and run) it, but not change, replace or delete it.
     std::fs::OpenOptions::new()
         .read(true)

@@ -1,7 +1,7 @@
 //! The helper end to end, with real processes: a stand-in app that waits to
 //! be told to quit, the release's files and a stand-in installer. Nothing
 //! touches the real app or elevates.
-#![cfg(windows)]
+#![cfg(all(windows, feature = "handoff"))]
 #![allow(
     clippy::unwrap_used,
     reason = "integration-test failures should fail at the observed boundary"

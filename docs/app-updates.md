@@ -146,6 +146,13 @@ app and shows a message box with the reason. Each attempt keeps
 `updates/work/<version>-<time>/handoff-<id>` under the app support
 directory; the next download clears it.
 
+The helper's Win32 calls (pinning a process, the administrator prompt, a
+spawn that inherits no handles, the version resource) are the crate's only
+`unsafe` code, built only with its `handoff` feature, which the release
+workflow and Windows CI enable. Without it the crate forbids `unsafe` and the
+helper refuses to run, so a local copy needs `cargo build --release -p
+pocox-updater --features handoff`.
+
 This replaces the PowerShell helper of 0.7.6 and earlier. A portable copy of
 those versions only saves the archive, so it needs one manual unpack of
 0.7.7 or later over its folder; an installed copy updates to 0.7.7 through

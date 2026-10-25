@@ -180,7 +180,7 @@ jobs:
       - name: Exercise Codex batch launcher and nested command
         run: cargo test --locked -p pocox-codex process::windows_tests
       - name: Exercise the update helper's handoff, installer and portable swap
-        run: cargo test --locked -p pocox-updater
+        run: cargo test --locked -p pocox-updater --features handoff
       - name: Exercise desktop shutdown and hosting ownership handoff
         run: cargo test --locked -p pocox_bridge --no-default-features engine::serve::lifecycle::tests
 

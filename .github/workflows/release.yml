@@ -240,7 +240,7 @@ jobs:
           flutter build windows --release
       # Puts every later update in place (installer or portable folder).
       - name: Build the update helper
-        run: cargo build --release --locked -p pocox-updater
+        run: cargo build --release --locked -p pocox-updater --features handoff
       - name: Package (installer + portable zip)
         shell: pwsh
         working-directory: apps/flutter
