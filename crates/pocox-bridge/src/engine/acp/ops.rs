@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use pocox_host_svc::acp::fold::{ItemKind, Turn};
-use pocox_host_svc::acp::{Identity, SteerOutcome};
+use pocox_host_svc::acp::{ClientError, Identity, SteerOutcome};
 use serde::Deserialize as _;
 use serde_json::Value;
 
@@ -14,6 +14,7 @@ use super::{block, conn, lock, translate, Link, Shared};
 use crate::engine::app_session::{
     OlderPage, ThreadHistory, ThreadItem, ThreadMeta, TurnItemsPage, TurnSummary,
 };
+use crate::engine::runtime;
 use crate::engine::session_engine::Supplement;
 
 /// Turns in the newest window and in each older page.
@@ -377,11 +378,36 @@ pub fn turn_start(
 ) -> Result<()> {
     let link = conn(service_key)?;
     let identity = link.identity();
-    block(
-        link.client
-            .prompt(thread_id, text, images, client_id, Some(&identity)),
-    )
-    .map(|_| ())
+    // The HTTP acknowledgement can precede the SSE start event. An empty
+    // marker protects an uncertain submission until the host resolves it.
+    link.commit(&identity, |view| {
+        view.running.entry(thread_id.into()).or_default();
+    })
+    .ok_or_else(superseded)?;
+    let result = runtime::runtime().block_on(link.client.prompt(
+        thread_id,
+        text,
+        images,
+        client_id,
+        Some(&identity),
+    ));
+    link.commit(&identity, |view| {
+        if view.running.get(thread_id).is_some_and(String::is_empty) {
+            match &result {
+                Ok(turn) => {
+                    view.running.insert(thread_id.into(), turn.clone());
+                },
+                Err(ClientError::Host {
+                    ..
+                }) => {
+                    view.running.remove(thread_id);
+                },
+                Err(_) => {},
+            }
+        }
+    })
+    .ok_or_else(superseded)?;
+    result.map(|_| ()).map_err(Into::into)
 }
 
 /// Add input to `turn_id` (the caller's turn; else the turn this controller

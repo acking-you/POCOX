@@ -265,7 +265,14 @@ pub trait SessionEngine: Sync {
     /// The protocol.
     fn protocol(&self) -> Protocol;
     /// Connect (idempotent while healthy).
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()>;
+    // The caller captures the epoch before queueing this selection.
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()>;
+    /// Protocol fixtures connect without the controller window's admission
+    /// policy.
+    #[cfg(test)]
+    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
+        self.connect_in_epoch(service_key, local_port, super::transport::epoch())
+    }
     /// Whether a live connection exists.
     fn is_connected(&self, service_key: &str) -> bool;
     /// Drop this controller's connection (never another client's work).
@@ -441,8 +448,12 @@ impl SessionEngine for CodexEngine {
         Protocol::CodexAppServer
     }
 
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        app_session::connect(service_key.clone(), local_port, &Target::resolve(&service_key)?)
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()> {
+        app_session::connect(
+            service_key.clone(),
+            local_port,
+            &Target::at_epoch(&service_key, epoch)?,
+        )
     }
 
     fn is_connected(&self, service_key: &str) -> bool {
@@ -612,8 +623,8 @@ impl SessionEngine for AcpEngine {
         Protocol::Acp
     }
 
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        acp::connect(&service_key, local_port, &Target::resolve(&service_key)?)
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()> {
+        acp::connect(&service_key, local_port, &Target::at_epoch(&service_key, epoch)?)
     }
 
     fn is_connected(&self, service_key: &str) -> bool {

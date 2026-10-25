@@ -543,6 +543,8 @@ extension _SessionRecovery on _AppSessionState {
   /// the retry.
   Future<void> _autoReconnect({bool reload = true}) async {
     if (!mounted || !_foreground || _reconnecting) return;
+    final switching = widget.hostSwitch;
+    if (switching != null && switching.phase != HostSwitchPhase.failed) return;
     // Debounce: a flapping socket (connect succeeds then drops) could otherwise
     // spin reconnect attempts. The periodic health check is the backstop.
     if (_reconnectCooldown?.isActive ?? false) return;
@@ -587,7 +589,7 @@ extension _SessionRecovery on _AppSessionState {
         try {
           record('connect', attempt);
           // Let the bridge retain a live socket if only its event subscription ended.
-          await api.appConnect(widget.serviceKey, appLocalPort);
+          await api.appReconnect(widget.serviceKey, appLocalPort);
           if (!current()) return;
           _connectionLost = false;
           // A reconnect may reach a different agent generation.

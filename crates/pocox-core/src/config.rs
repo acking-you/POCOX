@@ -63,9 +63,44 @@ pub struct Config {
     #[serde(default)]
     pub history_cache: HistoryCacheConfig,
 
+    /// Retained controller connections, counted by conversation service.
+    #[serde(default)]
+    pub connection_window: ConnectionWindowConfig,
+
     /// Outbound HTTP settings for POCOX itself, independent of hosted agents.
     #[serde(default)]
     pub network: NetworkConfig,
+}
+
+/// Retention of controller connections. Hosting and API subscriptions are
+/// separate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ConnectionWindowConfig {
+    /// Total conversation services, including the selected service (1–32).
+    pub capacity: u32,
+    /// Order in which idle, unselected services can be released.
+    pub eviction: ConnectionEviction,
+}
+
+impl Default for ConnectionWindowConfig {
+    fn default() -> Self {
+        Self {
+            capacity: 5,
+            eviction: ConnectionEviction::Lru,
+        }
+    }
+}
+
+/// Stable names for connection-window eviction policies.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionEviction {
+    /// Least recently selected service first.
+    #[default]
+    Lru,
+    /// Earliest established connection first; selection does not reorder it.
+    Fifo,
 }
 
 /// Application-owned requests, including release checks and downloads.

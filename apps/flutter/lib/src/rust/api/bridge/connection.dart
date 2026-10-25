@@ -24,6 +24,16 @@ Future<void> appConnect({required String serviceKey, required int localPort}) =>
       localPort: localPort,
     );
 
+/// Recover only the currently selected controller connection. An obsolete
+/// screen's automatic retry cannot reopen an evicted service or old account.
+Future<void> appReconnect({
+  required String serviceKey,
+  required int localPort,
+}) => RustLib.instance.api.crateApiBridgeConnectionAppReconnect(
+  serviceKey: serviceKey,
+  localPort: localPort,
+);
+
 /// The step the connect of `service_key` is at, or `None` when none is in
 /// progress. Cheap enough to poll while a reconnect is on screen.
 ConnectStageDto? appConnectStage({required String serviceKey}) => RustLib
@@ -39,6 +49,17 @@ bool appIsConnected({required String serviceKey}) => RustLib.instance.api
 /// Work owned by a host (ACP turns, permissions) keeps running there.
 Future<void> appDisconnect({required String serviceKey}) => RustLib.instance.api
     .crateApiBridgeConnectionAppDisconnect(serviceKey: serviceKey);
+
+/// Read this installation's connection window preferences.
+Future<ConnectionWindowDto> appConnectionWindow() =>
+    RustLib.instance.api.crateApiBridgeConnectionAppConnectionWindow();
+
+/// Save and apply retention limits. Running work and unanswered requests are
+/// protected; a reduced limit takes effect as protected services become idle.
+Future<void> appSetConnectionWindow({required ConnectionWindowDto value}) =>
+    RustLib.instance.api.crateApiBridgeConnectionAppSetConnectionWindow(
+      value: value,
+    );
 
 /// Probe whether a session service is actually REACHABLE — its backend
 /// answers — rather than merely registered on the relay, so a
@@ -368,4 +389,26 @@ enum ConnectStageDto {
 
   /// The session's protocol handshake.
   handshake,
+}
+
+/// Persisted controller connection retention settings.
+class ConnectionWindowDto {
+  /// Conversation services including the selected one; 1–32, default 5.
+  final int capacity;
+
+  /// `lru` (least recently selected) or `fifo` (earliest connected).
+  final String eviction;
+
+  const ConnectionWindowDto({required this.capacity, required this.eviction});
+
+  @override
+  int get hashCode => capacity.hashCode ^ eviction.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ConnectionWindowDto &&
+          runtimeType == other.runtimeType &&
+          capacity == other.capacity &&
+          eviction == other.eviction;
 }

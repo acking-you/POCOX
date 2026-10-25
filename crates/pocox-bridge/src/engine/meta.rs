@@ -241,9 +241,11 @@ fn base_url_for(
     let origin = target.open(&meta_key, registry, 0, false)?;
     let url = Url::parse(&origin.url()).context("parsing host endpoint")?;
     let epoch = target.epoch();
+    let lifetime = origin.retain_transport()?;
     // Capture the exact resolution, including same-port restarts; deriving a
     // new lifetime from the URL later could authorize a replacement host.
     let current = move || {
+        let _lease = &lifetime;
         anyhow::ensure!(
             transport::is_current(epoch) && origin.is_current(),
             "the host or connection changed; retry the request"
@@ -256,6 +258,13 @@ fn base_url_for(
 /// The transport context changed: close every meta tunnel of the old one.
 pub(super) fn context_changed() {
     runtime::unsubscribe_prefix(META_TUNNEL);
+}
+
+/// Release the companion tunnel with its controller's retained service.
+pub(super) fn release_service(service: &str) {
+    let Some(context) = transport::current_context() else { return };
+    let Ok(meta) = meta_key_of(service) else { return };
+    runtime::unsubscribe_service(&format!("{META_TUNNEL}{}\u{1f}{meta}", context.id()));
 }
 
 /// Build an endpoint URL under the meta base, percent-encoding each segment.

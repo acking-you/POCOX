@@ -507,3 +507,10 @@ class AccountService {
   /// The local `pcx:<device>:<kind>:<name>` key the app/session layer uses.
   String get key => 'pcx:$device:$kind:$name';
 }
+
+/// Persisted retention of conversation services (including the selected one).
+class ConnectionWindowPreferences {
+  const ConnectionWindowPreferences({this.capacity = 5, this.eviction = 'lru'});
+  final int capacity;
+  final String eviction;
+}

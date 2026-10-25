@@ -877,6 +877,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   @override
   void deactivate() {
+    _drafts.location = (threadId: _threadId, cwd: _cwd);
     unawaited(
       ref
           .read(bridgeApiProvider)

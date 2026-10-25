@@ -195,6 +195,30 @@ pub fn disconnect(service_key: &str) {
     }
 }
 
+/// Release only idle controller state. The event loop holds one shared
+/// reference; additional references belong to outstanding operations or follow
+/// readers.
+pub(crate) fn evict_idle(service_key: &str) -> bool {
+    let Ok(key) = current_key(service_key) else { return true };
+    let lifecycle = lifecycle(&key);
+    let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+    let mut registry = conns();
+    if registry.get(&key).is_some_and(|conn| {
+        let view = lock(&conn.shared);
+        Arc::strong_count(&conn.shared) > 2
+            || !view.running.is_empty()
+            || !view.permissions.is_empty()
+    }) {
+        return false;
+    }
+    let removed = registry.remove(&key);
+    drop(registry);
+    if let Some(conn) = removed {
+        release(conn);
+    }
+    true
+}
+
 /// The transport context changed: every connection belongs to the old one.
 /// Runs after [`transport::epoch`] moved, under the registry lock, so a
 /// connection still being established either is drained here or sees the
@@ -316,6 +340,7 @@ mod tests {
                     address: address.to_string(),
                     subscription: None,
                     local: None,
+                    remote: None,
                     transient: None,
                 },
                 epoch,

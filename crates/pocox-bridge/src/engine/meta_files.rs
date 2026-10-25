@@ -44,9 +44,9 @@ pub fn upload_file_scoped(
     expected: &str,
 ) -> Result<UploadedFile> {
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    let url = endpoint(service_key, &["uploads", file_name])?;
+    let (url, current) = guarded_endpoint(service_key, &["uploads", file_name])?;
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    upload_to(url, bytes)
+    upload_to(url, bytes, current)
 }
 
 /// Upload a document/file attachment to the host behind `service_key`,
@@ -55,12 +55,13 @@ pub fn upload_file_scoped(
 /// codex's native host-file workflow (its input protocol has no document
 /// slot; only images travel inline).
 pub fn upload_file(service_key: &str, file_name: &str, bytes: Vec<u8>) -> Result<UploadedFile> {
-    let url = endpoint(service_key, &["uploads", file_name])?;
-    upload_to(url, bytes)
+    let (url, current) = guarded_endpoint(service_key, &["uploads", file_name])?;
+    upload_to(url, bytes, current)
 }
 
-fn upload_to(url: Url, bytes: Vec<u8>) -> Result<UploadedFile> {
+fn upload_to(url: Url, bytes: Vec<u8>, current: impl Fn() -> Result<()>) -> Result<UploadedFile> {
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .post(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -68,11 +69,13 @@ fn upload_to(url: Url, bytes: Vec<u8>) -> Result<UploadedFile> {
             .send()
             .await
             .context("meta POST upload")?;
-        ensure_ok(resp)
+        let uploaded = ensure_ok(resp)
             .await?
             .json()
             .await
-            .context("decoding upload response")
+            .context("decoding upload response")?;
+        current()?;
+        Ok(uploaded)
     })
 }
 
@@ -87,14 +90,14 @@ pub fn upload_image_scoped(
     project: Option<&str>,
 ) -> Result<UploadedFile> {
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    let mut url = endpoint(service_key, &["uploads", "images", file_name])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["uploads", "images", file_name])?;
     if let Some(thread) = thread {
         url.query_pairs_mut().append_pair("thread", thread);
     } else if let Some(project) = project {
         url.query_pairs_mut().append_pair("project", project);
     }
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    upload_to(url, bytes)
+    upload_to(url, bytes, current)
 }
 
 /// `{ "path": ..., "entries": [...] }` — one directory's browsable children.
@@ -374,22 +377,9 @@ pub fn write_file(
     file_name: &str,
     bytes: Vec<u8>,
 ) -> Result<UploadedFile> {
-    let mut url = endpoint(service_key, &["fs", "write"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "write"])?;
     url.query_pairs_mut()
         .append_pair("dir", dir)
         .append_pair("name", file_name);
-    runtime::runtime().block_on(async move {
-        let resp = client()
-            .post(url)
-            .timeout(UPLOAD_TIMEOUT)
-            .body(bytes)
-            .send()
-            .await
-            .context("meta POST write")?;
-        ensure_ok(resp)
-            .await?
-            .json()
-            .await
-            .context("decoding write response")
-    })
+    upload_to(url, bytes, current)
 }

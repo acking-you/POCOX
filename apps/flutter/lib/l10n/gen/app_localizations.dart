@@ -98,6 +98,78 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @hostThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get hostThisDevice;
+
+  /// No description provided for @hostConnectionCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get hostConnectionCurrent;
+
+  /// No description provided for @hostConnectionRetained.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection retained'**
+  String get hostConnectionRetained;
+
+  /// No description provided for @hostConnectionAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect on selection'**
+  String get hostConnectionAvailable;
+
+  /// No description provided for @connectionWindowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retained connections'**
+  String get connectionWindowTitle;
+
+  /// No description provided for @connectionWindowCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Service limit'**
+  String get connectionWindowCapacity;
+
+  /// No description provided for @connectionWindowPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Eviction policy'**
+  String get connectionWindowPolicy;
+
+  /// No description provided for @connectionWindowLru.
+  ///
+  /// In en, this message translates to:
+  /// **'Least recently selected (LRU)'**
+  String get connectionWindowLru;
+
+  /// No description provided for @connectionWindowFifo.
+  ///
+  /// In en, this message translates to:
+  /// **'Earliest connected (FIFO)'**
+  String get connectionWindowFifo;
+
+  /// No description provided for @connectionWindowInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a number from 1 to 32'**
+  String get connectionWindowInvalid;
+
+  /// No description provided for @connectionWindowDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts conversation services, including the selected one. Default: 5. Switching reuses healthy connections. Running tasks and unanswered requests are protected. A lower limit applies as protected services become idle; a full window asks you to wait or raise the limit. One temporary connection may be opened during a switch. API forwarding and shared ports have separate lifetimes.'**
+  String get connectionWindowDescription;
+
+  /// No description provided for @connectionWindowFull.
+  ///
+  /// In en, this message translates to:
+  /// **'All retained connections are busy or awaiting a response. Increase the service limit in Settings or wait for a task to finish.'**
+  String get connectionWindowFull;
+
   /// No description provided for @connectionPathTitle.
   ///
   /// In en, this message translates to:

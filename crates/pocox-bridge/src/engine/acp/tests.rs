@@ -202,6 +202,7 @@ struct Script {
     streams: usize,
     /// The status and answer of `sessions/steer`.
     steer: Option<(&'static str, Value)>,
+    prompt: Option<(&'static str, Value)>,
     /// Request bodies `sessions/steer` received.
     steered: Vec<Value>,
     /// When set, `sessions/steer` answers only once this is notified.
@@ -308,6 +309,14 @@ async fn serve_one(mut socket: TcpStream, script: Arc<Mutex<Script>>) {
         if let Some(gate) = gate {
             gate.notified().await;
         }
+        reply(&mut socket, status, &answer).await;
+    } else if path.starts_with("/acp/v1/sessions/prompt") {
+        let (status, answer) = script
+            .lock()
+            .expect("script")
+            .prompt
+            .clone()
+            .unwrap_or(("403 Forbidden", json!({"code":"read_only","message":"read only"})));
         reply(&mut socket, status, &answer).await;
     } else if path.starts_with("/acp/v1/snapshot") {
         let snapshot = lock(&script);
@@ -895,4 +904,26 @@ fn session_release_rejects_stale_display_before_contacting_a_replacement_host() 
     assert!(err.to_string().contains("changed"), "{err}");
     assert!(lock(&shared).sessions.is_empty());
     disconnect_inner(&key);
+}
+
+#[test]
+fn submitted_turn_is_pinned_before_its_start_event_and_refusal_releases_it() {
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("init");
+    let gateway = runtime::runtime().block_on(fake_gateway(snapshot(json!([]), json!([]))));
+    let own = Context::of(&transport(None, "relay:retention"));
+    transport::test_context(own.clone());
+    let service = "pcx:studio:acp:retention";
+    let key = key_in(&own, service).expect("key");
+    let view = fake_conn_at(&key, 4, &format!("http://{}/", gateway.addr));
+    assert!(ops::turn_start(service, "s", "no", &[], None).is_err());
+    assert!(lock(&view).running.is_empty(), "explicit rejection releases the marker");
+    script(&gateway).prompt = Some(("200 OK", json!({"turnId":"accepted"})));
+    ops::turn_start(service, "s", "run", &[], None).expect("accepted");
+    assert!(!evict_idle(service), "acceptance pins the connection before SSE arrives");
+    translate::gateway_event(
+        &mut lock(&view),
+        &json!({"type":"turn_ended","sessionId":"s","turnId":"accepted","outcome":{"stopReason":"end_turn"}}),
+    );
+    assert!(evict_idle(service), "terminal host evidence releases the connection");
 }

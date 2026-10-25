@@ -389,6 +389,29 @@ class RustBridgeApi
   Future<void> codexSetPromptVariant(String variant) =>
       frb.codexSetPromptVariant(variant: variant);
 
+  @override
+  Future<ConnectionWindowPreferences> connectionWindowPreferences() async {
+    final value = await frb.appConnectionWindow();
+    return ConnectionWindowPreferences(
+      capacity: value.capacity,
+      eviction: value.eviction,
+    );
+  }
+
+  @override
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  ) => frb.appSetConnectionWindow(
+    value: frb.ConnectionWindowDto(
+      capacity: value.capacity,
+      eviction: value.eviction,
+    ),
+  );
+
+  @override
+  Future<void> appReconnect(String serviceKey, int localPort) =>
+      frb.appReconnect(serviceKey: serviceKey, localPort: localPort);
+
   // --- App-server remote control ---
 
   @override

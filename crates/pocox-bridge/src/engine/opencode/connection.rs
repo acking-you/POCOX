@@ -130,6 +130,33 @@ pub fn disconnect(service: &str) {
     }
 }
 
+/// The registry and event loop own two references; any other reference pins
+/// outstanding operations. Running turns and unanswered requests also pin it.
+pub(crate) fn evict_idle(service: &str) -> bool {
+    let Ok(key) = current_key(service) else { return true };
+    let lifecycle = lifecycle(&key);
+    let _guard = lock(&lifecycle);
+    let mut registry = lock(&CONNS);
+    if registry.get(&key).is_some_and(|conn| {
+        let view = lock(&conn.shared);
+        Arc::strong_count(&conn.shared) > 2
+            || !view.admitted.is_empty()
+            || view.sessions.values().any(|snapshot| {
+                snapshot.turn_id.is_some()
+                    || !snapshot.permissions.is_empty()
+                    || !snapshot.questions.is_empty()
+            })
+    }) {
+        return false;
+    }
+    let removed = registry.remove(&key);
+    drop(registry);
+    if let Some(conn) = removed {
+        dispose(conn);
+    }
+    true
+}
+
 /// Invalidate every connection of the previous account or relay.
 pub fn context_changed() {
     let all: Vec<_> = lock(&CONNS).drain().map(|(_, conn)| conn).collect();

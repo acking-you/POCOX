@@ -315,7 +315,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         for (final s in ranked) {
           if (!attempted.add(s.key)) continue;
           try {
-            final reason = localKeys.contains(s.key)
+            final reason =
+                api.appIsConnected(s.key) || localKeys.contains(s.key)
                 ? null
                 : await api.appProbeReason(s.key);
             if (!mounted || gen != _generation) return;
@@ -323,7 +324,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               lastError = _probeFailure(AppLocalizations.of(context), reason);
               continue;
             }
-            if (!api.appIsConnected(s.key)) await _connect(api, s.key);
+            await _connect(api, s.key);
             if (!mounted || gen != _generation) return;
             target = s;
             break;
@@ -384,20 +385,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _resolveStartedAt = null;
   }
 
-  /// Connect to [key], with one clean reconnect for a stale half-open
-  /// tunnel (the same recovery the project screen uses).
-  static Future<void> _connect(BridgeApi api, String key) async {
-    try {
-      await api.appConnect(key, appLocalPort);
-    } catch (_) {
-      await api.appDisconnect(key);
-      await api.appConnect(key, appLocalPort);
-    }
-  }
+  /// Selection is recorded even for a healthy connection so retention follows
+  /// visits, not probes or background history reads. The engine owns recovery.
+  static Future<void> _connect(BridgeApi api, String key) =>
+      api.appConnect(key, appLocalPort);
 
   /// Why a probe of a service failed, in the user's words.
   static String _probeFailure(AppLocalizations l10n, String reason) =>
-      isRelayAuthRejection(reason)
+      reason.contains('connection window is full')
+      ? l10n.connectionWindowFull
+      : isRelayAuthRejection(reason)
       ? l10n.unreachableAuthRejected
       : isProbeTimeout(reason)
       ? l10n.unreachableSilent
@@ -595,14 +592,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // bare "couldn't reach".
       String? reason;
       try {
-        if (!api.localServices().any((service) => service.key == key)) {
+        if (!api.appIsConnected(key) &&
+            !api.localServices().any((service) => service.key == key)) {
           reason = await api.appProbeReason(key);
         }
       } catch (e) {
         reason = '$e';
       }
       if (!mounted || gen != _generation) return;
-      if (reason == null && !api.appIsConnected(key)) {
+      if (reason == null) {
         step(HostSwitchPhase.connecting);
         try {
           await _connect(api, key);
@@ -618,14 +616,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       step(HostSwitchPhase.loading);
       final prefs = await _prefs();
       if (!mounted || gen != _generation) return;
-      final pick = await _pickThread(key, prefs);
+      final location = appSessionLastLocation(ref, key);
+      final pick = location == null ? await _pickThread(key, prefs) : null;
       if (!mounted || gen != _generation) return;
       ref.read(uiPrefsProvider.notifier).setLastService(key);
       setState(() {
         _phase = _Phase.ready;
         _serviceKey = key;
-        _threadId = pick?.id;
-        _cwd = pick?.cwd;
+        _threadId = location == null ? pick?.id : location.threadId;
+        _cwd = location == null ? pick?.cwd : location.cwd;
         _hostSwitch = null;
       });
       messenger.ok(l10n.hostSwitched(_hostLabelOf(key)));

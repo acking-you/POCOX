@@ -9,6 +9,43 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get hostThisDevice => '本机';
+
+  @override
+  String get hostConnectionCurrent => '使用中';
+
+  @override
+  String get hostConnectionRetained => '连接已保留';
+
+  @override
+  String get hostConnectionAvailable => '选择后连接';
+
+  @override
+  String get connectionWindowTitle => '连接保留窗口';
+
+  @override
+  String get connectionWindowCapacity => '服务数量上限';
+
+  @override
+  String get connectionWindowPolicy => '淘汰策略';
+
+  @override
+  String get connectionWindowLru => '最久未选择（LRU）';
+
+  @override
+  String get connectionWindowFifo => '最早连接（FIFO）';
+
+  @override
+  String get connectionWindowInvalid => '请输入 1–32 之间的整数';
+
+  @override
+  String get connectionWindowDescription =>
+      '按会话服务计数，包含当前选择的服务，默认保留 5 个。切换时复用健康连接。运行中的任务和待确认请求受到保护。降低上限后，受保护的服务会在空闲时释放；窗口满时需等待或提高上限。切换期间可能临时增加一个连接。API 转发和共享端口单独管理。';
+
+  @override
+  String get connectionWindowFull => '保留的连接正在运行任务或等待确认。请在设置中提高服务上限，或等待任务结束。';
+
+  @override
   String get connectionPathTitle => '连接路径';
 
   @override

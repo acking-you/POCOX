@@ -59,7 +59,12 @@ type WsSink = SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, WsMessage>;
 type Pending = Arc<StdMutex<HashMap<String, oneshot::Sender<Result<Value>>>>>;
 /// token (stringified id) → original [`RequestId`], so a server request can be
 /// answered with the exact id type (int stays int) it arrived with.
-type ServerReqs = Arc<Mutex<HashMap<String, RequestId>>>;
+type ServerReqs = Arc<StdMutex<HashMap<String, PendingServerRequest>>>;
+
+struct PendingServerRequest {
+    id: RequestId,
+    inbound: Inbound,
+}
 
 /// How often to send a WebSocket ping. Keeps the pb-mapper relay tunnel from
 /// idle-closing a backgrounded connection, and drives the liveness watchdog.
@@ -141,7 +146,7 @@ impl AppClient {
 
         let sink = Arc::new(Mutex::new(sink));
         let pending: Pending = Arc::new(StdMutex::new(HashMap::new()));
-        let server_reqs: ServerReqs = Arc::new(Mutex::new(HashMap::new()));
+        let server_reqs: ServerReqs = Arc::new(StdMutex::new(HashMap::new()));
         let (notify_tx, notify_rx) = mpsc::unbounded_channel();
 
         // Monotonic "frames seen" counter: the reader bumps it on EVERY inbound
@@ -199,7 +204,7 @@ impl AppClient {
                     },
                     Message::Error(e) => {
                         if let Some(tx) = take_pending(&reader_pending, &e.id) {
-                            let _ = tx.send(Err(anyhow!("{}", e.error.message)));
+                            let _ = tx.send(Err(e.error.into()));
                         }
                     },
                     // Server-initiated requests (approvals etc.): record the id
@@ -209,17 +214,33 @@ impl AppClient {
                             RequestId::String(s) => s.clone(),
                             RequestId::Number(n) => n.to_string(),
                         };
-                        reader_server_reqs
-                            .lock()
-                            .await
-                            .insert(token.clone(), req.id);
-                        let _ = notify_tx.send(Inbound {
+                        let inbound = Inbound {
                             method: req.method,
                             params: req.params,
-                            request_id: Some(token),
-                        });
+                            request_id: Some(token.clone()),
+                        };
+                        reader_server_reqs
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .insert(token, PendingServerRequest {
+                                id: req.id,
+                                inbound: inbound.clone(),
+                            });
+                        let _ = notify_tx.send(inbound);
                     },
                     Message::Notification(n) => {
+                        if n.method == "serverRequest/resolved" {
+                            if let Some(id) = n.params.as_ref().and_then(|p| p.get("requestId")) {
+                                let token = id
+                                    .as_str()
+                                    .map(str::to_owned)
+                                    .unwrap_or_else(|| id.to_string());
+                                reader_server_reqs
+                                    .lock()
+                                    .unwrap_or_else(|e| e.into_inner())
+                                    .remove(&token);
+                            }
+                        }
                         let _ = notify_tx.send(Inbound {
                             method: n.method,
                             params: n.params,
@@ -312,6 +333,28 @@ impl AppClient {
         !self.closed.is_cancelled()
     }
 
+    /// Whether the server is waiting for an approval, question or tool
+    /// response.
+    pub fn has_pending_server_requests(&self) -> bool {
+        !self
+            .server_reqs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .is_empty()
+    }
+
+    /// Snapshot unanswered requests when a view reattaches to this connection.
+    /// Subscribe to live events first, then replay this snapshot before reading
+    /// them.
+    pub fn pending_server_requests(&self) -> Vec<Inbound> {
+        self.server_reqs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+            .map(|request| request.inbound.clone())
+            .collect()
+    }
+
     /// Initialize this connection and acknowledge the server before sending
     /// RPCs.
     pub async fn initialize(&self, name: &str, experimental_api: bool) -> Result<Value> {
@@ -335,7 +378,12 @@ impl AppClient {
     /// Answer a server→client request (identified by the `request_id` token
     /// from an [`Inbound`]) with `result`. No-op if the token is unknown.
     pub async fn respond(&self, token: &str, result: Value) -> Result<()> {
-        let id = self.server_reqs.lock().await.remove(token);
+        let id = self
+            .server_reqs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(token)
+            .map(|request| request.id);
         let Some(id) = id else {
             return Ok(());
         };

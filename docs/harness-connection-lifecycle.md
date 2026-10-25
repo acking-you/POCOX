@@ -138,6 +138,45 @@ keys. Active turns remain host-owned when an idle controller disconnects. This
 policy bounds idle retention; it is not a global admission limit against an
 arbitrary number of simultaneously active clients. Descriptor limits are unchanged.
 
+### Retained conversation services
+
+`engine::connection_window` owns controller retention across Flutter screen
+changes. `[connection_window]` in the existing config stores `capacity` (1–32,
+default 5) and `eviction` (`lru`, default, or `fifo`). Capacity counts conversation
+services, including the selected service, across Codex, ACP and OpenCode. API
+proxies, shared ports, device-management connections and probes are separate.
+Selections update LRU recency; FIFO preserves original connection age. Reading
+history, probing and rebuilding a screen never count as a visit.
+
+A switch reuses a healthy client, stream and tunnel. A new service finishes its
+handshake before idle candidates are evicted, allowing one temporary staging
+connection above capacity. A failed handshake preserves the current selection.
+Protocol registries check idleness atomically with removing their connection:
+outstanding operations, running turns, unanswered approvals and questions pin
+it. Codex and ACP pin a submitted turn before its start notification arrives; an
+uncertain submission stays protected until the host resolves it. If every
+candidate is protected, the staging connection is released and the switch fails
+with a capacity message. No eviction interrupts a host turn, answers a request,
+or changes session admission.
+
+Reducing capacity defers eviction of the selected or busy services. Maintenance
+checks every five seconds and finishes shrinking as services become idle. Idle
+eviction drops the protocol reader, client and subscription and releases its
+companion metadata tunnel. Guarded metadata requests and file uploads retain
+their exact tunnel until they finish; eviction cannot cut an upload or redirect a retry to
+a replacement listener after port reuse. Transport epoch checks still reject
+old-account results. Unhealthy connections are removed; account/relay changes
+and logout invalidate the old
+transport epoch, and stopped local hosts invalidate their endpoint tokens.
+Automatic recovery may reconnect only the selected service in the current
+epoch; it cannot resurrect a service that a switch evicted. Explicit selection
+is required to admit it again.
+
+Codex keeps unanswered server requests with the client. A new view subscribes
+first, replays that snapshot, then reads queued live events, including host
+resolution notifications. View teardown never answers them. ACP and OpenCode
+continue to use their existing host snapshot and admission flows.
+
 ## Failure reporting and recovery
 
 Process inspection retains spawn, permission, missing executable, timeout,

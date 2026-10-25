@@ -30,6 +30,20 @@ mixin _FakeConnection on _FakeBridgeState {
   @override
   Future<void> historyCacheSetLimit(int limitMb) async {}
 
+  ConnectionWindowPreferences savedConnectionWindow =
+      const ConnectionWindowPreferences();
+  Object? connectionWindowSaveError;
+  @override
+  Future<ConnectionWindowPreferences> connectionWindowPreferences() async =>
+      savedConnectionWindow;
+  @override
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  ) async {
+    if (connectionWindowSaveError case final error?) throw error;
+    savedConnectionWindow = value;
+  }
+
   String? savedNetworkProxy;
   ProxyMode savedProxyMode = ProxyMode.system;
 
@@ -353,6 +367,10 @@ mixin _FakeConnection on _FakeBridgeState {
 
   @override
   bool appIsConnected(String serviceKey) => _appConnected.contains(serviceKey);
+
+  @override
+  Future<void> appReconnect(String serviceKey, int localPort) =>
+      appConnect(serviceKey, localPort);
 
   /// The stage [appConnectStage] reports, per service key.
   final Map<String, ConnectStage> connectStages = {};

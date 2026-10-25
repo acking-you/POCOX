@@ -28,10 +28,16 @@ async fn forward(rx: broadcast::Receiver<AppEvent>, keep: usize) -> Vec<AppEvent
     let mut received = Vec::new();
     tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        forward_projected_events(rx, watch::channel(None).1, EventTopic::All, |update| {
-            received.push(update.event);
-            received.len() < keep
-        }),
+        forward_projected_events(
+            rx,
+            watch::channel(None).1,
+            EventTopic::All,
+            Vec::new(),
+            |update| {
+                received.push(update.event);
+                received.len() < keep
+            },
+        ),
     )
     .await
     .expect("the feed ends without waiting for the socket to close");
@@ -107,7 +113,7 @@ async fn projection_coalesces_text_without_reordering_approvals_or_completion() 
     drop(tx);
     let mut received = Vec::new();
     let thread = watch::channel(Some("thread".into())).1;
-    forward_projected_events(rx, thread, EventTopic::All, |event| {
+    forward_projected_events(rx, thread, EventTopic::All, Vec::new(), |event| {
         received.push(event);
         true
     })
@@ -124,10 +130,16 @@ async fn following_another_thread_retargets_the_running_feed() {
     let (tx, rx) = broadcast::channel(8);
     let (follow, thread) = watch::channel(Some("a".to_string()));
     let (out, mut delivered) = mpsc::unbounded_channel();
-    tokio::spawn(forward_projected_events(rx, thread, EventTopic::All, move |update| {
-        out.send((update.event.thread_id, update.event.kind))
-            .is_ok()
-    }));
+    tokio::spawn(forward_projected_events(
+        rx,
+        thread,
+        EventTopic::All,
+        Vec::new(),
+        move |update| {
+            out.send((update.event.thread_id, update.event.kind))
+                .is_ok()
+        },
+    ));
     tx.send(on("b", "item/completed")).unwrap();
     tx.send(on("b", "turn/completed")).unwrap();
     tx.send(on("a", "item/completed")).unwrap();
