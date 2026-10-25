@@ -23,8 +23,9 @@ List<ServiceIdDto> localServices() =>
 Future<List<ServiceIdDto>> discoverServices() =>
     RustLib.instance.api.crateApiBridgeServicesDiscoverServices();
 
-/// Connect to an API service. Owned local services return their actual listener;
-/// remote services use the forwarding port `127.0.0.1:<local_port>`.
+/// Expose an API service on `127.0.0.1:<local_port>` (`0`: any free port).
+/// An API this app hosts is forwarded there directly, following its host's
+/// listener across restarts; another device's is subscribed through the relay.
 Future<SubStatusDto> apiSubscribe({
   required String serviceKey,
   required int localPort,

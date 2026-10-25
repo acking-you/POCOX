@@ -38,8 +38,11 @@ existing remote path.
 `service_connection::Target` selects that record before relay credential
 resolution, discovery, subscription or probes. Every controller uses the
 existing WebSocket/HTTP/SSE clients against the actual listener, with no
-forwarding socket. The app's API subscription returns this actual address;
-the requested forwarding port applies only to remote subscriptions. Remote
+forwarding socket. An API subscription is for clients outside the app, so it
+keeps the chosen loopback port: for this process's own API each connection is
+forwarded to the listener the host owns at that moment
+(`runtime::local_forward`), which survives host restarts and their new
+ephemeral ports, and a stopped host refuses instead of falling back. Remote
 publication remains independent and follows the existing publication policy.
 Local routing does not bypass protocol readiness, session admission, allowed
 roots, write ownership or the OpenCode gateway's private native credentials.
@@ -51,8 +54,10 @@ OpenCode registers its local routes only after native readiness, its initial
 catalog request and gateway startup. Each completed host restore refreshes the
 picker's local inventory without relay discovery, including an already open
 picker. A failed local handshake tries the next candidate; remote discovery is
-deferred until no local candidate can connect.
-Its picker consumes the last explicitly
+deferred until no local candidate can connect. Local hosts the user hid do not
+make a start local-only, and once the relay was asked the local inventory is
+read again, since an account or relay reset leaves it unknown until the next
+resolution. Its picker consumes the last explicitly
 requested remote inventory without triggering discovery merely by rendering
 a local conversation. Local startup and switching use the connection's real
 handshake once; probes still perform real protocol requests when requested.
@@ -62,9 +67,12 @@ account credential requirements for starting/publishing a host still apply.
 
 Stopping a host invalidates its token before listener teardown and closes its
 controller sessions/streams. A known stopped key stays retired for this process,
-so a failed local request never silently falls back to the relay. In-place
-Codex restarts suspend the record and issue a fresh token only after readiness
-checks; reusing the port cannot revive an old client. A full app restart rebuilds
+so a failed local request never silently falls back to the relay. An in-place
+Codex restart (watchdog or harness update) restarts only the app-server child,
+so only its route is suspended, before the child is signalled; a fresh token is
+issued only after readiness checks, and a child that does not exit is admitted
+again. The API proxy and meta service keep running and keep their routes.
+Reusing the port cannot revive an old client. A full app restart rebuilds
 the registry from new host starts, never from persisted port numbers. Account
 or relay changes invalidate outgoing sessions and subscriptions. Retried meta
 reads/writes retain their original endpoint lifetime and stop on retirement;
@@ -72,13 +80,18 @@ they do not replay against a replacement host.
 Codex, ACP and OpenCode republication stays bound to the host's startup
 account/relay context. Changing that context requires restarting the host;
 neither manual republication nor automatic recovery publishes its old listeners
-under a new context.
+under a new context. Starting a Codex or ACP host that runs under another
+context is that restart (stop, then start under the current one) rather than a
+reuse reporting success; while the current context cannot be resolved
+(offline), a live host is kept. OpenCode refuses a second start of a running
+host.
 
 Local subscriptions report `Local` / **Local direct** / **本机直连** and the
-actual endpoint, with no fabricated SDK counters, relay phases or P2P stages.
-The session step still depends on a successful protocol handshake. Healthy
-local link watches refresh every three seconds; remote recovery keeps its
-existing fast sampling and backoff.
+actual endpoint (or the chosen port of a forwarded API), with no fabricated SDK
+counters, relay phases or P2P stages. The connection sheet shows two steps,
+this device's listener and the session; the session step still depends on a
+successful protocol handshake. Healthy local link watches refresh every three
+seconds; remote recovery keeps its existing fast sampling and backoff.
 
 ### Remote connection ownership
 
@@ -141,9 +154,12 @@ harness and observes descriptor counts under the original soft limit.
 Local-routing fixtures exchange real loopback WebSocket/HTTP/SSE traffic for
 Codex, ACP, OpenCode and meta while a relay trap must receive no connection.
 They check session reuse, protocol permission failures, stop/restart invalidation,
-same-port meta retry rejection and fresh processes reopening the same isolated
-hosting state. UI tests cover pending relay discovery/publication, local session
-resume, device identity separation and truthful local connection steps.
+same-port meta retry rejection, a forwarded API port that follows a restarted
+host and refuses while it is stopped, a changed context restarting a Codex host
+instead of reusing it, and fresh processes reopening the same isolated hosting
+state. UI tests cover pending relay discovery/publication, local session
+resume, hidden local hosts, device identity separation and truthful local
+connection steps.
 
 Live regression on the public relay: ten completed OpenCode info requests were
 left connected with their subscriber handle still held. The publisher closed all

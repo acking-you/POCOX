@@ -60,6 +60,27 @@ impl Target {
         }
     }
 
+    /// Expose `service` on `127.0.0.1:<port>` (`0`: any free port) for
+    /// clients outside the app, tracked under its own key: forwarded to this
+    /// process's listener, or subscribed through the relay.
+    pub(crate) fn expose(&self, service: &str, port: u16) -> Result<runtime::SubStatus> {
+        ensure!(transport::is_current(self.epoch()), "the account or relay changed; try again");
+        match self {
+            Self::Local {
+                context,
+                epoch,
+                ..
+            } => runtime::forward_local(service.into(), context.clone(), *epoch, port),
+            Self::Remote(owned) => runtime::subscribe_service_as(
+                service.into(),
+                service,
+                port,
+                &owned.transport,
+                || transport::is_current(owned.epoch),
+            ),
+        }
+    }
+
     pub(crate) fn open(
         &self,
         service: &str,

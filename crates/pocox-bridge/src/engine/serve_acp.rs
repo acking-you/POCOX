@@ -324,7 +324,14 @@ pub(super) fn start_locked(
     launch_prepared(prepare(lease.name(), spec, provider, profiles)?)
 }
 
+/// A host of `spec` already running under `name`, republished where needed.
+/// One bound to an account or relay other than the current one is stopped
+/// instead (`None`), so this start is its restart there; while the current
+/// one cannot be resolved (offline), a live host is kept.
 fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
+    let current = transport::resolve_owned_blocking()
+        .ok()
+        .map(|owned| transport::Context::of(&owned.transport));
     let found = {
         let guard = hosts();
         let Some(host) = guard.get(name) else { return Ok(None) };
@@ -334,7 +341,12 @@ fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
                  name"
             );
         }
-        report(host, true)
+        let rebind = current.is_some_and(|current| current != host.context);
+        (!rebind).then(|| report(host, true))
+    };
+    let Some(found) = found else {
+        stop(name);
+        return Ok(None);
     };
     let _ = reregister(name, "acp");
     let _ = reregister(name, "meta");

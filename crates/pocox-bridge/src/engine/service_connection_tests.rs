@@ -217,6 +217,99 @@ fn local_protocols_bypass_relay_and_retire_with_the_host() {
     transport::context_changed();
 }
 
+/// The status line of a plain HTTP request to `/projects` through `address`;
+/// `None` when the connection is refused or closed unanswered.
+fn http_status(address: &str) -> Option<String> {
+    use std::io::{Read, Write};
+    let mut stream = std::net::TcpStream::connect(address).ok()?;
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .ok()?;
+    stream
+        .write_all(b"GET /projects HTTP/1.1\r\nHost: fixture\r\nConnection: close\r\n\r\n")
+        .ok()?;
+    let mut reply = String::new();
+    stream.read_to_string(&mut reply).ok()?;
+    reply.lines().next().map(str::to_string)
+}
+
+#[test]
+fn an_exposed_local_api_keeps_its_port_and_follows_its_host() {
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("runtime");
+    let relay = std::net::TcpListener::bind("127.0.0.1:0").expect("unused relay");
+    relay.set_nonblocking(true).expect("nonblocking");
+    let context = context(&relay.local_addr().expect("relay address").to_string(), None);
+    transport::test_context(context.clone());
+    let api = "pcx:forward-test:api:direct";
+    let (first, first_server) = metadata();
+    let host = Registration::new(&context, &[(api.into(), first)]).expect("host");
+    let exposed = Target::resolve(api)
+        .expect("local")
+        .expose(api, 0)
+        .expect("forward");
+    assert_eq!(exposed.path.path, runtime::TunnelPath::Local);
+    assert!(exposed.alive);
+    assert_ne!(exposed.local_addr, first.to_string(), "the chosen port, not the listener");
+    let ok = Some("HTTP/1.1 200 OK".to_string());
+    assert_eq!(http_status(&exposed.local_addr), ok);
+
+    drop(host);
+    let status = |key: &str| {
+        runtime::list_subscriptions()
+            .into_iter()
+            .find(|s| s.key == key)
+            .expect("still subscribed")
+    };
+    assert!(!status(api).alive, "a stopped host shows as dropped");
+    assert_eq!(http_status(&exposed.local_addr), None, "and refuses, with no relay fallback");
+
+    // A restarted host listens elsewhere; the chosen port reaches it.
+    let (second, second_server) = metadata();
+    let reopened = Registration::new(&context, &[(api.into(), second)]).expect("restart");
+    assert!(status(api).alive);
+    assert_eq!(http_status(&exposed.local_addr), ok);
+    let again = Target::resolve(api)
+        .expect("local")
+        .expose(api, 0)
+        .expect("again");
+    assert_eq!(again.local_addr, exposed.local_addr, "a live forward keeps its port");
+
+    // A WebSocket upgrade and its frames pass through unchanged, as the
+    // Responses API's WebSocket GET needs.
+    let streaming = "pcx:forward-test:api:streaming";
+    let (socket, socket_server) = websocket(Arc::new(AtomicUsize::new(0)));
+    let socket_host = Registration::new(&context, &[(streaming.into(), socket)]).expect("host");
+    let forwarded = Target::resolve(streaming)
+        .expect("local")
+        .expose(streaming, 0)
+        .expect("forward");
+    let reply = runtime::runtime().block_on(async {
+        let (mut ws, _) =
+            tokio_tungstenite::connect_async(format!("ws://{}/", forwarded.local_addr))
+                .await
+                .expect("upgrade through the forward");
+        ws.send(Message::text(json!({"id": 1, "method": "initialize"}).to_string()))
+            .await
+            .expect("send");
+        let Some(Ok(Message::Text(reply))) = ws.next().await else { panic!("no reply") };
+        reply.to_string()
+    });
+    assert!(reply.contains("fixture"), "{reply}");
+    runtime::unsubscribe_service(streaming);
+    drop(socket_host);
+    socket_server.abort();
+    assert!(
+        matches!(relay.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock),
+        "nothing dialled the relay"
+    );
+    runtime::unsubscribe_service(api);
+    drop(reopened);
+    first_server.abort();
+    second_server.abort();
+    transport::context_changed();
+}
+
 #[test]
 fn ownership_requires_the_exact_service_context_and_live_incarnation() {
     let _serial = transport::test_serial();

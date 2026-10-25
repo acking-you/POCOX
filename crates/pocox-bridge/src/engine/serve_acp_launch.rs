@@ -392,6 +392,8 @@ fn publish(
     ) {
         Ok(register) => register,
         Err(error) => {
+            // Retired before its listeners stop, like every other stop.
+            drop(local_routes);
             abort();
             drop(meta_register);
             return Err((error, owner));

@@ -170,7 +170,8 @@ fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
     let idle = || runtime::runtime().spawn(std::future::pending::<()>());
     let local: SocketAddr = "127.0.0.1:9".parse().expect("addr");
     LocalServe {
-        local_routes: None,
+        app_route: None,
+        service_routes: None,
         context: transport::Context::of(&transport::Transport {
             session: pocox_pb::RelaySession::for_test("127.0.0.1:9"),
             namespace: None,
@@ -214,13 +215,13 @@ fn finishes(handle: &tokio::task::AbortHandle) -> bool {
 }
 
 #[test]
-fn codex_republication_refuses_a_changed_context_before_dialing() {
+fn a_changed_context_restarts_codex_instead_of_republishing() {
     const ISOLATED: &str = "POCOX_REPUBLISH_CONTEXT_FIXTURE";
     if std::env::var_os(ISOLATED).is_none() {
         let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
             .args([
                 "--exact",
-                "engine::serve::tests::codex_republication_refuses_a_changed_context_before_dialing",
+                "engine::serve::tests::a_changed_context_restarts_codex_instead_of_republishing",
                 "--nocapture",
             ])
             .env(ISOLATED, "1")
@@ -250,9 +251,12 @@ fn codex_republication_refuses_a_changed_context_before_dialing() {
     .expect("isolated hosting context");
     let name = "republish-context";
     let mut host = fake_host(name, "original", true);
+    // Its codex still answers: only the changed context may retire it.
+    let codex = std::net::TcpListener::bind("127.0.0.1:0").expect("live app-server stand-in");
+    host.app_local = codex.local_addr().expect("address");
     let context = host.context.clone();
     let key = host.app_key.clone();
-    host.local_routes = Some(
+    host.app_route = Some(
         super::super::local_services::Registration::new(&context, &[(key.clone(), host.app_local)])
             .expect("owned startup route"),
     );
@@ -273,8 +277,14 @@ fn codex_republication_refuses_a_changed_context_before_dialing() {
         "the old host was not adopted by the new context"
     );
     assert!(matches!(relay.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock));
-    let host = hosts_locked().remove(name).expect("original host retained");
-    assert!(stop_host_tasks(host));
+    // Starting it again is its restart under the new context, never a reuse
+    // that reports success while it stays bound to the old one.
+    assert!(
+        reuse_or_retire_host(name, 0).expect("retired").is_none(),
+        "a start in the new context spawns afresh"
+    );
+    assert!(!hosts_locked().contains_key(name), "the old host was retired");
+    assert!(super::super::local_services::lookup(&context, &key).is_err(), "with its local route");
 }
 
 #[test]

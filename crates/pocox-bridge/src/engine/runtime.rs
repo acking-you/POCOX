@@ -21,6 +21,7 @@ use tokio::runtime::{Builder, Runtime};
 #[cfg(test)]
 use tokio::task::JoinHandle;
 
+mod local_forward;
 mod path_status;
 pub use path_status::{PathStatus, TunnelHealth, TunnelPath};
 
@@ -86,6 +87,8 @@ enum SubscriptionOwner {
         endpoint: super::local_services::Endpoint,
         epoch: u64,
     },
+    /// A chosen port for this process's own service, for clients outside it.
+    Forward(local_forward::Forward),
     Tunnel {
         connection: Arc<Connection>,
         path: ConnectionPath,
@@ -109,21 +112,9 @@ impl SubEntry {
             SubscriptionOwner::Local {
                 endpoint,
                 epoch,
-            } => {
-                let current = endpoint.is_current() && super::transport::is_current(*epoch);
-                SubStatus {
-                    key: key.into(),
-                    local_addr: self.local_addr.clone(),
-                    alive: current,
-                    ready: current,
-                    path: PathStatus {
-                        path: TunnelPath::Local,
-                        ..PathStatus::default()
-                    },
-                    health: TunnelHealth::default(),
-                    events: Vec::new(),
-                }
-            },
+            } => self
+                .local_status(key, endpoint.is_current() && super::transport::is_current(*epoch)),
+            SubscriptionOwner::Forward(forward) => self.local_status(key, forward.is_current()),
             SubscriptionOwner::Tunnel {
                 connection,
                 path,
@@ -138,6 +129,22 @@ impl SubEntry {
                 health: TunnelHealth::default(),
                 events: Vec::new(),
             },
+        }
+    }
+
+    /// This process's own service, reached without SDK counters or phases.
+    fn local_status(&self, key: &str, current: bool) -> SubStatus {
+        SubStatus {
+            key: key.into(),
+            local_addr: self.local_addr.clone(),
+            alive: current,
+            ready: current,
+            path: PathStatus {
+                path: TunnelPath::Local,
+                ..PathStatus::default()
+            },
+            health: TunnelHealth::default(),
+            events: Vec::new(),
         }
     }
 }
@@ -312,6 +319,48 @@ pub(crate) fn subscribe_local(
         },
     };
     let status = entry.status(&key);
+    let old = registry.insert(key, entry);
+    drop(registry);
+    drop(old);
+    Ok(status)
+}
+
+/// Expose this process's own `key` on `127.0.0.1:<local_port>` (`0`: any free
+/// port) for clients outside the app, such as a Responses API client. The
+/// port is held until [`unsubscribe_service`]; each connection reaches the
+/// listener the service's host owns at the time. A live forward keeps its
+/// port, like a live tunnel.
+pub(crate) fn forward_local(
+    key: String,
+    context: super::transport::Context,
+    epoch: u64,
+    local_port: u16,
+) -> Result<SubStatus> {
+    let stale = || anyhow!("the account or relay changed; try again");
+    let replaced = {
+        let mut registry = registry().lock().expect("registry poisoned");
+        if !super::transport::is_current(epoch) {
+            return Err(stale());
+        }
+        if let Some(entry) = registry.get(&key) {
+            if matches!(entry.owner, SubscriptionOwner::Forward(_)) {
+                return Ok(entry.status(&key));
+            }
+        }
+        // Another kind of entry (a relay tunnel, say) gives its port back first.
+        registry.remove(&key)
+    };
+    drop(replaced);
+    let (address, forward) = local_forward::Forward::bind(context, key.clone(), epoch, local_port)?;
+    let entry = SubEntry {
+        local_addr: address.to_string(),
+        owner: SubscriptionOwner::Forward(forward),
+    };
+    let status = entry.status(&key);
+    let mut registry = registry().lock().expect("registry poisoned");
+    if !super::transport::is_current(epoch) {
+        return Err(stale());
+    }
     let old = registry.insert(key, entry);
     drop(registry);
     drop(old);

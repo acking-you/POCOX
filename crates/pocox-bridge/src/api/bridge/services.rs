@@ -314,21 +314,13 @@ pub async fn discover_services() -> Result<Vec<ServiceIdDto>> {
     .await
 }
 
-/// Connect to an API service. Owned local services return their actual
-/// listener; remote services use the forwarding port `127.0.0.1:<local_port>`.
+/// Expose an API service on `127.0.0.1:<local_port>` (`0`: any free port).
+/// An API this app hosts is forwarded there directly, following its host's
+/// listener across restarts; another device's is subscribed through the relay.
 pub async fn api_subscribe(service_key: String, local_port: u16) -> Result<SubStatusDto> {
     execution::run(Lane::Control, move || {
         let target = crate::engine::service_connection::Target::resolve(&service_key)?;
-        let origin = target.open(&service_key, service_key.clone(), local_port, false)?;
-        let s = runtime::list_subscriptions()
-            .into_iter()
-            .find(|s| s.key == service_key)
-            .ok_or_else(|| anyhow::anyhow!("the connection changed; reconnect"))?;
-        anyhow::ensure!(
-            origin.is_current() && transport::is_current(target.epoch()),
-            "the service or connection changed; reconnect"
-        );
-        Ok(s.into())
+        Ok(target.expose(&service_key, local_port)?.into())
     })
     .await
 }

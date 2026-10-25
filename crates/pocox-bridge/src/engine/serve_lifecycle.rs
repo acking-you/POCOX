@@ -265,7 +265,8 @@ fn stop_native_hosts() -> Vec<String> {
 /// then kept in [`NATIVE`]).
 pub(super) fn stop_host_tasks(mut ls: LocalServe) -> bool {
     let owned = owned_of(&ls);
-    drop(ls.local_routes.take());
+    drop(ls.app_route.take());
+    drop(ls.service_routes.take());
     super::super::agent_tools::inject::hosted_stopped(&ls.name);
     // A watchdog restart in progress holds the lease the caller holds now,
     // so none is running; aborting stops the next one.
