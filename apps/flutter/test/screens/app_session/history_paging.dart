@@ -276,6 +276,16 @@ void _registerHistoryPaging() {
         await t.pumpAndSettle();
         expect(api.turnItemCalls, ['t1']);
         expect(find.text('first answer'), findsOneWidget);
+        // The jump flashes the message it landed on.
+        expect(
+          find.ancestor(
+            of: find.text('first question'),
+            matching: find.byWidgetPredicate(
+              (widget) => widget is ArrivalPulse && widget.revision != null,
+            ),
+          ),
+          findsOneWidget,
+        );
         // The newest turn is still there — a jump adds, it doesn't replace.
         expect(find.text('newest answer'), findsOneWidget);
         expect(find.byKey(const Key('chat-older-history')), findsNothing);
@@ -532,7 +542,7 @@ void _registerHistoryPaging() {
       expect(find.text('Earlier question 0').hitTestable(), findsOneWidget);
       expect(
         find.byWidgetPredicate(
-          (widget) => widget is HistoryArrival && widget.revision == 1,
+          (widget) => widget is ArrivalPulse && widget.revision == 1,
         ),
         findsOneWidget,
       );

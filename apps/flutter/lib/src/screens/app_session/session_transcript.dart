@@ -50,7 +50,7 @@ extension _SessionTranscript on _AppSessionState {
     }
   }
 
-  Widget _transcriptRow(Object row) => HistoryArrival(
+  Widget _transcriptRow(Object row) => ArrivalPulse(
     revision: _historyArrivalRow == _rowKey(row)
         ? _historyArrivalRevision
         : null,
@@ -132,6 +132,7 @@ extension _SessionTranscript on _AppSessionState {
       onEdit: _externalWriterMode || _historySyncing || _showingCachedHistory
           ? null
           : _editMessage,
+      flash: _turnFlashRow == _rowKey(row) ? _turnFlashRevision : null,
     );
   }
 

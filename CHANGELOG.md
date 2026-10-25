@@ -9,6 +9,13 @@ breaking change goes.
 
 ## Unreleased
 
+- **The turn rail works like ChatGPT's.** One mark per turn at a fixed
+  pitch; the turns on screen are inked darker instead of one blue mark. The
+  pointed-at mark and its neighbours grow with a quick spring, and the
+  preview opens after a short pause, then follows the pointer. Press and drag
+  scrubs through the conversation. A jump flashes the message it lands on.
+  Long conversations scroll the rail with faded edges instead of thinning
+  its marks, and the `n / total` outline button shows while you use the rail.
 - **Local services connect directly throughout the app.** Discovery, session
   setup, probes, metadata, Responses API access and recovery use this app's
   owned loopback listeners before resolving relay credentials. A selected

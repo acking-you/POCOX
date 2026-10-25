@@ -91,10 +91,14 @@ void _registerMonitoring() {
           await t.pumpAndSettle();
           expect(scroll.position.extentBefore, lessThan(20));
           expect(find.text('external question 0'), findsOneWidget);
-          final firstTick = t.widget<Container>(
+          // The first turn is now the one on screen, so its mark is inked.
+          final firstTick = t.widget<DecoratedBox>(
             find.byKey(const ValueKey('turn-minimap-tick-0')),
           );
-          expect(firstTick.constraints!.maxWidth, 13);
+          expect(
+            (firstTick.decoration as BoxDecoration).color!.a,
+            closeTo(0.6, 0.001),
+          );
           expect(find.byKey(const Key('chat-takeover-action')), findsOneWidget);
           expect(api.lastMetaResumedThread, isNull);
           await t.pumpWidget(const SizedBox());
