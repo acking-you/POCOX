@@ -210,7 +210,8 @@ extension _SessionTranscript on _AppSessionState {
     final hostSwitch = _hostSwitchBanner();
     final pane = Column(
       children: [
-        _statusBar(l10n),
+        // A short window carries the status line in its title row.
+        if (!_inlineStatus) _statusBar(l10n),
         // Where the reader is looking: the switch announces itself above the
         // conversation, which stays put until the new host has answered.
         Motion.resize(

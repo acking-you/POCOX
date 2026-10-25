@@ -29,6 +29,13 @@ breaking change goes.
   shown in the editor), **None** and **Custom**. A proxy URL saved by an
   earlier version keeps working as Custom; without one, the default now also
   reads the operating system's setting, not only the environment.
+- **Short windows keep the conversation in view.** Room decides, not the
+  platform: a window shorter than 560 px (a phone in landscape, a split
+  screen, a small desktop window) or narrower than 720 px folds the composer
+  into its capsule while no one writes, and a short one moves the status line
+  into the title row, where it shortens itself as on its own strip, and keeps
+  the host/branch footnote until the composer opens. Tall desktop and tablet
+  windows are unchanged.
 - New device-management routes `/manage/v1/harnesses…`; an older POCOX
   simply shows no agent card. See [harness updates](docs/harness-updates.md).
 

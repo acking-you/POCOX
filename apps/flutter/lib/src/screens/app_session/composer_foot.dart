@@ -32,11 +32,24 @@ extension _SessionComposerFoot on _AppSessionState {
   ValueNotifier<double> get _composerOverlay => _foot.overlay;
   double get _composerBlock => _foot.block;
 
-  /// Phones only: a tablet or desktop window has room for the composer. A
-  /// read-only view shows one action in its place, which never folds.
+  /// Below this window height the conversation keeps its room, whatever the
+  /// platform (a phone in landscape, a split screen, a short desktop window):
+  /// the composer folds and the status line rides in the title row.
+  static const _shortHeight = 560.0;
+
+  /// Whether the window is too short for the composer and the status strip
+  /// to stand open beside the conversation.
+  bool get _shortWindow => MediaQuery.sizeOf(context).height < _shortHeight;
+
+  /// The status line sits in the title row instead of a strip of its own: a
+  /// short window, unless the title is being edited there.
+  bool get _inlineStatus => _shortWindow && !_editingTitle;
+
+  /// Measured room, not the platform, decides: a narrow window (a phone, a
+  /// slim desktop window) or a short one folds the composer. A read-only
+  /// view shows one action in its place, which never folds.
   bool get _composerFoldable =>
-      !isDesktop &&
-      MediaQuery.sizeOf(context).width < 720 &&
+      (MediaQuery.sizeOf(context).width < 720 || _shortWindow) &&
       !_externalWriterMode;
 
   /// Whether the composer shows as its capsule: on a phone, whenever no one
