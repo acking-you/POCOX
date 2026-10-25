@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use super::command::{classify, Failure};
@@ -93,6 +94,40 @@ fn codex_installations_update_as_their_installer_does() {
         install::codex_method(Path::new("/opt/homebrew/bin/codex"), None, false),
         Method::Not("unmanaged")
     );
+}
+
+/// A check whose probes ran before an update finished never puts back the
+/// version the update replaced; it still brings the newest one it found.
+#[test]
+fn a_check_never_replaces_what_a_later_update_installed() {
+    let found = |kind, version: &str, latest: &str| super::service::Found {
+        installed: Some(install::Installed {
+            kind,
+            path: format!("/bin/{}", kind.label()).into(),
+            version: Some(version.into()),
+            method: Method::Own,
+            source: install::Source::Unchecked,
+        }),
+        latest: Some(latest.into()),
+    };
+    let version = |found: &super::service::Found| {
+        found
+            .installed
+            .as_ref()
+            .and_then(|installed| installed.version.clone())
+    };
+    let mut current = BTreeMap::from([
+        (Kind::Codex, found(Kind::Codex, "0.47.0", "0.47.0")),
+        (Kind::OpenCode, found(Kind::OpenCode, "1.19.4", "1.19.4")),
+    ]);
+    let checked = BTreeMap::from([
+        (Kind::Codex, found(Kind::Codex, "0.46.0", "0.48.0")),
+        (Kind::OpenCode, found(Kind::OpenCode, "1.19.5", "1.19.5")),
+    ]);
+    super::service::publish(&mut current, checked, |kind| kind == Kind::Codex);
+    assert_eq!(version(&current[&Kind::Codex]).as_deref(), Some("0.47.0"));
+    assert_eq!(current[&Kind::Codex].latest.as_deref(), Some("0.48.0"));
+    assert_eq!(version(&current[&Kind::OpenCode]).as_deref(), Some("1.19.5"));
 }
 
 #[test]

@@ -4723,6 +4723,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get harnessSkipShared => '跟随 OpenCode 自己的服务器';
 
   @override
+  String get harnessSkipOtherInstall => '运行的是另一份安装';
+
+  @override
   String get harnessSkipChanged => '期间已被重启';
 
   @override

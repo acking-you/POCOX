@@ -4998,6 +4998,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get harnessSkipShared => 'follows OpenCode\'s own server';
 
   @override
+  String get harnessSkipOtherInstall => 'runs another installation';
+
+  @override
   String get harnessSkipChanged => 'restarted meanwhile';
 
   @override

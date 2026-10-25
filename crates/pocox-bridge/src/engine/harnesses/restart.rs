@@ -9,7 +9,8 @@
 //! lifecycle lease and names the incarnation it saw, so a service restarted
 //! or replaced meanwhile is left alone. An adopted Codex app-server and a
 //! host attached to OpenCode's own background server are not this app's to
-//! restart.
+//! restart, and a service launched from another installation of the
+//! harness keeps running it.
 //!
 //! On Windows a running executable cannot be replaced, so Codex
 //! app-servers are stopped in place before the update and started again
@@ -17,6 +18,7 @@
 //! version is installed.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use super::view::Skipped;
@@ -45,8 +47,38 @@ pub(super) struct Target {
     pub(super) name: String,
     incarnation: Option<String>,
     engine: Engine,
+    /// The executable it was launched with, where hosting records it
+    /// (Codex, OpenCode); an ACP agent's comes from this computer's lookup.
+    program: Option<PathBuf>,
     /// Why it cannot be restarted at all.
     skip: Option<&'static str>,
+}
+
+impl Target {
+    /// Whether it runs the installation at `path` (an ACP agent, whose
+    /// executable is not recorded, is taken to).
+    fn runs(&self, path: &Path) -> bool {
+        let real = |path: &Path| std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+        self.program
+            .as_deref()
+            .is_none_or(|program| real(program) == real(path))
+    }
+}
+
+/// The installation `kind`'s running services were launched with (the
+/// first by name that records one), which a check and an update manage
+/// rather than whatever a new service would find.
+pub(super) fn installation(targets: &BTreeMap<Kind, Vec<Target>>, kind: Kind) -> Option<PathBuf> {
+    targets
+        .get(&kind)?
+        .iter()
+        .find_map(|target| target.program.clone())
+}
+
+/// `targets` split into those that run the installation at `path` and the
+/// others.
+pub(super) fn split(targets: Vec<Target>, path: &Path) -> (Vec<Target>, Vec<Target>) {
+    targets.into_iter().partition(|target| target.runs(path))
 }
 
 /// The running services of this device, by the harness each uses.
@@ -60,10 +92,17 @@ pub(super) fn targets() -> BTreeMap<Kind, Vec<Target>> {
             ("acp", Some("grok")) => (Kind::Grok, Engine::Acp),
             _ => continue,
         };
+        let codex = (engine == Engine::Codex)
+            .then(|| serve::codex_relaunch(&status.name))
+            .flatten();
+        let program = match engine {
+            Engine::Codex => codex.as_ref().and_then(|run| run.binary.clone()),
+            Engine::OpenCode => serve_opencode::relaunch(&status.name)
+                .map(|run| PathBuf::from(run.prepared.binary())),
+            Engine::Acp => None,
+        };
         let skip = match engine {
-            Engine::Codex if serve::codex_relaunch(&status.name).is_some_and(|run| run.adopted) => {
-                Some("adopted")
-            },
+            Engine::Codex if codex.as_ref().is_some_and(|run| run.adopted) => Some("adopted"),
             Engine::OpenCode
                 if status
                     .opencode
@@ -78,6 +117,7 @@ pub(super) fn targets() -> BTreeMap<Kind, Vec<Target>> {
             name: status.name,
             incarnation: status.incarnation,
             engine,
+            program,
             skip,
         });
     }

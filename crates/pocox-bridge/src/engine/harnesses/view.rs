@@ -92,9 +92,10 @@ pub struct Skipped {
     pub name: String,
     /// `disabled` (restarting is off), `adopted` (its app-server was not
     /// started by this app), `shared_server` (it follows OpenCode's own
-    /// background server), `changed` (it was restarted or replaced
-    /// meanwhile), `busy` (another operation held it) or `failed` (its
-    /// restart failed; it may be stopped).
+    /// background server), `other_install` (it runs another installation
+    /// of the harness), `changed` (it was restarted or replaced meanwhile),
+    /// `busy` (another operation held it) or `failed` (its restart failed;
+    /// it may be stopped).
     pub reason: String,
 }
 

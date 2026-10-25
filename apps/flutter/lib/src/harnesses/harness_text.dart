@@ -86,6 +86,7 @@ String _skipReason(AppLocalizations l10n, String reason) => switch (reason) {
   'disabled' => l10n.harnessSkipDisabled,
   'adopted' => l10n.harnessSkipAdopted,
   'shared_server' => l10n.harnessSkipShared,
+  'other_install' => l10n.harnessSkipOtherInstall,
   'changed' => l10n.harnessSkipChanged,
   'busy' => l10n.harnessSkipBusy,
   _ => l10n.harnessSkipFailed,

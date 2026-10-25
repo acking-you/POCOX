@@ -259,7 +259,8 @@ class HarnessSkipDto {
   /// Instance name.
   final String name;
 
-  /// `disabled`, `adopted`, `shared_server`, `changed`, `busy` or `failed`.
+  /// `disabled`, `adopted`, `shared_server`, `other_install`, `changed`,
+  /// `busy` or `failed`.
   final String reason;
 
   const HarnessSkipDto({required this.name, required this.reason});

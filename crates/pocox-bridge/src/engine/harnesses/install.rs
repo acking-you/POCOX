@@ -15,7 +15,8 @@ use std::path::{Path, PathBuf};
 
 use super::command::{self, Invocation};
 use super::Kind;
-use crate::engine::{claude_setup, config, runtime, serve_acp, serve_opencode};
+use crate::engine::host_profiles::Runtime;
+use crate::engine::{claude_setup, config, host_lifecycle, runtime, serve_acp, serve_opencode};
 
 /// A global package manager.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -182,14 +183,17 @@ pub(super) fn is_newer(latest: &str, installed: &str, line: Option<u64>) -> bool
 }
 
 /// Look for `kind` on this computer; `None` when it is not installed.
+/// Codex and OpenCode take the executable their running services were
+/// launched with (`running`), then what a new service finds, then one a
+/// stopped service saved; the others are found as their preset finds them.
 /// Blocks on bounded version probes.
-pub(super) fn detect(kind: Kind) -> Option<Installed> {
+pub(super) fn detect(kind: Kind, running: Option<&Path>) -> Option<Installed> {
     if !kind.hostable() {
         return None;
     }
     match kind {
-        Kind::Codex => codex(),
-        Kind::OpenCode => opencode(),
+        Kind::Codex => codex(running),
+        Kind::OpenCode => opencode(running),
         Kind::Claude => claude(),
         Kind::Grok => grok(),
     }
@@ -199,12 +203,43 @@ fn version_of(path: &Path) -> Option<String> {
     command::probe(path, &["--version"]).and_then(|output| version_text(&output))
 }
 
-fn codex() -> Option<Installed> {
-    let saved = runtime::support_dir()
+/// The executables services of `kind` saved for their restore.
+fn saved_binaries(kind: Kind) -> Vec<String> {
+    host_lifecycle::entries()
+        .unwrap_or_default()
+        .into_values()
+        .filter_map(|entry| match (kind, entry.runtime?) {
+            (
+                Kind::Codex,
+                Runtime::Codex {
+                    binary, ..
+                },
+            )
+            | (
+                Kind::OpenCode,
+                Runtime::OpenCode {
+                    binary, ..
+                },
+            ) => binary,
+            _ => None,
+        })
+        .collect()
+}
+
+fn codex(running: Option<&Path>) -> Option<Installed> {
+    let configured = runtime::support_dir()
         .ok()
         .and_then(|support| config::load_config(&support).ok())
         .and_then(|config| config.codex.binary);
-    let path = pocox_codex::locate_binary(saved.as_deref())?;
+    let path = running
+        .filter(|path| path.exists())
+        .map(Path::to_path_buf)
+        .or_else(|| pocox_codex::locate_binary(configured.as_deref()))
+        .or_else(|| {
+            saved_binaries(Kind::Codex)
+                .iter()
+                .find_map(|binary| pocox_codex::locate_binary(Some(binary)))
+        })?;
     let home = pocox_codex::rollout::codex_home().ok();
     let method = codex_method(&path, home.as_deref(), cfg!(target_os = "macos"));
     let source = match method {
@@ -304,8 +339,16 @@ fn package_manager(path: &Path, canonical: &Path, package: &[&str; 2]) -> Option
     })
 }
 
-fn opencode() -> Option<Installed> {
-    let path = serve_opencode::program().ok()?;
+fn opencode(running: Option<&Path>) -> Option<Installed> {
+    let explicit = |path: &str| serve_opencode::program(Some(path)).ok();
+    let path = running
+        .and_then(|path| explicit(&path.to_string_lossy()))
+        .or_else(|| serve_opencode::program(None).ok())
+        .or_else(|| {
+            saved_binaries(Kind::OpenCode)
+                .iter()
+                .find_map(|binary| explicit(binary))
+        })?;
     let version = version_of(&path);
     let major = version.as_deref().and_then(parse_version).map(|v| v.major);
     Some(Installed {

@@ -22,9 +22,9 @@ const FIRST_CHECK: Duration = Duration::from_secs(60);
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// The last check: what was installed, and the newest versions found.
-struct Found {
-    installed: Option<Installed>,
-    latest: Option<String>,
+pub(super) struct Found {
+    pub(super) installed: Option<Installed>,
+    pub(super) latest: Option<String>,
 }
 
 #[derive(Default)]
@@ -35,6 +35,10 @@ struct State {
     checking: bool,
     job: Option<Job>,
     runs: u64,
+    /// Moves whenever an update records what it installed.
+    generation: u64,
+    /// The [`Self::generation`] at which each kind's update recorded it.
+    installed_at: BTreeMap<Kind, u64>,
 }
 
 struct Shared {
@@ -103,15 +107,17 @@ fn require_supported() -> Result<()> {
 pub fn overview() -> Result<Overview> {
     require_supported()?;
     let settings = settings::load()?;
-    let stale = {
-        let state = state();
-        !state.checking
-            && state.checked_at_ms.is_none_or(|at| {
-                now_ms().saturating_sub(at) > u64::try_from(CHECK_EVERY.as_millis()).unwrap_or(0)
-            })
-    };
-    if stale && crate::engine::host_owner::require().is_ok() {
-        spawn("pcx-harness-check", check_now);
+    let stale = state().checked_at_ms.is_none_or(|at| {
+        now_ms().saturating_sub(at) > u64::try_from(CHECK_EVERY.as_millis()).unwrap_or(0)
+    });
+    // Reserved before this answer is read, so it says a check runs and the
+    // controller keeps reading until it ends.
+    if stale
+        && crate::engine::host_owner::require().is_ok()
+        && reserve_check()
+        && !spawn("pcx-harness-check", run_check)
+    {
+        end_check();
     }
     let mut services = restart::targets();
     let state = state();
@@ -176,34 +182,52 @@ pub fn check() -> Result<Overview> {
     overview()
 }
 
+/// Mark a check as running; false when one already runs.
+fn reserve_check() -> bool {
+    let mut state = state();
+    !std::mem::replace(&mut state.checking, true)
+}
+
+fn end_check() {
+    state().checking = false;
+    SHARED.changed.notify_all();
+}
+
+/// Run a check, or wait for the one already running.
 fn check_now() {
-    {
-        let mut state = state();
-        if state.checking {
-            while state.checking {
-                state = SHARED
-                    .changed
-                    .wait(state)
-                    .unwrap_or_else(|poison| poison.into_inner());
-            }
-            return;
-        }
-        state.checking = true;
+    if reserve_check() {
+        run_check();
+        return;
     }
+    let mut state = state();
+    while state.checking {
+        state = SHARED
+            .changed
+            .wait(state)
+            .unwrap_or_else(|poison| poison.into_inner());
+    }
+}
+
+/// The check [`reserve_check`] reserved.
+fn run_check() {
     // Ends the check however it ends.
     struct Checking;
     impl Drop for Checking {
         fn drop(&mut self) {
-            state().checking = false;
-            SHARED.changed.notify_all();
+            end_check();
         }
     }
     let _checking = Checking;
+    let since = state().generation;
+    let targets = restart::targets();
     let installed: Vec<(Kind, Option<Installed>)> = std::thread::scope(|scope| {
         let probes: Vec<_> = Kind::ALL
             .into_iter()
             .filter(|kind| kind.hostable())
-            .map(|kind| (kind, scope.spawn(move || install::detect(kind))))
+            .map(|kind| {
+                let running = restart::installation(&targets, kind);
+                (kind, scope.spawn(move || install::detect(kind, running.as_deref())))
+            })
             .collect();
         probes
             .into_iter()
@@ -215,17 +239,41 @@ fn check_now() {
         .filter_map(|(_, found)| found.clone())
         .collect();
     let mut newest = latest::lookup(&present).into_iter();
-    let mut found = BTreeMap::new();
+    let mut checked = BTreeMap::new();
     for (kind, installed) in installed {
         let latest = installed.as_ref().and_then(|_| newest.next().flatten());
-        found.insert(kind, Found {
+        checked.insert(kind, Found {
             installed,
             latest,
         });
     }
     let mut state = state();
-    state.found = found;
+    let State {
+        found,
+        installed_at,
+        ..
+    } = &mut *state;
+    publish(found, checked, |kind| installed_at.get(&kind).is_some_and(|at| *at > since));
     state.checked_at_ms = Some(now_ms());
+}
+
+/// Replace `found` with a check's results, except what an update recorded
+/// after the check began (`updated`): its probes may have seen the previous
+/// installation, so that kind keeps the update's, with the newest version
+/// the check found.
+pub(super) fn publish(
+    found: &mut BTreeMap<Kind, Found>,
+    checked: BTreeMap<Kind, Found>,
+    updated: impl Fn(Kind) -> bool,
+) {
+    for (kind, mut result) in checked {
+        if updated(kind) {
+            if let Some(previous) = found.get_mut(&kind) {
+                result.installed = previous.installed.take();
+            }
+        }
+        found.insert(kind, result);
+    }
 }
 
 /// Save a change to this device's settings, then answer as [`overview`].
@@ -252,8 +300,10 @@ fn start(kind: Kind, automatic: bool) -> Result<u64> {
     {
         return Err(Refusal::Running.into());
     }
-    // Looked up again: what runs the update is what is installed now.
-    let installed = install::detect(kind).ok_or(Refusal::Unavailable)?;
+    // Looked up again: what runs the update is what is installed now, the
+    // installation this device's services run.
+    let running = restart::installation(&restart::targets(), kind);
+    let installed = install::detect(kind, running.as_deref()).ok_or(Refusal::Unavailable)?;
     let invocation = installed.update().ok_or(Refusal::Unavailable)?;
     let run = {
         let mut state = state();
@@ -278,13 +328,21 @@ fn start(kind: Kind, automatic: bool) -> Result<u64> {
         });
         run
     };
-    spawn("pcx-harness-update", move || run_job(run, installed, invocation));
+    if !spawn("pcx-harness-update", move || run_job(run, installed, invocation)) {
+        // Ends it as failed: a job never stays running.
+        drop(Unfinished(run));
+    }
     Ok(run)
 }
 
-fn spawn(name: &str, work: impl FnOnce() + Send + 'static) {
-    if let Err(error) = std::thread::Builder::new().name(name.into()).spawn(work) {
-        tracing::warn!("{name} could not start: {error}");
+/// Run `work` on a thread of its own; false when none could be started.
+fn spawn(name: &str, work: impl FnOnce() + Send + 'static) -> bool {
+    match std::thread::Builder::new().name(name.into()).spawn(work) {
+        Ok(_) => true,
+        Err(error) => {
+            tracing::warn!("{name} could not start: {error}");
+            false
+        },
     }
 }
 
@@ -318,8 +376,12 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
     let _unfinished = Unfinished(run);
     let kind = installed.kind;
     let restart_services = settings::load().map_or(true, |settings| settings.restart_services);
-    let targets = restart::targets().remove(&kind).unwrap_or_default();
     let mut outcome = Outcome::default();
+    // Only services on the installation being updated restart; one on
+    // another copy keeps running what it runs.
+    let (targets, others) =
+        restart::split(restart::targets().remove(&kind).unwrap_or_default(), &installed.path);
+    outcome.skip_all(&others, "other_install");
     let paused = if restart_services && restart::STOP_FIRST {
         stage(run, "stopping");
         restart::pause(&targets, &mut outcome)
@@ -329,7 +391,7 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
     stage(run, "updating");
     tracing::info!(kind = kind.label(), from = ?installed.version, "updating harness");
     let result = super::command::install(&invocation);
-    let after = install::detect(kind);
+    let after = install::detect(kind, Some(&installed.path));
     let to_version = after.as_ref().and_then(|found| found.version.clone());
     let changed = result.is_ok() && to_version != installed.version;
     if !paused.is_empty() || changed && restart_services {
@@ -365,9 +427,18 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
         "harness update finished"
     );
     let mut state = state();
-    if let Some(found) = state.found.get_mut(&kind) {
-        found.installed = after;
-    }
+    // A check that began before this cannot replace it with what it saw.
+    state.generation += 1;
+    let generation = state.generation;
+    state.installed_at.insert(kind, generation);
+    state
+        .found
+        .entry(kind)
+        .or_insert(Found {
+            installed: None,
+            latest: None,
+        })
+        .installed = after;
     if let Some(job) = state.job.as_mut().filter(|job| job.run == run) {
         job.state = if result.is_ok() { "done" } else { "failed" }.into();
         job.stage = None;

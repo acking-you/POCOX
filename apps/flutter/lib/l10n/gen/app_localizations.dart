@@ -8561,6 +8561,12 @@ abstract class AppLocalizations {
   /// **'follows OpenCode\'s own server'**
   String get harnessSkipShared;
 
+  /// No description provided for @harnessSkipOtherInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'runs another installation'**
+  String get harnessSkipOtherInstall;
+
   /// No description provided for @harnessSkipChanged.
   ///
   /// In en, this message translates to:

@@ -36,7 +36,8 @@ pub struct HarnessDto {
 pub struct HarnessSkipDto {
     /// Instance name.
     pub name: String,
-    /// `disabled`, `adopted`, `shared_server`, `changed`, `busy` or `failed`.
+    /// `disabled`, `adopted`, `shared_server`, `other_install`, `changed`,
+    /// `busy` or `failed`.
     pub reason: String,
 }
 

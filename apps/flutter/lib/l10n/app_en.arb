@@ -1840,6 +1840,7 @@
   "harnessSkipDisabled": "restarting is off",
   "harnessSkipAdopted": "not started by POCOX",
   "harnessSkipShared": "follows OpenCode's own server",
+  "harnessSkipOtherInstall": "runs another installation",
   "harnessSkipChanged": "restarted meanwhile",
   "harnessSkipBusy": "busy",
   "harnessSkipFailed": "its restart failed; check it",

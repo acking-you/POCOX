@@ -480,9 +480,10 @@ pub(super) fn restart_locked(lease: &host_lease::Lease, incarnation: &str) -> Re
     Ok(true)
 }
 
-/// The OpenCode executable a new host launches, without starting it.
-pub(super) fn program() -> Result<std::path::PathBuf> {
-    launch_for(None).map(|launch| launch.program)
+/// The OpenCode executable a host launches for `binary` (none: what a new
+/// host finds), without starting it.
+pub(super) fn program(binary: Option<&str>) -> Result<std::path::PathBuf> {
+    launch_for(binary).map(|launch| launch.program)
 }
 pub(super) fn close_admission() {
     hosts().closing = true;

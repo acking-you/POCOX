@@ -34,11 +34,16 @@ output, paths or proxy values; texts are the controller's.
 
 ## Detection and versions
 
-Each harness is found exactly as hosting finds it (saved path, then the
-child `PATH`, then its preset's locations) and asked for `--version`, bounded
-in time and output (`pocox_core::process::bounded`). Only harnesses this
-platform can host are listed: Codex everywhere, the others where owned agent
-processes can be supervised (not Windows).
+Each harness is found as hosting finds it and asked for `--version`, bounded
+in time and output (`pocox_core::process::bounded`). For Codex and OpenCode,
+whose services each record the executable they were launched with, the
+managed installation is the one those services run (the first by name);
+without a running service it is what a new service would find (saved path,
+then the child `PATH`, then its preset's locations), else an executable a
+stopped service saved. The Claude preset's `claude` and Grok come from this
+computer's own lookup. Only harnesses this platform can host are listed:
+Codex everywhere, the others where owned agent processes can be supervised
+(not Windows).
 
 | Harness | How it updates | Newest version from |
 | --- | --- | --- |
@@ -63,9 +68,12 @@ The Claude preset without a native `claude` uses the CLI its adapter bundles
 is updated by WinGet (`winget`).
 
 A check runs a minute after the host starts and then every six hours; reading
-a computer whose last check is older starts one, and **Check for updates**
-runs one at once (a check already running is joined). Versions compare as
-semver; prereleases sort below their release.
+a computer whose last check is older starts one (marked as running before
+that answer is read, so the app keeps reading until it ends), and **Check
+for updates** runs one at once (a check already running is joined). Nothing
+is listed before the first check. A check that overlaps an update never
+replaces what the update recorded as installed with what its own probes saw
+earlier. Versions compare as semver; prereleases sort below their release.
 
 ## Network proxy
 
@@ -101,7 +109,9 @@ again. Each restart holds the instance's lifecycle lease (waiting up to 30 s)
 and names the incarnation it saw, so a service restarted or replaced
 meanwhile (`changed`) or held by another operation (`busy`) is left alone.
 An adopted Codex app-server (`adopted`) and a host attached to OpenCode's
-background server (`shared_server`) are not this app's to restart. Services
+background server (`shared_server`) are not this app's to restart, and a
+service launched from another installation of the harness than the one
+updated keeps running it (`other_install`). Services
 restart only when the version changed; with restarting off they are listed as
 `disabled` and keep the old version until they restart.
 

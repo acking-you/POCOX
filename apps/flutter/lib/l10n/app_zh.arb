@@ -1571,6 +1571,7 @@
   "harnessSkipDisabled": "已关闭重启",
   "harnessSkipAdopted": "不是由 POCOX 启动的",
   "harnessSkipShared": "跟随 OpenCode 自己的服务器",
+  "harnessSkipOtherInstall": "运行的是另一份安装",
   "harnessSkipChanged": "期间已被重启",
   "harnessSkipBusy": "正忙",
   "harnessSkipFailed": "重启失败，请检查",
