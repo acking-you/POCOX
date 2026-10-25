@@ -122,10 +122,13 @@ pub enum Method {
     Installer,
     /// Swap the AppImage file once the app has quit, then reopen it (Linux).
     ReplaceAppImage,
+    /// Swap the portable archive's files into the app's folder once the app
+    /// has quit, then reopen it (portable Windows).
+    ReplaceFolder,
     /// Hand the package to the desktop's package installer (Linux `.deb`).
     OpenPackage,
-    /// Save the archive to Downloads for the user to unpack (portable
-    /// Windows and Linux).
+    /// Save the archive to Downloads for the user to unpack (portable Linux,
+    /// and a portable Windows copy the app cannot replace).
     SaveDownload,
     /// Hand the package to the system installer, which asks the user
     /// (Android).
@@ -142,6 +145,7 @@ impl Method {
             Self::ReplaceBundle => "replace_bundle",
             Self::Installer => "installer",
             Self::ReplaceAppImage => "replace_app_image",
+            Self::ReplaceFolder => "replace_folder",
             Self::OpenPackage => "open_package",
             Self::SaveDownload => "save_download",
             Self::SystemInstaller => "system_installer",
@@ -151,7 +155,10 @@ impl Method {
 
     /// Whether applying it ends with this app quitting.
     pub fn restarts(self) -> bool {
-        matches!(self, Self::ReplaceBundle | Self::Installer | Self::ReplaceAppImage)
+        matches!(
+            self,
+            Self::ReplaceBundle | Self::Installer | Self::ReplaceAppImage | Self::ReplaceFolder
+        )
     }
 }
 
@@ -163,7 +170,10 @@ pub enum Install {
     /// Set up by the Windows installer (its uninstaller sits beside the
     /// executable).
     WindowsInstalled,
-    /// Unpacked from a portable archive.
+    /// Unpacked from the Windows portable archive into a folder this user may
+    /// write, with the update helper beside the executable.
+    WindowsPortable,
+    /// Unpacked from a portable archive the app cannot replace itself.
     Portable,
     /// Running from an AppImage.
     AppImage,
@@ -200,6 +210,7 @@ pub fn plan(manifest: &Manifest, host: Host) -> Plan {
         (Install::MacBundle, "aarch64") => ("-macos-arm64.dmg", Method::ReplaceBundle),
         (Install::MacBundle, "x86_64") => ("-macos-x64.dmg", Method::ReplaceBundle),
         (Install::WindowsInstalled, "x86_64") => ("-windows-x64-setup.exe", Method::Installer),
+        (Install::WindowsPortable, "x86_64") => ("-windows-x64.zip", Method::ReplaceFolder),
         (Install::Portable, "x86_64") if cfg!(windows) => {
             ("-windows-x64.zip", Method::SaveDownload)
         },

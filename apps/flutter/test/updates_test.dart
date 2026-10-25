@@ -30,7 +30,8 @@ UpdateState _found(
 void main() {
   group('one-click update', () {
     test('a restarting update quits the app once the helper waits', () async {
-      final api = FakeBridgeApi()..update = _found('replace_bundle');
+      // A portable Windows copy restarts too, rather than saving the archive.
+      final api = FakeBridgeApi()..update = _found('replace_folder');
       var quits = 0;
       final actions = UpdateActions(
         api,

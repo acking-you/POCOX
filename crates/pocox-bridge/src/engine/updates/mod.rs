@@ -16,6 +16,7 @@ mod macos;
 pub mod manifest;
 #[cfg(test)]
 mod tests;
+mod windows;
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -272,6 +273,9 @@ struct Saved {
 #[derive(Debug, Clone)]
 struct Staged {
     version: semver::Version,
+    /// The manifest's entry for the file, which the Windows helper checks
+    /// again.
+    asset: manifest::Asset,
     method: Method,
     path: PathBuf,
     work: PathBuf,
@@ -679,6 +683,7 @@ impl Updater {
         match staged {
             Ok(path) => Ok(Staged {
                 version: release.version.clone(),
+                asset: asset.clone(),
                 method,
                 path,
                 work,
@@ -706,7 +711,14 @@ impl Updater {
         if staged.method.restarts() && !self.config.replace_self {
             state.phase = Phase::VerifiedOnly;
         } else {
-            match apply::hand_off(staged.method, &staged.path, &staged.work) {
+            // Readying can take a while (the Windows helper unpacks the
+            // release or waits on the administrator prompt): show it.
+            state.phase = Phase::Installing;
+            state.failure = None;
+            self.publish(state);
+            let handoff = apply::hand_off(&staged);
+            state = self.lock();
+            match handoff {
                 Ok(Handoff::Quit) => state.phase = Phase::Installing,
                 // The system installer asks the user, who may decline; the
                 // package stays readied for another try.

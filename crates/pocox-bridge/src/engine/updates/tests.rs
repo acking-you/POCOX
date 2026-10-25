@@ -159,6 +159,7 @@ fn each_installation_takes_its_own_file() {
         "pocox-app-v1.0.0-windows-x64-setup.exe",
         "pocox-app-v1.0.0-linux-x86_64.AppImage",
         "pocox-app-v1.0.0-android-armeabi-v7a.apk",
+        "pocox-app-v1.0.0-windows-x64.zip",
     ];
     let assets: Vec<(&str, &[u8])> = names.iter().map(|name| (*name, &b"x"[..])).collect();
     let release = manifest::Manifest::parse(&manifest_for("1.0.0", &assets)).expect("manifest");
@@ -175,6 +176,10 @@ fn each_installation_takes_its_own_file() {
         (Method::Installer, Some(names[2].into()))
     );
     assert_eq!(pick(Install::Android, "arm"), (Method::SystemInstaller, Some(names[4].into())));
+    assert_eq!(
+        pick(Install::WindowsPortable, "x86_64"),
+        (Method::ReplaceFolder, Some(names[5].into()))
+    );
     // Nothing built for it, or nothing an app can install there.
     assert_eq!(pick(Install::Android, "aarch64"), (Method::ReleasePage, None));
     assert_eq!(pick(Install::Ios, "aarch64"), (Method::ReleasePage, None));

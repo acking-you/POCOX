@@ -45,7 +45,7 @@ class UpdateState {
   final bool newer;
 
   /// How it applies here: `replace_bundle`, `installer`,
-  /// `replace_app_image`, `open_package`, `save_download`,
+  /// `replace_app_image`, `replace_folder`, `open_package`, `save_download`,
   /// `system_installer` or `release_page`.
   final String method;
 
@@ -78,6 +78,7 @@ class UpdateState {
     'replace_bundle',
     'installer',
     'replace_app_image',
+    'replace_folder',
   }.contains(method);
 
   /// Something runs (a check the user asked for, a download, a handover).

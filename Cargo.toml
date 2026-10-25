@@ -12,6 +12,7 @@ members = [
     "crates/pocox-store",
     "crates/pocox-auth",
     "crates/pocox-backend",
+    "crates/pocox-updater",
 ]
 # `deps/codex` is a vendored upstream source kept as a git submodule,
 # intentionally excluded from this workspace so its own build
@@ -33,7 +34,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.7.6"
+version = "0.7.7"
 edition = "2021"
 rust-version = "1.99.1"
 authors = ["POCOX Contributors"]
@@ -121,6 +122,8 @@ directories = "5"
 # Release manifests are Ed25519-signed; ring is already the TLS crypto provider.
 ring = "0.17"
 semver = "1"
+# The Windows update helper unpacks the portable release archive (deflate only).
+zip = { version = "9.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 # Codex compresses cold rollouts to `.jsonl.zst`; already resolved through reqwest/tower-http.
 zstd = "0.13"
 which = "6"

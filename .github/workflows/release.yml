@@ -238,6 +238,9 @@ jobs:
         run: |
           flutter pub get
           flutter build windows --release
+      # Puts every later update in place (installer or portable folder).
+      - name: Build the update helper
+        run: cargo build --release --locked -p pocox-updater
       - name: Package (installer + portable zip)
         shell: pwsh
         working-directory: apps/flutter
@@ -246,6 +249,10 @@ jobs:
           $tag = "${env:GITHUB_REF_NAME}" -replace "/","-"
           $ver = $tag -replace "^v",""
           $rel = "build/windows/x64/runner/Release"
+          Copy-Item ../../target/release/pocox-updater.exe "$rel/"
+          foreach ($required in 'pocox.exe', 'pocox-updater.exe', 'pocox_bridge.dll', 'flutter_windows.dll', 'data') {
+            if (!(Test-Path "$rel/$required")) { throw "The Windows bundle has no $required" }
+          }
           New-Item -ItemType Directory -Force dist | Out-Null
           # Portable zip
           Compress-Archive -Path "$rel/*" -DestinationPath "dist/pocox-app-$tag-windows-x64.zip" -Force
