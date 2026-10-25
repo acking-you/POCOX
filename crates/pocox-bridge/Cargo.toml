@@ -74,6 +74,14 @@ two-face = { optional = true, version = "=0.5.2", default-features = false, feat
 rmcp = { version = "3.5.1", default-features = false, features = ["server", "base64", "transport-streamable-http-server"] }
 tokio-util = { workspace = true }
 
+# The system's proxy for POCOX's own requests (`engine::network::system`),
+# read without enabling it for every HTTP client of the build.
+[target.'cfg(windows)'.dependencies]
+windows-registry = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+system-configuration = "0.7"
+
 [dev-dependencies]
 tempfile = "3"
 tokio-tungstenite = { workspace = true }

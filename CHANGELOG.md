@@ -23,6 +23,12 @@ breaking change goes.
   after start and every six hours; **Check for updates** runs one now.
 - Version checks and installers use the computer's application network
   proxy; installers get it in their environment only.
+- **The application network proxy follows the system by default.** Its
+  editor offers **System** (the proxy environment variables, else Windows'
+  proxy settings or macOS' network proxies, read again for every request and
+  shown in the editor), **None** and **Custom**. A proxy URL saved by an
+  earlier version keeps working as Custom; without one, the default now also
+  reads the operating system's setting, not only the environment.
 - New device-management routes `/manage/v1/harnesses…`; an older POCOX
   simply shows no agent card. See [harness updates](docs/harness-updates.md).
 

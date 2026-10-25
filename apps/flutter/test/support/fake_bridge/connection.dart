@@ -28,6 +28,10 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<void> historyCacheSetLimit(int limitMb) async {}
 
   String? savedNetworkProxy;
+  ProxyMode savedProxyMode = ProxyMode.system;
+
+  /// The system's proxy the fake reports (without credentials).
+  String? systemProxy;
   Object? networkSaveError;
   int codexSetupReads = 0;
   RelayPreferences savedRelayPreferences = const RelayPreferences();
@@ -47,12 +51,23 @@ mixin _FakeConnection on _FakeBridgeState {
   }
 
   @override
-  Future<String?> networkProxy() async => savedNetworkProxy;
+  Future<NetworkProxySetting> networkProxySetting() async =>
+      NetworkProxySetting(
+        mode: savedProxyMode,
+        custom: savedNetworkProxy,
+        system: systemProxy,
+        systemSource: systemProxy == null ? null : 'system',
+      );
 
   @override
-  Future<void> networkSetProxy(String value) async {
+  Future<void> networkSetProxySetting(ProxyMode mode, String custom) async {
     if (networkSaveError case final error?) throw error;
-    savedNetworkProxy = value.trim().isEmpty ? null : value.trim();
+    final url = custom.trim().isEmpty ? null : custom.trim();
+    if (mode == ProxyMode.custom && url == null) {
+      throw StateError('a custom application proxy needs its URL');
+    }
+    savedProxyMode = mode;
+    savedNetworkProxy = url;
   }
 
   @override

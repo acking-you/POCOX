@@ -1,8 +1,9 @@
 //! Running a harness's own tools: version probes, its update check and its
 //! installer. Every run is bounded in time and output
 //! ([`pocox_core::process::bounded`]), starts in a temporary directory with
-//! no console window, and sees the app's network proxy, when one is set, in
-//! its environment only: never in argv, logs or answers.
+//! no console window, and follows the app's network route (see
+//! [`network::route`]) in its environment only: never in argv, logs or
+//! answers.
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -67,27 +68,46 @@ fn child_path() -> Option<OsString> {
     pocox_codex::external_tool_path().or_else(|| std::env::var_os("PATH"))
 }
 
-/// The app's network proxy as child variables, when one is set. A `socks5`
-/// proxy resolves names through itself, as the app's own requests do.
-fn proxy_env() -> Vec<(&'static str, String)> {
-    let saved = runtime::support_dir()
+/// The proxy variables a child understands.
+const PROXY_VARS: [&str; 6] =
+    ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"];
+
+/// The app's network route, as the child must see it.
+fn route() -> network::Route {
+    runtime::support_dir()
         .ok()
-        .and_then(|support| network::proxy(&support).ok().flatten());
-    let Some(proxy) = saved else { return Vec::new() };
-    let proxy = proxy
-        .strip_prefix("socks5://")
-        .map_or_else(|| proxy.clone(), |rest| format!("socks5h://{rest}"));
-    let mut env: Vec<(&'static str, String)> =
-        ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"]
-            .into_iter()
-            .map(|name| (name, proxy.clone()))
-            .collect();
-    // Loopback stays direct, as for the app's own clients.
-    if std::env::var_os("NO_PROXY").is_none() && std::env::var_os("no_proxy").is_none() {
-        env.push(("NO_PROXY", "localhost,127.0.0.1,::1".into()));
-        env.push(("no_proxy", "localhost,127.0.0.1,::1".into()));
+        .and_then(|support| network::route(&support).ok())
+        .unwrap_or(network::Route {
+            proxy: None,
+            bypass: Vec::new(),
+            source: network::Source::Direct,
+        })
+}
+
+/// Give `command` the app's route: a custom or system proxy as its proxy
+/// variables (a `socks5` one resolving names through itself, as the app's
+/// own requests do), none at all for a direct route; proxy variables the app
+/// inherited already reach it unchanged.
+fn apply_route(command: &mut Command, route: &network::Route) {
+    match (route.source, &route.proxy) {
+        (network::Source::Environment, _) => {},
+        (_, Some(proxy)) => {
+            let proxy = network::socks5h(proxy.clone());
+            for name in PROXY_VARS {
+                command.env(name, &proxy);
+            }
+            let mut direct = vec!["localhost".to_string(), "127.0.0.1".into(), "::1".into()];
+            direct.extend(route.bypass.iter().cloned());
+            for name in ["NO_PROXY", "no_proxy"] {
+                command.env(name, direct.join(","));
+            }
+        },
+        (_, None) => {
+            for name in PROXY_VARS {
+                command.env_remove(name);
+            }
+        },
     }
-    env
 }
 
 fn command(invocation: &Invocation) -> Command {
@@ -98,9 +118,7 @@ fn command(invocation: &Invocation) -> Command {
     if let Some(path) = pocox_codex::external_tool_path() {
         command.env("PATH", path);
     }
-    for (name, value) in proxy_env() {
-        command.env(name, value);
-    }
+    apply_route(&mut command, &route());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -205,16 +223,12 @@ pub(super) fn classify(output: &str, windows: bool) -> Failure {
     }
 }
 
+/// `text` without the route's proxy URL, as given or as passed to a child.
 fn withhold_proxy(text: &str) -> String {
     let mut text = text.to_string();
-    let saved = runtime::support_dir()
-        .ok()
-        .and_then(|support| network::proxy(&support).ok().flatten());
-    if let Some(proxy) = saved.filter(|proxy| !proxy.is_empty()) {
+    if let Some(proxy) = route().proxy.filter(|proxy| !proxy.is_empty()) {
+        text = text.replace(&network::socks5h(proxy.clone()), "[proxy]");
         text = text.replace(&proxy, "[proxy]");
-        if let Some(rest) = proxy.strip_prefix("socks5://") {
-            text = text.replace(&format!("socks5h://{rest}"), "[proxy]");
-        }
     }
     text
 }

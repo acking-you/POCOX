@@ -8312,14 +8312,62 @@ abstract class AppLocalizations {
   /// No description provided for @networkProxyScope.
   ///
   /// In en, this message translates to:
-  /// **'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.'**
+  /// **'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. By default it follows the system\'s proxy. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.'**
   String get networkProxyScope;
 
-  /// No description provided for @networkProxyDefault.
+  /// No description provided for @networkProxyModeSystem.
   ///
   /// In en, this message translates to:
-  /// **'Default network'**
-  String get networkProxyDefault;
+  /// **'System'**
+  String get networkProxyModeSystem;
+
+  /// No description provided for @networkProxyModeDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get networkProxyModeDirect;
+
+  /// No description provided for @networkProxyModeCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get networkProxyModeCustom;
+
+  /// No description provided for @networkProxySystemFound.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy: {proxy}'**
+  String networkProxySystemFound(String proxy);
+
+  /// No description provided for @networkProxySystemNone.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy: none set, connecting directly'**
+  String get networkProxySystemNone;
+
+  /// No description provided for @networkProxySystemInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The proxy environment variables (HTTPS_PROXY, ALL_PROXY, HTTP_PROXY) when set, otherwise this computer\'s own proxy setting: Windows proxy settings or macOS network proxies. Automatic configuration scripts (PAC) are not used; on Linux and phones only the environment counts. It is read again for every request.'**
+  String get networkProxySystemInfo;
+
+  /// No description provided for @networkProxyDirectSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'No proxy (direct connection)'**
+  String get networkProxyDirectSummary;
+
+  /// No description provided for @networkProxyDirectNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests connect directly, ignoring the system\'s and the environment\'s proxy.'**
+  String get networkProxyDirectNote;
+
+  /// No description provided for @networkProxyCustomRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a proxy URL, or choose another option.'**
+  String get networkProxyCustomRequired;
 
   /// No description provided for @networkProxyAddress.
   ///
@@ -8330,7 +8378,7 @@ abstract class AppLocalizations {
   /// No description provided for @networkProxyHint.
   ///
   /// In en, this message translates to:
-  /// **'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.'**
+  /// **'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. On a phone, 127.0.0.1 means the phone itself.'**
   String get networkProxyHint;
 
   /// No description provided for @networkProxyInvalid.

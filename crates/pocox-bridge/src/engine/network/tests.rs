@@ -4,12 +4,21 @@ use tokio::net::TcpListener;
 use super::*;
 
 #[test]
-fn settings_preserve_credentials_privately_and_reject_invalid_edits() {
+fn settings_default_to_the_system_and_keep_credentials_private() {
     let dir = tempfile::tempdir().expect("directory");
-    assert_eq!(proxy(dir.path()).expect("old config"), None);
+    // A fresh installation follows the system; one saved before modes existed
+    // keeps its proxy.
+    assert_eq!(setting(dir.path()).expect("default").mode, ProxyMode::System);
+    update_config(dir.path(), |config| {
+        config.network.proxy = Some("http://old.example:8080/".into());
+        Ok(())
+    })
+    .expect("older config");
+    assert_eq!(setting(dir.path()).expect("older").mode, ProxyMode::Custom);
     let value = "socks5://alice:private-password@127.0.0.1:1080";
-    set_proxy(dir.path(), value).expect("save");
-    assert_eq!(proxy(dir.path()).expect("load").as_deref(), Some(value));
+    let custom = |dir: &Path| setting(dir).expect("load").custom;
+    set_setting(dir.path(), ProxyMode::Custom, value).expect("save");
+    assert_eq!(custom(dir.path()).as_deref(), Some(value));
     let config = load_config(dir.path()).expect("config");
     assert!(!format!("{config:?}").contains("private-password"));
     for invalid in [
@@ -17,10 +26,18 @@ fn settings_preserve_credentials_privately_and_reject_invalid_edits() {
         "http://alice:private-password@localhost:0",
         "http://proxy:80/path",
     ] {
-        let error = set_proxy(dir.path(), invalid).expect_err("invalid");
+        let error = set_setting(dir.path(), ProxyMode::Custom, invalid).expect_err("invalid");
         assert!(!format!("{error:#}").contains("private-password"));
-        assert_eq!(proxy(dir.path()).expect("unchanged").as_deref(), Some(value));
+        assert_eq!(custom(dir.path()).as_deref(), Some(value));
     }
+    // A custom proxy needs its URL; another mode keeps it for later.
+    assert!(set_setting(dir.path(), ProxyMode::Custom, " ").is_err());
+    set_setting(dir.path(), ProxyMode::Direct, value).expect("direct");
+    assert_eq!(setting(dir.path()).expect("direct"), ProxySetting {
+        mode: ProxyMode::Direct,
+        custom: Some(value.into()),
+    });
+    assert_eq!(route(dir.path()).expect("route"), Route::direct());
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -29,8 +46,40 @@ fn settings_preserve_credentials_privately_and_reject_invalid_edits() {
             .permissions();
         assert_eq!(permissions.mode() & 0o777, 0o600);
     }
-    set_proxy(dir.path(), " ").expect("clear");
-    assert_eq!(proxy(dir.path()).expect("load"), None);
+    set_setting(dir.path(), ProxyMode::System, " ").expect("clear");
+    assert_eq!(custom(dir.path()), None);
+}
+
+/// The environment wins over the operating system's setting, as for curl,
+/// and Windows' per-protocol form picks the HTTPS proxy.
+#[test]
+fn the_system_proxy_is_read_as_other_programs_read_it() {
+    let vars = |set: &'static [(&'static str, &'static str)]| {
+        move |name: &str| {
+            set.iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| (*value).to_string())
+        }
+    };
+    let route = system::from_environment(vars(&[
+        ("HTTP_PROXY", "http://plain.example:1"),
+        ("HTTPS_PROXY", "127.0.0.1:7890"),
+        ("NO_PROXY", "*.corp.example, intranet"),
+    ]))
+    .expect("environment proxy");
+    assert_eq!(route.proxy.as_deref(), Some("http://127.0.0.1:7890"));
+    assert_eq!(route.bypass, ["corp.example", "intranet"]);
+    assert_eq!(route.source, Source::Environment);
+    assert_eq!(system::from_environment(vars(&[("HTTPS_PROXY", " ")])), None);
+    for (server, proxy) in [
+        ("127.0.0.1:7890", Some("http://127.0.0.1:7890")),
+        ("http=plain:80;https=secure:443;socks=sock:1080", Some("http://secure:443")),
+        ("socks=127.0.0.1:7891", Some("socks5h://127.0.0.1:7891")),
+        ("", None),
+    ] {
+        assert_eq!(system::windows_server(server).as_deref(), proxy, "{server}");
+    }
+    assert_eq!(without_credentials("http://alice:secret@127.0.0.1:7890/"), "http://127.0.0.1:7890");
 }
 
 #[tokio::test]
@@ -38,7 +87,8 @@ async fn http_proxy_authenticates_and_loopback_stays_direct() {
     let dir = tempfile::tempdir().expect("directory");
     let proxy = TcpListener::bind("127.0.0.1:0").await.expect("proxy");
     let address = proxy.local_addr().expect("address");
-    set_proxy(dir.path(), &format!("http://alice:secret@{address}")).expect("setting");
+    set_setting(dir.path(), ProxyMode::Custom, &format!("http://alice:secret@{address}"))
+        .expect("setting");
     let server = tokio::spawn(async move {
         let (mut socket, _) = proxy.accept().await.expect("accept");
         let mut bytes = Vec::new();
@@ -135,7 +185,7 @@ async fn socks5_uses_password_auth_and_remote_dns() {
             .await
             .expect("response");
     });
-    let http = builder(Some(&format!("socks5://alice:secret@{address}")))
+    let http = builder(Some(&format!("socks5://alice:secret@{address}")), &[])
         .expect("builder")
         .timeout(Duration::from_secs(3))
         .build()
@@ -182,7 +232,7 @@ async fn redirects_keep_the_proxy_and_https_uses_connect() {
             .await
             .expect("unavailable CDN");
     });
-    let http = builder(Some(&format!("http://alice:secret@{address}")))
+    let http = builder(Some(&format!("http://alice:secret@{address}")), &[])
         .expect("builder")
         .timeout(Duration::from_secs(3))
         .build()

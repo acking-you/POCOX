@@ -4572,17 +4572,44 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyScope =>
-      '用于 POCOX 检查更新、下载、账号请求和网络图片，以及检查和更新这台电脑上的智能体。托管智能体自身的请求、中继连接和系统浏览器使用各自的网络设置。保存后对新请求生效，当前传输继续完成。';
+      '用于 POCOX 检查更新、下载、账号请求和网络图片，以及检查和更新这台电脑上的智能体。默认跟随系统代理。托管智能体自身的请求、中继连接和系统浏览器使用各自的网络设置。保存后对新请求生效，当前传输继续完成。';
 
   @override
-  String get networkProxyDefault => '默认网络';
+  String get networkProxyModeSystem => '系统代理';
+
+  @override
+  String get networkProxyModeDirect => '不使用';
+
+  @override
+  String get networkProxyModeCustom => '自定义';
+
+  @override
+  String networkProxySystemFound(String proxy) {
+    return '系统代理：$proxy';
+  }
+
+  @override
+  String get networkProxySystemNone => '系统代理：未设置，直接连接';
+
+  @override
+  String get networkProxySystemInfo =>
+      '优先使用代理环境变量（HTTPS_PROXY、ALL_PROXY、HTTP_PROXY），未设置时使用这台电脑自己的代理设置：Windows 的代理设置或 macOS 的网络代理。不使用自动配置脚本（PAC）；Linux 和手机上只看环境变量。每次请求都会重新读取。';
+
+  @override
+  String get networkProxyDirectSummary => '不使用代理（直接连接）';
+
+  @override
+  String get networkProxyDirectNote => '请求直接连接，忽略系统和环境变量里的代理。';
+
+  @override
+  String get networkProxyCustomRequired => '请输入代理地址，或选择其他选项。';
 
   @override
   String get networkProxyAddress => '代理地址';
 
   @override
   String get networkProxyHint =>
-      '填写 HTTP(S) 或 SOCKS5 地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080，可带用户名和密码。SOCKS5 通过代理解析域名。留空恢复默认网络。手机上的 127.0.0.1 指手机本身。';
+      '填写 HTTP(S) 或 SOCKS5 地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080，可带用户名和密码。SOCKS5 通过代理解析域名。手机上的 127.0.0.1 指手机本身。';
 
   @override
   String get networkProxyInvalid =>

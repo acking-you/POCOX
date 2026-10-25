@@ -42,7 +42,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1190166416;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -652529325;
 
 
 // Section: executor
@@ -7349,7 +7349,7 @@ fn wire__crate__api__bridge__network__network_image_impl(
         },
     )
 }
-fn wire__crate__api__bridge__network__network_proxy_impl(
+fn wire__crate__api__bridge__network__network_proxy_setting_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7357,7 +7357,7 @@ fn wire__crate__api__bridge__network__network_proxy_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "network_proxy",
+            debug_name: "network_proxy_setting",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -7375,7 +7375,8 @@ fn wire__crate__api__bridge__network__network_proxy_impl(
             move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || async move {
-                        let output_ok = crate::api::bridge::network::network_proxy().await?;
+                        let output_ok =
+                            crate::api::bridge::network::network_proxy_setting().await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -7384,7 +7385,7 @@ fn wire__crate__api__bridge__network__network_proxy_impl(
         },
     )
 }
-fn wire__crate__api__bridge__network__network_set_proxy_impl(
+fn wire__crate__api__bridge__network__network_set_proxy_setting_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -7392,7 +7393,7 @@ fn wire__crate__api__bridge__network__network_set_proxy_impl(
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
         flutter_rust_bridge::for_generated::TaskInfo {
-            debug_name: "network_set_proxy",
+            debug_name: "network_set_proxy_setting",
             port: Some(port_),
             mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
         },
@@ -7406,13 +7407,16 @@ fn wire__crate__api__bridge__network__network_set_proxy_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
-            let api_value = <String>::sse_decode(&mut deserializer);
+            let api_mode = <String>::sse_decode(&mut deserializer);
+            let api_custom = <String>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
                     (move || async move {
-                        let output_ok =
-                            crate::api::bridge::network::network_set_proxy(api_value).await?;
+                        let output_ok = crate::api::bridge::network::network_set_proxy_setting(
+                            api_mode, api_custom,
+                        )
+                        .await?;
                         Ok(output_ok)
                     })()
                     .await,
@@ -11068,6 +11072,22 @@ impl SseDecode for crate::api::bridge::native_sessions::NativeSessionRevisionDto
     }
 }
 
+impl SseDecode for crate::api::bridge::network::NetworkProxyDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_mode = <String>::sse_decode(deserializer);
+        let mut var_custom = <Option<String>>::sse_decode(deserializer);
+        let mut var_system = <Option<String>>::sse_decode(deserializer);
+        let mut var_systemSource = <Option<String>>::sse_decode(deserializer);
+        return crate::api::bridge::network::NetworkProxyDto {
+            mode: var_mode,
+            custom: var_custom,
+            system: var_system,
+            system_source: var_systemSource,
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::threads::OlderPageDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -13323,10 +13343,13 @@ fn pde_ffi_dispatcher_primary_impl(
         183 => {
             wire__crate__api__bridge__network__network_image_impl(port, ptr, rust_vec_len, data_len)
         },
-        184 => {
-            wire__crate__api__bridge__network__network_proxy_impl(port, ptr, rust_vec_len, data_len)
-        },
-        185 => wire__crate__api__bridge__network__network_set_proxy_impl(
+        184 => wire__crate__api__bridge__network__network_proxy_setting_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        185 => wire__crate__api__bridge__network__network_set_proxy_setting_impl(
             port,
             ptr,
             rust_vec_len,
@@ -15454,6 +15477,29 @@ impl
     for crate::api::bridge::native_sessions::NativeSessionRevisionDto
 {
     fn into_into_dart(self) -> crate::api::bridge::native_sessions::NativeSessionRevisionDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::NetworkProxyDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.mode.into_into_dart().into_dart(),
+            self.custom.into_into_dart().into_dart(),
+            self.system.into_into_dart().into_dart(),
+            self.system_source.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::network::NetworkProxyDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::NetworkProxyDto>
+    for crate::api::bridge::network::NetworkProxyDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::network::NetworkProxyDto {
         self
     }
 }
@@ -18270,6 +18316,16 @@ impl SseEncode for crate::api::bridge::native_sessions::NativeSessionRevisionDto
             self.liveness,
             serializer,
         );
+    }
+}
+
+impl SseEncode for crate::api::bridge::network::NetworkProxyDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.mode, serializer);
+        <Option<String>>::sse_encode(self.custom, serializer);
+        <Option<String>>::sse_encode(self.system, serializer);
+        <Option<String>>::sse_encode(self.system_source, serializer);
     }
 }
 

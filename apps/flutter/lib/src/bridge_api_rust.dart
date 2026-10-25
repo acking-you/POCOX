@@ -83,7 +83,19 @@ class RustBridgeApi
   );
 
   @override
-  Future<String?> networkProxy() => frb.networkProxy();
+  Future<NetworkProxySetting> networkProxySetting() async {
+    final value = await frb.networkProxySetting();
+    return NetworkProxySetting(
+      mode: switch (value.mode) {
+        'direct' => ProxyMode.direct,
+        'custom' => ProxyMode.custom,
+        _ => ProxyMode.system,
+      },
+      custom: value.custom,
+      system: value.system,
+      systemSource: value.systemSource,
+    );
+  }
 
   @override
   Future<RelayPreferences> relayPreferences() async {
@@ -194,8 +206,8 @@ class RustBridgeApi
   };
 
   @override
-  Future<void> networkSetProxy(String value) =>
-      frb.networkSetProxy(value: value);
+  Future<void> networkSetProxySetting(ProxyMode mode, String custom) =>
+      frb.networkSetProxySetting(mode: mode.name, custom: custom);
 
   @override
   Future<ConfigInfo> getConfig() async {

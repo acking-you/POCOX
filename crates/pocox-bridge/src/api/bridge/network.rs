@@ -70,14 +70,64 @@ fn save_relay_preferences(support: &Path, preferences: RelayPreferencesDto) -> R
     })
 }
 
-/// Saved proxy URL for the explicit editor; may contain credentials.
-pub async fn network_proxy() -> Result<Option<String>> {
-    execution::run(Lane::Read, move || network::proxy(&runtime::support_dir()?)).await
+/// The application proxy setting and what the system offers now.
+pub struct NetworkProxyDto {
+    /// `system` (the default), `direct` or `custom`.
+    pub mode: String,
+    /// The saved custom URL, for the editor only: it may carry credentials.
+    pub custom: Option<String>,
+    /// The system's proxy now, without credentials; none connects directly.
+    pub system: Option<String>,
+    /// Where [`Self::system`] comes from: `environment` or `system`.
+    pub system_source: Option<String>,
 }
 
-/// Set an HTTP(S)/SOCKS5 proxy, or clear it with an empty string.
-pub async fn network_set_proxy(value: String) -> Result<()> {
-    execution::run(Lane::Read, move || network::set_proxy(&runtime::support_dir()?, &value)).await
+fn mode_name(mode: network::ProxyMode) -> &'static str {
+    match mode {
+        network::ProxyMode::System => "system",
+        network::ProxyMode::Direct => "direct",
+        network::ProxyMode::Custom => "custom",
+    }
+}
+
+/// Read the proxy setting for its editor, with the system's proxy now.
+pub async fn network_proxy_setting() -> Result<NetworkProxyDto> {
+    execution::run(Lane::Read, move || {
+        let support = runtime::support_dir()?;
+        let setting = network::setting(&support)?;
+        let system = network::system_route();
+        Ok(NetworkProxyDto {
+            mode: mode_name(setting.mode).into(),
+            custom: setting.custom,
+            system: system
+                .as_ref()
+                .and_then(|route| route.proxy.as_deref())
+                .map(network::without_credentials),
+            system_source: system.map(|route| {
+                match route.source {
+                    network::Source::Environment => "environment",
+                    _ => "system",
+                }
+                .into()
+            }),
+        })
+    })
+    .await
+}
+
+/// Save the mode (`system`, `direct` or `custom`) and the custom URL (blank
+/// removes it; `custom` requires one). Nothing changes on failure.
+pub async fn network_set_proxy_setting(mode: String, custom: String) -> Result<()> {
+    execution::run(Lane::Read, move || {
+        let mode = match mode.as_str() {
+            "system" => network::ProxyMode::System,
+            "direct" => network::ProxyMode::Direct,
+            "custom" => network::ProxyMode::Custom,
+            _ => anyhow::bail!("unknown proxy mode"),
+        };
+        network::set_setting(&runtime::support_dir()?, mode, &custom)
+    })
+    .await
 }
 
 /// Bounded avatar/favicon download using POCOX's network configuration.

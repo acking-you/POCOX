@@ -9,6 +9,42 @@ enum ConnectionPath {
   auto,
 }
 
+/// Where the application's own requests find their proxy.
+enum ProxyMode {
+  /// The proxy environment variables, else this computer's proxy setting.
+  system,
+
+  /// No proxy at all.
+  direct,
+
+  /// [NetworkProxySetting.custom].
+  custom,
+}
+
+/// The application proxy setting, from [BridgeApi.networkProxySetting].
+class NetworkProxySetting {
+  /// Creates a setting.
+  const NetworkProxySetting({
+    this.mode = ProxyMode.system,
+    this.custom,
+    this.system,
+    this.systemSource,
+  });
+
+  /// The mode in effect.
+  final ProxyMode mode;
+
+  /// The saved custom URL, kept while another mode is chosen. It may carry
+  /// credentials, so only its editor shows it whole.
+  final String? custom;
+
+  /// The system's proxy now, without credentials; null connects directly.
+  final String? system;
+
+  /// Where [system] comes from: `environment` or `system`.
+  final String? systemSource;
+}
+
 /// Saved network preferences; existing tunnels keep their captured settings.
 class RelayPreferences {
   /// Creates preferences; direct paths require an explicit opt-in.

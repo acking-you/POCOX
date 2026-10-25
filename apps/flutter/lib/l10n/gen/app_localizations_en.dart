@@ -4842,17 +4842,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get networkProxyScope =>
-      'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.';
+      'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. By default it follows the system\'s proxy. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.';
 
   @override
-  String get networkProxyDefault => 'Default network';
+  String get networkProxyModeSystem => 'System';
+
+  @override
+  String get networkProxyModeDirect => 'None';
+
+  @override
+  String get networkProxyModeCustom => 'Custom';
+
+  @override
+  String networkProxySystemFound(String proxy) {
+    return 'System proxy: $proxy';
+  }
+
+  @override
+  String get networkProxySystemNone =>
+      'System proxy: none set, connecting directly';
+
+  @override
+  String get networkProxySystemInfo =>
+      'The proxy environment variables (HTTPS_PROXY, ALL_PROXY, HTTP_PROXY) when set, otherwise this computer\'s own proxy setting: Windows proxy settings or macOS network proxies. Automatic configuration scripts (PAC) are not used; on Linux and phones only the environment counts. It is read again for every request.';
+
+  @override
+  String get networkProxyDirectSummary => 'No proxy (direct connection)';
+
+  @override
+  String get networkProxyDirectNote =>
+      'Requests connect directly, ignoring the system\'s and the environment\'s proxy.';
+
+  @override
+  String get networkProxyCustomRequired =>
+      'Enter a proxy URL, or choose another option.';
 
   @override
   String get networkProxyAddress => 'Proxy URL';
 
   @override
   String get networkProxyHint =>
-      'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.';
+      'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. On a phone, 127.0.0.1 means the phone itself.';
 
   @override
   String get networkProxyInvalid =>

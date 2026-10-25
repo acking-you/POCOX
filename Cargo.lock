@@ -2913,6 +2913,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syntect",
+ "system-configuration",
  "tempfile",
  "tokio",
  "tokio-rustls",
@@ -2925,6 +2926,7 @@ dependencies = [
  "uuid",
  "webpki-roots 0.26.11",
  "which",
+ "windows-registry",
 ]
 
 [[package]]

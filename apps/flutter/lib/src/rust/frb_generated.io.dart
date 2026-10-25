@@ -621,6 +621,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NativeSessionRevisionDto dco_decode_native_session_revision_dto(dynamic raw);
 
   @protected
+  NetworkProxyDto dco_decode_network_proxy_dto(dynamic raw);
+
+  @protected
   OlderPageDto dco_decode_older_page_dto(dynamic raw);
 
   @protected
@@ -1615,6 +1618,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NativeSessionRevisionDto sse_decode_native_session_revision_dto(
     SseDeserializer deserializer,
   );
+
+  @protected
+  NetworkProxyDto sse_decode_network_proxy_dto(SseDeserializer deserializer);
 
   @protected
   OlderPageDto sse_decode_older_page_dto(SseDeserializer deserializer);
@@ -2858,6 +2864,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_native_session_revision_dto(
     NativeSessionRevisionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_network_proxy_dto(
+    NetworkProxyDto self,
     SseSerializer serializer,
   );
 

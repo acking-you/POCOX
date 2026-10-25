@@ -91,7 +91,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1190166416;
+  int get rustContentHash => -652529325;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -947,9 +947,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<Uint8List> crateApiBridgeNetworkNetworkImage({required String url});
 
-  Future<String?> crateApiBridgeNetworkNetworkProxy();
+  Future<NetworkProxyDto> crateApiBridgeNetworkNetworkProxySetting();
 
-  Future<void> crateApiBridgeNetworkNetworkSetProxy({required String value});
+  Future<void> crateApiBridgeNetworkNetworkSetProxySetting({
+    required String mode,
+    required String custom,
+  });
 
   Future<OpenCodeEnvironmentDto> crateApiBridgeHostingOpencodeDetect({
     String? binary,
@@ -7410,7 +7413,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "network_image", argNames: ["url"]);
 
   @override
-  Future<String?> crateApiBridgeNetworkNetworkProxy() {
+  Future<NetworkProxyDto> crateApiBridgeNetworkNetworkProxySetting() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -7423,26 +7426,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           );
         },
         codec: SseCodec(
-          decodeSuccessData: sse_decode_opt_String,
+          decodeSuccessData: sse_decode_network_proxy_dto,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiBridgeNetworkNetworkProxyConstMeta,
+        constMeta: kCrateApiBridgeNetworkNetworkProxySettingConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiBridgeNetworkNetworkProxyConstMeta =>
-      const TaskConstMeta(debugName: "network_proxy", argNames: []);
+  TaskConstMeta get kCrateApiBridgeNetworkNetworkProxySettingConstMeta =>
+      const TaskConstMeta(debugName: "network_proxy_setting", argNames: []);
 
   @override
-  Future<void> crateApiBridgeNetworkNetworkSetProxy({required String value}) {
+  Future<void> crateApiBridgeNetworkNetworkSetProxySetting({
+    required String mode,
+    required String custom,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          sse_encode_String(value, serializer);
+          sse_encode_String(mode, serializer);
+          sse_encode_String(custom, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -7454,15 +7461,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiBridgeNetworkNetworkSetProxyConstMeta,
-        argValues: [value],
+        constMeta: kCrateApiBridgeNetworkNetworkSetProxySettingConstMeta,
+        argValues: [mode, custom],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiBridgeNetworkNetworkSetProxyConstMeta =>
-      const TaskConstMeta(debugName: "network_set_proxy", argNames: ["value"]);
+  TaskConstMeta get kCrateApiBridgeNetworkNetworkSetProxySettingConstMeta =>
+      const TaskConstMeta(
+        debugName: "network_set_proxy_setting",
+        argNames: ["mode", "custom"],
+      );
 
   @override
   Future<OpenCodeEnvironmentDto> crateApiBridgeHostingOpencodeDetect({
@@ -10387,6 +10397,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       generation: dco_decode_String(arr[1]),
       revision: dco_decode_String(arr[2]),
       liveness: dco_decode_session_liveness_dto(arr[3]),
+    );
+  }
+
+  @protected
+  NetworkProxyDto dco_decode_network_proxy_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return NetworkProxyDto(
+      mode: dco_decode_String(arr[0]),
+      custom: dco_decode_opt_String(arr[1]),
+      system: dco_decode_opt_String(arr[2]),
+      systemSource: dco_decode_opt_String(arr[3]),
     );
   }
 
@@ -13788,6 +13812,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NetworkProxyDto sse_decode_network_proxy_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_mode = sse_decode_String(deserializer);
+    var var_custom = sse_decode_opt_String(deserializer);
+    var var_system = sse_decode_opt_String(deserializer);
+    var var_systemSource = sse_decode_opt_String(deserializer);
+    return NetworkProxyDto(
+      mode: var_mode,
+      custom: var_custom,
+      system: var_system,
+      systemSource: var_systemSource,
+    );
+  }
+
+  @protected
   OlderPageDto sse_decode_older_page_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_items = sse_decode_list_thread_item_dto(deserializer);
@@ -17065,6 +17104,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.generation, serializer);
     sse_encode_String(self.revision, serializer);
     sse_encode_session_liveness_dto(self.liveness, serializer);
+  }
+
+  @protected
+  void sse_encode_network_proxy_dto(
+    NetworkProxyDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.mode, serializer);
+    sse_encode_opt_String(self.custom, serializer);
+    sse_encode_opt_String(self.system, serializer);
+    sse_encode_opt_String(self.systemSource, serializer);
   }
 
   @protected

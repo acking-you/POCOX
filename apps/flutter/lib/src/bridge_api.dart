@@ -40,8 +40,8 @@ abstract interface class BridgeApi
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
 
-  /// Read the private application proxy setting for its editor.
-  Future<String?> networkProxy();
+  /// Read the application proxy setting for its editor, with the system's.
+  Future<NetworkProxySetting> networkProxySetting();
 
   /// Preferences for newly created remote tunnels and local registrations.
   Future<RelayPreferences> relayPreferences();
@@ -49,8 +49,9 @@ abstract interface class BridgeApi
   /// Save [value] for new tunnels; open tunnels keep what they started with.
   Future<void> relaySetPreferences(RelayPreferences value);
 
-  /// Validate and save the application proxy; blank restores the default.
-  Future<void> networkSetProxy(String value);
+  /// Validate and save the proxy [mode] and [custom] URL (required by
+  /// [ProxyMode.custom]; blank removes it).
+  Future<void> networkSetProxySetting(ProxyMode mode, String custom);
 
   /// Set the relay `host:port` and persist.
   Future<void> setRelay(String relay);

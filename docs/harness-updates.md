@@ -78,14 +78,16 @@ earlier. Versions compare as semver; prereleases sort below their release.
 ## Network proxy
 
 Newest-version lookups use the app's HTTP client, so the computer's
-**Application network proxy** applies ([app updates](app-updates.md#application-network-proxy)).
-Installers and Grok's own check get the same proxy as `HTTPS_PROXY`,
-`HTTP_PROXY` and `ALL_PROXY` (and lower-case forms; `NO_PROXY` keeps
-loopback direct unless inherited) in their environment only, never in argv or
-logs; a `socks5://` proxy is passed as `socks5h://`. Without a saved proxy the
-child inherits the environment as before. Tools that ignore these variables
-(npm does not speak SOCKS; Windows PowerShell's `irm` uses the system proxy)
-keep their own behaviour.
+**Application network proxy** applies ([app updates](app-updates.md#application-network-proxy)),
+by default the system's. Installers and Grok's own check follow the same
+route in their environment only, never in argv or logs: a custom proxy, or
+one from the computer's own proxy setting, is given as `HTTPS_PROXY`,
+`HTTP_PROXY` and `ALL_PROXY` (and lower-case forms, with `NO_PROXY` keeping
+loopback and the setting's bypass list direct); proxy environment variables
+the app inherited reach them unchanged; **None** removes them. A `socks5://`
+proxy is passed as `socks5h://`. Tools that ignore these variables (npm does
+not speak SOCKS; Windows PowerShell's `irm` uses the system proxy) keep their
+own behaviour.
 
 ## Updating and restarting
 
