@@ -51,6 +51,26 @@ void main() {
     now: now,
   );
 
+  test(
+    'local readiness never claims a connected protocol or relay activity',
+    () {
+      final watch = LinkWatch(
+        tunnel: tunnel(path: TunnelPath.local),
+        stage: ConnectStage.handshake,
+      );
+      final opening = steps(watch);
+      expect(opening.relay.state, LinkStepState.skipped);
+      expect(opening.p2p.state, LinkStepState.skipped);
+      expect(opening.session.state, LinkStepState.active);
+      final connected = steps(
+        LinkWatch(tunnel: watch.tunnel),
+        connected: true,
+        reconnect: ReconnectState.idle,
+      );
+      expect(connected.session.state, LinkStepState.done);
+    },
+  );
+
   test('reaching the relay shows each phase, and a failure its retry', () {
     var s = steps(const LinkWatch(stage: ConnectStage.tunnel));
     expect(

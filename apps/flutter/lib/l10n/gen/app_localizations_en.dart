@@ -9,6 +9,9 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get tunnelPathLocal => 'Local direct';
+
+  @override
   String get connectionPathTitle => 'Connection path';
 
   @override

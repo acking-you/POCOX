@@ -98,6 +98,12 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @tunnelPathLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local direct'**
+  String get tunnelPathLocal;
+
   /// No description provided for @connectionPathTitle.
   ///
   /// In en, this message translates to:

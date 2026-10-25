@@ -232,6 +232,7 @@ impl TestSession {
             .lock()
             .expect("test sessions")
             .insert(key.clone(), Session {
+                owner: None,
                 client,
                 events: broadcast::channel(16).0,
                 forwarder: runtime::runtime().spawn(std::future::pending()),

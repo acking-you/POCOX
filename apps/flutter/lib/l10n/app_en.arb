@@ -1,4 +1,5 @@
 {
+  "tunnelPathLocal": "Local direct",
   "@@locale": "en",
   "connectionPathTitle": "Connection path",
   "connectionPathInfo": "P2P direct needs a relay and a host that support it. When direct setup fails, the connection falls back to the relay before any data is sent, so nothing is replayed. An established direct connection keeps running if the relay goes offline or its credential is revoked, until a device at either end disconnects it.",

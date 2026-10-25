@@ -63,6 +63,13 @@ class LinkPipeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
+    if (steps.relay.state == LinkStepState.skipped) {
+      return _StepColumn(
+        key: const Key('link-step-local'),
+        name: l10n.tunnelPathLocal,
+        step: steps.session,
+      );
+    }
     final track = scheme.onSurface.withValues(alpha: 0.1);
     Color line(LinkStep step, {bool p2p = false}) =>
         _passed(step.state) ? _look(scheme, step.state, p2p: p2p).color : track;
@@ -296,10 +303,12 @@ class LinkDots extends StatelessWidget {
         key: const Key('link-dots'),
         mainAxisSize: MainAxisSize.min,
         children: [
-          dot(steps.relay),
-          joint(steps.relay),
-          dot(steps.p2p, p2p: true),
-          joint(steps.p2p),
+          if (steps.relay.state != LinkStepState.skipped) ...[
+            dot(steps.relay),
+            joint(steps.relay),
+            dot(steps.p2p, p2p: true),
+            joint(steps.p2p),
+          ],
           dot(steps.session),
         ],
       ),
@@ -462,6 +471,11 @@ class LinkPathMark extends ConsumerWidget {
         AppIcons.sync,
         cautionColor(scheme),
         l10n.stateReconnecting,
+      ),
+      (path: TunnelPath.local, recovering: false) => (
+        AppIcons.link_outlined,
+        successColor(scheme),
+        l10n.tunnelPathLocal,
       ),
       (path: TunnelPath.direct, recovering: false) => (
         AppIcons.direct,
@@ -656,19 +670,21 @@ class LinkSheet extends ConsumerWidget {
                     ),
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.only(top: 18, bottom: 6),
-                child: Text(
-                  l10n.linkRecent,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
-                    color: scheme.onSurfaceVariant,
+              if (tunnel?.path != TunnelPath.local) ...[
+                Padding(
+                  padding: const EdgeInsets.only(top: 18, bottom: 6),
+                  child: Text(
+                    l10n.linkRecent,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
-              ),
-              LinkTimeline(tunnel?.events ?? const []),
+                LinkTimeline(tunnel?.events ?? const []),
+              ],
               if (tunnel != null)
                 Align(
                   alignment: AlignmentDirectional.centerStart,

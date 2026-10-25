@@ -112,6 +112,7 @@ String tunnelPathLabel(AppLocalizations l10n, SubInfo sub) {
     return directStageLabel(l10n, attempt.stage);
   }
   return switch (sub.path) {
+    TunnelPath.local => l10n.tunnelPathLocal,
     TunnelPath.relayOnly => l10n.connectionPathRelayOnly,
     TunnelPath.idle => l10n.tunnelPathIdle,
     TunnelPath.direct => l10n.tunnelPathDirect,
@@ -139,6 +140,7 @@ TunnelPath? tunnelPathOf(List<SubInfo>? subs, String serviceKey) => switch (subs
 /// The few words that say how a connected service travels, after its state.
 String tunnelPathShort(AppLocalizations l10n, TunnelPath path) =>
     switch (path) {
+      TunnelPath.local => l10n.tunnelPathLocal,
       TunnelPath.direct => 'P2P',
       TunnelPath.mixed => l10n.tunnelShortMixed,
       TunnelPath.relay || TunnelPath.relayOnly => l10n.tunnelShortRelay,
@@ -320,7 +322,9 @@ class _TunnelDetails extends ConsumerWidget {
               TunnelPathChip(sub),
             ],
           ),
-          if (sub.alive) ...[
+          if (sub.alive && sub.path == TunnelPath.local)
+            _Fact(l10n.tunnelLocalAddress, sub.localAddr, mono: true),
+          if (sub.alive && sub.path != TunnelPath.local) ...[
             _Heading(l10n.tunnelSectionP2p),
             if (sub.path == TunnelPath.relayOnly)
               Text(l10n.tunnelRelayOnlyNote, style: helpTextStyle(theme))

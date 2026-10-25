@@ -641,6 +641,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
       final api = _lifecycleApi()
+        ..discoverGate = Completer<void>()
         ..discoverError = StateError(
           'querying relay keys\n\nCaused by:\n'
           '    0: listing keys on lb7666.top:7666\n'
@@ -649,17 +650,74 @@ void main() {
       await _pumpHome(
         t,
         api,
-        prefs: _MemoryPrefs(_savedRestore),
+        prefs: _MemoryPrefs(
+          _savedRestore.copyWith(lastServiceKey: 'pcx:local:app:work'),
+        ),
         memoryDismissed: true,
       );
       await t.pumpAndSettle();
       expect(api.serveHosts.map((h) => h.name), ['work']);
+      expect(
+        api.discoverCalls,
+        0,
+        reason: 'local startup never invokes relay discovery',
+      );
       // Its own host is reached here without the relay.
       expect(api.appIsConnected('pcx:local:app:work'), isTrue);
       expect(find.byKey(const Key('send-btn')), findsOneWidget);
       expect(find.byKey(const Key('relay-problem')), findsNothing);
       await t.pumpWidget(const SizedBox());
     } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('cold local startup opens before publication finishes and '
+      'continues restoring other hosts', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final publication = Completer<void>();
+    try {
+      final api = _lifecycleApi()..serveStartGate = publication;
+      await _pumpHome(
+        t,
+        api,
+        prefs: _MemoryPrefs(
+          _savedRestore.copyWith(
+            lastServiceKey: 'pcx:local:app:work',
+            autoHostCodex: const [
+              AutoHostPrefs(port: 0, name: 'work'),
+              AutoHostPrefs(port: 0, name: 'second'),
+            ],
+          ),
+        ),
+        memoryDismissed: true,
+      );
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 100));
+      // Native listeners enter the ownership registry before relay publication
+      // finishes. The delayed restore reply is independent of local readiness.
+      api.serveHosts.add(
+        const AppServeStatus(
+          device: 'local',
+          name: 'work',
+          alive: true,
+          appServiceKey: 'pcx:local:app:work',
+        ),
+      );
+      await t.pump(const Duration(milliseconds: 100));
+      await t.pumpAndSettle();
+      expect(publication.isCompleted, isFalse);
+      expect(api.appIsConnected('pcx:local:app:work'), isTrue);
+      expect(api.discoverCalls, 0);
+      publication.complete();
+      await t.pumpAndSettle();
+      expect(
+        api.serveHosts.map((h) => h.name),
+        containsAll(['work', 'second']),
+      );
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      if (!publication.isCompleted) publication.complete();
       debugDefaultTargetPlatformOverride = null;
     }
   });

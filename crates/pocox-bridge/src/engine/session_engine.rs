@@ -18,11 +18,12 @@ use pocox_account_proto::NamespacedServiceId;
 use pocox_core::service::{ServiceId, ServiceKind};
 use tokio::sync::broadcast;
 
+use super::acp;
 use super::app_session::{
     self, AppEvent, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
     ThreadRuntimeConfig, TurnItemsPage,
 };
-use super::{acp, transport};
+use super::service_connection::Target;
 
 /// Wire protocol of a session service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -441,7 +442,7 @@ impl SessionEngine for CodexEngine {
     }
 
     fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        app_session::connect(service_key, local_port, &transport::resolve_blocking()?)
+        app_session::connect(service_key.clone(), local_port, &Target::resolve(&service_key)?)
     }
 
     fn is_connected(&self, service_key: &str) -> bool {
@@ -453,7 +454,7 @@ impl SessionEngine for CodexEngine {
     }
 
     fn probe_reason(&self, service_key: String) -> Result<Option<String>> {
-        Ok(app_session::probe_reason(service_key, 0, &transport::resolve_blocking()?))
+        Ok(app_session::probe_reason(service_key.clone(), 0, &Target::resolve(&service_key)?))
     }
 
     fn subscribe_events(&self, service_key: &str) -> Result<broadcast::Receiver<AppEvent>> {
@@ -612,7 +613,7 @@ impl SessionEngine for AcpEngine {
     }
 
     fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        acp::connect(&service_key, local_port, &transport::resolve_owned_blocking()?)
+        acp::connect(&service_key, local_port, &Target::resolve(&service_key)?)
     }
 
     fn is_connected(&self, service_key: &str) -> bool {
@@ -624,7 +625,7 @@ impl SessionEngine for AcpEngine {
     }
 
     fn probe_reason(&self, service_key: String) -> Result<Option<String>> {
-        Ok(acp::probe_reason(&service_key, &transport::resolve_owned_blocking()?))
+        Ok(acp::probe_reason(&service_key, &Target::resolve(&service_key)?))
     }
 
     fn subscribe_events(&self, service_key: &str) -> Result<broadcast::Receiver<AppEvent>> {

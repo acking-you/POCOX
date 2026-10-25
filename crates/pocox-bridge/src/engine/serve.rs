@@ -84,6 +84,7 @@ use super::host_services::{
 /// process-globally; several can run at once, keyed by service name. The three
 /// registrations can be dropped/re-added independently of the processes.
 struct LocalServe {
+    local_routes: Option<super::local_services::Registration>,
     device: String,
     name: String,
     // codex app-server (remote control).
@@ -719,9 +720,15 @@ fn launch_codex(
         let (api_std, api_local) = bind_loopback("in-app API proxy")?;
         let (meta_std, meta_local) = bind_loopback("in-app meta service")?;
         let transport = transport::resolve_blocking()?;
-        Ok((api_std, api_local, meta_std, meta_local, transport))
+        let local_routes =
+            super::local_services::Registration::new(&transport::Context::of(&transport), &[
+                (app_key.clone(), app_local),
+                (api_key.clone(), api_local),
+                (meta_key.clone(), meta_local),
+            ])?;
+        Ok((api_std, api_local, meta_std, meta_local, transport, local_routes))
     })();
-    let (api_std, api_local, meta_std, meta_local, transport) = match bringup_tail {
+    let (api_std, api_local, meta_std, meta_local, transport, local_routes) = match bringup_tail {
         Ok(tail) => tail,
         Err(e) => {
             watchdog.abort();
@@ -756,6 +763,7 @@ fn launch_codex(
         .flatten();
 
     let mut host = LocalServe {
+        local_routes: Some(local_routes),
         device: device.clone(),
         name: name.clone(),
         app_key: app_key.clone(),
@@ -917,19 +925,6 @@ pub(super) fn is_hosting_codex(name: &str) -> bool {
             .is_empty()
 }
 
-/// Resolve this process's own session (app-server or ACP
-/// gateway) and meta listeners without relay probes.
-pub(super) fn local_endpoints(service_key: &str) -> Option<(String, String)> {
-    let codex = hosts_locked()
-        .values()
-        .find(|host| host.app_key == service_key)
-        .map(|host| (host.app_local.to_string(), host.meta_local.to_string()));
-    codex
-        .or_else(|| super::serve_acp::local_endpoints(service_key))
-        .or_else(|| super::serve_opencode::local_endpoints(service_key))
-}
-
-/// `true` if something is accepting TCP on a `host:port` listen address.
 pub(super) fn listen_addr_open(listen_addr: &str) -> bool {
     match listen_addr.rsplit_once(':') {
         Some((host, port)) => port

@@ -375,13 +375,13 @@ void _registerHostingLayout() {
     api.discoverGate = discovery;
     final callsBefore = api.discoverCalls;
     await t.pumpWidget(host(const ServicesScreen(), api));
-    // The skeleton animates while loading: bounded frames only.
+    // Local hosting is available while remote discovery remains pending.
     for (var i = 0; i < 5; i++) {
       await t.pump(const Duration(milliseconds: 50));
     }
     expect(api.discoverCalls, greaterThan(callsBefore));
     expect(discovery.isCompleted, isFalse);
-    expect(find.byType(ListLoadingSkeleton), findsOneWidget);
+    expect(find.byKey(const Key('device-@local')), findsOneWidget);
     expect(find.byKey(const Key('host-this-device-btn')), findsOneWidget);
     // The action works mid-load.
     await t.tap(find.byKey(const Key('host-this-device-btn')));
@@ -392,8 +392,7 @@ void _registerHostingLayout() {
     discovery.complete();
     api.discoverGate = null;
     await t.pumpAndSettle();
-    // Data arrived: the skeleton gives way to the page.
-    expect(find.byType(ListLoadingSkeleton), findsNothing);
+    expect(t.takeException(), isNull);
   }, variant: desktop);
 
   testWidgets('a phone offers no hosting: no title-bar action, no add card', (

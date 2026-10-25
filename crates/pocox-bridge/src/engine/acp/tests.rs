@@ -401,8 +401,6 @@ async fn drain(rx: &mut broadcast::Receiver<AppEvent>) -> Vec<AppEvent> {
 
 fn no_watch() -> Watch {
     Watch {
-        logical: String::new(),
-        context: Context::of(&transport(None, "relay:none")),
         local: None,
     }
 }

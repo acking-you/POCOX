@@ -170,6 +170,7 @@ fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
     let idle = || runtime::runtime().spawn(std::future::pending::<()>());
     let local: SocketAddr = "127.0.0.1:9".parse().expect("addr");
     LocalServe {
+        local_routes: None,
         device: "test-device".into(),
         name: name.into(),
         app_key: format!("pcx:test-device:app:{name}"),

@@ -35,11 +35,10 @@ final linkWatchProvider = FutureProvider.autoDispose.family<LinkWatch, String>((
   Timer? next;
   var watched = true;
   var loaded = false;
+  var interval = _linkPollInterval;
   void schedule() {
     next?.cancel();
-    next = watched && loaded
-        ? Timer(_linkPollInterval, ref.invalidateSelf)
-        : null;
+    next = watched && loaded ? Timer(interval, ref.invalidateSelf) : null;
   }
 
   void stop() {
@@ -56,10 +55,11 @@ final linkWatchProvider = FutureProvider.autoDispose.family<LinkWatch, String>((
     });
   try {
     final subs = await api.subscriptions();
-    return LinkWatch(
-      tunnel: tunnelFor(subs, serviceKey),
-      stage: api.appConnectStage(serviceKey),
-    );
+    final tunnel = tunnelFor(subs, serviceKey);
+    interval = tunnel?.path == TunnelPath.local && tunnel!.alive
+        ? const Duration(seconds: 3)
+        : _linkPollInterval;
+    return LinkWatch(tunnel: tunnel, stage: api.appConnectStage(serviceKey));
   } finally {
     loaded = true;
     schedule();
@@ -191,6 +191,9 @@ LinkStep _relayStep(
   bool waitingRetry,
   ReconnectState reconnect,
 ) {
+  if (tunnel?.path == TunnelPath.local) {
+    return LinkStep(LinkStepState.skipped, l10n.tunnelPathLocal);
+  }
   if (tunnel == null || !tunnel.alive) {
     if (stage == ConnectStage.tunnel) {
       return LinkStep(LinkStepState.active, l10n.linkRelayReaching);
@@ -232,6 +235,9 @@ LinkStep _p2pStep(
   List<LinkEvent> recent,
 ) {
   if (tunnel == null) return LinkStep(LinkStepState.waiting, l10n.linkStepP2p);
+  if (tunnel.path == TunnelPath.local) {
+    return LinkStep(LinkStepState.skipped, l10n.tunnelPathLocal);
+  }
   if (tunnel.path == TunnelPath.relayOnly) {
     return LinkStep(LinkStepState.skipped, l10n.linkP2pOff);
   }

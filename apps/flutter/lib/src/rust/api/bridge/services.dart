@@ -7,7 +7,11 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `count`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`
+
+/// Discover this process's owned loopback services without contacting a relay.
+List<ServiceIdDto> localServices() =>
+    RustLib.instance.api.crateApiBridgeServicesLocalServices();
 
 /// Discover the services this device can reach on the relay.
 ///
@@ -19,7 +23,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 Future<List<ServiceIdDto>> discoverServices() =>
     RustLib.instance.api.crateApiBridgeServicesDiscoverServices();
 
-/// Subscribe to an API service, exposing it on `127.0.0.1:<local_port>`.
+/// Connect to an API service. Owned local services return their actual listener;
+/// remote services use the forwarding port `127.0.0.1:<local_port>`.
 Future<SubStatusDto> apiSubscribe({
   required String serviceKey,
   required int localPort,
@@ -372,4 +377,7 @@ enum TunnelPathDto {
 
   /// Direct and relay data connections are both open.
   mixed,
+
+  /// This process's own loopback service; no relay setup or data forwarding.
+  local,
 }

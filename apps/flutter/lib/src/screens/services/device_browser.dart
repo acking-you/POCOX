@@ -150,6 +150,8 @@ class _DeviceFirstServices extends ConsumerWidget {
         ? ownManagement?.serviceKey
         : null;
     final ownedKeys = {
+      for (final service in ref.read(bridgeApiProvider).localServices())
+        service.key,
       for (final host in localHosts) ...[
         host.appServiceKey,
         host.apiServiceKey,
@@ -234,16 +236,6 @@ class _DeviceFirstServices extends ConsumerWidget {
     final apis = deviceEntries
         .where((service) => service.kind == 'api')
         .toList();
-    // Loopback probing speaks the Codex handshake; ACP gateways
-    // are probed through appProbe, which dispatches by key kind.
-    final localAppAddr = <String, String>{
-      for (final host in localHosts)
-        if (host.isCodex) host.appServiceKey: host.appListenAddr,
-    };
-    final localApiAddr = <String, String>{
-      for (final host in localHosts)
-        if (host.isCodex) host.apiServiceKey: host.apiListenAddr,
-    };
     final localTunnels = <String, ({String name, String kind})>{
       for (final host in localHosts)
         if (host.isCodex) ...{
@@ -320,11 +312,8 @@ class _DeviceFirstServices extends ConsumerWidget {
           reasonText: l10n.unreachableReason,
         );
       }
-      final localAddr = localAppAddr[service.key];
       return probed(
-        localAddr == null
-            ? ref.watch(appReachableProvider(service.key))
-            : ref.watch(appReachableLocalProvider(localAddr)),
+        ref.watch(appReachableProvider(service.key)),
         l10n.unreachableReason,
       );
     }
@@ -349,11 +338,8 @@ class _DeviceFirstServices extends ConsumerWidget {
           reasonText: l10n.apiUnreachableReason,
         );
       }
-      final localAddr = localApiAddr[service.key];
       return probed(
-        localAddr == null
-            ? ref.watch(apiReachableProvider(service.key))
-            : ref.watch(apiReachableLocalProvider(localAddr)),
+        ref.watch(apiReachableProvider(service.key)),
         l10n.apiUnreachableReason,
       );
     }
@@ -467,7 +453,7 @@ class _DeviceFirstServices extends ConsumerWidget {
         protocol: host != null
             ? wireOf(service)
             : protocolOf(wireOf(service), service),
-        localAddr: localAppAddr[service.key],
+        localAddr: hosted?.isCodex == true ? hosted?.appListenAddr : null,
         menuKey: Key('capability-menu-${service.key}'),
         status: offlineChip(service.key) ?? appStates[service.key]!.chip,
         reason: appStates[service.key]!.reason,
@@ -501,7 +487,12 @@ class _DeviceFirstServices extends ConsumerWidget {
           icon: AppIcons.bolt_outlined,
           title: l10n.servicesApiCapability,
           protocol: protocolOf('API', service),
-          localAddr: localApiAddr[service.key],
+          localAddr: localHosts
+              .where(
+                (host) => host.isCodex && host.apiServiceKey == service.key,
+              )
+              .firstOrNull
+              ?.apiListenAddr,
           menuKey: Key('capability-menu-${service.key}'),
           status: offlineChip(service.key) ?? apiStates[service.key]!.chip,
           reason: apiStates[service.key]!.reason,

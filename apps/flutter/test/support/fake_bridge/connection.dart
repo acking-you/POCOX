@@ -103,6 +103,18 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<String> exportConfig() async => 'pcx1:ZmFrZQ';
 
   @override
+  List<ServiceEntry> localServices() => [
+    for (final host in serveHosts)
+      if (host.appServiceKey.isNotEmpty)
+        ServiceEntry(
+          device: host.device,
+          kind: host.sessionKind,
+          name: host.name,
+          key: host.appServiceKey,
+        ),
+  ];
+
+  @override
   Future<List<ServiceEntry>> discoverServices() async {
     discoverCalls++;
     final gate = discoverGate;

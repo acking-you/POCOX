@@ -9,6 +9,9 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get tunnelPathLocal => '本机直连';
+
+  @override
   String get connectionPathTitle => '连接路径';
 
   @override

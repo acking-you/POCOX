@@ -113,8 +113,6 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     }
     ref.invalidate(appReachableProvider);
     ref.invalidate(apiReachableProvider);
-    ref.invalidate(appReachableLocalProvider);
-    ref.invalidate(apiReachableLocalProvider);
     ref.invalidate(localServeListProvider);
     // Reads only: a stopped service is never restarted by a refresh.
     ref.invalidate(managedDeviceProvider);
@@ -178,11 +176,13 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: servicesAsync.when(
-          loading: () =>
-              const ListLoadingSkeleton(key: ValueKey('svc-loading')),
+          loading: () => _hostingSupported
+              ? devices(ref.read(bridgeApiProvider).localServices())
+              : const ListLoadingSkeleton(key: ValueKey('svc-loading')),
           error: (e, _) {
             final detail = friendlyError(e);
-            if (isAccountSessionExpired(detail)) {
+            if (isAccountSessionExpired(detail) &&
+                ref.read(bridgeApiProvider).localServices().isEmpty) {
               return KeyedSubtree(
                 key: const ValueKey('svc-error'),
                 child: _SessionExpired(

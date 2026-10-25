@@ -30,6 +30,7 @@ pub mod host_start;
 pub mod hosting;
 #[cfg(test)]
 mod hosting_live_tests;
+mod local_services;
 pub mod logging;
 pub mod management;
 pub mod management_client;
@@ -43,6 +44,7 @@ pub mod runtime;
 pub mod serve;
 pub mod serve_acp;
 pub mod serve_opencode;
+pub(crate) mod service_connection;
 pub mod session_cache;
 pub mod session_engine;
 pub mod session_projection;

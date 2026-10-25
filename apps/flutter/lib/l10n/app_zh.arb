@@ -1,4 +1,5 @@
 {
+  "tunnelPathLocal": "本机直连",
   "@@locale": "zh",
   "connectionPathTitle": "连接路径",
   "connectionPathInfo": "P2P 直连需要中继和主机都支持。直连建立失败时，会在发送任何数据之前改用中继，因此不会重放数据。已建立的直连在中继离线或凭据被撤销后仍会继续，直到任一端的设备将其断开。",

@@ -16,6 +16,26 @@ pub struct ServiceIdDto {
     pub key: String,
 }
 
+impl From<pocox_core::service::ServiceId> for ServiceIdDto {
+    fn from(id: pocox_core::service::ServiceId) -> Self {
+        Self {
+            device: id.device.clone(),
+            kind: id.kind.as_key_segment().into(),
+            name: id.name.clone(),
+            key: id.key(),
+        }
+    }
+}
+
+/// Discover this process's owned loopback services without contacting a relay.
+#[frb(sync)]
+pub fn local_services() -> Vec<ServiceIdDto> {
+    discovery::local()
+        .into_iter()
+        .map(ServiceIdDto::from)
+        .collect()
+}
+
 /// What a subscription's data connections currently go through, mirrored
 /// for Dart.
 pub enum TunnelPathDto {
@@ -29,11 +49,14 @@ pub enum TunnelPathDto {
     Relay,
     /// Direct and relay data connections are both open.
     Mixed,
+    /// This process's own loopback service; no relay setup or data forwarding.
+    Local,
 }
 
 impl From<runtime::TunnelPath> for TunnelPathDto {
     fn from(path: runtime::TunnelPath) -> Self {
         match path {
+            runtime::TunnelPath::Local => Self::Local,
             runtime::TunnelPath::RelayOnly => Self::RelayOnly,
             runtime::TunnelPath::Idle => Self::Idle,
             runtime::TunnelPath::Direct => Self::Direct,
@@ -286,24 +309,25 @@ pub async fn discover_services() -> Result<Vec<ServiceIdDto>> {
     execution::run(Lane::Background, move || {
         let transport = transport::resolve_blocking()?;
         let found = runtime::runtime().block_on(discovery::discover(&transport))?;
-        Ok(found
-            .into_iter()
-            .map(|id| ServiceIdDto {
-                device: id.device.clone(),
-                kind: id.kind.as_key_segment().to_string(),
-                name: id.name.clone(),
-                key: id.key(),
-            })
-            .collect())
+        Ok(found.into_iter().map(ServiceIdDto::from).collect())
     })
     .await
 }
 
-/// Subscribe to an API service, exposing it on `127.0.0.1:<local_port>`.
+/// Connect to an API service. Owned local services return their actual
+/// listener; remote services use the forwarding port `127.0.0.1:<local_port>`.
 pub async fn api_subscribe(service_key: String, local_port: u16) -> Result<SubStatusDto> {
     execution::run(Lane::Control, move || {
-        let transport = transport::resolve_blocking()?;
-        let s = runtime::subscribe_service(service_key, local_port, &transport)?;
+        let target = crate::engine::service_connection::Target::resolve(&service_key)?;
+        let origin = target.open(&service_key, service_key.clone(), local_port, false)?;
+        let s = runtime::list_subscriptions()
+            .into_iter()
+            .find(|s| s.key == service_key)
+            .ok_or_else(|| anyhow::anyhow!("the connection changed; reconnect"))?;
+        anyhow::ensure!(
+            origin.is_current() && transport::is_current(target.epoch()),
+            "the service or connection changed; reconnect"
+        );
         Ok(s.into())
     })
     .await

@@ -68,7 +68,12 @@ Relay-only tunnels display their policy without inventing active connection
 counts. Pressing a subscription opens its details (a popover on desktop, a
 sheet on touch): local address, active direct and relay connections,
 cumulative fallbacks and the most recent SDK reason. The bridge reports the
-path as a typed enum and the counters as `u32`. CLI diagnostics include the
+path as a typed enum and the counters as `u32`. **Local direct** identifies
+an owned loopback service, independently of the P2P preference: it has no relay
+or P2P steps/counters and displays only its real local endpoint. Its session
+handshake and recovery still run through the original protocol client (see
+[local routing](harness-connection-lifecycle.md#process-owned-local-routing)).
+CLI diagnostics include the
 same SDK `direct` counters.
 
 ### Watching a link recover

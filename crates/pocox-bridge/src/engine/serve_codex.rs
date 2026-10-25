@@ -359,6 +359,9 @@ fn stop_owned(watched: &Watched, what: &str) -> Result<()> {
     }
     if let Some(ls) = hosts_locked().get_mut(&watched.name) {
         ls.child = None;
+        if let Some(routes) = &ls.local_routes {
+            routes.suspend();
+        }
     }
     Ok(())
 }
@@ -427,6 +430,9 @@ fn spawn_again(watched: &Watched) -> Result<()> {
     if let Some(ls) = hosts_locked().get_mut(&watched.name) {
         ls.pid = report.info.pid;
         ls.child = child;
+        if let Some(routes) = &mut ls.local_routes {
+            routes.resume()?;
+        }
     }
     Ok(())
 }

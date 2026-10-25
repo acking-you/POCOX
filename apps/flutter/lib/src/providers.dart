@@ -84,7 +84,18 @@ final configProvider = FutureProvider<ConfigInfo>((ref) async {
 
 /// Discovered services on the configured relay. Re-run by invalidating.
 final servicesProvider = FutureProvider<List<ServiceEntry>>((ref) async {
-  return ref.watch(bridgeApiProvider).discoverServices();
+  var current = true;
+  ref.onDispose(() => current = false);
+  final found = await ref.watch(bridgeApiProvider).discoverServices();
+  if (current) ref.read(discoveredServicesProvider.notifier).state = found;
+  return found;
+});
+
+/// Last requested remote inventory for pickers. Watching it never starts
+/// discovery, so a local conversation has no hidden relay dependency.
+final discoveredServicesProvider = StateProvider<List<ServiceEntry>?>((ref) {
+  ref.watch(configProvider);
+  return null;
 });
 
 /// Display metadata for an unconnected host. Re-read on discovery refresh and
@@ -95,9 +106,10 @@ final agentIdentityProvider = FutureProvider.family<AgentIdentity, String>((
 ) async {
   final api = ref.watch(bridgeApiProvider);
   final config = ref.watch(configProvider.future);
-  final services = ref.watch(servicesProvider.future);
+  if (!api.localServices().any((service) => service.key == key)) {
+    await ref.watch(servicesProvider.future);
+  }
   await config;
-  await services;
   return api.appAgentIdentity(key);
 });
 
@@ -179,30 +191,6 @@ final apiReachableProvider = FutureProvider.family<bool, String>((
   serviceKey,
 ) async {
   return ref.watch(bridgeApiProvider).apiProbe(serviceKey);
-});
-
-/// Whether an app-server THIS machine hosts itself actually answers, probed by
-/// its loopback app-listen `host:port` (no relay hop). Unlike a host's bare
-/// port-open `alive` flag this is a real `initialize` handshake, so a wedged /
-/// half-open local codex reads `false` instead of a false "running"; and it is
-/// fast (loopback), so it flips green the instant the backend is up. Keyed by
-/// local address so it re-probes per host. Invalidated on the same cadence as
-/// [`appReachableProvider`].
-final appReachableLocalProvider = FutureProvider.family<bool, String>((
-  ref,
-  localAddr,
-) async {
-  return ref.watch(bridgeApiProvider).appProbeLocal(localAddr);
-});
-
-/// Loopback-direct reachability of an API proxy THIS machine hosts (the API
-/// analogue of [`appReachableLocalProvider`]): a real HTTP probe with no relay
-/// round-trip, so a local host's API tunnel reads "online" immediately.
-final apiReachableLocalProvider = FutureProvider.family<bool, String>((
-  ref,
-  localAddr,
-) async {
-  return ref.watch(bridgeApiProvider).apiProbeLocal(localAddr);
 });
 
 /// Whether the provider scope a host operation started in still exists.
