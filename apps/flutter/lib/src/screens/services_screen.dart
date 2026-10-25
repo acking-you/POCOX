@@ -126,25 +126,27 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     final servicesAsync = ref.watch(servicesProvider);
     final config = ref.watch(configProvider).valueOrNull;
     final account = config?.mode == 'account';
-    Widget devices(List<ServiceEntry> services, {bool relayDown = false}) =>
-        _DeviceFirstServices(
-          services: services,
-          relayDown: relayDown,
-          relay: config?.relay,
-          accountLogin: account ? config?.accountLogin : null,
-          accountId: account ? config?.accountId : null,
-          selectedDevice: _selectedDevice,
-          onSelectDevice: (device) {
-            if (_selectedDevice != device) {
-              setState(() => _selectedDevice = device);
-            }
-          },
-          onClearDevice: () {
-            if (_selectedDevice != null) {
-              setState(() => _selectedDevice = null);
-            }
-          },
-        );
+    Widget devices(
+      List<ServiceEntry> services, {
+      _RelayState relayState = _RelayState.online,
+    }) => _DeviceFirstServices(
+      services: services,
+      relayState: relayState,
+      relay: config?.relay,
+      accountLogin: account ? config?.accountLogin : null,
+      accountId: account ? config?.accountId : null,
+      selectedDevice: _selectedDevice,
+      onSelectDevice: (device) {
+        if (_selectedDevice != device) {
+          setState(() => _selectedDevice = device);
+        }
+      },
+      onClearDevice: () {
+        if (_selectedDevice != null) {
+          setState(() => _selectedDevice = null);
+        }
+      },
+    );
 
     return UtilityPage(
       route: '/manage',
@@ -176,27 +178,39 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: servicesAsync.when(
+          // This computer's own services need no listing: they show at once,
+          // in the same place the listed ones arrive, while the relay is
+          // still being asked.
           loading: () => _hostingSupported
-              ? devices(ref.read(bridgeApiProvider).localServices())
+              ? KeyedSubtree(
+                  key: const ValueKey('svc-data'),
+                  child: devices(
+                    ref.read(bridgeApiProvider).localServices(),
+                    relayState: _RelayState.checking,
+                  ),
+                )
               : const ListLoadingSkeleton(key: ValueKey('svc-loading')),
           error: (e, _) {
             final detail = friendlyError(e);
-            if (isAccountSessionExpired(detail) &&
-                ref.read(bridgeApiProvider).localServices().isEmpty) {
+            final hasLocal =
+                _hostingSupported &&
+                ref.read(bridgeApiProvider).localServices().isNotEmpty;
+            final expired = isAccountSessionExpired(detail);
+            void signIn() => context.go('/onboarding?reason=session-expired');
+            if (expired && !hasLocal) {
               return KeyedSubtree(
                 key: const ValueKey('svc-error'),
-                child: _SessionExpired(
-                  onSignIn: () =>
-                      context.go('/onboarding?reason=session-expired'),
-                ),
+                child: _SessionExpired(onSignIn: signIn),
               );
             }
-            final problem = RelayProblem(
-              detail: detail,
-              relay: config?.relay,
-              compact: _hostingSupported,
-              onRetry: () => _refreshServices(manual: true),
-            );
+            final problem = expired
+                ? _SessionExpired(onSignIn: signIn, compact: true)
+                : RelayProblem(
+                    detail: detail,
+                    relay: config?.relay,
+                    compact: _hostingSupported,
+                    onRetry: () => _refreshServices(manual: true),
+                  );
             // The relay only lists other devices: this computer's own
             // services are known here and still work here, so they stay on
             // the page under the problem rather than behind it.
@@ -210,7 +224,12 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                           child: problem,
                         ),
-                        Expanded(child: devices(const [], relayDown: true)),
+                        Expanded(
+                          child: devices(
+                            const [],
+                            relayState: _RelayState.down,
+                          ),
+                        ),
                       ],
                     )
                   : problem,
@@ -228,14 +247,93 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
 
 /// The account's session has expired: discovery can never succeed until the
 /// user signs in again, so that is the one action offered.
+///
+/// [compact] heads the page above this computer's own services, which still
+/// work here, like a compact [RelayProblem]; a retry could never help.
 class _SessionExpired extends StatelessWidget {
-  const _SessionExpired({required this.onSignIn});
+  const _SessionExpired({required this.onSignIn, this.compact = false});
 
   final VoidCallback onSignIn;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final signIn = FilledButton.icon(
+      key: const Key('services-sign-in-again'),
+      onPressed: onSignIn,
+      icon: Icon(AppIcons.login, size: compact ? 16 : null),
+      label: Text(l10n.accountSignInAgain),
+    );
+    if (compact) {
+      final muted = theme.colorScheme.onSurfaceVariant;
+      final message = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(AppIcons.login, size: 18, color: muted),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.accountSessionExpiredTitle,
+                  key: const Key('services-error'),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  l10n.accountSessionExpiredMessage,
+                  style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(kCardRadius),
+          boxShadow: raisedCardShadows(theme.colorScheme),
+        ),
+        child: Card(
+          key: const Key('services-session-expired'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            // Beside the message while both have room (the room scales with
+            // the text), under it otherwise.
+            child: LayoutBuilder(
+              builder: (context, box) =>
+                  box.maxWidth >= MediaQuery.textScalerOf(context).scale(480)
+                  ? Row(
+                      children: [
+                        Expanded(child: message),
+                        const SizedBox(width: 8),
+                        signIn,
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        message,
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: signIn,
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      );
+    }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -255,12 +353,7 @@ class _SessionExpired extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('services-sign-in-again'),
-            onPressed: onSignIn,
-            icon: const Icon(AppIcons.login),
-            label: Text(l10n.accountSignInAgain),
-          ),
+          signIn,
         ],
       ),
     );

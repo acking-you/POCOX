@@ -23,10 +23,23 @@ breaking change goes.
   **Local direct**. Stopped or replaced hosts invalidate old connections;
   local failures never silently switch to the relay. Remote publication and
   access permissions retain their existing behavior.
+- Its connection sheet shows two steps, **This device** with the listener's
+  address and the session, and the status bar marks it with a computer in
+  ink. The services page lists this computer's hosts while the relay is
+  still being asked (**Checking…**, not Online), and an expired account
+  session offers **Sign in again** above them instead of a relay retry.
+- Subscribing to this computer's own Responses API keeps the port you chose:
+  it is forwarded straight to the API, keeps working across host restarts
+  and refuses while the host is stopped, so a saved `base_url` stays valid.
 - Local startup waits for OpenCode's native gateway readiness, tries other
-  candidates after a failed handshake and adds later restored hosts to the
-  picker without relay discovery. Republishing a running Codex host after an
-  account or relay change now requires a restart, matching ACP and OpenCode.
+  candidates after a failed handshake, still reaches other devices when your
+  local hosts are hidden, and adds later restored hosts to the picker without
+  relay discovery. A Codex watchdog or update restart reconnects only its
+  app-server; the API and session sharing stay up.
+- Publishing stays bound to the account or relay a host started under.
+  Republishing a running Codex host after a change now requires a restart,
+  matching ACP and OpenCode, and starting a Codex or ACP host again after the
+  change is that restart instead of reporting it already running.
 
 ## 0.7.7 — 2026-10-25 — Portable Windows copies update themselves
 

@@ -220,21 +220,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         local = api.localServices();
       }
       if (!mounted || gen != _generation) return;
-      final localKeys = {for (final service in local) service.key};
+      // Hidden local hosts do not make this a local-only start.
+      final localApps = _chatCandidates(local, dismissed);
       final localOnly =
-          localKeys.contains(selected) ||
-          (selected == null && local.any((s) => isSessionKind(s.kind)));
+          localApps.any((s) => s.key == selected) ||
+          (selected == null && localApps.isNotEmpty);
       List<ServiceEntry> services = local;
       String? relayProblem;
       if (!localOnly) {
         try {
           final remote = await ref.read(servicesProvider.future);
+          // Asking the relay resolves the account or relay again, which an
+          // earlier reset may have left unknown: read this app's own
+          // services again rather than trust the snapshot from before.
+          local = api.localServices();
           services = {
             ...{for (final s in remote) s.key: s},
             ...{for (final s in local) s.key: s},
           }.values.toList();
         } catch (e) {
           if (!mounted || gen != _generation) return;
+          local = api.localServices();
+          services = local;
           final message = friendlyError(e);
           if (isAccountSessionExpired(message) && local.isEmpty) {
             context.go('/onboarding?reason=session-expired');
@@ -253,6 +260,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         }
       }
       if (!mounted || gen != _generation) return;
+      final localKeys = {for (final service in local) service.key};
       final apps = _chatCandidates(services, dismissed);
       if (apps.isEmpty) {
         setState(() {

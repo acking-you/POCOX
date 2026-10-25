@@ -71,11 +71,15 @@ class _MemoryPrefs extends UiPrefsStore {
   Future<void> save(UiPrefs prefs) async {}
 }
 
-/// In-memory dismissed services (none), so a test never depends on how the
-/// app-support lookup fails without a platform.
+/// In-memory dismissed services ([initial], none by default), so a test never
+/// depends on how the app-support lookup fails without a platform.
 class _MemoryDismissed extends DismissedServices {
+  _MemoryDismissed([this.initial = const {}]);
+
+  final Set<String> initial;
+
   @override
-  Future<Set<String>> build() async => <String>{};
+  Future<Set<String>> build() async => {...initial};
 }
 
 /// Owns the test's container and router: both are disposed when this leaves
@@ -122,6 +126,7 @@ Future<ProviderContainer> _pumpHome(
   List<GoRoute> extraRoutes = const [],
   _MemoryPrefs? prefs,
   bool memoryDismissed = false,
+  Set<String> dismissed = const {},
 }) async {
   final store = prefs ?? _MemoryPrefs();
   final container = ProviderContainer(
@@ -129,7 +134,9 @@ Future<ProviderContainer> _pumpHome(
       bridgeApiProvider.overrideWithValue(api),
       uiPrefsProvider.overrideWith(() => store),
       if (memoryDismissed)
-        dismissedServicesProvider.overrideWith(_MemoryDismissed.new),
+        dismissedServicesProvider.overrideWith(
+          () => _MemoryDismissed(dismissed),
+        ),
     ],
   );
   seed?.call(container);
@@ -780,6 +787,20 @@ void main() {
       reason: 'two bounded local retries, one remote connect',
     );
     expect(find.byKey(const Key('send-btn')), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+
+    // Local hosts the user hid are no reason to skip the other devices.
+    await api.appDisconnect(_app2.key);
+    api.appConnectErrors.clear();
+    await _pumpHome(
+      t,
+      api,
+      memoryDismissed: true,
+      dismissed: {'pcx:local:app:first', 'pcx:local:app:second'},
+    );
+    await t.pumpAndSettle();
+    expect(api.appIsConnected(_app2.key), isTrue);
+    expect(api.appIsConnected('pcx:local:app:first'), isFalse);
   });
 
   for (final error in [

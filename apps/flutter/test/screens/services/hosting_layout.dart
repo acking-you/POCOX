@@ -383,6 +383,9 @@ void _registerHostingLayout() {
     expect(discovery.isCompleted, isFalse);
     expect(find.byKey(const Key('device-@local')), findsOneWidget);
     expect(find.byKey(const Key('host-this-device-btn')), findsOneWidget);
+    // The relay has not answered: it is being checked, not online.
+    expect(find.text('检测中…'), findsOneWidget);
+    expect(find.text('在线'), findsNothing);
     // The action works mid-load.
     await t.tap(find.byKey(const Key('host-this-device-btn')));
     for (var i = 0; i < 8; i++) {
@@ -393,6 +396,33 @@ void _registerHostingLayout() {
     api.discoverGate = null;
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
+  }, variant: desktop);
+
+  testWidgets('an expired session keeps this computer\'s hosts and offers '
+      'sign-in, not a relay retry', (t) async {
+    final api = accountFake()
+      ..discoverError = StateError('session expired; sign in again')
+      ..serveHosts.add(
+        const AppServeStatus(
+          device: 'local',
+          name: 'work',
+          alive: true,
+          appServiceKey: 'pcx:local:app:work',
+        ),
+      );
+    // A small window with large text: the banner stacks, nothing overflows.
+    t.view.physicalSize = const Size(320, 640);
+    t.view.devicePixelRatio = 1;
+    t.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(t.view.reset);
+    addTearDown(t.platformDispatcher.clearTextScaleFactorTestValue);
+    await t.pumpWidget(host(const ServicesScreen(), api));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(find.byKey(const Key('services-session-expired')), findsOneWidget);
+    expect(find.byKey(const Key('services-sign-in-again')), findsOneWidget);
+    expect(find.byKey(const Key('relay-problem-retry')), findsNothing);
+    expect(find.byKey(const Key('device-@local')), findsOneWidget);
   }, variant: desktop);
 
   testWidgets('a phone offers no hosting: no title-bar action, no add card', (

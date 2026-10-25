@@ -98,12 +98,6 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
-  /// No description provided for @tunnelPathLocal.
-  ///
-  /// In en, this message translates to:
-  /// **'Local direct'**
-  String get tunnelPathLocal;
-
   /// No description provided for @connectionPathTitle.
   ///
   /// In en, this message translates to:
@@ -169,6 +163,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save. Your previous choice is kept.'**
   String get connectionPathSaveFailed;
+
+  /// No description provided for @tunnelPathLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local direct'**
+  String get tunnelPathLocal;
 
   /// No description provided for @tunnelPathIdle.
   ///
@@ -2135,7 +2135,7 @@ abstract class AppLocalizations {
   /// No description provided for @noAuthWarning.
   ///
   /// In en, this message translates to:
-  /// **'⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.'**
+  /// **'The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.'**
   String get noAuthWarning;
 
   /// No description provided for @subscribeFailed.

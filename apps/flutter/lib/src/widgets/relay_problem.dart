@@ -102,6 +102,28 @@ class _RelayProblemState extends State<RelayProblem> {
       tileKey: const Key('relay-problem-details'),
     );
     if (widget.compact) {
+      final message = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(AppIcons.cloud_off, size: 18, color: muted),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [title, const SizedBox(height: 2), cause],
+            ),
+          ),
+        ],
+      );
+      final retry = OutlinedButton.icon(
+        key: const Key('relay-problem-retry'),
+        onPressed: widget.onRetry,
+        icon: const Icon(AppIcons.refresh, size: 16),
+        label: Text(l10n.retry),
+      );
       return DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(kCardRadius),
@@ -115,28 +137,31 @@ class _RelayProblemState extends State<RelayProblem> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Icon(AppIcons.cloud_off, size: 18, color: muted),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [title, const SizedBox(height: 2), cause],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      key: const Key('relay-problem-retry'),
-                      onPressed: widget.onRetry,
-                      icon: const Icon(AppIcons.refresh, size: 16),
-                      label: Text(l10n.retry),
-                    ),
-                  ],
+                // The retry sits beside the message while both have room
+                // (the room scales with the text), under it otherwise.
+                LayoutBuilder(
+                  builder: (context, box) =>
+                      box.maxWidth >=
+                          MediaQuery.textScalerOf(context).scale(480)
+                      ? Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: message),
+                            const SizedBox(width: 8),
+                            retry,
+                          ],
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            message,
+                            const SizedBox(height: 8),
+                            Align(
+                              alignment: AlignmentDirectional.centerEnd,
+                              child: retry,
+                            ),
+                          ],
+                        ),
                 ),
                 details,
               ],

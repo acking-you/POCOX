@@ -9,9 +9,6 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get tunnelPathLocal => '本机直连';
-
-  @override
   String get connectionPathTitle => '连接路径';
 
   @override
@@ -44,6 +41,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get connectionPathSaveFailed => '保存失败，已保留原设置。';
+
+  @override
+  String get tunnelPathLocal => '本机直连';
 
   @override
   String get tunnelPathIdle => '空闲';
@@ -1127,7 +1127,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get portRangeError => '端口必须是 1 到 65535 之间的整数';
 
   @override
-  String get noAuthWarning => '⚠ 本地端点无鉴权，仅监听 127.0.0.1。仅在 App 前台存活。';
+  String get noAuthWarning => '本地端点无鉴权，仅监听 127.0.0.1。仅在 App 前台存活。';
 
   @override
   String get subscribeFailed => '无法启动订阅';

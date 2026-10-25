@@ -5,6 +5,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/desktop_theme.dart';
+import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/network/link_activity.dart';
@@ -49,9 +50,10 @@ bool _passed(LinkStepState state) =>
     state == LinkStepState.fallback ||
     state == LinkStepState.skipped;
 
-/// The three steps of reaching a service side by side: relay, P2P, session.
-/// The step under way turns, a failed one says why, and the line between
-/// two fills once the first is passed.
+/// The steps of reaching a service side by side: relay, P2P and session, or
+/// this device and the session for a service this app hosts. The step under
+/// way turns, a failed one says why, and the line between two fills once the
+/// first is passed.
 class LinkPipeline extends StatelessWidget {
   /// Creates the pipeline of [steps].
   const LinkPipeline(this.steps, {super.key});
@@ -63,87 +65,82 @@ class LinkPipeline extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    if (steps.relay.state == LinkStepState.skipped) {
-      return _StepColumn(
-        key: const Key('link-step-local'),
-        name: l10n.tunnelPathLocal,
+    final local = steps.local;
+    final columns = [
+      if (local != null)
+        _StepColumn(
+          key: const Key('link-step-local'),
+          name: l10n.servicesLocalDevice,
+          step: local,
+          // Its label is the listener's address.
+          mono: local.state == LinkStepState.done,
+        )
+      else ...[
+        _StepColumn(
+          key: const Key('link-step-relay'),
+          name: l10n.linkStepRelay,
+          step: steps.relay,
+        ),
+        _StepColumn(
+          key: const Key('link-step-p2p'),
+          name: l10n.linkStepP2p,
+          step: steps.p2p,
+          p2p: true,
+        ),
+      ],
+      _StepColumn(
+        key: const Key('link-step-session'),
+        name: l10n.linkStepSession,
         step: steps.session,
-      );
-    }
+      ),
+    ];
     final track = scheme.onSurface.withValues(alpha: 0.1);
-    Color line(LinkStep step, {bool p2p = false}) =>
-        _passed(step.state) ? _look(scheme, step.state, p2p: p2p).color : track;
     return CustomPaint(
       key: const Key('link-pipeline'),
-      painter: _Connectors(
-        first: line(steps.relay),
-        second: line(steps.p2p, p2p: true),
-      ),
+      painter: _Connectors([
+        for (final column in columns.take(columns.length - 1))
+          _passed(column.step.state)
+              ? _look(scheme, column.step.state, p2p: column.p2p).color
+              : track,
+      ]),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            child: _StepColumn(
-              key: const Key('link-step-relay'),
-              name: l10n.linkStepRelay,
-              step: steps.relay,
-            ),
-          ),
-          Expanded(
-            child: _StepColumn(
-              key: const Key('link-step-p2p'),
-              name: l10n.linkStepP2p,
-              step: steps.p2p,
-              p2p: true,
-            ),
-          ),
-          Expanded(
-            child: _StepColumn(
-              key: const Key('link-step-session'),
-              name: l10n.linkStepSession,
-              step: steps.session,
-            ),
-          ),
-        ],
+        children: [for (final column in columns) Expanded(child: column)],
       ),
     );
   }
 }
 
-/// The node of each step is centred in its third, 12 px down.
+/// The node of each step is centred in its column, 12 px down; [segments]
+/// colour the lines between neighbouring nodes.
 class _Connectors extends CustomPainter {
-  const _Connectors({required this.first, required this.second});
+  const _Connectors(this.segments);
 
-  final Color first;
-  final Color second;
+  final List<Color> segments;
 
   static const _center = 12.0;
   static const _gap = 16.0;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final third = size.width / 3;
+    final column = size.width / (segments.length + 1);
     final paint = Paint()
       ..strokeWidth = 2
       ..strokeCap = StrokeCap.round;
-    void segment(int from, Color color) {
-      final start = third * (from + 0.5) + _gap;
-      final end = third * (from + 1.5) - _gap;
-      if (end <= start) return;
+    for (final (from, color) in segments.indexed) {
+      final start = column * (from + 0.5) + _gap;
+      final end = column * (from + 1.5) - _gap;
+      if (end <= start) continue;
       canvas.drawLine(
         Offset(start, _center),
         Offset(end, _center),
         paint..color = color,
       );
     }
-
-    segment(0, first);
-    segment(1, second);
   }
 
   @override
-  bool shouldRepaint(_Connectors old) =>
-      old.first != first || old.second != second;
+  bool shouldRepaint(_Connectors old) => !listEquals(old.segments, segments);
 }
 
 class _StepColumn extends StatelessWidget {
@@ -152,11 +149,16 @@ class _StepColumn extends StatelessWidget {
     required this.name,
     required this.step,
     this.p2p = false,
+    this.mono = false,
   });
 
   final String name;
   final LinkStep step;
   final bool p2p;
+
+  /// The label is an address: set in code type and ink rather than the
+  /// step's colour, which its node already carries.
+  final bool mono;
 
   @override
   Widget build(BuildContext context) {
@@ -189,9 +191,13 @@ class _StepColumn extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 12.5,
+                fontFamily: mono ? monoFontFamily : null,
+                fontFamilyFallback: mono ? monoCjkFallback : null,
+                fontSize: mono ? 12 : 12.5,
                 height: 1.25,
-                color: step.state == LinkStepState.waiting
+                color: mono
+                    ? scheme.onSurfaceVariant
+                    : step.state == LinkStepState.waiting
                     ? onSurfaceMuted(scheme)
                     : step.state == LinkStepState.active
                     ? scheme.onSurface
@@ -267,8 +273,8 @@ class _Node extends StatelessWidget {
   }
 }
 
-/// The three steps as dots small enough for a status line; the step under
-/// way pulses.
+/// The steps as dots small enough for a status line; the step under way
+/// pulses.
 class LinkDots extends StatelessWidget {
   /// Creates the dots of [steps].
   const LinkDots(this.steps, {super.key});
@@ -303,7 +309,10 @@ class LinkDots extends StatelessWidget {
         key: const Key('link-dots'),
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (steps.relay.state != LinkStepState.skipped) ...[
+          if (steps.local case final local?) ...[
+            dot(local),
+            joint(local),
+          ] else ...[
             dot(steps.relay),
             joint(steps.relay),
             dot(steps.p2p, p2p: true),
@@ -433,8 +442,9 @@ class LinkStatusLine extends ConsumerWidget {
   }
 }
 
-/// How a session travels, as one small mark for its status bar: direct,
-/// through the relay, or recovering. Tapping it opens the connection sheet.
+/// How a session travels, as one small mark for its status bar: this
+/// device's own listener, direct, through the relay, or recovering. Tapping
+/// it opens the connection sheet.
 class LinkPathMark extends ConsumerWidget {
   /// Creates the mark for [serviceKey].
   const LinkPathMark({
@@ -472,9 +482,11 @@ class LinkPathMark extends ConsumerWidget {
         cautionColor(scheme),
         l10n.stateReconnecting,
       ),
+      // The usual state of a desktop's own host: ink, like the rest of a
+      // resting status bar.
       (path: TunnelPath.local, recovering: false) => (
-        AppIcons.link_outlined,
-        successColor(scheme),
+        AppIcons.computer,
+        scheme.onSurfaceVariant,
         l10n.tunnelPathLocal,
       ),
       (path: TunnelPath.direct, recovering: false) => (
@@ -670,7 +682,9 @@ class LinkSheet extends ConsumerWidget {
                     ),
                   ),
                 ),
-              if (tunnel?.path != TunnelPath.local) ...[
+              // This app's own listener has no relay history, and its one
+              // detail, the address, is on its step.
+              if (steps.local == null) ...[
                 Padding(
                   padding: const EdgeInsets.only(top: 18, bottom: 6),
                   child: Text(
@@ -684,19 +698,19 @@ class LinkSheet extends ConsumerWidget {
                   ),
                 ),
                 LinkTimeline(tunnel?.events ?? const []),
-              ],
-              if (tunnel != null)
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: TextButton(
-                      key: const Key('link-show-details'),
-                      onPressed: () => showTunnelDetails(context, tunnel.key),
-                      child: Text(l10n.linkShowDetails),
+                if (tunnel != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: TextButton(
+                        key: const Key('link-show-details'),
+                        onPressed: () => showTunnelDetails(context, tunnel.key),
+                        child: Text(l10n.linkShowDetails),
+                      ),
                     ),
                   ),
-                ),
+              ],
             ],
           ),
         );

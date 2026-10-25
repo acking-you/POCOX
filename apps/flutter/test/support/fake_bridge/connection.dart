@@ -105,16 +105,23 @@ mixin _FakeConnection on _FakeBridgeState {
   @override
   Future<String> exportConfig() async => 'pcx1:ZmFrZQ';
 
+  /// Like the bridge's listener registry: every service a host owns here,
+  /// its session, API and meta listeners alike.
   @override
   List<ServiceEntry> localServices() => [
     for (final host in serveHosts)
-      if (host.appServiceKey.isNotEmpty)
-        ServiceEntry(
-          device: host.device,
-          kind: host.sessionKind,
-          name: host.name,
-          key: host.appServiceKey,
-        ),
+      for (final (kind, key) in [
+        (host.sessionKind, host.appServiceKey),
+        ('api', host.apiServiceKey),
+        ('meta', host.metaServiceKey),
+      ])
+        if (key.isNotEmpty)
+          ServiceEntry(
+            device: host.device,
+            kind: kind,
+            name: host.name,
+            key: key,
+          ),
   ];
 
   @override
@@ -128,10 +135,15 @@ mixin _FakeConnection on _FakeBridgeState {
 
   @override
   Future<SubInfo> apiSubscribe(String serviceKey, int localPort) async {
+    // An API hosted here is forwarded straight to its listener, as in the
+    // bridge.
     final s = SubInfo(
       key: serviceKey,
       localAddr: '127.0.0.1:$localPort',
       alive: true,
+      path: serveHosts.any((host) => host.apiServiceKey == serviceKey)
+          ? TunnelPath.local
+          : TunnelPath.relayOnly,
     );
     _subs[serviceKey] = s;
     return s;

@@ -1,5 +1,4 @@
 {
-  "tunnelPathLocal": "Local direct",
   "@@locale": "en",
   "connectionPathTitle": "Connection path",
   "connectionPathInfo": "P2P direct needs a relay and a host that support it. When direct setup fails, the connection falls back to the relay before any data is sent, so nothing is replayed. An established direct connection keeps running if the relay goes offline or its credential is revoked, until a device at either end disconnects it.",
@@ -12,6 +11,7 @@
   "connectionPathIncomingPending": "Restart hosting to apply.",
   "connectionPathReadFailed": "Couldn't read connection preferences.",
   "connectionPathSaveFailed": "Couldn't save. Your previous choice is kept.",
+  "tunnelPathLocal": "Local direct",
   "tunnelPathIdle": "Idle",
   "tunnelPathDirect": "P2P direct",
   "tunnelPathRelay": "Via relay",
@@ -442,7 +442,7 @@
   "startSubscription": "Start subscription",
   "stop": "Stop",
   "portRangeError": "Port must be an integer from 1 to 65535",
-  "noAuthWarning": "⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.",
+  "noAuthWarning": "The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.",
   "subscribeFailed": "Couldn't start the subscription",
   "settingsTitle": "Settings",
   "utilityChat": "Conversation",

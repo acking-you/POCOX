@@ -1,5 +1,4 @@
 {
-  "tunnelPathLocal": "本机直连",
   "@@locale": "zh",
   "connectionPathTitle": "连接路径",
   "connectionPathInfo": "P2P 直连需要中继和主机都支持。直连建立失败时，会在发送任何数据之前改用中继，因此不会重放数据。已建立的直连在中继离线或凭据被撤销后仍会继续，直到任一端的设备将其断开。",
@@ -12,6 +11,7 @@
   "connectionPathIncomingPending": "重启托管后生效。",
   "connectionPathReadFailed": "无法读取连接偏好。",
   "connectionPathSaveFailed": "保存失败，已保留原设置。",
+  "tunnelPathLocal": "本机直连",
   "tunnelPathIdle": "空闲",
   "tunnelPathDirect": "P2P 直连",
   "tunnelPathRelay": "经中继",
@@ -392,7 +392,7 @@
   "startSubscription": "启动订阅",
   "stop": "停止",
   "portRangeError": "端口必须是 1 到 65535 之间的整数",
-  "noAuthWarning": "⚠ 本地端点无鉴权，仅监听 127.0.0.1。仅在 App 前台存活。",
+  "noAuthWarning": "本地端点无鉴权，仅监听 127.0.0.1。仅在 App 前台存活。",
   "subscribeFailed": "无法启动订阅",
   "settingsTitle": "设置",
   "utilityChat": "对话",

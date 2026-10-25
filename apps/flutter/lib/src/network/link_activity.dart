@@ -150,9 +150,15 @@ class LinkStep {
   final String? detail;
 }
 
-/// The three steps of reaching a service: its tunnel's relay link, a direct
-/// (P2P) attempt over it, and the session opened through it.
-typedef LinkSteps = ({LinkStep relay, LinkStep p2p, LinkStep session});
+/// The steps of reaching a service: its tunnel's relay link, a direct (P2P)
+/// attempt over it, and the session opened through it. A service this app
+/// hosts itself has [local], its own listener, in place of relay and P2P.
+typedef LinkSteps = ({
+  LinkStep? local,
+  LinkStep relay,
+  LinkStep p2p,
+  LinkStep session,
+});
 
 /// The steps of [watch] for a session whose controller reports [reconnect];
 /// [connected] is whether its session is up.
@@ -178,10 +184,24 @@ LinkSteps linkSteps(
         ];
   final waitingRetry = reconnect.active && reconnect.retryAt != null;
   return (
+    local: _localStep(l10n, tunnel),
     relay: _relayStep(l10n, tunnel, stage, waitingRetry, reconnect),
     p2p: _p2pStep(l10n, tunnel, recent),
     session: _sessionStep(l10n, stage, reconnect, connected, waitingRetry),
   );
+}
+
+/// This app's own listener: current, or retired by a stop or restart. Null
+/// for a remote service.
+LinkStep? _localStep(AppLocalizations l10n, SubInfo? tunnel) {
+  if (tunnel == null || tunnel.path != TunnelPath.local) return null;
+  return tunnel.alive
+      ? LinkStep(LinkStepState.done, tunnel.localAddr)
+      : LinkStep(
+          LinkStepState.failed,
+          l10n.subscribedDead,
+          detail: tunnel.localAddr,
+        );
 }
 
 LinkStep _relayStep(
@@ -313,6 +333,7 @@ LinkStep _sessionStep(
 /// The steps before anything is known: every one waiting, so the first real
 /// sample changes them without a false failure in between.
 LinkSteps waitingSteps(AppLocalizations l10n) => (
+  local: null,
   relay: LinkStep(LinkStepState.waiting, l10n.linkStepRelay),
   p2p: LinkStep(LinkStepState.waiting, l10n.linkStepP2p),
   session: LinkStep(LinkStepState.waiting, l10n.linkStepSession),
@@ -332,10 +353,11 @@ String linkHeadline(
   }
   // Session opening waits on the transport: show the actual network work
   // while it is in flight instead of hiding it behind "Opening the session".
-  for (final step in [steps.relay, steps.p2p, steps.session]) {
+  final order = [?steps.local, steps.relay, steps.p2p, steps.session];
+  for (final step in order) {
     if (step.state == LinkStepState.active) return step.label;
   }
-  for (final step in [steps.relay, steps.p2p, steps.session]) {
+  for (final step in order) {
     if (step.state == LinkStepState.failed) return step.label;
   }
   return l10n.stateReconnecting;

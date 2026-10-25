@@ -9,9 +9,6 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get tunnelPathLocal => 'Local direct';
-
-  @override
   String get connectionPathTitle => 'Connection path';
 
   @override
@@ -48,6 +45,9 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get connectionPathSaveFailed =>
       'Couldn\'t save. Your previous choice is kept.';
+
+  @override
+  String get tunnelPathLocal => 'Local direct';
 
   @override
   String get tunnelPathIdle => 'Idle';
@@ -1182,7 +1182,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noAuthWarning =>
-      '⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
+      'The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
 
   @override
   String get subscribeFailed => 'Couldn\'t start the subscription';

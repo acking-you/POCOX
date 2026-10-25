@@ -8,6 +8,19 @@ const _thisDevice = '@local';
 bool _capability(ServiceEntry service) =>
     service.kind != 'host' && service.kind != 'port';
 
+/// What the page knows of the relay that lists the other devices.
+enum _RelayState {
+  /// It listed them.
+  online,
+
+  /// It has not answered yet; this computer's own services already show.
+  checking,
+
+  /// It could not list them: only this computer's own services are known,
+  /// and none of them is published until it answers.
+  down,
+}
+
 /// The service inventory, organized around devices rather than protocol tabs.
 /// App/API remain the real discovered services; session sharing is presented
 /// as a capability derived from an account-mode app host, because meta is
@@ -25,7 +38,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     required this.selectedDevice,
     required this.onSelectDevice,
     required this.onClearDevice,
-    this.relayDown = false,
+    this.relayState = _RelayState.online,
   });
 
   final List<ServiceEntry> services;
@@ -41,9 +54,8 @@ class _DeviceFirstServices extends ConsumerWidget {
   /// Return to the device list (narrow only).
   final VoidCallback onClearDevice;
 
-  /// The relay could not list services: only this computer's own are known,
-  /// and none of them is published until it answers.
-  final bool relayDown;
+  /// Whether the relay listed [services].
+  final _RelayState relayState;
 
   /// Below this the device column and the detail can't sit side by side. Matches
   /// the conversation's own document-layout breakpoint so the whole app changes
@@ -413,7 +425,9 @@ class _DeviceFirstServices extends ConsumerWidget {
         (offline ?? offlineTunnels).contains(key)
         ? StatusChip(
             color: scheme.outline,
-            label: relayDown ? l10n.tunnelNotConnected : l10n.tunnelOffline,
+            label: relayState == _RelayState.down
+                ? l10n.tunnelNotConnected
+                : l10n.tunnelOffline,
             filled: true,
           )
         : null;
@@ -587,7 +601,7 @@ class _DeviceFirstServices extends ConsumerWidget {
             device.name,
       },
       onSelect: onSelectDevice,
-      relayDown: relayDown,
+      relayState: relayState,
       // Beside a detail pane the column owns the full height and scrolls its
       // own list; stacked it is the page's only content and scrolls with it.
       filled: split,
@@ -890,6 +904,12 @@ class _NarrowServices extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeOutCubic,
+      // A short list starts at the top, also under a relay or sign-in
+      // banner, never centred in the room left below it.
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previous, ?current],
+      ),
       transitionBuilder: (child, animation) => SlideTransition(
         position: Tween<Offset>(
           begin: Offset(showDetail ? 0.06 : -0.06, 0),

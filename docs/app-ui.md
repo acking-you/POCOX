@@ -80,8 +80,11 @@ for Flutter diagnostics. Native console lifetime tests live in
   after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,
   the services hub's app and API rows); in the galaxy, a bright taut beam for
   direct, a dashed high arc for the relay, both for mixed
-  ([connection paths](galaxy-geometry.md#connection-paths)). A local host
-  reached over loopback shows no path.
+  ([connection paths](galaxy-geometry.md#connection-paths)). A host of this
+  app, reached on its own loopback listener, reads **Local direct /
+  本机直连**: a monitor mark in ink on the status bar (it is the resting state
+  of a desktop's own host), no galaxy link, no relay or P2P counters
+  ([local routing](harness-connection-lifecycle.md#process-owned-local-routing)).
 - Subscription rows carry one `TunnelPathChip` (live path or dropped) and open
   live details from the pressed row. Paths come from local SDK observations,
   never from the preference; the polled list is watched by the subscription
@@ -91,9 +94,11 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Recovery is shown as it happens ([watching a link
   recover](relay-worker-recovery.md#watching-a-link-recover)): the model is
   `network/link_activity.dart` (`linkWatchProvider` polls one service every
-  400 ms while watched; `linkSteps` turns a tunnel, the connect stage and the
-  controller's `ReconnectState` into relay / P2P / session steps), drawn by
-  `widgets/link_progress.dart`: `LinkPipeline` (three nodes, the active one
+  400 ms while watched, every 3 s for a healthy local link; `linkSteps` turns
+  a tunnel, the connect stage and the controller's `ReconnectState` into relay
+  / P2P / session steps, or this device's listener and the session for a local
+  service), drawn by `widgets/link_progress.dart`: `LinkPipeline` (three nodes,
+  two for a local service with its address on the first, the active one
   turning, a failed one saying why), `LinkDots` for a status line,
   `LinkTimeline` for recent events and `showLinkSheet`, a popover on desktop
   and a sheet on touch. A reconnecting session's status bar shows
@@ -115,6 +120,10 @@ for Flutter diagnostics. Native console lifetime tests live in
   it). The services page keeps this computer's hosts under a relay problem
   card (`widgets/relay_problem.dart`: cause in words, retry, raw error folded
   and copyable), the relay marked unreachable and its tunnels not connected.
+  An expired account session heads them with **Sign in again** instead of a
+  retry that cannot succeed. While the relay is still being asked, this
+  computer's hosts already show and the relay reads **Checking…** with a
+  pulsing dot, never Online.
 - A relay name resolving only to 198.18.0.0/15 is named as a proxy's or VPN's
   unrouted virtual address (`lib/src/relay_diagnosis.dart`). The app never
   resolves around the system DNS.

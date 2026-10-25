@@ -12,7 +12,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.onSelect,
     required this.filled,
     this.offlineDevices = const {},
-    this.relayDown = false,
+    this.relayState = _RelayState.online,
   });
 
   final String relay;
@@ -31,8 +31,8 @@ class _DeviceColumn extends StatelessWidget {
   /// False sizes to the list instead, for a column that is the whole page.
   final bool filled;
 
-  /// The relay could not be reached.
-  final bool relayDown;
+  /// Whether the relay listed the devices.
+  final _RelayState relayState;
 
   @override
   Widget build(BuildContext context) {
@@ -81,18 +81,23 @@ class _DeviceColumn extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 );
-                final label = relayDown
-                    ? l10n.statusUnreachable
-                    : l10n.statusOnline;
-                final status = StatusChip(
-                  color: relayDown ? scheme.error : online,
-                  label: label,
-                  filled: true,
-                );
+                final (label, color) = switch (relayState) {
+                  _RelayState.online => (l10n.statusOnline, online),
+                  _RelayState.checking => (l10n.statusChecking, scheme.outline),
+                  _RelayState.down => (l10n.statusUnreachable, scheme.error),
+                };
                 // The status sits beside the identity while both stay
-                // readable there, otherwise under it.
+                // readable there, otherwise under it, where a long label
+                // in large text wraps instead of overflowing.
                 final beside =
                     constraints.maxWidth >= _identityRowWidth(context, label);
+                final status = StatusChip(
+                  color: color,
+                  label: label,
+                  filled: true,
+                  pulsing: relayState == _RelayState.checking,
+                  wrap: !beside,
+                );
                 return Padding(
                   padding: const EdgeInsets.all(_identityPadding),
                   child: Row(
