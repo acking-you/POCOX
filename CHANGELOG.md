@@ -16,6 +16,10 @@ breaking change goes.
   **Local direct**. Stopped or replaced hosts invalidate old connections;
   local failures never silently switch to the relay. Remote publication and
   access permissions retain their existing behavior.
+- Local startup waits for OpenCode's native gateway readiness, tries other
+  candidates after a failed handshake and adds later restored hosts to the
+  picker without relay discovery. Republishing a running Codex host after an
+  account or relay change now requires a restart, matching ACP and OpenCode.
 
 ## 0.7.7 — 2026-10-25 — Portable Windows copies update themselves
 

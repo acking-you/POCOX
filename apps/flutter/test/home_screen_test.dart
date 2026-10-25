@@ -709,17 +709,77 @@ void main() {
       expect(publication.isCompleted, isFalse);
       expect(api.appIsConnected('pcx:local:app:work'), isTrue);
       expect(api.discoverCalls, 0);
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+        findsNothing,
+      );
       publication.complete();
       await t.pumpAndSettle();
       expect(
         api.serveHosts.map((h) => h.name),
         containsAll(['work', 'second']),
       );
+      expect(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+        findsOneWidget,
+        reason:
+            'the open picker receives newly restored hosts without discovery',
+      );
+      expect(api.discoverCalls, 0);
+      await t.tap(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+      );
+      await t.pumpAndSettle();
+      expect(api.appIsConnected('pcx:local:app:second'), isTrue);
       await t.pumpWidget(const SizedBox());
     } finally {
       if (!publication.isCompleted) publication.complete();
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  testWidgets('a failed local handshake tries the next local host before '
+      'discovering remote alternatives', (t) async {
+    final api = FakeBridgeApi(config: _accountConfig, services: [_app2]);
+    for (final name in ['first', 'second']) {
+      api.serveHosts.add(
+        AppServeStatus(
+          device: 'local',
+          name: name,
+          alive: true,
+          appServiceKey: 'pcx:local:app:$name',
+        ),
+      );
+    }
+    api.appConnectErrors['pcx:local:app:first'] = StateError('wedged');
+    await _pumpHome(t, api, memoryDismissed: true);
+    await t.pumpAndSettle();
+    expect(api.appIsConnected('pcx:local:app:second'), isTrue);
+    expect(api.discoverCalls, 0);
+    expect(
+      api.appProbeCalls,
+      isEmpty,
+      reason: 'local connects are their only handshake',
+    );
+    await t.pumpWidget(const SizedBox());
+
+    // The same resolution with no working local candidate must still reach
+    // the remote host, and must not retry the failed locals after discovery.
+    await api.appDisconnect('pcx:local:app:second');
+    api.appConnectErrors['pcx:local:app:second'] = StateError('also wedged');
+    final before = api.appConnectCount;
+    await _pumpHome(t, api, memoryDismissed: true);
+    await t.pumpAndSettle();
+    expect(api.appIsConnected(_app2.key), isTrue);
+    expect(api.discoverCalls, 1);
+    expect(
+      api.appConnectCount - before,
+      5,
+      reason: 'two bounded local retries, one remote connect',
+    );
+    expect(find.byKey(const Key('send-btn')), findsOneWidget);
   });
 
   for (final error in [

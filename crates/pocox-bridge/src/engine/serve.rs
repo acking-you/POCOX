@@ -85,6 +85,7 @@ use super::host_services::{
 /// registrations can be dropped/re-added independently of the processes.
 struct LocalServe {
     local_routes: Option<super::local_services::Registration>,
+    context: transport::Context,
     device: String,
     name: String,
     // codex app-server (remote control).
@@ -764,6 +765,7 @@ fn launch_codex(
 
     let mut host = LocalServe {
         local_routes: Some(local_routes),
+        context: transport::Context::of(&transport),
         device: device.clone(),
         name: name.clone(),
         app_key: app_key.clone(),

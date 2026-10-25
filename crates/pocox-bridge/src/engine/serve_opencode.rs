@@ -300,11 +300,6 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let uploads = pocox_core::paths::state_dir()?.join("opencode-uploads");
     let (gateway, local) = host_services::bind_loopback("OpenCode gateway")?;
     let (meta_listener, meta) = host_services::bind_loopback("OpenCode meta")?;
-    let local_routes =
-        super::local_services::Registration::new(&transport::Context::of(&owned.transport), &[
-            (ServiceId::new(&device, ServiceKind::OpenCode, &prepared.name).key(), local),
-            (ServiceId::new(&device, ServiceKind::Meta, &prepared.name).key(), meta),
-        ])?;
     let rt = runtime::runtime();
     // OpenCode's own configuration on the history its background server
     // serves: join that server rather than run a second engine on it.
@@ -370,7 +365,7 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let watch =
         service.map(|service| rt.spawn(watch(name.clone(), host.info().identity.host_id, service)));
     let serving = Serving {
-        local_routes: Some(local_routes),
+        local_routes: None,
         key: ServiceId::new(&device, ServiceKind::OpenCode, &name).key(),
         meta_key: ServiceId::new(&device, ServiceKind::Meta, &name).key(),
         prepared,
@@ -397,18 +392,33 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     };
     // From here a failed stop retains both the record and this name.
     reservation.commit();
-    let publish = if closing || !transport::is_current(owned.epoch) {
-        Err(anyhow!("the app is quitting or its account/relay changed during OpenCode startup"))
-    } else {
-        reregister(&name, "opencode").and_then(|()| reregister(&name, "meta"))
-    }
-    .and_then(|()| {
+    let publish = (|| {
+        ensure!(
+            !closing && transport::is_current(owned.epoch),
+            "the app is quitting or its account/relay changed during OpenCode startup"
+        );
+        // Native readiness, the initial catalog and both gateway tasks precede
+        // discovery. A bound socket alone is not a usable local service.
+        // Record the host first so a registration failure uses normal cleanup.
+        {
+            let mut registry = hosts();
+            let host = registry
+                .hosts
+                .get_mut(&name)
+                .ok_or_else(|| anyhow!("OpenCode stopped during startup"))?;
+            host.local_routes = Some(super::local_services::Registration::new(&host.context, &[
+                (host.key.clone(), local),
+                (host.meta_key.clone(), meta),
+            ])?);
+        }
+        reregister(&name, "opencode")?;
+        reregister(&name, "meta")?;
         ensure!(
             transport::is_current(owned.epoch) && !hosts().closing,
             "the app is quitting or its account/relay changed during OpenCode startup"
         );
         Ok(())
-    });
+    })();
     if let Err(error) = publish {
         stop(&name)
             .context("OpenCode startup cleanup did not confirm exit; stop this host again")?;

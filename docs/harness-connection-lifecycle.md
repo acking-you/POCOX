@@ -47,6 +47,11 @@ roots, write ownership or the OpenCode gateway's private native credentials.
 The home screen restores configured hosting before remote discovery and can
 open a selected local service as soon as its listener is registered, while
 publication and the remaining configured host restores finish independently.
+OpenCode registers its local routes only after native readiness, its initial
+catalog request and gateway startup. Each completed host restore refreshes the
+picker's local inventory without relay discovery, including an already open
+picker. A failed local handshake tries the next candidate; remote discovery is
+deferred until no local candidate can connect.
 Its picker consumes the last explicitly
 requested remote inventory without triggering discovery merely by rendering
 a local conversation. Local startup and switching use the connection's real
@@ -64,6 +69,10 @@ the registry from new host starts, never from persisted port numbers. Account
 or relay changes invalidate outgoing sessions and subscriptions. Retried meta
 reads/writes retain their original endpoint lifetime and stop on retirement;
 they do not replay against a replacement host.
+Codex, ACP and OpenCode republication stays bound to the host's startup
+account/relay context. Changing that context requires restarting the host;
+neither manual republication nor automatic recovery publishes its old listeners
+under a new context.
 
 Local subscriptions report `Local` / **Local direct** / **本机直连** and the
 actual endpoint, with no fabricated SDK counters, relay phases or P2P stages.

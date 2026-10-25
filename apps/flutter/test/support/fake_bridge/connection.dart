@@ -7,6 +7,9 @@ mixin _FakeConnection on _FakeBridgeState {
   /// When set, [appConnect] fails with it, as an unreachable host does.
   Object? appConnectError;
 
+  /// Connection failures scoped to one host, for candidate fallback.
+  final Map<String, Object> appConnectErrors = {};
+
   /// When set, [accountWebLoginStart] fails with it, as a backend refusal does.
   Object? webLoginStartError;
 
@@ -329,7 +332,9 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<void> appConnect(String serviceKey, int localPort) async {
     appConnectCount++;
     await appConnectGate;
-    if (appConnectError case final error?) throw error;
+    if (appConnectErrors[serviceKey] ?? appConnectError case final error?) {
+      throw error;
+    }
     _appConnected.add(serviceKey);
     _appEvents.putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast);
   }

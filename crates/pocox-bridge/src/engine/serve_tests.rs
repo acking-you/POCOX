@@ -171,6 +171,10 @@ fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
     let local: SocketAddr = "127.0.0.1:9".parse().expect("addr");
     LocalServe {
         local_routes: None,
+        context: transport::Context::of(&transport::Transport {
+            session: pocox_pb::RelaySession::for_test("127.0.0.1:9"),
+            namespace: None,
+        }),
         device: "test-device".into(),
         name: name.into(),
         app_key: format!("pcx:test-device:app:{name}"),
@@ -207,6 +211,70 @@ fn finishes(handle: &tokio::task::AbortHandle) -> bool {
         std::thread::sleep(Duration::from_millis(10));
     }
     true
+}
+
+#[test]
+fn codex_republication_refuses_a_changed_context_before_dialing() {
+    const ISOLATED: &str = "POCOX_REPUBLISH_CONTEXT_FIXTURE";
+    if std::env::var_os(ISOLATED).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "engine::serve::tests::codex_republication_refuses_a_changed_context_before_dialing",
+                "--nocapture",
+            ])
+            .env(ISOLATED, "1")
+            .output()
+            .expect("isolated context fixture");
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let state = tempfile::tempdir().expect("isolated state");
+    runtime::init(state.path().to_path_buf()).expect("runtime");
+    let relay = std::net::TcpListener::bind("127.0.0.1:0").expect("relay trap");
+    relay.set_nonblocking(true).expect("nonblocking");
+    let next = transport::Transport {
+        session: pocox_pb::RelaySession::for_test(relay.local_addr().expect("address").to_string()),
+        namespace: None,
+    };
+    runtime::configure_host(runtime::HostContext {
+        device: "test-device".into(),
+        profiles: state.path().join("hosting"),
+        transport: Some(next.clone()),
+    })
+    .expect("isolated hosting context");
+    let name = "republish-context";
+    let mut host = fake_host(name, "original", true);
+    let context = host.context.clone();
+    let key = host.app_key.clone();
+    host.local_routes = Some(
+        super::super::local_services::Registration::new(&context, &[(key.clone(), host.app_local)])
+            .expect("owned startup route"),
+    );
+    hosts_locked().insert(name.into(), host);
+    serve_deregister(name, "app").expect("already unpublished");
+    assert!(serve_reregister(name, "app").is_err(), "explicit publish must require restart");
+    assert!(republish_dropped(name).is_err(), "recovery must obey the same context fence");
+    assert!(
+        super::super::local_services::lookup(&context, &key)
+            .expect("original route")
+            .is_some(),
+        "a publication refusal does not stop the original local listener"
+    );
+    assert!(
+        super::super::local_services::lookup(&transport::Context::of(&next), &key)
+            .expect("other context")
+            .is_none(),
+        "the old host was not adopted by the new context"
+    );
+    assert!(matches!(relay.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock));
+    let host = hosts_locked().remove(name).expect("original host retained");
+    assert!(stop_host_tasks(host));
 }
 
 #[test]
