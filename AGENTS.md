@@ -43,6 +43,7 @@ vendor/pagable/  excluded provenance copy; not a dependency, keep unchanged
 | `pocox-account-proto` | backend wire types and `pcxu:` namespacing |
 | `pocox-auth`, `pocox-store` | GitHub login and session tokens; SQLite persistence for the backend |
 | `pocox-backend` | the deployable account backend ([deploy](deploy/README.md)) |
+| `pocox-updater` | the Windows update helper shipped beside the app; its own executable because it must outlive the app; its Win32 `unsafe` is behind the `handoff` feature ([updates](docs/app-updates.md)) |
 
 Prefer a new module in an existing crate over a new crate: crates are cheap,
 boundaries are not.
@@ -148,7 +149,7 @@ cargo fmt --check \
   -p pocox-core -p pocox-codex -p pocox-pb \
   -p pocox-api-proxy -p pocox-host-svc -p pocox-cli \
   -p pocox_bridge -p pocox-account-proto -p pocox-store \
-  -p pocox-auth -p pocox-backend
+  -p pocox-auth -p pocox-backend -p pocox-updater
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --locked
 

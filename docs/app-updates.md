@@ -107,8 +107,8 @@ certificate.
 | Installation | File | How it applies |
 |---|---|---|
 | macOS app bundle | `…-macos-arm64.dmg` / `…-macos-x64.dmg` (this build's architecture) | Staged out of the disk image and verified; the app quits through its normal path (hosted services stop first); a helper swaps the bundle and reopens it. Restores the old bundle if the swap fails. A bundle the user cannot replace (another owner, App Translocation) opens the disk image instead. |
-| Windows, installed | `…-windows-x64-setup.exe` | A helper acknowledges startup before the app quits, runs the installer silently in the existing installation directory (elevated: UAC asks), and reopens the app. |
-| Windows, portable | `…-windows-x64.zip` | Saved to Downloads and shown in Explorer. |
+| Windows, installed | `…-windows-x64-setup.exe` | `pocox-updater.exe` checks the installer again and takes the administrator prompt while the app still runs; the app then quits, the installer runs silently in the existing installation directory, the app must report the new version, and it reopens. |
+| Windows, portable | `…-windows-x64.zip` | `pocox-updater.exe` unpacks the archive into `.pocox-update` in the app folder and checks the new `pocox.exe`'s version while the app still runs; the app then quits, each of the archive's entries takes the place of the app's own (the user's other files stay), and the app reopens. A failed swap puts every file back and reopens the old version. A copy whose folder this user cannot write, or without the helper, saves the archive to Downloads instead. |
 | Linux AppImage | `…-linux-x86_64.AppImage` | The app quits; a helper replaces the AppImage file (`$APPIMAGE`) and reopens it. |
 | Linux `.deb` | `…-linux-amd64.deb` | Opened in the desktop's package installer; restart POCOX after it finishes. |
 | Linux portable | `…-linux-x64.zip` | Saved to Downloads and shown. |
@@ -127,21 +127,43 @@ why; the helper waits up to two minutes for the process to exit and otherwise
 gives up without touching anything. **Retry** applies the same verified
 download again.
 
-On Windows, failure to start the helper keeps the app open. The helper uses
-`CREATE_NO_WINDOW` and a new process group, without `DETACHED_PROCESS`: with
-the latter, Windows PowerShell can exit successfully without executing its
-script. A per-download lock prevents concurrent helpers from running the same
-installer. Installer failure or UAC cancellation reopens the existing app and
-retains the verified package. Each attempt leaves `helper.log` and, once the
-installer runs, `installer.log` in `updates/work/<version>-<time>/handoff-<id>`
-under the app support directory. A subsequent download clears this directory.
+On Windows the helper is `pocox-updater.exe`, shipped beside `pocox.exe` (the
+`pocox-updater` crate). The app writes a request naming its process, the
+download and the manifest's size, SHA-256 and version, then runs the
+helper's `--prepare` mode and quits only once that succeeds. `--prepare`
+copies the helper next to the download (so the release can replace the
+shipped one) and starts its worker from there, sharing no handles with the
+app and outside any job the app runs in. The worker holds the app's process
+by handle, so a reused process id cannot stand in for it. It re-checks the
+download while holding it against changes, readies the update (see the
+table) and only then reports ready. A declined administrator prompt, a
+download that no longer matches, an archive with unsafe paths or the wrong
+version, and a helper that never got ready all leave the app running with
+the reason shown. One update of a copy runs at a time, and a retry calls off
+the attempt still waiting. After the app has quit, a failure reopens the
+app and shows a message box with the reason. Each attempt keeps
+`request.json`, `status.json` and, for the installer, `installer.log` in
+`updates/work/<version>-<time>/handoff-<id>` under the app support
+directory; the next download clears it.
+
+The helper's Win32 calls (pinning a process, the administrator prompt, a
+spawn that inherits no handles, the version resource) are the crate's only
+`unsafe` code, built only with its `handoff` feature, which the release
+workflow and Windows CI enable. Without it the crate forbids `unsafe` and the
+helper refuses to run, so a local copy needs `cargo build --release -p
+pocox-updater --features handoff`.
+
+This replaces the PowerShell helper of 0.7.6 and earlier. A portable copy of
+those versions only saves the archive, so it needs one manual unpack of
+0.7.7 or later over its folder; an installed copy updates to 0.7.7 through
+its existing helper.
 
 The Windows release/profile GUI never attaches to the launcher's console;
 closing a shell or updater console cannot terminate it. Only debug builds
-attach for Flutter diagnostics. The helper reopens the app without creating a
-console and passes `/NORESTARTAPPLICATIONS` to Inno Setup so only the helper
-owns the restart. POCOX does not install a task that reopens it after Quit;
-external scheduled watchdogs must be disabled separately if they do so.
+attach for Flutter diagnostics. The helper has no console, reopens the app
+without one and passes `/NORESTARTAPPLICATIONS` to Inno Setup so only the
+helper owns the restart. POCOX does not install a task that reopens it after
+Quit; external scheduled watchdogs must be disabled separately if they do so.
 
 Windows installations of 0.7.0 and 0.7.1 contain the broken helper launch. They
 need one manual installation of 0.7.2 or later from the release page; an old
@@ -169,11 +191,13 @@ test key.
 
 - Native macOS/Windows proxy settings and the system browser are outside the
   application proxy setting. Configure an explicit URL when needed.
-- Windows CI runs Windows PowerShell subprocess tests for helper startup,
-  acknowledgement failures, concurrent handoffs, waiting for app exit,
-  successful installation, installer failure and reopening. These tests use
-  temporary installers/apps and replace only the interactive UAC boundary;
-  they do not validate an elevated installation into Program Files.
+- Windows CI runs the helper with real processes: stand-in apps and an
+  installer, paths with spaces and non-ASCII names. It covers waiting for the
+  app to quit, the portable swap and its rollback while a file is held,
+  refusing a changed download or a wrong version before the app quits, an
+  installer that reports success without installing, and a called-off
+  update. The tests skip the administrator prompt, so they do not exercise an
+  elevated installation into Program Files.
 - Native Windows CI closes an owned launcher's console and verifies that a GUI
   using the release runner's console policy survives. It also exercises the
   Codex launcher through a batch shim and nested PowerShell command, checking

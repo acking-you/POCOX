@@ -102,7 +102,8 @@ jobs:
             -p pocox-account-proto \
             -p pocox-store \
             -p pocox-auth \
-            -p pocox-backend
+            -p pocox-backend \
+            -p pocox-updater
 
   clippy:
     name: rust clippy
@@ -178,8 +179,8 @@ jobs:
           ctest --test-dir target/windows-console-tests -C Release --output-on-failure --no-tests=error
       - name: Exercise Codex batch launcher and nested command
         run: cargo test --locked -p pocox-codex process::windows_tests
-      - name: Exercise Windows PowerShell handoff and installer lifecycle
-        run: cargo test --locked -p pocox_bridge --no-default-features engine::updates::apply::tests
+      - name: Exercise the update helper's handoff, installer and portable swap
+        run: cargo test --locked -p pocox-updater --features handoff
       - name: Exercise desktop shutdown and hosting ownership handoff
         run: cargo test --locked -p pocox_bridge --no-default-features engine::serve::lifecycle::tests
 

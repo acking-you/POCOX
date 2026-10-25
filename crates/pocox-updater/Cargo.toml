@@ -1,0 +1,45 @@
+[package]
+name = "pocox-updater"
+description = "Puts a verified POCOX release in place on Windows once the app has quit, then reopens it."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+# Shipped beside `pocox.exe` in the Windows installer and portable archive.
+[[bin]]
+name = "pocox-updater"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[features]
+# The Windows process handoff: the crate's only `unsafe` (Win32 FFI behind
+# safe wrappers, in `src/windows/`). Off by default, so workspace builds stay
+# `forbid(unsafe_code)`; the release workflow and Windows CI enable it.
+handoff = ["dep:windows-sys"]
+
+[dependencies]
+anyhow = { workspace = true }
+ring = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+zip = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", optional = true, features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[dev-dependencies]
+tempfile = "3"
