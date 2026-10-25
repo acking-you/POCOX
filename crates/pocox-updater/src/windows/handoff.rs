@@ -2,18 +2,18 @@
 //!
 //! - `--prepare <request>` runs while the app waits for it. It copies this
 //!   executable into the handoff directory, so the release can replace the
-//!   shipped one, then starts the worker from that copy and returns once the
-//!   worker is ready. The app quits only if it succeeds.
-//! - `--worker <request>` outlives the app. It pins the app's process, checks
-//!   the download and readies the update: it unpacks and checks a portable
-//!   release, or starts the administrator half for an installer. Then it
-//!   reports ready and waits for the app to exit. It puts the update in place
-//!   and reopens the app, and shows anything that went wrong.
-//! - `--elevated <request>` is the installer's administrator half. The worker
-//!   starts it before the app quits, so the administrator prompt comes while
-//!   the app still runs and declining it leaves the app running. It waits for
-//!   the app to exit, then runs the installer from the file it checked and
-//!   still holds.
+//!   shipped one. For an installer it starts the administrator half from that
+//!   copy. Then it starts the worker and returns once the worker is ready. The
+//!   app quits only if it succeeds.
+//! - `--worker <request> [<half>]` outlives the app. It pins the app's process,
+//!   checks the download and readies the update: it unpacks and checks a
+//!   portable release, or pins the administrator half (process id `<half>`) for
+//!   an installer. Then it reports ready and waits for the app to exit. It puts
+//!   the update in place, reopens the app, and shows anything that went wrong.
+//! - `--elevated <request>` is the installer's administrator half. It starts
+//!   before the app quits, so the administrator prompt comes while the app
+//!   still runs and declining it leaves the app running. It waits for the app
+//!   to exit, then runs the installer from the file it checked and still holds.
 
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
@@ -51,14 +51,23 @@ const LOCK_PATIENCE: Duration = Duration::from_secs(15);
 pub fn run(mut arguments: impl Iterator<Item = OsString>) -> Result<()> {
     let mode = arguments.next().context("missing the updater mode")?;
     let path = PathBuf::from(arguments.next().context("missing the update request")?);
+    // `--worker` also takes the administrator half's process id.
+    let half = arguments
+        .next()
+        .map(|id| {
+            id.to_str()
+                .and_then(|id| id.parse::<u32>().ok())
+                .context("malformed process id")
+        })
+        .transpose()?;
     ensure!(arguments.next().is_none(), "unexpected updater argument");
     let dir = request::handoff_dir(&path)?.to_path_buf();
     let (result, name) = match mode.to_str() {
         // Its error goes to the app through standard error.
-        Some("--prepare") => return prepare(&path, &dir),
-        Some("--worker") => (worker(&path, &dir), status::WORKER),
-        Some("--elevated") => (elevated(&path, &dir), status::ELEVATED),
-        _ => bail!("unknown updater mode"),
+        Some("--prepare") if half.is_none() => return prepare(&path, &dir),
+        Some("--worker") => (worker(&path, &dir, half), status::WORKER),
+        Some("--elevated") if half.is_none() => (elevated(&path, &dir), status::ELEVATED),
+        _ => bail!("unknown updater mode or argument"),
     };
     if let Err(error) = &result {
         let reported = status::read(&dir, name).is_some_and(|found| found.stage == Stage::Failed);
@@ -70,14 +79,24 @@ pub fn run(mut arguments: impl Iterator<Item = OsString>) -> Result<()> {
 }
 
 fn prepare(path: &Path, dir: &Path) -> Result<()> {
-    Request::read(path)?;
+    let request = Request::read(path)?;
     let worker = dir.join(WORKER_EXE);
     ensure!(
         status::read(dir, status::WORKER).is_none() && !status::cancelled(dir) && !worker.exists(),
         "this update handoff was already used"
     );
     std::fs::copy(std::env::current_exe()?, &worker).context("copying the update helper")?;
-    let child = process::spawn(&worker, &[OsStr::new("--worker"), path.as_os_str()], dir)?;
+    // The administrator prompt comes from here: the app in the foreground
+    // started this process, so Windows shows the prompt in front of it rather
+    // than as a flashing taskbar button.
+    let half = match request.method {
+        Method::Installer => Some(start_elevated(&worker, path, dir, &request)?),
+        Method::ReplaceFolder => None,
+    };
+    let half_id = half.as_ref().map(|half| half.id().to_string());
+    let mut arguments = vec![OsStr::new("--worker"), path.as_os_str()];
+    arguments.extend(half_id.as_deref().map(OsStr::new));
+    let child = process::spawn(&worker, &arguments, dir).inspect_err(|_| status::cancel(dir))?;
     let deadline = Instant::now() + READY_WITHIN;
     loop {
         match status::read(dir, status::WORKER) {
@@ -115,7 +134,7 @@ enum Readied {
     Installer(Process),
 }
 
-fn worker(path: &Path, dir: &Path) -> Result<()> {
+fn worker(path: &Path, dir: &Path, half: Option<u32>) -> Result<()> {
     let request = Request::read(path)?;
     let app_dir = request.app_dir()?.to_path_buf();
     let app = Process::pin(request.process_id)?;
@@ -123,7 +142,10 @@ fn worker(path: &Path, dir: &Path) -> Result<()> {
     let package = package::open_verified(&request.package, request.size, &request.sha256)?;
     let readied = match request.method {
         Method::ReplaceFolder => Readied::Folder(unpack(&request, &package, &app_dir)?),
-        Method::Installer => Readied::Installer(start_elevated(path, dir, &request)?),
+        Method::Installer => {
+            let half = half.context("the installer's administrator half is missing")?;
+            Readied::Installer(Process::pin(half)?)
+        },
     };
     drop(package);
     status::write(dir, status::WORKER, Stage::Ready, "waiting for POCOX to quit")?;
@@ -212,13 +234,14 @@ fn unpack(request: &Request, archive: &File, app_dir: &Path) -> Result<PathBuf> 
     Ok(staging)
 }
 
-/// Starts the administrator half and waits until it holds the installer.
-fn start_elevated(path: &Path, dir: &Path, request: &Request) -> Result<Process> {
+/// Starts the administrator half from `helper` and waits until it holds the
+/// installer.
+fn start_elevated(helper: &Path, path: &Path, dir: &Path, request: &Request) -> Result<Process> {
     let mut parameters = OsString::from("--elevated \"");
     // Windows paths cannot contain quotes.
     parameters.push(path);
     parameters.push("\"");
-    let half = process::launch(&std::env::current_exe()?, &parameters, request.elevate)?;
+    let half = process::launch(helper, &parameters, request.elevate)?;
     let deadline = Instant::now() + ELEVATED_READY_WITHIN;
     loop {
         match status::read(dir, status::ELEVATED) {

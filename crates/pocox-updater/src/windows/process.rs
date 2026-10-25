@@ -12,7 +12,7 @@ use windows_sys::Win32::Foundation::{
     ERROR_CANCELLED, WAIT_ABANDONED, WAIT_OBJECT_0, WAIT_TIMEOUT,
 };
 use windows_sys::Win32::System::Threading::{
-    CreateMutexW, CreateProcessW, GetExitCodeProcess, OpenProcess, ReleaseMutex,
+    CreateMutexW, CreateProcessW, GetExitCodeProcess, GetProcessId, OpenProcess, ReleaseMutex,
     WaitForSingleObject, CREATE_BREAKAWAY_FROM_JOB, CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW,
     PROCESS_INFORMATION, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SYNCHRONIZE, STARTUPINFOW,
 };
@@ -43,11 +43,17 @@ impl Process {
         // process handle that nothing else owns.
         let raw =
             unsafe { OpenProcess(PROCESS_SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, 0, id) };
-        ensure!(!raw.is_null(), "opening the app's process: {}", std::io::Error::last_os_error());
+        ensure!(!raw.is_null(), "opening process {id}: {}", std::io::Error::last_os_error());
         // SAFETY: `raw` is a valid handle owned by this value from now on.
         let process = Self(unsafe { OwnedHandle::from_raw_handle(raw) });
-        ensure!(!process.wait(Duration::ZERO)?, "the app has already quit");
+        ensure!(!process.wait(Duration::ZERO)?, "process {id} has already exited");
         Ok(process)
+    }
+
+    /// Its process id.
+    pub fn id(&self) -> u32 {
+        // SAFETY: the handle stays open for the call.
+        unsafe { GetProcessId(self.0.as_raw_handle()) }
     }
 
     /// Whether it exited within `timeout`.
