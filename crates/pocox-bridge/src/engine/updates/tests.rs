@@ -257,11 +257,11 @@ async fn background_checks_stay_rare_and_survive_a_restart() {
 
 #[tokio::test]
 async fn checks_and_downloads_follow_the_current_app_proxy_and_verify_bytes() {
-    use crate::engine::network::set_proxy;
+    use crate::engine::network::{set_setting, ProxyMode};
     let (mut feed, key) = (Feed::start().await, Key::new());
     let dir = tempfile::tempdir().expect("directory");
     let proxy_url = feed.url.clone();
-    set_proxy(dir.path(), &proxy_url).expect("proxy setting");
+    set_setting(dir.path(), ProxyMode::Custom, &proxy_url).expect("proxy setting");
     feed.url = "http://release.invalid/".into();
     let name = PORTABLE_PACKAGE;
     let package = b"verified package";
@@ -276,11 +276,11 @@ async fn checks_and_downloads_follow_the_current_app_proxy_and_verify_bytes() {
     let closed = std::net::TcpListener::bind("127.0.0.1:0").expect("closed proxy");
     let dead_url = format!("http://{}", closed.local_addr().expect("address"));
     drop(closed);
-    set_proxy(dir.path(), &dead_url).expect("new proxy");
+    set_setting(dir.path(), ProxyMode::Custom, &dead_url).expect("new proxy");
     assert_eq!(update.download().await.failure.map(|f| f.kind), Some(Kind::Network));
     assert_eq!(feed.hits.load(Ordering::SeqCst), 2);
 
-    set_proxy(dir.path(), &proxy_url).expect("restore proxy");
+    set_setting(dir.path(), ProxyMode::Custom, &proxy_url).expect("restore proxy");
     assert_eq!(update.download().await.phase, Phase::Ready);
     assert_eq!(feed.hits.load(Ordering::SeqCst), 3);
 }

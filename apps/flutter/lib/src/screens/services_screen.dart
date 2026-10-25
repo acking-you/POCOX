@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/harnesses/harness_panel.dart';
 import 'package:pocox/src/hosting/hosting_owner.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/network/connection_paths.dart';

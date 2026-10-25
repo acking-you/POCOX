@@ -8312,14 +8312,62 @@ abstract class AppLocalizations {
   /// No description provided for @networkProxyScope.
   ///
   /// In en, this message translates to:
-  /// **'Used by POCOX for update checks, downloads, account requests and web images. Hosted agents, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.'**
+  /// **'Used by POCOX for update checks, downloads, account requests and web images, and to check and update the agents on this computer. By default it follows the system\'s proxy. Hosted agents\' own requests, relay connections and the system browser keep their own network settings. New requests use the saved setting; current transfers continue.'**
   String get networkProxyScope;
 
-  /// No description provided for @networkProxyDefault.
+  /// No description provided for @networkProxyModeSystem.
   ///
   /// In en, this message translates to:
-  /// **'Default network'**
-  String get networkProxyDefault;
+  /// **'System'**
+  String get networkProxyModeSystem;
+
+  /// No description provided for @networkProxyModeDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get networkProxyModeDirect;
+
+  /// No description provided for @networkProxyModeCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get networkProxyModeCustom;
+
+  /// No description provided for @networkProxySystemFound.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy: {proxy}'**
+  String networkProxySystemFound(String proxy);
+
+  /// No description provided for @networkProxySystemNone.
+  ///
+  /// In en, this message translates to:
+  /// **'System proxy: none set, connecting directly'**
+  String get networkProxySystemNone;
+
+  /// No description provided for @networkProxySystemInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The proxy environment variables (HTTPS_PROXY, ALL_PROXY, HTTP_PROXY) when set, otherwise this computer\'s own proxy setting: Windows proxy settings or macOS network proxies. Automatic configuration scripts (PAC) are not used; on Linux and phones only the environment counts. It is read again for every request.'**
+  String get networkProxySystemInfo;
+
+  /// No description provided for @networkProxyDirectSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'No proxy (direct connection)'**
+  String get networkProxyDirectSummary;
+
+  /// No description provided for @networkProxyDirectNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Requests connect directly, ignoring the system\'s and the environment\'s proxy.'**
+  String get networkProxyDirectNote;
+
+  /// No description provided for @networkProxyCustomRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a proxy URL, or choose another option.'**
+  String get networkProxyCustomRequired;
 
   /// No description provided for @networkProxyAddress.
   ///
@@ -8330,7 +8378,7 @@ abstract class AppLocalizations {
   /// No description provided for @networkProxyHint.
   ///
   /// In en, this message translates to:
-  /// **'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. Leave blank to restore the default network. On a phone, 127.0.0.1 means the phone itself.'**
+  /// **'HTTP(S) or SOCKS5 URL, e.g. http://127.0.0.1:7890 or socks5://127.0.0.1:1080. Username and password are supported. SOCKS5 resolves names through the proxy. On a phone, 127.0.0.1 means the phone itself.'**
   String get networkProxyHint;
 
   /// No description provided for @networkProxyInvalid.
@@ -8362,6 +8410,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide proxy URL'**
   String get networkProxyHide;
+
+  /// No description provided for @harnessesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents on this computer'**
+  String get harnessesTitle;
+
+  /// No description provided for @harnessesInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'POCOX checks which version of each agent is installed on this computer and whether a newer one is out, and updates it with the agent\'s own installer. Checks and installers use this computer\'s application network proxy. Each computer keeps its own settings.'**
+  String get harnessesInfo;
+
+  /// No description provided for @harnessCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get harnessCheckNow;
+
+  /// No description provided for @harnessChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking for updates…'**
+  String get harnessChecking;
+
+  /// No description provided for @harnessCheckedAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked {ago}'**
+  String harnessCheckedAgo(String ago);
+
+  /// No description provided for @harnessNotChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Not checked yet'**
+  String get harnessNotChecked;
+
+  /// No description provided for @harnessNotInstalled.
+  ///
+  /// In en, this message translates to:
+  /// **'Not installed'**
+  String get harnessNotInstalled;
+
+  /// No description provided for @harnessVersionUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Version unknown'**
+  String get harnessVersionUnknown;
+
+  /// No description provided for @harnessUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Up to date'**
+  String get harnessUpToDate;
+
+  /// No description provided for @harnessUpdateTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Update to {version}'**
+  String harnessUpdateTo(String version);
+
+  /// No description provided for @harnessUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update'**
+  String get harnessUpdate;
+
+  /// No description provided for @harnessStageStopping.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopping services…'**
+  String get harnessStageStopping;
+
+  /// No description provided for @harnessStageUpdating.
+  ///
+  /// In en, this message translates to:
+  /// **'Updating…'**
+  String get harnessStageUpdating;
+
+  /// No description provided for @harnessStageRestarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Restarting services…'**
+  String get harnessStageRestarting;
+
+  /// No description provided for @harnessMethodBrew.
+  ///
+  /// In en, this message translates to:
+  /// **'Homebrew'**
+  String get harnessMethodBrew;
+
+  /// No description provided for @harnessMethodStandalone.
+  ///
+  /// In en, this message translates to:
+  /// **'standalone install'**
+  String get harnessMethodStandalone;
+
+  /// No description provided for @harnessUsedBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Used by {names}'**
+  String harnessUsedBy(String names);
+
+  /// No description provided for @harnessAutoUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update automatically'**
+  String get harnessAutoUpdate;
+
+  /// No description provided for @harnessRestartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart services after updating'**
+  String get harnessRestartTitle;
+
+  /// No description provided for @harnessRestartOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Services that use an updated agent restart on the new version. Their conversations reconnect; drafts are kept.'**
+  String get harnessRestartOn;
+
+  /// No description provided for @harnessRestartOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Services keep running the previous version until they restart.'**
+  String get harnessRestartOff;
+
+  /// No description provided for @harnessConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update {name} to {version}?'**
+  String harnessConfirmTitle(String name, String version);
+
+  /// No description provided for @harnessConfirmRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'It updates with its own installer on that computer. Then {names} restart on the new version: open conversations reconnect and a running turn is interrupted. Drafts are kept.'**
+  String harnessConfirmRestart(String names);
+
+  /// No description provided for @harnessConfirmKeep.
+  ///
+  /// In en, this message translates to:
+  /// **'It updates with its own installer on that computer. {names} keep running the current version until they restart.'**
+  String harnessConfirmKeep(String names);
+
+  /// No description provided for @harnessConfirmPlain.
+  ///
+  /// In en, this message translates to:
+  /// **'It updates with its own installer on that computer.'**
+  String get harnessConfirmPlain;
+
+  /// No description provided for @harnessUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated to {version}.'**
+  String harnessUpdated(String version);
+
+  /// No description provided for @harnessUpdatedAutomatically.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated automatically to {version}.'**
+  String harnessUpdatedAutomatically(String version);
+
+  /// No description provided for @harnessUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The installer finished, but {version} is still installed.'**
+  String harnessUnchanged(String version);
+
+  /// No description provided for @harnessRestarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Restarted: {names}.'**
+  String harnessRestarted(String names);
+
+  /// No description provided for @harnessNotRestarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Not restarted: {items}.'**
+  String harnessNotRestarted(String items);
+
+  /// No description provided for @harnessSkipDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'restarting is off'**
+  String get harnessSkipDisabled;
+
+  /// No description provided for @harnessSkipAdopted.
+  ///
+  /// In en, this message translates to:
+  /// **'not started by POCOX'**
+  String get harnessSkipAdopted;
+
+  /// No description provided for @harnessSkipShared.
+  ///
+  /// In en, this message translates to:
+  /// **'follows OpenCode\'s own server'**
+  String get harnessSkipShared;
+
+  /// No description provided for @harnessSkipOtherInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'runs another installation'**
+  String get harnessSkipOtherInstall;
+
+  /// No description provided for @harnessSkipChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'restarted meanwhile'**
+  String get harnessSkipChanged;
+
+  /// No description provided for @harnessSkipBusy.
+  ///
+  /// In en, this message translates to:
+  /// **'busy'**
+  String get harnessSkipBusy;
+
+  /// No description provided for @harnessSkipFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'its restart failed; check it'**
+  String get harnessSkipFailed;
+
+  /// No description provided for @harnessFailedToolMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: its installer was not found on that computer.'**
+  String get harnessFailedToolMissing;
+
+  /// No description provided for @harnessFailedInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: its files are in use. Close other running copies of it on that computer and try again.'**
+  String get harnessFailedInUse;
+
+  /// No description provided for @harnessFailedPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: the installation needs administrator rights. Update it in a terminal on that computer.'**
+  String get harnessFailedPermission;
+
+  /// No description provided for @harnessFailedTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed: the installer did not finish in time.'**
+  String get harnessFailedTimeout;
+
+  /// No description provided for @harnessFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update failed. That computer\'s diagnostics have the installer\'s output.'**
+  String get harnessFailed;
+
+  /// No description provided for @harnessProblemUnmanaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed in a way POCOX cannot update. Update it yourself.'**
+  String get harnessProblemUnmanaged;
+
+  /// No description provided for @harnessProblemWinget.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed with WinGet. Update it with WinGet.'**
+  String get harnessProblemWinget;
+
+  /// No description provided for @harnessProblemBundled.
+  ///
+  /// In en, this message translates to:
+  /// **'Uses the Claude Code bundled with its adapter, which updates with POCOX.'**
+  String get harnessProblemBundled;
+
+  /// No description provided for @harnessProblemVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Its version could not be read.'**
+  String get harnessProblemVersion;
+
+  /// No description provided for @harnessProblemCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not look up its newest version.'**
+  String get harnessProblemCheck;
+
+  /// No description provided for @harnessUpdateRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Another agent update is running on that computer. Wait for it to finish.'**
+  String get harnessUpdateRunning;
+
+  /// No description provided for @harnessUpdateUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This agent is not installed or cannot be updated on that computer. Refresh to see its state.'**
+  String get harnessUpdateUnavailable;
 
   /// No description provided for @logsDiskLost.
   ///

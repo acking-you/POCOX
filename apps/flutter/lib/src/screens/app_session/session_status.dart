@@ -135,8 +135,6 @@ extension _SessionStatus on _AppSessionState {
   Widget _statusBar(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final st = _sessionState(l10n);
-    final activeModel = _activeModelStatus();
-    final running = _streaming || _externalWriterRunning;
     return AnimatedContainer(
       duration: Motion.of(context, Motion.medium),
       curve: Motion.move,
@@ -153,112 +151,122 @@ extension _SessionStatus on _AppSessionState {
               ),
       ),
       padding: EdgeInsets.fromLTRB(isDesktop ? 18 : 14, 3, 14, 5),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          final labelStyle = TextStyle(
-            fontSize: 12,
-            color: st.color,
-            // Resting state reads as a label, not an alert.
-            fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
-          );
-          final fit = _statusFit(
-            box.maxWidth,
-            label: st.label,
-            labelStyle: labelStyle,
-            model: activeModel == null
-                ? null
-                : _modelDisplayLabel(activeModel.id),
-            running: running,
-            branch: _branch,
-          );
-          return Row(
-            children: [
-              if (_externalWriterRunning || (_streaming && !st.nominal))
-                PulsingDot(
-                  key: _externalWriterRunning
-                      ? const Key('chat-status-running-pulse')
-                      : null,
-                  color: st.color,
-                  size: 7,
-                )
-              else
-                Icon(st.icon, size: 13, color: st.color),
-              const SizedBox(width: 6),
-              // The state takes what the right side leaves, so the line
-              // never overflows; [_statusFit] keeps it whole when it can.
-              // While the link is down it says, live, how far getting it
-              // back has come, and opens the connection sheet.
-              Expanded(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: _reconnecting || _connectionLost ? _showLink : null,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: _reconnecting
-                        ? LinkStatusLine(
-                            serviceKey: widget.serviceKey,
-                            reconnect: _relink.view,
+      child: _statusLine(l10n),
+    );
+  }
+
+  /// The status bar's line, fitted to its width ([_statusFit]): on its own
+  /// strip, or inside the title row of a short window.
+  Widget _statusLine(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final st = _sessionState(l10n);
+    final activeModel = _activeModelStatus();
+    final running = _streaming || _externalWriterRunning;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final labelStyle = TextStyle(
+          fontSize: 12,
+          color: st.color,
+          // Resting state reads as a label, not an alert.
+          fontWeight: st.nominal ? FontWeight.w500 : FontWeight.w600,
+        );
+        final fit = _statusFit(
+          box.maxWidth,
+          label: st.label,
+          labelStyle: labelStyle,
+          model: activeModel == null
+              ? null
+              : _modelDisplayLabel(activeModel.id),
+          running: running,
+          branch: _branch,
+        );
+        return Row(
+          children: [
+            if (_externalWriterRunning || (_streaming && !st.nominal))
+              PulsingDot(
+                key: _externalWriterRunning
+                    ? const Key('chat-status-running-pulse')
+                    : null,
+                color: st.color,
+                size: 7,
+              )
+            else
+              Icon(st.icon, size: 13, color: st.color),
+            const SizedBox(width: 6),
+            // The state takes what the right side leaves, so the line
+            // never overflows; [_statusFit] keeps it whole when it can.
+            // While the link is down it says, live, how far getting it
+            // back has come, and opens the connection sheet.
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _reconnecting || _connectionLost ? _showLink : null,
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: _reconnecting
+                      ? LinkStatusLine(
+                          serviceKey: widget.serviceKey,
+                          reconnect: _relink.view,
+                          style: labelStyle,
+                        )
+                      : _withAccessScope(
+                          l10n,
+                          Text(
+                            st.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: labelStyle,
-                          )
-                        : _withAccessScope(
-                            l10n,
-                            Text(
-                              st.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: labelStyle,
-                            ),
                           ),
+                        ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // How the session travels (P2P or relay); opens the same sheet.
+            LinkPathMark(serviceKey: widget.serviceKey, onTap: _showLink),
+            const SizedBox(width: 6),
+            // The model actively handling this thread's requests — server
+            // truth when confirmed, else the best-known effective value.
+            // Tap for the full runtime configuration, so a model switch is
+            // verifiable.
+            if (activeModel != null && fit.model != null) ...[
+              _activeModelChip(
+                l10n,
+                scheme,
+                activeModel,
+                nameWidth: fit.model!,
+              ),
+              const SizedBox(width: 10),
+            ],
+            // Live elapsed clock for the running turn. A local turn freezes
+            // this into its transcript footnote; an external turn counts
+            // from when this read-only observer attached and disappears
+            // when it finishes.
+            if (running && fit.clock) ...[
+              Icon(AppIcons.schedule, size: 12, color: st.color),
+              const SizedBox(width: 4),
+              ValueListenableBuilder<int>(
+                valueListenable: _elapsed,
+                builder: (context, secs, _) => Text(
+                  _fmtElapsed(secs),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: st.color,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              // How the session travels (P2P or relay); opens the same sheet.
-              LinkPathMark(serviceKey: widget.serviceKey, onTap: _showLink),
-              const SizedBox(width: 6),
-              // The model actively handling this thread's requests — server
-              // truth when confirmed, else the best-known effective value.
-              // Tap for the full runtime configuration, so a model switch is
-              // verifiable.
-              if (activeModel != null && fit.model != null) ...[
-                _activeModelChip(
-                  l10n,
-                  scheme,
-                  activeModel,
-                  nameWidth: fit.model!,
-                ),
-                const SizedBox(width: 10),
-              ],
-              // Live elapsed clock for the running turn. A local turn freezes
-              // this into its transcript footnote; an external turn counts
-              // from when this read-only observer attached and disappears
-              // when it finishes.
-              if (running && fit.clock) ...[
-                Icon(AppIcons.schedule, size: 12, color: st.color),
-                const SizedBox(width: 4),
-                ValueListenableBuilder<int>(
-                  valueListenable: _elapsed,
-                  builder: (context, secs, _) => Text(
-                    _fmtElapsed(secs),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: st.color,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              // Branch + working-tree change counts, tappable to open the
-              // diff. This is the single, unified place the git state lives
-              // (no separate app-bar chip), so the status bar is the one
-              // source of truth.
-              if (_branch case final branch?)
-                _branchChip(l10n, scheme, branch, nameWidth: fit.branch),
+              const SizedBox(width: 10),
             ],
-          );
-        },
-      ),
+            // Branch + working-tree change counts, tappable to open the
+            // diff. This is the single, unified place the git state lives
+            // (no separate app-bar chip), so the status bar is the one
+            // source of truth.
+            if (_branch case final branch?)
+              _branchChip(l10n, scheme, branch, nameWidth: fit.branch),
+          ],
+        );
+      },
     );
   }
 

@@ -202,8 +202,8 @@ fn scoped_listeners_are_never_attributed_across_interfaces() {
     assert_eq!(netstat_pids(netstat, &ips(&["fe80::1"]), 18080), None);
 }
 
-fn probed(code: Option<i32>, stdout: &str, stderr: &str) -> probe::Probed {
-    probe::Probed {
+fn probed(code: Option<i32>, stdout: &str, stderr: &str) -> bounded::Output {
+    bounded::Output {
         code,
         stdout: stdout.as_bytes().to_vec(),
         stderr: stderr.as_bytes().to_vec(),
@@ -242,7 +242,9 @@ fn lsof_shaped_runs_are_bounded_and_classified() {
         let mut sh = std::process::Command::new("/bin/sh");
         sh.args(["-c", script]);
         let deadline = std::time::Instant::now() + budget;
-        probe::run(&mut sh, deadline, 1024).and_then(|run| lsof_listing(&run, &ours, 18080))
+        bounded::run(&mut sh, deadline, 1024)
+            .ok()
+            .and_then(|run| lsof_listing(&run, &ours, 18080))
     };
     let roomy = Duration::from_secs(10);
     assert_eq!(read("exit 1", roomy), Some(vec![]), "no match");

@@ -361,10 +361,12 @@ void main() {
       expect(_face(t, 'variant'), 'high', reason: 'the choice survives');
       await capturePreview(t, 'responsive-composer-options-keyboard');
 
-      // Landscape: one toolbar line, everything reachable.
+      // Landscape is a short window: the composer folds while nobody writes;
+      // opened, it keeps one toolbar line with everything reachable.
       t.view.viewInsets = FakeViewPadding.zero;
       t.view.physicalSize = const Size(852, 393);
       await _frames(t);
+      await unfoldComposer(t);
       expect(t.takeException(), isNull);
       for (final key in [
         'agent-config-model',
@@ -659,6 +661,77 @@ void main() {
       expect(last.turnStartCount, 0);
       t.view.viewInsets = FakeViewPadding.zero;
     });
+  });
+
+  testWidgets('a short window keeps the conversation in view on any '
+      'platform: the composer folds and the status line joins the title', (
+    t,
+  ) async {
+    const screen = AppSessionScreen(
+      serviceKey: _codex,
+      threadId: 't1',
+      home: true,
+    );
+    const latest = '最新的回答在这里';
+    // Room, not the platform, decides; a tall window keeps both open.
+    for (final (platform, size, short) in const [
+      (TargetPlatform.android, Size(909, 409), true),
+      (TargetPlatform.android, Size(640, 360), true),
+      (TargetPlatform.macOS, Size(1280, 500), true),
+      (TargetPlatform.macOS, Size(1280, 800), false),
+    ]) {
+      debugDefaultTargetPlatformOverride = platform;
+      try {
+        final api = _api()
+          ..readResult = const ThreadHistory(
+            items: [
+              ThreadItem(
+                id: 'u1',
+                itemType: 'userMessage',
+                title: '',
+                text: '帮忙看看 wsl 的本机和挂载上来的服务',
+              ),
+              ThreadItem(
+                id: 'a1',
+                itemType: 'agentMessage',
+                title: '',
+                text: latest,
+              ),
+            ],
+            running: false,
+          );
+        await api.appConnect(_codex, 1);
+        await _mount(t, api, screen, size: size, locale: const Locale('zh'));
+        final at = '${platform.name} $size';
+        expect(t.takeException(), isNull, reason: 'no overflow: $at');
+        final folded = find.byKey(const Key('composer-folded'));
+        expect(folded, short ? findsOneWidget : findsNothing, reason: at);
+        expect(
+          find.byKey(const Key('title-with-status')),
+          short ? findsOneWidget : findsNothing,
+          reason: at,
+        );
+        // The latest answer reads above the composer.
+        final answer = find.text(latest, findRichText: true);
+        _reachable(t, answer, Offset.zero & size, 'latest $at');
+        final composer = short
+            ? folded
+            : find.byKey(const Key('composer-input'));
+        expect(
+          t.getRect(answer).bottom,
+          lessThanOrEqualTo(t.getRect(composer).top),
+          reason: at,
+        );
+        await capturePreview(
+          t,
+          'responsive-short-${platform.name}-'
+          '${size.width.toInt()}x${size.height.toInt()}',
+        );
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    }
+    t.view.reset();
   });
 
   testWidgets('the host switcher sheet keeps device names recognisable', (

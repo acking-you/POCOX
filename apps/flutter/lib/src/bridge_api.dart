@@ -24,9 +24,11 @@ part 'bridge/management_types.dart';
 part 'bridge/device_metadata.dart';
 part 'bridge/tools_types.dart';
 part 'bridge/grok_types.dart';
+part 'bridge/harness_types.dart';
 part 'bridge/controller_api.dart';
 
-abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
+abstract interface class BridgeApi
+    implements UpdateApi, ControllerBridgeApi, HarnessBridgeApi {
   /// Read only local disk; cached history is display-only until synchronized.
   Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
   Future<bool> appHistorySyncPrepare(String serviceKey);
@@ -38,8 +40,8 @@ abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
 
-  /// Read the private application proxy setting for its editor.
-  Future<String?> networkProxy();
+  /// Read the application proxy setting for its editor, with the system's.
+  Future<NetworkProxySetting> networkProxySetting();
 
   /// Preferences for newly created remote tunnels and local registrations.
   Future<RelayPreferences> relayPreferences();
@@ -47,8 +49,9 @@ abstract interface class BridgeApi implements UpdateApi, ControllerBridgeApi {
   /// Save [value] for new tunnels; open tunnels keep what they started with.
   Future<void> relaySetPreferences(RelayPreferences value);
 
-  /// Validate and save the application proxy; blank restores the default.
-  Future<void> networkSetProxy(String value);
+  /// Validate and save the proxy [mode] and [custom] URL (required by
+  /// [ProxyMode.custom]; blank removes it).
+  Future<void> networkSetProxySetting(ProxyMode mode, String custom);
 
   /// Set the relay `host:port` and persist.
   Future<void> setRelay(String relay);

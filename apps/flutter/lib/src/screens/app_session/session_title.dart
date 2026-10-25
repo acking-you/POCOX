@@ -206,13 +206,15 @@ extension _SessionTitle on _AppSessionState {
               // bar so a long conversation preview truncates and the rest of
               // the strip stays empty (and draggable).
               Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 480),
-                    child: _barTitleWidget(l10n),
-                  ),
-                ),
+                child: _inlineStatus
+                    ? _titleWithStatus(l10n, _barTitleWidget(l10n))
+                    : Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 480),
+                          child: _barTitleWidget(l10n),
+                        ),
+                      ),
               ),
               if (_ctx != null)
                 ContextGauge(
@@ -282,6 +284,24 @@ extension _SessionTitle on _AppSessionState {
       ),
     );
   }
+
+  /// A short window's title row: [title], cut well short, then the status
+  /// line taking the rest, which shortens itself as it does on its strip.
+  Widget _titleWithStatus(AppLocalizations l10n, Widget title) => LayoutBuilder(
+    builder: (context, box) => Row(
+      key: const Key('title-with-status'),
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: math.min(320, box.maxWidth * 0.45),
+          ),
+          child: title,
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: _statusLine(l10n)),
+      ],
+    ),
+  );
 
   /// Enter title-edit mode, seeded with the current title and fully selected
   /// (so typing replaces it, the way a rename should).

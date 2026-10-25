@@ -143,9 +143,15 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
   22 px composer radius with a quieter idle edge, 44 px sidebar heading
   buttons, two-line host switcher names.
-- Below 720 px on touch the composer is a capsule whenever no one is writing
-  (`_composerFolded` in `screens/app_session/composer_foot.dart`,
-  `widgets/folding_panel.dart`): every conversation opens folded, and it
+- Measured room, not the platform, decides how much chrome stands open. A
+  window narrower than 720 px or shorter than 560 px (a phone, a phone in
+  landscape, a split screen, a small desktop window) folds the composer into
+  a capsule whenever no one is writing (`_composerFoldable`, `_composerFolded`
+  in `screens/app_session/composer_foot.dart`, `widgets/folding_panel.dart`).
+  A short window also carries the status line in the title row
+  (`_titleWithStatus` in `session_title.dart`, the same fitted
+  `_statusLine`), and the composer's host/branch footnote waits under the
+  open composer. Every conversation in such a window opens folded, and it
   unfolds only while the field has focus, a dictation take runs or the full
   editor is open. A tap on the capsule focuses the field; letting go folds it
   again. Reaching the end, jumping to the latest message, sending and a reply
@@ -153,8 +159,9 @@ for Flutter diagnostics. Native console lifetime tests live in
   (Android's back button) releases the field after 250 ms, unless it came back,
   another app is in front or a take runs. The capsule is the same glass pane
   (radius, focus and streaming edges) showing the draft's first line or the
-  hint, attachments and Stop while a turn runs. Desktop, tablets and read-only
-  views never fold. The full composer stays mounted underneath, so draft and
+  hint, attachments and Stop while a turn runs. Read-only views never fold,
+  and a desktop or tablet window with room keeps the composer and status strip
+  open as before. The full composer stays mounted underneath, so draft and
   options survive. The height morphs on the emphasized curve over
   `Motion.slow`, roughly with the keyboard; both forms fade on that eased
   progress (so the pane is never empty glass) and settle 6 px into place, and
@@ -372,7 +379,8 @@ git checkout -- apps/flutter/pubspec.yaml   # restore before committing
 ## UI tests
 
 - Responsive coverage: `test/responsive_layout_test.dart` (320 px at 2.0
-  text en/zh, 393 px, keyboard, landscape, tablet, real fonts),
+  text en/zh, 393 px, keyboard, landscape, tablet, short windows on phone
+  and desktop, real fonts),
   `test/chat_status_bar_test.dart` and `test/phone_pages_overflow_test.dart`
   (393/375/360/320 px, ×1.0–2.0 text, en/zh).
 - Widget tests mock haptics and cover the system pointer cancel. A test

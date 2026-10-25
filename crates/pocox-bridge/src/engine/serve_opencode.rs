@@ -463,6 +463,28 @@ pub(super) fn retire(name: &str) -> Result<Option<Prepared>> {
 pub(super) fn stop(name: &str) -> Result<()> {
     retire(name).map(drop)
 }
+
+/// Restart `lease`'s host on the server it owns, from its exact prepared
+/// launch, while it is still `incarnation`. `Ok(false)`: it is not hosting,
+/// is another incarnation, or follows OpenCode's own background server,
+/// which is not this host's to restart. A failed start leaves it stopped.
+pub(super) fn restart_locked(lease: &host_lease::Lease, incarnation: &str) -> Result<bool> {
+    let owned = hosts().hosts.get(lease.name()).is_some_and(|host| {
+        !host.background_server && host.host.info().identity.host_id == incarnation
+    });
+    if !owned {
+        return Ok(false);
+    }
+    let Some(prepared) = retire(lease.name())? else { return Ok(false) };
+    launch_prepared(prepared)?;
+    Ok(true)
+}
+
+/// The OpenCode executable a host launches for `binary` (none: what a new
+/// host finds), without starting it.
+pub(super) fn program(binary: Option<&str>) -> Result<std::path::PathBuf> {
+    launch_for(binary).map(|launch| launch.program)
+}
 pub(super) fn close_admission() {
     hosts().closing = true;
 }

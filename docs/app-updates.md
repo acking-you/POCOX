@@ -25,29 +25,50 @@ Android installer channel, opening the release page.
 
 ## Application network proxy
 
-**Settings › Application network proxy** is available on phones and desktops.
-Enter an `http://`, `https://`, `socks5://` or `socks5h://` URL, optionally with
-`username:password@` authentication. For example, `http://127.0.0.1:7890` or
-`socks5://127.0.0.1:1080`. On a phone, `127.0.0.1` means that phone; a proxy
-running on a computer needs that computer's reachable address instead.
+**Settings › Application network proxy** is available on phones and desktops,
+with three modes:
 
-The private `[network].proxy` setting in the app's `config.toml` applies to
-release manifests, signatures and package downloads (including redirects),
-POCOX account/backend requests, GitHub avatars and site favicons; every such
-client is built by `engine::network`. SOCKS5
-resolves destination names through the proxy. Explicit proxies take precedence
-over environment variables and bypass loopback destinations. An unavailable
-proxy fails the request; it never falls back to a direct connection.
+- **System** (the default): the proxy environment variables when set
+  (`HTTPS_PROXY`, then `ALL_PROXY`, then `HTTP_PROXY`, with `NO_PROXY`),
+  otherwise this computer's own setting: Windows' proxy settings (the
+  `Internet Settings` registry values that proxy tools such as Clash set,
+  with their bypass list; a per-protocol `ProxyServer` uses its HTTPS entry,
+  then HTTP, then SOCKS) or macOS' network proxies (HTTPS, then HTTP, then
+  SOCKS). It is read again for every client and every time the editor opens,
+  which shows what it found. Automatic configuration scripts (PAC) are not
+  evaluated; Linux and phones offer only the environment.
+- **None**: requests connect directly, ignoring the environment and the
+  system.
+- **Custom**: an `http://`, `https://`, `socks5://` or `socks5h://` URL,
+  optionally with `username:password@` authentication, for example
+  `http://127.0.0.1:7890` or `socks5://127.0.0.1:1080`. On a phone,
+  `127.0.0.1` means that phone; a proxy running on a computer needs that
+  computer's reachable address instead.
+
+The private `[network]` section of the app's `config.toml` holds `mode`
+(`system`, `direct` or `custom`) and the custom `proxy` URL, which is kept
+while another mode is chosen. A configuration saved before modes existed has
+no `mode`: a saved `proxy` keeps working as **Custom**, and none means
+**System** (until 0.7.5 that default read only the environment variables).
+The setting applies to release manifests, signatures and package downloads
+(including redirects), POCOX account/backend requests, GitHub avatars and site
+favicons; every such client is built by `engine::network`, which reads the
+system's proxy itself, so other HTTP clients of the app keep their own
+behaviour. SOCKS5 resolves destination names through the proxy. Loopback
+destinations always connect directly. An unavailable proxy fails the request;
+it never falls back to a direct connection.
 
 Save affects new operations without a restart. An existing transfer keeps its
-client. Clearing the field restores the previous default: proxy environment
-variables such as `HTTPS_PROXY` apply, but native OS proxy settings are not
-read. Proxy credentials are masked in the editor and omitted from summaries
-and debug output; the app's config remains private (0600 on Unix).
+client. Proxy credentials are masked in the editor and omitted from summaries
+(the system's proxy is shown without them) and debug output; the app's config
+remains private (0600 on Unix).
 
-This setting does not configure relay TCP transports, hosted harnesses, the
-Responses API service's upstream proxy, or pages opened in the system browser.
-Their existing network configuration remains authoritative. Automatic checks
+This setting does not configure relay TCP transports, hosted harnesses' own
+requests, the Responses API service's upstream proxy, or pages opened in the
+system browser. Their existing network configuration remains authoritative.
+Checking and updating a computer's harnesses does use it: version lookups go
+through the app's client, and installers get it in their environment only
+([harness updates](harness-updates.md#network-proxy)). Automatic checks
 still fetch only release metadata; package downloading starts when the user
 chooses Update. Signature and package verification remain mandatory.
 

@@ -4572,17 +4572,44 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyScope =>
-      '用于 POCOX 检查更新、下载、账号请求和网络图片。托管智能体、中继连接和系统浏览器使用各自的网络设置。保存后对新请求生效，当前传输继续完成。';
+      '用于 POCOX 检查更新、下载、账号请求和网络图片，以及检查和更新这台电脑上的智能体。默认跟随系统代理。托管智能体自身的请求、中继连接和系统浏览器使用各自的网络设置。保存后对新请求生效，当前传输继续完成。';
 
   @override
-  String get networkProxyDefault => '默认网络';
+  String get networkProxyModeSystem => '系统代理';
+
+  @override
+  String get networkProxyModeDirect => '不使用';
+
+  @override
+  String get networkProxyModeCustom => '自定义';
+
+  @override
+  String networkProxySystemFound(String proxy) {
+    return '系统代理：$proxy';
+  }
+
+  @override
+  String get networkProxySystemNone => '系统代理：未设置，直接连接';
+
+  @override
+  String get networkProxySystemInfo =>
+      '优先使用代理环境变量（HTTPS_PROXY、ALL_PROXY、HTTP_PROXY），未设置时使用这台电脑自己的代理设置：Windows 的代理设置或 macOS 的网络代理。不使用自动配置脚本（PAC）；Linux 和手机上只看环境变量。每次请求都会重新读取。';
+
+  @override
+  String get networkProxyDirectSummary => '不使用代理（直接连接）';
+
+  @override
+  String get networkProxyDirectNote => '请求直接连接，忽略系统和环境变量里的代理。';
+
+  @override
+  String get networkProxyCustomRequired => '请输入代理地址，或选择其他选项。';
 
   @override
   String get networkProxyAddress => '代理地址';
 
   @override
   String get networkProxyHint =>
-      '填写 HTTP(S) 或 SOCKS5 地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080，可带用户名和密码。SOCKS5 通过代理解析域名。留空恢复默认网络。手机上的 127.0.0.1 指手机本身。';
+      '填写 HTTP(S) 或 SOCKS5 地址，如 http://127.0.0.1:7890 或 socks5://127.0.0.1:1080，可带用户名和密码。SOCKS5 通过代理解析域名。手机上的 127.0.0.1 指手机本身。';
 
   @override
   String get networkProxyInvalid =>
@@ -4599,6 +4626,176 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get networkProxyHide => '隐藏代理地址';
+
+  @override
+  String get harnessesTitle => '本机智能体';
+
+  @override
+  String get harnessesInfo =>
+      'POCOX 会检查这台电脑上每个智能体安装的版本以及是否有新版本，并用智能体自带的安装方式更新。检查和更新都使用这台电脑的应用网络代理。每台电脑各自保存自己的设置。';
+
+  @override
+  String get harnessCheckNow => '检查更新';
+
+  @override
+  String get harnessChecking => '正在检查更新…';
+
+  @override
+  String harnessCheckedAgo(String ago) {
+    return '$ago检查';
+  }
+
+  @override
+  String get harnessNotChecked => '尚未检查';
+
+  @override
+  String get harnessNotInstalled => '未安装';
+
+  @override
+  String get harnessVersionUnknown => '版本未知';
+
+  @override
+  String get harnessUpToDate => '已是最新';
+
+  @override
+  String harnessUpdateTo(String version) {
+    return '更新到 $version';
+  }
+
+  @override
+  String get harnessUpdate => '更新';
+
+  @override
+  String get harnessStageStopping => '正在停止服务…';
+
+  @override
+  String get harnessStageUpdating => '正在更新…';
+
+  @override
+  String get harnessStageRestarting => '正在重启服务…';
+
+  @override
+  String get harnessMethodBrew => 'Homebrew';
+
+  @override
+  String get harnessMethodStandalone => '独立安装';
+
+  @override
+  String harnessUsedBy(String names) {
+    return '使用中：$names';
+  }
+
+  @override
+  String get harnessAutoUpdate => '自动更新';
+
+  @override
+  String get harnessRestartTitle => '更新后重启服务';
+
+  @override
+  String get harnessRestartOn => '使用已更新智能体的服务会用新版本重启，其会话会重新连接，草稿会保留。';
+
+  @override
+  String get harnessRestartOff => '服务继续运行旧版本，直到下次重启。';
+
+  @override
+  String harnessConfirmTitle(String name, String version) {
+    return '将 $name 更新到 $version？';
+  }
+
+  @override
+  String harnessConfirmRestart(String names) {
+    return '将在那台电脑上用它自带的安装方式更新。随后 $names 会用新版本重启：打开的会话会重新连接，正在进行的回合会被中断，草稿会保留。';
+  }
+
+  @override
+  String harnessConfirmKeep(String names) {
+    return '将在那台电脑上用它自带的安装方式更新。$names 会继续运行当前版本，直到下次重启。';
+  }
+
+  @override
+  String get harnessConfirmPlain => '将在那台电脑上用它自带的安装方式更新。';
+
+  @override
+  String harnessUpdated(String version) {
+    return '已更新到 $version。';
+  }
+
+  @override
+  String harnessUpdatedAutomatically(String version) {
+    return '已自动更新到 $version。';
+  }
+
+  @override
+  String harnessUnchanged(String version) {
+    return '安装程序已结束，但安装的仍是 $version。';
+  }
+
+  @override
+  String harnessRestarted(String names) {
+    return '已重启：$names。';
+  }
+
+  @override
+  String harnessNotRestarted(String items) {
+    return '未重启：$items。';
+  }
+
+  @override
+  String get harnessSkipDisabled => '已关闭重启';
+
+  @override
+  String get harnessSkipAdopted => '不是由 POCOX 启动的';
+
+  @override
+  String get harnessSkipShared => '跟随 OpenCode 自己的服务器';
+
+  @override
+  String get harnessSkipOtherInstall => '运行的是另一份安装';
+
+  @override
+  String get harnessSkipChanged => '期间已被重启';
+
+  @override
+  String get harnessSkipBusy => '正忙';
+
+  @override
+  String get harnessSkipFailed => '重启失败，请检查';
+
+  @override
+  String get harnessFailedToolMissing => '更新失败：在那台电脑上找不到它的安装程序。';
+
+  @override
+  String get harnessFailedInUse => '更新失败：它的文件正被占用。请关闭那台电脑上正在运行的其他副本后重试。';
+
+  @override
+  String get harnessFailedPermission => '更新失败：安装位置需要管理员权限。请在那台电脑的终端里更新它。';
+
+  @override
+  String get harnessFailedTimeout => '更新失败：安装程序未在限定时间内完成。';
+
+  @override
+  String get harnessFailed => '更新失败。安装程序的输出记录在那台电脑的诊断日志里。';
+
+  @override
+  String get harnessProblemUnmanaged => '它的安装方式 POCOX 无法更新，请自行更新。';
+
+  @override
+  String get harnessProblemWinget => '通过 WinGet 安装，请用 WinGet 更新。';
+
+  @override
+  String get harnessProblemBundled => '使用适配器自带的 Claude Code，会随 POCOX 一起更新。';
+
+  @override
+  String get harnessProblemVersion => '无法读取它的版本。';
+
+  @override
+  String get harnessProblemCheck => '无法查询它的最新版本。';
+
+  @override
+  String get harnessUpdateRunning => '那台电脑上正在进行另一个智能体更新，请等待它完成。';
+
+  @override
+  String get harnessUpdateUnavailable => '这个智能体在那台电脑上未安装或无法更新。请刷新查看它的状态。';
 
   @override
   String logsDiskLost(int count) {

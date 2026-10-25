@@ -15,6 +15,7 @@ import 'package:pocox/src/rust/api/bridge/device_metadata.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/diff.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/events.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/grok.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/harnesses.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/history_projection.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_config.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/host_sessions.dart' as frb;
@@ -35,6 +36,7 @@ part 'bridge/rust_host_sessions.dart';
 part 'bridge/rust_management.dart';
 part 'bridge/rust_tools.dart';
 part 'bridge/rust_grok.dart';
+part 'bridge/rust_harnesses.dart';
 part 'bridge/rust_updates.dart';
 part 'bridge/rust_composer.dart';
 part 'bridge/rust_events.dart';
@@ -48,6 +50,7 @@ class RustBridgeApi
         _RustManagement,
         _RustTools,
         _RustGrok,
+        _RustHarnesses,
         _RustUpdates
     implements BridgeApi {
   /// Creates the real bridge.
@@ -80,7 +83,19 @@ class RustBridgeApi
   );
 
   @override
-  Future<String?> networkProxy() => frb.networkProxy();
+  Future<NetworkProxySetting> networkProxySetting() async {
+    final value = await frb.networkProxySetting();
+    return NetworkProxySetting(
+      mode: switch (value.mode) {
+        'direct' => ProxyMode.direct,
+        'custom' => ProxyMode.custom,
+        _ => ProxyMode.system,
+      },
+      custom: value.custom,
+      system: value.system,
+      systemSource: value.systemSource,
+    );
+  }
 
   @override
   Future<RelayPreferences> relayPreferences() async {
@@ -191,8 +206,8 @@ class RustBridgeApi
   };
 
   @override
-  Future<void> networkSetProxy(String value) =>
-      frb.networkSetProxy(value: value);
+  Future<void> networkSetProxySetting(ProxyMode mode, String custom) =>
+      frb.networkSetProxySetting(mode: mode.name, custom: custom);
 
   @override
   Future<ConfigInfo> getConfig() async {

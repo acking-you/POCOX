@@ -533,8 +533,9 @@ extension _SessionComposer on _AppSessionState {
             // Desktop: where this turn will land — host, branch — as a
             // footnote under the card rather than chrome inside it; the facts
             // ellipsize rather than overflow. A phone shows them in the
-            // status bar.
-            if (doc)
+            // status bar, and a folded capsule (a short window) leaves them
+            // until someone writes.
+            if (doc && !_composerFolded)
               Padding(
                 padding: const EdgeInsets.fromLTRB(6, 7, 6, 0),
                 child: _composerContext(l10n),

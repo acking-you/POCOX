@@ -161,6 +161,7 @@ impl Manager {
             }
         }
         management::set_enabled(true)?;
+        super::harnesses::initialize();
         self.refresh_status()?;
         Ok(())
     }

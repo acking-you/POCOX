@@ -72,17 +72,45 @@ pub struct Config {
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct NetworkConfig {
-    /// Optional HTTP(S) or SOCKS5 proxy URL; may contain credentials.
-    /// Absent means the HTTP client's normal environment proxy behavior.
+    /// How requests choose a proxy. Absent: [`ProxyMode::Custom`] when
+    /// [`Self::proxy`] is set (configurations saved before modes existed),
+    /// else [`ProxyMode::System`].
+    pub mode: Option<ProxyMode>,
+    /// The custom HTTP(S) or SOCKS5 proxy URL; may contain credentials. Kept
+    /// while another mode is chosen, so switching back restores it.
     pub proxy: Option<String>,
+}
+
+impl NetworkConfig {
+    /// The mode in effect.
+    pub fn effective_mode(&self) -> ProxyMode {
+        self.mode.unwrap_or(if self.proxy.is_some() {
+            ProxyMode::Custom
+        } else {
+            ProxyMode::System
+        })
+    }
 }
 
 impl std::fmt::Debug for NetworkConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("NetworkConfig")
+            .field("mode", &self.mode)
             .field("proxy", &self.proxy.as_ref().map(|_| "[redacted]"))
             .finish()
     }
+}
+
+/// Where application-owned requests find their proxy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProxyMode {
+    /// The proxy environment variables, else this computer's proxy setting.
+    System,
+    /// No proxy, whatever the environment or the system says.
+    Direct,
+    /// [`NetworkConfig::proxy`].
+    Custom,
 }
 
 /// Capacity of the controller's disposable disk cache, separate from RAM.

@@ -6,7 +6,7 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `save_relay_preferences`
+// These functions are ignored because they are not marked as `pub`: `mode_name`, `save_relay_preferences`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
 
 /// Read this installation's relay preferences, shared by both account modes.
@@ -20,13 +20,19 @@ Future<void> relaySetPreferences({required RelayPreferencesDto preferences}) =>
       preferences: preferences,
     );
 
-/// Saved proxy URL for the explicit editor; may contain credentials.
-Future<String?> networkProxy() =>
-    RustLib.instance.api.crateApiBridgeNetworkNetworkProxy();
+/// Read the proxy setting for its editor, with the system's proxy now.
+Future<NetworkProxyDto> networkProxySetting() =>
+    RustLib.instance.api.crateApiBridgeNetworkNetworkProxySetting();
 
-/// Set an HTTP(S)/SOCKS5 proxy, or clear it with an empty string.
-Future<void> networkSetProxy({required String value}) =>
-    RustLib.instance.api.crateApiBridgeNetworkNetworkSetProxy(value: value);
+/// Save the mode (`system`, `direct` or `custom`) and the custom URL (blank
+/// removes it; `custom` requires one). Nothing changes on failure.
+Future<void> networkSetProxySetting({
+  required String mode,
+  required String custom,
+}) => RustLib.instance.api.crateApiBridgeNetworkNetworkSetProxySetting(
+  mode: mode,
+  custom: custom,
+);
 
 /// Bounded avatar/favicon download using POCOX's network configuration.
 Future<Uint8List> networkImage({required String url}) =>
@@ -39,6 +45,42 @@ enum ConnectionPathDto {
 
   /// Direct first, with the SDK's pre-commit relay fallback.
   auto,
+}
+
+/// The application proxy setting and what the system offers now.
+class NetworkProxyDto {
+  /// `system` (the default), `direct` or `custom`.
+  final String mode;
+
+  /// The saved custom URL, for the editor only: it may carry credentials.
+  final String? custom;
+
+  /// The system's proxy now, without credentials; none connects directly.
+  final String? system;
+
+  /// Where [`Self::system`] comes from: `environment` or `system`.
+  final String? systemSource;
+
+  const NetworkProxyDto({
+    required this.mode,
+    this.custom,
+    this.system,
+    this.systemSource,
+  });
+
+  @override
+  int get hashCode =>
+      mode.hashCode ^ custom.hashCode ^ system.hashCode ^ systemSource.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NetworkProxyDto &&
+          runtimeType == other.runtimeType &&
+          mode == other.mode &&
+          custom == other.custom &&
+          system == other.system &&
+          systemSource == other.systemSource;
 }
 
 /// Preferences captured when a new network tunnel is created.

@@ -1,6 +1,7 @@
-//! A bounded run of a listing tool (`lsof`, `netstat`): its time and output
-//! are capped, nothing waits on it without a bound, and stopping it stops
-//! only what it started.
+//! A bounded run of a short external tool (a listing such as `lsof` or
+//! `netstat`, a version probe, an installer): its time and output are capped,
+//! nothing waits on it without a bound, and stopping it stops only what it
+//! started.
 
 use std::io::Read;
 use std::process::{Child, Command, ExitStatus, Stdio};
@@ -8,27 +9,42 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
-/// How a probe exited and what it printed.
+/// How a run exited and what it printed.
 #[derive(Debug, Default)]
-pub(super) struct Probed {
+pub struct Output {
     /// Its exit code; `None` when a signal ended it.
-    pub(super) code: Option<i32>,
+    pub code: Option<i32>,
     /// Its standard output.
-    pub(super) stdout: Vec<u8>,
+    pub stdout: Vec<u8>,
     /// Its standard error.
-    pub(super) stderr: Vec<u8>,
+    pub stderr: Vec<u8>,
+}
+
+/// Why a run produced no [`Output`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum Failure {
+    /// The program could not be started.
+    #[error("the program could not be started ({0:?})")]
+    Start(std::io::ErrorKind),
+    /// It was still running at its deadline and was stopped.
+    #[error("the program did not finish in time")]
+    Deadline,
+    /// It printed more than the cap, its output could not be read, or its
+    /// output stayed open after it exited.
+    #[error("the program's output could not be read within its bound")]
+    Unreadable,
 }
 
 /// What a run's cleanup achieved.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Cleanup {
-    /// The probe was reaped (a probe that does not die is left unreaped, so
-    /// its id is never reused while anything here could still signal it).
-    pub(super) reaped: bool,
+struct Cleanup {
+    /// The run was reaped (one that does not die is left unreaped, so its id
+    /// is never reused while anything here could still signal it).
+    reaped: bool,
     /// Both reader threads finished and were joined. One stays blocked only
-    /// on a pipe held by a process outside the probe's group, which is never
+    /// on a pipe held by a process outside the run's group, which is never
     /// signalled.
-    pub(super) readers_joined: bool,
+    readers_joined: bool,
 }
 
 /// A cleanup that left nothing behind.
@@ -37,12 +53,11 @@ const CLEAN: Cleanup = Cleanup {
     readers_joined: true,
 };
 
-/// How often a running probe is looked at.
+/// How often a running program is looked at.
 const POLL: Duration = Duration::from_millis(10);
 
-/// How long a probe's output may still arrive once it exited, and how long
-/// the cleanup after every run may take to reap the probe and finish its
-/// readers.
+/// How long a run's output may still arrive once it exited, and how long
+/// the cleanup after every run may take to reap it and finish its readers.
 const SETTLE: Duration = Duration::from_millis(500);
 
 /// One output stream (0 stdout, 1 stderr): its bytes, or `None` when it
@@ -53,25 +68,26 @@ type Stream = (usize, Option<Vec<u8>>);
 type Reports = [Option<Option<Vec<u8>>>; 2];
 
 /// Run `command` until `deadline`, keeping at most `cap` bytes of each output
-/// stream; standard input is closed. `None` when it cannot be started, does
-/// not finish by the deadline, prints more than the cap, or its output cannot
-/// be read. Returns at most [`SETTLE`] after the deadline.
-pub(super) fn run(command: &mut Command, deadline: Instant, cap: usize) -> Option<Probed> {
-    let (probed, cleanup) = attempt(command, deadline, cap);
+/// stream; standard input is closed. On unix it leads a process group of its
+/// own, which is stopped once it exited or failed, so nothing it started
+/// outlives the run; elsewhere only the program itself is stopped. Returns at
+/// most [`SETTLE`] after the deadline.
+pub fn run(command: &mut Command, deadline: Instant, cap: usize) -> Result<Output, Failure> {
+    let (output, cleanup) = attempt(command, deadline, cap);
     if cleanup != CLEAN {
-        tracing::debug!(?cleanup, "a listener probe was not fully cleaned up");
+        tracing::debug!(?cleanup, "a bounded run was not fully cleaned up");
     }
-    probed
+    output
 }
 
-/// [`run`], also reporting its cleanup. On unix the probe leads its own
+/// [`run`], also reporting its cleanup. On unix the program leads its own
 /// process group; every run ends with [`finish`], so the group is stopped on
 /// every path, never after the leader was reaped.
-pub(super) fn attempt(
+fn attempt(
     command: &mut Command,
     deadline: Instant,
     cap: usize,
-) -> (Option<Probed>, Cleanup) {
+) -> (Result<Output, Failure>, Cleanup) {
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -81,8 +97,9 @@ pub(super) fn attempt(
         use std::os::unix::process::CommandExt;
         command.process_group(0);
     }
-    let Ok(mut child) = command.spawn() else {
-        return (None, CLEAN);
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => return (Err(Failure::Start(error.kind())), CLEAN),
     };
     let (tx, rx) = mpsc::channel();
     let mut readers = [None, None];
@@ -94,53 +111,58 @@ pub(super) fn attempt(
     }
     drop(tx);
     let mut reports: Reports = [None, None];
-    let complete =
-        readers.iter().all(Option::is_some) && collect(&mut child, &rx, &mut reports, deadline);
+    let complete = if readers.iter().all(Option::is_some) {
+        collect(&mut child, &rx, &mut reports, deadline)
+    } else {
+        Err(Failure::Unreadable)
+    };
     let (status, cleanup) = finish(&mut child, &rx, readers, &mut reports);
-    let probed = match (complete, status) {
-        (true, Some(status)) => {
+    let output = match (complete, status) {
+        (Ok(()), Some(status)) => {
             let [stdout, stderr] = reports.map(|report| report.flatten().unwrap_or_default());
-            Some(Probed {
+            Ok(Output {
                 code: status.code(),
                 stdout,
                 stderr,
             })
         },
-        _ => None,
+        (Ok(()), None) => Err(Failure::Unreadable),
+        (Err(failure), _) => Err(failure),
     };
-    (probed, cleanup)
+    (output, cleanup)
 }
 
-/// Receive both streams until the probe exited: `true` once both arrived
-/// whole and it no longer runs, `false` on an overflow or read error, past
-/// `deadline`, or when its output is still held open [`SETTLE`] after it
-/// exited. The leader is never reaped here.
+/// Receive both streams until the program exited: done once both arrived
+/// whole and it no longer runs; [`Failure::Deadline`] while it still runs at
+/// `deadline`; [`Failure::Unreadable`] on an overflow or read error, or when
+/// its output is still held open [`SETTLE`] after it exited. The leader is
+/// never reaped here.
 fn collect(
     child: &mut Child,
     rx: &Receiver<Stream>,
     reports: &mut Reports,
     deadline: Instant,
-) -> bool {
+) -> Result<(), Failure> {
     let mut exited: Option<Instant> = None;
     loop {
         let whole = reports.iter().all(|report| matches!(report, Some(Some(_))));
         if whole && exited.is_some() {
-            return true;
+            return Ok(());
         }
         let limit = exited.map_or(deadline, |at| deadline.min(at + SETTLE));
         let now = Instant::now();
         if now >= limit {
-            return false;
+            return Err(if exited.is_some() { Failure::Unreadable } else { Failure::Deadline });
         }
         match rx.recv_timeout(POLL.min(limit - now)) {
             Ok((index, Some(bytes))) => reports[index] = Some(Some(bytes)),
             Ok((index, None)) => {
                 reports[index] = Some(None);
-                return false;
+                return Err(Failure::Unreadable);
             },
             Err(RecvTimeoutError::Timeout) => {},
             Err(RecvTimeoutError::Disconnected) if whole => thread::sleep(POLL),
-            Err(RecvTimeoutError::Disconnected) => return false,
+            Err(RecvTimeoutError::Disconnected) => return Err(Failure::Unreadable),
         }
         if exited.is_none() && !leader_runs(child) {
             exited = Some(Instant::now());
@@ -148,14 +170,14 @@ fn collect(
     }
 }
 
-/// Whether the probe still runs, without reaping it on unix: a zombie leader
+/// Whether the program still runs, without reaping it on unix: a zombie leader
 /// keeps its process and group ids reserved until [`finish`] signalled them.
 #[cfg(unix)]
 fn leader_runs(child: &mut Child) -> bool {
     crate::process::pid_running(child.id())
 }
 
-/// Whether the probe still runs; the handle held here keeps its id reserved.
+/// Whether the program still runs; the handle held here keeps its id reserved.
 #[cfg(not(unix))]
 fn leader_runs(child: &mut Child) -> bool {
     matches!(child.try_wait(), Ok(None))
@@ -173,7 +195,7 @@ fn read_capped<R: Read + Send + 'static>(
     let tx = tx.clone();
     let limit = u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1);
     thread::Builder::new()
-        .name("pcx-listener-probe".into())
+        .name("pcx-bounded-run".into())
         .spawn(move || {
             let mut bytes = Vec::new();
             let read = pipe.take(limit).read_to_end(&mut bytes);
@@ -184,7 +206,7 @@ fn read_capped<R: Read + Send + 'static>(
         .ok()
 }
 
-/// Stop the probe and what it started, then reap it and finish its readers,
+/// Stop the program and what it started, then reap it and finish its readers,
 /// all within one [`SETTLE`]. On unix its process group is killed first,
 /// while the leader is still unreaped, so the group id names no one else;
 /// nothing is signalled after the reap. Its status when reaped.
@@ -271,12 +293,12 @@ mod tests {
         script: &str,
         deadline: Duration,
         cap: usize,
-    ) -> (Option<Probed>, Cleanup, Duration, u32) {
+    ) -> (Result<Output, Failure>, Cleanup, Duration, u32) {
         let file = pid_file();
         let mut command = sh(script);
         command.arg("pcx-probe").arg(&file);
         let started = Instant::now();
-        let (probed, cleanup) = attempt(&mut command, started + deadline, cap);
+        let (output, cleanup) = attempt(&mut command, started + deadline, cap);
         let took = started.elapsed();
         let helper = std::fs::read_to_string(&file)
             .expect("the helper was started")
@@ -284,7 +306,7 @@ mod tests {
             .parse()
             .expect("its pid");
         let _ = std::fs::remove_file(&file);
-        (probed, cleanup, took, helper)
+        (output, cleanup, took, helper)
     }
 
     /// `pid` stops running soon (a zombie counts as stopped).
@@ -326,7 +348,8 @@ mod tests {
         assert_eq!(ran.stderr, b"err");
         let quiet = run(&mut sh("exit 1"), roomy(), 64).expect("ran");
         assert_eq!((quiet.code, quiet.stdout.len(), quiet.stderr.len()), (Some(1), 0, 0));
-        assert!(run(&mut Command::new("/nonexistent/pcx-probe"), roomy(), 64).is_none());
+        let missing = run(&mut Command::new("/nonexistent/pcx-probe"), roomy(), 64);
+        assert!(matches!(missing, Err(Failure::Start(_))), "{missing:?}");
     }
 
     #[test]
@@ -334,11 +357,11 @@ mod tests {
         let ran = run(&mut sh("printf 0123456789"), roomy(), 10).expect("exactly the cap");
         assert_eq!(ran.stdout, b"0123456789");
         let started = Instant::now();
-        assert!(run(&mut sh("printf 0123456789"), roomy(), 9).is_none());
+        assert_eq!(run(&mut sh("printf 0123456789"), roomy(), 9).err(), Some(Failure::Unreadable));
         // An endless writer is stopped as soon as it passed the cap.
         for endless in ["while :; do printf 0123456789; done", "while :; do printf e >&2; done"] {
             let (ran, cleanup) = attempt(&mut sh(endless), roomy(), 1024);
-            assert!(ran.is_none());
+            assert_eq!(ran.err(), Some(Failure::Unreadable), "{endless}");
             assert_eq!(cleanup, CLEAN, "{endless}");
         }
         assert!(started.elapsed() < Duration::from_secs(8), "{:?}", started.elapsed());
@@ -354,7 +377,7 @@ mod tests {
             Duration::from_secs(10),
             1024,
         );
-        assert!(ran.is_none());
+        assert_eq!(ran.err(), Some(Failure::Unreadable));
         assert_eq!(cleanup, CLEAN);
         assert!(took < Duration::from_secs(4), "{took:?}");
         assert_gone(helper);
@@ -371,7 +394,7 @@ mod tests {
         let (ran, cleanup) =
             attempt(&mut sh("exec sleep 30"), started + Duration::from_secs(1), 64);
         let took = started.elapsed();
-        assert!(ran.is_none());
+        assert_eq!(ran.err(), Some(Failure::Deadline));
         assert_eq!(cleanup, CLEAN);
         assert!(took < Duration::from_secs(1) + 2 * SETTLE, "{took:?}");
         bystander.assert_running();
@@ -386,7 +409,7 @@ mod tests {
         let mut bystander = Bystander::start();
         let (ran, cleanup, took, helper) =
             with_helper("sleep 30 & echo $! > \"$1\"; exit 0", Duration::from_secs(10), 64);
-        assert!(ran.is_none());
+        assert_eq!(ran.err(), Some(Failure::Unreadable));
         assert_eq!(cleanup, CLEAN);
         assert!(took < Duration::from_secs(4), "{took:?}");
         assert_gone(helper);

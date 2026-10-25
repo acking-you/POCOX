@@ -30,6 +30,7 @@ pub mod device_metadata;
 pub mod diff;
 pub mod events;
 pub mod grok;
+pub mod harnesses;
 pub mod history_projection;
 pub mod host_config;
 pub mod host_sessions;
@@ -80,6 +81,10 @@ pub use self::events::{
 pub use self::grok::{
     grok_account_status, grok_sign_in_cancel, grok_sign_in_start, grok_sign_in_state,
     grok_sign_out, GrokAccountDto, GrokSignInDto,
+};
+pub use self::harnesses::{
+    harness_check, harness_overview, harness_settings, harness_update, HarnessDto, HarnessJobDto,
+    HarnessOverviewDto, HarnessSkipDto,
 };
 pub use self::host_config::{
     app_serve_apply, app_serve_start_configured, codex_local_auth_status, codex_local_login_cancel,
@@ -179,6 +184,7 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     // runs on the same hosting state hosts nothing for its whole run.
     crate::engine::host_owner::claim_desktop();
     crate::engine::management::initialize();
+    crate::engine::harnesses::initialize();
     crate::engine::agent_tools::initialize();
     Ok(())
 }

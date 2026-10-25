@@ -229,12 +229,15 @@ extension _SessionLayout on _AppSessionState {
             onPressed: () => LayeredNavigation.maybeOf(ctx)?.open(),
           ),
         ),
-        title: Text(
-          _barTitle(l10n),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        title: () {
+          final title = Text(
+            _barTitle(l10n),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          );
+          return _inlineStatus ? _titleWithStatus(l10n, title) : title;
+        }(),
         actions: [
           if (_ctx != null)
             ContextGauge(

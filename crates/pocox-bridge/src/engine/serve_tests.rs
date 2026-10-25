@@ -178,6 +178,7 @@ fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
         child: None,
         app_register: None,
         watchdog: idle(),
+        watched: None,
         log_tail: None,
         api_key: format!("pcx:test-device:api:{name}"),
         api_local: local,

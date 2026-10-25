@@ -11,6 +11,7 @@ use std::time::Duration;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, System, UpdateKind};
 use tracing::warn;
 
+pub mod bounded;
 mod identity;
 pub use identity::{is_process_descendant, process_arguments, process_identity, ProcessIdentity};
 
