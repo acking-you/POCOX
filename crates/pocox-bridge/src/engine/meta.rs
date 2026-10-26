@@ -267,12 +267,11 @@ pub(super) fn release_service(service: &str) {
     runtime::unsubscribe_service(&format!("{META_TUNNEL}{}\u{1f}{meta}", context.id()));
 }
 
-/// Build an endpoint URL under the meta base, percent-encoding each segment.
-pub(super) fn endpoint(service_key: &str, segments: &[&str]) -> Result<Url> {
-    guarded_endpoint(service_key, segments).map(|(url, _)| url)
-}
-
-fn guarded_endpoint(
+/// Build an endpoint URL under the meta base, percent-encoding each segment,
+/// with its guard: it fails once the host or connection the URL was resolved
+/// for is gone, and it holds that connection's tunnel while it lives, so a
+/// transfer keeps it until the guard drops even if its service is released.
+pub(super) fn guarded_endpoint(
     service_key: &str,
     segments: &[&str],
 ) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
@@ -604,8 +603,9 @@ pub fn force_resume(service_key: &str, thread_id: &str) -> Result<ForceResumeOut
             "this provider has no verified safe takeover operation; continue viewing read-only"
         ));
     }
-    let url = endpoint(service_key, &["sessions", thread_id, "resume"])?;
+    let (url, current) = guarded_endpoint(service_key, &["sessions", thread_id, "resume"])?;
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .post(url)
             .send()

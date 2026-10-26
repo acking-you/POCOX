@@ -166,9 +166,10 @@ or changes session admission.
 Reducing capacity defers eviction of the selected or busy services. Maintenance
 checks every five seconds and finishes shrinking as services become idle. Idle
 eviction drops the protocol reader, client and subscription and releases its
-companion metadata tunnel. Guarded metadata requests and file uploads retain
-their exact tunnel until they finish; eviction cannot cut an upload or redirect a retry to
-a replacement listener after port reuse. Transport epoch checks still reject
+companion metadata tunnel. Every metadata request (uploads, downloads, file
+reads and previews, history windows, device management and event streams)
+holds its exact tunnel until it finishes; eviction cannot cut a transfer or
+redirect a retry to a replacement listener after port reuse. Transport epoch checks still reject
 old-account results. An outage is not an eviction: a connection stays in the
 window, with every protection of its work, while it can still come back (an
 ACP or OpenCode stream retrying after a relay blip, a Codex session whose
@@ -176,9 +177,14 @@ reconnect reuses its tunnel, and keeps its slot, so a window of busy services
 cannot strand it). It leaves only once it cannot: gone from its registry, its
 event task finished, its local host restarted or stopped, or its account/relay
 epoch replaced (account/relay changes and logout). Automatic recovery may
-reconnect only the selected service in the current epoch; it cannot resurrect
-a service that a switch evicted. Explicit selection is required to admit it
-again. A saved capacity outside 1–32 reads as the nearest allowed value.
+reconnect the selected service or one still retained, in the current epoch,
+and it is no visit (selection and recency stay); it cannot resurrect a service
+that a switch evicted. Explicit selection is required to admit it again: a
+switch, or opening a conversation from elsewhere (the session browser, say),
+which admits its service on entry. A switch evicts nothing unless enough idle
+services can go to admit it, so a refused switch leaves the conversation on
+screen connected. A saved capacity outside 1–32 reads as the nearest allowed
+value.
 
 Codex keeps unanswered server requests with the client. A new view subscribes
 first, replays that snapshot, then reads queued live events, including host

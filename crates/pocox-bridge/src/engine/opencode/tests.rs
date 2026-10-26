@@ -26,6 +26,9 @@ fn identity() -> Identity {
     }
 }
 
+/// A link registered in the process-wide registry, which an account or
+/// relay change in another test drains: tests using one hold
+/// `transport::test_serial()`.
 pub(super) struct Fixture {
     pub(super) link: Link,
     _runtime: tokio::runtime::Runtime,
@@ -91,6 +94,7 @@ impl Drop for Fixture {
 
 #[test]
 fn stale_host_source_and_replaced_connections_cannot_commit() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     let link = &fixture.link;
     let mut next = snapshot();
@@ -110,6 +114,7 @@ fn stale_host_source_and_replaced_connections_cannot_commit() {
 
 #[test]
 fn snapshots_never_roll_back_a_newer_live_prefix() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     let link = &fixture.link;
     let mut current = snapshot();
@@ -127,6 +132,7 @@ fn snapshots_never_roll_back_a_newer_live_prefix() {
 
 #[test]
 fn full_snapshots_replace_prefixes_once_and_keep_native_boundaries() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     let mut rx = fixture.link.tx.subscribe();
     let old = snapshot();
@@ -211,6 +217,7 @@ fn pending_handles_bind_host_and_session_and_retain_multiple_choices() {
 
 #[test]
 fn inactive_windows_are_evicted_before_running_windows() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     fixture
         .link
@@ -338,6 +345,7 @@ fn incomplete_prompt_history_is_marked_instead_of_becoming_retry_input() {
 
 #[test]
 fn completed_reasoning_only_output_keeps_provenance_and_original_part_identity() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     let mut rx = fixture.link.tx.subscribe();
     let mut running = snapshot();
@@ -371,6 +379,7 @@ fn completed_reasoning_only_output_keeps_provenance_and_original_part_identity()
 
 #[test]
 fn a_turn_that_ends_between_refreshes_still_starts_and_completes() {
+    let _serial = transport::test_serial();
     let fixture = Fixture::new();
     let mut rx = fixture.link.tx.subscribe();
     let mut before = snapshot();

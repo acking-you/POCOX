@@ -40,6 +40,19 @@ extension _SessionRecovery on _AppSessionState {
         );
   }
 
+  /// A conversation pushed from elsewhere (the session browser, say) is a
+  /// visit: one whose service is already connected is selected now; one that
+  /// is not connects through its first recovery, which admits it.
+  void _admitOnEntry() {
+    final api = ref.read(bridgeApiProvider);
+    if (_admitted || !api.appIsConnected(widget.serviceKey)) return;
+    unawaited(
+      api
+          .appConnect(widget.serviceKey, appLocalPort)
+          .then((_) => _admitted = true, onError: (_) {}),
+    );
+  }
+
   void _onStreamClosed() {
     if (!mounted) return;
     _linkEpoch++;
@@ -588,8 +601,14 @@ extension _SessionRecovery on _AppSessionState {
         );
         try {
           record('connect', attempt);
-          // Let the bridge retain a live socket if only its event subscription ended.
-          await api.appReconnect(widget.serviceKey, appLocalPort);
+          // Let the bridge retain a live socket if only its event subscription
+          // ended. A conversation not admitted yet is a visit: it selects.
+          if (_admitted) {
+            await api.appReconnect(widget.serviceKey, appLocalPort);
+          } else {
+            await api.appConnect(widget.serviceKey, appLocalPort);
+            _admitted = true;
+          }
           if (!current()) return;
           _connectionLost = false;
           // A reconnect may reach a different agent generation.

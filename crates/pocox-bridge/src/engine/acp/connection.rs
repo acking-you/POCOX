@@ -208,20 +208,28 @@ pub fn disconnect(service_key: &str) {
     }
 }
 
-/// Release only idle controller state. The event loop holds one shared
-/// reference; additional references belong to outstanding operations or follow
-/// readers.
+/// The event loop holds one shared reference; additional references belong
+/// to outstanding operations or follow readers. Running turns and unanswered
+/// permissions pin it too.
+fn busy(conn: &Conn) -> bool {
+    let view = lock(&conn.shared);
+    Arc::strong_count(&conn.shared) > 2 || !view.running.is_empty() || !view.permissions.is_empty()
+}
+
+/// Whether [`evict_idle`] would release `service_key` now, without
+/// releasing it.
+pub(crate) fn is_idle(service_key: &str) -> bool {
+    let Ok(key) = current_key(service_key) else { return true };
+    !conns().get(&key).is_some_and(busy)
+}
+
+/// Release only idle controller state (see [`busy`]).
 pub(crate) fn evict_idle(service_key: &str) -> bool {
     let Ok(key) = current_key(service_key) else { return true };
     let lifecycle = lifecycle(&key);
     let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
     let mut registry = conns();
-    if registry.get(&key).is_some_and(|conn| {
-        let view = lock(&conn.shared);
-        Arc::strong_count(&conn.shared) > 2
-            || !view.running.is_empty()
-            || !view.permissions.is_empty()
-    }) {
+    if registry.get(&key).is_some_and(busy) {
         return false;
     }
     let removed = registry.remove(&key);

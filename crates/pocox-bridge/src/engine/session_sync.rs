@@ -109,7 +109,7 @@ pub fn prepare(service: &str) -> Result<bool> {
             return Ok(enabled);
         }
     }
-    let url = meta::endpoint(service, &["history", "v1", "capabilities"])?;
+    let (url, _lease) = meta::guarded_endpoint(service, &["history", "v1", "capabilities"])?;
     let supported = runtime::runtime().block_on(async {
         let response = meta::client()
             .get(url)
@@ -240,7 +240,8 @@ fn sync(service: &str, query: &WindowQuery, running: bool) -> Result<HistoryWind
     let key = key(query)?;
     let base: Option<HistoryWindow> = cache.read_json(&owner, &query.session, &key)?;
     let known = base.as_ref().map(HistoryWindow::manifest).transpose()?;
-    let url = meta::endpoint(service, &["history", "v1", "window"])?;
+    // Held until the window arrives: it keeps the meta tunnel.
+    let (url, _lease) = meta::guarded_endpoint(service, &["history", "v1", "window"])?;
     let response: SyncResponse = runtime::runtime().block_on(async {
         let response = meta::client()
             .post(url)

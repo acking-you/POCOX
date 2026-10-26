@@ -37,10 +37,11 @@ impl Window {
         port: u16,
         settings: ConnectionWindowConfig,
         epoch: u64,
+        visit: Visit,
     ) -> Result<()> {
         ensure!(transport::is_current(epoch), "the account or relay changed; reconnect");
         self.refresh();
-        let already_retained = self.entries.iter().any(|entry| entry.service == service);
+        let already_retained = self.retains(&service);
         session_engine::engine(&service).connect_in_epoch(service.clone(), port, epoch)?;
         ensure!(transport::is_current(epoch), "the account or relay changed; reconnect");
         if !already_retained && !self.trim(settings, &service, 1) {
@@ -51,8 +52,15 @@ impl Window {
                  finish"
             );
         }
-        self.touch(&service);
+        // Recovery is not a visit: it keeps the selection and recency.
+        if visit == Visit::Selected || !already_retained {
+            self.touch(&service);
+        }
         Ok(())
+    }
+
+    fn retains(&self, service: &str) -> bool {
+        self.entries.iter().any(|entry| entry.service == service)
     }
 
     fn refresh(&mut self) {
@@ -112,8 +120,21 @@ impl Window {
             .collect()
     }
 
+    /// Release idle services, least wanted first, until `reserve` more fit.
+    /// Admitting one (`reserve` > 0) evicts nothing unless enough can go, so
+    /// a switch that cannot be admitted leaves every retained connection,
+    /// the one still on screen included, in place. Shrinking (`reserve` 0)
+    /// releases what it can now and the rest as it becomes idle.
     fn trim(&mut self, settings: ConnectionWindowConfig, selected: &str, reserve: usize) -> bool {
-        for candidate in self.candidates(settings.eviction, selected) {
+        let over = (self.entries.len() + reserve).saturating_sub(settings.capacity as usize);
+        if over == 0 {
+            return true;
+        }
+        let candidates = self.candidates(settings.eviction, selected);
+        if reserve > 0 && candidates.iter().filter(|c| is_idle(c)).count() < over {
+            return false;
+        }
+        for candidate in candidates {
             if self.entries.len() + reserve <= settings.capacity as usize {
                 break;
             }
@@ -123,6 +144,15 @@ impl Window {
             }
         }
         self.entries.len() + reserve <= settings.capacity as usize
+    }
+}
+
+/// Whether the release of [`evict_idle`] would succeed now.
+fn is_idle(service: &str) -> bool {
+    match session_engine::protocol_of(service) {
+        Protocol::CodexAppServer => super::app_session::is_idle(service),
+        Protocol::Acp => super::acp::is_idle(service),
+        Protocol::OpenCode => super::opencode::is_idle(service),
     }
 }
 
@@ -171,29 +201,40 @@ pub(crate) fn set_preferences(settings: ConnectionWindowConfig) -> Result<()> {
     Ok(())
 }
 
+/// Whether a connection is a visit, which selects it and counts for LRU.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Visit {
+    /// The user chose it: a switch, or a conversation opened on it.
+    Selected,
+    /// Automatic recovery of a connection already admitted.
+    Recovery,
+}
+
 /// Idempotently select a service. One staging connection may temporarily exceed
 /// capacity, so a failed handshake never destroys the selected conversation.
 pub(crate) fn connect(service: String, port: u16, epoch: u64) -> Result<()> {
     let settings = preferences()?;
     let mut window = WINDOW.lock().unwrap_or_else(|e| e.into_inner());
-    window.connect(service, port, settings, epoch)?;
+    window.connect(service, port, settings, epoch, Visit::Selected)?;
     drop(window);
     start_maintenance();
     Ok(())
 }
 
-/// Automatic recovery cannot select an evicted service or cross an account
-/// change. Only a new explicit selection may admit it again.
+/// Automatic recovery of the selected service or one still retained. It
+/// cannot revive a service the window evicted or cross an account change:
+/// only a new explicit selection may admit that again.
 pub(crate) fn reconnect(service: String, port: u16, epoch: u64) -> Result<()> {
     let settings = preferences()?;
     let mut window = WINDOW.lock().unwrap_or_else(|e| e.into_inner());
+    window.refresh();
     ensure!(
         transport::is_current(epoch)
             && window.epoch == epoch
-            && window.selected.as_deref() == Some(&service),
-        "the service is no longer selected; select it again to connect"
+            && (window.selected.as_deref() == Some(&service) || window.retains(&service)),
+        "the service is no longer retained; select it again to connect"
     );
-    window.connect(service, port, settings, epoch)
+    window.connect(service, port, settings, epoch, Visit::Recovery)
 }
 
 pub(crate) fn disconnect(service: &str) {

@@ -57,7 +57,7 @@ use self::config::{
 pub use self::config::{model_list, thread_runtime_config, ThreadRuntimeConfig};
 #[cfg(test)]
 pub use self::connection::probe_endpoint_error;
-pub(crate) use self::connection::{connect, evict_idle, probe_api, probe_reason};
+pub(crate) use self::connection::{connect, evict_idle, is_idle, probe_api, probe_reason};
 pub use self::connection::{
     connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };

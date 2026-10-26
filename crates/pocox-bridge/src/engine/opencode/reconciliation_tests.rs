@@ -55,6 +55,7 @@ fn info() -> Value {
 
 #[test]
 fn deleted_session_is_removed_without_blocking_other_session_updates() {
+    let _serial = transport::test_serial();
     let (client, _server) = server(|path| {
         if path.ends_with("/info") {
             return (200, info());
@@ -103,6 +104,7 @@ fn deleted_session_is_removed_without_blocking_other_session_updates() {
 
 #[test]
 fn failed_settings_refresh_preserves_errors_and_cached_session() {
+    let _serial = transport::test_serial();
     for cached in [false, true] {
         let (client, _server) = server(|_| (503, json!({"code":"not_ready"})));
         let fixture = tests::Fixture::with_client(client);
@@ -121,6 +123,7 @@ fn failed_settings_refresh_preserves_errors_and_cached_session() {
 
 #[test]
 fn project_catalog_reads_never_reuse_the_connection_global_catalog() {
+    let _serial = transport::test_serial();
     let (client, _server) = server(|path| {
         let url =
             reqwest::Url::parse(&format!("http://localhost{path}")).expect("valid test fixture");
@@ -154,6 +157,7 @@ fn project_catalog_reads_never_reuse_the_connection_global_catalog() {
 
 #[test]
 fn access_detects_deletion_without_sse_including_uncached_sessions() {
+    let _serial = transport::test_serial();
     for cached in [false, true] {
         let (client, _server) = server(|path| {
             if path.ends_with("/info") {
@@ -186,6 +190,7 @@ fn access_detects_deletion_without_sse_including_uncached_sessions() {
 
 #[test]
 fn failed_reads_preserve_sessions_and_emit_no_deletion() {
+    let _serial = transport::test_serial();
     for (status, code, replaced) in [
         (404, "native_request_failed", false),
         (503, "session_not_found", false),
@@ -222,6 +227,7 @@ fn failed_reads_preserve_sessions_and_emit_no_deletion() {
 
 #[test]
 fn follow_detects_external_deletion_without_an_sse_invalidation() {
+    let _serial = transport::test_serial();
     let (client, _server) = server(|path| {
         if path.ends_with("/info") {
             return (200, info());

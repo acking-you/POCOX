@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/network/connection_window.dart';
+import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/widgets/host_switcher.dart';
 
 import 'fake_bridge_api.dart';
@@ -61,6 +62,24 @@ void main() {
       expect(t.takeException(), isNull);
     },
   );
+
+  testWidgets('a conversation opened from elsewhere is admitted, so it '
+      'connects although recovery alone is refused', (t) async {
+    const service = 'pcx:studio:app:browser';
+    final api = FakeBridgeApi(
+      config: const ConfigInfo(relay: 'relay:7666', hasKey: true),
+    )..appReconnectRefused.add(service);
+    await t.pumpWidget(
+      host(const AppSessionScreen(serviceKey: service, threadId: 't'), api),
+    );
+    // The health check notices the missing connection and recovers it.
+    for (var i = 0; i < 30; i++) {
+      await t.pump(const Duration(seconds: 1));
+    }
+    expect(api.appIsConnected(service), isTrue);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 5));
+  });
 
   testWidgets(
     'same labels cannot merge accounts or mark unowned services local',

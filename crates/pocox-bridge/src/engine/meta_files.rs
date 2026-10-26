@@ -135,9 +135,10 @@ pub fn list_files(service_key: &str, path: &str) -> Result<Vec<FileEntry>> {
 /// the generous upload timeout since a large file over a relay hop can outlast
 /// [`META_TIMEOUT`].
 pub fn read_file(service_key: &str, path: &str) -> Result<Vec<u8>> {
-    let mut url = endpoint(service_key, &["fs", "read"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "read"])?;
     url.query_pairs_mut().append_pair("path", path);
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .get(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -145,7 +146,9 @@ pub fn read_file(service_key: &str, path: &str) -> Result<Vec<u8>> {
             .await
             .context("meta GET read")?;
         let resp = ensure_ok(resp).await?;
-        Ok(resp.bytes().await.context("reading file bytes")?.to_vec())
+        let bytes = resp.bytes().await.context("reading file bytes")?.to_vec();
+        current()?;
+        Ok(bytes)
     })
 }
 
@@ -157,21 +160,28 @@ pub struct FilePreview {
     pub total_size: u64,
 }
 
-fn file_link_url(service: &str, thread: Option<&str>, href: &str, preview: bool) -> Result<Url> {
-    let mut url = endpoint(service, &["fs", "thread-file"])?;
+/// The URL of a session file link, with the guard of [`guarded_endpoint`].
+fn file_link_url(
+    service: &str,
+    thread: Option<&str>,
+    href: &str,
+    preview: bool,
+) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
+    let (mut url, current) = guarded_endpoint(service, &["fs", "thread-file"])?;
     url.query_pairs_mut()
         .append_pair("href", href)
         .append_pair("preview", if preview { "true" } else { "false" });
     if let Some(thread) = thread {
         url.query_pairs_mut().append_pair("thread", thread);
     }
-    Ok(url)
+    Ok((url, current))
 }
 
 /// Fetch a bounded preview only after an explicit user action.
 pub fn file_preview(service: &str, thread: Option<&str>, href: &str) -> Result<FilePreview> {
-    let url = file_link_url(service, thread, href, true)?;
+    let (url, current) = file_link_url(service, thread, href, true)?;
     runtime::runtime().block_on(async {
+        current()?;
         let mut response = ensure_ok(client().get(url).send().await?).await?;
         let total_size: u64 = response
             .headers()
@@ -191,6 +201,7 @@ pub fn file_preview(service: &str, thread: Option<&str>, href: &str) -> Result<F
             bytes.len() as u64 == total_size.min(pocox_host_svc::file_links::PREVIEW_LIMIT),
             "file preview was incomplete"
         );
+        current()?;
         Ok(FilePreview {
             bytes,
             total_size,
@@ -272,15 +283,20 @@ pub fn file_download(
     href: &str,
     destination: &str,
 ) -> Result<()> {
-    let url = file_link_url(service, thread, href, false)?;
-    let legacy_url = if thread.is_none() {
-        let mut url = endpoint(service, &["fs", "read"])?;
+    let (url, current) = file_link_url(service, thread, href, false)?;
+    // Both guards live until the transfer ends: they hold its tunnel.
+    let (legacy_url, _legacy_lease) = if thread.is_none() {
+        let (mut url, lease) = guarded_endpoint(service, &["fs", "read"])?;
         url.query_pairs_mut().append_pair("path", href);
-        Some(url)
+        (Some(url), Some(lease))
     } else {
-        None
+        (None, None)
     };
-    runtime::runtime().block_on(download_file(url, legacy_url, std::path::Path::new(destination)))
+    runtime::runtime().block_on(async {
+        current()?;
+        download_file(url, legacy_url, std::path::Path::new(destination)).await?;
+        current()
+    })
 }
 
 pub(super) async fn download_file(
@@ -325,7 +341,7 @@ pub fn host_is_local(service: &str) -> Result<bool> {
     cleanup.0 = Some(path);
     std::io::Write::write_all(&mut file, secret.as_bytes())?;
     drop(file);
-    let mut url = endpoint(service, &["host", "local-probe"])?;
+    let (mut url, _lease) = guarded_endpoint(service, &["host", "local-probe"])?;
     url.query_pairs_mut().append_pair("id", &id.to_string());
     let verified = runtime::runtime().block_on(async {
         let response = client()
@@ -350,11 +366,12 @@ pub fn read_thread_image(service_key: &str, thread_id: &str, path: &str) -> Resu
     if let Ok(Some(bytes)) = crate::engine::session_sync::preview(service_key, thread_id, path) {
         return Ok(bytes);
     }
-    let mut url = endpoint(service_key, &["fs", "thread-image"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "thread-image"])?;
     url.query_pairs_mut()
         .append_pair("thread", thread_id)
         .append_pair("path", path);
     let bytes = runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .get(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -362,7 +379,9 @@ pub fn read_thread_image(service_key: &str, thread_id: &str, path: &str) -> Resu
             .await
             .context("meta GET thread-image")?;
         let resp = ensure_ok(resp).await?;
-        Ok::<_, anyhow::Error>(resp.bytes().await.context("reading image bytes")?.to_vec())
+        let bytes = resp.bytes().await.context("reading image bytes")?.to_vec();
+        current()?;
+        Ok::<_, anyhow::Error>(bytes)
     })?;
     crate::engine::session_sync::save_preview(service_key, thread_id, path, &bytes);
     Ok(bytes)

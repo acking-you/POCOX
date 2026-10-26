@@ -375,21 +375,35 @@ fn disconnect_inner(service_key: &str) {
     runtime::unsubscribe_service(service_key);
 }
 
+/// Outstanding operations, unanswered server requests and running turns pin
+/// a session.
+fn busy(session: &Session) -> bool {
+    Arc::strong_count(&session.client) > 1
+        || session.client.has_pending_server_requests()
+        || !session
+            .active_turns
+            .lock()
+            .expect("active turns poisoned")
+            .is_empty()
+}
+
+/// Whether [`evict_idle`] would release `service_key` now, without
+/// releasing it.
+pub(crate) fn is_idle(service_key: &str) -> bool {
+    !sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .get(service_key)
+        .is_some_and(busy)
+}
+
 /// Remove an idle connection under the same locks used to acquire its client.
 /// Outstanding operations retain a client reference and prevent eviction.
 pub(crate) fn evict_idle(service_key: &str) -> bool {
     let lifecycle = lifecycle(service_key);
     let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
     let mut map = sessions().lock().expect("sessions poisoned");
-    if map.get(service_key).is_some_and(|session| {
-        Arc::strong_count(&session.client) > 1
-            || session.client.has_pending_server_requests()
-            || !session
-                .active_turns
-                .lock()
-                .expect("active turns poisoned")
-                .is_empty()
-    }) {
+    if map.get(service_key).is_some_and(busy) {
         return false;
     }
     let removed = map.remove(service_key);

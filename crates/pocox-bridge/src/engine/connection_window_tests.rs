@@ -111,12 +111,12 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
     let epoch = transport::epoch();
     for service in [a, b, a] {
         window
-            .connect(service.into(), 0, settings, epoch)
+            .connect(service.into(), 0, settings, epoch, Visit::Selected)
             .expect("retention fixture");
     }
     assert_eq!(peers[0].handshakes.load(Ordering::SeqCst), 1, "switching back reuses the socket");
     window
-        .connect(c.into(), 0, settings, epoch)
+        .connect(c.into(), 0, settings, epoch, Visit::Selected)
         .expect("retention fixture");
     assert!(app_session::is_connected(a));
     assert!(!app_session::is_connected(b), "LRU releases the complete idle connection");
@@ -142,7 +142,9 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
     peers[2].emit(c, json!({"id":42,"method":"item/tool/requestUserInput","params":{"threadId":"question","questions":[]}}));
     assert_eq!(app_session::pending_requests(c).len(), 1);
     assert!(
-        window.connect(b.into(), 0, settings, epoch).is_err(),
+        window
+            .connect(b.into(), 0, settings, epoch, Visit::Selected)
+            .is_err(),
         "busy services cannot be evicted"
     );
     assert!(app_session::is_connected(a) && app_session::is_connected(c));
@@ -166,12 +168,14 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
     window.refresh();
     assert!(window.entries.is_empty(), "a restart retires its host's clients");
     assert!(
-        window.connect(c.into(), 0, settings, epoch).is_err(),
+        window
+            .connect(c.into(), 0, settings, epoch, Visit::Selected)
+            .is_err(),
         "a restarting local host cannot fall back to a relay"
     );
     registration.resume();
     window
-        .connect(c.into(), 0, settings, epoch)
+        .connect(c.into(), 0, settings, epoch, Visit::Selected)
         .expect("retention fixture");
     assert_eq!(
         peers[2].handshakes.load(Ordering::SeqCst),
@@ -186,7 +190,9 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
     )])
     .expect("retention fixture");
     drop(closed);
-    assert!(window.connect(failed.into(), 0, smaller, epoch).is_err());
+    assert!(window
+        .connect(failed.into(), 0, smaller, epoch, Visit::Selected)
+        .is_err());
     assert_eq!(
         window.selected.as_deref(),
         Some(c),
@@ -197,7 +203,9 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
     window.refresh();
     assert!(window.entries.is_empty() && window.selected.is_none());
     assert!(
-        window.connect(c.into(), 0, settings, epoch).is_err(),
+        window
+            .connect(c.into(), 0, settings, epoch, Visit::Selected)
+            .is_err(),
         "queued old-context selections cannot reconnect"
     );
     assert!(!app_session::is_connected(c));
@@ -226,7 +234,7 @@ fn an_outage_keeps_its_connection_and_its_slot() {
     let epoch = transport::epoch();
     for service in [a, b] {
         window
-            .connect(service.into(), 0, settings, epoch)
+            .connect(service.into(), 0, settings, epoch, Visit::Selected)
             .expect("retention fixture");
     }
     // The other service is busy, so the window could admit nothing new.
@@ -247,12 +255,61 @@ fn an_outage_keeps_its_connection_and_its_slot() {
     assert!(runtime::list_subscriptions()
         .iter()
         .any(|entry| entry.key == a));
-    // Reconnecting reuses its slot, so a full window of busy services cannot
-    // strand it.
+    // Recovering reuses its slot, so a full window of busy services cannot
+    // strand it, and it is no visit: the selection stays where it was.
     window
-        .connect(a.into(), 0, settings, epoch)
+        .connect(a.into(), 0, settings, epoch, Visit::Recovery)
         .expect("retention fixture");
     assert!(app_session::is_connected(a));
     assert_eq!(peers[0].handshakes.load(Ordering::SeqCst), 2);
+    assert_eq!(window.selected.as_deref(), Some(b));
+    transport::context_changed();
+}
+
+#[test]
+fn a_switch_that_cannot_be_admitted_evicts_nothing() {
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("retention fixture");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:9"),
+        namespace: Some("window-admission".into()),
+    });
+    transport::test_context(context.clone());
+    let a = "pcx:window-admission:app:a";
+    let b = "pcx:window-admission:app:b";
+    let c = "pcx:window-admission:app:c";
+    let peers = [Peer::new(), Peer::new(), Peer::new()];
+    let _registration = Registration::new(&context, &[
+        (a.into(), peers[0].address),
+        (b.into(), peers[1].address),
+        (c.into(), peers[2].address),
+    ])
+    .expect("retention fixture");
+    let mut window = Window::default();
+    let two = ConnectionWindowConfig {
+        capacity: 2,
+        ..Default::default()
+    };
+    let epoch = transport::epoch();
+    for service in [b, a] {
+        window
+            .connect(service.into(), 0, two, epoch, Visit::Selected)
+            .expect("retention fixture");
+    }
+    peers[1].emit(b, json!({"id":9,"method":"item/tool/requestUserInput","params":{"threadId":"question","questions":[]}}));
+    // A lower limit cannot release the selected or the busy service yet.
+    let one = ConnectionWindowConfig {
+        capacity: 1,
+        ..two
+    };
+    assert!(!window.trim(one, a, 0));
+    // Admitting C would need both gone; only A could go, so nothing does.
+    assert!(window
+        .connect(c.into(), 0, one, epoch, Visit::Selected)
+        .is_err());
+    assert!(app_session::is_connected(a), "the conversation on screen keeps its connection");
+    assert!(app_session::is_connected(b));
+    assert!(!app_session::is_connected(c));
+    assert_eq!(window.selected.as_deref(), Some(a));
     transport::context_changed();
 }
