@@ -27,6 +27,9 @@ impl SessionEngine for OpenCodeEngine {
     fn is_connected(&self, service: &str) -> bool {
         is_connected(service)
     }
+    fn is_retained(&self, service: &str) -> bool {
+        is_retained(service)
+    }
     fn disconnect(&self, service: &str) {
         disconnect(service);
     }

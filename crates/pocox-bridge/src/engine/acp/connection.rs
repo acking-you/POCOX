@@ -144,17 +144,21 @@ pub(super) fn register(key: Key, conn: Conn, epoch: u64) -> Result<()> {
     Ok(())
 }
 
-/// Whether `key`'s connection is alive, its stream healthy, and — for a
-/// local host — still pointing at the host currently published here.
+/// Whether `conn`'s event loop still runs (perhaps retrying an outage) and,
+/// for a local host, still points at the host currently published here.
+fn running(conn: &Conn) -> bool {
+    !conn.task.is_finished()
+        && conn
+            .local
+            .as_ref()
+            .is_none_or(crate::engine::local_services::Endpoint::is_current)
+}
+
+/// Whether `key`'s connection is running and its stream healthy.
 pub(super) fn is_current(key: &Key, _context: &Context) -> bool {
-    let conns = conns();
-    let Some(conn) = conns.get(key) else { return false };
-    if conn.task.is_finished() || !lock(&conn.shared).healthy {
-        return false;
-    }
-    conn.local
-        .as_ref()
-        .is_none_or(crate::engine::local_services::Endpoint::is_current)
+    conns()
+        .get(key)
+        .is_some_and(|conn| running(conn) && lock(&conn.shared).healthy)
 }
 
 /// Whether a live, healthy connection exists in the current context.
@@ -162,6 +166,15 @@ pub fn is_connected(service_key: &str) -> bool {
     let Some(context) = transport::current_context() else { return false };
     let Ok(key) = key_in(&context, service_key) else { return false };
     is_current(&key, &context)
+}
+
+/// Whether a connection in the current context may still come back on its
+/// own: its event loop retries a dropped stream, so an outage alone never
+/// ends it.
+pub fn is_retained(service_key: &str) -> bool {
+    let Some(context) = transport::current_context() else { return false };
+    let Ok(key) = key_in(&context, service_key) else { return false };
+    conns().get(&key).is_some_and(running)
 }
 
 pub(super) fn disconnect_inner(key: &Key) {

@@ -205,8 +205,11 @@ struct Script {
     prompt: Option<(&'static str, Value)>,
     /// Request bodies `sessions/steer` received.
     steered: Vec<Value>,
-    /// When set, `sessions/steer` answers only once this is notified.
-    steer_gate: Option<Arc<tokio::sync::Notify>>,
+    /// Prompts `sessions/prompt` received.
+    prompted: usize,
+    /// When set, `sessions/steer` and `sessions/prompt` answer only once
+    /// this is notified.
+    gate: Option<Arc<tokio::sync::Notify>>,
 }
 
 struct FakeGateway {
@@ -284,39 +287,48 @@ async fn serve_one(mut socket: TcpStream, script: Arc<Mutex<Script>>) {
             .snapshot
             .clone()
     };
+    // The whole request is read before answering: closing a socket with
+    // unread input resets it, which can discard the reply before the client
+    // reads it.
+    let length = head
+        .lines()
+        .find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            name.eq_ignore_ascii_case("content-length")
+                .then(|| value.trim().parse::<usize>().ok())
+                .flatten()
+        })
+        .unwrap_or(0);
+    let mut body = vec![0u8; length];
+    if socket.read_exact(&mut body).await.is_err() {
+        return;
+    }
     if path.starts_with("/acp/v1/sessions/steer") {
-        let length = head
-            .lines()
-            .find_map(|line| {
-                let (name, value) = line.split_once(':')?;
-                name.eq_ignore_ascii_case("content-length")
-                    .then(|| value.trim().parse::<usize>().ok())
-                    .flatten()
-            })
-            .unwrap_or(0);
-        let mut body = vec![0u8; length];
-        if socket.read_exact(&mut body).await.is_err() {
-            return;
-        }
         let (status, answer, gate) = {
             let mut script = script.lock().unwrap_or_else(|poison| poison.into_inner());
             script
                 .steered
                 .push(serde_json::from_slice(&body).unwrap_or(Value::Null));
             let (status, answer) = script.steer.clone().unwrap_or(("404 Not Found", json!({})));
-            (status, answer, script.steer_gate.clone())
+            (status, answer, script.gate.clone())
         };
         if let Some(gate) = gate {
             gate.notified().await;
         }
         reply(&mut socket, status, &answer).await;
     } else if path.starts_with("/acp/v1/sessions/prompt") {
-        let (status, answer) = script
-            .lock()
-            .expect("script")
-            .prompt
-            .clone()
-            .unwrap_or(("403 Forbidden", json!({"code":"read_only","message":"read only"})));
+        let (status, answer, gate) = {
+            let mut script = script.lock().unwrap_or_else(|poison| poison.into_inner());
+            script.prompted += 1;
+            let (status, answer) = script
+                .prompt
+                .clone()
+                .unwrap_or(("403 Forbidden", json!({"code":"read_only","message":"read only"})));
+            (status, answer, script.gate.clone())
+        };
+        if let Some(gate) = gate {
+            gate.notified().await;
+        }
         reply(&mut socket, status, &answer).await;
     } else if path.starts_with("/acp/v1/snapshot") {
         let snapshot = lock(&script);
@@ -857,7 +869,7 @@ fn a_late_supplement_answer_is_owned_by_the_connection_and_host_that_asked() {
             let sent_before = {
                 let mut script = script(&gateway);
                 script.steer = Some(("200 OK", answer.clone()));
-                script.steer_gate = Some(gate.clone());
+                script.gate = Some(gate.clone());
                 script.steered.len()
             };
             let pending = std::thread::spawn(move || {
@@ -874,7 +886,7 @@ fn a_late_supplement_answer_is_owned_by_the_connection_and_host_that_asked() {
             let late = pending.join().expect("thread");
             let error = late.expect_err(&format!("{outcome} after a {change}"));
             assert!(error.contains("may or may not"), "{outcome} after a {change}: {error}");
-            script(&gateway).steer_gate = None;
+            script(&gateway).gate = None;
             disconnect_inner(&key);
         }
     }
@@ -915,7 +927,8 @@ fn submitted_turn_is_pinned_before_its_start_event_and_refusal_releases_it() {
     transport::test_context(own.clone());
     let service = "pcx:studio:acp:retention";
     let key = key_in(&own, service).expect("key");
-    let view = fake_conn_at(&key, 4, &format!("http://{}/", gateway.addr));
+    let url = format!("http://{}/", gateway.addr);
+    let view = fake_conn_at(&key, 4, &url);
     assert!(ops::turn_start(service, "s", "no", &[], None).is_err());
     assert!(lock(&view).running.is_empty(), "explicit rejection releases the marker");
     script(&gateway).prompt = Some(("200 OK", json!({"turnId":"accepted"})));
@@ -926,4 +939,39 @@ fn submitted_turn_is_pinned_before_its_start_event_and_refusal_releases_it() {
         &json!({"type":"turn_ended","sessionId":"s","turnId":"accepted","outcome":{"stopReason":"end_turn"}}),
     );
     assert!(evict_idle(service), "terminal host evidence releases the connection");
+
+    // A prompt not confirmed yet names no turn: steering it addresses the
+    // host's active turn rather than an empty one.
+    let view = fake_conn_at(&key, 4, &url);
+    lock(&view).running.insert("s".into(), String::new());
+    script(&gateway).steer = Some(("200 OK", json!({"outcome":"injected","turnId":"t9"})));
+    ops::turn_supplement(service, "s", None, "more", &[], None).expect("steered");
+    let steered = script(&gateway).steered.last().cloned().expect("sent");
+    assert!(steered["turnId"].is_null(), "{steered}");
+
+    // Accepted while another connection replaced this one: it may run, so
+    // the caller is never told to send it again.
+    let gate = Arc::new(tokio::sync::Notify::new());
+    let sent = {
+        let mut script = script(&gateway);
+        script.gate = Some(gate.clone());
+        script.prompted
+    };
+    let pending = std::thread::spawn(move || {
+        ops::turn_start(service, "s", "again", &[], None).map_err(|e| e.to_string())
+    });
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while script(&gateway).prompted == sent {
+        assert!(Instant::now() < deadline, "the prompt never arrived");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    fake_conn_at(&key, 4, &url);
+    gate.notify_one();
+    let error = pending
+        .join()
+        .expect("thread")
+        .expect_err("replaced in flight");
+    assert!(error.contains("may or may not"), "{error}");
+    script(&gateway).gate = None;
+    disconnect_inner(&key);
 }

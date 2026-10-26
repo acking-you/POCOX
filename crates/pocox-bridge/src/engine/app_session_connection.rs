@@ -339,6 +339,17 @@ pub fn is_connected(service_key: &str) -> bool {
         .unwrap_or(false)
 }
 
+/// Whether a session is still recorded for `service_key` in the current
+/// account or relay and with its host still serving, live or not: a dead
+/// socket is recovered by reconnecting, which keeps the session's tunnel.
+pub fn is_retained(service_key: &str) -> bool {
+    sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .get(service_key)
+        .is_some_and(|s| s.is_current())
+}
+
 /// Connect `service_key` to an app-server this process started itself on
 /// loopback `local_addr`, without the relay (the private login server of
 /// `engine::codex_login`). Replaces any session under that key.

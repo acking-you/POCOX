@@ -52,7 +52,9 @@ impl Peer {
                                     if ws.send(Message::text(json!({"id": request["id"], "result": result}).to_string())).await.is_err() { break; }
                                 }
                                 event = events.recv() => {
+                                    // Null drops the socket while the host keeps serving.
                                     let Ok(event) = event else { break };
+                                    if event.is_null() { break; }
                                     if ws.send(Message::text(event.to_string())).await.is_err() { break; }
                                 }
                             }
@@ -162,12 +164,12 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
 
     registration.suspend();
     window.refresh();
-    assert!(window.entries.is_empty());
+    assert!(window.entries.is_empty(), "a restart retires its host's clients");
     assert!(
         window.connect(c.into(), 0, settings, epoch).is_err(),
-        "a stopped local host cannot fall back to a relay"
+        "a restarting local host cannot fall back to a relay"
     );
-    registration.resume().expect("retention fixture");
+    registration.resume();
     window
         .connect(c.into(), 0, settings, epoch)
         .expect("retention fixture");
@@ -199,4 +201,58 @@ fn retained_sockets_evict_idle_services_and_fence_retired_owners() {
         "queued old-context selections cannot reconnect"
     );
     assert!(!app_session::is_connected(c));
+}
+
+#[test]
+fn an_outage_keeps_its_connection_and_its_slot() {
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("retention fixture");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:9"),
+        namespace: Some("window-outage".into()),
+    });
+    transport::test_context(context.clone());
+    let a = "pcx:window-outage:app:a";
+    let b = "pcx:window-outage:app:b";
+    let peers = [Peer::new(), Peer::new()];
+    let _registration =
+        Registration::new(&context, &[(a.into(), peers[0].address), (b.into(), peers[1].address)])
+            .expect("retention fixture");
+    let mut window = Window::default();
+    let settings = ConnectionWindowConfig {
+        capacity: 2,
+        ..Default::default()
+    };
+    let epoch = transport::epoch();
+    for service in [a, b] {
+        window
+            .connect(service.into(), 0, settings, epoch)
+            .expect("retention fixture");
+    }
+    // The other service is busy, so the window could admit nothing new.
+    peers[1].emit(b, json!({"id":7,"method":"item/tool/requestUserInput","params":{"threadId":"question","questions":[]}}));
+
+    // A's socket drops while its host keeps serving.
+    peers[0]
+        .commands
+        .send(Value::Null)
+        .expect("retention fixture");
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while app_session::is_connected(a) {
+        assert!(std::time::Instant::now() < deadline, "the socket closes");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    window.refresh();
+    assert!(window.entries.iter().any(|entry| entry.service == a), "an outage is not an eviction");
+    assert!(runtime::list_subscriptions()
+        .iter()
+        .any(|entry| entry.key == a));
+    // Reconnecting reuses its slot, so a full window of busy services cannot
+    // strand it.
+    window
+        .connect(a.into(), 0, settings, epoch)
+        .expect("retention fixture");
+    assert!(app_session::is_connected(a));
+    assert_eq!(peers[0].handshakes.load(Ordering::SeqCst), 2);
+    transport::context_changed();
 }

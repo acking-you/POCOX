@@ -74,7 +74,7 @@ pub use translate::app_item as native_item;
 
 use self::connection::check_api;
 pub(crate) use self::connection::{connect, evict_idle, host_info, local_stopped, probe_reason};
-pub use self::connection::{context_changed, disconnect, is_connected};
+pub use self::connection::{context_changed, disconnect, is_connected, is_retained};
 #[cfg(test)]
 use self::connection::{disconnect_inner, is_current, register};
 #[cfg(test)]

@@ -3,6 +3,7 @@
 //! Protocol registries make the final idle check atomically with removing their
 //! client.
 
+use std::ops::RangeInclusive;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
@@ -63,8 +64,12 @@ impl Window {
             self.selected = None;
             self.epoch = epoch;
         }
+        // Only a connection that can no longer come back leaves here. One
+        // whose stream is down retries on its own (or reconnects over its
+        // tunnel) and keeps every protection of its work: an outage never
+        // evicts a running turn or an unanswered request.
         self.entries.retain(|entry| {
-            if session_engine::engine(&entry.service).is_connected(&entry.service) {
+            if session_engine::engine(&entry.service).is_retained(&entry.service) {
                 true
             } else {
                 release(&entry.service);
@@ -134,14 +139,25 @@ fn release(service: &str) {
     meta::release_service(service);
 }
 
+/// How many conversation services the window may retain.
+const CAPACITY: RangeInclusive<u32> = 1..=32;
+
 pub(crate) fn preferences() -> Result<ConnectionWindowConfig> {
     let settings = config::load_config(&runtime::support_dir()?)?.connection_window;
-    validate(settings)?;
-    Ok(settings)
+    Ok(readable(settings))
+}
+
+/// A capacity edited by hand outside the range reads as the nearest allowed
+/// one rather than refusing every connection; Settings saves only valid ones.
+fn readable(settings: ConnectionWindowConfig) -> ConnectionWindowConfig {
+    ConnectionWindowConfig {
+        capacity: settings.capacity.clamp(*CAPACITY.start(), *CAPACITY.end()),
+        ..settings
+    }
 }
 
 fn validate(settings: ConnectionWindowConfig) -> Result<()> {
-    ensure!((1..=32).contains(&settings.capacity), "connection capacity must be between 1 and 32");
+    ensure!(CAPACITY.contains(&settings.capacity), "connection capacity must be between 1 and 32");
     Ok(())
 }
 
@@ -239,6 +255,14 @@ mod tests {
             ..Default::default()
         })
         .is_err());
+        // A hand-edited file still connects.
+        for (saved, read) in [(0, 1), (40, 32)] {
+            let settings = ConnectionWindowConfig {
+                capacity: saved,
+                ..Default::default()
+            };
+            assert_eq!(readable(settings).capacity, read);
+        }
         let serialized = toml::to_string(&ConnectionWindowConfig {
             capacity: 8,
             eviction: ConnectionEviction::Fifo,

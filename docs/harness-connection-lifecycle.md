@@ -153,8 +153,12 @@ handshake before idle candidates are evicted, allowing one temporary staging
 connection above capacity. A failed handshake preserves the current selection.
 Protocol registries check idleness atomically with removing their connection:
 outstanding operations, running turns, unanswered approvals and questions pin
-it. Codex and ACP pin a submitted turn before its start notification arrives; an
-uncertain submission stays protected until the host resolves it. If every
+it. Codex and ACP pin a submitted turn before its start notification arrives;
+the marker names no turn, so Stop or a supplement in that window addresses the
+host's active turn, and an ACP prompt that fails or is refused drops it (a
+start event that still comes records the turn). An ACP prompt answered after
+another connection replaced its own is reported as possibly running, never as
+one to send again. If every
 candidate is protected, the staging connection is released and the switch fails
 with a capacity message. No eviction interrupts a host turn, answers a request,
 or changes session admission.
@@ -165,12 +169,16 @@ eviction drops the protocol reader, client and subscription and releases its
 companion metadata tunnel. Guarded metadata requests and file uploads retain
 their exact tunnel until they finish; eviction cannot cut an upload or redirect a retry to
 a replacement listener after port reuse. Transport epoch checks still reject
-old-account results. Unhealthy connections are removed; account/relay changes
-and logout invalidate the old
-transport epoch, and stopped local hosts invalidate their endpoint tokens.
-Automatic recovery may reconnect only the selected service in the current
-epoch; it cannot resurrect a service that a switch evicted. Explicit selection
-is required to admit it again.
+old-account results. An outage is not an eviction: a connection stays in the
+window, with every protection of its work, while it can still come back (an
+ACP or OpenCode stream retrying after a relay blip, a Codex session whose
+reconnect reuses its tunnel, and keeps its slot, so a window of busy services
+cannot strand it). It leaves only once it cannot: gone from its registry, its
+event task finished, its local host restarted or stopped, or its account/relay
+epoch replaced (account/relay changes and logout). Automatic recovery may
+reconnect only the selected service in the current epoch; it cannot resurrect
+a service that a switch evicted. Explicit selection is required to admit it
+again. A saved capacity outside 1–32 reads as the nearest allowed value.
 
 Codex keeps unanswered server requests with the client. A new view subscribes
 first, replays that snapshot, then reads queued live events, including host

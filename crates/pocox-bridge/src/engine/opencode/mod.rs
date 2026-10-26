@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use anyhow::{anyhow, bail, Result};
 pub(crate) use connection::{connect, evict_idle, local_stopped, probe_reason};
-pub use connection::{context_changed, disconnect, is_connected};
+pub use connection::{context_changed, disconnect, is_connected, is_retained};
 pub use engine::{models_for_project, OpenCodeEngine};
 pub use follow::{follow_session, liveness};
 use once_cell::sync::Lazy;

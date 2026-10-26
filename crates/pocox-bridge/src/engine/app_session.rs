@@ -59,7 +59,7 @@ pub use self::config::{model_list, thread_runtime_config, ThreadRuntimeConfig};
 pub use self::connection::probe_endpoint_error;
 pub(crate) use self::connection::{connect, evict_idle, probe_api, probe_reason};
 pub use self::connection::{
-    connect_local, disconnect, is_connected, probe_endpoint, probe_http_endpoint,
+    connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };
 use self::history::{
     fetch_item_page, fetch_older_item_page, fetch_turn_page, is_unknown_method,

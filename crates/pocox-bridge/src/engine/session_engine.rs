@@ -275,6 +275,11 @@ pub trait SessionEngine: Sync {
     }
     /// Whether a live connection exists.
     fn is_connected(&self, service_key: &str) -> bool;
+    /// Whether this controller still holds a connection that may come back:
+    /// a stream retrying after an outage, or a session whose reconnect reuses
+    /// its tunnel. False once it is gone, retired with its host, or of
+    /// another account or relay.
+    fn is_retained(&self, service_key: &str) -> bool;
     /// Drop this controller's connection (never another client's work).
     fn disconnect(&self, service_key: &str);
     /// Why the service is unreachable, or `None`.
@@ -460,6 +465,10 @@ impl SessionEngine for CodexEngine {
         app_session::is_connected(service_key)
     }
 
+    fn is_retained(&self, service_key: &str) -> bool {
+        app_session::is_retained(service_key)
+    }
+
     fn disconnect(&self, service_key: &str) {
         app_session::disconnect(service_key);
     }
@@ -629,6 +638,10 @@ impl SessionEngine for AcpEngine {
 
     fn is_connected(&self, service_key: &str) -> bool {
         acp::is_connected(service_key)
+    }
+
+    fn is_retained(&self, service_key: &str) -> bool {
+        acp::is_retained(service_key)
     }
 
     fn disconnect(&self, service_key: &str) {
