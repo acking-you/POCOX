@@ -9180,8 +9180,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AppServeStatusDto dco_decode_app_serve_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 29)
-      throw Exception('unexpected arr length: expect 29 but see ${arr.length}');
+    if (arr.length != 30)
+      throw Exception('unexpected arr length: expect 30 but see ${arr.length}');
     return AppServeStatusDto(
       name: dco_decode_String(arr[0]),
       device: dco_decode_String(arr[1]),
@@ -9212,6 +9212,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       configRevision: dco_decode_opt_box_autoadd_u_64(arr[26]),
       incarnation: dco_decode_opt_String(arr[27]),
       busy: dco_decode_opt_String(arr[28]),
+      boundElsewhere: dco_decode_bool(arr[29]),
     );
   }
 
@@ -12085,6 +12086,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_configRevision = sse_decode_opt_box_autoadd_u_64(deserializer);
     var var_incarnation = sse_decode_opt_String(deserializer);
     var var_busy = sse_decode_opt_String(deserializer);
+    var var_boundElsewhere = sse_decode_bool(deserializer);
     return AppServeStatusDto(
       name: var_name,
       device: var_device,
@@ -12115,6 +12117,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       configRevision: var_configRevision,
       incarnation: var_incarnation,
       busy: var_busy,
+      boundElsewhere: var_boundElsewhere,
     );
   }
 
@@ -15748,6 +15751,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_opt_box_autoadd_u_64(self.configRevision, serializer);
     sse_encode_opt_String(self.incarnation, serializer);
     sse_encode_opt_String(self.busy, serializer);
+    sse_encode_bool(self.boundElsewhere, serializer);
   }
 
   @protected

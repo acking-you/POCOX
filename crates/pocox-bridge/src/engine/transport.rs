@@ -97,6 +97,13 @@ impl Context {
         self.namespace.as_deref()
     }
 
+    /// Whether something bound to this context belongs to an account or
+    /// relay other than `current`; never while none is current (offline, or
+    /// between a configuration change and the next resolution).
+    pub fn is_superseded_by(&self, current: Option<&Context>) -> bool {
+        current.is_some_and(|current| current != self)
+    }
+
     /// Whether `service_key` may name a service of this context: a
     /// namespaced key must carry this account's own namespace (a self-host
     /// context admits none).

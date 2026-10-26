@@ -341,8 +341,7 @@ fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
                  name"
             );
         }
-        let rebind = current.is_some_and(|current| current != host.context);
-        (!rebind).then(|| report(host, true))
+        (!host.context.is_superseded_by(current.as_ref())).then(|| report(host, true))
     };
     let Some(found) = found else {
         stop(name);
@@ -412,6 +411,8 @@ pub(crate) fn listen_ports() -> Vec<u16> {
 }
 
 pub(super) fn status() -> Vec<ServeStatus> {
+    // Read before the hosts lock: the context's lock never nests inside it.
+    let current = transport::current_context();
     hosts()
         .values()
         .map(|host| {
@@ -450,6 +451,7 @@ pub(super) fn status() -> Vec<ServeStatus> {
                 config_revision: host.config.as_ref().map(|c| c.revision),
                 incarnation: Some(host.host.host_id().to_string()),
                 busy: host_lease::holder(&host.name).map(|op| op.label().to_string()),
+                bound_elsewhere: host.context.is_superseded_by(current.as_ref()),
             }
         })
         .collect()

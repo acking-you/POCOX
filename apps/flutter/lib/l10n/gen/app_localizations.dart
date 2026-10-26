@@ -2792,6 +2792,24 @@ abstract class AppLocalizations {
   /// **'Did not stop: stop again'**
   String get localHostStopFailed;
 
+  /// No description provided for @localHostRestartNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart needed'**
+  String get localHostRestartNeeded;
+
+  /// No description provided for @localHostBoundElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Started under another account or relay. Restart to use it here.'**
+  String get localHostBoundElsewhere;
+
+  /// No description provided for @localHostRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get localHostRestart;
+
   /// No description provided for @localHostPort.
   ///
   /// In en, this message translates to:

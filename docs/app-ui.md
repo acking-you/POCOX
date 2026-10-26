@@ -362,6 +362,14 @@ for Flutter diagnostics. Native console lifetime tests live in
   A finished start or stop closes the editor with one toast naming the host (a
   restore warning rides in it). Editor rules:
   [Hosting configuration](hosting-configuration.md).
+- A local host still running under an earlier account or relay
+  (`AppServeStatus.boundElsewhere`) shows **Restart needed / 需要重启** in its
+  card's status and one caution state line under it ("Restart to use it
+  here") with a **Restart** `BusyLabel` at its end. Restart confirms the
+  interruption like Apply and restart, restarts exactly the incarnation shown
+  and reports a failure as a toast; the editor shows the same line and enables
+  Apply and restart without an edit. It is never restarted automatically
+  ([local routing](harness-connection-lifecycle.md#process-owned-local-routing)).
 - The Codex setup page (`screens/codex_setup_screen.dart`) lists ChatGPT
   sign-in and custom provider as two rows, each with its control at the row's
   end (`widgets/action_row.dart`) and an "in use" mark on the method Codex runs

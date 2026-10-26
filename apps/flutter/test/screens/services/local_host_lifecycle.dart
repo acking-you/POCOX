@@ -96,6 +96,41 @@ void _registerLocalHostLifecycle() {
     expect(api.serveHosts, isEmpty);
   }, variant: desktop);
 
+  testWidgets('a host still on another account or relay says so and restarts '
+      'here only when asked', (t) async {
+    final api = accountFake()
+      ..serveHosts.add(
+        const AppServeStatus(
+          name: 'earlier',
+          device: 'local',
+          alive: true,
+          appListenAddr: '127.0.0.1:18080',
+          appServiceKey: 'pcx:local:app:earlier',
+          provider: 'codex',
+          protocol: 'codex-app-server',
+          providerName: 'Codex',
+          incarnation: 'inc-earlier',
+          boundElsewhere: true,
+        ),
+      );
+    await showServices(t, api);
+    expect(find.byKey(const Key('local-host-restart-needed')), findsOneWidget);
+    expect(api.applyCalls, isEmpty, reason: 'never restarted on its own');
+
+    final restart = find.byKey(const Key('local-host-restart-earlier'));
+    await t.tap(restart);
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('local-host-restart-confirm')));
+    await t.pumpAndSettle();
+    expect(
+      api.applyCalls,
+      [('earlier', 'inc-earlier', null)],
+      reason: 'exactly the incarnation shown, with its saved configuration',
+    );
+    expect(find.byKey(const Key('local-host-restart-needed')), findsNothing);
+    expect(restart, findsNothing);
+  }, variant: desktop);
+
   testWidgets('local-host: turning off the proxy passes no proxy', (t) async {
     final api = accountFake();
     await showServices(t, api);

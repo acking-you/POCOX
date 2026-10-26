@@ -566,6 +566,8 @@ pub(crate) fn listen_ports() -> Vec<u16> {
 
 pub(super) fn status() -> Vec<ServeStatus> {
     registration::recover();
+    // Read before the hosts lock: the context's lock never nests inside it.
+    let current = transport::current_context();
     hosts()
         .hosts
         .values()
@@ -597,6 +599,7 @@ pub(super) fn status() -> Vec<ServeStatus> {
                 background_server: host.background_server,
                 ..host.status.clone()
             }),
+            bound_elsewhere: host.context.is_superseded_by(current.as_ref()),
             ..ServeStatus::default()
         })
         .collect()

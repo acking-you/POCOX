@@ -9502,6 +9502,7 @@ impl SseDecode for crate::api::bridge::hosting::AppServeStatusDto {
         let mut var_configRevision = <Option<u64>>::sse_decode(deserializer);
         let mut var_incarnation = <Option<String>>::sse_decode(deserializer);
         let mut var_busy = <Option<String>>::sse_decode(deserializer);
+        let mut var_boundElsewhere = <bool>::sse_decode(deserializer);
         return crate::api::bridge::hosting::AppServeStatusDto {
             name: var_name,
             device: var_device,
@@ -9532,6 +9533,7 @@ impl SseDecode for crate::api::bridge::hosting::AppServeStatusDto {
             config_revision: var_configRevision,
             incarnation: var_incarnation,
             busy: var_busy,
+            bound_elsewhere: var_boundElsewhere,
         };
     }
 }
@@ -14288,6 +14290,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::hosting::AppServeStat
             self.config_revision.into_into_dart().into_dart(),
             self.incarnation.into_into_dart().into_dart(),
             self.busy.into_into_dart().into_dart(),
+            self.bound_elsewhere.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -17267,6 +17270,7 @@ impl SseEncode for crate::api::bridge::hosting::AppServeStatusDto {
         <Option<u64>>::sse_encode(self.config_revision, serializer);
         <Option<String>>::sse_encode(self.incarnation, serializer);
         <Option<String>>::sse_encode(self.busy, serializer);
+        <bool>::sse_encode(self.bound_elsewhere, serializer);
     }
 }
 

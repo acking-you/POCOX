@@ -1479,6 +1479,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get localHostStopFailed => '未能停止：请再次停止';
 
   @override
+  String get localHostRestartNeeded => '需要重启';
+
+  @override
+  String get localHostBoundElsewhere => '在其他账号或中继下启动。重启后才能在这里使用。';
+
+  @override
+  String get localHostRestart => '重启';
+
+  @override
   String get localHostPort => '端口';
 
   @override

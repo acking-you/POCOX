@@ -8,6 +8,7 @@ import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/hosting/acp_host_form.dart';
 import 'package:pocox/src/hosting/agent_choice_grid.dart';
 import 'package:pocox/src/hosting/cancellable_delay.dart';
+import 'package:pocox/src/hosting/host_apply_problem.dart';
 import 'package:pocox/src/hosting/host_editor_drafts.dart';
 import 'package:pocox/src/hosting/host_names.dart';
 import 'package:pocox/src/providers.dart';
@@ -597,15 +598,8 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
               ? l10n.hostApplied
               : '${l10n.hostApplied}\n'
                     '${l10n.managedRestoreProblem(restoreProblem)}';
-        } else if (result.restoredPrevious) {
-          error = l10n.hostApplyRestored(_reason(result.error));
-        } else if (result.restoreError != null) {
-          error = l10n.hostApplyStopped(
-            _reason(result.error),
-            _reason(result.restoreError),
-          );
         } else {
-          error = l10n.hostApplyFailed(_reason(result.error));
+          error = hostApplyProblem(l10n, result);
         }
       });
       // What the host runs now (the new configuration or the previous one).
@@ -616,14 +610,6 @@ mixin HostEditorActions<T extends ConsumerStatefulWidget>
       _end(op);
     }
   }
-
-  /// A restart's failure [raw] (the bridge's safe text) in the user's words
-  /// where they have some.
-  String _reason(String? raw) => raw == null
-      ? ''
-      : raw.contains('opencode_already_hosted')
-      ? AppLocalizations.of(context).openCodeAlreadyHosted
-      : raw;
 
   /// This computer's restart-persistence warning for [name], if any. A read
   /// failure is not a warning.

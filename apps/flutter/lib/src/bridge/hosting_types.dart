@@ -83,6 +83,7 @@ class AppServeStatus {
     this.configRevision,
     this.incarnation,
     this.busy,
+    this.boundElsewhere = false,
   });
 
   /// Service instance name.
@@ -181,6 +182,12 @@ class AppServeStatus {
   /// A lifecycle operation holds this host now: `starting`, `stopping`,
   /// `restarting` or `applying`; null when idle.
   final String? busy;
+
+  /// The host still publishes under the account or relay it started in,
+  /// not the current one: this device reaches it only after a restart
+  /// ([BridgeApi.appServeApply]), which is never automatic. False while no
+  /// account or relay is current.
+  final bool boundElsewhere;
 
   /// Whether this host runs a native Codex app-server.
   bool get isCodex => provider == 'codex';

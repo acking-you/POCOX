@@ -99,6 +99,11 @@ pub struct AppServeStatusDto {
     /// A lifecycle operation holds this host now: `starting`, `stopping`,
     /// `restarting` or `applying`; `None` when idle.
     pub busy: Option<String>,
+    /// The host still publishes under an account or relay other than the
+    /// current one: this device reaches it only after a restart
+    /// ([`super::host_config::app_serve_apply`]). False while no account or
+    /// relay is current; never restarted automatically.
+    pub bound_elsewhere: bool,
 }
 
 /// Native OpenCode runtime and sanitized service-default catalog summary.
@@ -495,6 +500,7 @@ impl From<serve::ServeStatus> for AppServeStatusDto {
             config_revision: s.config_revision,
             incarnation: s.incarnation,
             busy: s.busy,
+            bound_elsewhere: s.bound_elsewhere,
         }
     }
 }

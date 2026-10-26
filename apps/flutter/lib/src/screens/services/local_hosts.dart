@@ -21,6 +21,9 @@ class _LocalHostCard extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final (chip, healthy) = _health(ref, AppLocalizations.of(context), scheme);
     final row = this.row;
+    final content = row == null
+        ? _summary(context, scheme, chip)
+        : _HostStatus(chip: healthy ? null : chip, child: row);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       // A row of its card, not a plate inside it: the hover finds it. The
@@ -34,9 +37,15 @@ class _LocalHostCard extends ConsumerWidget {
           mouseCursor: clickable,
           borderRadius: BorderRadius.circular(kRowRadius),
           onTap: () => showHostingEditor(context, existing: host),
-          child: row == null
-              ? _summary(context, scheme, chip)
-              : _HostStatus(chip: healthy ? null : chip, child: row),
+          child: host.boundElsewhere
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    content,
+                    _BoundElsewhereLine(host: host),
+                  ],
+                )
+              : content,
         ),
       ),
     );
@@ -82,6 +91,17 @@ class _LocalHostCard extends ConsumerWidget {
         ),
         false,
       );
+    }
+    if (host.boundElsewhere) {
+      // It answers only under the account or relay it started in; a probe
+      // from this one could only call it unresponsive.
+      final chip = StatusChip(
+        key: const Key('local-host-restart-needed'),
+        color: cautionColor(scheme),
+        label: l10n.localHostRestartNeeded,
+        filled: true,
+      );
+      return (chip, false);
     }
     // Null while starting.
     final answers = !host.alive
@@ -173,6 +193,96 @@ class _LocalHostCard extends ConsumerWidget {
           ],
         ),
       );
+}
+
+/// Why a running host cannot be used from this device, and its one fix. A
+/// host keeps publishing under the account or relay it started in; only
+/// this explicit Restart (an apply of its saved configuration, which starts
+/// under the current one) moves it here. Nothing restarts it on its own.
+class _BoundElsewhereLine extends StatefulWidget {
+  const _BoundElsewhereLine({required this.host});
+
+  final AppServeStatus host;
+
+  @override
+  State<_BoundElsewhereLine> createState() => _BoundElsewhereLineState();
+}
+
+class _BoundElsewhereLineState extends State<_BoundElsewhereLine> {
+  bool _restarting = false;
+
+  /// Restart exactly the incarnation shown, after the user agreed to the
+  /// interruption; a replaced host is refused, never retargeted.
+  Future<void> _restart() async {
+    final host = widget.host;
+    final l10n = AppLocalizations.of(context);
+    final toast = ToastMessenger.of(context);
+    // Captured now: this line leaves with the card's old state as soon as
+    // the host list reports the restarted host.
+    final container = ProviderScope.containerOf(context);
+    final agreed = await confirmEditorAction(
+      context,
+      title: l10n.hostApplyConfirmTitle(host.name),
+      body: l10n.hostApplyConfirmBody,
+      action: l10n.localHostRestart,
+      confirmKey: const Key('local-host-restart-confirm'),
+    );
+    if (!agreed || !mounted) return;
+    setState(() => _restarting = true);
+    try {
+      final result = await container
+          .read(bridgeApiProvider)
+          .appServeApply(host.name, expectedIncarnation: host.incarnation);
+      if (hostApplyProblem(l10n, result) case final problem?) {
+        toast.error(problem);
+      }
+    } catch (e) {
+      toast.error(friendlyError(e));
+    } finally {
+      // What runs now, whichever way it ended.
+      container.invalidate(localServeListProvider);
+      container.invalidate(servicesProvider);
+      if (mounted) setState(() => _restarting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 6, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              l10n.localHostBoundElsewhere,
+              style: helpTextStyle(theme).copyWith(color: cautionColor(scheme)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            key: Key('local-host-restart-${widget.host.name}'),
+            style: _restarting
+                ? TextButton.styleFrom(disabledForegroundColor: scheme.primary)
+                : null,
+            // Another lifecycle operation (a stop, an editor's apply) holds
+            // the host.
+            onPressed: _restarting || widget.host.busy != null
+                ? null
+                : _restart,
+            child: BusyLabel(
+              busy: _restarting,
+              icon: AppIcons.restart_alt,
+              label: l10n.localHostRestart,
+              busyLabel: l10n.hostRestarting,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The "+ host another" entry that opens [LocalHostDialog] in new-host mode.

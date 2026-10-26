@@ -99,6 +99,19 @@ reuse reporting success; while the current context cannot be resolved
 (offline), a live host is kept. OpenCode refuses a second start of a running
 host.
 
+Such a host is not lost from view: every status row carries `bound_elsewhere`,
+true only when a current context is known (`transport::current_context`) and
+differs from the host's own (`Context::is_superseded_by`, the same rule the
+restart paths use). It stays false while none is current, and an older host's
+row without it reads false. The services page then shows **Restart needed** in
+place of a probe that could only fail, says why on the host's card and offers
+**Restart**, which applies the host's saved configuration (`app_serve_apply`:
+the incarnation shown is stopped and started under the current context, the
+previous launch restored when the start fails). The host editor's **Apply and
+restart** runs for it without a configuration change. Nothing restarts such a
+host on its own: devices still using it under the earlier account or relay
+keep it until the user restarts it here.
+
 Local subscriptions report `Local` / **Local direct** / **本机直连** and the
 actual endpoint (or the chosen port of a forwarded API), with no fabricated SDK
 counters, relay phases or P2P stages. The connection sheet shows two steps,
