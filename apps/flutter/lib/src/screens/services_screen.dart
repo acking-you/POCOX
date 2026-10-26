@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
@@ -26,6 +27,8 @@ import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/api_service_panel.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/error_details.dart';
 import 'package:pocox/src/widgets/github_avatar.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/loading.dart';
@@ -66,6 +69,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
 
   Timer? _reprobeTimer;
   String? _selectedDevice;
+
+  /// A retry the user asked for runs until the relay answers again.
+  bool _retrying = false;
 
   @override
   void initState() {
@@ -124,11 +130,14 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final servicesAsync = ref.watch(servicesProvider);
+    ref.listen(servicesProvider, (_, next) {
+      if (_retrying && !next.isLoading) setState(() => _retrying = false);
+    });
     final config = ref.watch(configProvider).valueOrNull;
     final account = config?.mode == 'account';
     Widget devices(
       List<ServiceEntry> services, {
-      _RelayState relayState = _RelayState.online,
+      _RelayState relayState = const _RelayOnline(),
     }) => _DeviceFirstServices(
       services: services,
       relayState: relayState,
@@ -186,53 +195,45 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
                   key: const ValueKey('svc-data'),
                   child: devices(
                     ref.read(bridgeApiProvider).localServices(),
-                    relayState: _RelayState.checking,
+                    relayState: const _RelayChecking(),
                   ),
                 )
               : const ListLoadingSkeleton(key: ValueKey('svc-loading')),
           error: (e, _) {
             final detail = friendlyError(e);
-            final hasLocal =
-                _hostingSupported &&
-                ref.read(bridgeApiProvider).localServices().isNotEmpty;
-            final expired = isAccountSessionExpired(detail);
             void signIn() => context.go('/onboarding?reason=session-expired');
-            if (expired && !hasLocal) {
+            final expired = isAccountSessionExpired(detail);
+            // The relay only lists other devices: this computer's own
+            // services are known here and still work here, so a desktop
+            // keeps them in place and says what is wrong on the relay's
+            // card, beside the list it could not fill.
+            if (_hostingSupported) {
               return KeyedSubtree(
-                key: const ValueKey('svc-error'),
-                child: _SessionExpired(onSignIn: signIn),
+                key: const ValueKey('svc-data'),
+                child: devices(
+                  ref.read(bridgeApiProvider).localServices(),
+                  relayState: expired
+                      ? _RelaySignedOut(onSignIn: signIn)
+                      : _RelayDown(
+                          detail,
+                          retrying: _retrying,
+                          onRetry: () {
+                            setState(() => _retrying = true);
+                            _refreshServices(manual: true);
+                          },
+                        ),
+                ),
               );
             }
-            final problem = expired
-                ? _SessionExpired(onSignIn: signIn, compact: true)
-                : RelayProblem(
-                    detail: detail,
-                    relay: config?.relay,
-                    compact: _hostingSupported,
-                    onRetry: () => _refreshServices(manual: true),
-                  );
-            // The relay only lists other devices: this computer's own
-            // services are known here and still work here, so they stay on
-            // the page under the problem rather than behind it.
             return KeyedSubtree(
               key: const ValueKey('svc-error'),
-              child: _hostingSupported
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                          child: problem,
-                        ),
-                        Expanded(
-                          child: devices(
-                            const [],
-                            relayState: _RelayState.down,
-                          ),
-                        ),
-                      ],
-                    )
-                  : problem,
+              child: expired
+                  ? _SessionExpired(onSignIn: signIn)
+                  : RelayProblem(
+                      detail: detail,
+                      relay: config?.relay,
+                      onRetry: () => _refreshServices(manual: true),
+                    ),
             );
           },
           data: (services) => KeyedSubtree(
@@ -247,93 +248,20 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
 
 /// The account's session has expired: discovery can never succeed until the
 /// user signs in again, so that is the one action offered.
-///
-/// [compact] heads the page above this computer's own services, which still
-/// work here, like a compact [RelayProblem]; a retry could never help.
 class _SessionExpired extends StatelessWidget {
-  const _SessionExpired({required this.onSignIn, this.compact = false});
+  const _SessionExpired({required this.onSignIn});
 
   final VoidCallback onSignIn;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
     final signIn = FilledButton.icon(
       key: const Key('services-sign-in-again'),
       onPressed: onSignIn,
-      icon: Icon(AppIcons.login, size: compact ? 16 : null),
+      icon: const Icon(AppIcons.login),
       label: Text(l10n.accountSignInAgain),
     );
-    if (compact) {
-      final muted = theme.colorScheme.onSurfaceVariant;
-      final message = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(AppIcons.login, size: 18, color: muted),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n.accountSessionExpiredTitle,
-                  key: const Key('services-error'),
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  l10n.accountSessionExpiredMessage,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: muted),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-      return DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(kCardRadius),
-          boxShadow: raisedCardShadows(theme.colorScheme),
-        ),
-        child: Card(
-          key: const Key('services-session-expired'),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-            // Beside the message while both have room (the room scales with
-            // the text), under it otherwise.
-            child: LayoutBuilder(
-              builder: (context, box) =>
-                  box.maxWidth >= MediaQuery.textScalerOf(context).scale(480)
-                  ? Row(
-                      children: [
-                        Expanded(child: message),
-                        const SizedBox(width: 8),
-                        signIn,
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        message,
-                        const SizedBox(height: 10),
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: signIn,
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        ),
-      );
-    }
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,

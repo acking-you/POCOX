@@ -666,8 +666,8 @@ void main() {
       expect(api.serveHosts.map((h) => h.name), ['work']);
       expect(
         api.discoverCalls,
-        0,
-        reason: 'local startup never invokes relay discovery',
+        1,
+        reason: 'the relay is asked only behind the open conversation',
       );
       // Its own host is reached here without the relay.
       expect(api.appIsConnected('pcx:local:app:work'), isTrue);
@@ -683,8 +683,11 @@ void main() {
       'continues restoring other hosts', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     final publication = Completer<void>();
+    final relay = Completer<void>();
     try {
-      final api = _lifecycleApi()..serveStartGate = publication;
+      final api = _lifecycleApi()
+        ..serveStartGate = publication
+        ..discoverGate = relay;
       await _pumpHome(
         t,
         api,
@@ -715,7 +718,11 @@ void main() {
       await t.pumpAndSettle();
       expect(publication.isCompleted, isFalse);
       expect(api.appIsConnected('pcx:local:app:work'), isTrue);
-      expect(api.discoverCalls, 0);
+      expect(
+        api.discoverCalls,
+        1,
+        reason: 'the relay is asked behind the open conversation',
+      );
       await t.tap(find.byKey(const Key('sidebar-service-switcher')));
       await t.pumpAndSettle();
       expect(
@@ -734,15 +741,22 @@ void main() {
         reason:
             'the open picker receives newly restored hosts without discovery',
       );
-      expect(api.discoverCalls, 0);
+      expect(api.discoverCalls, 1);
       await t.tap(
         find.byKey(const Key('host-switch-item-pcx:local:app:second')),
       );
       await t.pumpAndSettle();
       expect(api.appIsConnected('pcx:local:app:second'), isTrue);
+      // Once the relay answers, the switcher lists the other devices too.
+      relay.complete();
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await t.pumpAndSettle();
+      expect(find.byKey(Key('host-switch-item-${_app1.key}')), findsOneWidget);
       await t.pumpWidget(const SizedBox());
     } finally {
       if (!publication.isCompleted) publication.complete();
+      if (!relay.isCompleted) relay.complete();
       debugDefaultTargetPlatformOverride = null;
     }
   });
@@ -764,12 +778,14 @@ void main() {
     await _pumpHome(t, api, memoryDismissed: true);
     await t.pumpAndSettle();
     expect(api.appIsConnected('pcx:local:app:second'), isTrue);
-    expect(api.discoverCalls, 0);
+    expect(api.appIsConnected(_app2.key), isFalse);
     expect(
       api.appProbeCalls,
       isEmpty,
       reason: 'local connects are their only handshake',
     );
+    // Asked only behind the open conversation, for the switcher.
+    expect(api.discoverCalls, 1);
     await t.pumpWidget(const SizedBox());
 
     // The same resolution with no working local candidate must still reach
@@ -777,10 +793,11 @@ void main() {
     await api.appDisconnect('pcx:local:app:second');
     api.appConnectErrors['pcx:local:app:second'] = StateError('also wedged');
     final before = api.appConnectCount;
+    final discovered = api.discoverCalls;
     await _pumpHome(t, api, memoryDismissed: true);
     await t.pumpAndSettle();
     expect(api.appIsConnected(_app2.key), isTrue);
-    expect(api.discoverCalls, 1);
+    expect(api.discoverCalls - discovered, 1);
     expect(
       api.appConnectCount - before,
       5,

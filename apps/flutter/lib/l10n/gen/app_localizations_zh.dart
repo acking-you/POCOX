@@ -46,6 +46,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get tunnelPathLocal => '本机直连';
 
   @override
+  String get linkLocalStopped => '已停止';
+
+  @override
+  String get linkLocalWaiting => '等待本机托管恢复';
+
+  @override
   String get tunnelPathIdle => '空闲';
 
   @override
@@ -954,6 +960,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get statusUnreachable => '不可达';
+
+  @override
+  String get statusSessionExpired => '登录已过期';
 
   @override
   String get unreachableReason => '中继上的注册仍在，但远端 app-server 没有响应——它可能未启动，或已经宕机。';

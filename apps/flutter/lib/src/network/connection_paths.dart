@@ -102,6 +102,15 @@ final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
 /// What [sub]'s status chip says: dropped, coming up or recovering, trying a
 /// direct path, or the path its data takes now.
 String tunnelPathLabel(AppLocalizations l10n, SubInfo sub) {
+  // This app's own listener has no relay phases: it serves, restarts in
+  // place or stopped.
+  if (sub.path == TunnelPath.local) {
+    return !sub.alive
+        ? l10n.linkLocalStopped
+        : !sub.ready
+        ? l10n.hostRestarting
+        : l10n.tunnelPathLocal;
+  }
   if (!sub.alive) return l10n.subscribedDead;
   if (sub.recovering) {
     return sub.ready

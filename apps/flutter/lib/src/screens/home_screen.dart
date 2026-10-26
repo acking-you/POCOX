@@ -294,8 +294,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ServiceEntry? target;
       String? lastError;
       final attempted = <String>{};
+      var askedRelay = !localOnly;
       for (var pass = 0; pass < (localOnly ? 2 : 1); pass++) {
         if (pass > 0) {
+          askedRelay = true;
           try {
             final remote = await ref.read(servicesProvider.future);
             if (!mounted || gen != _generation) return;
@@ -360,6 +362,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // other devices cannot reach this one until it answers again.
       if (relayProblem != null && opening) {
         showToast(context, AppLocalizations.of(context).homeRelayLocalOnly);
+      }
+      // A local start never waited for the relay. Ask it now, behind the
+      // open conversation, so the switcher also lists the other devices.
+      if (!askedRelay) {
+        unawaited(
+          ref.read(servicesProvider.future).then<void>((_) {}, onError: (_) {}),
+        );
       }
     } finally {
       _endResolve(gen);

@@ -1,7 +1,7 @@
 //! Choose a process-owned loopback endpoint before resolving any relay
 //! credential. All protocols keep their existing clients and admission rules.
 
-use anyhow::{ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 
 use super::local_services::{self, Endpoint};
 use super::runtime;
@@ -28,6 +28,37 @@ impl Target {
         }
         let owned = transport::resolve_owned_blocking()?;
         Self::in_context(service, owned)
+    }
+
+    /// Resolve `companion`, a service its host publishes beside `selected`
+    /// (a Codex host's meta service). A local `selected` restarting in place
+    /// still admits it: only its child restarts, and the host's other
+    /// listeners keep serving. A stopped one never reaches a surviving or
+    /// unrelated companion host.
+    pub(crate) fn resolve_companion(selected: &str, companion: &str) -> Result<Self> {
+        let epoch = transport::epoch();
+        if let Some(context) = transport::current_context() {
+            if local_services::hosts(&context, selected)? {
+                return Self::local_companion(context, epoch, companion);
+            }
+        }
+        let owned = transport::resolve_owned_blocking()?;
+        let context = Context::of(&owned.transport);
+        if local_services::hosts(&context, selected)? {
+            return Self::local_companion(context, owned.epoch, companion);
+        }
+        Self::in_context(companion, owned)
+    }
+
+    fn local_companion(context: Context, epoch: u64, companion: &str) -> Result<Self> {
+        let endpoint = local_services::lookup(&context, companion)?
+            .ok_or_else(|| anyhow!("the local host has no endpoint for {companion}"))?;
+        ensure!(transport::is_current(epoch), "the account or relay changed; try again");
+        Ok(Self::Local {
+            context,
+            epoch,
+            endpoint,
+        })
     }
 
     pub(crate) fn in_context(service: &str, owned: Owned) -> Result<Self> {

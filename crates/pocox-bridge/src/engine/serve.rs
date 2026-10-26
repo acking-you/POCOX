@@ -384,9 +384,9 @@ fn resolve_codex_binary(
 ///
 /// - same name, codex alive → re-register any dropped tunnels; `Some(report)`,
 ///   and the caller returns without spawning.
-/// - same name, codex dead, or published under an account or relay other than
-///   the current one → retire the entry; `None`, spawn fresh. A host stays
-///   bound to the context it started in, so this start is its restart.
+/// - same name, codex dead or not restarted, or published under an account or
+///   relay other than the current one → retire the entry; `None`, spawn fresh.
+///   A host stays bound to the context it started in.
 /// - requested port taken   → error.
 ///
 /// Runs before anything is spawned, so a re-host never leaves two codex
@@ -410,7 +410,10 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
         let rebind = current
             .as_ref()
             .is_some_and(|current| *current != ls.context);
-        if !rebind && listen_addr_open(&ls.app_local.to_string()) {
+        // A restart whose respawn failed leaves the route restarting:
+        // whatever holds the port then is not this host's codex.
+        let serving = ls.app_route.as_ref().is_none_or(|route| route.is_serving());
+        if !rebind && serving && listen_addr_open(&ls.app_local.to_string()) {
             let report = ServeReport {
                 device: ls.device.clone(),
                 name: ls.name.clone(),

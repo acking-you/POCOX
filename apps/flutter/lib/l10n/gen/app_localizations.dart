@@ -170,6 +170,18 @@ abstract class AppLocalizations {
   /// **'Local direct'**
   String get tunnelPathLocal;
 
+  /// No description provided for @linkLocalStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get linkLocalStopped;
+
+  /// No description provided for @linkLocalWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for this device\'s host'**
+  String get linkLocalWaiting;
+
   /// No description provided for @tunnelPathIdle.
   ///
   /// In en, this message translates to:
@@ -1813,6 +1825,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unreachable'**
   String get statusUnreachable;
+
+  /// No description provided for @statusSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired'**
+  String get statusSessionExpired;
 
   /// No description provided for @unreachableReason.
   ///

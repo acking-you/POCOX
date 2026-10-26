@@ -11,7 +11,7 @@ use anyhow::{Context as _, Result};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::{JoinHandle, JoinSet};
 
-use super::super::local_services;
+use super::super::local_services::{self, Endpoint, Standing};
 use super::super::transport::{self, Context};
 
 /// A forwarding listener. Dropping it closes the port and every connection
@@ -50,9 +50,13 @@ impl Forward {
         }))
     }
 
-    /// Whether a connection made now reaches the service.
-    pub(super) fn is_current(&self) -> bool {
-        transport::is_current(self.epoch) && target(&self.context, &self.service).is_some()
+    /// Where the service a connection made now would reach stands.
+    pub(super) fn standing(&self) -> Standing {
+        if transport::is_current(self.epoch) {
+            local_services::standing(&self.context, &self.service)
+        } else {
+            Standing::Stopped
+        }
     }
 }
 
@@ -62,12 +66,10 @@ impl Drop for Forward {
     }
 }
 
-/// The listener `service` has now; none while its host is stopped.
-fn target(context: &Context, service: &str) -> Option<String> {
-    local_services::lookup(context, service)
-        .ok()
-        .flatten()
-        .map(|endpoint| endpoint.address())
+/// The listener `service` has now; none while its host is stopped or
+/// restarting.
+fn target(context: &Context, service: &str) -> Option<Endpoint> {
+    local_services::lookup(context, service).ok().flatten()
 }
 
 async fn serve(listener: TcpListener, context: Context, service: String, epoch: u64) {
@@ -77,17 +79,23 @@ async fn serve(listener: TcpListener, context: Context, service: String, epoch: 
         tokio::select! {
             accepted = listener.accept() => match accepted {
                 Ok((mut inbound, _)) => {
-                    let address = transport::is_current(epoch)
+                    let endpoint = transport::is_current(epoch)
                         .then(|| target(&context, &service))
                         .flatten();
-                    let Some(address) = address else { continue };
+                    let Some(endpoint) = endpoint else { continue };
                     connections.spawn(async move {
-                        if let Ok(mut outbound) = TcpStream::connect(address).await {
-                            if let Err(error) =
-                                tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await
-                            {
-                                tracing::debug!(%error, "a local forward ended with an error");
-                            }
+                        let Ok(mut outbound) = TcpStream::connect(endpoint.address()).await else {
+                            return;
+                        };
+                        // The host may have stopped while this dialled, and
+                        // another process may own the port by now.
+                        if !endpoint.is_current() || !transport::is_current(epoch) {
+                            return;
+                        }
+                        if let Err(error) =
+                            tokio::io::copy_bidirectional(&mut inbound, &mut outbound).await
+                        {
+                            tracing::debug!(%error, "a local forward ended with an error");
                         }
                     });
                 },

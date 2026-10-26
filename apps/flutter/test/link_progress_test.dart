@@ -168,5 +168,58 @@ void main() {
     await capturePreview(t, 'link-sheet-local-dark');
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 4));
+
+    // Its host restarting in place: under way, not dropped, and said once.
+    final zh = await AppLocalizations.delegate.load(const Locale('zh'));
+    const bridgeError = 'this local host is restarting; reconnect in a moment';
+    final reconnecting = ReconnectState(
+      active: true,
+      attempt: 1,
+      lastError: bridgeError,
+    );
+    await mount(
+      t,
+      reconnecting,
+      tunnel: const SubInfo(
+        key: _service,
+        localAddr: '127.0.0.1:51734',
+        alive: true,
+        ready: false,
+        path: TunnelPath.local,
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('link-step-local')),
+        matching: find.text(zh.hostRestarting),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(zh.subscribedDead), findsNothing);
+    expect(find.text(bridgeError), findsNothing);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+
+    // Stopped: the step says so, the headline what the reconnect waits for.
+    await mount(
+      t,
+      reconnecting,
+      tunnel: const SubInfo(
+        key: _service,
+        localAddr: '127.0.0.1:51734',
+        alive: false,
+        path: TunnelPath.local,
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('link-step-local')),
+        matching: find.text(zh.linkLocalStopped),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(zh.linkLocalWaiting), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
   });
 }

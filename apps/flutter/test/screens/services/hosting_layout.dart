@@ -263,8 +263,8 @@ void _registerHostingLayout() {
       expect(t.takeException(), isNull, reason: 'no overflow: $size ×$scale');
     }
 
-    // The identity text and the whole status lie inside the row, which
-    // stays on screen and opens settings when tapped.
+    // The identity text and, under it, the whole status lie inside the
+    // row, which stays on screen and opens settings when tapped.
     void identityWhole(Size size) {
       expect(identity.hitTestable(), findsOneWidget);
       final row = rectOf(identity);
@@ -275,6 +275,11 @@ void _registerHostingLayout() {
       }
       final status = t.renderObject<RenderParagraph>(inIdentity(online));
       expect(status.didExceedMaxLines, isFalse);
+      expect(
+        rectOf(inIdentity(online)).top,
+        greaterThanOrEqualTo(rectOf(inIdentity(relay)).bottom - 0.5),
+        reason: 'status under the identity',
+      );
     }
 
     // The capabilities title inside its group.
@@ -290,18 +295,10 @@ void _registerHostingLayout() {
     }
 
     for (final brightness in Brightness.values) {
-      // Regular text on a desktop: the column beside the detail, the
-      // status beside the identity.
+      // Regular text on a desktop: the column beside the detail.
       await show(const Size(1440, 900), 1, brightness);
       expect(narrowList, findsNothing, reason: 'side by side');
       identityWhole(const Size(1440, 900));
-      expect(
-        (rectOf(inIdentity(online)).center.dy -
-                rectOf(inIdentity(relay)).center.dy)
-            .abs(),
-        lessThan(4),
-        reason: 'status on the identity line',
-      );
       countWhole(const Size(1440, 900));
 
       // 3× text on a tablet: one level at a time, everything whole.
@@ -316,14 +313,9 @@ void _registerHostingLayout() {
       await t.pumpAndSettle();
       expect(narrowList, findsOneWidget);
 
-      // 2× text on a phone: the status moves under the identity.
+      // 2× text on a phone.
       await show(const Size(320, 640), 2, brightness);
       identityWhole(const Size(320, 640));
-      expect(
-        rectOf(inIdentity(online)).top,
-        greaterThanOrEqualTo(rectOf(inIdentity(relay)).bottom - 0.5),
-        reason: 'status under the identity',
-      );
     }
   }, variant: desktop);
 
@@ -423,6 +415,56 @@ void _registerHostingLayout() {
     expect(find.byKey(const Key('services-sign-in-again')), findsOneWidget);
     expect(find.byKey(const Key('relay-problem-retry')), findsNothing);
     expect(find.byKey(const Key('device-@local')), findsOneWidget);
+  }, variant: desktop);
+
+  testWidgets('an unreachable relay is said on its card, beside this '
+      'computer\'s working hosts, and a retry shows until it answers', (
+    t,
+  ) async {
+    final api = accountFake()
+      ..discoverError = StateError('connection refused (os error 61)')
+      ..serveHosts.add(
+        const AppServeStatus(
+          device: 'local',
+          name: 'work',
+          alive: true,
+          appServiceKey: 'pcx:local:app:work',
+        ),
+      );
+    await t.pumpWidget(host(const ServicesScreen(), api));
+    await t.pumpAndSettle();
+    final card = find.byKey(const Key('identity-open-settings'));
+    expect(
+      find.descendant(of: card, matching: find.text('不可达')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('relay-problem')), findsOneWidget);
+    expect(find.textContaining('connection refused'), findsOneWidget);
+    expect(find.byKey(const Key('device-@local')), findsOneWidget);
+
+    final relay = Completer<void>();
+    api
+      ..discoverError = null
+      ..discoverGate = relay;
+    await t.tap(find.byKey(const Key('relay-problem-retry')));
+    for (var i = 0; i < 4; i++) {
+      await t.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('relay-problem-retry')),
+        matching: find.text('检测中…'),
+      ),
+      findsOneWidget,
+      reason: 'the retry runs on its own button',
+    );
+    relay.complete();
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('relay-problem')), findsNothing);
+    expect(
+      find.descendant(of: card, matching: find.text('在线')),
+      findsOneWidget,
+    );
   }, variant: desktop);
 
   testWidgets('a phone offers no hosting: no title-bar action, no add card', (

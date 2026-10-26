@@ -21,7 +21,7 @@ fn a_same_port_restart_cannot_authorize_an_old_meta_request() {
     let (url, original) = super::guarded_endpoint(service, &["projects"]).expect("original");
     original().expect("active");
     host.suspend();
-    host.resume().expect("replacement");
+    host.resume();
     let (new_url, replacement) = super::guarded_endpoint(service, &["projects"]).expect("new");
     assert_eq!(url, new_url, "the address alone does not identify a host lifetime");
     assert!(original().is_err(), "old GET/PUT retries must stop even on the same port");
@@ -31,7 +31,50 @@ fn a_same_port_restart_cannot_authorize_an_old_meta_request() {
 }
 
 #[test]
+fn a_codex_child_restart_keeps_its_meta_service_reachable() {
+    use pocox_pb::{RelaySession, Transport};
+
+    use crate::engine::{local_services, transport};
+
+    let _serial = transport::test_serial();
+    crate::engine::runtime::init(std::env::temp_dir()).expect("runtime");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:1"),
+        namespace: None,
+    });
+    transport::test_context(context.clone());
+    let service = "pcx:meta-restart:app:test";
+    // As a Codex host registers them: the app-server child apart from the
+    // meta service, which outlives the child's restarts.
+    let mut app = local_services::Registration::new(&context, &[(
+        service.into(),
+        "127.0.0.1:10104".parse().expect("loopback"),
+    )])
+    .expect("app-server");
+    let meta = local_services::Registration::new(&context, &[(
+        "pcx:meta-restart:meta:test".into(),
+        "127.0.0.1:10105".parse().expect("loopback"),
+    )])
+    .expect("meta service");
+    let (_, before) = super::guarded_endpoint(service, &["projects"]).expect("serving");
+    app.suspend();
+    let (_, during) = super::guarded_endpoint(service, &["projects"]).expect("restarting");
+    during().expect("a request while the child restarts is admitted");
+    app.resume();
+    before().expect("a follow from before the restart continues");
+    drop(app);
+    assert!(
+        super::guarded_endpoint(service, &["projects"]).is_err(),
+        "a stopped app-server never reaches its surviving meta service"
+    );
+    drop(meta);
+    transport::context_changed();
+}
+
+#[test]
 fn pending_upload_context_changes_with_credentials_but_not_ui_settings() {
+    // The context includes the transport epoch, which other tests move.
+    let _serial = crate::engine::transport::test_serial();
     let dir = tempfile::tempdir().expect("support");
     let initial = super::upload_context_at(dir.path()).expect("context");
     crate::engine::config::update_config(dir.path(), |cfg| {

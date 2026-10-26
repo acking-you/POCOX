@@ -370,7 +370,7 @@ fn stop_owned(watched: &Watched, what: &str) -> Result<()> {
             .get_mut(&watched.name)
             .and_then(|ls| ls.app_route.as_mut())
         {
-            route.resume()?;
+            route.resume();
         }
         bail!("{what} did not exit; the restart was not attempted");
     }
@@ -445,7 +445,7 @@ fn spawn_again(watched: &Watched) -> Result<()> {
         ls.pid = report.info.pid;
         ls.child = child;
         if let Some(route) = &mut ls.app_route {
-            route.resume()?;
+            route.resume();
         }
     }
     Ok(())

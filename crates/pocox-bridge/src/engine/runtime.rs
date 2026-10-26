@@ -25,6 +25,7 @@ mod local_forward;
 mod path_status;
 pub use path_status::{PathStatus, TunnelHealth, TunnelPath};
 
+use crate::engine::local_services::Standing;
 use crate::engine::transport::Transport;
 
 static RUNTIME: OnceCell<Runtime> = OnceCell::new();
@@ -112,9 +113,15 @@ impl SubEntry {
             SubscriptionOwner::Local {
                 endpoint,
                 epoch,
-            } => self
-                .local_status(key, endpoint.is_current() && super::transport::is_current(*epoch)),
-            SubscriptionOwner::Forward(forward) => self.local_status(key, forward.is_current()),
+            } => self.local_status(
+                key,
+                if super::transport::is_current(*epoch) {
+                    endpoint.standing()
+                } else {
+                    Standing::Stopped
+                },
+            ),
+            SubscriptionOwner::Forward(forward) => self.local_status(key, forward.standing()),
             SubscriptionOwner::Tunnel {
                 connection,
                 path,
@@ -133,12 +140,14 @@ impl SubEntry {
     }
 
     /// This process's own service, reached without SDK counters or phases.
-    fn local_status(&self, key: &str, current: bool) -> SubStatus {
+    /// A host restarting in place is alive but not ready, like a tunnel
+    /// coming back.
+    fn local_status(&self, key: &str, standing: Standing) -> SubStatus {
         SubStatus {
             key: key.into(),
             local_addr: self.local_addr.clone(),
-            alive: current,
-            ready: current,
+            alive: standing != Standing::Stopped,
+            ready: standing == Standing::Serving,
             path: PathStatus {
                 path: TunnelPath::Local,
                 ..PathStatus::default()
@@ -351,16 +360,24 @@ pub(crate) fn forward_local(
         registry.remove(&key)
     };
     drop(replaced);
-    let (address, forward) = local_forward::Forward::bind(context, key.clone(), epoch, local_port)?;
+    let bound = local_forward::Forward::bind(context, key.clone(), epoch, local_port);
+    let mut registry = registry().lock().expect("registry poisoned");
+    if !super::transport::is_current(epoch) {
+        return Err(stale());
+    }
+    // A concurrent call for the same key bound first: its port is the one
+    // handed out, and this one (if it bound at all) closes again.
+    if let Some(entry) = registry.get(&key) {
+        if matches!(entry.owner, SubscriptionOwner::Forward(_)) {
+            return Ok(entry.status(&key));
+        }
+    }
+    let (address, forward) = bound?;
     let entry = SubEntry {
         local_addr: address.to_string(),
         owner: SubscriptionOwner::Forward(forward),
     };
     let status = entry.status(&key);
-    let mut registry = registry().lock().expect("registry poisoned");
-    if !super::transport::is_current(epoch) {
-        return Err(stale());
-    }
     let old = registry.insert(key, entry);
     drop(registry);
     drop(old);

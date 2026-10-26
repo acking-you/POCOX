@@ -618,7 +618,9 @@ class LinkSheet extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (tunnel != null) ...[
+                  // While it reconnects, the headline below says where it
+                  // stands; the chip is for a link at rest.
+                  if (tunnel != null && !state.active) ...[
                     const SizedBox(width: 12),
                     TunnelPathChip(tunnel),
                   ],
@@ -649,7 +651,9 @@ class LinkSheet extends ConsumerWidget {
                       ),
                   ],
                 ),
-                if (error != null)
+                // This app's own host: its step says what happened, and the
+                // bridge's error would only repeat it.
+                if (error != null && steps.local == null)
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(

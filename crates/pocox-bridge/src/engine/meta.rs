@@ -233,25 +233,10 @@ fn base_url_for(
     direct: bool,
 ) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
     // Validate the selected service before deriving its companion. A stopped
-    // session service must not connect to a surviving or unrelated meta host.
-    let selected = Target::resolve(service_key)?;
+    // session service must not connect to a surviving or unrelated meta host;
+    // one restarting in place keeps its meta service.
     let meta_key = if direct { service_key.to_string() } else { meta_key_of(service_key)? };
-    let target = match selected {
-        Target::Local {
-            context,
-            epoch,
-            ..
-        } => {
-            let endpoint = super::local_services::lookup(&context, &meta_key)?
-                .ok_or_else(|| anyhow!("the local host has no meta endpoint"))?;
-            Target::Local {
-                context,
-                epoch,
-                endpoint,
-            }
-        },
-        Target::Remote(owned) => Target::in_context(&meta_key, owned)?,
-    };
+    let target = Target::resolve_companion(service_key, &meta_key)?;
     let registry = format!("{META_TUNNEL}{}\u{1f}{meta_key}", target.context().id());
     let origin = target.open(&meta_key, registry, 0, false)?;
     let url = Url::parse(&origin.url()).context("parsing host endpoint")?;

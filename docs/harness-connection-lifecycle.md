@@ -57,10 +57,11 @@ picker. A failed local handshake tries the next candidate; remote discovery is
 deferred until no local candidate can connect. Local hosts the user hid do not
 make a start local-only, and once the relay was asked the local inventory is
 read again, since an account or relay reset leaves it unknown until the next
-resolution. Its picker consumes the last explicitly
-requested remote inventory without triggering discovery merely by rendering
-a local conversation. Local startup and switching use the connection's real
-handshake once; probes still perform real protocol requests when requested.
+resolution. Once a local start has landed, the relay is asked once behind
+the open conversation so the picker lists the other devices; rendering a
+local conversation never waits for it. Local startup and switching use the
+connection's real handshake once; probes still perform real protocol
+requests when requested.
 The services page keeps local hosts visible while remote discovery is pending
 or failing. This removes the controller's relay dependency; the existing
 account credential requirements for starting/publishing a host still apply.
@@ -69,10 +70,22 @@ Stopping a host invalidates its token before listener teardown and closes its
 controller sessions/streams. A known stopped key stays retired for this process,
 so a failed local request never silently falls back to the relay. An in-place
 Codex restart (watchdog or harness update) restarts only the app-server child,
-so only its route is suspended, before the child is signalled; a fresh token is
-issued only after readiness checks, and a child that does not exit is admitted
-again. The API proxy and meta service keep running and keep their routes.
-Reusing the port cannot revive an old client. A full app restart rebuilds
+so only its route is suspended, before the child is signalled. A suspended
+route reads as restarting, not stopped: it keeps its key (nothing else can host
+it), stays in local discovery, refuses new connections with a retryable error,
+and its subscription rows are alive but not ready, so views show the restart
+under way. Its host's companion services keep admitting requests (a meta read
+or write while the child restarts resolves the meta route directly), while a
+stopped app-server still never reaches a surviving meta service. A new
+generation is issued only after readiness checks, and a child that does not
+exit is admitted again. Clients from before the restart stay retired and
+reconnect to the new generation. A restart whose respawn fails leaves the route
+restarting; starting the host again then retires the entry and starts fresh
+rather than reporting whatever holds the port as running. The API proxy and
+meta service keep running and keep their routes. Reusing the port cannot
+revive an old client. A forwarded API connection checks its target again once
+dialled, so a host stopped meanwhile (or a reused port) is never bridged, and
+concurrent subscriptions to one API share its forward. A full app restart rebuilds
 the registry from new host starts, never from persisted port numbers. Account
 or relay changes invalidate outgoing sessions and subscriptions. Retried meta
 reads/writes retain their original endpoint lifetime and stop on retirement;

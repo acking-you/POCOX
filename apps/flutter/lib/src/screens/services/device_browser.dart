@@ -3,22 +3,58 @@ part of '../services_screen.dart';
 // A UI target, never a relay device label. Windows and WSL may share labels.
 const _thisDevice = '@local';
 
-/// Services listed as a device's capabilities: not its management entry, and
-/// not its shared ports, which have their own section.
+/// A service listed as a capability row of its own: a meta service shows as
+/// its app host's session sharing, and shared ports have their own section.
 bool _capability(ServiceEntry service) =>
-    service.kind != 'host' && service.kind != 'port';
+    isSessionKind(service.kind) || service.kind == 'api';
 
 /// What the page knows of the relay that lists the other devices.
-enum _RelayState {
-  /// It listed them.
-  online,
+sealed class _RelayState {
+  const _RelayState();
 
-  /// It has not answered yet; this computer's own services already show.
-  checking,
+  /// Whether this computer's services are published: false while the relay
+  /// cannot be asked.
+  bool get publishing => true;
+}
 
-  /// It could not list them: only this computer's own services are known,
-  /// and none of them is published until it answers.
-  down,
+/// It listed them.
+final class _RelayOnline extends _RelayState {
+  const _RelayOnline();
+}
+
+/// It has not answered yet; this computer's own services already show.
+final class _RelayChecking extends _RelayState {
+  const _RelayChecking();
+}
+
+/// It could not list them: only this computer's own services are known, and
+/// none of them is published until it answers.
+final class _RelayDown extends _RelayState {
+  const _RelayDown(this.detail, {required this.onRetry, this.retrying = false});
+
+  /// The error, as the bridge reported it.
+  final String detail;
+
+  /// Ask it again.
+  final VoidCallback onRetry;
+
+  /// A retry the user asked for is under way.
+  final bool retrying;
+
+  @override
+  bool get publishing => false;
+}
+
+/// The account's session expired: nothing can be listed or published until
+/// the user signs in again, so no retry is offered.
+final class _RelaySignedOut extends _RelayState {
+  const _RelaySignedOut({required this.onSignIn});
+
+  /// Go to sign-in.
+  final VoidCallback onSignIn;
+
+  @override
+  bool get publishing => false;
 }
 
 /// The service inventory, organized around devices rather than protocol tabs.
@@ -38,7 +74,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     required this.selectedDevice,
     required this.onSelectDevice,
     required this.onClearDevice,
-    this.relayState = _RelayState.online,
+    this.relayState = const _RelayOnline(),
   });
 
   final List<ServiceEntry> services;
@@ -216,7 +252,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     // layout instead, with the column at full width.
     final split =
         MediaQuery.sizeOf(context).width >= _splitWidth &&
-        _identityRowWidth(context, l10n.statusOnline) <= _columnWidth;
+        _identityRowWidth(context) <= _columnWidth;
     // Wide always has a device in the detail pane — an empty pane beside a
     // populated column reads as broken. Narrow shows the list first and only
     // resolves a device once one is picked, so nothing is chosen on the user's
@@ -425,7 +461,7 @@ class _DeviceFirstServices extends ConsumerWidget {
         (offline ?? offlineTunnels).contains(key)
         ? StatusChip(
             color: scheme.outline,
-            label: relayState == _RelayState.down
+            label: !relayState.publishing
                 ? l10n.tunnelNotConnected
                 : l10n.tunnelOffline,
             filled: true,

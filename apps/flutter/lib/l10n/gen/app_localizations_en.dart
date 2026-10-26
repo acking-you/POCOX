@@ -50,6 +50,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tunnelPathLocal => 'Local direct';
 
   @override
+  String get linkLocalStopped => 'Stopped';
+
+  @override
+  String get linkLocalWaiting => 'Waiting for this device\'s host';
+
+  @override
   String get tunnelPathIdle => 'Idle';
 
   @override
@@ -1005,6 +1011,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get statusUnreachable => 'Unreachable';
+
+  @override
+  String get statusSessionExpired => 'Session expired';
 
   @override
   String get unreachableReason =>

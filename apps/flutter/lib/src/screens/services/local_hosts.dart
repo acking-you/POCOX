@@ -65,6 +65,24 @@ class _LocalHostCard extends ConsumerWidget {
       );
       return (chip, false);
     }
+    // A lifecycle operation holds it (an update restarting it in place,
+    // say): it reads as what it is doing, never as not responding.
+    if (host.busy case final busy?) {
+      final label = switch (busy) {
+        'starting' => l10n.localHostStarting,
+        'stopping' => l10n.hostStopping,
+        _ => l10n.hostRestarting,
+      };
+      return (
+        StatusChip(
+          color: scheme.tertiary,
+          label: label,
+          filled: true,
+          pulsing: true,
+        ),
+        false,
+      );
+    }
     // Null while starting.
     final answers = !host.alive
         ? null

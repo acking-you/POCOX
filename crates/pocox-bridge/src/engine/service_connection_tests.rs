@@ -345,9 +345,21 @@ fn ownership_requires_the_exact_service_context_and_live_incarnation() {
         .expect("host");
     second.suspend();
     assert!(local_services::lookup(&alice, service).is_err());
-    second.resume().expect("in-place restart");
+    // Restarting in place is not stopping: the host keeps its key, stays
+    // listed and still admits its companion services.
+    assert!(local_services::hosts(&alice, service).expect("restarting"));
+    assert_eq!(local_services::discover(&alice).len(), 1);
+    assert!(Registration::new(&alice, &[(service.into(), address)]).is_err());
+    second.resume();
     assert!(!before_restart.is_current(), "reusing a port cannot revive an old client");
+    assert_eq!(
+        before_restart.standing(),
+        local_services::Standing::Restarting,
+        "an old client reconnects to the restarted host"
+    );
     drop(second);
+    assert_eq!(before_restart.standing(), local_services::Standing::Stopped);
+    assert!(local_services::hosts(&alice, service).is_err(), "a stopped host is not hosting");
     assert!(Registration::new(&alice, &[(
         service.into(),
         "192.0.2.1:80".parse().expect("remote")

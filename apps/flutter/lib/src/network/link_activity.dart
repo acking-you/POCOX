@@ -56,7 +56,9 @@ final linkWatchProvider = FutureProvider.autoDispose.family<LinkWatch, String>((
   try {
     final subs = await api.subscriptions();
     final tunnel = tunnelFor(subs, serviceKey);
-    interval = tunnel?.path == TunnelPath.local && tunnel!.alive
+    // A serving local listener has nothing to follow closely; one
+    // restarting comes back within seconds.
+    interval = tunnel?.path == TunnelPath.local && tunnel!.ready
         ? const Duration(seconds: 3)
         : _linkPollInterval;
     return LinkWatch(tunnel: tunnel, stage: api.appConnectStage(serviceKey));
@@ -183,25 +185,43 @@ LinkSteps linkSteps(
             if (since == null || event.ageMs <= since) event,
         ];
   final waitingRetry = reconnect.active && reconnect.retryAt != null;
+  final local = _localStep(l10n, tunnel);
+  final session = _sessionStep(l10n, stage, reconnect, connected, waitingRetry);
   return (
-    local: _localStep(l10n, tunnel),
+    local: local,
     relay: _relayStep(l10n, tunnel, stage, waitingRetry, reconnect),
     p2p: _p2pStep(l10n, tunnel, recent),
-    session: _sessionStep(l10n, stage, reconnect, connected, waitingRetry),
+    // While this device's host is not serving, the session waits on it: it
+    // is not what failed.
+    session:
+        local != null &&
+            local.state != LinkStepState.done &&
+            session.state == LinkStepState.failed
+        ? LinkStep(LinkStepState.waiting, l10n.linkStepSession)
+        : session,
   );
 }
 
-/// This app's own listener: current, or retired by a stop or restart. Null
-/// for a remote service.
+/// This app's own listener: serving (its address), restarting in place
+/// (the session reconnects to it on its own), or stopped. Null for a remote
+/// service.
 LinkStep? _localStep(AppLocalizations l10n, SubInfo? tunnel) {
   if (tunnel == null || tunnel.path != TunnelPath.local) return null;
-  return tunnel.alive
-      ? LinkStep(LinkStepState.done, tunnel.localAddr)
-      : LinkStep(
-          LinkStepState.failed,
-          l10n.subscribedDead,
-          detail: tunnel.localAddr,
-        );
+  if (!tunnel.alive) {
+    return LinkStep(
+      LinkStepState.failed,
+      l10n.linkLocalStopped,
+      detail: tunnel.localAddr,
+    );
+  }
+  if (!tunnel.ready) {
+    return LinkStep(
+      LinkStepState.active,
+      l10n.hostRestarting,
+      detail: tunnel.localAddr,
+    );
+  }
+  return LinkStep(LinkStepState.done, tunnel.localAddr);
 }
 
 LinkStep _relayStep(
@@ -358,7 +378,9 @@ String linkHeadline(
     if (step.state == LinkStepState.active) return step.label;
   }
   for (final step in order) {
-    if (step.state == LinkStepState.failed) return step.label;
+    if (step.state != LinkStepState.failed) continue;
+    // The step already says it stopped; the reconnect waits for its host.
+    return identical(step, steps.local) ? l10n.linkLocalWaiting : step.label;
   }
   return l10n.stateReconnecting;
 }
