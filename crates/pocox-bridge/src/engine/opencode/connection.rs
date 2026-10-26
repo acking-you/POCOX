@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use super::super::connect_stage::{self, ConnectStage};
-use super::super::transport::Owned;
+use super::super::service_connection::Target;
 use super::*;
 
 fn remove(key: &Key) {
@@ -20,15 +20,18 @@ fn dispose(conn: Conn) {
 }
 
 /// Connect to this context's native gateway, with a stream before publication.
-pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
-    let context = Context::of(&owned.transport);
+pub(crate) fn connect(service: &str, port: u16, owned: &Target) -> Result<()> {
+    let context = owned.context();
     let key = key_in(&context, service)?;
     let lifecycle = lifecycle(&key);
     let _guard = lock(&lifecycle);
-    if lock(&CONNS)
-        .get(&key)
-        .is_some_and(|c| !c.task.is_finished() && lock(&c.shared).healthy)
-    {
+    if lock(&CONNS).get(&key).is_some_and(|c| {
+        !c.task.is_finished()
+            && lock(&c.shared).healthy
+            && c.local
+                .as_ref()
+                .is_none_or(super::super::local_services::Endpoint::is_current)
+    }) {
         return Ok(());
     }
     // A stale connection goes, but its live tunnel stays for the new one: the
@@ -39,23 +42,10 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
         let _ = stale.tx.send(projection::health(false));
     }
     let subscription = format!("opencode\u{1f}{}\u{1f}{}", key.0, key.1);
-    let address = match super::super::serve_opencode::local_gateway(&key.1, &context) {
-        Some(local) => {
-            runtime::unsubscribe_service(&subscription);
-            local
-        },
-        None => {
-            runtime::subscribe_service_as(
-                subscription.clone(),
-                &key.1,
-                port,
-                &owned.transport,
-                || transport::is_current(owned.epoch),
-            )
-            .inspect_err(|_| runtime::unsubscribe_service(&subscription))?
-            .local_addr
-        },
-    };
+    let origin = owned
+        .open(&key.1, subscription.clone(), port, false)
+        .inspect_err(|_| runtime::unsubscribe_service(&subscription))?;
+    let address = &origin.address;
     connect_stage::enter(service, ConnectStage::Session);
     let opened = runtime::runtime().block_on(async {
         let client = Gateway::new(&format!("http://{}/", address))?;
@@ -101,9 +91,15 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
         tx,
         task,
         subscription,
+        local: origin.local,
     };
     let mut registry = lock(&CONNS);
-    if transport::epoch() != owned.epoch {
+    if transport::epoch() != owned.epoch()
+        || connection
+            .local
+            .as_ref()
+            .is_some_and(|local| !local.is_current())
+    {
         drop(registry);
         dispose(connection);
         bail!("the account or relay changed while connecting; try again");
@@ -116,9 +112,13 @@ pub fn connect(service: &str, port: u16, owned: &Owned) -> Result<()> {
 /// Live health of this controller, independently of host-owned turns.
 pub fn is_connected(service: &str) -> bool {
     let Ok(key) = current_key(service) else { return false };
-    lock(&CONNS)
-        .get(&key)
-        .is_some_and(|c| !c.task.is_finished() && lock(&c.shared).healthy)
+    lock(&CONNS).get(&key).is_some_and(|c| {
+        !c.task.is_finished()
+            && lock(&c.shared).healthy
+            && c.local
+                .as_ref()
+                .is_none_or(super::super::local_services::Endpoint::is_current)
+    })
 }
 
 /// Release only this controller's subscription and task.
@@ -138,27 +138,37 @@ pub fn context_changed() {
     }
 }
 
+/// Retiring a local host closes its controller streams immediately.
+pub(crate) fn local_stopped() {
+    let mut registry = lock(&CONNS);
+    let keys: Vec<_> = registry
+        .iter()
+        .filter(|(_, conn)| conn.local.as_ref().is_some_and(|local| !local.is_current()))
+        .map(|(key, _)| key.clone())
+        .collect();
+    let retired: Vec<_> = keys.iter().filter_map(|key| registry.remove(key)).collect();
+    drop(registry);
+    for conn in retired {
+        dispose(conn);
+    }
+}
+
 /// Test a transient subscription without retaining a controller connection.
-pub fn probe_reason(service: &str, owned: &Owned) -> Option<String> {
+pub(crate) fn probe_reason(service: &str, owned: &Target) -> Option<String> {
     let attempt = || -> Result<()> {
-        let context = Context::of(&owned.transport);
+        let context = owned.context();
         let key = key_in(&context, service)?;
-        let (address, task) = match super::super::serve_opencode::local_gateway(&key.1, &context) {
-            Some(local) => (local, None),
-            None => {
-                let (address, task) = runtime::subscribe_transient(key.1, 0, &owned.transport)?;
-                (address, Some(task))
-            },
-        };
+        let origin = owned.open(&key.1, String::new(), 0, true)?;
+        let address = &origin.address;
         let result = runtime::runtime().block_on(async {
             tokio::time::timeout(Duration::from_secs(10), async {
                 Gateway::new(&format!("http://{address}/"))?.info().await
             })
             .await
         });
-        if let Some(task) = task {
-            task.close();
-        }
+        let current = origin.is_current() && transport::is_current(owned.epoch());
+        origin.close_probe();
+        anyhow::ensure!(current, "the host or connection changed; reconnect");
         result??;
         Ok(())
     };

@@ -102,6 +102,15 @@ final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
 /// What [sub]'s status chip says: dropped, coming up or recovering, trying a
 /// direct path, or the path its data takes now.
 String tunnelPathLabel(AppLocalizations l10n, SubInfo sub) {
+  // This app's own listener has no relay phases: it serves, restarts in
+  // place or stopped.
+  if (sub.path == TunnelPath.local) {
+    return !sub.alive
+        ? l10n.linkLocalStopped
+        : !sub.ready
+        ? l10n.hostRestarting
+        : l10n.tunnelPathLocal;
+  }
   if (!sub.alive) return l10n.subscribedDead;
   if (sub.recovering) {
     return sub.ready
@@ -112,6 +121,7 @@ String tunnelPathLabel(AppLocalizations l10n, SubInfo sub) {
     return directStageLabel(l10n, attempt.stage);
   }
   return switch (sub.path) {
+    TunnelPath.local => l10n.tunnelPathLocal,
     TunnelPath.relayOnly => l10n.connectionPathRelayOnly,
     TunnelPath.idle => l10n.tunnelPathIdle,
     TunnelPath.direct => l10n.tunnelPathDirect,
@@ -139,6 +149,7 @@ TunnelPath? tunnelPathOf(List<SubInfo>? subs, String serviceKey) => switch (subs
 /// The few words that say how a connected service travels, after its state.
 String tunnelPathShort(AppLocalizations l10n, TunnelPath path) =>
     switch (path) {
+      TunnelPath.local => l10n.tunnelPathLocal,
       TunnelPath.direct => 'P2P',
       TunnelPath.mixed => l10n.tunnelShortMixed,
       TunnelPath.relay || TunnelPath.relayOnly => l10n.tunnelShortRelay,
@@ -320,7 +331,9 @@ class _TunnelDetails extends ConsumerWidget {
               TunnelPathChip(sub),
             ],
           ),
-          if (sub.alive) ...[
+          if (sub.alive && sub.path == TunnelPath.local)
+            _Fact(l10n.tunnelLocalAddress, sub.localAddr, mono: true),
+          if (sub.alive && sub.path != TunnelPath.local) ...[
             _Heading(l10n.tunnelSectionP2p),
             if (sub.path == TunnelPath.relayOnly)
               Text(l10n.tunnelRelayOnlyNote, style: helpTextStyle(theme))

@@ -20,7 +20,7 @@ pub async fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto>
     execution::run(Lane::Background, move || {
         let caps = match session_engine::protocol_of(&service_key) {
             Protocol::Acp => {
-                let owned = transport::resolve_owned_blocking()?;
+                let owned = crate::engine::service_connection::Target::resolve(&service_key)?;
                 let info = crate::engine::acp::host_info(&service_key, &owned)?;
                 crate::engine::acp::capabilities_of(&info, 0)
             },
@@ -117,7 +117,8 @@ pub async fn app_probe_reason(service_key: String) -> Result<Option<String>> {
 /// call), then tears it down.
 pub async fn api_probe(service_key: String) -> Result<bool> {
     execution::run(Lane::Background, move || {
-        Ok(app_session::probe_api(service_key, &transport::resolve_blocking()?))
+        let target = crate::engine::service_connection::Target::resolve(&service_key)?;
+        Ok(app_session::probe_api(service_key, &target))
     })
     .await
 }

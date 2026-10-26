@@ -26,8 +26,9 @@ use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use tokio::sync::broadcast;
 
+use crate::engine::service_connection::Target;
 use crate::engine::session_engine::{protocol_of, Protocol};
-use crate::engine::{acp, runtime, serve, transport};
+use crate::engine::{acp, runtime, transport};
 
 #[path = "meta_files.rs"]
 mod files;
@@ -124,7 +125,7 @@ fn stream_client() -> &'static Client {
 /// The `meta` service key for any pocox service key (same device +
 /// name).
 fn meta_key_of(service_key: &str) -> Result<String> {
-    let id = ServiceId::parse_key(service_key)
+    let id = super::session_engine::service_id_of(service_key)
         .ok_or_else(|| anyhow!("not a pocox service key: {service_key}"))?;
     Ok(ServiceId::new(
         id.device,
@@ -138,14 +139,11 @@ fn meta_key_of(service_key: &str) -> Result<String> {
 /// capability. A network failure is not proof of an older host; never silently
 /// substitute a different working directory after that failure.
 pub fn default_projects_available(service_key: &str) -> Result<bool> {
-    if serve::local_endpoints(service_key).is_some() {
-        return Ok(true);
-    }
-    let id = ServiceId::parse_key(service_key).context("invalid service key")?;
+    let Target::Remote(owned) = Target::resolve(service_key)? else { return Ok(true) };
+    let id = super::session_engine::service_id_of(service_key).context("invalid service key")?;
     if id.kind != ServiceKind::App {
         return Ok(true);
     }
-    let owned = transport::resolve_owned_blocking()?;
     if !transport::Context::of(&owned.transport).admits(service_key) {
         anyhow::bail!("this service belongs to another account or relay");
     }
@@ -230,34 +228,29 @@ const META_TUNNEL: &str = "meta\u{1f}";
 /// context never reuses it, it is dropped when the context changes, and one
 /// opened while the context changed is closed again instead of kept. A key
 /// namespaced to another account is refused.
-fn base_url(service_key: &str) -> Result<Url> {
-    base_url_for(service_key, false)
-}
-
-fn base_url_for(service_key: &str, direct: bool) -> Result<Url> {
-    // Loopback short-circuit only when THIS process actually hosts the viewed
-    // app-server — match its app key, not just the derived meta key, so a remote
-    // host that happens to share this device id + instance name can't misroute
-    // to our local loopback meta service.
-    let base = if let Some((_, addr)) = serve::local_endpoints(service_key) {
-        format!("http://{addr}")
-    } else {
-        let meta_key = if direct { service_key.to_string() } else { meta_key_of(service_key)? };
-        let owned = transport::resolve_owned_blocking()?;
-        let context = transport::Context::of(&owned.transport);
-        if !context.admits(service_key) {
-            anyhow::bail!("this service belongs to another account or relay");
-        }
-        let registry = format!("{META_TUNNEL}{}\u{1f}{meta_key}", context.id());
-        // Registered only while the context it was resolved in is current;
-        // a change drops it (`context_changed`) after the epoch moved.
-        let sub = runtime::subscribe_service_as(registry, &meta_key, 0, &owned.transport, || {
-            transport::is_current(owned.epoch)
-        })
-        .context("subscribing to the host meta tunnel")?;
-        format!("http://{}", sub.local_addr)
+fn base_url_for(
+    service_key: &str,
+    direct: bool,
+) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
+    // Validate the selected service before deriving its companion. A stopped
+    // session service must not connect to a surviving or unrelated meta host;
+    // one restarting in place keeps its meta service.
+    let meta_key = if direct { service_key.to_string() } else { meta_key_of(service_key)? };
+    let target = Target::resolve_companion(service_key, &meta_key)?;
+    let registry = format!("{META_TUNNEL}{}\u{1f}{meta_key}", target.context().id());
+    let origin = target.open(&meta_key, registry, 0, false)?;
+    let url = Url::parse(&origin.url()).context("parsing host endpoint")?;
+    let epoch = target.epoch();
+    // Capture the exact resolution, including same-port restarts; deriving a
+    // new lifetime from the URL later could authorize a replacement host.
+    let current = move || {
+        anyhow::ensure!(
+            transport::is_current(epoch) && origin.is_current(),
+            "the host or connection changed; retry the request"
+        );
+        Ok(())
     };
-    Url::parse(&base).with_context(|| format!("parsing meta base url `{base}`"))
+    Ok((url, current))
 }
 
 /// The transport context changed: close every meta tunnel of the old one.
@@ -267,18 +260,25 @@ pub(super) fn context_changed() {
 
 /// Build an endpoint URL under the meta base, percent-encoding each segment.
 pub(super) fn endpoint(service_key: &str, segments: &[&str]) -> Result<Url> {
-    let mut url = base_url(service_key)?;
+    guarded_endpoint(service_key, segments).map(|(url, _)| url)
+}
+
+fn guarded_endpoint(
+    service_key: &str,
+    segments: &[&str],
+) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
+    let (mut url, current) = base_url_for(service_key, false)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("meta base url cannot be a base"))?
         .extend(segments);
-    Ok(url)
+    Ok((url, current))
 }
 
 /// A standalone API proxy has no companion meta service, so read its metadata
 /// from the API listener itself. All other engines use their meta/host route.
 pub(super) fn device_endpoint(service_key: &str) -> Result<Url> {
-    let id = ServiceId::parse_key(service_key).context("invalid service key")?;
-    let mut url = base_url_for(service_key, id.kind == ServiceKind::Api)?;
+    let id = super::session_engine::service_id_of(service_key).context("invalid service key")?;
+    let (mut url, _) = base_url_for(service_key, id.kind == ServiceKind::Api)?;
     url.path_segments_mut()
         .map_err(|_| anyhow!("host URL cannot be a base"))?
         .extend(pocox_core::device::ROUTE.split('/').skip(1));
@@ -359,9 +359,9 @@ fn is_transient(err: &reqwest::Error) -> bool {
 /// or `POST /sessions/{id}/resume` (evicts processes). Those stay single-shot
 /// by design.
 ///
-/// The URL is rebuilt per attempt by the caller's closure rather than captured,
-/// so a retry re-resolves the base — a remote host whose tunnel was
-/// re-subscribed lands on the new local port instead of the stale one.
+/// Retries belong to the original connection and host lifetime. Retirement
+/// stops this request; a new caller resolves the replacement endpoint. In
+/// particular a PUT cannot be replayed into another host incarnation.
 ///
 /// `run` owns the WHOLE exchange, body included. A response resolves as soon as
 /// its headers arrive, so reading the body outside the retry would let a
@@ -371,7 +371,11 @@ fn is_transient(err: &reqwest::Error) -> bool {
 /// Bounded by [`META_TOTAL_DEADLINE`] as well as by attempts: against a
 /// blackholed tunnel every attempt can burn the full per-request timeout, and
 /// ten of those would turn a 30-second failure into a five-minute one.
-async fn retry_idempotent<T, F, Fut>(url_for_log: Url, run: F) -> Result<T>
+async fn retry_idempotent<T, F, Fut>(
+    url_for_log: Url,
+    current: impl Fn() -> Result<()>,
+    run: F,
+) -> Result<T>
 where
     F: Fn() -> Fut,
     Fut: std::future::Future<Output = std::result::Result<T, reqwest::Error>>,
@@ -379,8 +383,12 @@ where
     let mut retry = BoundedRetry::new();
     let started = Instant::now();
     loop {
+        current()?;
         match run().await {
-            Ok(v) => return Ok(v),
+            Ok(v) => {
+                current()?;
+                return Ok(v);
+            },
             Err(e) if is_transient(&e) => {
                 let elapsed = started.elapsed();
                 let give_up = retry.fail();
@@ -417,7 +425,7 @@ where
     }
 }
 
-async fn get_json<T: DeserializeOwned>(url: Url) -> Result<T> {
+async fn get_json<T: DeserializeOwned>(url: Url, current: impl Fn() -> Result<()>) -> Result<T> {
     // Send AND drain inside one retried unit: a body cut short mid-transfer is
     // the same dropped connection as a failed send, and must spend the same
     // budget rather than escaping it.
@@ -426,7 +434,7 @@ async fn get_json<T: DeserializeOwned>(url: Url) -> Result<T> {
     // body still have to reach the caller — so the outcome is carried out of the
     // retry rather than turned into a reqwest status error, whose message would
     // drop the body that usually says what the host objected to.
-    let (status, bytes) = retry_idempotent(url.clone(), || async {
+    let (status, bytes) = retry_idempotent(url.clone(), &current, || async {
         let resp = client().get(url.clone()).send().await?;
         let status = resp.status();
         Ok((status, resp.bytes().await?))
@@ -452,11 +460,11 @@ struct TranscriptResponse {
 
 /// List the remote host's local sessions over its meta tunnel.
 pub fn sessions(service_key: &str, running_only: bool) -> Result<Vec<LocalSession>> {
-    let mut url = endpoint(service_key, &["sessions"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["sessions"])?;
     if running_only {
         url.query_pairs_mut().append_pair("running_only", "true");
     }
-    let resp: SessionsResponse = runtime::runtime().block_on(get_json(url))?;
+    let resp: SessionsResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp
         .sessions
         .into_iter()
@@ -472,8 +480,8 @@ pub fn session_liveness(service_key: &str, thread_id: &str) -> Result<SessionLiv
     if protocol_of(service_key) == Protocol::Acp {
         return acp::native_liveness(service_key, thread_id);
     }
-    let url = endpoint(service_key, &["sessions", thread_id, "liveness"])?;
-    runtime::runtime().block_on(get_json(url))
+    let (url, current) = guarded_endpoint(service_key, &["sessions", thread_id, "liveness"])?;
+    runtime::runtime().block_on(get_json(url.clone(), current))
 }
 
 /// Read a remote session's transcript for read-only viewing.
@@ -481,8 +489,8 @@ pub fn transcript(service_key: &str, thread_id: &str) -> Result<Vec<TranscriptIt
     if matches!(protocol_of(service_key), Protocol::Acp | Protocol::OpenCode) {
         return Err(anyhow!("use the paginated native history of the selected ACP host"));
     }
-    let url = endpoint(service_key, &["sessions", thread_id, "transcript"])?;
-    let resp: TranscriptResponse = runtime::runtime().block_on(get_json(url))?;
+    let (url, current) = guarded_endpoint(service_key, &["sessions", thread_id, "transcript"])?;
+    let resp: TranscriptResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp.items)
 }
 
@@ -510,11 +518,13 @@ where
     // Keep their block_on calls off the async worker that consumes the SSE body.
     let key = service_key.to_owned();
     let thread = thread_id.to_owned();
-    let mut url =
-        tokio::task::spawn_blocking(move || endpoint(&key, &["sessions", &thread, "follow"]))
-            .await
-            .context("resolving session follow endpoint")??;
+    let (mut url, current) = tokio::task::spawn_blocking(move || {
+        guarded_endpoint(&key, &["sessions", &thread, "follow"])
+    })
+    .await
+    .context("resolving session follow endpoint")??;
     url.query_pairs_mut().append_pair("metadata_only", "true");
+    current()?;
     let response = tokio::time::timeout(META_TIMEOUT, stream_client().get(url.clone()).send())
         .await
         .with_context(|| format!("meta session follow connection to {url} timed out"))?
@@ -527,6 +537,7 @@ where
         .await
         .context("reading meta session follow")?
     {
+        current()?;
         pending.extend_from_slice(&chunk);
         while let Some(event) = take_sse_event(&mut pending) {
             let Some(update) = decode_follow_event(&event)? else {
@@ -602,25 +613,31 @@ pub fn force_resume(service_key: &str, thread_id: &str) -> Result<ForceResumeOut
 /// Read the host's project-folder config (configured roots + default project)
 /// over its meta tunnel — what a new session's folder browser starts from.
 pub fn project_config(service_key: &str) -> Result<HostConfig> {
-    let url = endpoint(service_key, &["projects"])?;
-    runtime::runtime().block_on(get_json(url))
+    let (url, current) = guarded_endpoint(service_key, &["projects"])?;
+    runtime::runtime().block_on(get_json(url.clone(), current))
 }
 
 /// Replace the host's project-folder config; returns the stored value. The
 /// desktop host edits this over its own loopback meta tunnel.
 pub fn set_project_config(service_key: &str, config: HostConfig) -> Result<HostConfig> {
-    let url = endpoint(service_key, &["projects"])?;
+    let (url, current) = guarded_endpoint(service_key, &["projects"])?;
     runtime::runtime().block_on(async move {
         // A full replace, so repeating it is safe: the second write stores the
         // same value the first would have.
-        put_json(url, &config).await.context("meta PUT projects")
+        put_json(url.clone(), &config, current)
+            .await
+            .context("meta PUT projects")
     })
 }
 
 /// A full-replace PUT plus its JSON response, as ONE retried unit (same
 /// send-and-drain reasoning as [`get_json`]).
-async fn put_json<B: serde::Serialize, T: DeserializeOwned>(url: Url, body: &B) -> Result<T> {
-    let (status, bytes) = retry_idempotent(url.clone(), || async {
+async fn put_json<B: serde::Serialize, T: DeserializeOwned>(
+    url: Url,
+    body: &B,
+    current: impl Fn() -> Result<()>,
+) -> Result<T> {
+    let (status, bytes) = retry_idempotent(url.clone(), &current, || async {
         let resp = client()
             .request(Method::PUT, url.clone())
             .json(body)
@@ -639,8 +656,8 @@ async fn put_json<B: serde::Serialize, T: DeserializeOwned>(url: Url, body: &B) 
 
 /// Read a remote thread's persisted config (all-unset when none stored).
 pub fn config_get(service_key: &str, thread_id: &str) -> Result<ThreadConfig> {
-    let url = endpoint(service_key, &["threads", thread_id, "config"])?;
-    runtime::runtime().block_on(get_json(url))
+    let (url, current) = guarded_endpoint(service_key, &["threads", thread_id, "config"])?;
+    runtime::runtime().block_on(get_json(url.clone(), current))
 }
 
 /// Persist a remote thread's config; returns the stored value.
@@ -649,10 +666,12 @@ pub fn config_put(
     thread_id: &str,
     config: ThreadConfig,
 ) -> Result<ThreadConfig> {
-    let url = endpoint(service_key, &["threads", thread_id, "config"])?;
+    let (url, current) = guarded_endpoint(service_key, &["threads", thread_id, "config"])?;
     runtime::runtime().block_on(async move {
         // Full replace, so a retry is safe (same reasoning as the projects PUT).
-        put_json(url, &config).await.context("meta PUT config")
+        put_json(url.clone(), &config, current)
+            .await
+            .context("meta PUT config")
     })
 }
 

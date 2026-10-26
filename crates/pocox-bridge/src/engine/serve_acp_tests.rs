@@ -3,7 +3,6 @@ use super::*;
 #[test]
 fn unknown_hosts_are_not_hosting() {
     assert!(!is_hosting("no-such-acp-host"));
-    assert!(local_endpoints("pcx:dev:acp:no-such").is_none());
     assert!(deregister("no-such-acp-host", "acp").is_err());
     assert!(restart("no-such-acp-host").is_err());
 }
@@ -89,6 +88,7 @@ fn fixture_host(name: &str, context: transport::Context) -> AcpServe {
     let id = owners().begin(host.clone()).expect("the barrier is open");
     assert!(owners().commit(id));
     AcpServe {
+        local_routes: None,
         device: "dev".into(),
         name: name.into(),
         key: ServiceId::new("dev", ServiceKind::Acp, name).key(),

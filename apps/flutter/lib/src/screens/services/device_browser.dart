@@ -3,10 +3,59 @@ part of '../services_screen.dart';
 // A UI target, never a relay device label. Windows and WSL may share labels.
 const _thisDevice = '@local';
 
-/// Services listed as a device's capabilities: not its management entry, and
-/// not its shared ports, which have their own section.
+/// A service listed as a capability row of its own: a meta service shows as
+/// its app host's session sharing, and shared ports have their own section.
 bool _capability(ServiceEntry service) =>
-    service.kind != 'host' && service.kind != 'port';
+    isSessionKind(service.kind) || service.kind == 'api';
+
+/// What the page knows of the relay that lists the other devices.
+sealed class _RelayState {
+  const _RelayState();
+
+  /// Whether this computer's services are published: false while the relay
+  /// cannot be asked.
+  bool get publishing => true;
+}
+
+/// It listed them.
+final class _RelayOnline extends _RelayState {
+  const _RelayOnline();
+}
+
+/// It has not answered yet; this computer's own services already show.
+final class _RelayChecking extends _RelayState {
+  const _RelayChecking();
+}
+
+/// It could not list them: only this computer's own services are known, and
+/// none of them is published until it answers.
+final class _RelayDown extends _RelayState {
+  const _RelayDown(this.detail, {required this.onRetry, this.retrying = false});
+
+  /// The error, as the bridge reported it.
+  final String detail;
+
+  /// Ask it again.
+  final VoidCallback onRetry;
+
+  /// A retry the user asked for is under way.
+  final bool retrying;
+
+  @override
+  bool get publishing => false;
+}
+
+/// The account's session expired: nothing can be listed or published until
+/// the user signs in again, so no retry is offered.
+final class _RelaySignedOut extends _RelayState {
+  const _RelaySignedOut({required this.onSignIn});
+
+  /// Go to sign-in.
+  final VoidCallback onSignIn;
+
+  @override
+  bool get publishing => false;
+}
 
 /// The service inventory, organized around devices rather than protocol tabs.
 /// App/API remain the real discovered services; session sharing is presented
@@ -25,7 +74,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     required this.selectedDevice,
     required this.onSelectDevice,
     required this.onClearDevice,
-    this.relayDown = false,
+    this.relayState = const _RelayOnline(),
   });
 
   final List<ServiceEntry> services;
@@ -41,9 +90,8 @@ class _DeviceFirstServices extends ConsumerWidget {
   /// Return to the device list (narrow only).
   final VoidCallback onClearDevice;
 
-  /// The relay could not list services: only this computer's own are known,
-  /// and none of them is published until it answers.
-  final bool relayDown;
+  /// Whether the relay listed [services].
+  final _RelayState relayState;
 
   /// Below this the device column and the detail can't sit side by side. Matches
   /// the conversation's own document-layout breakpoint so the whole app changes
@@ -150,6 +198,8 @@ class _DeviceFirstServices extends ConsumerWidget {
         ? ownManagement?.serviceKey
         : null;
     final ownedKeys = {
+      for (final service in ref.read(bridgeApiProvider).localServices())
+        service.key,
       for (final host in localHosts) ...[
         host.appServiceKey,
         host.apiServiceKey,
@@ -202,7 +252,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     // layout instead, with the column at full width.
     final split =
         MediaQuery.sizeOf(context).width >= _splitWidth &&
-        _identityRowWidth(context, l10n.statusOnline) <= _columnWidth;
+        _identityRowWidth(context) <= _columnWidth;
     // Wide always has a device in the detail pane — an empty pane beside a
     // populated column reads as broken. Narrow shows the list first and only
     // resolves a device once one is picked, so nothing is chosen on the user's
@@ -234,16 +284,6 @@ class _DeviceFirstServices extends ConsumerWidget {
     final apis = deviceEntries
         .where((service) => service.kind == 'api')
         .toList();
-    // Loopback probing speaks the Codex handshake; ACP gateways
-    // are probed through appProbe, which dispatches by key kind.
-    final localAppAddr = <String, String>{
-      for (final host in localHosts)
-        if (host.isCodex) host.appServiceKey: host.appListenAddr,
-    };
-    final localApiAddr = <String, String>{
-      for (final host in localHosts)
-        if (host.isCodex) host.apiServiceKey: host.apiListenAddr,
-    };
     final localTunnels = <String, ({String name, String kind})>{
       for (final host in localHosts)
         if (host.isCodex) ...{
@@ -320,11 +360,8 @@ class _DeviceFirstServices extends ConsumerWidget {
           reasonText: l10n.unreachableReason,
         );
       }
-      final localAddr = localAppAddr[service.key];
       return probed(
-        localAddr == null
-            ? ref.watch(appReachableProvider(service.key))
-            : ref.watch(appReachableLocalProvider(localAddr)),
+        ref.watch(appReachableProvider(service.key)),
         l10n.unreachableReason,
       );
     }
@@ -349,11 +386,8 @@ class _DeviceFirstServices extends ConsumerWidget {
           reasonText: l10n.apiUnreachableReason,
         );
       }
-      final localAddr = localApiAddr[service.key];
       return probed(
-        localAddr == null
-            ? ref.watch(apiReachableProvider(service.key))
-            : ref.watch(apiReachableLocalProvider(localAddr)),
+        ref.watch(apiReachableProvider(service.key)),
         l10n.apiUnreachableReason,
       );
     }
@@ -427,7 +461,9 @@ class _DeviceFirstServices extends ConsumerWidget {
         (offline ?? offlineTunnels).contains(key)
         ? StatusChip(
             color: scheme.outline,
-            label: relayDown ? l10n.tunnelNotConnected : l10n.tunnelOffline,
+            label: !relayState.publishing
+                ? l10n.tunnelNotConnected
+                : l10n.tunnelOffline,
             filled: true,
           )
         : null;
@@ -467,7 +503,7 @@ class _DeviceFirstServices extends ConsumerWidget {
         protocol: host != null
             ? wireOf(service)
             : protocolOf(wireOf(service), service),
-        localAddr: localAppAddr[service.key],
+        localAddr: hosted?.isCodex == true ? hosted?.appListenAddr : null,
         menuKey: Key('capability-menu-${service.key}'),
         status: offlineChip(service.key) ?? appStates[service.key]!.chip,
         reason: appStates[service.key]!.reason,
@@ -501,7 +537,12 @@ class _DeviceFirstServices extends ConsumerWidget {
           icon: AppIcons.bolt_outlined,
           title: l10n.servicesApiCapability,
           protocol: protocolOf('API', service),
-          localAddr: localApiAddr[service.key],
+          localAddr: localHosts
+              .where(
+                (host) => host.isCodex && host.apiServiceKey == service.key,
+              )
+              .firstOrNull
+              ?.apiListenAddr,
           menuKey: Key('capability-menu-${service.key}'),
           status: offlineChip(service.key) ?? apiStates[service.key]!.chip,
           reason: apiStates[service.key]!.reason,
@@ -596,7 +637,7 @@ class _DeviceFirstServices extends ConsumerWidget {
             device.name,
       },
       onSelect: onSelectDevice,
-      relayDown: relayDown,
+      relayState: relayState,
       // Beside a detail pane the column owns the full height and scrolls its
       // own list; stacked it is the page's only content and scrolls with it.
       filled: split,
@@ -899,6 +940,12 @@ class _NarrowServices extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeOutCubic,
+      // A short list starts at the top, also under a relay or sign-in
+      // banner, never centred in the room left below it.
+      layoutBuilder: (current, previous) => Stack(
+        alignment: Alignment.topCenter,
+        children: [...previous, ?current],
+      ),
       transitionBuilder: (child, animation) => SlideTransition(
         position: Tween<Offset>(
           begin: Offset(showDetail ? 0.06 : -0.06, 0),

@@ -84,6 +84,13 @@ use super::host_services::{
 /// process-globally; several can run at once, keyed by service name. The three
 /// registrations can be dropped/re-added independently of the processes.
 struct LocalServe {
+    /// This process's route to the app-server child, suspended while only
+    /// the child restarts in place.
+    app_route: Option<super::local_services::Registration>,
+    /// Routes to the API proxy and meta service, which keep running across
+    /// such a restart and end with the host.
+    service_routes: Option<super::local_services::Registration>,
+    context: transport::Context,
     device: String,
     name: String,
     // codex app-server (remote control).
@@ -377,12 +384,19 @@ fn resolve_codex_binary(
 ///
 /// - same name, codex alive → re-register any dropped tunnels; `Some(report)`,
 ///   and the caller returns without spawning.
-/// - same name, codex dead  → retire the stale entry; `None`, spawn fresh.
+/// - same name, codex dead or not restarted, or published under an account or
+///   relay other than the current one → retire the entry; `None`, spawn fresh.
+///   A host stays bound to the context it started in.
 /// - requested port taken   → error.
 ///
 /// Runs before anything is spawned, so a re-host never leaves two codex
 /// processes fighting over one port.
 fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
+    // Unknown while the account or relay cannot be resolved (offline): a
+    // live host is then kept, as it always was.
+    let current = transport::resolve_owned_blocking()
+        .ok()
+        .map(|owned| transport::Context::of(&owned.transport));
     let mut guard = hosts_locked();
     // Another spelling of the same instance would publish the same relay
     // keys and share its saved configuration.
@@ -393,7 +407,13 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
         bail!("`{other}` is already hosting under the same name; choose another name");
     }
     if let Some(ls) = guard.get_mut(name) {
-        if listen_addr_open(&ls.app_local.to_string()) {
+        let rebind = current
+            .as_ref()
+            .is_some_and(|current| *current != ls.context);
+        // A restart whose respawn failed leaves the route restarting:
+        // whatever holds the port then is not this host's codex.
+        let serving = ls.app_route.as_ref().is_none_or(|route| route.is_serving());
+        if !rebind && serving && listen_addr_open(&ls.app_local.to_string()) {
             let report = ServeReport {
                 device: ls.device.clone(),
                 name: ls.name.clone(),
@@ -413,9 +433,12 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
             republish_dropped(name)?;
             return Ok(Some(report));
         }
-        // codex dead → retire the stale entry and fall through to spawn.
+        // Retire the entry and fall through to spawn. It is stopped outside
+        // the lock: a live codex may take its whole exit wait.
         if let Some(stale) = guard.remove(name) {
+            drop(guard);
             stop_host_tasks(stale);
+            guard = hosts_locked();
         }
     }
     if port != 0 && guard.values().any(|ls| ls.app_local.port() == port) {
@@ -719,9 +742,17 @@ fn launch_codex(
         let (api_std, api_local) = bind_loopback("in-app API proxy")?;
         let (meta_std, meta_local) = bind_loopback("in-app meta service")?;
         let transport = transport::resolve_blocking()?;
-        Ok((api_std, api_local, meta_std, meta_local, transport))
+        let context = transport::Context::of(&transport);
+        let routes = (
+            super::local_services::Registration::new(&context, &[(app_key.clone(), app_local)])?,
+            super::local_services::Registration::new(&context, &[
+                (api_key.clone(), api_local),
+                (meta_key.clone(), meta_local),
+            ])?,
+        );
+        Ok((api_std, api_local, meta_std, meta_local, transport, routes))
     })();
-    let (api_std, api_local, meta_std, meta_local, transport) = match bringup_tail {
+    let (api_std, api_local, meta_std, meta_local, transport, routes) = match bringup_tail {
         Ok(tail) => tail,
         Err(e) => {
             watchdog.abort();
@@ -755,7 +786,11 @@ fn launch_codex(
         .ok()
         .flatten();
 
+    let (app_route, service_routes) = routes;
     let mut host = LocalServe {
+        app_route: Some(app_route),
+        service_routes: Some(service_routes),
+        context: transport::Context::of(&transport),
         device: device.clone(),
         name: name.clone(),
         app_key: app_key.clone(),
@@ -917,19 +952,6 @@ pub(super) fn is_hosting_codex(name: &str) -> bool {
             .is_empty()
 }
 
-/// Resolve this process's own session (app-server or ACP
-/// gateway) and meta listeners without relay probes.
-pub(super) fn local_endpoints(service_key: &str) -> Option<(String, String)> {
-    let codex = hosts_locked()
-        .values()
-        .find(|host| host.app_key == service_key)
-        .map(|host| (host.app_local.to_string(), host.meta_local.to_string()));
-    codex
-        .or_else(|| super::serve_acp::local_endpoints(service_key))
-        .or_else(|| super::serve_opencode::local_endpoints(service_key))
-}
-
-/// `true` if something is accepting TCP on a `host:port` listen address.
 pub(super) fn listen_addr_open(listen_addr: &str) -> bool {
     match listen_addr.rsplit_once(':') {
         Some((host, port)) => port

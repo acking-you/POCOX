@@ -353,8 +353,25 @@ pub(in crate::engine) fn start_in_place(_lease: &Lease, stopped: Stopped) -> Res
 fn stop_owned(watched: &Watched, what: &str) -> Result<()> {
     // Nothing launches beside an earlier codex of this host still running.
     settle_retained(&watched.name)?;
-    let old = hosts_locked().get(&watched.name).and_then(|ls| ls.child);
+    // Retire this app's clients of the child before it is signalled, so none
+    // is admitted to a process on its way out. The API proxy and meta service
+    // keep running and keep their routes.
+    let old = {
+        let guard = hosts_locked();
+        let ls = guard.get(&watched.name);
+        if let Some(route) = ls.and_then(|ls| ls.app_route.as_ref()) {
+            route.suspend();
+        }
+        ls.and_then(|ls| ls.child)
+    };
     if old.is_some_and(|old| !NATIVE.stop(&watched.name, old, EXIT_WAIT)) {
+        // It stays owned and running: admit clients to it again.
+        if let Some(route) = hosts_locked()
+            .get_mut(&watched.name)
+            .and_then(|ls| ls.app_route.as_mut())
+        {
+            route.resume();
+        }
         bail!("{what} did not exit; the restart was not attempted");
     }
     if let Some(ls) = hosts_locked().get_mut(&watched.name) {
@@ -427,6 +444,9 @@ fn spawn_again(watched: &Watched) -> Result<()> {
     if let Some(ls) = hosts_locked().get_mut(&watched.name) {
         ls.pid = report.info.pid;
         ls.child = child;
+        if let Some(route) = &mut ls.app_route {
+            route.resume();
+        }
     }
     Ok(())
 }

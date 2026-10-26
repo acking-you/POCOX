@@ -25,7 +25,6 @@ use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 use crate::engine::runtime;
-use crate::engine::transport::Transport;
 
 #[path = "app_session_live.rs"]
 mod live;
@@ -58,9 +57,9 @@ use self::config::{
 pub use self::config::{model_list, thread_runtime_config, ThreadRuntimeConfig};
 #[cfg(test)]
 pub use self::connection::probe_endpoint_error;
+pub(crate) use self::connection::{connect, probe_api, probe_reason};
 pub use self::connection::{
-    connect, connect_local, disconnect, is_connected, probe_api, probe_endpoint,
-    probe_http_endpoint, probe_reason,
+    connect_local, disconnect, is_connected, probe_endpoint, probe_http_endpoint,
 };
 use self::history::{
     fetch_item_page, fetch_older_item_page, fetch_turn_page, is_unknown_method,
@@ -210,6 +209,7 @@ pub struct ThreadItem {
 }
 
 struct Session {
+    owner: Option<SessionOwner>,
     client: Arc<AppClient>,
     events: broadcast::Sender<AppEvent>,
     forwarder: JoinHandle<()>,
@@ -314,6 +314,27 @@ fn advancing_cursor(
     next.filter(|next| !next.is_empty() && seen.insert(next.clone()))
 }
 
+struct SessionOwner {
+    epoch: u64,
+    local: Option<super::local_services::Endpoint>,
+}
+
+impl SessionOwner {
+    fn is_current(&self) -> bool {
+        super::transport::is_current(self.epoch)
+            && self
+                .local
+                .as_ref()
+                .is_none_or(super::local_services::Endpoint::is_current)
+    }
+}
+
+impl Session {
+    fn is_current(&self) -> bool {
+        self.owner.as_ref().is_none_or(SessionOwner::is_current)
+    }
+}
+
 impl Drop for Session {
     fn drop(&mut self) {
         self.forwarder.abort();
@@ -321,6 +342,24 @@ impl Drop for Session {
 }
 
 static SESSIONS: OnceCell<Mutex<HashMap<String, Session>>> = OnceCell::new();
+
+/// Close sessions of the old account/relay after its epoch has moved.
+pub(super) fn context_changed() {
+    // Private sign-in clients have no transport owner and survive account
+    // transitions; only ordinary controller sessions belong to this context.
+    sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .retain(|_, session| session.owner.is_none());
+}
+
+/// Release sockets of retired local listeners, even when no UI is polling.
+pub(super) fn local_stopped() {
+    sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .retain(|_, session| session.is_current());
+}
 
 fn sessions() -> &'static Mutex<HashMap<String, Session>> {
     SESSIONS.get_or_init(|| Mutex::new(HashMap::new()))
@@ -368,6 +407,7 @@ pub fn subscribe_events(service_key: &str) -> Result<broadcast::Receiver<AppEven
 fn client_for(service_key: &str) -> Result<Arc<AppClient>> {
     let map = sessions().lock().expect("sessions poisoned");
     map.get(service_key)
+        .filter(|s| s.is_current())
         .map(|s| Arc::clone(&s.client))
         .ok_or_else(|| anyhow!("not connected to {service_key}"))
 }

@@ -47,6 +47,15 @@ class AppLocalizationsEn extends AppLocalizations {
       'Couldn\'t save. Your previous choice is kept.';
 
   @override
+  String get tunnelPathLocal => 'Local direct';
+
+  @override
+  String get linkLocalStopped => 'Stopped';
+
+  @override
+  String get linkLocalWaiting => 'Waiting for this device\'s host';
+
+  @override
   String get tunnelPathIdle => 'Idle';
 
   @override
@@ -1004,6 +1013,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusUnreachable => 'Unreachable';
 
   @override
+  String get statusSessionExpired => 'Session expired';
+
+  @override
   String get unreachableReason =>
       'Still registered on the relay, but the remote app-server isn\'t responding — it may not be running, or has crashed.';
 
@@ -1179,7 +1191,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noAuthWarning =>
-      '⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
+      'The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
 
   @override
   String get subscribeFailed => 'Couldn\'t start the subscription';

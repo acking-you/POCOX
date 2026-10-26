@@ -126,6 +126,7 @@ class RustBridgeApi
     localAddr: s.localAddr,
     alive: s.alive,
     path: switch (s.path) {
+      frb.TunnelPathDto.local => TunnelPath.local,
       frb.TunnelPathDto.relayOnly => TunnelPath.relayOnly,
       frb.TunnelPathDto.idle => TunnelPath.idle,
       frb.TunnelPathDto.direct => TunnelPath.direct,
@@ -304,6 +305,19 @@ class RustBridgeApi
 
   @override
   Future<String> exportConfig() => frb.exportConfig();
+
+  @override
+  List<ServiceEntry> localServices() => frb
+      .localServices()
+      .map(
+        (s) => ServiceEntry(
+          device: s.device,
+          kind: s.kind,
+          name: s.name,
+          key: s.key,
+        ),
+      )
+      .toList();
 
   @override
   Future<List<ServiceEntry>> discoverServices() async {

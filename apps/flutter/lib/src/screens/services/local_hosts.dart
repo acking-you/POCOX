@@ -46,7 +46,7 @@ class _LocalHostCard extends ConsumerWidget {
   /// port-open (the listener bound), which stays true even when the embedded
   /// codex has wedged / gone half-open (still accept()ing but never answering
   /// RPC) — a false "hosting". So once the listener is up, the real signal is
-  /// a loopback `initialize` handshake (appReachableLocalProvider, no relay
+  /// a protocol handshake (the bridge selects the owned loopback endpoint, no relay
   /// hop): answers → 托管中, listening but silent → 无响应. Before the port is
   /// even open it is genuinely starting.
   (StatusChip, bool) _health(
@@ -65,15 +65,29 @@ class _LocalHostCard extends ConsumerWidget {
       );
       return (chip, false);
     }
+    // A lifecycle operation holds it (an update restarting it in place,
+    // say): it reads as what it is doing, never as not responding.
+    if (host.busy case final busy?) {
+      final label = switch (busy) {
+        'starting' => l10n.localHostStarting,
+        'stopping' => l10n.hostStopping,
+        _ => l10n.hostRestarting,
+      };
+      return (
+        StatusChip(
+          color: scheme.tertiary,
+          label: label,
+          filled: true,
+          pulsing: true,
+        ),
+        false,
+      );
+    }
     // Null while starting.
     final answers = !host.alive
         ? null
         : ref
-              .watch(
-                host.isCodex
-                    ? appReachableLocalProvider(host.appListenAddr)
-                    : appReachableProvider(host.appServiceKey),
-              )
+              .watch(appReachableProvider(host.appServiceKey))
               .when(
                 data: (ok) => ok,
                 loading: () => null,

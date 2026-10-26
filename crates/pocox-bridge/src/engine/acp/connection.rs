@@ -5,67 +5,7 @@
 
 use super::*;
 use crate::engine::connect_stage::{self, ConnectStage};
-
-/// Where a connection reaches its gateway.
-struct Origin {
-    pub(super) url: String,
-    /// The relay subscription made for it (registry key), if any.
-    pub(super) subscription: Option<String>,
-    /// The loopback gateway, when hosted here.
-    pub(super) local: Option<String>,
-    /// A transient tunnel to abort when done (probes).
-    pub(super) transient: Option<runtime::TransientSubscription>,
-}
-
-impl Origin {
-    fn release(&self) {
-        if let Some(subscription) = &self.subscription {
-            runtime::unsubscribe_service(subscription);
-        }
-    }
-}
-
-/// Resolve the gateway origin. A host this process owns under the same
-/// context is reached on loopback — decided before any relay work; anything
-/// else through a relay subscription scoped to the context.
-fn origin(
-    key: &Key,
-    context: &Context,
-    local_port: u16,
-    owned: &Owned,
-    transient: bool,
-) -> Result<Origin> {
-    let transport = &owned.transport;
-    if let Some(gateway) = crate::engine::serve_acp::local_gateway(&key.1, context) {
-        return Ok(Origin {
-            url: format!("http://{gateway}/"),
-            subscription: None,
-            local: Some(gateway),
-            transient: None,
-        });
-    }
-    if transient {
-        let (addr, handle) = runtime::subscribe_transient(key.1.clone(), local_port, transport)?;
-        return Ok(Origin {
-            url: format!("http://{addr}/"),
-            subscription: None,
-            local: None,
-            transient: Some(handle),
-        });
-    }
-    let registry = subscription_key(key);
-    let epoch = owned.epoch;
-    let sub =
-        runtime::subscribe_service_as(registry.clone(), &key.1, local_port, transport, || {
-            transport::is_current(epoch)
-        })?;
-    Ok(Origin {
-        url: format!("http://{}/", sub.local_addr),
-        subscription: Some(registry),
-        local: None,
-        transient: None,
-    })
-}
+use crate::engine::service_connection::{Origin, Target};
 
 pub(super) fn check_api(snapshot: &Value) -> Result<()> {
     match snapshot["info"]["api"].as_u64() {
@@ -104,9 +44,9 @@ async fn open(client: &GatewayClient) -> Result<(Value, EventStream)> {
 /// Connect (idempotent while the connection is healthy and current). The
 /// connection belongs to the context `owned` was resolved in and is
 /// registered only while that context is current.
-pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> {
-    let context = Context::of(&owned.transport);
-    let epoch = owned.epoch;
+pub(crate) fn connect(service_key: &str, local_port: u16, owned: &Target) -> Result<()> {
+    let context = owned.context();
+    let epoch = owned.epoch();
     let key = key_in(&context, service_key)?;
     let lifecycle = lifecycle(&key);
     let _guard = lifecycle
@@ -121,7 +61,7 @@ pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> 
     if let Some(stale) = &stale {
         close(stale);
     }
-    let origin = origin(&key, &context, local_port, owned, false);
+    let origin = owned.open(&key.1, subscription_key(&key), local_port, false);
     // A tunnel the new connection does not reuse (it failed, or the host is
     // now reached on loopback) is the old one's alone.
     let kept = origin
@@ -135,7 +75,7 @@ pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> 
     }
     let origin = origin?;
     connect_stage::enter(service_key, ConnectStage::Session);
-    let client = match GatewayClient::new(&origin.url) {
+    let client = match GatewayClient::new(&origin.url()) {
         Ok(client) => client,
         Err(error) => {
             origin.release();
@@ -164,8 +104,6 @@ pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> 
         view.healthy = true;
     }
     let watch = Watch {
-        logical: key.1.clone(),
-        context: context.clone(),
         local: origin.local.clone(),
     };
     // The event task recovers running folds from this snapshot before it
@@ -197,7 +135,7 @@ pub fn connect(service_key: &str, local_port: u16, owned: &Owned) -> Result<()> 
 /// the change (see [`context_changed`]).
 pub(super) fn register(key: Key, conn: Conn, epoch: u64) -> Result<()> {
     let mut registry = conns();
-    if transport::epoch() != epoch {
+    if transport::epoch() != epoch || conn.local.as_ref().is_some_and(|local| !local.is_current()) {
         drop(registry);
         release(conn);
         bail!("the account or relay changed while connecting; try again");
@@ -208,18 +146,15 @@ pub(super) fn register(key: Key, conn: Conn, epoch: u64) -> Result<()> {
 
 /// Whether `key`'s connection is alive, its stream healthy, and — for a
 /// local host — still pointing at the host currently published here.
-pub(super) fn is_current(key: &Key, context: &Context) -> bool {
+pub(super) fn is_current(key: &Key, _context: &Context) -> bool {
     let conns = conns();
     let Some(conn) = conns.get(key) else { return false };
     if conn.task.is_finished() || !lock(&conn.shared).healthy {
         return false;
     }
-    match &conn.local {
-        Some(local) => {
-            crate::engine::serve_acp::local_gateway(&key.1, context).as_ref() == Some(local)
-        },
-        None => true,
-    }
+    conn.local
+        .as_ref()
+        .is_none_or(crate::engine::local_services::Endpoint::is_current)
 }
 
 /// Whether a live, healthy connection exists in the current context.
@@ -271,9 +206,24 @@ pub fn context_changed() {
     }
 }
 
+/// Retiring a local host closes its controller streams immediately.
+pub(crate) fn local_stopped() {
+    let mut registry = conns();
+    let keys: Vec<_> = registry
+        .iter()
+        .filter(|(_, conn)| conn.local.as_ref().is_some_and(|local| !local.is_current()))
+        .map(|(key, _)| key.clone())
+        .collect();
+    let retired: Vec<_> = keys.iter().filter_map(|key| registry.remove(key)).collect();
+    drop(registry);
+    for conn in retired {
+        release(conn);
+    }
+}
+
 /// Why the service is unreachable or unusable, or `None` when it is ready.
-pub fn probe_reason(service_key: &str, owned: &Owned) -> Option<String> {
-    let context = Context::of(&owned.transport);
+pub(crate) fn probe_reason(service_key: &str, owned: &Target) -> Option<String> {
+    let context = owned.context();
     let key = match key_in(&context, service_key) {
         Ok(key) => key,
         Err(error) => return Some(format!("{error:#}")),
@@ -298,15 +248,15 @@ pub fn probe_reason(service_key: &str, owned: &Owned) -> Option<String> {
 
 /// Read the host's declared profile without opening a session or event stream.
 /// The temporary tunnel is closed even on failure; stale context answers fail.
-pub fn host_info(service_key: &str, owned: &Owned) -> Result<Value> {
-    let context = Context::of(&owned.transport);
+pub(crate) fn host_info(service_key: &str, owned: &Target) -> Result<Value> {
+    let context = owned.context();
     let key = key_in(&context, service_key)?;
-    let origin = origin(&key, &context, 0, owned, true)?;
-    read_info(origin, owned.epoch)
+    let origin = owned.open(&key.1, subscription_key(&key), 0, true)?;
+    read_info(origin, owned.epoch())
 }
 
 fn read_info(origin: Origin, epoch: u64) -> Result<Value> {
-    let result = GatewayClient::new(&origin.url)
+    let result = GatewayClient::new(&origin.url())
         .map_err(|error| anyhow!("{error}"))
         .and_then(|client| {
             runtime::runtime()
@@ -314,10 +264,9 @@ fn read_info(origin: Origin, epoch: u64) -> Result<Value> {
                 .context("the agent host did not answer in time")?
                 .map_err(|error| anyhow!("{error}"))
         });
-    if let Some(handle) = origin.transient {
-        handle.close();
-    }
-    if !transport::is_current(epoch) {
+    let current = origin.is_current() && transport::is_current(epoch);
+    origin.close_probe();
+    if !current {
         bail!("the account or relay changed while reading the agent identity");
     }
     result
@@ -364,7 +313,7 @@ mod tests {
             let connections = conns().len();
             let result = read_info(
                 Origin {
-                    url: format!("http://{address}/"),
+                    address: address.to_string(),
                     subscription: None,
                     local: None,
                     transient: None,

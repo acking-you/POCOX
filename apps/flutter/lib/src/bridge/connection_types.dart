@@ -79,6 +79,9 @@ class RelayPreferences {
 /// What a subscription's data connections go through right now: a local SDK
 /// observation, never the saved preference.
 enum TunnelPath {
+  /// Process-owned loopback; no relay setup or intermediate forwarding.
+  local,
+
   /// Opened with the relay-only preference.
   relayOnly,
 

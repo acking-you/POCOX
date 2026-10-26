@@ -7,6 +7,9 @@ mixin _FakeConnection on _FakeBridgeState {
   /// When set, [appConnect] fails with it, as an unreachable host does.
   Object? appConnectError;
 
+  /// Connection failures scoped to one host, for candidate fallback.
+  final Map<String, Object> appConnectErrors = {};
+
   /// When set, [accountWebLoginStart] fails with it, as a backend refusal does.
   Object? webLoginStartError;
 
@@ -102,6 +105,25 @@ mixin _FakeConnection on _FakeBridgeState {
   @override
   Future<String> exportConfig() async => 'pcx1:ZmFrZQ';
 
+  /// Like the bridge's listener registry: every service a host owns here,
+  /// its session, API and meta listeners alike.
+  @override
+  List<ServiceEntry> localServices() => [
+    for (final host in serveHosts)
+      for (final (kind, key) in [
+        (host.sessionKind, host.appServiceKey),
+        ('api', host.apiServiceKey),
+        ('meta', host.metaServiceKey),
+      ])
+        if (key.isNotEmpty)
+          ServiceEntry(
+            device: host.device,
+            kind: kind,
+            name: host.name,
+            key: key,
+          ),
+  ];
+
   @override
   Future<List<ServiceEntry>> discoverServices() async {
     discoverCalls++;
@@ -113,10 +135,15 @@ mixin _FakeConnection on _FakeBridgeState {
 
   @override
   Future<SubInfo> apiSubscribe(String serviceKey, int localPort) async {
+    // An API hosted here is forwarded straight to its listener, as in the
+    // bridge.
     final s = SubInfo(
       key: serviceKey,
       localAddr: '127.0.0.1:$localPort',
       alive: true,
+      path: serveHosts.any((host) => host.apiServiceKey == serviceKey)
+          ? TunnelPath.local
+          : TunnelPath.relayOnly,
     );
     _subs[serviceKey] = s;
     return s;
@@ -317,7 +344,9 @@ mixin _FakeConnection on _FakeBridgeState {
   Future<void> appConnect(String serviceKey, int localPort) async {
     appConnectCount++;
     await appConnectGate;
-    if (appConnectError case final error?) throw error;
+    if (appConnectErrors[serviceKey] ?? appConnectError case final error?) {
+      throw error;
+    }
     _appConnected.add(serviceKey);
     _appEvents.putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast);
   }

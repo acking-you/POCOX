@@ -32,6 +32,33 @@ void _registerLocalHostLifecycle() {
     expect(api.serveHosts, isEmpty);
   }, variant: desktop);
 
+  testWidgets('a host held by a restart reads as restarting, not as '
+      'not responding', (t) async {
+    final api = accountFake()
+      // Its app-server is down while it restarts.
+      ..reachable['pcx:local:app:work'] = false
+      ..serveHosts.add(
+        const AppServeStatus(
+          device: 'local',
+          name: 'work',
+          alive: true,
+          appServiceKey: 'pcx:local:app:work',
+          busy: 'restarting',
+        ),
+      );
+    await t.pumpWidget(host(const ServicesScreen(), api));
+    // The chip pulses while it restarts: bounded frames only.
+    for (var i = 0; i < 6; i++) {
+      await t.pump(const Duration(milliseconds: 50));
+    }
+    final card = find.byKey(const Key('local-host-work'));
+    expect(
+      find.descendant(of: card, matching: find.text('重启中…')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: card, matching: find.text('无响应')), findsNothing);
+  }, variant: desktop);
+
   testWidgets('a host whose codex did not exit stays listed and stoppable '
       'until a stop succeeds', (t) async {
     final api = accountFake()

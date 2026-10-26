@@ -366,6 +366,19 @@ fn publish(
             return Err((error, owner));
         },
     };
+    let local_routes = match super::super::local_services::Registration::new(
+        &transport::Context::of(&transport),
+        &[
+            (ServiceId::new(&device, ServiceKind::Acp, name).key(), gateway_local),
+            (ServiceId::new(&device, ServiceKind::Meta, name).key(), meta_local),
+        ],
+    ) {
+        Ok(routes) => routes,
+        Err(error) => {
+            abort();
+            return Err((error, owner));
+        },
+    };
     let meta_register =
         host_services::register_service(&transport, &device, ServiceKind::Meta, name, meta_local)
             .ok()
@@ -379,12 +392,15 @@ fn publish(
     ) {
         Ok(register) => register,
         Err(error) => {
+            // Retired before its listeners stop, like every other stop.
+            drop(local_routes);
             abort();
             drop(meta_register);
             return Err((error, owner));
         },
     };
     Ok(AcpServe {
+        local_routes: Some(local_routes),
         key: ServiceId::new(&device, ServiceKind::Acp, name).key(),
         meta_key: ServiceId::new(&device, ServiceKind::Meta, name).key(),
         device,

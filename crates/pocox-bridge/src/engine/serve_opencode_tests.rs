@@ -116,7 +116,9 @@ fn native_bridge_hosting_controller_and_original_resume() {
     let mut pid = row.pid.expect("owned process");
     let incarnation = row.incarnation.expect("incarnation");
     let owned = transport::resolve_owned_blocking().expect("self-host transport");
-    assert!(local_gateway(key, &transport::Context::of(&owned.transport)).is_some());
+    assert!(super::super::local_services::lookup(&transport::Context::of(&owned.transport), key)
+        .expect("local route")
+        .is_some());
     let duplicate = host_start::start_configured(
         Some("native-second"),
         Runtime::OpenCode {
@@ -362,7 +364,8 @@ fn native_bridge_hosting_controller_and_original_resume() {
     serve::serve_stop(name).expect("confirmed native stop");
     assert!(!is_hosting(name));
     assert_eq!(pocox_core::process::pid_running(pid), v2, "stopping only detaches");
-    assert!(local_endpoints(key).is_none());
+    assert!(super::super::local_services::lookup(&transport::Context::of(&owned.transport), key)
+        .is_err());
     serve::serve_stop_all().expect("quit drained all owned work");
     assert_eq!(opencode::runtime::pending_cleanup(), 0);
     std::fs::write(root.join("result.json"), serde_json::to_vec_pretty(&json!({"originalSession":original,"nativeProtocol":caps.protocol,"localWithoutRelay":true,"sourceSingleton":true,"originalHistoryAfterApply":true,"ownedProcessesStopped":true})).expect("valid test fixture")).expect("valid test fixture");

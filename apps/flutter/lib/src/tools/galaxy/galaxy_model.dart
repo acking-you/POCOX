@@ -202,7 +202,7 @@ enum LinkPath {
   static LinkPath of(TunnelPath? observation) => switch (observation) {
     null => unknown,
     TunnelPath.relayOnly || TunnelPath.relay => relay,
-    TunnelPath.direct => direct,
+    TunnelPath.local || TunnelPath.direct => direct,
     TunnelPath.mixed => mixed,
     TunnelPath.idle => idle,
   };
@@ -241,7 +241,7 @@ enum LinkPath {
     var (direct, relay, idle) = (false, false, false);
     for (final path in observed) {
       switch (path) {
-        case TunnelPath.direct:
+        case TunnelPath.local || TunnelPath.direct:
           direct = true;
         case TunnelPath.relay || TunnelPath.relayOnly:
           relay = true;

@@ -80,8 +80,11 @@ for Flutter diagnostics. Native console lifetime tests live in
   after a state "Connected · P2P" or "Subscribed · Relay" (`ConnectedChip`,
   the services hub's app and API rows); in the galaxy, a bright taut beam for
   direct, a dashed high arc for the relay, both for mixed
-  ([connection paths](galaxy-geometry.md#connection-paths)). A local host
-  reached over loopback shows no path.
+  ([connection paths](galaxy-geometry.md#connection-paths)). A host of this
+  app, reached on its own loopback listener, reads **Local direct /
+  本机直连**: a monitor mark in ink on the status bar (it is the resting state
+  of a desktop's own host), no galaxy link, no relay or P2P counters
+  ([local routing](harness-connection-lifecycle.md#process-owned-local-routing)).
 - Subscription rows carry one `TunnelPathChip` (live path or dropped) and open
   live details from the pressed row. Paths come from local SDK observations,
   never from the preference; the polled list is watched by the subscription
@@ -91,14 +94,21 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Recovery is shown as it happens ([watching a link
   recover](relay-worker-recovery.md#watching-a-link-recover)): the model is
   `network/link_activity.dart` (`linkWatchProvider` polls one service every
-  400 ms while watched; `linkSteps` turns a tunnel, the connect stage and the
-  controller's `ReconnectState` into relay / P2P / session steps), drawn by
-  `widgets/link_progress.dart`: `LinkPipeline` (three nodes, the active one
-  turning, a failed one saying why), `LinkDots` for a status line,
+  400 ms while watched, every 3 s for a serving local link; `linkSteps` turns
+  a tunnel, the connect stage and the controller's `ReconnectState` into relay
+  / P2P / session steps, or this device's listener and the session for a local
+  service: its address while it serves, **Restarting…** under way while its
+  host restarts in place, with the session waiting rather than failed, and
+  **Stopped**), drawn by `widgets/link_progress.dart`: `LinkPipeline` (three
+  nodes, two for a local service, the active one turning, a failed one saying
+  why), `LinkDots` for a status line,
   `LinkTimeline` for recent events and `showLinkSheet`, a popover on desktop
-  and a sheet on touch. A reconnecting session's status bar shows
-  `LinkStatusLine` in place of its state and a `LinkPathMark` at all times; both
-  open the sheet, whose **Retry now** ends the wait between attempts.
+  and a sheet on touch. While a reconnect runs, the sheet's headline says where
+  it stands and the path chip, which describes a link at rest, is hidden; a
+  local service's bridge error is not repeated under it. A reconnecting
+  session's status bar shows `LinkStatusLine` in place of its state and a
+  `LinkPathMark` at all times; both open the sheet, whose **Retry now** ends
+  the wait between attempts.
 
 - `/` is chat-first: it resolves a host (last used → locally hosted → first
   reachable), auto-connects and opens the latest session with all sessions in
@@ -112,9 +122,20 @@ for Flutter diagnostics. Native console lifetime tests live in
   relay connections stay first-class.
 - When the relay cannot list services, a desktop still restores its hosts and
   opens its own host over loopback (a toast says other devices cannot reach
-  it). The services page keeps this computer's hosts under a relay problem
-  card (`widgets/relay_problem.dart`: cause in words, retry, raw error folded
-  and copyable), the relay marked unreachable and its tunnels not connected.
+  it), then asks the relay behind the open conversation so the switcher lists
+  the other devices. On the services page the relay's state is said once, on
+  the account/relay card heading the device list (`_RelayCard`): a state line
+  under the name (**Online**, **Checking…** with a pulsing dot while it is
+  asked, **Unreachable**, **Session expired**), and, while it cannot list the
+  devices, under it the cause in words (`RelayCause`), a retry that runs on its
+  own button, and the raw error folded and copyable, or **Sign in again**
+  instead of a retry that cannot succeed. This computer's hosts stay in place
+  below and beside it, never under a banner, with its tunnels not connected.
+  A phone, which has no hosts of its own, shows the problem as its page
+  (`widgets/relay_problem.dart`). A local host card held by a lifecycle
+  operation (an update restarting it in place, say) reads **Restarting…**,
+  **Starting…** or **Stopping…** instead of probing a host that is meant to be
+  down for a moment.
 - A relay name resolving only to 198.18.0.0/15 is named as a proxy's or VPN's
   unrouted virtual address (`lib/src/relay_diagnosis.dart`). The app never
   resolves around the system DNS.

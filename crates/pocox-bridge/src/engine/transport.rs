@@ -22,8 +22,8 @@
 //! resolution records the current context; when it changes (or the
 //! configuration changes), state owned by the previous context is dropped.
 //!
-//! Owned state is the ACP connection registry and the context-scoped meta
-//! tunnels. One revision, the [`epoch`], orders all of it:
+//! Owned state includes all controller sessions and subscriptions. One
+//! revision, the [`epoch`], orders all of it:
 //!
 //! - A resolution captures the epoch *before* it reads the configuration and
 //!   commits ([`Owned`]) only if the epoch is unchanged when it is observed —
@@ -154,10 +154,12 @@ pub struct Owned {
 /// Called with [`current`] held.
 fn drop_owned_locked() {
     EPOCH.fetch_add(1, Ordering::SeqCst);
+    super::app_session::context_changed();
     super::acp::context_changed();
     super::opencode::context_changed();
     super::meta::context_changed();
     super::agent_tools::context_changed();
+    runtime::context_changed();
 }
 
 /// A resolution that read a configuration which has changed since.
@@ -329,6 +331,12 @@ pub fn resolve_owned_blocking() -> Result<Owned> {
 pub(crate) fn test_serial() -> MutexGuard<'static, ()> {
     static SERIAL: Mutex<()> = Mutex::new(());
     SERIAL.lock().unwrap_or_else(|poison| poison.into_inner())
+}
+
+/// Install a context without configuration files or credentials in fixtures.
+#[cfg(test)]
+pub(crate) fn test_context(context: Context) {
+    *current() = Some(context);
 }
 
 #[cfg(test)]

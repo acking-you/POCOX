@@ -5,6 +5,14 @@ use pocox_core::service::ServiceId;
 
 use crate::engine::transport::Transport;
 
+/// Services owned by this process in the selected account/relay context.
+/// No credential resolution, publication wait or network probe is performed.
+pub fn local() -> Vec<ServiceId> {
+    super::transport::current_context()
+        .map(|context| super::local_services::discover(&context))
+        .unwrap_or_default()
+}
+
 /// List the POCOX services this transport can reach, dropping keys that
 /// are not ours.
 ///

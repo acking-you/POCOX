@@ -124,8 +124,9 @@ pub use self::native_sessions::{
     NativeSessionListDto, NativeSessionPageDto, NativeSessionRevisionDto,
 };
 pub use self::services::{
-    api_subscribe, api_unsubscribe, discover_services, subscriptions, DirectStageDto, LinkEventDto,
-    LinkEventKindDto, RelayPhaseDto, ServiceIdDto, SubStatusDto, TunnelFailureDto, TunnelPathDto,
+    api_subscribe, api_unsubscribe, discover_services, local_services, subscriptions,
+    DirectStageDto, LinkEventDto, LinkEventKindDto, RelayPhaseDto, ServiceIdDto, SubStatusDto,
+    TunnelFailureDto, TunnelPathDto,
 };
 pub use self::session_config::{
     app_session_settings, app_set_session_config, app_set_session_mode, SessionConfigOptionDto,

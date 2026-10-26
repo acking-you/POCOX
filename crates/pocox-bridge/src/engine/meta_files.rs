@@ -107,9 +107,9 @@ struct ListDirResponse {
 /// project-folder browser. The host confines this to its configured roots, so
 /// a path outside them errors (surfaced as a `403` in the returned message).
 pub fn list_dir(service_key: &str, path: &str) -> Result<Vec<DirEntry>> {
-    let mut url = endpoint(service_key, &["fs", "list"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "list"])?;
     url.query_pairs_mut().append_pair("path", path);
-    let resp: ListDirResponse = runtime::runtime().block_on(get_json(url))?;
+    let resp: ListDirResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp.entries)
 }
 
@@ -122,9 +122,9 @@ struct ListFilesResponse {
 /// List the files in `path` on the host (root-confined), for the file-transfer
 /// panel. A path outside the configured roots errors (403 in the message).
 pub fn list_files(service_key: &str, path: &str) -> Result<Vec<FileEntry>> {
-    let mut url = endpoint(service_key, &["fs", "files"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "files"])?;
     url.query_pairs_mut().append_pair("path", path);
-    let resp: ListFilesResponse = runtime::runtime().block_on(get_json(url))?;
+    let resp: ListFilesResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp.files)
 }
 
@@ -306,7 +306,7 @@ pub(super) async fn download_file(
 /// Verify shared filesystem access; a loopback tunnel is not evidence of
 /// locality.
 pub fn host_is_local(service: &str) -> Result<bool> {
-    if serve::local_endpoints(service).is_some() {
+    if matches!(Target::resolve(service)?, Target::Local { .. }) {
         return Ok(true);
     }
     let dir = pocox_host_svc::file_links::probe_dir()?;

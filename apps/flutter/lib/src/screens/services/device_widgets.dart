@@ -12,7 +12,7 @@ class _DeviceColumn extends StatelessWidget {
     required this.onSelect,
     required this.filled,
     this.offlineDevices = const {},
-    this.relayDown = false,
+    this.relayState = const _RelayOnline(),
   });
 
   final String relay;
@@ -31,14 +31,13 @@ class _DeviceColumn extends StatelessWidget {
   /// False sizes to the list instead, for a column that is the whole page.
   final bool filled;
 
-  /// The relay could not be reached.
-  final bool relayDown;
+  /// Whether the relay listed the devices.
+  final _RelayState relayState;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final online = successColor(scheme);
     // Installations that share a name (two copies of one WSL distribution,
     // say) are told apart by their stable ID. The platform is in the header.
     final sameNamed = sameNamedDevices(devices.where((d) => d != _thisDevice));
@@ -60,78 +59,12 @@ class _DeviceColumn extends StatelessWidget {
     // The relay (or account) this list comes from, as a small raised card;
     // the devices below it are rows on the sheet itself, the chosen one
     // lifted into a card of its own — one level of plates, not a slab.
-    final identity = DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(kCardRadius),
-        boxShadow: raisedCardShadows(scheme),
-      ),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Tooltip(
-          message: l10n.settingsTitle,
-          child: InkWell(
-            key: const Key('identity-open-settings'),
-            mouseCursor: clickable,
-            onTap: () => context.push('/settings'),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final identity = Text(
-                  accountLogin == null ? relay : '@$accountLogin',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                );
-                final label = relayDown
-                    ? l10n.statusUnreachable
-                    : l10n.statusOnline;
-                final status = StatusChip(
-                  color: relayDown ? scheme.error : online,
-                  label: label,
-                  filled: true,
-                );
-                // The status sits beside the identity while both stay
-                // readable there, otherwise under it.
-                final beside =
-                    constraints.maxWidth >= _identityRowWidth(context, label);
-                return Padding(
-                  padding: const EdgeInsets.all(_identityPadding),
-                  child: Row(
-                    children: [
-                      GitHubAvatar(
-                        accountId: accountId,
-                        fallbackIcon: accountLogin == null
-                            ? AppIcons.lan_outlined
-                            : AppIcons.person_outline,
-                        size: _avatarSize,
-                      ),
-                      const SizedBox(width: _avatarGap),
-                      if (beside) ...[
-                        Expanded(child: identity),
-                        status,
-                      ] else
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              identity,
-                              const SizedBox(height: 4),
-                              status,
-                            ],
-                          ),
-                        ),
-                      Icon(
-                        AppIcons.chevron_right,
-                        size: _chevronSize,
-                        color: scheme.outline,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
+    final identity = _RelayCard(
+      name: accountLogin == null ? relay : '@$accountLogin',
+      relay: relay,
+      account: accountLogin != null,
+      accountId: accountId,
+      state: relayState,
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -159,34 +92,240 @@ class _DeviceColumn extends StatelessWidget {
   }
 }
 
-// The identity row's fixed parts.
+// The relay card's fixed parts.
 const double _identityPadding = 12;
 const double _avatarSize = 36;
 const double _avatarGap = 10;
 const double _chevronSize = 18;
+const double _stateDotSize = 7;
+const double _stateDotGap = 6;
 
-/// The width the identity row needs to show the whole [status] chip beside
-/// at least three glyphs of the identity, at the current text scale. The chip's
-/// own geometry (10 px padding a side, an 8 px dot and a 6 px gap) is that of
-/// a filled [StatusChip].
-double _identityRowWidth(BuildContext context, String status) {
+/// The style of the relay card's state line.
+TextStyle _stateStyle(BuildContext context) =>
+    Theme.of(context).textTheme.bodySmall!.copyWith(height: 1.3);
+
+/// The width the relay card needs beside a detail pane at the current text
+/// scale: at least three glyphs of its name, and every word of its states
+/// whole under the name (a state wraps to a second line rather than break a
+/// word). Measured over every state, so the layout never changes when only
+/// the relay's answer does.
+double _identityRowWidth(BuildContext context) {
+  final l10n = AppLocalizations.of(context);
   final scaler = MediaQuery.textScalerOf(context);
-  final label = measureTextLine(
-    context,
-    status,
-    const TextStyle(
-      fontSize: 11.5,
-      fontWeight: FontWeight.w600,
-      letterSpacing: 0.1,
-    ),
-  );
-  final chip = 10 + 8 + 6 + label.width + 10;
+  final style = _stateStyle(context);
+  var word = 0.0;
+  for (final label in [
+    l10n.statusOnline,
+    l10n.statusChecking,
+    l10n.statusUnreachable,
+    l10n.statusSessionExpired,
+  ]) {
+    for (final part in label.split(' ')) {
+      word = math.max(word, measureTextLine(context, part, style).width);
+    }
+  }
   return 2 * _identityPadding +
       _avatarSize +
       _avatarGap +
-      scaler.scale(14) * 3 +
-      chip +
+      math.max(scaler.scale(14) * 3, _stateDotSize + _stateDotGap + word) +
       _chevronSize;
+}
+
+/// The relay (or account) the device list comes from, and whether it
+/// answers: a state line under its name, and, while it cannot list the
+/// devices, what is wrong and the one action that helps. The relay's state
+/// is said here only, beside the list it concerns, never as a banner over
+/// this computer's own services, which work without it.
+class _RelayCard extends StatelessWidget {
+  const _RelayCard({
+    required this.name,
+    required this.relay,
+    required this.account,
+    required this.accountId,
+    required this.state,
+  });
+
+  /// The account's login or the relay's address.
+  final String name;
+
+  /// The configured relay, for diagnosing a failure.
+  final String relay;
+
+  /// Signed in to an account rather than a self-hosted relay.
+  final bool account;
+
+  /// The account's GitHub ID, for its avatar.
+  final String? accountId;
+
+  final _RelayState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final (label, color, attention) = switch (state) {
+      _RelayOnline() => (l10n.statusOnline, successColor(scheme), false),
+      _RelayChecking() => (l10n.statusChecking, scheme.outline, false),
+      _RelayDown() => (l10n.statusUnreachable, scheme.error, true),
+      _RelaySignedOut() => (
+        l10n.statusSessionExpired,
+        cautionColor(scheme),
+        true,
+      ),
+    };
+    final style = _stateStyle(context);
+    final header = Padding(
+      padding: const EdgeInsets.all(_identityPadding),
+      child: Row(
+        children: [
+          GitHubAvatar(
+            accountId: accountId,
+            fallbackIcon: account
+                ? AppIcons.person_outline
+                : AppIcons.lan_outlined,
+            size: _avatarSize,
+          ),
+          const SizedBox(width: _avatarGap),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  key: const Key('relay-state'),
+                  children: [
+                    if (state is _RelayChecking)
+                      PulsingDot(color: color, size: _stateDotSize)
+                    else
+                      StatusDot(color: color, size: _stateDotSize),
+                    const SizedBox(width: _stateDotGap),
+                    Flexible(
+                      child: Text(
+                        label,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: style.copyWith(
+                          color: attention ? color : scheme.onSurfaceVariant,
+                          fontWeight: attention ? FontWeight.w600 : null,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            AppIcons.chevron_right,
+            size: _chevronSize,
+            color: scheme.outline,
+          ),
+        ],
+      ),
+    );
+    // Under the name, so the card reads as one statement.
+    const inset = _identityPadding + _avatarSize + _avatarGap;
+    final problem = switch (state) {
+      _RelayDown(:final detail, :final onRetry, :final retrying) => Column(
+        key: const Key('relay-problem'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          RelayCause(
+            detail: detail,
+            relay: relay,
+            style: style.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: OutlinedButton(
+              key: const Key('relay-problem-retry'),
+              // Kept legible while it runs, with its spinner.
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+                disabledForegroundColor: scheme.onSurface,
+              ),
+              onPressed: retrying ? null : onRetry,
+              child: BusyLabel(
+                busy: retrying,
+                icon: AppIcons.refresh,
+                label: l10n.retry,
+                busyLabel: l10n.statusChecking,
+              ),
+            ),
+          ),
+          ErrorDetails(
+            detail: detail,
+            tileKey: const Key('relay-problem-details'),
+          ),
+        ],
+      ),
+      _RelaySignedOut(:final onSignIn) => Padding(
+        key: const Key('services-session-expired'),
+        padding: const EdgeInsets.only(bottom: _identityPadding),
+        child: Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FilledButton.icon(
+            key: const Key('services-sign-in-again'),
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              textStyle: theme.textTheme.labelLarge?.copyWith(fontSize: 13),
+            ),
+            onPressed: onSignIn,
+            icon: const Icon(AppIcons.login, size: 16),
+            label: Text(l10n.accountSignInAgain),
+          ),
+        ),
+      ),
+      _RelayOnline() || _RelayChecking() => null,
+    };
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(kCardRadius),
+        boxShadow: raisedCardShadows(scheme),
+      ),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: AnimatedSize(
+          duration: Motion.of(context, Motion.medium),
+          curve: Motion.move,
+          alignment: Alignment.topCenter,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Tooltip(
+                message: l10n.settingsTitle,
+                child: InkWell(
+                  key: const Key('identity-open-settings'),
+                  mouseCursor: clickable,
+                  onTap: () => context.push('/settings'),
+                  child: header,
+                ),
+              ),
+              if (problem != null)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: inset,
+                    end: _identityPadding,
+                  ),
+                  child: problem,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DeviceTile extends StatelessWidget {

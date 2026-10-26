@@ -24,6 +24,9 @@ moving parts; each subsystem's rules live in its own doc (see the
   creates a network subscription even on the same computer. Remote subscriptions
   default to the relay and can opt into authenticated P2P direct connections;
   see [connection paths](relay-worker-recovery.md#direct-connections).
+  Local discovery and connection selection use the owning process's live
+  listener registry before resolving a relay credential; see
+  [local routing](harness-connection-lifecycle.md#process-owned-local-routing).
 - **Controllers** — the Flutter apps (iOS, Android, macOS, Windows, Linux),
   which reach Rust through `flutter_rust_bridge`, and the CLI (for example
   `pocox connect` followed by `codex --remote`).

@@ -66,6 +66,7 @@ use self::launch::Captured;
 pub(super) use self::launch::{launch_prepared, prepare, Prepared};
 
 struct AcpServe {
+    local_routes: Option<super::local_services::Registration>,
     device: String,
     name: String,
     key: String,
@@ -323,7 +324,14 @@ pub(super) fn start_locked(
     launch_prepared(prepare(lease.name(), spec, provider, profiles)?)
 }
 
+/// A host of `spec` already running under `name`, republished where needed.
+/// One bound to an account or relay other than the current one is stopped
+/// instead (`None`), so this start is its restart there; while the current
+/// one cannot be resolved (offline), a live host is kept.
 fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
+    let current = transport::resolve_owned_blocking()
+        .ok()
+        .map(|owned| transport::Context::of(&owned.transport));
     let found = {
         let guard = hosts();
         let Some(host) = guard.get(name) else { return Ok(None) };
@@ -333,7 +341,12 @@ fn reuse(name: &str, spec: &AgentSpec) -> Result<Option<AcpServeReport>> {
                  name"
             );
         }
-        report(host, true)
+        let rebind = current.is_some_and(|current| current != host.context);
+        (!rebind).then(|| report(host, true))
+    };
+    let Some(found) = found else {
+        stop(name);
+        return Ok(None);
     };
     let _ = reregister(name, "acp");
     let _ = reregister(name, "meta");
@@ -440,30 +453,6 @@ pub(super) fn status() -> Vec<ServeStatus> {
             }
         })
         .collect()
-}
-
-/// Loopback gateway + meta addresses of a locally hosted ACP key, when it
-/// was published under the current transport context. In another context
-/// the same logical key names someone else's service, and a key namespaced
-/// to another account never resolves here.
-pub(super) fn local_endpoints(service_key: &str) -> Option<(String, String)> {
-    let logical = super::session_engine::logical_key(service_key)?;
-    let context = transport::current_context()?;
-    if !context.admits(service_key) {
-        return None;
-    }
-    hosts()
-        .values()
-        .find(|host| host.key == logical && host.context == context)
-        .map(|host| (host.gateway_local.to_string(), host.meta_local.to_string()))
-}
-
-/// The loopback gateway of logical key `logical` published under `context`.
-pub(super) fn local_gateway(logical: &str, context: &transport::Context) -> Option<String> {
-    hosts()
-        .values()
-        .find(|host| host.key == logical && &host.context == context)
-        .map(|host| host.gateway_local.to_string())
 }
 
 fn slot(host: &mut AcpServe, kind: ServiceKind) -> Result<&mut Slot> {
@@ -617,12 +606,15 @@ pub(super) fn retire(name: &str) -> Option<Prepared> {
 /// an ordinary stop or by another quit — has been stopped; relay keys of the
 /// hosts drained here get [`WITHDRAW_GRACE`] after that.
 pub(super) fn stop_all() {
-    let (agents, drained) = {
+    let (agents, mut drained) = {
         let mut barrier = owners();
         let agents = barrier.close();
         let drained: Vec<AcpServe> = hosts().drain().map(|(_, host)| host).collect();
         (agents, drained)
     };
+    for host in &mut drained {
+        drop(host.local_routes.take());
+    }
     pause_point("quit");
     let names: Vec<String> = drained.iter().map(|host| host.name.clone()).collect();
     runtime::runtime().block_on(async {
@@ -653,7 +645,8 @@ pub(super) fn stop_all() {
     }
 }
 
-fn stop_host(host: AcpServe) {
+fn stop_host(mut host: AcpServe) {
+    drop(host.local_routes.take());
     let name = host.name.clone();
     crate::engine::agent_tools::inject::hosted_stopped(&name);
     runtime::runtime().block_on(async {

@@ -347,6 +347,28 @@ void main() {
     expect(api.appIsConnected('pcx:lb7666:app:default'), isTrue);
   });
 
+  desktopTest('local resume does not wait for relay discovery', (t) async {
+    final api = FakeBridgeApi()..discoverError = StateError('relay offline');
+    final host = await api.appServeStart(port: 0, embedded: false);
+    String? resolved;
+    await t.pumpWidget(
+      _host(
+        Consumer(
+          builder: (context, ref, _) => TextButton(
+            onPressed: () async => resolved = await ensureResumeTarget(ref),
+            child: const Text('go'),
+          ),
+        ),
+        api,
+      ),
+    );
+    await t.tap(find.text('go'));
+    await _settle(t);
+    expect(resolved, host.appServiceKey);
+    expect(api.appConnectCount, 1);
+    expect(api.discoverCalls, 0);
+  });
+
   desktopTest('groups by activity time and the search box filters content', (
     t,
   ) async {

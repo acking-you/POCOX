@@ -71,11 +71,15 @@ class _MemoryPrefs extends UiPrefsStore {
   Future<void> save(UiPrefs prefs) async {}
 }
 
-/// In-memory dismissed services (none), so a test never depends on how the
-/// app-support lookup fails without a platform.
+/// In-memory dismissed services ([initial], none by default), so a test never
+/// depends on how the app-support lookup fails without a platform.
 class _MemoryDismissed extends DismissedServices {
+  _MemoryDismissed([this.initial = const {}]);
+
+  final Set<String> initial;
+
   @override
-  Future<Set<String>> build() async => <String>{};
+  Future<Set<String>> build() async => {...initial};
 }
 
 /// Owns the test's container and router: both are disposed when this leaves
@@ -122,6 +126,7 @@ Future<ProviderContainer> _pumpHome(
   List<GoRoute> extraRoutes = const [],
   _MemoryPrefs? prefs,
   bool memoryDismissed = false,
+  Set<String> dismissed = const {},
 }) async {
   final store = prefs ?? _MemoryPrefs();
   final container = ProviderContainer(
@@ -129,7 +134,9 @@ Future<ProviderContainer> _pumpHome(
       bridgeApiProvider.overrideWithValue(api),
       uiPrefsProvider.overrideWith(() => store),
       if (memoryDismissed)
-        dismissedServicesProvider.overrideWith(_MemoryDismissed.new),
+        dismissedServicesProvider.overrideWith(
+          () => _MemoryDismissed(dismissed),
+        ),
     ],
   );
   seed?.call(container);
@@ -641,6 +648,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
       final api = _lifecycleApi()
+        ..discoverGate = Completer<void>()
         ..discoverError = StateError(
           'querying relay keys\n\nCaused by:\n'
           '    0: listing keys on lb7666.top:7666\n'
@@ -649,11 +657,18 @@ void main() {
       await _pumpHome(
         t,
         api,
-        prefs: _MemoryPrefs(_savedRestore),
+        prefs: _MemoryPrefs(
+          _savedRestore.copyWith(lastServiceKey: 'pcx:local:app:work'),
+        ),
         memoryDismissed: true,
       );
       await t.pumpAndSettle();
       expect(api.serveHosts.map((h) => h.name), ['work']);
+      expect(
+        api.discoverCalls,
+        1,
+        reason: 'the relay is asked only behind the open conversation',
+      );
       // Its own host is reached here without the relay.
       expect(api.appIsConnected('pcx:local:app:work'), isTrue);
       expect(find.byKey(const Key('send-btn')), findsOneWidget);
@@ -662,6 +677,147 @@ void main() {
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
+  });
+
+  testWidgets('cold local startup opens before publication finishes and '
+      'continues restoring other hosts', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    final publication = Completer<void>();
+    final relay = Completer<void>();
+    try {
+      final api = _lifecycleApi()
+        ..serveStartGate = publication
+        ..discoverGate = relay;
+      await _pumpHome(
+        t,
+        api,
+        prefs: _MemoryPrefs(
+          _savedRestore.copyWith(
+            lastServiceKey: 'pcx:local:app:work',
+            autoHostCodex: const [
+              AutoHostPrefs(port: 0, name: 'work'),
+              AutoHostPrefs(port: 0, name: 'second'),
+            ],
+          ),
+        ),
+        memoryDismissed: true,
+      );
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 100));
+      // Native listeners enter the ownership registry before relay publication
+      // finishes. The delayed restore reply is independent of local readiness.
+      api.serveHosts.add(
+        const AppServeStatus(
+          device: 'local',
+          name: 'work',
+          alive: true,
+          appServiceKey: 'pcx:local:app:work',
+        ),
+      );
+      await t.pump(const Duration(milliseconds: 100));
+      await t.pumpAndSettle();
+      expect(publication.isCompleted, isFalse);
+      expect(api.appIsConnected('pcx:local:app:work'), isTrue);
+      expect(
+        api.discoverCalls,
+        1,
+        reason: 'the relay is asked behind the open conversation',
+      );
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await t.pumpAndSettle();
+      expect(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+        findsNothing,
+      );
+      publication.complete();
+      await t.pumpAndSettle();
+      expect(
+        api.serveHosts.map((h) => h.name),
+        containsAll(['work', 'second']),
+      );
+      expect(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+        findsOneWidget,
+        reason:
+            'the open picker receives newly restored hosts without discovery',
+      );
+      expect(api.discoverCalls, 1);
+      await t.tap(
+        find.byKey(const Key('host-switch-item-pcx:local:app:second')),
+      );
+      await t.pumpAndSettle();
+      expect(api.appIsConnected('pcx:local:app:second'), isTrue);
+      // Once the relay answers, the switcher lists the other devices too.
+      relay.complete();
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await t.pumpAndSettle();
+      expect(find.byKey(Key('host-switch-item-${_app1.key}')), findsOneWidget);
+      await t.pumpWidget(const SizedBox());
+    } finally {
+      if (!publication.isCompleted) publication.complete();
+      if (!relay.isCompleted) relay.complete();
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('a failed local handshake tries the next local host before '
+      'discovering remote alternatives', (t) async {
+    final api = FakeBridgeApi(config: _accountConfig, services: [_app2]);
+    for (final name in ['first', 'second']) {
+      api.serveHosts.add(
+        AppServeStatus(
+          device: 'local',
+          name: name,
+          alive: true,
+          appServiceKey: 'pcx:local:app:$name',
+        ),
+      );
+    }
+    api.appConnectErrors['pcx:local:app:first'] = StateError('wedged');
+    await _pumpHome(t, api, memoryDismissed: true);
+    await t.pumpAndSettle();
+    expect(api.appIsConnected('pcx:local:app:second'), isTrue);
+    expect(api.appIsConnected(_app2.key), isFalse);
+    expect(
+      api.appProbeCalls,
+      isEmpty,
+      reason: 'local connects are their only handshake',
+    );
+    // Asked only behind the open conversation, for the switcher.
+    expect(api.discoverCalls, 1);
+    await t.pumpWidget(const SizedBox());
+
+    // The same resolution with no working local candidate must still reach
+    // the remote host, and must not retry the failed locals after discovery.
+    await api.appDisconnect('pcx:local:app:second');
+    api.appConnectErrors['pcx:local:app:second'] = StateError('also wedged');
+    final before = api.appConnectCount;
+    final discovered = api.discoverCalls;
+    await _pumpHome(t, api, memoryDismissed: true);
+    await t.pumpAndSettle();
+    expect(api.appIsConnected(_app2.key), isTrue);
+    expect(api.discoverCalls - discovered, 1);
+    expect(
+      api.appConnectCount - before,
+      5,
+      reason: 'two bounded local retries, one remote connect',
+    );
+    expect(find.byKey(const Key('send-btn')), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+
+    // Local hosts the user hid are no reason to skip the other devices.
+    await api.appDisconnect(_app2.key);
+    api.appConnectErrors.clear();
+    await _pumpHome(
+      t,
+      api,
+      memoryDismissed: true,
+      dismissed: {'pcx:local:app:first', 'pcx:local:app:second'},
+    );
+    await t.pumpAndSettle();
+    expect(api.appIsConnected(_app2.key), isTrue);
+    expect(api.appIsConnected('pcx:local:app:first'), isFalse);
   });
 
   for (final error in [

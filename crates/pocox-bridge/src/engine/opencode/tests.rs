@@ -67,6 +67,7 @@ impl Fixture {
             .expect("fixture runtime");
         let task = runtime.spawn(std::future::pending());
         lock(&CONNS).insert(key, Conn {
+            local: None,
             client,
             shared,
             tx,
