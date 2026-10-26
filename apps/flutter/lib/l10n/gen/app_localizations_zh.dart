@@ -9,16 +9,10 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
-  String get hostThisDevice => '本机';
-
-  @override
   String get hostConnectionCurrent => '使用中';
 
   @override
   String get hostConnectionRetained => '连接已保留';
-
-  @override
-  String get hostConnectionAvailable => '选择后连接';
 
   @override
   String get connectionWindowTitle => '连接保留窗口';
@@ -30,13 +24,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionWindowPolicy => '淘汰策略';
 
   @override
-  String get connectionWindowLru => '最久未选择（LRU）';
+  String get connectionWindowPolicyInfo =>
+      '达到上限时先释放哪个空闲服务：最久没有选择的，或最早连接的。忙碌中的服务不会被释放。';
 
   @override
-  String get connectionWindowFifo => '最早连接（FIFO）';
+  String get connectionWindowLru => '最久未用';
 
   @override
-  String get connectionWindowInvalid => '请输入 1–32 之间的整数';
+  String get connectionWindowFifo => '最早连接';
 
   @override
   String get connectionWindowDescription =>

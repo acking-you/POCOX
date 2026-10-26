@@ -7,7 +7,6 @@ import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/network/link_activity.dart';
-import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/theme.dart';
@@ -15,8 +14,8 @@ import 'package:pocox/src/widgets/adaptive_sheet.dart';
 import 'package:pocox/src/widgets/field_help.dart';
 import 'package:pocox/src/widgets/glass.dart';
 import 'package:pocox/src/widgets/group_card.dart';
-import 'package:pocox/src/widgets/icon_badge.dart';
 import 'package:pocox/src/widgets/link_progress.dart';
+import 'package:pocox/src/widgets/setting_row.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 
 /// This installation's saved path preferences.
@@ -570,23 +569,45 @@ class _ConnectionPathSettingsState
             _Preference.incoming => l10n.connectionPathIncomingPending,
           }
         : null;
+    final paths = <GlassSegment<ConnectionPath?>>[
+      GlassSegment(
+        key: const Key('connection-path-relay-only'),
+        value: ConnectionPath.relayOnly,
+        icon: AppIcons.server,
+        label: l10n.connectionPathRelayOnly,
+      ),
+      GlassSegment(
+        key: const Key('connection-path-auto'),
+        value: ConnectionPath.auto,
+        icon: AppIcons.direct,
+        label: l10n.connectionPathAuto,
+      ),
+    ];
     return GroupCard(
       key: const Key('connection-path-settings'),
       title: l10n.connectionPathTitle,
       info: l10n.connectionPathInfo,
       children: [
         if (prefs == null && saved.hasError)
-          _ReadFailed(onRetry: () => ref.invalidate(relayPreferencesProvider))
+          SettingReadFailed(
+            icon: AppIcons.route,
+            message: l10n.connectionPathReadFailed,
+            retryLabel: l10n.retry,
+            retryKey: const Key('connection-path-retry'),
+            onRetry: () => ref.invalidate(relayPreferencesProvider),
+          )
         else ...[
-          _PreferenceRow(
+          SettingRow(
             icon: AppIcons.route,
             title: l10n.connectionPathOutgoing,
             state: state(
               _Preference.outgoing,
               changed: opened != null && prefs?.path != opened.path,
             ),
+            stateKey: const Key('connection-path-state'),
             failed: _failed == _Preference.outgoing,
             stackWhenNarrow: true,
+            controlWidth: GlassSegmented.naturalWidth(context, paths),
             control: (expand) => IgnorePointer(
               ignoring: !ready,
               child: GlassSegmented<ConnectionPath?>(
@@ -599,26 +620,13 @@ class _ConnectionPathSettingsState
                     _save(prefs.copyWith(path: path), _Preference.outgoing);
                   }
                 },
-                segments: [
-                  GlassSegment(
-                    key: const Key('connection-path-relay-only'),
-                    value: ConnectionPath.relayOnly,
-                    icon: AppIcons.server,
-                    label: l10n.connectionPathRelayOnly,
-                  ),
-                  GlassSegment(
-                    key: const Key('connection-path-auto'),
-                    value: ConnectionPath.auto,
-                    icon: AppIcons.direct,
-                    label: l10n.connectionPathAuto,
-                  ),
-                ],
+                segments: paths,
               ),
             ),
           ),
           // Only a computer publishes services for others to reach.
           if (isDesktop)
-            _PreferenceRow(
+            SettingRow(
               icon: AppIcons.laptop,
               title: l10n.connectionPathIncoming,
               info: l10n.connectionPathIncomingInfo,
@@ -627,6 +635,7 @@ class _ConnectionPathSettingsState
                 changed:
                     opened != null && prefs?.allowDirect != opened.allowDirect,
               ),
+              stateKey: const Key('connection-path-state'),
               failed: _failed == _Preference.incoming,
               // The themed switch, like the other settings toggles.
               control: (_) => Switch(
@@ -642,137 +651,6 @@ class _ConnectionPathSettingsState
             ),
         ],
       ],
-    );
-  }
-}
-
-/// A preference: its mark, name and (when there is one) state line, with its
-/// control at the end, or under it on a narrow row when [stackWhenNarrow].
-class _PreferenceRow extends StatelessWidget {
-  const _PreferenceRow({
-    required this.icon,
-    required this.title,
-    required this.control,
-    this.info,
-    this.state,
-    this.failed = false,
-    this.stackWhenNarrow = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? info;
-
-  /// Pending or failed, never instructions.
-  final String? state;
-  final bool failed;
-  final bool stackWhenNarrow;
-
-  /// The control; `true` asks it to fill the row's width.
-  final Widget Function(bool expand) control;
-
-  /// The narrowest row that holds a segmented control beside its title.
-  static const double _sideBySide = 480;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final state = this.state;
-    final lead = Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        IconBadge(icon: icon),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Padding(
-            // Centres a one-line title on the badge.
-            padding: const EdgeInsets.only(top: 6),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                InfoTitle(
-                  title: Text(
-                    title,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  info: info,
-                ),
-                Motion.resize(
-                  context,
-                  duration: Motion.fast,
-                  curve: Motion.emphasized,
-                  alignment: AlignmentDirectional.topStart,
-                  child: state == null
-                      ? const SizedBox(width: double.infinity)
-                      : Padding(
-                          padding: const EdgeInsets.only(top: 3),
-                          child: Text(
-                            state,
-                            key: const Key('connection-path-state'),
-                            style: helpTextStyle(theme).copyWith(
-                              color: failed ? theme.colorScheme.error : null,
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(13, 10, 13, 10),
-      child: LayoutBuilder(
-        builder: (context, box) {
-          if (stackWhenNarrow && box.maxWidth < _sideBySide) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [lead, const SizedBox(height: 12), control(true)],
-            );
-          }
-          return Row(
-            children: [
-              Expanded(child: lead),
-              const SizedBox(width: 16),
-              control(false),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// The saved preferences could not be read: say so, and offer a retry.
-class _ReadFailed extends StatelessWidget {
-  const _ReadFailed({required this.onRetry});
-
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(13, 8, 8, 8),
-      child: Row(
-        children: [
-          IconBadge(icon: AppIcons.route),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              l10n.connectionPathReadFailed,
-              style: TextStyle(color: scheme.error),
-            ),
-          ),
-          TextButton(
-            key: const Key('connection-path-retry'),
-            onPressed: onRetry,
-            child: Text(l10n.retry),
-          ),
-        ],
-      ),
     );
   }
 }

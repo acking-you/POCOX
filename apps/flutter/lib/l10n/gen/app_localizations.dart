@@ -98,12 +98,6 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
-  /// No description provided for @hostThisDevice.
-  ///
-  /// In en, this message translates to:
-  /// **'This device'**
-  String get hostThisDevice;
-
   /// No description provided for @hostConnectionCurrent.
   ///
   /// In en, this message translates to:
@@ -115,12 +109,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connection retained'**
   String get hostConnectionRetained;
-
-  /// No description provided for @hostConnectionAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect on selection'**
-  String get hostConnectionAvailable;
 
   /// No description provided for @connectionWindowTitle.
   ///
@@ -140,23 +128,23 @@ abstract class AppLocalizations {
   /// **'Eviction policy'**
   String get connectionWindowPolicy;
 
+  /// No description provided for @connectionWindowPolicyInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'When the limit is reached, the idle service released first: the one you selected least recently, or the one that connected first. Busy services are never released.'**
+  String get connectionWindowPolicyInfo;
+
   /// No description provided for @connectionWindowLru.
   ///
   /// In en, this message translates to:
-  /// **'Least recently selected (LRU)'**
+  /// **'Least recent'**
   String get connectionWindowLru;
 
   /// No description provided for @connectionWindowFifo.
   ///
   /// In en, this message translates to:
-  /// **'Earliest connected (FIFO)'**
+  /// **'First connected'**
   String get connectionWindowFifo;
-
-  /// No description provided for @connectionWindowInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter a number from 1 to 32'**
-  String get connectionWindowInvalid;
 
   /// No description provided for @connectionWindowDescription.
   ///

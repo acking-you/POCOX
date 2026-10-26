@@ -479,7 +479,7 @@ class _HostList extends StatelessWidget {
                         child: Text(
                           [
                             deviceLabel(group.value.first.device),
-                            if (group.key == 'local') l10n.hostThisDevice,
+                            if (group.key == 'local') l10n.servicesLocalDevice,
                             ?distinction(group),
                           ].join(' · '),
                           style: Theme.of(context).textTheme.labelMedium,
@@ -525,73 +525,92 @@ class _HostList extends StatelessWidget {
     );
   }
 
+  /// One service of a device: its mark, name and provider, and one mark at
+  /// the end for its connection: the check of the current one, a dot for a
+  /// connection kept from earlier, none for one that connects when picked.
+  /// Only a failed switch adds a line.
   Widget _item(BuildContext context, ServiceEntry s) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final isCurrent = s.key == current;
+    final retained = !isCurrent && connectedKeys.contains(s.key);
     final failed =
         pending?.target == s.key && pending?.phase == HostSwitchPhase.failed;
-    return InkWell(
-      key: Key('host-switch-item-${s.key}'),
-      mouseCursor: clickable,
-      onTap: () => onPick(s.key),
-      child: Padding(
-        padding: _rowPadding(touch).add(const EdgeInsets.only(left: 12)),
-        child: Row(
-          children: [
-            _identityIcon(identities, s.key, scheme.onSurfaceVariant),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Two lines on touch: a long device or instance name (or the
-                  // failure) stays recognisable in a phone's sheet.
-                  Text(
-                    s.name,
-                    maxLines: touch ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: touch ? 14 : 13,
-                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+    final state = isCurrent
+        ? l10n.hostConnectionCurrent
+        : retained
+        ? l10n.hostConnectionRetained
+        : null;
+    return Semantics(
+      selected: isCurrent,
+      value: failed ? l10n.hostSwitchLastFailed : state,
+      child: InkWell(
+        key: Key('host-switch-item-${s.key}'),
+        mouseCursor: clickable,
+        onTap: () => onPick(s.key),
+        child: Padding(
+          padding: _rowPadding(touch).add(const EdgeInsets.only(left: 12)),
+          child: Row(
+            children: [
+              _identityIcon(identities, s.key, scheme.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Two lines on touch: a long instance name stays
+                    // recognisable in a phone's sheet.
+                    Text(
+                      s.name,
+                      maxLines: touch ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: touch ? 14 : 13,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  Text(
-                    [
-                      if (failed)
-                        l10n.hostSwitchLastFailed
-                      else if (isCurrent)
-                        l10n.hostConnectionCurrent
-                      else if (connectedKeys.contains(s.key))
-                        l10n.hostConnectionRetained
-                      else
-                        l10n.hostConnectionAvailable,
-                    ].join(' · '),
-                    maxLines: touch ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: failed ? scheme.error : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                    if (failed)
+                      Text(
+                        l10n.hostSwitchLastFailed,
+                        maxLines: touch ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: scheme.error),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            _badge(identities, s.key),
-            const SizedBox(width: 6),
-            StatusDot(
-              color: failed
-                  ? scheme.error
-                  : isCurrent || connectedKeys.contains(s.key)
-                  ? successColor(scheme)
-                  : scheme.outline,
-              size: 8,
-            ),
-            if (isCurrent)
-              Icon(AppIcons.check, size: 16, color: signalColor(scheme)),
-          ],
+              const SizedBox(width: 8),
+              _badge(identities, s.key),
+              // One slot, so names and pills line up whatever the state.
+              SizedBox(
+                width: 24,
+                child: Center(
+                  child: isCurrent
+                      ? Icon(
+                          AppIcons.check,
+                          key: const Key('host-switch-current'),
+                          size: 16,
+                          color: signalColor(scheme),
+                        )
+                      : retained
+                      ? Tooltip(
+                          message: l10n.hostConnectionRetained,
+                          child: StatusDot(
+                            key: Key('host-switch-retained-${s.key}'),
+                            color: successColor(scheme),
+                            size: 7,
+                          ),
+                        )
+                      : failed
+                      ? StatusDot(color: scheme.error, size: 7)
+                      : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

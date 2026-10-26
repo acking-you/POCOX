@@ -3,22 +3,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
-import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/providers.dart';
-import 'package:pocox/src/widgets/app_dialog.dart';
+import 'package:pocox/src/widgets/glass.dart';
+import 'package:pocox/src/widgets/glass_stepper.dart';
 import 'package:pocox/src/widgets/group_card.dart';
+import 'package:pocox/src/widgets/setting_row.dart';
 
-/// The same persisted retention policy on phone and desktop.
+/// How many conversation services stay connected across switches, and which
+/// idle one goes first: two quiet rows that save as they change, the same on
+/// phone and desktop. A failed save puts the saved value back and says so on
+/// its row.
 class ConnectionWindowSettings extends ConsumerStatefulWidget {
+  /// Creates the group.
   const ConnectionWindowSettings({super.key});
 
   @override
   ConsumerState<ConnectionWindowSettings> createState() => _SettingsState();
 }
 
+/// The row a failed save belongs to.
+enum _Row { capacity, eviction }
+
 class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
-  ConnectionWindowPreferences? _value;
-  String? _error;
+  /// What the bridge has saved.
+  ConnectionWindowPreferences? _saved;
+
+  /// What the controls show: [_saved], or a change still being saved.
+  ConnectionWindowPreferences? _shown;
+
+  bool _readFailed = false;
+  _Row? _failed;
+
+  /// A change made while another was being saved, and its row; it is
+  /// saved next.
+  (ConnectionWindowPreferences, _Row)? _queued;
   bool _saving = false;
 
   @override
@@ -28,154 +46,137 @@ class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
   }
 
   Future<void> _load() async {
+    setState(() => _readFailed = false);
     try {
       final value = await ref
           .read(bridgeApiProvider)
           .connectionWindowPreferences();
-      if (mounted) {
-        setState(() {
-          _value = value;
-          _error = null;
-        });
-      }
-    } catch (error) {
-      if (mounted) setState(() => _error = friendlyError(error));
+      if (mounted) setState(() => _saved = _shown = value);
+    } catch (_) {
+      if (mounted) setState(() => _readFailed = true);
     }
   }
 
-  Future<void> _edit() async {
-    final current = _value;
-    if (current == null || _saving) return;
-    final l10n = AppLocalizations.of(context);
-    final capacity = TextEditingController(text: '${current.capacity}');
-    final form = GlobalKey<FormState>();
-    var eviction = current.eviction;
-    final result = await showAppDialog<ConnectionWindowPreferences>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(l10n.connectionWindowTitle),
-        content: SingleChildScrollView(
-          child: Form(
-            key: form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(l10n.connectionWindowDescription),
-                const SizedBox(height: 16),
-                TextFormField(
-                  key: const Key('connection-window-capacity'),
-                  controller: capacity,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: l10n.connectionWindowCapacity,
-                  ),
-                  validator: (text) {
-                    final number = int.tryParse(text ?? '');
-                    return number == null || number < 1 || number > 32
-                        ? l10n.connectionWindowInvalid
-                        : null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  key: const Key('connection-window-policy'),
-                  initialValue: eviction,
-                  isExpanded: true,
-                  itemHeight: null,
-                  decoration: InputDecoration(
-                    labelText: l10n.connectionWindowPolicy,
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: 'lru',
-                      child: Text(l10n.connectionWindowLru),
-                    ),
-                    DropdownMenuItem(
-                      value: 'fifo',
-                      child: Text(l10n.connectionWindowFifo),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) eviction = value;
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            key: const Key('connection-window-save'),
-            onPressed: () {
-              if (form.currentState!.validate()) {
-                Navigator.pop(
-                  context,
-                  ConnectionWindowPreferences(
-                    capacity: int.parse(capacity.text),
-                    eviction: eviction,
-                  ),
-                );
-              }
-            },
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) => capacity.dispose());
-    if (result == null || !mounted) return;
+  void _change(ConnectionWindowPreferences next, _Row row) {
     setState(() {
-      _saving = true;
-      _error = null;
+      _shown = next;
+      _failed = null;
     });
+    if (_saving) {
+      _queued = (next, row);
+    } else {
+      _save(next, row);
+    }
+  }
+
+  /// Saves [next], then the latest change made meanwhile.
+  Future<void> _save(ConnectionWindowPreferences next, _Row row) async {
+    _saving = true;
+    var (value, current) = (next, row);
     try {
-      await ref.read(bridgeApiProvider).setConnectionWindowPreferences(result);
-      if (mounted) setState(() => _value = result);
-    } catch (error) {
-      if (mounted) setState(() => _error = friendlyError(error));
+      while (mounted) {
+        await ref.read(bridgeApiProvider).setConnectionWindowPreferences(value);
+        _saved = value;
+        final queued = _queued;
+        _queued = null;
+        if (queued == null || queued.$1 == value) break;
+        (value, current) = queued;
+      }
+    } catch (_) {
+      _queued = null;
+      if (mounted) {
+        setState(() {
+          _shown = _saved;
+          _failed = current;
+        });
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      _saving = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final value = _value;
+    final shown = _shown;
+    String? state(_Row row) =>
+        _failed == row ? l10n.connectionPathSaveFailed : null;
+    final policies = <GlassSegment<ConnectionEviction?>>[
+      GlassSegment(
+        key: const Key('connection-window-lru'),
+        value: ConnectionEviction.lru,
+        label: l10n.connectionWindowLru,
+      ),
+      GlassSegment(
+        key: const Key('connection-window-fifo'),
+        value: ConnectionEviction.fifo,
+        label: l10n.connectionWindowFifo,
+      ),
+    ];
     return GroupCard(
+      key: const Key('connection-window-settings'),
       title: l10n.connectionWindowTitle,
       info: l10n.connectionWindowDescription,
       children: [
-        ListTile(
-          key: const Key('connection-window-settings'),
-          title: Text(l10n.connectionWindowCapacity),
-          subtitle: _error != null
-              ? Text(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                )
-              : value == null
-              ? null
-              : Text(
-                  '${value.capacity} · ${value.eviction == 'fifo' ? l10n.connectionWindowFifo : l10n.connectionWindowLru}',
-                ),
-          trailing: _saving
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(AppIcons.edit_outlined),
-          onTap: _saving
-              ? null
-              : value == null
-              ? _load
-              : _edit,
-        ),
+        if (_readFailed)
+          SettingReadFailed(
+            icon: AppIcons.layers_outlined,
+            message: l10n.connectionPathReadFailed,
+            retryLabel: l10n.retry,
+            retryKey: const Key('connection-window-retry'),
+            onRetry: _load,
+          )
+        else ...[
+          SettingRow(
+            icon: AppIcons.layers_outlined,
+            title: l10n.connectionWindowCapacity,
+            state: state(_Row.capacity),
+            stateKey: const Key('connection-window-state'),
+            failed: _failed == _Row.capacity,
+            control: (_) => GlassStepper(
+              key: const Key('connection-window-capacity'),
+              decreaseKey: const Key('connection-window-capacity-decrease'),
+              increaseKey: const Key('connection-window-capacity-increase'),
+              semanticLabel: l10n.connectionWindowCapacity,
+              // Nothing to step until the saved value is known.
+              value:
+                  shown?.capacity ??
+                  const ConnectionWindowPreferences().capacity,
+              min: ConnectionWindowPreferences.minCapacity,
+              max: ConnectionWindowPreferences.maxCapacity,
+              onChanged: shown == null
+                  ? null
+                  : (capacity) => _change(
+                      shown.copyWith(capacity: capacity),
+                      _Row.capacity,
+                    ),
+            ),
+          ),
+          SettingRow(
+            icon: AppIcons.history,
+            title: l10n.connectionWindowPolicy,
+            info: l10n.connectionWindowPolicyInfo,
+            state: state(_Row.eviction),
+            stateKey: const Key('connection-window-state'),
+            failed: _failed == _Row.eviction,
+            stackWhenNarrow: true,
+            controlWidth: GlassSegmented.naturalWidth(context, policies),
+            control: (expand) => IgnorePointer(
+              ignoring: shown == null,
+              child: GlassSegmented<ConnectionEviction?>(
+                key: const Key('connection-window-policy'),
+                expand: expand,
+                selected: shown?.eviction,
+                onChanged: (eviction) {
+                  if (shown != null && eviction != null) {
+                    _change(shown.copyWith(eviction: eviction), _Row.eviction);
+                  }
+                },
+                segments: policies,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

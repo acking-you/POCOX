@@ -9,16 +9,10 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get hostThisDevice => 'This device';
-
-  @override
   String get hostConnectionCurrent => 'In use';
 
   @override
   String get hostConnectionRetained => 'Connection retained';
-
-  @override
-  String get hostConnectionAvailable => 'Connect on selection';
 
   @override
   String get connectionWindowTitle => 'Retained connections';
@@ -30,13 +24,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionWindowPolicy => 'Eviction policy';
 
   @override
-  String get connectionWindowLru => 'Least recently selected (LRU)';
+  String get connectionWindowPolicyInfo =>
+      'When the limit is reached, the idle service released first: the one you selected least recently, or the one that connected first. Busy services are never released.';
 
   @override
-  String get connectionWindowFifo => 'Earliest connected (FIFO)';
+  String get connectionWindowLru => 'Least recent';
 
   @override
-  String get connectionWindowInvalid => 'Enter a number from 1 to 32';
+  String get connectionWindowFifo => 'First connected';
 
   @override
   String get connectionWindowDescription =>

@@ -10,8 +10,10 @@ import 'support/screen_harness.dart';
 
 void main() {
   testWidgets(
-    'window preferences persist and a failed save keeps the previous limit',
+    'window preferences save as they change and a failed save keeps the '
+    'previous limit',
     (t) async {
+      // A phone with large text: the rows stack and stay usable.
       t.view.physicalSize = const Size(320, 780);
       t.view.devicePixelRatio = 1;
       t.platformDispatcher.textScaleFactorTestValue = 1.5;
@@ -22,45 +24,40 @@ void main() {
       final l10n = lookupAppLocalizations(const Locale('zh'));
       await t.pumpWidget(
         host(
-          const Scaffold(body: ConnectionWindowSettings()),
+          const Scaffold(
+            body: SingleChildScrollView(child: ConnectionWindowSettings()),
+          ),
           api,
           theme: ThemeData(brightness: Brightness.dark),
         ),
       );
       await t.pumpAndSettle();
-      Future<void> edit() async {
-        await t.tap(find.byKey(const Key('connection-window-settings')));
+      final increase = find.byKey(
+        const Key('connection-window-capacity-increase'),
+      );
+      for (var i = 0; i < 3; i++) {
+        await t.tap(increase);
         await t.pumpAndSettle();
       }
+      expect(api.savedConnectionWindow.capacity, 8);
+      await t.tap(find.byKey(const Key('connection-window-fifo')));
+      await t.pumpAndSettle();
+      expect(api.savedConnectionWindow.eviction, ConnectionEviction.fifo);
+      expect(api.savedConnectionWindow.capacity, 8);
 
-      await edit();
-      final field = find.byKey(const Key('connection-window-capacity'));
-      final save = find.byKey(const Key('connection-window-save'));
-      await t.enterText(field, '0');
-      await t.tap(save);
-      await t.pumpAndSettle();
-      expect(api.savedConnectionWindow.capacity, 5);
-      expect(find.byType(AlertDialog), findsOneWidget);
-      await t.enterText(field, '8');
-      final policy = find.byKey(const Key('connection-window-policy'));
-      await t.ensureVisible(policy);
-      await t.pumpAndSettle();
-      await t.tap(policy);
-      await t.pumpAndSettle();
-      await t.tap(find.text(l10n.connectionWindowFifo).last);
-      await t.pumpAndSettle();
-      await t.tap(save);
-      await t.pumpAndSettle();
-      expect(api.savedConnectionWindow.capacity, 8);
-      expect(api.savedConnectionWindow.eviction, 'fifo');
-      await edit();
-      expect(t.widget<TextFormField>(field).controller!.text, '8');
       api.connectionWindowSaveError = StateError('disk unavailable');
-      await t.enterText(field, '2');
-      await t.tap(save);
+      await t.tap(find.byKey(const Key('connection-window-capacity-decrease')));
       await t.pumpAndSettle();
       expect(api.savedConnectionWindow.capacity, 8);
-      expect(find.textContaining('disk unavailable'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('connection-window-capacity')),
+          matching: find.text('8'),
+        ),
+        findsOneWidget,
+        reason: 'the saved limit is shown again',
+      );
+      expect(find.text(l10n.connectionPathSaveFailed), findsOneWidget);
       expect(t.takeException(), isNull);
     },
   );

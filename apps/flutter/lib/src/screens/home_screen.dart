@@ -329,7 +329,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             target = s;
             break;
           } catch (e) {
-            lastError = friendlyError(e);
+            lastError = _probeFailure(
+              AppLocalizations.of(context),
+              friendlyError(e),
+            );
           }
           if (!mounted || gen != _generation) return;
         }
@@ -392,7 +395,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   /// Why a probe of a service failed, in the user's words.
   static String _probeFailure(AppLocalizations l10n, String reason) =>
-      reason.contains('connection window is full')
+      isConnectionWindowFull(reason)
       ? l10n.connectionWindowFull
       : isRelayAuthRejection(reason)
       ? l10n.unreachableAuthRejected

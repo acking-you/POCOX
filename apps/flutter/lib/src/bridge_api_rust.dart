@@ -394,7 +394,9 @@ class RustBridgeApi
     final value = await frb.appConnectionWindow();
     return ConnectionWindowPreferences(
       capacity: value.capacity,
-      eviction: value.eviction,
+      eviction: value.eviction == 'fifo'
+          ? ConnectionEviction.fifo
+          : ConnectionEviction.lru,
     );
   }
 
@@ -404,7 +406,7 @@ class RustBridgeApi
   ) => frb.appSetConnectionWindow(
     value: frb.ConnectionWindowDto(
       capacity: value.capacity,
-      eviction: value.eviction,
+      eviction: value.eviction.name,
     ),
   );
 
