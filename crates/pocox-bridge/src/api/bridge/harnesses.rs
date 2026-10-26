@@ -41,6 +41,18 @@ pub struct HarnessSkipDto {
     pub reason: String,
 }
 
+/// Installer-reported measurements for the current download.
+pub struct HarnessDownloadDto {
+    /// Bytes received, when reported.
+    pub downloaded_bytes: Option<i64>,
+    /// Total bytes, when reported.
+    pub total_bytes: Option<i64>,
+    /// Bytes per second, when reported.
+    pub bytes_per_second: Option<i64>,
+    /// Percentage of the download, not of the entire update.
+    pub percent: Option<u8>,
+}
+
 /// The running or most recent update of a device.
 pub struct HarnessJobDto {
     /// Its number on that device.
@@ -49,8 +61,13 @@ pub struct HarnessJobDto {
     pub kind: String,
     /// `running`, `done` or `failed`.
     pub state: String,
-    /// `stopping`, `updating` or `restarting` while running.
+    /// `stopping`, `updating`, `downloading`, `installing`, `verifying` or
+    /// `restarting` while running.
     pub stage: Option<String>,
+    /// Measurements reported by the installer, absent for silent installers.
+    pub download: Option<HarnessDownloadDto>,
+    /// Elapsed milliseconds measured on the host; absent on older hosts.
+    pub elapsed_ms: Option<i64>,
     /// Started by the device's automatic update.
     pub automatic: bool,
     /// The version before it.
@@ -115,6 +132,13 @@ impl From<harnesses::Overview> for HarnessOverviewDto {
                 kind: job.kind,
                 state: job.state,
                 stage: job.stage,
+                download: job.download.map(|download| HarnessDownloadDto {
+                    downloaded_bytes: download.downloaded_bytes.map(millis),
+                    total_bytes: download.total_bytes.map(millis),
+                    bytes_per_second: download.bytes_per_second.map(millis),
+                    percent: download.percent,
+                }),
+                elapsed_ms: job.elapsed_ms.map(millis),
                 automatic: job.automatic,
                 from_version: job.from_version,
                 to_version: job.to_version,

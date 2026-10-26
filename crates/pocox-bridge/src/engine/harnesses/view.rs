@@ -63,8 +63,15 @@ pub struct Job {
     pub kind: String,
     /// `running`, `done` or `failed`.
     pub state: String,
-    /// While running: `stopping`, `updating` or `restarting`.
+    /// While running: `stopping`, `updating`, `downloading`, `installing`,
+    /// `verifying` or `restarting`.
     pub stage: Option<String>,
+    /// Download measurements reported by the installer, when available.
+    #[serde(default)]
+    pub download: Option<Download>,
+    /// Elapsed time measured on the host, independent of controller clock skew.
+    #[serde(default)]
+    pub elapsed_ms: Option<u64>,
     /// Started by this device's automatic update, not by a person.
     pub automatic: bool,
     /// The version before the update.
@@ -82,6 +89,20 @@ pub struct Job {
     pub started_at_ms: u64,
     /// When it finished (Unix milliseconds).
     pub finished_at_ms: Option<u64>,
+}
+
+/// Installer-reported download progress. Absent values are unknown, not zero.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Download {
+    /// Bytes received for the current file.
+    pub downloaded_bytes: Option<u64>,
+    /// Size of the current file, when known.
+    pub total_bytes: Option<u64>,
+    /// Current download speed reported by the installer, in bytes per second.
+    pub bytes_per_second: Option<u64>,
+    /// Download percentage, from 0 to 100; not overall installation progress.
+    pub percent: Option<u8>,
 }
 
 /// A service an update did not restart.

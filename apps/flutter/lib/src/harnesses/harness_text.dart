@@ -42,6 +42,9 @@ String? harnessProblemText(AppLocalizations l10n, HarnessInfo harness) =>
 String harnessStageText(AppLocalizations l10n, HarnessJob job) =>
     switch (job.stage) {
       'stopping' => l10n.harnessStageStopping,
+      'downloading' => l10n.harnessStageDownloading,
+      'installing' => l10n.harnessStageInstalling,
+      'verifying' => l10n.harnessStageVerifying,
       'restarting' => l10n.harnessStageRestarting,
       _ => l10n.harnessStageUpdating,
     };

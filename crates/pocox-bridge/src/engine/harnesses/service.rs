@@ -5,7 +5,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::{Condvar, Mutex, MutexGuard};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use once_cell::sync::Lazy;
@@ -13,7 +13,7 @@ use once_cell::sync::Lazy;
 use super::install::{self, Installed};
 use super::restart::{self, Outcome};
 use super::view::{Harness, Job, Overview, SettingsChange};
-use super::{latest, settings, Kind};
+use super::{latest, progress, settings, Kind};
 
 /// A background check runs this long after the host starts …
 const FIRST_CHECK: Duration = Duration::from_secs(60);
@@ -34,6 +34,9 @@ struct State {
     checked_at_ms: Option<u64>,
     checking: bool,
     job: Option<Job>,
+    /// Freshness of the last installer download sample, for hiding stale
+    /// speeds.
+    download_at: Option<Instant>,
     runs: u64,
     /// Moves whenever an update records what it installed.
     generation: u64,
@@ -137,7 +140,22 @@ pub fn overview() -> Result<Overview> {
         checked_at_ms: state.checked_at_ms,
         checking: state.checking,
         restart_services: settings.restart_services,
-        job: state.job.clone(),
+        job: state.job.clone().map(|mut job| {
+            job.elapsed_ms = Some(
+                job.finished_at_ms
+                    .unwrap_or_else(now_ms)
+                    .saturating_sub(job.started_at_ms),
+            );
+            if state
+                .download_at
+                .is_none_or(|at| at.elapsed() > Duration::from_secs(3))
+            {
+                if let Some(download) = &mut job.download {
+                    download.bytes_per_second = None;
+                }
+            }
+            job
+        }),
     })
 }
 
@@ -311,12 +329,15 @@ fn start(kind: Kind, automatic: bool) -> Result<u64> {
             return Err(Refusal::Running.into());
         }
         state.runs += 1;
+        state.download_at = None;
         let run = state.runs;
         state.job = Some(Job {
             run,
             kind: kind.label().into(),
             state: "running".into(),
             stage: Some("updating".into()),
+            download: None,
+            elapsed_ms: None,
             automatic,
             from_version: installed.version.clone(),
             to_version: None,
@@ -349,6 +370,20 @@ fn spawn(name: &str, work: impl FnOnce() + Send + 'static) -> bool {
 fn stage(run: u64, stage: &str) {
     if let Some(job) = state().job.as_mut().filter(|job| job.run == run) {
         job.stage = Some(stage.into());
+        job.download = None;
+    }
+}
+
+fn progress(run: u64, update: progress::Update) {
+    let mut state = state();
+    if let Some(job) = state.job.as_mut().filter(|job| {
+        job.run == run
+            && job.state == "running"
+            && matches!(job.stage.as_deref(), Some("updating" | "downloading" | "installing"))
+    }) {
+        job.stage = Some(update.stage.into());
+        job.download = update.download;
+        state.download_at = Some(Instant::now());
     }
 }
 
@@ -364,6 +399,7 @@ impl Drop for Unfinished {
         {
             job.state = "failed".into();
             job.stage = None;
+            job.download = None;
             job.failure = Some("failed".into());
             job.finished_at_ms = Some(now_ms());
         }
@@ -390,10 +426,12 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
     };
     stage(run, "updating");
     tracing::info!(kind = kind.label(), from = ?installed.version, "updating harness");
-    let result = super::command::install(&invocation);
-    let after = install::detect(kind, Some(&installed.path));
+    let result = super::command::install(&invocation, move |update| progress(run, update));
+    stage(run, "verifying");
+    let after = installed.recheck();
     let to_version = after.as_ref().and_then(|found| found.version.clone());
-    let changed = result.is_ok() && to_version != installed.version;
+    let verified = installed.verify(after.as_ref(), result);
+    let changed = matches!(verified, Ok(install::Change::Updated));
     if !paused.is_empty() || changed && restart_services {
         stage(run, "restarting");
     }
@@ -422,7 +460,8 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
     tracing::info!(
         kind = kind.label(),
         to = ?to_version,
-        ok = result.is_ok(),
+        installer_ok = result.is_ok(),
+        ok = verified.is_ok(),
         restarted = outcome.restarted.len(),
         "harness update finished"
     );
@@ -440,10 +479,11 @@ fn run_job(run: u64, installed: Installed, invocation: super::command::Invocatio
         })
         .installed = after;
     if let Some(job) = state.job.as_mut().filter(|job| job.run == run) {
-        job.state = if result.is_ok() { "done" } else { "failed" }.into();
+        job.state = if verified.is_ok() { "done" } else { "failed" }.into();
         job.stage = None;
+        job.download = None;
         job.to_version = to_version;
-        job.failure = result.err().map(|failure| failure.code().into());
+        job.failure = verified.err().map(|failure| failure.code().into());
         job.restarted = outcome.restarted;
         job.not_restarted = outcome.skipped;
         job.finished_at_ms = Some(now_ms());

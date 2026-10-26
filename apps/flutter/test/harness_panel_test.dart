@@ -78,6 +78,64 @@ void main() {
     expect(find.byKey(const Key('harness-updating-codex')), findsOneWidget);
     expect(find.text(_en.harnessStageUpdating), findsOneWidget);
     expect(find.byKey(const Key('harness-update-codex')), findsNothing);
+    expect(
+      t
+          .widget<LinearProgressIndicator>(
+            find.byKey(const Key('harness-progress-bar-codex')),
+          )
+          .value,
+      isNull,
+      reason: 'a silent installer never gets a fabricated percentage',
+    );
+
+    final running = api.harnessOverviews[_studio]!;
+    void progress(String stage) {
+      api.harnessOverviews[_studio] = HarnessOverview(
+        harnesses: running.harnesses,
+        checkedAtMs: running.checkedAtMs,
+        job: HarnessJob(
+          run: running.job!.run,
+          kind: 'codex',
+          state: 'running',
+          stage: stage,
+          fromVersion: '0.46.0',
+          // The controller's wall clock must not affect host elapsed time.
+          startedAtMs: 1,
+          elapsedMs: 7000,
+          download: const HarnessDownload(
+            downloadedBytes: 25000000,
+            totalBytes: 100000000,
+            bytesPerSecond: 1000000,
+            percent: 25,
+          ),
+        ),
+      );
+    }
+
+    progress('downloading');
+    await t.pump(const Duration(seconds: 1));
+    await t.pump();
+    expect(
+      t
+          .widget<LinearProgressIndicator>(
+            find.byKey(const Key('harness-progress-bar-codex')),
+          )
+          .value,
+      0.25,
+    );
+    expect(find.textContaining('25 MB / 100 MB'), findsOneWidget);
+    expect(find.textContaining('1.0 MB/s'), findsOneWidget);
+    expect(find.textContaining('0:07'), findsOneWidget);
+
+    progress('verifying');
+    await t.pump(const Duration(seconds: 1));
+    await t.pump();
+    expect(find.text(_en.harnessStageVerifying), findsOneWidget);
+    expect(
+      find.textContaining('MB/s'),
+      findsNothing,
+      reason: 'a finished transfer has no current speed',
+    );
 
     api.finishHarnessUpdate(
       _studio,
@@ -93,6 +151,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('harness-current-codex')), findsOneWidget);
+    expect(find.byKey(const Key('harness-progress-codex')), findsNothing);
     expect(api.harnessCalls, hasLength(1), reason: 'nothing is sent again');
   });
 

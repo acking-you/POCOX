@@ -6,6 +6,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/harnesses/harness_text.dart';
+import 'package:pocox/src/harnesses/harness_progress.dart';
 import 'package:pocox/src/hosting/editor_block.dart';
 import 'package:pocox/src/managed/managed_host_editor.dart';
 import 'package:pocox/src/managed/managed_providers.dart';
@@ -367,9 +368,7 @@ class _HarnessRow extends StatelessWidget {
         child: BusyLabel(
           busy: true,
           label: l10n.harnessUpdate,
-          busyLabel: running
-              ? harnessStageText(l10n, job!)
-              : l10n.harnessStageUpdating,
+          busyLabel: running ? l10n.harnessUpdate : l10n.harnessStageUpdating,
         ),
       );
     } else if (harness.updateAvailable && harness.canUpdate && latest != null) {
@@ -400,6 +399,8 @@ class _HarnessRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (action == null) lead else ActionRow(lead: lead, action: action),
+          if (running)
+            HarnessProgress(key: Key('harness-progress-$kind'), job: job!),
           if (harness.updateAvailable && !harness.canUpdate && latest != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),

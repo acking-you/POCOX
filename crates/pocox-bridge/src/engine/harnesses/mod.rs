@@ -15,6 +15,7 @@ mod command;
 mod install;
 mod kind;
 mod latest;
+mod progress;
 mod restart;
 mod service;
 mod settings;

@@ -115,14 +115,16 @@ Future<void> _scene(
   Locale locale = const Locale('zh'),
   Brightness brightness = Brightness.light,
   required String open,
+  bool updating = false,
 }) async {
   debugDefaultTargetPlatformOverride = platform;
   try {
     t.view.physicalSize = size;
     t.view.devicePixelRatio = 1;
+    final api = _api();
     await t.pumpWidget(
       ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(_api())],
+        overrides: [bridgeApiProvider.overrideWithValue(api)],
         child: MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -145,6 +147,30 @@ Future<void> _scene(
       scrollable: find.byType(Scrollable).last,
     );
     await t.pumpAndSettle();
+    if (updating) {
+      final device = open == 'studio' ? _studio : '';
+      final current = api.harnessOverviews[device]!;
+      api.harnessOverviews[device] = HarnessOverview(
+        harnesses: current.harnesses,
+        checkedAtMs: current.checkedAtMs,
+        job: const HarnessJob(
+          run: 4,
+          kind: 'codex',
+          state: 'running',
+          stage: 'downloading',
+          elapsedMs: 42000,
+          download: HarnessDownload(
+            downloadedBytes: 25000000,
+            totalBytes: 100000000,
+            bytesPerSecond: 1500000,
+            percent: 25,
+          ),
+        ),
+      );
+      await t.tap(find.byKey(const Key('harness-check')));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 200));
+    }
     expect(t.takeException(), isNull, reason: name);
     await capturePreview(t, name);
     await t.pumpWidget(const SizedBox());
@@ -182,6 +208,7 @@ void main() {
       platform: TargetPlatform.macOS,
       locale: const Locale('en'),
       open: '@local',
+      updating: true,
     );
   });
 
@@ -202,6 +229,7 @@ void main() {
       platform: TargetPlatform.iOS,
       brightness: Brightness.dark,
       open: 'studio',
+      updating: true,
     );
   });
 }

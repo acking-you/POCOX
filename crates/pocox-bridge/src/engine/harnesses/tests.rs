@@ -23,6 +23,17 @@ fn requests_name_a_harness_only() {
 }
 
 #[test]
+fn older_hosts_can_omit_progress_measurements() {
+    let job: super::view::Job = serde_json::from_value(serde_json::json!({
+        "run": 1, "kind": "codex", "state": "running", "stage": "updating",
+        "automatic": false, "restarted": [], "notRestarted": [], "startedAtMs": 1
+    }))
+    .expect("an older host's job");
+    assert!(job.download.is_none());
+    assert!(job.elapsed_ms.is_none());
+}
+
+#[test]
 fn versions_are_read_from_each_vendor_and_compared_within_a_line() {
     for (output, version) in [
         ("codex-cli 0.46.0\n", "0.46.0"),
@@ -184,4 +195,83 @@ fn installer_failures_are_told_apart() {
     assert_eq!(classify(locked, false), Failure::Permission);
     assert_eq!(classify("npm error code EACCES\npermission denied", false), Failure::Permission);
     assert_eq!(classify("npm error 404 Not Found", false), Failure::Failed);
+}
+
+fn codex_at(path: &Path, version: Option<&str>) -> install::Installed {
+    install::Installed {
+        kind: Kind::Codex,
+        path: path.to_path_buf(),
+        version: version.map(str::to_string),
+        method: Method::Brew,
+        source: install::Source::Cask("codex"),
+    }
+}
+
+/// Homebrew can replace the cask's symlink and then fail unrelated maintenance.
+/// The same launch path must verify the upgrade and allow its services to
+/// restart.
+#[cfg(unix)]
+#[test]
+fn an_installer_error_does_not_discard_a_verified_upgrade() {
+    use std::os::unix::fs::{self, PermissionsExt};
+
+    use super::command::{self, Invocation};
+
+    let root = tempfile::tempdir().expect("temp");
+    let old = root.path().join("codex-0.163.0");
+    let new = root.path().join("codex-0.164.0");
+    for (path, version) in [(&old, "0.163.0"), (&new, "0.164.0")] {
+        std::fs::write(path, format!("#!/bin/sh\nprintf 'codex-cli {version}\\n'\n"))
+            .expect("version fixture");
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).expect("executable");
+    }
+    let path = root.path().join("codex");
+    fs::symlink(&old, &path).expect("old launch path");
+    let before = codex_at(&path, None).recheck().expect("installed");
+    assert_eq!(before.version.as_deref(), Some("0.163.0"));
+    let result = command::install(
+        &Invocation {
+            program: "/bin/sh".into(),
+            args: vec![
+                "-c".into(),
+                "rm \"$1\" && ln -s \"$2\" \"$1\"; printf 'maintenance failed\\n' >&2; exit 1"
+                    .into(),
+                "fixture".into(),
+                path.to_string_lossy().into_owned(),
+                new.to_string_lossy().into_owned(),
+            ],
+        },
+        |_| {},
+    );
+    assert_eq!(result, Err(Failure::Failed));
+    let after = before.recheck().expect("updated launch path");
+    assert_eq!(after.path, path);
+    assert_eq!(after.version.as_deref(), Some("0.164.0"));
+    assert_eq!(before.verify(Some(&after), result), Ok(install::Change::Updated));
+}
+
+#[test]
+fn an_update_needs_version_evidence_from_the_same_installation() {
+    let before = codex_at(Path::new("/managed/codex"), Some("0.163.0"));
+    assert_eq!(before.verify(Some(&before), Ok(())), Ok(install::Change::Unchanged));
+    assert_eq!(before.verify(Some(&before), Err(Failure::Permission)), Err(Failure::Permission));
+    let other = codex_at(Path::new("/other/codex"), Some("0.164.0"));
+    assert_eq!(before.verify(Some(&other), Ok(())), Err(Failure::Failed));
+    let older = codex_at(&before.path, Some("0.162.0"));
+    assert_eq!(before.verify(Some(&older), Ok(())), Err(Failure::Failed));
+    let unknown = codex_at(&before.path, None);
+    assert_eq!(before.verify(Some(&unknown), Ok(())), Err(Failure::Failed));
+    assert_eq!(before.verify(None, Err(Failure::TimedOut)), Err(Failure::TimedOut));
+}
+
+#[test]
+fn a_removed_executable_is_not_replaced_by_another_detected_installation() {
+    let root = tempfile::tempdir().expect("temp");
+    let before = codex_at(&root.path().join("codex"), Some("0.163.0"));
+    touch(&before.path);
+    // An existing but non-executable file cannot confirm an upgrade either.
+    let unreadable = before.recheck().expect("file exists");
+    assert_eq!(before.verify(Some(&unreadable), Ok(())), Err(Failure::Failed));
+    std::fs::remove_file(&before.path).expect("installer removed old executable");
+    assert!(before.recheck().is_none(), "verification stays on the managed launch path");
 }

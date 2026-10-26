@@ -44,7 +44,6 @@ flutter_rust_bridge::frb_generated_boilerplate!(
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -652529325;
 
-
 // Section: executor
 
 flutter_rust_bridge::frb_generated_default_handler!();
@@ -8792,9 +8791,7 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>
 );
 
-
 // Section: dart2rust
-
 
 impl SseDecode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -9829,6 +9826,22 @@ impl SseDecode for crate::api::bridge::grok::GrokSignInDto {
     }
 }
 
+impl SseDecode for crate::api::bridge::harnesses::HarnessDownloadDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_downloadedBytes = <Option<i64>>::sse_decode(deserializer);
+        let mut var_totalBytes = <Option<i64>>::sse_decode(deserializer);
+        let mut var_bytesPerSecond = <Option<i64>>::sse_decode(deserializer);
+        let mut var_percent = <Option<u8>>::sse_decode(deserializer);
+        return crate::api::bridge::harnesses::HarnessDownloadDto {
+            downloaded_bytes: var_downloadedBytes,
+            total_bytes: var_totalBytes,
+            bytes_per_second: var_bytesPerSecond,
+            percent: var_percent,
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::harnesses::HarnessDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -9864,6 +9877,9 @@ impl SseDecode for crate::api::bridge::harnesses::HarnessJobDto {
         let mut var_kind = <String>::sse_decode(deserializer);
         let mut var_state = <String>::sse_decode(deserializer);
         let mut var_stage = <Option<String>>::sse_decode(deserializer);
+        let mut var_download =
+            <Option<crate::api::bridge::harnesses::HarnessDownloadDto>>::sse_decode(deserializer);
+        let mut var_elapsedMs = <Option<i64>>::sse_decode(deserializer);
         let mut var_automatic = <bool>::sse_decode(deserializer);
         let mut var_fromVersion = <Option<String>>::sse_decode(deserializer);
         let mut var_toVersion = <Option<String>>::sse_decode(deserializer);
@@ -9878,6 +9894,8 @@ impl SseDecode for crate::api::bridge::harnesses::HarnessJobDto {
             kind: var_kind,
             state: var_state,
             stage: var_stage,
+            download: var_download,
+            elapsed_ms: var_elapsedMs,
             automatic: var_automatic,
             from_version: var_fromVersion,
             to_version: var_toVersion,
@@ -11261,6 +11279,19 @@ impl SseDecode for Option<crate::api::bridge::services::DirectStageDto> {
     }
 }
 
+impl SseDecode for Option<crate::api::bridge::harnesses::HarnessDownloadDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::bridge::harnesses::HarnessDownloadDto>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::bridge::harnesses::HarnessJobDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11425,6 +11456,17 @@ impl SseDecode for Option<u64> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<u64>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<u8>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -13618,9 +13660,7 @@ fn pde_ffi_dispatcher_sync_impl(
     }
 }
 
-
 // Section: rust2dart
-
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<ComposerController> {
@@ -13640,7 +13680,6 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<ComposerController>> for Compo
     }
 }
 
-
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<EventFeed> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -13655,7 +13694,6 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<EventFeed>> for EventFeed {
         self.into()
     }
 }
-
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<PreparedFile> {
@@ -14730,6 +14768,29 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::grok::GrokSignInDto>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::harnesses::HarnessDownloadDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.downloaded_bytes.into_into_dart().into_dart(),
+            self.total_bytes.into_into_dart().into_dart(),
+            self.bytes_per_second.into_into_dart().into_dart(),
+            self.percent.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::harnesses::HarnessDownloadDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::harnesses::HarnessDownloadDto>
+    for crate::api::bridge::harnesses::HarnessDownloadDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::harnesses::HarnessDownloadDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::harnesses::HarnessDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -14766,6 +14827,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::harnesses::HarnessJob
             self.kind.into_into_dart().into_dart(),
             self.state.into_into_dart().into_dart(),
             self.stage.into_into_dart().into_dart(),
+            self.download.into_into_dart().into_dart(),
+            self.elapsed_ms.into_into_dart().into_dart(),
             self.automatic.into_into_dart().into_dart(),
             self.from_version.into_into_dart().into_dart(),
             self.to_version.into_into_dart().into_dart(),
@@ -17403,6 +17466,16 @@ impl SseEncode for crate::api::bridge::grok::GrokSignInDto {
     }
 }
 
+impl SseEncode for crate::api::bridge::harnesses::HarnessDownloadDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <Option<i64>>::sse_encode(self.downloaded_bytes, serializer);
+        <Option<i64>>::sse_encode(self.total_bytes, serializer);
+        <Option<i64>>::sse_encode(self.bytes_per_second, serializer);
+        <Option<u8>>::sse_encode(self.percent, serializer);
+    }
+}
+
 impl SseEncode for crate::api::bridge::harnesses::HarnessDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -17426,6 +17499,11 @@ impl SseEncode for crate::api::bridge::harnesses::HarnessJobDto {
         <String>::sse_encode(self.kind, serializer);
         <String>::sse_encode(self.state, serializer);
         <Option<String>>::sse_encode(self.stage, serializer);
+        <Option<crate::api::bridge::harnesses::HarnessDownloadDto>>::sse_encode(
+            self.download,
+            serializer,
+        );
+        <Option<i64>>::sse_encode(self.elapsed_ms, serializer);
         <bool>::sse_encode(self.automatic, serializer);
         <Option<String>>::sse_encode(self.from_version, serializer);
         <Option<String>>::sse_encode(self.to_version, serializer);
@@ -18461,6 +18539,16 @@ impl SseEncode for Option<crate::api::bridge::services::DirectStageDto> {
     }
 }
 
+impl SseEncode for Option<crate::api::bridge::harnesses::HarnessDownloadDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::bridge::harnesses::HarnessDownloadDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::bridge::harnesses::HarnessJobDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -18599,6 +18687,16 @@ impl SseEncode for Option<u64> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <u64>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<u8> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <u8>::sse_encode(value, serializer);
         }
     }
 }
@@ -19278,12 +19376,10 @@ impl SseEncode for crate::api::bridge::hosted_account::WebLoginStartDto {
     }
 }
 
-
 #[cfg(not(target_family = "wasm"))]
 mod io {
     // This file is automatically generated, so please do not edit it.
     // @generated by `flutter_rust_bridge`@ 2.12.0.
-
 
     // Section: imports
 
@@ -19309,14 +19405,12 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::increment_strong_count(ptr as _);
     }
 
-
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::decrement_strong_count(ptr as _);
     }
-
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
@@ -19325,7 +19419,6 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::increment_strong_count(ptr as _);
     }
 
-
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
         ptr: *const std::ffi::c_void,
@@ -19333,14 +19426,12 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::decrement_strong_count(ptr as _);
     }
 
-
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>>::increment_strong_count(ptr as _);
     }
-
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
@@ -19352,13 +19443,11 @@ mod io {
 #[cfg(not(target_family = "wasm"))]
 pub use io::*;
 
-
 /// cbindgen:ignore
 #[cfg(target_family = "wasm")]
 mod web {
     // This file is automatically generated, so please do not edit it.
     // @generated by `flutter_rust_bridge`@ 2.12.0.
-
 
     // Section: imports
 
@@ -19376,7 +19465,6 @@ mod web {
     use crate::api::bridge::composer::*;
     use crate::api::bridge::events::*;
 
-
     // Section: boilerplate
 
     flutter_rust_bridge::frb_generated_boilerplate_web!();
@@ -19388,14 +19476,12 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::increment_strong_count(ptr as _);
     }
 
-
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::decrement_strong_count(ptr as _);
     }
-
 
     #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
@@ -19404,7 +19490,6 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::increment_strong_count(ptr as _);
     }
 
-
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
         ptr: *const std::ffi::c_void,
@@ -19412,14 +19497,12 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::decrement_strong_count(ptr as _);
     }
 
-
     #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>>::increment_strong_count(ptr as _);
     }
-
 
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(

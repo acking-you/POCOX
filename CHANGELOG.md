@@ -9,6 +9,17 @@ breaking change goes.
 
 ## Unreleased
 
+- **Harness updates verify the installed executable.** A newer version at
+  the same launch path is reported as updated and its services restart even
+  when the installer returns an error, such as Homebrew failing unrelated
+  maintenance after upgrading Codex. Missing or unreadable executables no
+  longer count as a version change, and a failed upgrade cannot be verified
+  against another installation found on PATH.
+- **Harness updates show their progress.** Each agent's update has a status
+  bar, current phase and elapsed time on local and remote computers. When its
+  installer reports download measurements, the card also shows percentage,
+  downloaded bytes and speed; silent installers show an indeterminate bar.
+
 - **Windows P2P handshake replies recover from a rejected UDP source hint.**
   Some Windows network stacks reject the source-address control message with
   error 10022, causing a phone to fall back to the relay even while the host's

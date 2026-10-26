@@ -222,6 +222,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DirectStageDto dco_decode_box_autoadd_direct_stage_dto(dynamic raw);
 
   @protected
+  HarnessDownloadDto dco_decode_box_autoadd_harness_download_dto(dynamic raw);
+
+  @protected
   HarnessJobDto dco_decode_box_autoadd_harness_job_dto(dynamic raw);
 
   @protected
@@ -281,6 +284,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt dco_decode_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  int dco_decode_box_autoadd_u_8(dynamic raw);
 
   @protected
   ClaudeVariableDto dco_decode_claude_variable_dto(dynamic raw);
@@ -356,6 +362,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   GrokSignInDto dco_decode_grok_sign_in_dto(dynamic raw);
+
+  @protected
+  HarnessDownloadDto dco_decode_harness_download_dto(dynamic raw);
 
   @protected
   HarnessDto dco_decode_harness_dto(dynamic raw);
@@ -667,6 +676,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   DirectStageDto? dco_decode_opt_box_autoadd_direct_stage_dto(dynamic raw);
 
   @protected
+  HarnessDownloadDto? dco_decode_opt_box_autoadd_harness_download_dto(
+    dynamic raw,
+  );
+
+  @protected
   HarnessJobDto? dco_decode_opt_box_autoadd_harness_job_dto(dynamic raw);
 
   @protected
@@ -717,6 +731,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw);
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_8(dynamic raw);
 
   @protected
   List<String>? dco_decode_opt_list_String(dynamic raw);
@@ -1083,6 +1100,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HarnessDownloadDto sse_decode_box_autoadd_harness_download_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HarnessJobDto sse_decode_box_autoadd_harness_job_dto(
     SseDeserializer deserializer,
   );
@@ -1168,6 +1190,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_box_autoadd_u_8(SseDeserializer deserializer);
 
   @protected
   ClaudeVariableDto sse_decode_claude_variable_dto(
@@ -1261,6 +1286,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   GrokSignInDto sse_decode_grok_sign_in_dto(SseDeserializer deserializer);
+
+  @protected
+  HarnessDownloadDto sse_decode_harness_download_dto(
+    SseDeserializer deserializer,
+  );
 
   @protected
   HarnessDto sse_decode_harness_dto(SseDeserializer deserializer);
@@ -1680,6 +1710,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  HarnessDownloadDto? sse_decode_opt_box_autoadd_harness_download_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   HarnessJobDto? sse_decode_opt_box_autoadd_harness_job_dto(
     SseDeserializer deserializer,
   );
@@ -1740,6 +1775,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   BigInt? sse_decode_opt_box_autoadd_u_64(SseDeserializer deserializer);
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_8(SseDeserializer deserializer);
 
   @protected
   List<String>? sse_decode_opt_list_String(SseDeserializer deserializer);
@@ -2178,6 +2216,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_harness_download_dto(
+    HarnessDownloadDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_harness_job_dto(
     HarnessJobDto self,
     SseSerializer serializer,
@@ -2281,6 +2325,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_u_8(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_claude_variable_dto(
@@ -2402,6 +2449,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_grok_sign_in_dto(
     GrokSignInDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_harness_download_dto(
+    HarnessDownloadDto self,
     SseSerializer serializer,
   );
 
@@ -2943,6 +2996,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_harness_download_dto(
+    HarnessDownloadDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_harness_job_dto(
     HarnessJobDto? self,
     SseSerializer serializer,
@@ -3016,6 +3075,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_u_64(BigInt? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_8(int? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_list_String(List<String>? self, SseSerializer serializer);

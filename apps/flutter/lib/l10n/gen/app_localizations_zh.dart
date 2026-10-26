@@ -4672,6 +4672,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get harnessStageUpdating => '正在更新…';
 
   @override
+  String get harnessStageDownloading => '正在下载…';
+
+  @override
+  String get harnessStageInstalling => '正在安装…';
+
+  @override
+  String get harnessStageVerifying => '正在验证已安装版本…';
+
+  @override
+  String harnessElapsed(String time) {
+    return '已用时 $time';
+  }
+
+  @override
   String get harnessStageRestarting => '正在重启服务…';
 
   @override

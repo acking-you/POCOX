@@ -6,6 +6,7 @@
 use std::io::Read;
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
@@ -67,13 +68,47 @@ type Stream = (usize, Option<Vec<u8>>);
 /// Each reader's report once it arrived (see [`Stream`]).
 type Reports = [Option<Option<Vec<u8>>>; 2];
 
+/// Which output pipe produced an observed chunk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputStream {
+    /// The child's standard output.
+    Stdout,
+    /// The child's standard error.
+    Stderr,
+}
+
+type Observer = Arc<dyn Fn(OutputStream, &[u8]) + Send + Sync>;
+
 /// Run `command` until `deadline`, keeping at most `cap` bytes of each output
 /// stream; standard input is closed. On unix it leads a process group of its
 /// own, which is stopped once it exited or failed, so nothing it started
 /// outlives the run; elsewhere only the program itself is stopped. Returns at
 /// most [`SETTLE`] after the deadline.
 pub fn run(command: &mut Command, deadline: Instant, cap: usize) -> Result<Output, Failure> {
-    let (output, cleanup) = attempt(command, deadline, cap);
+    observed(command, deadline, cap, None)
+}
+
+/// Like [`run`], also observing output as it arrives, before the child exits.
+/// Chunks are arbitrary byte boundaries, not lines or complete UTF-8 text.
+/// The callback runs on both pipe-reader threads: it must return promptly,
+/// must not panic, and must tolerate a late chunk if cleanup cannot join a
+/// reader.
+pub fn run_observed(
+    command: &mut Command,
+    deadline: Instant,
+    cap: usize,
+    observer: impl Fn(OutputStream, &[u8]) + Send + Sync + 'static,
+) -> Result<Output, Failure> {
+    observed(command, deadline, cap, Some(Arc::new(observer)))
+}
+
+fn observed(
+    command: &mut Command,
+    deadline: Instant,
+    cap: usize,
+    observer: Option<Observer>,
+) -> Result<Output, Failure> {
+    let (output, cleanup) = attempt(command, deadline, cap, observer);
     if cleanup != CLEAN {
         tracing::debug!(?cleanup, "a bounded run was not fully cleaned up");
     }
@@ -87,6 +122,7 @@ fn attempt(
     command: &mut Command,
     deadline: Instant,
     cap: usize,
+    observer: Option<Observer>,
 ) -> (Result<Output, Failure>, Cleanup) {
     command
         .stdin(Stdio::null())
@@ -104,9 +140,9 @@ fn attempt(
     let (tx, rx) = mpsc::channel();
     let mut readers = [None, None];
     if let (Some(out), Some(err)) = (child.stdout.take(), child.stderr.take()) {
-        readers[0] = read_capped(out, 0, cap, &tx);
+        readers[0] = read_capped(out, 0, cap, &tx, observer.clone());
         if readers[0].is_some() {
-            readers[1] = read_capped(err, 1, cap, &tx);
+            readers[1] = read_capped(err, 1, cap, &tx, observer);
         }
     }
     drop(tx);
@@ -187,19 +223,41 @@ fn leader_runs(child: &mut Child) -> bool {
 /// `index`: `None` beyond `cap` bytes (reading stops there) or on a read
 /// error. `None` when no thread could be started.
 fn read_capped<R: Read + Send + 'static>(
-    pipe: R,
+    mut pipe: R,
     index: usize,
     cap: usize,
     tx: &Sender<Stream>,
+    observer: Option<Observer>,
 ) -> Option<JoinHandle<()>> {
     let tx = tx.clone();
-    let limit = u64::try_from(cap).unwrap_or(u64::MAX).saturating_add(1);
     thread::Builder::new()
         .name("pcx-bounded-run".into())
         .spawn(move || {
             let mut bytes = Vec::new();
-            let read = pipe.take(limit).read_to_end(&mut bytes);
-            let kept = (read.is_ok() && bytes.len() <= cap).then_some(bytes);
+            let mut buffer = [0; 8192];
+            let readable = loop {
+                match pipe.read(&mut buffer) {
+                    Ok(0) => break true,
+                    Ok(read) if read > cap.saturating_sub(bytes.len()) => break false,
+                    Ok(read) => {
+                        let chunk = &buffer[..read];
+                        bytes.extend_from_slice(chunk);
+                        if let Some(observer) = &observer {
+                            observer(
+                                if index == 0 {
+                                    OutputStream::Stdout
+                                } else {
+                                    OutputStream::Stderr
+                                },
+                                chunk,
+                            );
+                        }
+                    },
+                    Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                    Err(_) => break false,
+                }
+            };
+            let kept = readable.then_some(bytes);
             // reason: the run may have stopped receiving; the report is moot.
             let _ = tx.send((index, kept));
         })
@@ -298,7 +356,7 @@ mod tests {
         let mut command = sh(script);
         command.arg("pcx-probe").arg(&file);
         let started = Instant::now();
-        let (output, cleanup) = attempt(&mut command, started + deadline, cap);
+        let (output, cleanup) = attempt(&mut command, started + deadline, cap, None);
         let took = started.elapsed();
         let helper = std::fs::read_to_string(&file)
             .expect("the helper was started")
@@ -340,7 +398,8 @@ mod tests {
 
     #[test]
     fn a_probe_reports_its_exit_and_both_streams() {
-        let (ran, cleanup) = attempt(&mut sh("printf out; printf err >&2; exit 3"), roomy(), 64);
+        let (ran, cleanup) =
+            attempt(&mut sh("printf out; printf err >&2; exit 3"), roomy(), 64, None);
         let ran = ran.expect("ran");
         assert_eq!(cleanup, CLEAN);
         assert_eq!(ran.code, Some(3));
@@ -353,6 +412,26 @@ mod tests {
     }
 
     #[test]
+    fn output_is_observed_before_the_child_exits() {
+        let gate = pid_file();
+        let observed_gate = gate.clone();
+        let mut command =
+            sh("printf 'downloading\\r' >&2; while [ ! -f \"$1\" ]; do sleep 0.02; done; printf \
+                done");
+        command.arg("fixture").arg(&gate);
+        let result = run_observed(&mut command, roomy(), 64, move |stream, bytes| {
+            if stream == OutputStream::Stderr && bytes.contains(&b'\r') {
+                std::fs::write(&observed_gate, b"observed").expect("release fixture");
+            }
+        })
+        .expect("child completed after live observation");
+        let _ = std::fs::remove_file(gate);
+        assert_eq!(result.code, Some(0));
+        assert_eq!(result.stdout, b"done");
+        assert_eq!(result.stderr, b"downloading\r");
+    }
+
+    #[test]
     fn output_beyond_the_cap_is_unreadable_and_stops_the_probe() {
         let ran = run(&mut sh("printf 0123456789"), roomy(), 10).expect("exactly the cap");
         assert_eq!(ran.stdout, b"0123456789");
@@ -360,7 +439,7 @@ mod tests {
         assert_eq!(run(&mut sh("printf 0123456789"), roomy(), 9).err(), Some(Failure::Unreadable));
         // An endless writer is stopped as soon as it passed the cap.
         for endless in ["while :; do printf 0123456789; done", "while :; do printf e >&2; done"] {
-            let (ran, cleanup) = attempt(&mut sh(endless), roomy(), 1024);
+            let (ran, cleanup) = attempt(&mut sh(endless), roomy(), 1024, None);
             assert_eq!(ran.err(), Some(Failure::Unreadable), "{endless}");
             assert_eq!(cleanup, CLEAN, "{endless}");
         }
@@ -392,7 +471,7 @@ mod tests {
         let mut bystander = Bystander::start();
         let started = Instant::now();
         let (ran, cleanup) =
-            attempt(&mut sh("exec sleep 30"), started + Duration::from_secs(1), 64);
+            attempt(&mut sh("exec sleep 30"), started + Duration::from_secs(1), 64, None);
         let took = started.elapsed();
         assert_eq!(ran.err(), Some(Failure::Deadline));
         assert_eq!(cleanup, CLEAN);

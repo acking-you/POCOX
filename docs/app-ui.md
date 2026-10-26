@@ -320,6 +320,11 @@ for Flutter diagnostics. Native console lifetime tests live in
   A finished start or stop closes the editor with one toast naming the host (a
   restore warning rides in it). Editor rules:
   [Hosting configuration](hosting-configuration.md).
+- Each running harness update has an inline progress track, phase and elapsed
+  time. Download percentages, byte counts and speeds appear only when reported
+  by its installer; silent installers keep an indeterminate track. Measurements
+  clear when verifying or restarting, and completed jobs replace the progress
+  with their result. See [harness updates](harness-updates.md).
 - The Codex setup page (`screens/codex_setup_screen.dart`) lists ChatGPT
   sign-in and custom provider as two rows, each with its control at the row's
   end (`widgets/action_row.dart`) and an "in use" mark on the method Codex runs
