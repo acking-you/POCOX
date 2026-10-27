@@ -101,7 +101,9 @@ pub struct HarnessOverviewDto {
     pub job: Option<HarnessJobDto>,
 }
 
-fn millis(value: u64) -> i64 {
+/// A counter, byte count or timestamp as a Dart integer; beyond `i64` it
+/// saturates.
+fn signed(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
@@ -124,21 +126,21 @@ impl From<harnesses::Overview> for HarnessOverviewDto {
                     services: harness.services,
                 })
                 .collect(),
-            checked_at_ms: value.checked_at_ms.map(millis),
+            checked_at_ms: value.checked_at_ms.map(signed),
             checking: value.checking,
             restart_services: value.restart_services,
             job: value.job.map(|job| HarnessJobDto {
-                run: millis(job.run),
+                run: signed(job.run),
                 kind: job.kind,
                 state: job.state,
                 stage: job.stage,
                 download: job.download.map(|download| HarnessDownloadDto {
-                    downloaded_bytes: download.downloaded_bytes.map(millis),
-                    total_bytes: download.total_bytes.map(millis),
-                    bytes_per_second: download.bytes_per_second.map(millis),
+                    downloaded_bytes: download.downloaded_bytes.map(signed),
+                    total_bytes: download.total_bytes.map(signed),
+                    bytes_per_second: download.bytes_per_second.map(signed),
                     percent: download.percent,
                 }),
-                elapsed_ms: job.elapsed_ms.map(millis),
+                elapsed_ms: job.elapsed_ms.map(signed),
                 automatic: job.automatic,
                 from_version: job.from_version,
                 to_version: job.to_version,
@@ -152,8 +154,8 @@ impl From<harnesses::Overview> for HarnessOverviewDto {
                         reason: skipped.reason,
                     })
                     .collect(),
-                started_at_ms: millis(job.started_at_ms),
-                finished_at_ms: job.finished_at_ms.map(millis),
+                started_at_ms: signed(job.started_at_ms),
+                finished_at_ms: job.finished_at_ms.map(signed),
             }),
         }
     }

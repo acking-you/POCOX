@@ -15,10 +15,12 @@ breaking change goes.
   maintenance after upgrading Codex. Missing or unreadable executables no
   longer count as a version change, and a failed upgrade cannot be verified
   against another installation found on PATH.
-- **Harness updates show their progress.** Each agent's update has a status
-  bar, current phase and elapsed time on local and remote computers. When its
-  installer reports download measurements, the card also shows percentage,
-  downloaded bytes and speed; silent installers show an indeterminate bar.
+- **Harness updates show their progress.** A confirmed update replaces the
+  agent's button with a progress track, its current phase, the target
+  version and the elapsed time, on local and remote computers; the outcome
+  then appears in the same place. When its installer reports download
+  measurements, the row also shows percentage, downloaded bytes and speed;
+  silent installers keep an indeterminate track.
 
 - **Windows P2P handshake replies recover from a rejected UDP source hint.**
   Some Windows network stacks reject the source-address control message with

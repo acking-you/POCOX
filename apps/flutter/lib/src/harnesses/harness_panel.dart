@@ -5,16 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
-import 'package:pocox/src/harnesses/harness_text.dart';
 import 'package:pocox/src/harnesses/harness_progress.dart';
+import 'package:pocox/src/harnesses/harness_text.dart';
 import 'package:pocox/src/hosting/editor_block.dart';
 import 'package:pocox/src/managed/managed_host_editor.dart';
 import 'package:pocox/src/managed/managed_providers.dart';
+import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/time_ago.dart';
 import 'package:pocox/src/widgets/action_row.dart';
-import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 
@@ -252,9 +253,10 @@ class _HarnessPanelState extends ConsumerState<HarnessPanel> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : Icon(AppIcons.restart_alt, color: scheme.primary),
-            title: Text(l10n.harnessRestartTitle),
-            subtitle: Text(
-              overview.restartServices
+            // What either choice does to running services, behind its mark.
+            title: InfoTitle(
+              title: Text(l10n.harnessRestartTitle),
+              info: overview.restartServices
                   ? l10n.harnessRestartOn
                   : l10n.harnessRestartOff,
             ),
@@ -335,6 +337,7 @@ class _HarnessRow extends StatelessWidget {
     );
     final kind = harness.kind;
     final running = job?.running ?? false;
+    final updating = running || pending;
     final latest = harness.latest;
     final lead = Row(
       children: [
@@ -347,7 +350,7 @@ class _HarnessRow extends StatelessWidget {
               Text(harnessName(kind), style: theme.textTheme.titleSmall),
               const SizedBox(height: 2),
               Text(
-                harnessVersionLine(l10n, harness),
+                harnessVersionLine(l10n, harness, updating: updating),
                 key: Key('harness-version-$kind'),
                 style: muted,
               ),
@@ -356,51 +359,90 @@ class _HarnessRow extends StatelessWidget {
         ),
       ],
     );
-    final Widget? action;
-    if (running || pending) {
-      action = FilledButton(
-        key: Key('harness-updating-$kind'),
-        style: FilledButton.styleFrom(
-          disabledBackgroundColor: scheme.primary,
-          disabledForegroundColor: scheme.onPrimary,
-        ),
-        onPressed: null,
-        child: BusyLabel(
-          busy: true,
-          label: l10n.harnessUpdate,
-          busyLabel: running ? l10n.harnessUpdate : l10n.harnessStageUpdating,
-        ),
+    final Widget header;
+    if (updating) {
+      // The progress under the name is the busy state: no button beside it,
+      // only how long it has run.
+      header = Row(
+        children: [
+          Expanded(child: lead),
+          if (job case final job? when job.running) ...[
+            const SizedBox(width: 12),
+            HarnessElapsed(job: job),
+          ],
+        ],
       );
     } else if (harness.updateAvailable && harness.canUpdate && latest != null) {
-      action = FilledButton(
-        key: Key('harness-update-$kind'),
-        onPressed: canStart ? onUpdate : null,
-        child: Text(l10n.harnessUpdateTo(latest)),
+      header = ActionRow(
+        lead: lead,
+        action: FilledButton(
+          key: Key('harness-update-$kind'),
+          onPressed: canStart ? onUpdate : null,
+          child: Text(l10n.harnessUpdateTo(latest)),
+        ),
       );
     } else if (harness.installed &&
         latest != null &&
         !harness.updateAvailable) {
-      action = StatusChip(
-        key: Key('harness-current-$kind'),
-        color: successColor(scheme),
-        label: l10n.harnessUpToDate,
-        filled: true,
+      header = ActionRow(
+        lead: lead,
+        action: StatusChip(
+          key: Key('harness-current-$kind'),
+          color: successColor(scheme),
+          label: l10n.harnessUpToDate,
+          filled: true,
+        ),
       );
     } else {
-      action = null;
+      header = lead;
     }
     final problem = harnessProblemText(l10n, harness);
-    final outcome = switch (job) {
-      final job? when !job.running => harnessOutcome(l10n, job),
-      _ => null,
+    // The update's progress, then its outcome, in the same place.
+    final Widget status = switch (job) {
+      _ when updating => HarnessProgress(
+        key: Key('harness-progress-$kind'),
+        kind: kind,
+        job: running ? job : null,
+      ),
+      final job? => switch (harnessOutcome(l10n, job)) {
+        (final text, final failed) when text.isNotEmpty => Padding(
+          key: Key('harness-result-$kind'),
+          padding: const EdgeInsets.only(top: 8),
+          child: Text(
+            text,
+            style: muted?.copyWith(
+              color: failed ? scheme.error : successColor(scheme),
+            ),
+          ),
+        ),
+        _ => const SizedBox(width: double.infinity),
+      },
+      null => const SizedBox(width: double.infinity),
     };
     return EditorBlock(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (action == null) lead else ActionRow(lead: lead, action: action),
-          if (running)
-            HarnessProgress(key: Key('harness-progress-$kind'), job: job!),
+          header,
+          // One move: what leaves folds away while what arrives unfolds.
+          AnimatedSwitcher(
+            duration: Motion.of(context, Motion.medium),
+            switchInCurve: Motion.emphasized,
+            switchOutCurve: Motion.move,
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: SizeTransition(
+                sizeFactor: animation,
+                alignment: AlignmentDirectional.topStart,
+                child: child,
+              ),
+            ),
+            layoutBuilder: (current, previous) => Stack(
+              alignment: AlignmentDirectional.topStart,
+              children: [...previous, ?current],
+            ),
+            child: status,
+          ),
           if (harness.updateAvailable && !harness.canUpdate && latest != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
@@ -419,18 +461,6 @@ class _HarnessRow extends StatelessWidget {
                 l10n.harnessUsedBy(harness.services.join(', ')),
                 key: Key('harness-services-$kind'),
                 style: muted,
-              ),
-            ),
-          if (outcome case (final text, final failed) when text.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                text,
-                key: Key('harness-result-$kind'),
-                style: TextStyle(
-                  color: failed ? scheme.error : successColor(scheme),
-                  fontSize: 12,
-                ),
               ),
             ),
           if (harness.installed && harness.canUpdate)

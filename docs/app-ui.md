@@ -362,11 +362,14 @@ for Flutter diagnostics. Native console lifetime tests live in
   A finished start or stop closes the editor with one toast naming the host (a
   restore warning rides in it). Editor rules:
   [Hosting configuration](hosting-configuration.md).
-- Each running harness update has an inline progress track, phase and elapsed
-  time. Download percentages, byte counts and speeds appear only when reported
-  by its installer; silent installers keep an indeterminate track. Measurements
-  clear when verifying or restarting, and completed jobs replace the progress
-  with their result. See [harness updates](harness-updates.md).
+- A harness update replaces its row's button the moment it is confirmed: the
+  version line reads `0.46.0 → 0.47.0`, the row's end shows the host's elapsed
+  clock, and under the name a slim `ProgressTrack` sits over one state line
+  (the phase, then any installer measurements). The track fills only with a
+  reported download percentage; silent installers and other phases stay
+  indeterminate. When the update ends its outcome folds in where the progress
+  was. The restart-services switch explains itself behind its info mark. See
+  [harness updates](harness-updates.md).
 - A local host still running under an earlier account or relay
   (`AppServeStatus.boundElsewhere`) shows **Restart needed / 需要重启** in its
   card's status and one caution state line under it ("Started under another

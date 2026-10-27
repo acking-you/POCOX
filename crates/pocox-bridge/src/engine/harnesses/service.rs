@@ -20,6 +20,8 @@ const FIRST_CHECK: Duration = Duration::from_secs(60);
 /// … and then this often; reading a device whose last check is older starts
 /// one too.
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
+/// A reported download speed is shown this long without a newer sample.
+const SPEED_FRESH: Duration = Duration::from_secs(3);
 
 /// The last check: what was installed, and the newest versions found.
 pub(super) struct Found {
@@ -34,8 +36,8 @@ struct State {
     checked_at_ms: Option<u64>,
     checking: bool,
     job: Option<Job>,
-    /// Freshness of the last installer download sample, for hiding stale
-    /// speeds.
+    /// When the running installer last reported progress (see
+    /// [`SPEED_FRESH`]).
     download_at: Option<Instant>,
     runs: u64,
     /// Moves whenever an update records what it installed.
@@ -140,23 +142,29 @@ pub fn overview() -> Result<Overview> {
         checked_at_ms: state.checked_at_ms,
         checking: state.checking,
         restart_services: settings.restart_services,
-        job: state.job.clone().map(|mut job| {
-            job.elapsed_ms = Some(
-                job.finished_at_ms
-                    .unwrap_or_else(now_ms)
-                    .saturating_sub(job.started_at_ms),
-            );
-            if state
-                .download_at
-                .is_none_or(|at| at.elapsed() > Duration::from_secs(3))
-            {
-                if let Some(download) = &mut job.download {
-                    download.bytes_per_second = None;
-                }
-            }
-            job
-        }),
+        job: state
+            .job
+            .as_ref()
+            .map(|job| snapshot(job, state.download_at)),
     })
+}
+
+/// What a reader sees of `job` now: how long it has run on this host's
+/// clock, and no speed once its installer stopped reporting one (`sampled`
+/// is its last download sample).
+fn snapshot(job: &Job, sampled: Option<Instant>) -> Job {
+    let mut job = job.clone();
+    job.elapsed_ms = Some(
+        job.finished_at_ms
+            .unwrap_or_else(now_ms)
+            .saturating_sub(job.started_at_ms),
+    );
+    if sampled.is_none_or(|at| at.elapsed() > SPEED_FRESH) {
+        if let Some(download) = &mut job.download {
+            download.bytes_per_second = None;
+        }
+    }
+    job
 }
 
 fn row(kind: Kind, found: &Found, auto_update: bool, services: Vec<restart::Target>) -> Harness {

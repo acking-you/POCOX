@@ -11,6 +11,7 @@ import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/harnesses/harness_panel.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/widgets/progress_track.dart';
 
 import 'fake_bridge_api.dart';
 
@@ -75,15 +76,18 @@ void main() {
     await t.pump();
 
     expect(api.harnessCalls.single, (op: 'update', key: _studio, arg: 'codex'));
-    expect(find.byKey(const Key('harness-updating-codex')), findsOneWidget);
+    // The progress takes the button's place at once.
+    expect(find.byKey(const Key('harness-progress-codex')), findsOneWidget);
     expect(find.text(_en.harnessStageUpdating), findsOneWidget);
     expect(find.byKey(const Key('harness-update-codex')), findsNothing);
+    expect(find.text('0.46.0 → 0.47.0 · npm'), findsOneWidget);
+    double? track() => t
+        .widget<ProgressTrack>(
+          find.byKey(const Key('harness-progress-bar-codex')),
+        )
+        .value;
     expect(
-      t
-          .widget<LinearProgressIndicator>(
-            find.byKey(const Key('harness-progress-bar-codex')),
-          )
-          .value,
+      track(),
       isNull,
       reason: 'a silent installer never gets a fabricated percentage',
     );
@@ -115,26 +119,19 @@ void main() {
     progress('downloading');
     await t.pump(const Duration(seconds: 1));
     await t.pump();
-    expect(
-      t
-          .widget<LinearProgressIndicator>(
-            find.byKey(const Key('harness-progress-bar-codex')),
-          )
-          .value,
-      0.25,
-    );
-    expect(find.textContaining('25 MB / 100 MB'), findsOneWidget);
-    expect(find.textContaining('1.0 MB/s'), findsOneWidget);
-    expect(find.textContaining('0:07'), findsOneWidget);
+    expect(track(), 0.25);
+    expect(find.text('25% · 25 MB / 100 MB · 1.0 MB/s'), findsOneWidget);
+    expect(find.text('0:07'), findsOneWidget, reason: "the host's clock");
 
     progress('verifying');
     await t.pump(const Duration(seconds: 1));
     await t.pump();
     expect(find.text(_en.harnessStageVerifying), findsOneWidget);
+    expect(track(), isNull);
     expect(
-      find.textContaining('MB/s'),
+      find.byKey(const Key('harness-progress-metrics-codex')),
       findsNothing,
-      reason: 'a finished transfer has no current speed',
+      reason: 'a finished transfer has no current measurements',
     );
 
     api.finishHarnessUpdate(
@@ -198,14 +195,10 @@ void main() {
       key: null,
       arg: (kind: null, autoUpdate: null, restart: false),
     ));
-    expect(
-      _within('harnesses-local', find.text(_en.harnessRestartOff)),
-      findsOneWidget,
-    );
-    expect(
-      _within('harnesses-$_studio', find.text(_en.harnessRestartOn)),
-      findsOneWidget,
-    );
+    SwitchListTile restart(String panel) =>
+        t.widget(_within(panel, find.byKey(const Key('harness-restart'))));
+    expect(restart('harnesses-local').value, isFalse);
+    expect(restart('harnesses-$_studio').value, isTrue);
   });
 
   testWidgets('what cannot be updated says why; refusals are explained', (
