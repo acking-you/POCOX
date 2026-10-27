@@ -19,7 +19,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use anyhow::{anyhow, bail, Result};
-pub use connection::{connect, context_changed, disconnect, is_connected, probe_reason};
+pub(crate) use connection::{connect, evict_idle, is_idle, local_stopped, probe_reason};
+pub use connection::{context_changed, disconnect, is_connected, is_retained};
 pub use engine::{models_for_project, OpenCodeEngine};
 pub use follow::{follow_session, liveness};
 use once_cell::sync::Lazy;
@@ -71,6 +72,7 @@ struct Conn {
     tx: broadcast::Sender<AppEvent>,
     task: JoinHandle<()>,
     subscription: String,
+    local: Option<super::local_services::Endpoint>,
 }
 
 fn lock<T>(value: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -196,6 +198,13 @@ fn conn(service: &str) -> Result<Link> {
     let found = registry
         .get(&key)
         .ok_or_else(|| anyhow!("OpenCode is not connected"))?;
+    anyhow::ensure!(
+        found
+            .local
+            .as_ref()
+            .is_none_or(super::local_services::Endpoint::is_current),
+        "the local host stopped or restarted; reconnect"
+    );
     Ok(Link {
         key,
         client: found.client.clone(),

@@ -17,17 +17,24 @@ impl SessionEngine for OpenCodeEngine {
     fn protocol(&self) -> Protocol {
         Protocol::OpenCode
     }
-    fn connect(&self, service: String, port: u16) -> Result<()> {
-        connect(&service, port, &transport::resolve_owned_blocking()?)
+    fn connect_in_epoch(&self, service: String, port: u16, epoch: u64) -> Result<()> {
+        connect(
+            &service,
+            port,
+            &super::super::service_connection::Target::at_epoch(&service, epoch)?,
+        )
     }
     fn is_connected(&self, service: &str) -> bool {
         is_connected(service)
+    }
+    fn is_retained(&self, service: &str) -> bool {
+        is_retained(service)
     }
     fn disconnect(&self, service: &str) {
         disconnect(service);
     }
     fn probe_reason(&self, service: String) -> Result<Option<String>> {
-        Ok(probe_reason(&service, &transport::resolve_owned_blocking()?))
+        Ok(probe_reason(&service, &super::super::service_connection::Target::resolve(&service)?))
     }
     fn subscribe_events(&self, service: &str) -> Result<broadcast::Receiver<AppEvent>> {
         Ok(conn(service)?.tx.subscribe())

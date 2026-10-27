@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/hosting/host_editor_page.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/services_screen.dart';
@@ -21,7 +22,6 @@ import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/api_service_panel.dart';
 import 'package:pocox/src/widgets/group_card.dart';
-import 'package:pocox/src/widgets/loading.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 
 import '../fake_bridge_api.dart';

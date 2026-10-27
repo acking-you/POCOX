@@ -21,9 +21,11 @@ use tokio::runtime::{Builder, Runtime};
 #[cfg(test)]
 use tokio::task::JoinHandle;
 
+mod local_forward;
 mod path_status;
 pub use path_status::{PathStatus, TunnelHealth, TunnelPath};
 
+use crate::engine::local_services::Standing;
 use crate::engine::transport::Transport;
 
 static RUNTIME: OnceCell<Runtime> = OnceCell::new();
@@ -82,6 +84,12 @@ struct SubEntry {
 }
 
 enum SubscriptionOwner {
+    Local {
+        endpoint: super::local_services::Endpoint,
+        epoch: u64,
+    },
+    /// A chosen port for this process's own service, for clients outside it.
+    Forward(local_forward::Forward),
     Tunnel {
         connection: Arc<Connection>,
         path: ConnectionPath,
@@ -102,6 +110,18 @@ impl Drop for SubscriptionOwner {
 impl SubEntry {
     fn status(&self, key: &str) -> SubStatus {
         match &self.owner {
+            SubscriptionOwner::Local {
+                endpoint,
+                epoch,
+            } => self.local_status(
+                key,
+                if super::transport::is_current(*epoch) {
+                    endpoint.standing()
+                } else {
+                    Standing::Stopped
+                },
+            ),
+            SubscriptionOwner::Forward(forward) => self.local_status(key, forward.standing()),
             SubscriptionOwner::Tunnel {
                 connection,
                 path,
@@ -115,7 +135,28 @@ impl SubEntry {
                 path: PathStatus::default(),
                 health: TunnelHealth::default(),
                 events: Vec::new(),
+                lifetime: None,
             },
+        }
+    }
+
+    /// This process's own service, reached without SDK counters or phases.
+    /// A host restarting in place is alive but not ready, like a tunnel
+    /// coming back.
+    fn local_status(&self, key: &str, standing: Standing) -> SubStatus {
+        SubStatus {
+            key: key.into(),
+            local_addr: self.local_addr.clone(),
+            alive: standing != Standing::Stopped,
+            ready: standing == Standing::Serving,
+            path: PathStatus {
+                path: TunnelPath::Local,
+                ..PathStatus::default()
+            },
+            health: TunnelHealth::default(),
+            events: Vec::new(),
+            // No SDK connection to outlive its registry slot.
+            lifetime: None,
         }
     }
 }
@@ -124,7 +165,7 @@ impl SubEntry {
 fn observe(
     key: &str,
     local_addr: &str,
-    connection: &Connection,
+    connection: &Arc<Connection>,
     path: ConnectionPath,
     ready: bool,
 ) -> SubStatus {
@@ -143,6 +184,7 @@ fn observe(
         path: PathStatus::observe(path, diagnostics.direct),
         health,
         events: diagnostics.events,
+        lifetime: Some(Arc::downgrade(connection)),
     }
 }
 
@@ -258,6 +300,101 @@ pub struct SubStatus {
     pub health: TunnelHealth,
     /// What happened to it lately, oldest first.
     pub events: Vec<TunnelEvent>,
+    /// Exact SDK owner observed atomically with this endpoint address.
+    pub(crate) lifetime: Option<std::sync::Weak<Connection>>,
+}
+
+/// Track direct use of an owned service without binding or forwarding a port.
+pub(crate) fn subscribe_local(
+    key: String,
+    endpoint: super::local_services::Endpoint,
+    epoch: u64,
+) -> Result<SubStatus> {
+    let mut registry = registry().lock().expect("registry poisoned");
+    anyhow::ensure!(
+        endpoint.is_current() && super::transport::is_current(epoch),
+        "the local host or connection changed; reconnect"
+    );
+    if let Some(entry) = registry.get(&key) {
+        if let SubscriptionOwner::Local {
+            endpoint: current,
+            epoch: current_epoch,
+        } = &entry.owner
+        {
+            if *current_epoch == epoch && current.same_listener(&endpoint) {
+                return Ok(entry.status(&key));
+            }
+        }
+    }
+    let entry = SubEntry {
+        local_addr: endpoint.address(),
+        owner: SubscriptionOwner::Local {
+            endpoint,
+            epoch,
+        },
+    };
+    let status = entry.status(&key);
+    let old = registry.insert(key, entry);
+    drop(registry);
+    drop(old);
+    Ok(status)
+}
+
+/// Expose this process's own `key` on `127.0.0.1:<local_port>` (`0`: any free
+/// port) for clients outside the app, such as a Responses API client. The
+/// port is held until [`unsubscribe_service`]; each connection reaches the
+/// listener the service's host owns at the time. A live forward keeps its
+/// port, like a live tunnel.
+pub(crate) fn forward_local(
+    key: String,
+    context: super::transport::Context,
+    epoch: u64,
+    local_port: u16,
+) -> Result<SubStatus> {
+    let stale = || anyhow!("the account or relay changed; try again");
+    let replaced = {
+        let mut registry = registry().lock().expect("registry poisoned");
+        if !super::transport::is_current(epoch) {
+            return Err(stale());
+        }
+        if let Some(entry) = registry.get(&key) {
+            if matches!(entry.owner, SubscriptionOwner::Forward(_)) {
+                return Ok(entry.status(&key));
+            }
+        }
+        // Another kind of entry (a relay tunnel, say) gives its port back first.
+        registry.remove(&key)
+    };
+    drop(replaced);
+    let bound = local_forward::Forward::bind(context, key.clone(), epoch, local_port);
+    let mut registry = registry().lock().expect("registry poisoned");
+    if !super::transport::is_current(epoch) {
+        return Err(stale());
+    }
+    // A concurrent call for the same key bound first: its port is the one
+    // handed out, and this one (if it bound at all) closes again.
+    if let Some(entry) = registry.get(&key) {
+        if matches!(entry.owner, SubscriptionOwner::Forward(_)) {
+            return Ok(entry.status(&key));
+        }
+    }
+    let (address, forward) = bound?;
+    let entry = SubEntry {
+        local_addr: address.to_string(),
+        owner: SubscriptionOwner::Forward(forward),
+    };
+    let status = entry.status(&key);
+    let old = registry.insert(key, entry);
+    drop(registry);
+    drop(old);
+    Ok(status)
+}
+
+/// Retire every outgoing connection after its account/relay epoch moves.
+pub(super) fn context_changed() {
+    let Some(registry) = REGISTRY.get() else { return };
+    let old = std::mem::take(&mut *registry.lock().expect("registry poisoned"));
+    drop(old);
 }
 
 /// Start (or no-op if already live) an in-process subscription exposing
@@ -274,11 +411,7 @@ pub struct SubStatus {
 /// dialled immediately. Callers do exactly that — `app_session::connect` opens
 /// a websocket to it on the next line — and a listener that is merely *about*
 /// to be bound would refuse that connection nondeterministically.
-pub fn subscribe_service(key: String, local_port: u16, transport: &Transport) -> Result<SubStatus> {
-    subscribe_service_as(key.clone(), &key, local_port, transport, || true)
-}
-
-/// [`subscribe_service`] for `service_key`, tracked under `registry_key`,
+/// Subscribes to `service_key`, tracked under `registry_key`,
 /// for an owner that may stop being current meanwhile.
 ///
 /// Lets a caller scope its subscription to more than the service key — the
@@ -545,6 +678,7 @@ mod tests {
 
     #[test]
     fn a_family_of_tunnels_is_dropped_together() {
+        let _serial = super::super::transport::test_serial();
         init(std::env::temp_dir()).expect("init");
         let family = "family-test\u{1f}";
         let doomed = runtime().spawn(std::future::pending::<()>());
@@ -597,6 +731,7 @@ mod tests {
     /// winner too: no created tunnel survives detached.
     #[test]
     fn concurrent_creations_register_one_tunnel_and_stop_every_other() {
+        let _serial = super::super::transport::test_serial();
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::{Arc, Barrier};
         init(std::env::temp_dir()).expect("init");
@@ -649,6 +784,7 @@ mod tests {
     /// is stopped, not registered.
     #[test]
     fn a_tunnel_created_for_a_stale_owner_is_stopped() {
+        let _serial = super::super::transport::test_serial();
         use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
         init(std::env::temp_dir()).expect("init");
@@ -688,13 +824,20 @@ mod tests {
 
     #[test]
     fn subscribe_fails_fast_when_port_in_use() {
+        let _serial = super::super::transport::test_serial();
         init(std::env::temp_dir()).expect("init");
         // Hold a port so the probe-bind inside subscribe_service must fail.
         let occupied = std::net::TcpListener::bind("127.0.0.1:0").expect("bind probe holder");
         let port = occupied.local_addr().expect("addr").port();
 
-        let err = subscribe_service("pcx:t:api:t".to_string(), port, &test_transport())
-            .expect_err("port is occupied; subscribe must error, not report alive");
+        let err = subscribe_service_as(
+            "pcx:t:api:t".into(),
+            "pcx:t:api:t",
+            port,
+            &test_transport(),
+            || true,
+        )
+        .expect_err("port is occupied; subscribe must error, not report alive");
         assert!(err.to_string().contains("cannot bind"), "got: {err}");
         // Nothing should have been registered for the failed attempt.
         assert!(!list_subscriptions().iter().any(|s| s.key == "pcx:t:api:t"));
@@ -702,6 +845,7 @@ mod tests {
 
     #[test]
     fn an_unreachable_relay_fails_instead_of_reporting_a_dead_endpoint() {
+        let _serial = super::super::transport::test_serial();
         init(std::env::temp_dir()).expect("init");
         // Nothing is listening, so waiting out the production budget would just
         // make this case slow.
@@ -711,8 +855,14 @@ mod tests {
         // open a websocket to it on the next line, so reporting "alive" for a
         // tunnel that never came up is worse than failing — it turns a clear relay
         // error into a nondeterministic connection refused.
-        let err = subscribe_service("pcx:t:app:down".to_string(), 0, &test_transport())
-            .expect_err("nothing is listening on the relay, so this cannot be ready");
+        let err = subscribe_service_as(
+            "pcx:t:app:down".into(),
+            "pcx:t:app:down",
+            0,
+            &test_transport(),
+            || true,
+        )
+        .expect_err("nothing is listening on the relay, so this cannot be ready");
         let err = err.to_string();
         assert!(
             err.contains("subscribing to the relay failed") || err.contains("did not accept"),
@@ -727,11 +877,14 @@ mod tests {
 
     #[test]
     fn a_tunnel_is_listed_while_it_comes_up_and_not_once_it_gives_up() {
+        let _serial = super::super::transport::test_serial();
         init(std::env::temp_dir()).expect("init");
         *TEST_READY_TIMEOUT.lock().unwrap_or_else(|p| p.into_inner()) =
             Some(std::time::Duration::from_millis(600));
         let key = "pcx:t:app:coming";
-        let opening = std::thread::spawn(|| subscribe_service(key.into(), 0, &test_transport()));
+        let opening = std::thread::spawn(|| {
+            subscribe_service_as(key.into(), key, 0, &test_transport(), || true)
+        });
         // How the first connection goes is what a reconnect shows, so the
         // tunnel is visible before it is ready, not only after.
         let seen = (0..500).find_map(|_| {
@@ -748,20 +901,5 @@ mod tests {
             !list_subscriptions().iter().any(|s| s.key == key),
             "a tunnel given up is no longer listed"
         );
-    }
-
-    #[test]
-    fn a_reachable_service_gets_its_own_concrete_port() {
-        init(std::env::temp_dir()).expect("init");
-        // Port 0 must resolve to a concrete OS-assigned port (so every service
-        // gets its own; a fixed shared port lets only the first bind), and the
-        // reported address must carry it rather than a literal `:0`.
-        //
-        // Exercised through `spawn_subscribe`'s bind step alone: confirming the
-        // readiness half needs a relay, which lives in the e2e tests.
-        let probe = std::net::TcpListener::bind("127.0.0.1:0").expect("probe bind");
-        let addr = probe.local_addr().expect("probe addr");
-        assert_ne!(addr.port(), 0, "the OS must assign a concrete port for :0");
-        assert_eq!(addr.ip().to_string(), "127.0.0.1", "subscriptions stay on loopback");
     }
 }

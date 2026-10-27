@@ -53,7 +53,10 @@ Future<HostConfigDto> hostConfigSave({
 /// and `expected_revision` ([`HostConfigDto::revision`]) name what the
 /// caller reviewed: a replaced host or a newer save is refused. Only that
 /// host restarts; controllers reconnect. A failed start restores the
-/// previous configuration exactly.
+/// previous configuration exactly. Both start under the current account or
+/// relay, so this is also how a host [bound elsewhere] moves here.
+///
+/// [bound elsewhere]: super::hosting::AppServeStatusDto::bound_elsewhere
 Future<HostApplyDto> appServeApply({
   required String name,
   String? expectedIncarnation,

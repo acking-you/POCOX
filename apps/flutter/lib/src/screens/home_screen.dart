@@ -207,65 +207,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       final api = ref.read(bridgeApiProvider);
 
-      // 1. Discover.
-      List<ServiceEntry> services;
-      // Set when the relay could not list services. A desktop goes on with
-      // its own hosts: the relay lists other devices, and this computer's
-      // hosts are served here over loopback without it.
-      String? relayProblem;
-      try {
-        services = await ref.read(servicesProvider.future);
-      } catch (e) {
-        if (!mounted || gen != _generation) return;
-        final message = friendlyError(e);
-        if (isAccountSessionExpired(message)) {
-          // A stored account still makes config.mode `account`, so cold-start
-          // routing cannot know its refresh token has expired. Discovery is the
-          // first authenticated operation that can tell us; return directly to
-          // the existing sign-in flow instead of trapping the user on a retry
-          // hero whose retries can never succeed.
-          context.go('/onboarding?reason=session-expired');
-          return;
-        }
-        if (!isDesktop) {
-          setState(() {
-            _phase = _serviceKey == null ? _Phase.discoverFailed : _Phase.ready;
-            _error = message;
-          });
-          return;
-        }
-        relayProblem = message;
-        services = const [];
-      }
+      final prefs = await _prefs();
       if (!mounted || gen != _generation) return;
       final dismissed = await _dismissed();
       if (!mounted || gen != _generation) return;
-      Future<List<ServiceEntry>> candidates() async => relayProblem == null
-          ? _chatCandidates(services, dismissed)
-          : _localApps(api, dismissed);
-
-      // 2. Desktop: restore the hosting the user left running last time, so a
-      // freshly booted desktop is immediately chattable (and phone-reachable)
-      // even when OTHER hosts are discoverable. Gated per provider on THIS
-      // machine not hosting it yet; best-effort — failures fall through to the
-      // hero/remote.
-      var apps = await candidates();
-      if (!mounted || gen != _generation) return;
-      if (isDesktop &&
-          await _restoreHosting(api, gen: gen, background: background)) {
+      final selected =
+          forceKey ?? prefs.preferredAppServiceKey ?? prefs.lastServiceKey;
+      var local = api.localServices();
+      if (isDesktop) {
+        await _restoreForResolve(api, gen, selected, background);
         if (!mounted || gen != _generation) return;
-        ref.invalidate(localServeListProvider);
-        if (relayProblem == null) {
-          try {
-            ref.invalidate(servicesProvider);
-            services = await ref.read(servicesProvider.future);
-          } catch (_) {
-            // The hero (with its start-hosting action) is the fallback.
-          }
-        }
-        apps = await candidates();
+        local = api.localServices();
       }
       if (!mounted || gen != _generation) return;
+      // Hidden local hosts do not make this a local-only start.
+      final localApps = _chatCandidates(local, dismissed);
+      final localOnly =
+          localApps.any((s) => s.key == selected) ||
+          (selected == null && localApps.isNotEmpty);
+      List<ServiceEntry> services = local;
+      String? relayProblem;
+      if (!localOnly) {
+        try {
+          final remote = await ref.read(servicesProvider.future);
+          // Asking the relay resolves the account or relay again, which an
+          // earlier reset may have left unknown: read this app's own
+          // services again rather than trust the snapshot from before.
+          local = api.localServices();
+          services = {
+            ...{for (final s in remote) s.key: s},
+            ...{for (final s in local) s.key: s},
+          }.values.toList();
+        } catch (e) {
+          if (!mounted || gen != _generation) return;
+          local = api.localServices();
+          services = local;
+          final message = friendlyError(e);
+          if (isAccountSessionExpired(message) && local.isEmpty) {
+            context.go('/onboarding?reason=session-expired');
+            return;
+          }
+          if (!isDesktop) {
+            setState(() {
+              _phase = _serviceKey == null
+                  ? _Phase.discoverFailed
+                  : _Phase.ready;
+              _error = message;
+            });
+            return;
+          }
+          relayProblem = message;
+        }
+      }
+      if (!mounted || gen != _generation) return;
+      final localKeys = {for (final service in local) service.key};
+      final apps = _chatCandidates(services, dismissed);
       if (apps.isEmpty) {
         setState(() {
           if (relayProblem != null) {
@@ -283,17 +279,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // 3. Rank: explicit default > last used > hosted here > the rest. A
       // one-off switch still wins for this resolve through [forceKey], without
       // silently overwriting the user's durable default choice.
-      final prefs = await _prefs();
-      if (!mounted || gen != _generation) return;
-      final localKeys = <String>{};
-      try {
-        for (final h in await api.appServeStatus()) {
-          localKeys.add(h.appServiceKey);
-        }
-      } catch (_) {
-        // Local-host lookup is desktop-only sugar; ignore failures.
-      }
-      if (!mounted || gen != _generation) return;
       int rank(ServiceEntry s) {
         if (s.key == forceKey) return 0;
         if (s.key == prefs.preferredAppServiceKey) return 1;
@@ -302,28 +287,56 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return 4;
       }
 
-      final ranked = [...apps]..sort((a, b) => rank(a).compareTo(rank(b)));
+      var ranked = [...apps]..sort((a, b) => rank(a).compareTo(rank(b)));
 
-      // 4. First reachable wins. An already-connected session short-circuits
-      // (appProbe returns true for it without a network round-trip).
+      // First successful connection wins. Local candidates use their real
+      // handshake once; only discover remote alternatives if all locals fail.
       ServiceEntry? target;
       String? lastError;
-      for (final s in ranked) {
-        try {
-          // Ask WHY rather than just whether: an unreachable service that
-          // answered and refused us needs a different fix from a dead one, and
-          // the generic fallback below can't tell the user which it was.
-          final reason = await api.appProbeReason(s.key);
-          if (reason == null) {
-            target = s;
+      final attempted = <String>{};
+      var askedRelay = !localOnly;
+      for (var pass = 0; pass < (localOnly ? 2 : 1); pass++) {
+        if (pass > 0) {
+          askedRelay = true;
+          try {
+            final remote = await ref.read(servicesProvider.future);
+            if (!mounted || gen != _generation) return;
+            ranked = _chatCandidates(
+              {
+                for (final s in [...remote, ...local]) s.key: s,
+              }.values.toList(),
+              dismissed,
+            )..sort((a, b) => rank(a).compareTo(rank(b)));
+          } catch (e) {
+            relayProblem = friendlyError(e);
             break;
           }
-          if (!mounted) return;
-          lastError = _probeFailure(AppLocalizations.of(context), reason);
-        } catch (e) {
-          lastError = friendlyError(e);
         }
-        if (!mounted || gen != _generation) return;
+        for (final s in ranked) {
+          if (!attempted.add(s.key)) continue;
+          try {
+            final reason =
+                api.appIsConnected(s.key) || localKeys.contains(s.key)
+                ? null
+                : await api.appProbeReason(s.key);
+            if (!mounted || gen != _generation) return;
+            if (reason != null) {
+              lastError = _probeFailure(AppLocalizations.of(context), reason);
+              continue;
+            }
+            await _connect(api, s.key);
+            if (!mounted || gen != _generation) return;
+            target = s;
+            break;
+          } catch (e) {
+            lastError = _probeFailure(
+              AppLocalizations.of(context),
+              friendlyError(e),
+            );
+          }
+          if (!mounted || gen != _generation) return;
+        }
+        if (target != null) break;
       }
       if (!mounted || gen != _generation) return;
       if (target == null) {
@@ -334,22 +347,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         });
         return;
       }
-
-      // 5. Connect (reuse a live session).
-      if (!api.appIsConnected(target.key)) {
-        try {
-          await _connect(api, target.key);
-        } catch (e) {
-          if (!mounted || gen != _generation) return;
-          setState(() {
-            _phase = _serviceKey == null ? _Phase.noService : _Phase.ready;
-            _candidates = ranked;
-            _error = friendlyError(e);
-          });
-          return;
-        }
-      }
-      if (!mounted || gen != _generation) return;
 
       // 6. Land in the most recent conversation (prefer the one the user last
       // had open); none → a fresh conversation with the starter guidance.
@@ -370,6 +367,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       if (relayProblem != null && opening) {
         showToast(context, AppLocalizations.of(context).homeRelayLocalOnly);
       }
+      // A local start never waited for the relay. Ask it now, behind the
+      // open conversation, so the switcher also lists the other devices.
+      if (!askedRelay) {
+        unawaited(
+          ref.read(servicesProvider.future).then<void>((_) {}, onError: (_) {}),
+        );
+      }
     } finally {
       _endResolve(gen);
     }
@@ -384,24 +388,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _resolveStartedAt = null;
   }
 
-  /// Connect to [key], with one clean reconnect for a stale half-open
-  /// tunnel (the same recovery the project screen uses).
-  static Future<void> _connect(BridgeApi api, String key) async {
-    try {
-      await api.appConnect(key, appLocalPort);
-    } catch (_) {
-      await api.appDisconnect(key);
-      await api.appConnect(key, appLocalPort);
-    }
-  }
+  /// Selection is recorded even for a healthy connection so retention follows
+  /// visits, not probes or background history reads. The engine owns recovery.
+  static Future<void> _connect(BridgeApi api, String key) =>
+      api.appConnect(key, appLocalPort);
 
   /// Why a probe of a service failed, in the user's words.
   static String _probeFailure(AppLocalizations l10n, String reason) =>
-      isRelayAuthRejection(reason)
+      isConnectionWindowFull(reason)
+      ? l10n.connectionWindowFull
+      : isRelayAuthRejection(reason)
       ? l10n.unreachableAuthRejected
       : isProbeTimeout(reason)
       ? l10n.unreachableSilent
       : friendlyError(reason);
+
+  /// Hosting owns publication and restores every configured service. The
+  /// controller can proceed as soon as its own listener appears, even while
+  /// the hosting operation is still waiting for a relay response.
+  Future<void> _restoreForResolve(
+    BridgeApi api,
+    int gen,
+    String? selected,
+    bool background,
+  ) async {
+    bool localReady() => api.localServices().any(
+      (s) => isSessionKind(s.kind) && (selected == null || s.key == selected),
+    );
+    var finished = false;
+    final restoring = () async {
+      try {
+        await _restoreHosting(
+          api,
+          gen: gen,
+          background: background || localReady(),
+        );
+      } catch (e) {
+        if (mounted && gen == _generation) {
+          ref.read(hostRestoreBlockedProvider.notifier).state = friendlyError(
+            e,
+          );
+        }
+      } finally {
+        finished = true;
+      }
+    }();
+    while (mounted && gen == _generation && !finished && !localReady()) {
+      // Only a memory snapshot during startup; no network probes or timer
+      // survives listener readiness, restore completion or leaving this view.
+      await Future.any([
+        restoring,
+        Future<void>.delayed(const Duration(milliseconds: 100)),
+      ]);
+    }
+  }
 
   /// Restore the Codex, ACP and OpenCode hosting the user left running, each
   /// at most once per run and only what this machine does not host already
@@ -457,35 +497,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _autoHostAcpAttempted.addAll(names.acp);
     if (!background) setState(() => _rehosting = true);
     try {
-      return await runHostRestore(api, chosen);
+      return await runHostRestore(
+        api,
+        chosen,
+        onRestored: () {
+          // Hosting continues after a foreground service switch. Refresh its
+          // local inventory even when a newer resolve owns the foreground.
+          if (!mounted) return;
+          ref.invalidate(localServeListProvider);
+          setState(() {});
+        },
+      );
     } finally {
       if (mounted && gen == _generation && _rehosting) {
         setState(() => _rehosting = false);
       }
-    }
-  }
-
-  /// This computer's own chat services, from its hosts rather than the relay
-  /// (each is reached over loopback); empty when they cannot be read.
-  Future<List<ServiceEntry>> _localApps(
-    BridgeApi api,
-    Set<String> dismissed,
-  ) async {
-    try {
-      return [
-        for (final host in await api.appServeStatus())
-          if (host.appServiceKey.isNotEmpty &&
-              isSessionKind(host.sessionKind) &&
-              !dismissed.contains(host.appServiceKey))
-            ServiceEntry(
-              device: host.device,
-              kind: host.sessionKind,
-              name: host.name,
-              key: host.appServiceKey,
-            ),
-      ];
-    } catch (_) {
-      return const [];
     }
   }
 
@@ -569,12 +595,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // bare "couldn't reach".
       String? reason;
       try {
-        reason = await api.appProbeReason(key);
+        if (!api.appIsConnected(key) &&
+            !api.localServices().any((service) => service.key == key)) {
+          reason = await api.appProbeReason(key);
+        }
       } catch (e) {
         reason = '$e';
       }
       if (!mounted || gen != _generation) return;
-      if (reason == null && !api.appIsConnected(key)) {
+      if (reason == null) {
         step(HostSwitchPhase.connecting);
         try {
           await _connect(api, key);
@@ -590,14 +619,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       step(HostSwitchPhase.loading);
       final prefs = await _prefs();
       if (!mounted || gen != _generation) return;
-      final pick = await _pickThread(key, prefs);
+      final location = appSessionLastLocation(ref, key);
+      final pick = location == null ? await _pickThread(key, prefs) : null;
       if (!mounted || gen != _generation) return;
       ref.read(uiPrefsProvider.notifier).setLastService(key);
       setState(() {
         _phase = _Phase.ready;
         _serviceKey = key;
-        _threadId = pick?.id;
-        _cwd = pick?.cwd;
+        _threadId = location == null ? pick?.id : location.threadId;
+        _cwd = location == null ? pick?.cwd : location.cwd;
         _hostSwitch = null;
       });
       messenger.ok(l10n.hostSwitched(_hostLabelOf(key)));
@@ -624,7 +654,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   String _hostLabelOf(String key) {
-    for (final s in ref.read(servicesProvider).valueOrNull ?? _candidates) {
+    for (final s in ref.read(discoveredServicesProvider) ?? _candidates) {
       if (s.key == key) return hostLabel(s);
     }
     return serviceKeyLabel(key);
@@ -676,13 +706,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         // The switcher list tracks live discovery (a host added/removed on the
         // manage page shows up without re-resolving); reachability is probed
         // on switch, so no per-entry filtering here.
-        final live = ref.watch(servicesProvider).valueOrNull;
+        final live = ref.watch(discoveredServicesProvider);
         final dismissed =
             ref.watch(dismissedServicesProvider).valueOrNull ??
             const <String>{};
-        final candidates = live == null
-            ? _candidates
-            : _chatCandidates(live, dismissed);
+        final candidates = _chatCandidates(
+          {
+            for (final s in [
+              ...(live ?? _candidates),
+              ...ref.read(bridgeApiProvider).localServices(),
+            ])
+              s.key: s,
+          }.values.toList(),
+          dismissed,
+        );
         // The chat IS the home. Keyed by service so a switch rebuilds the
         // session state from scratch (connections stay alive underneath).
         page = AppSessionScreen(

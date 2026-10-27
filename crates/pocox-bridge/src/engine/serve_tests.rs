@@ -170,6 +170,12 @@ fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
     let idle = || runtime::runtime().spawn(std::future::pending::<()>());
     let local: SocketAddr = "127.0.0.1:9".parse().expect("addr");
     LocalServe {
+        app_route: None,
+        service_routes: None,
+        context: transport::Context::of(&transport::Transport {
+            session: pocox_pb::RelaySession::for_test("127.0.0.1:9"),
+            namespace: None,
+        }),
         device: "test-device".into(),
         name: name.into(),
         app_key: format!("pcx:test-device:app:{name}"),
@@ -206,6 +212,108 @@ fn finishes(handle: &tokio::task::AbortHandle) -> bool {
         std::thread::sleep(Duration::from_millis(10));
     }
     true
+}
+
+#[test]
+fn a_changed_context_restarts_codex_instead_of_republishing() {
+    const ISOLATED: &str = "POCOX_REPUBLISH_CONTEXT_FIXTURE";
+    if std::env::var_os(ISOLATED).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().expect("test executable"))
+            .args([
+                "--exact",
+                "engine::serve::tests::a_changed_context_restarts_codex_instead_of_republishing",
+                "--nocapture",
+            ])
+            .env(ISOLATED, "1")
+            .output()
+            .expect("isolated context fixture");
+        assert!(
+            output.status.success() && String::from_utf8_lossy(&output.stdout).contains("1 passed"),
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return;
+    }
+    let state = tempfile::tempdir().expect("isolated state");
+    runtime::init(state.path().to_path_buf()).expect("runtime");
+    let relay = std::net::TcpListener::bind("127.0.0.1:0").expect("relay trap");
+    relay.set_nonblocking(true).expect("nonblocking");
+    let next = transport::Transport {
+        session: pocox_pb::RelaySession::for_test(relay.local_addr().expect("address").to_string()),
+        namespace: None,
+    };
+    runtime::configure_host(runtime::HostContext {
+        device: "test-device".into(),
+        profiles: state.path().join("hosting"),
+        transport: Some(next.clone()),
+    })
+    .expect("isolated hosting context");
+    let name = "republish-context";
+    let mut host = fake_host(name, "original", true);
+    // Its codex still answers: only the changed context may retire it.
+    let codex = std::net::TcpListener::bind("127.0.0.1:0").expect("live app-server stand-in");
+    host.app_local = codex.local_addr().expect("address");
+    let context = host.context.clone();
+    let key = host.app_key.clone();
+    host.app_route = Some(
+        super::super::local_services::Registration::new(&context, &[(key.clone(), host.app_local)])
+            .expect("owned startup route"),
+    );
+    hosts_locked().insert(name.into(), host);
+    serve_deregister(name, "app").expect("already unpublished");
+    assert!(serve_reregister(name, "app").is_err(), "explicit publish must require restart");
+    assert!(republish_dropped(name).is_err(), "recovery must obey the same context fence");
+    assert!(
+        super::super::local_services::lookup(&context, &key)
+            .expect("original route")
+            .is_some(),
+        "a publication refusal does not stop the original local listener"
+    );
+    assert!(
+        super::super::local_services::lookup(&transport::Context::of(&next), &key)
+            .expect("other context")
+            .is_none(),
+        "the old host was not adopted by the new context"
+    );
+    assert!(matches!(relay.accept(), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock));
+    // Starting it again is its restart under the new context, never a reuse
+    // that reports success while it stays bound to the old one.
+    assert!(
+        reuse_or_retire_host(name, 0).expect("retired").is_none(),
+        "a start in the new context spawns afresh"
+    );
+    assert!(!hosts_locked().contains_key(name), "the old host was retired");
+    assert!(super::super::local_services::lookup(&context, &key).is_err(), "with its local route");
+}
+
+/// A host keeps publishing under the account or relay it started in. Its row
+/// says so once another one is current, and never while none is (offline,
+/// or right after a sign-in until the next resolution).
+#[test]
+fn a_host_reports_when_it_is_bound_to_another_account_or_relay() {
+    let _serial = transport::test_serial();
+    let name = "bound-elsewhere";
+    let host = fake_host(name, "inc-1", true);
+    let own = host.context.clone();
+    hosts_locked().insert(name.into(), host);
+    let bound_elsewhere = || {
+        codex_status()
+            .into_iter()
+            .find(|row| row.name == name)
+            .expect("listed")
+            .bound_elsewhere
+    };
+    transport::test_context(own);
+    assert!(!bound_elsewhere(), "the context it started in is current");
+    transport::test_context(transport::Context::of(&transport::Transport {
+        session: pocox_pb::RelaySession::for_test("other-relay.test:1"),
+        namespace: None,
+    }));
+    assert!(bound_elsewhere(), "another relay is current");
+    transport::context_changed();
+    assert!(!bound_elsewhere(), "unknown until the next resolution");
+    stop_host_tasks(hosts_locked().remove(name).expect("recorded"));
 }
 
 #[test]

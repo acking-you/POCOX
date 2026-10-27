@@ -243,6 +243,7 @@ void _registerConnection() {
         host(const AppSessionScreen(serviceKey: service), api),
       );
       await t.pumpAndSettle();
+      final mounted = api.appConnectCount;
       final container = ProviderScope.containerOf(
         t.element(find.byType(AppSessionScreen)),
       );
@@ -256,7 +257,7 @@ void _registerConnection() {
       await t.pump();
       await t.pump(const Duration(seconds: 10));
       expect(t.takeException(), isNull);
-      expect(api.appConnectCount, 2);
+      expect(api.appConnectCount, mounted + 1);
     },
   );
 
@@ -317,24 +318,25 @@ void _registerConnection() {
         host(const AppSessionScreen(serviceKey: service), api),
       );
       await t.pumpAndSettle();
+      final mounted = api.appConnectCount;
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await api.appDisconnect(service);
       await t.pump(const Duration(seconds: 13));
-      expect(api.appConnectCount, 1);
+      expect(api.appConnectCount, mounted, reason: 'no recovery while paused');
       final gate = Completer<void>();
       api.appConnectGate = gate.future;
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pump();
-      expect(api.appConnectCount, 2);
+      expect(api.appConnectCount, mounted + 1);
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       gate.complete();
       await t.pumpAndSettle();
       t.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await t.pumpAndSettle();
       expect(find.text('就绪'), findsOneWidget);
-      expect(api.appConnectCount, 2);
+      expect(api.appConnectCount, mounted + 1);
       await t.pumpWidget(const SizedBox());
     },
   );

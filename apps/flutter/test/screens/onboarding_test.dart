@@ -84,6 +84,14 @@ Future<void> _signInWithDeviceCode(WidgetTester t) async {
   await t.pump(); // router rebuilds
 }
 
+/// Scroll the settings list until [finder] is built: rows below the fold of
+/// the 600 px test viewport are built lazily.
+Future<void> _reveal(WidgetTester t, Finder finder) => t.scrollUntilVisible(
+  finder,
+  200,
+  scrollable: find.byType(Scrollable).first,
+);
+
 void main() {
   // AppSessionScreen keeps per-thread plan/effort memory in process-wide static
   // maps (so a reopened thread restores its mode before the persisted config
@@ -278,7 +286,9 @@ void main() {
     );
     await t.pumpWidget(host(const SettingsScreen(), api));
     await t.pumpAndSettle();
+    await _reveal(t, find.text('lb7666.top:7666'));
     expect(find.text('lb7666.top:7666'), findsOneWidget);
+    await _reveal(t, find.text('••••••••（已设置）'));
     expect(find.text('••••••••（已设置）'), findsOneWidget);
     expect(find.byKey(const Key('export-btn')), findsOneWidget);
   });
@@ -304,6 +314,7 @@ void main() {
     await t.pumpAndSettle();
 
     // The row is below the fold in a 600 px test viewport.
+    await _reveal(t, find.byKey(const Key('diagnostics-btn')));
     await t.ensureVisible(find.byKey(const Key('diagnostics-btn')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('diagnostics-btn')));
@@ -603,7 +614,9 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    await _reveal(t, find.text('@octocat'));
     expect(find.text('@octocat'), findsOneWidget); // signed-in identity
+    await _reveal(t, find.byKey(const Key('sign-out-btn')));
     // Centred: at the list's edge it would sit under the bottom navigation.
     await Scrollable.ensureVisible(
       t.element(find.byKey(const Key('sign-out-btn'))),
@@ -642,6 +655,7 @@ void main() {
 
     // The provider re-read the post-login config, so the identity is on screen.
     expect(container.read(configProvider).valueOrNull?.mode, 'account');
+    await _reveal(t, find.text('@octocat'));
     expect(find.text('@octocat'), findsOneWidget);
   });
 

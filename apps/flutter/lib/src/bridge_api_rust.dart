@@ -126,6 +126,7 @@ class RustBridgeApi
     localAddr: s.localAddr,
     alive: s.alive,
     path: switch (s.path) {
+      frb.TunnelPathDto.local => TunnelPath.local,
       frb.TunnelPathDto.relayOnly => TunnelPath.relayOnly,
       frb.TunnelPathDto.idle => TunnelPath.idle,
       frb.TunnelPathDto.direct => TunnelPath.direct,
@@ -306,6 +307,19 @@ class RustBridgeApi
   Future<String> exportConfig() => frb.exportConfig();
 
   @override
+  List<ServiceEntry> localServices() => frb
+      .localServices()
+      .map(
+        (s) => ServiceEntry(
+          device: s.device,
+          kind: s.kind,
+          name: s.name,
+          key: s.key,
+        ),
+      )
+      .toList();
+
+  @override
   Future<List<ServiceEntry>> discoverServices() async {
     final list = await frb.discoverServices();
     return list
@@ -374,6 +388,31 @@ class RustBridgeApi
   @override
   Future<void> codexSetPromptVariant(String variant) =>
       frb.codexSetPromptVariant(variant: variant);
+
+  @override
+  Future<ConnectionWindowPreferences> connectionWindowPreferences() async {
+    final value = await frb.appConnectionWindow();
+    return ConnectionWindowPreferences(
+      capacity: value.capacity,
+      eviction: value.eviction == 'fifo'
+          ? ConnectionEviction.fifo
+          : ConnectionEviction.lru,
+    );
+  }
+
+  @override
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  ) => frb.appSetConnectionWindow(
+    value: frb.ConnectionWindowDto(
+      capacity: value.capacity,
+      eviction: value.eviction.name,
+    ),
+  );
+
+  @override
+  Future<void> appReconnect(String serviceKey, int localPort) =>
+      frb.appReconnect(serviceKey: serviceKey, localPort: localPort);
 
   // --- App-server remote control ---
 

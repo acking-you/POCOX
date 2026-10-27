@@ -135,7 +135,7 @@ void _registerHostSwitching() {
     await t.tap(find.byKey(const Key('sidebar-service-switcher')));
     await t.pumpAndSettle();
     Finder inItem(ServiceEntry s, String text) => find.descendant(
-      of: find.byKey(Key('host-switch-item-${s.key}')).last,
+      of: find.byKey(Key('host-switch-device-pcx:${s.device}')).last,
       matching: find.textContaining(text),
     );
     expect(inItem(windows, 'studio (Windows)'), findsOneWidget);
@@ -275,32 +275,67 @@ void _registerHostSwitching() {
     expect(find.textContaining('stub:manage'), findsOneWidget);
   });
 
-  testWidgets('Sidebar switcher moves the chat to another host', (t) async {
-    final api = FakeBridgeApi(config: _accountConfig, services: [_app1, _app2]);
-    final container = await _pumpHome(t, api);
-    await t.pumpAndSettle();
-    expect(api.appIsConnected(_app1.key), isTrue);
+  testWidgets(
+    'Switching services retains both connections and restores the unsent draft',
+    (t) async {
+      final api = FakeBridgeApi(
+        config: _accountConfig,
+        services: [_app1, _app2],
+      );
+      final container = await _pumpHome(t, api);
+      await t.pumpAndSettle();
+      await t.enterText(
+        find.byKey(const Key('composer-input')),
+        'unsent on alpha',
+      );
+      Future<void> select(ServiceEntry service) async {
+        await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+        await t.pumpAndSettle();
+        await t.tap(find.byKey(Key('host-switch-item-${service.key}')).last);
+        await t.pumpAndSettle();
+      }
 
-    await t.tap(find.byKey(const Key('sidebar-service-switcher')));
-    await t.pumpAndSettle();
-    // The current host is checked in the list.
-    expect(
-      find.descendant(
-        of: find.byKey(Key('host-switch-item-${_app1.key}')).last,
-        matching: find.byIcon(AppIcons.check),
-      ),
-      findsOneWidget,
-    );
-    await t.tap(find.byKey(Key('host-switch-item-${_app2.key}')).last);
-    await t.pumpAndSettle();
-
-    expect(api.appIsConnected(_app2.key), isTrue);
-    expect(find.byKey(const Key('send-btn')), findsOneWidget);
-    expect(
-      container.read(uiPrefsProvider).valueOrNull?.lastServiceKey,
-      _app2.key,
-    );
-  });
+      await select(_app2);
+      expect(api.appIsConnected(_app1.key), isTrue);
+      expect(api.appIsConnected(_app2.key), isTrue);
+      expect(
+        t
+            .widget<TextField>(find.byKey(const Key('composer-input')))
+            .controller!
+            .text,
+        isEmpty,
+      );
+      await t.enterText(
+        find.byKey(const Key('composer-input')),
+        'unsent on beta',
+      );
+      await select(_app1);
+      expect(
+        api.appIsConnected(_app1.key) && api.appIsConnected(_app2.key),
+        isTrue,
+      );
+      expect(
+        container.read(uiPrefsProvider).valueOrNull?.lastServiceKey,
+        _app1.key,
+      );
+      expect(
+        t
+            .widget<TextField>(find.byKey(const Key('composer-input')))
+            .controller!
+            .text,
+        'unsent on alpha',
+      );
+      await select(_app2);
+      expect(
+        t
+            .widget<TextField>(find.byKey(const Key('composer-input')))
+            .controller!
+            .text,
+        'unsent on beta',
+      );
+      expect(t.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     "Sidebar footer reaches host management and this host's history",

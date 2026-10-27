@@ -18,11 +18,12 @@ use pocox_account_proto::NamespacedServiceId;
 use pocox_core::service::{ServiceId, ServiceKind};
 use tokio::sync::broadcast;
 
+use super::acp;
 use super::app_session::{
     self, AppEvent, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
     ThreadRuntimeConfig, TurnItemsPage,
 };
-use super::{acp, transport};
+use super::service_connection::Target;
 
 /// Wire protocol of a session service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -264,9 +265,21 @@ pub trait SessionEngine: Sync {
     /// The protocol.
     fn protocol(&self) -> Protocol;
     /// Connect (idempotent while healthy).
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()>;
+    // The caller captures the epoch before queueing this selection.
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()>;
+    /// Protocol fixtures connect without the controller window's admission
+    /// policy.
+    #[cfg(test)]
+    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
+        self.connect_in_epoch(service_key, local_port, super::transport::epoch())
+    }
     /// Whether a live connection exists.
     fn is_connected(&self, service_key: &str) -> bool;
+    /// Whether this controller still holds a connection that may come back:
+    /// a stream retrying after an outage, or a session whose reconnect reuses
+    /// its tunnel. False once it is gone, retired with its host, or of
+    /// another account or relay.
+    fn is_retained(&self, service_key: &str) -> bool;
     /// Drop this controller's connection (never another client's work).
     fn disconnect(&self, service_key: &str);
     /// Why the service is unreachable, or `None`.
@@ -440,12 +453,20 @@ impl SessionEngine for CodexEngine {
         Protocol::CodexAppServer
     }
 
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        app_session::connect(service_key, local_port, &transport::resolve_blocking()?)
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()> {
+        app_session::connect(
+            service_key.clone(),
+            local_port,
+            &Target::at_epoch(&service_key, epoch)?,
+        )
     }
 
     fn is_connected(&self, service_key: &str) -> bool {
         app_session::is_connected(service_key)
+    }
+
+    fn is_retained(&self, service_key: &str) -> bool {
+        app_session::is_retained(service_key)
     }
 
     fn disconnect(&self, service_key: &str) {
@@ -453,7 +474,7 @@ impl SessionEngine for CodexEngine {
     }
 
     fn probe_reason(&self, service_key: String) -> Result<Option<String>> {
-        Ok(app_session::probe_reason(service_key, 0, &transport::resolve_blocking()?))
+        Ok(app_session::probe_reason(service_key.clone(), 0, &Target::resolve(&service_key)?))
     }
 
     fn subscribe_events(&self, service_key: &str) -> Result<broadcast::Receiver<AppEvent>> {
@@ -611,12 +632,16 @@ impl SessionEngine for AcpEngine {
         Protocol::Acp
     }
 
-    fn connect(&self, service_key: String, local_port: u16) -> Result<()> {
-        acp::connect(&service_key, local_port, &transport::resolve_owned_blocking()?)
+    fn connect_in_epoch(&self, service_key: String, local_port: u16, epoch: u64) -> Result<()> {
+        acp::connect(&service_key, local_port, &Target::at_epoch(&service_key, epoch)?)
     }
 
     fn is_connected(&self, service_key: &str) -> bool {
         acp::is_connected(service_key)
+    }
+
+    fn is_retained(&self, service_key: &str) -> bool {
+        acp::is_retained(service_key)
     }
 
     fn disconnect(&self, service_key: &str) {
@@ -624,7 +649,7 @@ impl SessionEngine for AcpEngine {
     }
 
     fn probe_reason(&self, service_key: String) -> Result<Option<String>> {
-        Ok(acp::probe_reason(&service_key, &transport::resolve_owned_blocking()?))
+        Ok(acp::probe_reason(&service_key, &Target::resolve(&service_key)?))
     }
 
     fn subscribe_events(&self, service_key: &str) -> Result<broadcast::Receiver<AppEvent>> {

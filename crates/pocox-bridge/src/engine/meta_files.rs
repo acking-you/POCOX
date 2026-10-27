@@ -44,9 +44,9 @@ pub fn upload_file_scoped(
     expected: &str,
 ) -> Result<UploadedFile> {
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    let url = endpoint(service_key, &["uploads", file_name])?;
+    let (url, current) = guarded_endpoint(service_key, &["uploads", file_name])?;
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    upload_to(url, bytes)
+    upload_to(url, bytes, current)
 }
 
 /// Upload a document/file attachment to the host behind `service_key`,
@@ -55,12 +55,13 @@ pub fn upload_file_scoped(
 /// codex's native host-file workflow (its input protocol has no document
 /// slot; only images travel inline).
 pub fn upload_file(service_key: &str, file_name: &str, bytes: Vec<u8>) -> Result<UploadedFile> {
-    let url = endpoint(service_key, &["uploads", file_name])?;
-    upload_to(url, bytes)
+    let (url, current) = guarded_endpoint(service_key, &["uploads", file_name])?;
+    upload_to(url, bytes, current)
 }
 
-fn upload_to(url: Url, bytes: Vec<u8>) -> Result<UploadedFile> {
+fn upload_to(url: Url, bytes: Vec<u8>, current: impl Fn() -> Result<()>) -> Result<UploadedFile> {
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .post(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -68,11 +69,13 @@ fn upload_to(url: Url, bytes: Vec<u8>) -> Result<UploadedFile> {
             .send()
             .await
             .context("meta POST upload")?;
-        ensure_ok(resp)
+        let uploaded = ensure_ok(resp)
             .await?
             .json()
             .await
-            .context("decoding upload response")
+            .context("decoding upload response")?;
+        current()?;
+        Ok(uploaded)
     })
 }
 
@@ -87,14 +90,14 @@ pub fn upload_image_scoped(
     project: Option<&str>,
 ) -> Result<UploadedFile> {
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    let mut url = endpoint(service_key, &["uploads", "images", file_name])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["uploads", "images", file_name])?;
     if let Some(thread) = thread {
         url.query_pairs_mut().append_pair("thread", thread);
     } else if let Some(project) = project {
         url.query_pairs_mut().append_pair("project", project);
     }
     anyhow::ensure!(upload_context()? == expected, "attachment context changed; retry the upload");
-    upload_to(url, bytes)
+    upload_to(url, bytes, current)
 }
 
 /// `{ "path": ..., "entries": [...] }` — one directory's browsable children.
@@ -107,9 +110,9 @@ struct ListDirResponse {
 /// project-folder browser. The host confines this to its configured roots, so
 /// a path outside them errors (surfaced as a `403` in the returned message).
 pub fn list_dir(service_key: &str, path: &str) -> Result<Vec<DirEntry>> {
-    let mut url = endpoint(service_key, &["fs", "list"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "list"])?;
     url.query_pairs_mut().append_pair("path", path);
-    let resp: ListDirResponse = runtime::runtime().block_on(get_json(url))?;
+    let resp: ListDirResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp.entries)
 }
 
@@ -122,9 +125,9 @@ struct ListFilesResponse {
 /// List the files in `path` on the host (root-confined), for the file-transfer
 /// panel. A path outside the configured roots errors (403 in the message).
 pub fn list_files(service_key: &str, path: &str) -> Result<Vec<FileEntry>> {
-    let mut url = endpoint(service_key, &["fs", "files"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "files"])?;
     url.query_pairs_mut().append_pair("path", path);
-    let resp: ListFilesResponse = runtime::runtime().block_on(get_json(url))?;
+    let resp: ListFilesResponse = runtime::runtime().block_on(get_json(url.clone(), current))?;
     Ok(resp.files)
 }
 
@@ -132,9 +135,10 @@ pub fn list_files(service_key: &str, path: &str) -> Result<Vec<FileEntry>> {
 /// the generous upload timeout since a large file over a relay hop can outlast
 /// [`META_TIMEOUT`].
 pub fn read_file(service_key: &str, path: &str) -> Result<Vec<u8>> {
-    let mut url = endpoint(service_key, &["fs", "read"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "read"])?;
     url.query_pairs_mut().append_pair("path", path);
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .get(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -142,7 +146,9 @@ pub fn read_file(service_key: &str, path: &str) -> Result<Vec<u8>> {
             .await
             .context("meta GET read")?;
         let resp = ensure_ok(resp).await?;
-        Ok(resp.bytes().await.context("reading file bytes")?.to_vec())
+        let bytes = resp.bytes().await.context("reading file bytes")?.to_vec();
+        current()?;
+        Ok(bytes)
     })
 }
 
@@ -154,21 +160,28 @@ pub struct FilePreview {
     pub total_size: u64,
 }
 
-fn file_link_url(service: &str, thread: Option<&str>, href: &str, preview: bool) -> Result<Url> {
-    let mut url = endpoint(service, &["fs", "thread-file"])?;
+/// The URL of a session file link, with the guard of [`guarded_endpoint`].
+fn file_link_url(
+    service: &str,
+    thread: Option<&str>,
+    href: &str,
+    preview: bool,
+) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
+    let (mut url, current) = guarded_endpoint(service, &["fs", "thread-file"])?;
     url.query_pairs_mut()
         .append_pair("href", href)
         .append_pair("preview", if preview { "true" } else { "false" });
     if let Some(thread) = thread {
         url.query_pairs_mut().append_pair("thread", thread);
     }
-    Ok(url)
+    Ok((url, current))
 }
 
 /// Fetch a bounded preview only after an explicit user action.
 pub fn file_preview(service: &str, thread: Option<&str>, href: &str) -> Result<FilePreview> {
-    let url = file_link_url(service, thread, href, true)?;
+    let (url, current) = file_link_url(service, thread, href, true)?;
     runtime::runtime().block_on(async {
+        current()?;
         let mut response = ensure_ok(client().get(url).send().await?).await?;
         let total_size: u64 = response
             .headers()
@@ -188,6 +201,7 @@ pub fn file_preview(service: &str, thread: Option<&str>, href: &str) -> Result<F
             bytes.len() as u64 == total_size.min(pocox_host_svc::file_links::PREVIEW_LIMIT),
             "file preview was incomplete"
         );
+        current()?;
         Ok(FilePreview {
             bytes,
             total_size,
@@ -269,15 +283,20 @@ pub fn file_download(
     href: &str,
     destination: &str,
 ) -> Result<()> {
-    let url = file_link_url(service, thread, href, false)?;
-    let legacy_url = if thread.is_none() {
-        let mut url = endpoint(service, &["fs", "read"])?;
+    let (url, current) = file_link_url(service, thread, href, false)?;
+    // Both guards live until the transfer ends: they hold its tunnel.
+    let (legacy_url, _legacy_lease) = if thread.is_none() {
+        let (mut url, lease) = guarded_endpoint(service, &["fs", "read"])?;
         url.query_pairs_mut().append_pair("path", href);
-        Some(url)
+        (Some(url), Some(lease))
     } else {
-        None
+        (None, None)
     };
-    runtime::runtime().block_on(download_file(url, legacy_url, std::path::Path::new(destination)))
+    runtime::runtime().block_on(async {
+        current()?;
+        download_file(url, legacy_url, std::path::Path::new(destination)).await?;
+        current()
+    })
 }
 
 pub(super) async fn download_file(
@@ -306,7 +325,7 @@ pub(super) async fn download_file(
 /// Verify shared filesystem access; a loopback tunnel is not evidence of
 /// locality.
 pub fn host_is_local(service: &str) -> Result<bool> {
-    if serve::local_endpoints(service).is_some() {
+    if matches!(Target::resolve(service)?, Target::Local { .. }) {
         return Ok(true);
     }
     let dir = pocox_host_svc::file_links::probe_dir()?;
@@ -322,7 +341,7 @@ pub fn host_is_local(service: &str) -> Result<bool> {
     cleanup.0 = Some(path);
     std::io::Write::write_all(&mut file, secret.as_bytes())?;
     drop(file);
-    let mut url = endpoint(service, &["host", "local-probe"])?;
+    let (mut url, _lease) = guarded_endpoint(service, &["host", "local-probe"])?;
     url.query_pairs_mut().append_pair("id", &id.to_string());
     let verified = runtime::runtime().block_on(async {
         let response = client()
@@ -347,11 +366,12 @@ pub fn read_thread_image(service_key: &str, thread_id: &str, path: &str) -> Resu
     if let Ok(Some(bytes)) = crate::engine::session_sync::preview(service_key, thread_id, path) {
         return Ok(bytes);
     }
-    let mut url = endpoint(service_key, &["fs", "thread-image"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "thread-image"])?;
     url.query_pairs_mut()
         .append_pair("thread", thread_id)
         .append_pair("path", path);
     let bytes = runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .get(url)
             .timeout(UPLOAD_TIMEOUT)
@@ -359,7 +379,9 @@ pub fn read_thread_image(service_key: &str, thread_id: &str, path: &str) -> Resu
             .await
             .context("meta GET thread-image")?;
         let resp = ensure_ok(resp).await?;
-        Ok::<_, anyhow::Error>(resp.bytes().await.context("reading image bytes")?.to_vec())
+        let bytes = resp.bytes().await.context("reading image bytes")?.to_vec();
+        current()?;
+        Ok::<_, anyhow::Error>(bytes)
     })?;
     crate::engine::session_sync::save_preview(service_key, thread_id, path, &bytes);
     Ok(bytes)
@@ -374,22 +396,9 @@ pub fn write_file(
     file_name: &str,
     bytes: Vec<u8>,
 ) -> Result<UploadedFile> {
-    let mut url = endpoint(service_key, &["fs", "write"])?;
+    let (mut url, current) = guarded_endpoint(service_key, &["fs", "write"])?;
     url.query_pairs_mut()
         .append_pair("dir", dir)
         .append_pair("name", file_name);
-    runtime::runtime().block_on(async move {
-        let resp = client()
-            .post(url)
-            .timeout(UPLOAD_TIMEOUT)
-            .body(bytes)
-            .send()
-            .await
-            .context("meta POST write")?;
-        ensure_ok(resp)
-            .await?
-            .json()
-            .await
-            .context("decoding write response")
-    })
+    upload_to(url, bytes, current)
 }

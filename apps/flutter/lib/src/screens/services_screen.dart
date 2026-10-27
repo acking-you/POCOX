@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
@@ -8,6 +9,8 @@ import 'package:go_router/go_router.dart';
 import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/harnesses/harness_panel.dart';
+import 'package:pocox/src/hosting/editor_block.dart';
+import 'package:pocox/src/hosting/host_apply_problem.dart';
 import 'package:pocox/src/hosting/hosting_owner.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/network/connection_paths.dart';
@@ -26,6 +29,9 @@ import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/api_service_panel.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
+import 'package:pocox/src/widgets/busy_label.dart';
+import 'package:pocox/src/widgets/error_details.dart';
+import 'package:pocox/src/widgets/field_help.dart';
 import 'package:pocox/src/widgets/github_avatar.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/loading.dart';
@@ -66,6 +72,9 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
 
   Timer? _reprobeTimer;
   String? _selectedDevice;
+
+  /// A retry the user asked for runs until the relay answers again.
+  bool _retrying = false;
 
   @override
   void initState() {
@@ -113,8 +122,6 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     }
     ref.invalidate(appReachableProvider);
     ref.invalidate(apiReachableProvider);
-    ref.invalidate(appReachableLocalProvider);
-    ref.invalidate(apiReachableLocalProvider);
     ref.invalidate(localServeListProvider);
     // Reads only: a stopped service is never restarted by a refresh.
     ref.invalidate(managedDeviceProvider);
@@ -126,27 +133,32 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final servicesAsync = ref.watch(servicesProvider);
+    ref.listen(servicesProvider, (_, next) {
+      if (_retrying && !next.isLoading) setState(() => _retrying = false);
+    });
     final config = ref.watch(configProvider).valueOrNull;
     final account = config?.mode == 'account';
-    Widget devices(List<ServiceEntry> services, {bool relayDown = false}) =>
-        _DeviceFirstServices(
-          services: services,
-          relayDown: relayDown,
-          relay: config?.relay,
-          accountLogin: account ? config?.accountLogin : null,
-          accountId: account ? config?.accountId : null,
-          selectedDevice: _selectedDevice,
-          onSelectDevice: (device) {
-            if (_selectedDevice != device) {
-              setState(() => _selectedDevice = device);
-            }
-          },
-          onClearDevice: () {
-            if (_selectedDevice != null) {
-              setState(() => _selectedDevice = null);
-            }
-          },
-        );
+    Widget devices(
+      List<ServiceEntry> services, {
+      _RelayState relayState = const _RelayOnline(),
+    }) => _DeviceFirstServices(
+      services: services,
+      relayState: relayState,
+      relay: config?.relay,
+      accountLogin: account ? config?.accountLogin : null,
+      accountId: account ? config?.accountId : null,
+      selectedDevice: _selectedDevice,
+      onSelectDevice: (device) {
+        if (_selectedDevice != device) {
+          setState(() => _selectedDevice = device);
+        }
+      },
+      onClearDevice: () {
+        if (_selectedDevice != null) {
+          setState(() => _selectedDevice = null);
+        }
+      },
+    );
 
     return UtilityPage(
       route: '/manage',
@@ -178,42 +190,53 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: servicesAsync.when(
-          loading: () =>
-              const ListLoadingSkeleton(key: ValueKey('svc-loading')),
+          // This computer's own services need no listing: they show at once,
+          // in the same place the listed ones arrive, while the relay is
+          // still being asked.
+          loading: () => _hostingSupported
+              ? KeyedSubtree(
+                  key: const ValueKey('svc-data'),
+                  child: devices(
+                    ref.read(bridgeApiProvider).localServices(),
+                    relayState: const _RelayChecking(),
+                  ),
+                )
+              : const ListLoadingSkeleton(key: ValueKey('svc-loading')),
           error: (e, _) {
             final detail = friendlyError(e);
-            if (isAccountSessionExpired(detail)) {
+            void signIn() => context.go('/onboarding?reason=session-expired');
+            final expired = isAccountSessionExpired(detail);
+            // The relay only lists other devices: this computer's own
+            // services are known here and still work here, so a desktop
+            // keeps them in place and says what is wrong on the relay's
+            // card, beside the list it could not fill.
+            if (_hostingSupported) {
               return KeyedSubtree(
-                key: const ValueKey('svc-error'),
-                child: _SessionExpired(
-                  onSignIn: () =>
-                      context.go('/onboarding?reason=session-expired'),
+                key: const ValueKey('svc-data'),
+                child: devices(
+                  ref.read(bridgeApiProvider).localServices(),
+                  relayState: expired
+                      ? _RelaySignedOut(onSignIn: signIn)
+                      : _RelayDown(
+                          detail,
+                          retrying: _retrying,
+                          onRetry: () {
+                            setState(() => _retrying = true);
+                            _refreshServices(manual: true);
+                          },
+                        ),
                 ),
               );
             }
-            final problem = RelayProblem(
-              detail: detail,
-              relay: config?.relay,
-              compact: _hostingSupported,
-              onRetry: () => _refreshServices(manual: true),
-            );
-            // The relay only lists other devices: this computer's own
-            // services are known here and still work here, so they stay on
-            // the page under the problem rather than behind it.
             return KeyedSubtree(
               key: const ValueKey('svc-error'),
-              child: _hostingSupported
-                  ? Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                          child: problem,
-                        ),
-                        Expanded(child: devices(const [], relayDown: true)),
-                      ],
-                    )
-                  : problem,
+              child: expired
+                  ? _SessionExpired(onSignIn: signIn)
+                  : RelayProblem(
+                      detail: detail,
+                      relay: config?.relay,
+                      onRetry: () => _refreshServices(manual: true),
+                    ),
             );
           },
           data: (services) => KeyedSubtree(
@@ -236,6 +259,12 @@ class _SessionExpired extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final signIn = FilledButton.icon(
+      key: const Key('services-sign-in-again'),
+      onPressed: onSignIn,
+      icon: const Icon(AppIcons.login),
+      label: Text(l10n.accountSignInAgain),
+    );
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -255,12 +284,7 @@ class _SessionExpired extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
-            key: const Key('services-sign-in-again'),
-            onPressed: onSignIn,
-            icon: const Icon(AppIcons.login),
-            label: Text(l10n.accountSignInAgain),
-          ),
+          signIn,
         ],
       ),
     );

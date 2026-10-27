@@ -73,9 +73,10 @@ use tokio::time::Instant;
 pub use translate::app_item as native_item;
 
 use self::connection::check_api;
-pub use self::connection::{
-    connect, context_changed, disconnect, host_info, is_connected, probe_reason,
+pub(crate) use self::connection::{
+    connect, evict_idle, host_info, is_idle, local_stopped, probe_reason,
 };
+pub use self::connection::{context_changed, disconnect, is_connected, is_retained};
 #[cfg(test)]
 use self::connection::{disconnect_inner, is_current, register};
 #[cfg(test)]
@@ -84,7 +85,7 @@ use self::events::{event_loop, Watch};
 use super::app_session::AppEvent;
 use super::runtime;
 use super::session_engine::{logical_key, Capabilities};
-use super::transport::{self, Context, Owned};
+use super::transport::{self, Context};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 const EVENT_BUFFER: usize = 1024;
@@ -184,7 +185,7 @@ struct Conn {
     /// Registry key of the relay subscription this connection owns.
     subscription: Option<String>,
     /// The loopback gateway address, when this process hosts the service.
-    local: Option<String>,
+    local: Option<super::local_services::Endpoint>,
 }
 
 fn conns() -> MutexGuard<'static, HashMap<Key, Conn>> {
@@ -280,6 +281,12 @@ pub(crate) fn conn(service_key: &str) -> Result<Link> {
     let conn = conns
         .get(&key)
         .ok_or_else(|| anyhow!("not connected to {}", key.1))?;
+    anyhow::ensure!(
+        conn.local
+            .as_ref()
+            .is_none_or(super::local_services::Endpoint::is_current),
+        "the local host stopped or restarted; reconnect"
+    );
     Ok(Link {
         client: conn.client.clone(),
         shared: conn.shared.clone(),

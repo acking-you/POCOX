@@ -34,6 +34,59 @@ breaking change goes.
   Long conversations scroll the rail with faded edges instead of thinning
   its marks, and the `n / total` outline button shows while you use the rail.
 
+- **Host switching groups services by device and reuses connections.** The
+  picker distinguishes this app's own services and marks the current one and
+  those whose connection is retained. Returning restores the previous thread
+  or project draft. Settings lets you retain 1–32 conversation services
+  (default five) with a stepper, releasing the least recently selected or the
+  first connected idle one; changes save at once. Running tasks and
+  unanswered requests protect their connections, and a relay outage never
+  releases one that is recovering; a full window explains why switching
+  cannot proceed. Failed switches keep the current service, and account
+  changes, stopped hosts and stale recovery cannot revive old owners.
+- **Local services connect directly throughout the app.** Discovery, session
+  setup, probes, metadata, Responses API access and recovery use this app's
+  owned loopback listeners before resolving relay credentials. A selected
+  local conversation opens without waiting for relay discovery and shows
+  **Local direct**. Stopped or replaced hosts invalidate old connections;
+  local failures never silently switch to the relay. Remote publication and
+  access permissions retain their existing behavior.
+- Its connection sheet shows two steps, **This device** with the listener's
+  address and the session, and the status bar marks it with a computer in
+  ink. While its host restarts in place the step reads **Restarting…** and
+  the session waits, instead of a dropped link; a stopped host reads
+  **Stopped**.
+- The services page says how the relay answers on its own card, under the
+  account or relay name: **Checking…** while it is asked (this computer's
+  hosts already show), **Unreachable** with the cause, a retry and the error
+  details, or **Session expired** with **Sign in again**. This computer's
+  services stay in place below and beside it instead of under a banner, and
+  its capability count no longer changes while the relay is asked. A host
+  restarting for an update reads **Restarting…** rather than Not responding.
+- Subscribing to this computer's own Responses API keeps the port you chose:
+  it is forwarded straight to the API, keeps working across host restarts
+  and refuses while the host is stopped, so a saved `base_url` stays valid.
+- Local startup waits for OpenCode's native gateway readiness, tries other
+  candidates after a failed handshake, still reaches other devices when your
+  local hosts are hidden, and adds later restored hosts to the picker without
+  relay discovery. Once a local conversation is open the relay is asked
+  behind it, so the host switcher lists your other devices too. A Codex
+  watchdog or update restart reconnects only its app-server; the API and
+  session sharing stay up and keep answering while it restarts, and
+  **Start** after a restart that failed starts the host again instead of
+  reporting it running.
+- Publishing stays bound to the account or relay a host started under.
+  Republishing a running Codex host after a change now requires a restart,
+  matching ACP and OpenCode, and starting a Codex or ACP host again after the
+  change is that restart instead of reporting it already running.
+- **A host left on an earlier account or relay says so.** After you sign in
+  to another account or change relay, a host started before shows **Restart
+  needed** instead of **Not responding**, with the reason and a **Restart**
+  button on its card that restarts the configuration it runs (saved changes
+  not active yet open the editor for review instead); its editor's **Apply
+  and restart** works without a change. Hosts are never restarted for you, so
+  devices still on the earlier account keep them until you do.
+
 ## 0.7.7 — 2026-10-25 — Portable Windows copies update themselves
 
 - **A portable Windows copy now updates in place.** **Update and restart**

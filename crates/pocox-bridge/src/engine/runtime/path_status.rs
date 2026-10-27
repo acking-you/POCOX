@@ -18,6 +18,8 @@ pub enum TunnelPath {
     Relay,
     /// Some open data connections are direct, others use the relay.
     Mixed,
+    /// A process-owned loopback service, with no relay or forwarding listener.
+    Local,
 }
 
 /// A local SDK observation, never inferred from the configured preference.

@@ -36,6 +36,10 @@ abstract interface class BridgeApi
   Future<void> appHistoryFocus(String serviceKey, String? threadId);
   Future<HistoryCacheStatus> historyCacheStatus();
   Future<void> historyCacheSetLimit(int limitMb);
+  Future<ConnectionWindowPreferences> connectionWindowPreferences();
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  );
 
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
@@ -67,6 +71,9 @@ abstract interface class BridgeApi
 
   /// Discover services on the configured relay.
   Future<List<ServiceEntry>> discoverServices();
+
+  /// Process-owned loopback services; never contacts the relay.
+  List<ServiceEntry> localServices();
 
   /// This app's publisher identity, available before hosting starts.
   DeviceMetadata localDeviceMetadata();
@@ -395,6 +402,7 @@ abstract interface class BridgeApi
 
   /// Disconnect the app-server session and its pb-mapper subscription.
   Future<void> appDisconnect(String serviceKey);
+  Future<void> appReconnect(String serviceKey, int localPort);
 
   /// Probe whether a session service is actually REACHABLE (a Codex
   /// app-server answers `initialize`; an ACP gateway reports a ready agent)

@@ -98,6 +98,66 @@ abstract class AppLocalizations {
     Locale('zh'),
   ];
 
+  /// No description provided for @hostConnectionCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'In use'**
+  String get hostConnectionCurrent;
+
+  /// No description provided for @hostConnectionRetained.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection retained'**
+  String get hostConnectionRetained;
+
+  /// No description provided for @connectionWindowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Retained connections'**
+  String get connectionWindowTitle;
+
+  /// No description provided for @connectionWindowCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Service limit'**
+  String get connectionWindowCapacity;
+
+  /// No description provided for @connectionWindowPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Eviction policy'**
+  String get connectionWindowPolicy;
+
+  /// No description provided for @connectionWindowPolicyInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'When the limit is reached, the idle service released first: the one you selected least recently, or the one that connected first. Busy services are never released.'**
+  String get connectionWindowPolicyInfo;
+
+  /// No description provided for @connectionWindowLru.
+  ///
+  /// In en, this message translates to:
+  /// **'Least recent'**
+  String get connectionWindowLru;
+
+  /// No description provided for @connectionWindowFifo.
+  ///
+  /// In en, this message translates to:
+  /// **'First connected'**
+  String get connectionWindowFifo;
+
+  /// No description provided for @connectionWindowDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Counts conversation services, including the selected one. Default: 5. Switching reuses healthy connections. Running tasks and unanswered requests are protected. A lower limit applies as protected services become idle; a full window asks you to wait or raise the limit. One temporary connection may be opened during a switch. API forwarding and shared ports have separate lifetimes.'**
+  String get connectionWindowDescription;
+
+  /// No description provided for @connectionWindowFull.
+  ///
+  /// In en, this message translates to:
+  /// **'All retained connections are busy or awaiting a response. Increase the service limit in Settings or wait for a task to finish.'**
+  String get connectionWindowFull;
+
   /// No description provided for @connectionPathTitle.
   ///
   /// In en, this message translates to:
@@ -163,6 +223,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t save. Your previous choice is kept.'**
   String get connectionPathSaveFailed;
+
+  /// No description provided for @tunnelPathLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local direct'**
+  String get tunnelPathLocal;
+
+  /// No description provided for @linkLocalStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get linkLocalStopped;
+
+  /// No description provided for @linkLocalWaiting.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for this device\'s host'**
+  String get linkLocalWaiting;
 
   /// No description provided for @tunnelPathIdle.
   ///
@@ -1808,6 +1886,12 @@ abstract class AppLocalizations {
   /// **'Unreachable'**
   String get statusUnreachable;
 
+  /// No description provided for @statusSessionExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Session expired'**
+  String get statusSessionExpired;
+
   /// No description provided for @unreachableReason.
   ///
   /// In en, this message translates to:
@@ -2129,7 +2213,7 @@ abstract class AppLocalizations {
   /// No description provided for @noAuthWarning.
   ///
   /// In en, this message translates to:
-  /// **'⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.'**
+  /// **'The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.'**
   String get noAuthWarning;
 
   /// No description provided for @subscribeFailed.
@@ -2707,6 +2791,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Did not stop: stop again'**
   String get localHostStopFailed;
+
+  /// No description provided for @localHostRestartNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart needed'**
+  String get localHostRestartNeeded;
+
+  /// No description provided for @localHostBoundElsewhere.
+  ///
+  /// In en, this message translates to:
+  /// **'Started under another account or relay.'**
+  String get localHostBoundElsewhere;
+
+  /// No description provided for @localHostRestart.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart'**
+  String get localHostRestart;
 
   /// No description provided for @localHostPort.
   ///

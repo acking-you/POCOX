@@ -347,8 +347,38 @@ pub fn turn_start(
             );
         }
     }
-    runtime::runtime().block_on(client.request("turn/start", Value::Object(params)))?;
-    Ok(())
+    // Pin before sending: the response may precede turn/started, and a timeout
+    // does not prove rejection. Keep uncertain submissions until a terminal
+    // notification (or connection retirement) resolves them.
+    let turns = {
+        let map = sessions().lock().expect("sessions poisoned");
+        let session = map
+            .get(service_key)
+            .context("the connection changed; reconnect")?;
+        anyhow::ensure!(Arc::ptr_eq(&client, &session.client), "the connection changed; reconnect");
+        Arc::clone(&session.active_turns)
+    };
+    turns
+        .lock()
+        .expect("active turns poisoned")
+        .entry(thread_id.into())
+        .or_insert(Value::Null);
+    let result = runtime::runtime().block_on(client.request("turn/start", Value::Object(params)));
+    let mut active = turns.lock().expect("active turns poisoned");
+    if active.get(thread_id).is_some_and(Value::is_null) {
+        match &result {
+            Ok(response) => {
+                if let Some(id) = extract_turn_id(response) {
+                    active.insert(thread_id.into(), id);
+                }
+            },
+            Err(error) if error.is::<pocox_codex::protocol::ErrorPayload>() => {
+                active.remove(thread_id);
+            },
+            Err(_) => {},
+        }
+    }
+    result.map(|_| ())
 }
 
 /// Deliver an asynchronous answer to the expected running turn.

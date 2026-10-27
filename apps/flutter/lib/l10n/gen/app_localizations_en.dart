@@ -9,6 +9,39 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get hostConnectionCurrent => 'In use';
+
+  @override
+  String get hostConnectionRetained => 'Connection retained';
+
+  @override
+  String get connectionWindowTitle => 'Retained connections';
+
+  @override
+  String get connectionWindowCapacity => 'Service limit';
+
+  @override
+  String get connectionWindowPolicy => 'Eviction policy';
+
+  @override
+  String get connectionWindowPolicyInfo =>
+      'When the limit is reached, the idle service released first: the one you selected least recently, or the one that connected first. Busy services are never released.';
+
+  @override
+  String get connectionWindowLru => 'Least recent';
+
+  @override
+  String get connectionWindowFifo => 'First connected';
+
+  @override
+  String get connectionWindowDescription =>
+      'Counts conversation services, including the selected one. Default: 5. Switching reuses healthy connections. Running tasks and unanswered requests are protected. A lower limit applies as protected services become idle; a full window asks you to wait or raise the limit. One temporary connection may be opened during a switch. API forwarding and shared ports have separate lifetimes.';
+
+  @override
+  String get connectionWindowFull =>
+      'All retained connections are busy or awaiting a response. Increase the service limit in Settings or wait for a task to finish.';
+
+  @override
   String get connectionPathTitle => 'Connection path';
 
   @override
@@ -45,6 +78,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get connectionPathSaveFailed =>
       'Couldn\'t save. Your previous choice is kept.';
+
+  @override
+  String get tunnelPathLocal => 'Local direct';
+
+  @override
+  String get linkLocalStopped => 'Stopped';
+
+  @override
+  String get linkLocalWaiting => 'Waiting for this device\'s host';
 
   @override
   String get tunnelPathIdle => 'Idle';
@@ -1004,6 +1046,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get statusUnreachable => 'Unreachable';
 
   @override
+  String get statusSessionExpired => 'Session expired';
+
+  @override
   String get unreachableReason =>
       'Still registered on the relay, but the remote app-server isn\'t responding — it may not be running, or has crashed.';
 
@@ -1179,7 +1224,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noAuthWarning =>
-      '⚠ The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
+      'The local endpoint has no auth and binds 127.0.0.1 only. Alive only while the app is foregrounded.';
 
   @override
   String get subscribeFailed => 'Couldn\'t start the subscription';
@@ -1495,6 +1540,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localHostStopFailed => 'Did not stop: stop again';
+
+  @override
+  String get localHostRestartNeeded => 'Restart needed';
+
+  @override
+  String get localHostBoundElsewhere =>
+      'Started under another account or relay.';
+
+  @override
+  String get localHostRestart => 'Restart';
 
   @override
   String get localHostPort => 'Port';

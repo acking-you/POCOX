@@ -315,6 +315,33 @@ void _runningHostTests() {
     expect(find.text(l10n.hostReplaced), findsWidgets);
   });
 
+  testWidgets('a host still on another account or relay restarts without a '
+      'configuration change', (t) async {
+    final api = FakeBridgeApi();
+    api.serveHosts.add(_codexHost);
+    final container = await _pumpEditor(t, api, existing: _codexHost);
+    expect(_onPressed(t, 'host-config-apply'), isNull, reason: 'nothing new');
+
+    api.serveHosts[0] = AppServeStatus(
+      name: _codexHost.name,
+      device: _codexHost.device,
+      alive: true,
+      appListenAddr: _codexHost.appListenAddr,
+      appServiceKey: _codexHost.appServiceKey,
+      codexBinary: _codexHost.codexBinary,
+      incarnation: _codexHost.incarnation,
+      boundElsewhere: true,
+    );
+    container.invalidate(localServeListProvider);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('host-bound-elsewhere')), findsOneWidget);
+
+    await _tapKey(t, 'host-config-apply');
+    await _tapKey(t, 'host-apply-confirm');
+    expect(api.applyCalls.single, ('alpha', 'inc-alpha', 0));
+    expect(find.byKey(const Key('host-bound-elsewhere')), findsNothing);
+  });
+
   testWidgets('a stopped host is not operated on', (t) async {
     final api = FakeBridgeApi();
     api.serveHosts.add(_codexHost);

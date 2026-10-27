@@ -202,3 +202,14 @@ String conversationRoute(String key, String threadId, {String? cwd}) {
 /// part; a plain key is returned as is.
 String subscriptionServiceKey(String subscriptionKey) =>
     subscriptionKey.split('\u001f').last;
+
+/// Authority-bearing device segment, including its account namespace. Display
+/// hostnames and OS labels never establish identity. Unknown keys stay separate.
+String serviceDeviceIdentity(String key) {
+  final parts = key.split(':');
+  if (parts.length >= 5 && parts.first == 'pcxu') {
+    return parts.take(3).join(':');
+  }
+  if (parts.length >= 4 && parts.first == 'pcx') return parts.take(2).join(':');
+  return key;
+}

@@ -145,18 +145,6 @@ part 'app_session/transcript_list.dart';
 /// [BridgeApi.appConnect].
 const appLocalPort = 0;
 
-// Cold-open loads that retry on their own schedule when the first attempt loses
-// the race against the connection. See `_retryOpenLoad`.
-const String _kThreadsLoad = 'threads';
-const String _kCwdSeed = 'cwd';
-const String _kModelsLoad = 'models';
-
-/// Attempts each cold-open load gets before giving up (1/2/4/8/16s apart).
-/// Reaches ~31s of coverage, which is what a desktop auto-host restore needs:
-/// the host is a child process this app spawns, and it took ~30s to become
-/// ready in the field.
-const int _kOpenLoadMaxRetries = 5;
-
 /// A live conversation with a remote codex app-server thread.
 ///
 /// New conversations let the user pick model / permission mode / remote project
@@ -677,6 +665,10 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // timer, so the window follows the app's clock rather than a stopwatch.
   Timer? _reconnectCooldown;
   int _reconnectEpoch = 0;
+  // Whether this service went through the connection window's admission:
+  // the home selects before showing it, a pushed one on entry. Recovery never
+  // admits, so it cannot revive a service the window evicted.
+  late bool _admitted = widget.home;
   bool _foreground = true;
   bool _restoringSettings = false;
   Timer? _healthTimer;
@@ -811,6 +803,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
         }
       });
     }, fireImmediately: true);
+    _admitOnEntry();
     if (_threadId != null) _resumeAndLoad();
     _loadThreads();
     // Periodically verify the connection is alive and auto-reconnect if not, so
@@ -877,6 +870,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   @override
   void deactivate() {
+    _drafts.location = (threadId: _threadId, cwd: _cwd);
     unawaited(
       ref
           .read(bridgeApiProvider)

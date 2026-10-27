@@ -53,13 +53,15 @@ void main() {
     bool light = false,
     double width = 393,
     VoidCallback? onRetry,
+    SubInfo tunnel = _tunnel,
+    bool connected = false,
   }) async {
     t.view.physicalSize = Size(width, 760);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
     final api = FakeBridgeApi(
       config: const ConfigInfo(relay: 'relay:7666', hasKey: true),
-    )..putSubscription(_tunnel);
+    )..putSubscription(tunnel);
     await t.pumpWidget(
       ProviderScope(
         overrides: [bridgeApiProvider.overrideWithValue(api)],
@@ -79,7 +81,7 @@ void main() {
                     child: LinkSheet(
                       serviceKey: _service,
                       reconnect: ValueNotifier(state),
-                      connected: () => false,
+                      connected: () => connected,
                       onRetry: onRetry,
                     ),
                   ),
@@ -141,5 +143,83 @@ void main() {
     await t.pumpWidget(const SizedBox());
     await t.pump(const Duration(seconds: 1));
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a local service shows this device and its session, with no '
+      'relay steps, history or relay details', (t) async {
+    await mount(
+      t,
+      ReconnectState.idle,
+      tunnel: const SubInfo(
+        key: _service,
+        localAddr: '127.0.0.1:51734',
+        alive: true,
+        path: TunnelPath.local,
+      ),
+      connected: true,
+    );
+    expect(find.byKey(const Key('link-step-local')), findsOneWidget);
+    expect(find.byKey(const Key('link-step-session')), findsOneWidget);
+    expect(find.byKey(const Key('link-step-relay')), findsNothing);
+    expect(find.byKey(const Key('link-step-p2p')), findsNothing);
+    expect(find.text('127.0.0.1:51734'), findsOneWidget);
+    expect(find.byKey(const Key('link-timeline')), findsNothing);
+    expect(find.byKey(const Key('link-show-details')), findsNothing);
+    await capturePreview(t, 'link-sheet-local-dark');
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 4));
+
+    // Its host restarting in place: under way, not dropped, and said once.
+    final zh = await AppLocalizations.delegate.load(const Locale('zh'));
+    const bridgeError = 'this local host is restarting; reconnect in a moment';
+    final reconnecting = ReconnectState(
+      active: true,
+      attempt: 1,
+      lastError: bridgeError,
+    );
+    await mount(
+      t,
+      reconnecting,
+      tunnel: const SubInfo(
+        key: _service,
+        localAddr: '127.0.0.1:51734',
+        alive: true,
+        ready: false,
+        path: TunnelPath.local,
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('link-step-local')),
+        matching: find.text(zh.hostRestarting),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(zh.subscribedDead), findsNothing);
+    expect(find.text(bridgeError), findsNothing);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+
+    // Stopped: the step says so, the headline what the reconnect waits for.
+    await mount(
+      t,
+      reconnecting,
+      tunnel: const SubInfo(
+        key: _service,
+        localAddr: '127.0.0.1:51734',
+        alive: false,
+        path: TunnelPath.local,
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('link-step-local')),
+        matching: find.text(zh.linkLocalStopped),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text(zh.linkLocalWaiting), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
   });
 }

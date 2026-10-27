@@ -1,19 +1,20 @@
 //! Relay registrations of native hosts: unpublish and re-publish one service,
 //! and the rate-limited self-healing re-publication run by status polls.
 
+use anyhow::ensure;
+
 use super::*;
 
 /// Re-publish whichever of `name`'s three services are not currently published.
 ///
-/// Errors only on a name CONFLICT, which is the one condition a caller must act
-/// on: the local host stays up either way, but a name another device owns can
-/// never publish, so a re-host under it has to say so rather than report
-/// success.
+/// A name conflict or changed account/relay requires caller action. The host
+/// remains bound to its startup context until restarted, just like ACP and
+/// OpenCode, so republication cannot expose it under another context.
 ///
 /// Takes the hosts lock only to read what needs publishing and to store the
 /// results — never across the relay round trip, which would stall status polls.
 pub(super) fn republish_dropped(name: &str) -> Result<()> {
-    let Some((device, pending)) = ({
+    let Some((device, pending, context, incarnation)) = ({
         let guard = hosts_locked();
         guard.get(name).map(|ls| {
             let pending: Vec<(ServiceKind, SocketAddr)> = [
@@ -25,7 +26,7 @@ pub(super) fn republish_dropped(name: &str) -> Result<()> {
             .filter(|(_, _, slot)| needs_publishing(slot))
             .map(|(kind, local, _)| (kind, local))
             .collect();
-            (ls.device.clone(), pending)
+            (ls.device.clone(), pending, ls.context.clone(), ls.incarnation.clone())
         })
     }) else {
         return Ok(());
@@ -33,7 +34,11 @@ pub(super) fn republish_dropped(name: &str) -> Result<()> {
     if pending.is_empty() {
         return Ok(());
     }
-    let transport = transport::resolve_blocking()?;
+    let owned = transport::resolve_owned_blocking()?;
+    ensure!(
+        transport::Context::of(&owned.transport) == context,
+        "the account or relay changed; restart this Codex host"
+    );
 
     let mut conflict = None;
     for (kind, local) in pending {
@@ -41,7 +46,7 @@ pub(super) fn republish_dropped(name: &str) -> Result<()> {
         // releases the old key and the fresh publish is not competing with its
         // own predecessor for the name.
         take_registration(name, kind);
-        let published = match register_service(&transport, &device, kind, name, local) {
+        let published = match register_service(&owned.transport, &device, kind, name, local) {
             Ok(published) => published,
             Err(err) => {
                 // Keep going: a conflict on one kind (typically `app`) should not
@@ -51,7 +56,7 @@ pub(super) fn republish_dropped(name: &str) -> Result<()> {
                 continue;
             },
         };
-        store_registration(name, kind, published);
+        store_registration(name, kind, published, &incarnation, &owned);
     }
     match conflict {
         Some(err) => Err(err),
@@ -71,13 +76,24 @@ fn take_registration(name: &str, kind: ServiceKind) {
 /// Store a freshly published registration, or clear the slot when publishing
 /// did not produce one. Drops it immediately if the host vanished while we
 /// published.
-fn store_registration(name: &str, kind: ServiceKind, published: Option<Published>) {
+fn store_registration(
+    name: &str,
+    kind: ServiceKind,
+    published: Option<Published>,
+    incarnation: &str,
+    owned: &transport::Owned,
+) {
     let mut guard = hosts_locked();
     match guard.get_mut(name) {
-        Some(ls) => *registration_slot(ls, kind) = published,
-        // The host was stopped while we were publishing; unpublish rather than
-        // leaving a key on the relay with nothing behind it.
-        None => drop(published),
+        Some(ls)
+            if ls.incarnation == incarnation
+                && ls.context == transport::Context::of(&owned.transport)
+                && transport::is_current(owned.epoch) =>
+        {
+            *registration_slot(ls, kind) = published;
+        },
+        // Stopped, replaced, or moved to another account/relay while publishing.
+        _ => drop(published),
     }
 }
 
@@ -175,7 +191,8 @@ pub fn serve_deregister(name: &str, kind: &str) -> Result<()> {
 }
 
 /// Re-publish a previously [`serve_deregister`]'d service, forwarding to the
-/// still-running process. No-op if already published.
+/// still-running process. No-op if already published. A changed account or
+/// relay requires restarting the host before it can publish there.
 pub fn serve_reregister(name: &str, kind: &str) -> Result<()> {
     if crate::engine::serve_opencode::is_hosting(name) {
         return crate::engine::serve_opencode::reregister(name, kind);
@@ -186,7 +203,7 @@ pub fn serve_reregister(name: &str, kind: &str) -> Result<()> {
     let kind: ServiceKind = kind
         .parse()
         .map_err(|_| anyhow!("invalid service kind `{kind}`"))?;
-    let Some((device, local)) = ({
+    let Some((device, local, context, incarnation)) = ({
         let guard = hosts_locked();
         let ls = guard
             .get(name)
@@ -196,14 +213,19 @@ pub fn serve_reregister(name: &str, kind: &str) -> Result<()> {
             ServiceKind::Meta => (ls.meta_local, &ls.meta_register),
             _ => (ls.app_local, &ls.app_register),
         };
-        needs_publishing(slot).then(|| (ls.device.clone(), local))
+        needs_publishing(slot)
+            .then(|| (ls.device.clone(), local, ls.context.clone(), ls.incarnation.clone()))
     }) else {
         return Ok(());
     };
     // Publishing waits on the relay, so it happens with the hosts lock RELEASED —
     // holding it would stall every status poll for as long as the relay takes.
-    let transport = transport::resolve_blocking()?;
-    let published = register_service(&transport, &device, kind, name, local)?;
-    store_registration(name, kind, published);
+    let owned = transport::resolve_owned_blocking()?;
+    ensure!(
+        transport::Context::of(&owned.transport) == context,
+        "the account or relay changed; restart this Codex host"
+    );
+    let published = register_service(&owned.transport, &device, kind, name, local)?;
+    store_registration(name, kind, published, &incarnation, &owned);
     Ok(())
 }

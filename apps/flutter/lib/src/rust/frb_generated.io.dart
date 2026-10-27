@@ -213,6 +213,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ConnectStageDto dco_decode_box_autoadd_connect_stage_dto(dynamic raw);
 
   @protected
+  ConnectionWindowDto dco_decode_box_autoadd_connection_window_dto(dynamic raw);
+
+  @protected
   DeviceMetadataDto dco_decode_box_autoadd_device_metadata_dto(dynamic raw);
 
   @protected
@@ -317,6 +320,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConnectionPathDto dco_decode_connection_path_dto(dynamic raw);
+
+  @protected
+  ConnectionWindowDto dco_decode_connection_window_dto(dynamic raw);
 
   @protected
   DeviceCodeDto dco_decode_device_code_dto(dynamic raw);
@@ -1087,6 +1093,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  ConnectionWindowDto sse_decode_box_autoadd_connection_window_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   DeviceMetadataDto sse_decode_box_autoadd_device_metadata_dto(
     SseDeserializer deserializer,
   );
@@ -1233,6 +1244,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ConnectionPathDto sse_decode_connection_path_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ConnectionWindowDto sse_decode_connection_window_dto(
     SseDeserializer deserializer,
   );
 
@@ -2201,6 +2217,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_connection_window_dto(
+    ConnectionWindowDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_device_metadata_dto(
     DeviceMetadataDto self,
     SseSerializer serializer,
@@ -2383,6 +2405,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_connection_path_dto(
     ConnectionPathDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_connection_window_dto(
+    ConnectionWindowDto self,
     SseSerializer serializer,
   );
 

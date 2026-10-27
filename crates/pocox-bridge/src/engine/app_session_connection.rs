@@ -2,6 +2,8 @@
 
 use super::*;
 use crate::engine::connect_stage::{self, ConnectStage};
+use crate::engine::service_connection::Target;
+use crate::engine::transport;
 
 /// Subscribe to `service_key` (materialising the local ws endpoint), open a
 /// JSON-RPC client over it and run the `initialize` handshake. Idempotent: a
@@ -11,7 +13,7 @@ use crate::engine::connect_stage::{self, ConnectStage};
 /// direct paths on its own, so a dropped socket only needs a new one, and
 /// the tunnel's history stays with it. Only a failed attempt rebuilds the
 /// tunnel too, in case the tunnel itself is what failed.
-pub fn connect(service_key: String, local_port: u16, transport: &Transport) -> Result<()> {
+pub(crate) fn connect(service_key: String, local_port: u16, target: &Target) -> Result<()> {
     let lifecycle = lifecycle(&service_key);
     let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
     if reuse_live(&service_key) {
@@ -22,14 +24,16 @@ pub fn connect(service_key: String, local_port: u16, transport: &Transport) -> R
         .lock()
         .expect("sessions poisoned")
         .remove(&service_key);
-    if let Some((addr, _)) = crate::engine::serve::local_endpoints(&service_key) {
-        return establish(service_key, &addr);
-    }
-    // Materialise the local ws endpoint via pb-mapper (kind-agnostic subscribe).
-    let sub = runtime::subscribe_service(service_key.clone(), local_port, transport)?;
-    establish(service_key.clone(), &sub.local_addr).inspect_err(|_| {
-        runtime::unsubscribe_service(&service_key);
-    })
+    let origin = target.open(&service_key, service_key.clone(), local_port, false)?;
+    establish_owned(
+        service_key.clone(),
+        &origin.address,
+        Some(SessionOwner {
+            epoch: target.epoch(),
+            local: origin.local.clone(),
+        }),
+    )
+    .inspect_err(|_| origin.release())
 }
 
 /// Whether a live session already exists for `service_key`. The forwarder task
@@ -40,13 +44,21 @@ pub fn connect(service_key: String, local_port: u16, transport: &Transport) -> R
 fn reuse_live(service_key: &str) -> bool {
     let map = sessions().lock().expect("sessions poisoned");
     map.get(service_key)
-        .is_some_and(|s| !s.forwarder.is_finished() && s.client.is_alive())
+        .is_some_and(|s| s.is_current() && !s.forwarder.is_finished() && s.client.is_alive())
 }
 
 /// Open the JSON-RPC client over `ws://<local_addr>`, run the `initialize`
 /// handshake, wire the event forwarder, and record the session. Transport-
 /// agnostic: the local endpoint is materialised by the caller's subscribe.
 pub(super) fn establish(service_key: String, local_addr: &str) -> Result<()> {
+    establish_owned(service_key, local_addr, None)
+}
+
+fn establish_owned(
+    service_key: String,
+    local_addr: &str,
+    owner: Option<SessionOwner>,
+) -> Result<()> {
     let ws_url = format!("ws://{local_addr}");
     connect_stage::enter(&service_key, ConnectStage::Session);
 
@@ -169,19 +181,22 @@ pub(super) fn establish(service_key: String, local_addr: &str) -> Result<()> {
         }
     });
 
-    sessions()
-        .lock()
-        .expect("sessions poisoned")
-        .insert(service_key, Session {
-            client,
-            events: events_tx,
-            forwarder,
-            active_turns,
-            runtime_config,
-            pending_approvals,
-            transcript,
-            pagination,
-        });
+    let mut sessions = sessions().lock().expect("sessions poisoned");
+    if owner.as_ref().is_some_and(|owner| !owner.is_current()) {
+        forwarder.abort();
+        bail!("the host or connection changed while connecting; reconnect");
+    }
+    sessions.insert(service_key, Session {
+        owner,
+        client,
+        events: events_tx,
+        forwarder,
+        active_turns,
+        runtime_config,
+        pending_approvals,
+        transcript,
+        pagination,
+    });
     Ok(())
 }
 
@@ -218,7 +233,11 @@ const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 /// a far end that answered and refused the handshake needs a different remedy
 /// from one that is simply down, and the UI can only say so if the transport's
 /// own words survive this far.
-pub fn probe_reason(service_key: String, local_port: u16, transport: &Transport) -> Option<String> {
+pub(crate) fn probe_reason(
+    service_key: String,
+    local_port: u16,
+    target: &Target,
+) -> Option<String> {
     if is_connected(&service_key) {
         return None;
     }
@@ -226,17 +245,18 @@ pub fn probe_reason(service_key: String, local_port: u16, transport: &Transport)
     // so this probe can never reuse a real connection's tunnel nor abort it on
     // teardown — a `connect`/`appConnect` racing this probe for the same
     // service key keeps its own separate entry.
-    let (local_addr, handle) =
-        match runtime::subscribe_transient(service_key.clone(), local_port, transport) {
-            Ok(v) => v,
-            // The tunnel itself never came up: a relay problem, which is a
-            // different failure from "the tunnel opened and the far end said no".
-            Err(e) => return Some(format!("{e:#}")),
-        };
-    let reason = probe_endpoint_error(&local_addr);
-    // Tear down ONLY this probe's own transient tunnel.
-    handle.close();
-    reason
+    let origin = match target.open(&service_key, String::new(), local_port, true) {
+        Ok(origin) => origin,
+        Err(error) => return Some(format!("{error:#}")),
+    };
+    let reason = probe_endpoint_error(&origin.address);
+    let current = origin.is_current() && transport::is_current(target.epoch());
+    origin.close_probe();
+    if current {
+        reason
+    } else {
+        Some("the host or connection changed; reconnect".into())
+    }
 }
 
 /// Open a transient JSON-RPC client over `ws://<local_addr>` and run the
@@ -268,12 +288,12 @@ pub fn probe_endpoint_error(local_addr: &str) -> Option<String> {
 /// Reachability of a remote API proxy: a transient tunnel plus a minimal HTTP
 /// request. The HTTP counterpart of [`probe_reason`], as a bare bool because an
 /// API proxy has no handshake whose failure would need explaining.
-pub fn probe_api(service_key: String, transport: &Transport) -> bool {
-    let Ok((local_addr, handle)) = runtime::subscribe_transient(service_key, 0, transport) else {
-        return false;
-    };
-    let ok = probe_http_endpoint(&local_addr);
-    handle.close();
+pub(crate) fn probe_api(service_key: String, target: &Target) -> bool {
+    let Ok(origin) = target.open(&service_key, String::new(), 0, true) else { return false };
+    let ok = probe_http_endpoint(&origin.address)
+        && origin.is_current()
+        && transport::is_current(target.epoch());
+    origin.close_probe();
     ok
 }
 
@@ -315,8 +335,19 @@ pub fn is_connected(service_key: &str) -> bool {
         .lock()
         .expect("sessions poisoned")
         .get(service_key)
-        .map(|s| !s.forwarder.is_finished() && s.client.is_alive())
+        .map(|s| s.is_current() && !s.forwarder.is_finished() && s.client.is_alive())
         .unwrap_or(false)
+}
+
+/// Whether a session is still recorded for `service_key` in the current
+/// account or relay and with its host still serving, live or not: a dead
+/// socket is recovered by reconnecting, which keeps the session's tunnel.
+pub fn is_retained(service_key: &str) -> bool {
+    sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .get(service_key)
+        .is_some_and(|s| s.is_current())
 }
 
 /// Connect `service_key` to an app-server this process started itself on
@@ -342,4 +373,42 @@ fn disconnect_inner(service_key: &str) {
         .expect("sessions poisoned")
         .remove(service_key);
     runtime::unsubscribe_service(service_key);
+}
+
+/// Outstanding operations, unanswered server requests and running turns pin
+/// a session.
+fn busy(session: &Session) -> bool {
+    Arc::strong_count(&session.client) > 1
+        || session.client.has_pending_server_requests()
+        || !session
+            .active_turns
+            .lock()
+            .expect("active turns poisoned")
+            .is_empty()
+}
+
+/// Whether [`evict_idle`] would release `service_key` now, without
+/// releasing it.
+pub(crate) fn is_idle(service_key: &str) -> bool {
+    !sessions()
+        .lock()
+        .expect("sessions poisoned")
+        .get(service_key)
+        .is_some_and(busy)
+}
+
+/// Remove an idle connection under the same locks used to acquire its client.
+/// Outstanding operations retain a client reference and prevent eviction.
+pub(crate) fn evict_idle(service_key: &str) -> bool {
+    let lifecycle = lifecycle(service_key);
+    let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+    let mut map = sessions().lock().expect("sessions poisoned");
+    if map.get(service_key).is_some_and(busy) {
+        return false;
+    }
+    let removed = map.remove(service_key);
+    drop(map);
+    drop(removed);
+    runtime::unsubscribe_service(service_key);
+    true
 }

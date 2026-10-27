@@ -139,8 +139,13 @@ HostRestorePlan planHostRestore(
 /// from another device after the plan was made wins) and starts with what is
 /// saved for the name. Only a legacy record carries its runtime. A failed
 /// restore is left to the start-hosting fallback. Returns whether anything
-/// was restored (discovery is then stale).
-Future<bool> runHostRestore(BridgeApi api, HostRestorePlan plan) async {
+/// was restored (discovery is then stale). [onRestored] refreshes local views
+/// after each successful host, without waiting for the rest of the plan.
+Future<bool> runHostRestore(
+  BridgeApi api,
+  HostRestorePlan plan, {
+  void Function()? onRestored,
+}) async {
   var restored = false;
   Future<void> restore(
     String name, {
@@ -154,6 +159,7 @@ Future<bool> runHostRestore(BridgeApi api, HostRestorePlan plan) async {
         legacyRuntime: legacyRuntime,
       );
       restored = true;
+      onRestored?.call();
     } catch (_) {
       // Uninstalled, changed or stopped meanwhile: nothing is forced, and
       // the hero (with its start-hosting action) is the fallback.

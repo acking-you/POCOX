@@ -98,7 +98,8 @@ const LIMIT: usize = 512 * 1024;
 /// runs a POCOX without one. Call off the async workers (it may open a
 /// tunnel).
 pub fn fetch(host_key: &str) -> Result<Option<Catalog>> {
-    let url = meta::endpoint(host_key, &["services", "v1"])?;
+    // Held until the catalog arrives: it keeps the meta tunnel.
+    let (url, _lease) = meta::guarded_endpoint(host_key, &["services", "v1"])?;
     runtime::runtime().block_on(async move {
         let mut response = client()
             .get(url)

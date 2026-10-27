@@ -84,6 +84,13 @@ use super::host_services::{
 /// process-globally; several can run at once, keyed by service name. The three
 /// registrations can be dropped/re-added independently of the processes.
 struct LocalServe {
+    /// This process's route to the app-server child, suspended while only
+    /// the child restarts in place.
+    app_route: Option<super::local_services::Registration>,
+    /// Routes to the API proxy and meta service, which keep running across
+    /// such a restart and end with the host.
+    service_routes: Option<super::local_services::Registration>,
+    context: transport::Context,
     device: String,
     name: String,
     // codex app-server (remote control).
@@ -259,7 +266,6 @@ pub struct ServeStatus {
     pub provider: String,
     /// Provider version, when known (ACP agents report it).
     pub provider_version: Option<String>,
-
     /// Wire protocol: `codex-app-server` or `acp`.
     pub protocol: String,
     /// Human-readable provider / agent name.
@@ -287,6 +293,11 @@ pub struct ServeStatus {
     /// What holds the host right now (`starting`, `stopping`, `restarting`,
     /// `applying`), when anything does.
     pub busy: Option<String>,
+    /// The host still publishes under an account or relay other than the
+    /// current one, and only a restart moves it to the current one. False
+    /// while no account or relay is current, and from hosts that predate it.
+    #[serde(default)]
+    pub bound_elsewhere: bool,
 }
 
 fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
@@ -294,15 +305,6 @@ fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
     HOSTS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Lock the process-global host map, RECOVERING a poisoned lock instead of
-/// panicking. The guarded value is a plain registry of `JoinHandle`s +
-/// metadata with no cross-field invariant a panic could half-update, so a
-/// previous panic-while-holding leaves it perfectly usable. Without this,
-/// `.lock().expect(...)` would turn one unlucky panic into a cascade: every
-/// later serve/status/stop call would panic on the poisoned lock — under the
-/// release `panic = "unwind"` that just errors the call, but recovering keeps
-/// hosting fully operational. Prefer this over `.lock().expect(...)`
-/// everywhere.
 /// Loopback ports this process's Codex hosts listen on (the app-server, API
 /// proxy and meta service), read from their records without probing.
 pub(crate) fn listen_ports() -> Vec<u16> {
@@ -312,6 +314,9 @@ pub(crate) fn listen_ports() -> Vec<u16> {
         .collect()
 }
 
+/// Lock the process-global host map, recovering a poisoned lock: it guards a
+/// plain registry with no cross-field invariant a panic could half-update, so
+/// one panic never turns every later serve, status or stop call into another.
 fn hosts_locked() -> std::sync::MutexGuard<'static, HashMap<String, LocalServe>> {
     hosts().lock().unwrap_or_else(|poison| poison.into_inner())
 }
@@ -377,12 +382,19 @@ fn resolve_codex_binary(
 ///
 /// - same name, codex alive → re-register any dropped tunnels; `Some(report)`,
 ///   and the caller returns without spawning.
-/// - same name, codex dead  → retire the stale entry; `None`, spawn fresh.
+/// - same name, codex dead or not restarted, or published under an account or
+///   relay other than the current one → retire the entry; `None`, spawn fresh.
+///   A host stays bound to the context it started in.
 /// - requested port taken   → error.
 ///
 /// Runs before anything is spawned, so a re-host never leaves two codex
 /// processes fighting over one port.
 fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
+    // Unknown while the account or relay cannot be resolved (offline): a
+    // live host is then kept, as it always was.
+    let current = transport::resolve_owned_blocking()
+        .ok()
+        .map(|owned| transport::Context::of(&owned.transport));
     let mut guard = hosts_locked();
     // Another spelling of the same instance would publish the same relay
     // keys and share its saved configuration.
@@ -393,7 +405,11 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
         bail!("`{other}` is already hosting under the same name; choose another name");
     }
     if let Some(ls) = guard.get_mut(name) {
-        if listen_addr_open(&ls.app_local.to_string()) {
+        let rebind = ls.context.is_superseded_by(current.as_ref());
+        // A restart whose respawn failed leaves the route restarting:
+        // whatever holds the port then is not this host's codex.
+        let serving = ls.app_route.as_ref().is_none_or(|route| route.is_serving());
+        if !rebind && serving && listen_addr_open(&ls.app_local.to_string()) {
             let report = ServeReport {
                 device: ls.device.clone(),
                 name: ls.name.clone(),
@@ -413,9 +429,12 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
             republish_dropped(name)?;
             return Ok(Some(report));
         }
-        // codex dead → retire the stale entry and fall through to spawn.
+        // Retire the entry and fall through to spawn. It is stopped outside
+        // the lock: a live codex may take its whole exit wait.
         if let Some(stale) = guard.remove(name) {
+            drop(guard);
             stop_host_tasks(stale);
+            guard = hosts_locked();
         }
     }
     if port != 0 && guard.values().any(|ls| ls.app_local.port() == port) {
@@ -719,9 +738,17 @@ fn launch_codex(
         let (api_std, api_local) = bind_loopback("in-app API proxy")?;
         let (meta_std, meta_local) = bind_loopback("in-app meta service")?;
         let transport = transport::resolve_blocking()?;
-        Ok((api_std, api_local, meta_std, meta_local, transport))
+        let context = transport::Context::of(&transport);
+        let routes = (
+            super::local_services::Registration::new(&context, &[(app_key.clone(), app_local)])?,
+            super::local_services::Registration::new(&context, &[
+                (api_key.clone(), api_local),
+                (meta_key.clone(), meta_local),
+            ])?,
+        );
+        Ok((api_std, api_local, meta_std, meta_local, transport, routes))
     })();
-    let (api_std, api_local, meta_std, meta_local, transport) = match bringup_tail {
+    let (api_std, api_local, meta_std, meta_local, transport, routes) = match bringup_tail {
         Ok(tail) => tail,
         Err(e) => {
             watchdog.abort();
@@ -755,7 +782,11 @@ fn launch_codex(
         .ok()
         .flatten();
 
+    let (app_route, service_routes) = routes;
     let mut host = LocalServe {
+        app_route: Some(app_route),
+        service_routes: Some(service_routes),
+        context: transport::Context::of(&transport),
         device: device.clone(),
         name: name.clone(),
         app_key: app_key.clone(),
@@ -850,6 +881,8 @@ pub fn serve_status() -> Vec<ServeStatus> {
 
 /// The Codex rows of [`serve_status`], without its relay recovery.
 fn codex_status() -> Vec<ServeStatus> {
+    // Read before the hosts lock: the context's lock never nests inside it.
+    let current = transport::current_context();
     let guard = hosts_locked();
     // Hosts whose owned codex did not exit, whether or not their record is
     // still here: listed (and so stoppable again) until it exited.
@@ -883,6 +916,7 @@ fn codex_status() -> Vec<ServeStatus> {
             incarnation: Some(ls.incarnation.clone()),
             busy: host_lease::holder(&ls.name).map(|op| op.label().to_string()),
             agent_error: stuck(&ls.name).then(|| NOT_EXITED.to_string()),
+            bound_elsewhere: ls.context.is_superseded_by(current.as_ref()),
             ..ServeStatus::default()
         })
         .collect();
@@ -917,19 +951,6 @@ pub(super) fn is_hosting_codex(name: &str) -> bool {
             .is_empty()
 }
 
-/// Resolve this process's own session (app-server or ACP
-/// gateway) and meta listeners without relay probes.
-pub(super) fn local_endpoints(service_key: &str) -> Option<(String, String)> {
-    let codex = hosts_locked()
-        .values()
-        .find(|host| host.app_key == service_key)
-        .map(|host| (host.app_local.to_string(), host.meta_local.to_string()));
-    codex
-        .or_else(|| super::serve_acp::local_endpoints(service_key))
-        .or_else(|| super::serve_opencode::local_endpoints(service_key))
-}
-
-/// `true` if something is accepting TCP on a `host:port` listen address.
 pub(super) fn listen_addr_open(listen_addr: &str) -> bool {
     match listen_addr.rsplit_once(':') {
         Some((host, port)) => port

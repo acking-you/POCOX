@@ -46,6 +46,7 @@ struct Slot {
     revision: u64,
 }
 struct Serving {
+    local_routes: Option<super::local_services::Registration>,
     prepared: Prepared,
     host: Host,
     pid: u32,
@@ -364,6 +365,7 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     let watch =
         service.map(|service| rt.spawn(watch(name.clone(), host.info().identity.host_id, service)));
     let serving = Serving {
+        local_routes: None,
         key: ServiceId::new(&device, ServiceKind::OpenCode, &name).key(),
         meta_key: ServiceId::new(&device, ServiceKind::Meta, &name).key(),
         prepared,
@@ -390,18 +392,33 @@ pub(super) fn launch_prepared(prepared: Prepared) -> Result<Report> {
     };
     // From here a failed stop retains both the record and this name.
     reservation.commit();
-    let publish = if closing || !transport::is_current(owned.epoch) {
-        Err(anyhow!("the app is quitting or its account/relay changed during OpenCode startup"))
-    } else {
-        reregister(&name, "opencode").and_then(|()| reregister(&name, "meta"))
-    }
-    .and_then(|()| {
+    let publish = (|| {
+        ensure!(
+            !closing && transport::is_current(owned.epoch),
+            "the app is quitting or its account/relay changed during OpenCode startup"
+        );
+        // Native readiness, the initial catalog and both gateway tasks precede
+        // discovery. A bound socket alone is not a usable local service.
+        // Record the host first so a registration failure uses normal cleanup.
+        {
+            let mut registry = hosts();
+            let host = registry
+                .hosts
+                .get_mut(&name)
+                .ok_or_else(|| anyhow!("OpenCode stopped during startup"))?;
+            host.local_routes = Some(super::local_services::Registration::new(&host.context, &[
+                (host.key.clone(), local),
+                (host.meta_key.clone(), meta),
+            ])?);
+        }
+        reregister(&name, "opencode")?;
+        reregister(&name, "meta")?;
         ensure!(
             transport::is_current(owned.epoch) && !hosts().closing,
             "the app is quitting or its account/relay changed during OpenCode startup"
         );
         Ok(())
-    });
+    })();
     if let Err(error) = publish {
         stop(&name)
             .context("OpenCode startup cleanup did not confirm exit; stop this host again")?;
@@ -430,6 +447,7 @@ pub(super) fn retire(name: &str) -> Result<Option<Prepared>> {
         let mut registry = hosts();
         registry.hosts.get_mut(name).map(|host| {
             host.stopped = true;
+            drop(host.local_routes.take());
             host.host.clone()
         })
     }) else {
@@ -548,6 +566,8 @@ pub(crate) fn listen_ports() -> Vec<u16> {
 
 pub(super) fn status() -> Vec<ServeStatus> {
     registration::recover();
+    // Read before the hosts lock: the context's lock never nests inside it.
+    let current = transport::current_context();
     hosts()
         .hosts
         .values()
@@ -579,6 +599,7 @@ pub(super) fn status() -> Vec<ServeStatus> {
                 background_server: host.background_server,
                 ..host.status.clone()
             }),
+            bound_elsewhere: host.context.is_superseded_by(current.as_ref()),
             ..ServeStatus::default()
         })
         .collect()
@@ -643,26 +664,6 @@ fn reattach(name: &str, incarnation: &str) -> Result<()> {
         Some(prepared) => launch_prepared(prepared).map(drop),
         None => Ok(()),
     }
-}
-
-pub(super) fn local_gateway(logical: &str, context: &transport::Context) -> Option<String> {
-    hosts()
-        .hosts
-        .values()
-        .find(|host| host.key == logical && &host.context == context && !host.stopped)
-        .map(|host| host.local.to_string())
-}
-pub(super) fn local_endpoints(service: &str) -> Option<(String, String)> {
-    let context = transport::current_context()?;
-    if !context.admits(service) {
-        return None;
-    }
-    let logical = super::session_engine::logical_key(service)?;
-    hosts()
-        .hosts
-        .values()
-        .find(|host| host.key == logical && host.context == context && !host.stopped)
-        .map(|host| (host.local.to_string(), host.meta.to_string()))
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use pocox_host_svc::acp::fold::{ItemKind, Turn};
-use pocox_host_svc::acp::{Identity, SteerOutcome};
+use pocox_host_svc::acp::{ClientError, Identity, SteerOutcome};
 use serde::Deserialize as _;
 use serde_json::Value;
 
@@ -14,6 +14,7 @@ use super::{block, conn, lock, translate, Link, Shared};
 use crate::engine::app_session::{
     OlderPage, ThreadHistory, ThreadItem, ThreadMeta, TurnItemsPage, TurnSummary,
 };
+use crate::engine::runtime;
 use crate::engine::session_engine::Supplement;
 
 /// Turns in the newest window and in each older page.
@@ -377,11 +378,52 @@ pub fn turn_start(
 ) -> Result<()> {
     let link = conn(service_key)?;
     let identity = link.identity();
-    block(
-        link.client
-            .prompt(thread_id, text, images, client_id, Some(&identity)),
-    )
-    .map(|_| ())
+    // The HTTP acknowledgement can precede the SSE start event. An empty
+    // marker protects an uncertain submission until the host resolves it.
+    link.commit(&identity, |view| {
+        view.running.entry(thread_id.into()).or_default();
+    })
+    .ok_or_else(superseded)?;
+    let result = runtime::runtime().block_on(link.client.prompt(
+        thread_id,
+        text,
+        images,
+        client_id,
+        Some(&identity),
+    ));
+    let recorded = link.commit(&identity, |view| {
+        if view.running.get(thread_id).is_some_and(String::is_empty) {
+            match &result {
+                Ok(turn) => {
+                    view.running.insert(thread_id.into(), turn.clone());
+                },
+                // Not admitted, or not known to be: no marker outlives the
+                // request. A start event that still comes records the turn.
+                Err(_) => {
+                    view.running.remove(thread_id);
+                },
+            }
+        }
+    });
+    match (recorded, result) {
+        (Some(()), result) => result.map(|_| ()).map_err(Into::into),
+        // Refused: nothing started, whatever this controller shows now.
+        (
+            None,
+            Err(
+                error @ ClientError::Host {
+                    ..
+                },
+            ),
+        ) => Err(error.into()),
+        // Another connection replaced this one while the prompt was in
+        // flight. The host may run it, so sending it again could start it
+        // twice.
+        (None, _) => Err(uncertain(
+            "the agent host connection changed while the prompt was sent, so it may or may not be \
+             running",
+        )),
+    }
 }
 
 /// Add input to `turn_id` (the caller's turn; else the turn this controller
@@ -414,7 +456,7 @@ pub(super) fn supplement(
         let turn = turn_id
             .filter(|turn| !turn.trim().is_empty())
             .map(str::to_string)
-            .or_else(|| view.running.get(thread_id).cloned());
+            .or_else(|| known_turn(&view, thread_id));
         (turn, view.identity())
     };
     let (outcome, accepted) = block(link.client.steer(
@@ -449,7 +491,17 @@ pub(super) fn supplement(
     }
 }
 
-/// An answer that does not establish what happened to a supplement.
+/// The turn this controller sees running in `thread_id`. A prompt whose
+/// start event has not arrived yet holds an empty marker, which names no
+/// turn: the host then addresses its active one.
+fn known_turn(view: &Shared, thread_id: &str) -> Option<String> {
+    view.running
+        .get(thread_id)
+        .filter(|turn| !turn.is_empty())
+        .cloned()
+}
+
+/// An answer that does not establish what happened to a request.
 fn uncertain(why: &str) -> anyhow::Error {
     anyhow!("{why}; check the conversation before sending it again")
 }
@@ -464,7 +516,7 @@ pub fn turn_interrupt(service_key: &str, thread_id: &str, turn_id: Option<String
         let view = lock(&link.shared);
         let turn = turn_id
             .filter(|turn| !turn.trim().is_empty())
-            .or_else(|| view.running.get(thread_id).cloned());
+            .or_else(|| known_turn(&view, thread_id));
         (turn, view.identity())
     };
     block(

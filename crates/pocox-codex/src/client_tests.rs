@@ -88,6 +88,61 @@ async fn connection() -> (AppClient, mpsc::UnboundedReceiver<Inbound>, WebSocket
 }
 
 #[tokio::test]
+async fn pending_requests_survive_view_detach_and_only_explicit_answers_respond() {
+    let (client, mut inbound, mut server) = connection().await;
+    for (id, method) in
+        [(7, "item/commandExecution/requestApproval"), (8, "item/tool/requestUserInput")]
+    {
+        server
+            .send(WsMessage::text(
+                json!({"id":id,"method":method,"params":{"threadId":"thread"}}).to_string(),
+            ))
+            .await
+            .expect("pending request exchange");
+        inbound.recv().await.expect("pending request exchange");
+    }
+    assert!(client.has_pending_server_requests());
+    assert_eq!(
+        client.pending_server_requests().len(),
+        2,
+        "reopening a view can reconstruct both prompts"
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(20), server.next())
+            .await
+            .is_err(),
+        "retention must never answer a request"
+    );
+    client
+        .respond("7", json!({"decision":"decline"}))
+        .await
+        .expect("pending request exchange");
+    let response: Value = serde_json::from_str(
+        &server
+            .next()
+            .await
+            .expect("pending request exchange")
+            .expect("pending request exchange")
+            .into_text()
+            .expect("pending request exchange"),
+    )
+    .expect("pending request exchange");
+    assert_eq!(response["id"], 7, "preserve numeric JSON-RPC identity");
+    assert_eq!(client.pending_server_requests().len(), 1);
+    server
+        .send(WsMessage::text(
+            json!({"method":"serverRequest/resolved","params":{"requestId":8}}).to_string(),
+        ))
+        .await
+        .expect("pending request exchange");
+    inbound.recv().await.expect("pending request exchange");
+    assert!(
+        !client.has_pending_server_requests(),
+        "resolved prompts cannot return with an old view"
+    );
+}
+
+#[tokio::test]
 async fn peer_close_marks_dead_and_rejects_future_requests() {
     let (client, mut inbound, mut server) = connection().await;
     server.close(None).await.expect("test operation");

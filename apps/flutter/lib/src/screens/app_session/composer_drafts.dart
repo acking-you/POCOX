@@ -1,5 +1,11 @@
 part of '../app_session_screen.dart';
 
+/// Last thread or project draft viewed on this service during the app session.
+({String? threadId, String? cwd})? appSessionLastLocation(
+  WidgetRef ref,
+  String service,
+) => ref.read(_composerDraftsProvider(service)).location;
+
 // Drafts live for this ProviderScope, including navigation away from the screen.
 // Hosts have separate stores; new conversations are also scoped by project.
 final _composerDraftsProvider =
@@ -90,6 +96,7 @@ void addToConversationDraft(
 class _ComposerDrafts extends ChangeNotifier {
   _ComposerDrafts(this.api);
   final BridgeApi api;
+  ({String? threadId, String? cwd})? location;
   final Map<(String?, String?), _ComposerDraft> _drafts = {};
   final Set<(String?, String?)> _badges = {};
   int nextAttachmentId = 0;

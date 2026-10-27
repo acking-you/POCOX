@@ -53,7 +53,8 @@ pub(crate) fn request<T: DeserializeOwned, B: Serialize + ?Sized>(
     body: Option<&B>,
 ) -> Result<T> {
     let epoch = transport::epoch();
-    let url = meta::endpoint(key, segments)?;
+    // Held until the request completes: it keeps the meta tunnel.
+    let (url, _lease) = meta::guarded_endpoint(key, segments)?;
     if !transport::is_current(epoch) {
         bail!("connection changed; refresh the host");
     }

@@ -1,5 +1,80 @@
 #[test]
+fn a_same_port_restart_cannot_authorize_an_old_meta_request() {
+    use pocox_pb::{RelaySession, Transport};
+
+    use crate::engine::{local_services, transport};
+
+    let _serial = transport::test_serial();
+    crate::engine::runtime::init(std::env::temp_dir()).expect("runtime");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:1"),
+        namespace: None,
+    });
+    transport::test_context(context.clone());
+    let service = "pcx:meta-lifetime:app:test";
+    let address = "127.0.0.1:10103".parse().expect("loopback");
+    let mut host = local_services::Registration::new(&context, &[
+        (service.into(), address),
+        ("pcx:meta-lifetime:meta:test".into(), address),
+    ])
+    .expect("host");
+    let (url, original) = super::guarded_endpoint(service, &["projects"]).expect("original");
+    original().expect("active");
+    host.suspend();
+    host.resume();
+    let (new_url, replacement) = super::guarded_endpoint(service, &["projects"]).expect("new");
+    assert_eq!(url, new_url, "the address alone does not identify a host lifetime");
+    assert!(original().is_err(), "old GET/PUT retries must stop even on the same port");
+    replacement().expect("a new request is admitted");
+    drop(host);
+    transport::context_changed();
+}
+
+#[test]
+fn a_codex_child_restart_keeps_its_meta_service_reachable() {
+    use pocox_pb::{RelaySession, Transport};
+
+    use crate::engine::{local_services, transport};
+
+    let _serial = transport::test_serial();
+    crate::engine::runtime::init(std::env::temp_dir()).expect("runtime");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:1"),
+        namespace: None,
+    });
+    transport::test_context(context.clone());
+    let service = "pcx:meta-restart:app:test";
+    // As a Codex host registers them: the app-server child apart from the
+    // meta service, which outlives the child's restarts.
+    let mut app = local_services::Registration::new(&context, &[(
+        service.into(),
+        "127.0.0.1:10104".parse().expect("loopback"),
+    )])
+    .expect("app-server");
+    let meta = local_services::Registration::new(&context, &[(
+        "pcx:meta-restart:meta:test".into(),
+        "127.0.0.1:10105".parse().expect("loopback"),
+    )])
+    .expect("meta service");
+    let (_, before) = super::guarded_endpoint(service, &["projects"]).expect("serving");
+    app.suspend();
+    let (_, during) = super::guarded_endpoint(service, &["projects"]).expect("restarting");
+    during().expect("a request while the child restarts is admitted");
+    app.resume();
+    before().expect("a follow from before the restart continues");
+    drop(app);
+    assert!(
+        super::guarded_endpoint(service, &["projects"]).is_err(),
+        "a stopped app-server never reaches its surviving meta service"
+    );
+    drop(meta);
+    transport::context_changed();
+}
+
+#[test]
 fn pending_upload_context_changes_with_credentials_but_not_ui_settings() {
+    // The context includes the transport epoch, which other tests move.
+    let _serial = crate::engine::transport::test_serial();
     let dir = tempfile::tempdir().expect("support");
     let initial = super::upload_context_at(dir.path()).expect("context");
     crate::engine::config::update_config(dir.path(), |cfg| {
@@ -25,6 +100,67 @@ fn pending_upload_context_changes_with_credentials_but_not_ui_settings() {
 }
 
 use super::*;
+
+#[test]
+fn file_writes_keep_their_owner_and_reject_a_retired_hosts_answer() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use axum::routing::post;
+    use axum::{Json, Router};
+    use pocox_pb::{RelaySession, Transport};
+
+    use crate::engine::local_services::Registration;
+
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("runtime");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:1"),
+        namespace: None,
+    });
+    transport::test_context(context.clone());
+    let listener = runtime::runtime()
+        .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+        .expect("listen");
+    let address = listener.local_addr().expect("address");
+    let service = "pcx:file-write:app:test";
+    let host = Arc::new(
+        Registration::new(&context, &[
+            (service.into(), address),
+            ("pcx:file-write:meta:test".into(), address),
+        ])
+        .expect("host"),
+    );
+    let requests = Arc::new(AtomicUsize::new(0));
+    let received = requests.clone();
+    let router = Router::new().fallback_service(post(move |body: axum::body::Bytes| {
+        let host = host.clone();
+        let received = received.clone();
+        async move {
+            assert_eq!(body.as_ref(), b"attachment", "the original body reaches the host once");
+            if received.fetch_add(1, Ordering::SeqCst) == 1 {
+                host.suspend();
+            }
+            Json(serde_json::json!({"path":"/project/file"}))
+        }
+    }));
+    let server = runtime::runtime().spawn(async move {
+        axum::serve(listener, router).await.expect("serve");
+    });
+    assert_eq!(
+        upload_file(service, "file", b"attachment".to_vec())
+            .expect("upload")
+            .path,
+        "/project/file"
+    );
+    assert!(
+        write_file(service, "/project", "file", b"attachment".to_vec()).is_err(),
+        "a retired host cannot grant an attachment to the new view"
+    );
+    assert_eq!(requests.load(Ordering::SeqCst), 2, "writes are never retried automatically");
+    server.abort();
+    transport::context_changed();
+}
 
 async fn file_server(responses: Vec<String>) -> (Url, tokio::task::JoinHandle<Vec<String>>) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -279,11 +415,15 @@ async fn idempotent_request_survives_a_dropped_connection() {
     });
 
     let url: Url = format!("http://{addr}/sessions").parse().expect("url");
-    let (status, _body) = retry_idempotent(url.clone(), || async {
-        let resp = client().get(url.clone()).send().await?;
-        let status = resp.status();
-        Ok((status, resp.bytes().await?))
-    })
+    let (status, _body) = retry_idempotent(
+        url.clone(),
+        || Ok(()),
+        || async {
+            let resp = client().get(url.clone()).send().await?;
+            let status = resp.status();
+            Ok((status, resp.bytes().await?))
+        },
+    )
     .await
     .expect("the retry should recover the dropped first attempt");
     assert!(status.is_success());
@@ -333,7 +473,7 @@ async fn a_truncated_body_is_retried_like_a_dropped_send() {
         ok: bool,
     }
     let url: Url = format!("http://{addr}/sessions").parse().expect("url");
-    let out: Body = get_json(url)
+    let out: Body = get_json(url, || Ok(()))
         .await
         .expect("the truncated body must be retried");
     assert!(out.ok);
@@ -360,7 +500,7 @@ async fn retry_progress_names_the_upcoming_attempt() {
 
     let mut rx = subscribe_retries();
     let url: Url = format!("http://{addr}/sessions").parse().expect("url");
-    let out: Result<serde_json::Value> = get_json(url).await;
+    let out: Result<serde_json::Value> = get_json(url, || Ok(())).await;
     assert!(out.is_err());
 
     let first = rx.try_recv().expect("a first retry tick");

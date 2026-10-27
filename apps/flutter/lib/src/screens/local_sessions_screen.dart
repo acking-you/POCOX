@@ -785,7 +785,10 @@ class _SessionRow extends StatelessWidget {
 /// Codex only (`app`): these are Codex rollouts, which ACP agents cannot resume.
 String? connectedAppKey(WidgetRef ref) {
   final bridge = ref.read(bridgeApiProvider);
-  final services = ref.read(servicesProvider).valueOrNull ?? const [];
+  final services = [
+    ...bridge.localServices(),
+    ...?ref.read(discoveredServicesProvider),
+  ];
   for (final s in services) {
     if (s.kind == 'app' && bridge.appIsConnected(s.key)) return s.key;
   }
@@ -794,28 +797,23 @@ String? connectedAppKey(WidgetRef ref) {
 
 /// Resolve a *live* app-server to resume into, connecting one if necessary.
 ///
-/// Prefers a service that is already connected; otherwise connects the first
-/// reachable app-server. Crucially it first awaits `servicesProvider` — a bare
-/// `connectedAppKey` reads `valueOrNull` and sees `[]` while relay discovery is
-/// still in flight, which is why a plain resume used to report "no app-server"
-/// while a force takeover (which awaits liveness first, giving discovery time)
-/// happened to work. Returns null only when no app-server can be reached.
+/// Prefers an existing connection, then this process's owned app-servers.
+/// Remote discovery is needed only when no local host is available.
 Future<String?> ensureResumeTarget(WidgetRef ref) async {
-  // Let discovery resolve so the sync `connectedAppKey` below can see services.
-  try {
-    await ref.read(servicesProvider.future);
-  } catch (_) {
-    // Discovery failed — fall through; there may still be a live connection.
-  }
   final already = connectedAppKey(ref);
   if (already != null) return already;
-
-  // No live connection (e.g. the backend was restarted and the old socket
-  // died): connect the first reachable app-server. `appConnect` reuses or
-  // reconnects and is bounded by the connect timeout, so a dead one fails
-  // rather than hanging.
   final bridge = ref.read(bridgeApiProvider);
-  final services = ref.read(servicesProvider).valueOrNull ?? const [];
+  var services = bridge.localServices().where((s) => s.kind == 'app').toList();
+  if (services.isEmpty) {
+    try {
+      services = await ref.read(servicesProvider.future);
+    } catch (_) {
+      services = ref.read(discoveredServicesProvider) ?? const [];
+    }
+    final connected = connectedAppKey(ref);
+    if (connected != null) return connected;
+  }
+  // The chosen transport does its own protocol handshake and bounded recovery.
   for (final s in services.where((s) => s.kind == 'app')) {
     try {
       await bridge.appConnect(s.key, appLocalPort);

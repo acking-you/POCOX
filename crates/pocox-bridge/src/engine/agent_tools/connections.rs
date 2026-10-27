@@ -312,6 +312,7 @@ fn link_of(status: Option<&runtime::SubStatus>, restore: &Restore) -> Option<Lin
     Some(LinkView {
         policy: if path.path == TunnelPath::RelayOnly { "relay_only" } else { "p2p_first" }.into(),
         path: match path.path {
+            TunnelPath::Local => "local",
             TunnelPath::RelayOnly | TunnelPath::Relay => "relay",
             TunnelPath::Idle => "idle",
             TunnelPath::Direct => "direct",

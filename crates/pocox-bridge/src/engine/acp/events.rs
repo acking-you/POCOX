@@ -6,18 +6,12 @@ use super::*;
 
 /// What the event task needs to notice a replaced local host.
 pub(super) struct Watch {
-    pub(super) logical: String,
-    pub(super) context: Context,
-    pub(super) local: Option<String>,
+    pub(super) local: Option<super::super::local_services::Endpoint>,
 }
 
 impl Watch {
-    /// Whether a local host was stopped or replaced (another port).
     fn replaced(&self) -> bool {
-        self.local.as_ref().is_some_and(|local| {
-            crate::engine::serve_acp::local_gateway(&self.logical, &self.context).as_ref()
-                != Some(local)
-        })
+        self.local.as_ref().is_some_and(|local| !local.is_current())
     }
 }
 
