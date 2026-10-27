@@ -581,7 +581,7 @@
   "stopHosting": "Stop hosting",
   "localHostStopFailed": "Did not stop: stop again",
   "localHostRestartNeeded": "Restart needed",
-  "localHostBoundElsewhere": "Started under another account or relay. Restart to use it here.",
+  "localHostBoundElsewhere": "Started under another account or relay.",
   "localHostRestart": "Restart",
   "localHostPort": "Port",
   "localHostName": "Instance name",

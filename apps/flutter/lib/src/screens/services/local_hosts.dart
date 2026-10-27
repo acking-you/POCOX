@@ -211,8 +211,11 @@ class _BoundElsewhereLine extends StatefulWidget {
 class _BoundElsewhereLineState extends State<_BoundElsewhereLine> {
   bool _restarting = false;
 
-  /// Restart exactly the incarnation shown, after the user agreed to the
-  /// interruption; a replaced host is refused, never retargeted.
+  /// Restart exactly what the card shows, after the user agreed to the
+  /// interruption: this incarnation with the saved configuration it runs,
+  /// under the current account or relay. Saved changes not active yet are
+  /// the editor's to apply, where Apply and restart shows them; a replaced
+  /// host or a save made meanwhile is refused, never applied unseen.
   Future<void> _restart() async {
     final host = widget.host;
     final l10n = AppLocalizations.of(context);
@@ -220,6 +223,20 @@ class _BoundElsewhereLineState extends State<_BoundElsewhereLine> {
     // Captured now: this line leaves with the card's old state as soon as
     // the host list reports the restarted host.
     final container = ProviderScope.containerOf(context);
+    final running = host.configRevision;
+    final int saved;
+    try {
+      saved = (await container.read(bridgeApiProvider).hostConfigGet(host.name))
+          .revision;
+    } catch (e) {
+      toast.error(friendlyError(e));
+      return;
+    }
+    if (!mounted) return;
+    if (running == null || saved != running) {
+      await showHostingEditor(context, existing: host);
+      return;
+    }
     final agreed = await confirmEditorAction(
       context,
       title: l10n.hostApplyConfirmTitle(host.name),
@@ -232,7 +249,11 @@ class _BoundElsewhereLineState extends State<_BoundElsewhereLine> {
     try {
       final result = await container
           .read(bridgeApiProvider)
-          .appServeApply(host.name, expectedIncarnation: host.incarnation);
+          .appServeApply(
+            host.name,
+            expectedIncarnation: host.incarnation,
+            expectedRevision: running,
+          );
       if (hostApplyProblem(l10n, result) case final problem?) {
         toast.error(problem);
       }

@@ -71,9 +71,10 @@ breaking change goes.
 - **A host left on an earlier account or relay says so.** After you sign in
   to another account or change relay, a host started before shows **Restart
   needed** instead of **Not responding**, with the reason and a **Restart**
-  button on its card; its editor's **Apply and restart** works without a
-  change. Hosts are never restarted for you, so devices still on the earlier
-  account keep them until you do.
+  button on its card that restarts the configuration it runs (saved changes
+  not active yet open the editor for review instead); its editor's **Apply
+  and restart** works without a change. Hosts are never restarted for you, so
+  devices still on the earlier account keep them until you do.
 
 ## 0.7.7 — 2026-10-25 — Portable Windows copies update themselves
 

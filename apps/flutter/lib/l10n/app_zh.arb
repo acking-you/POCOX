@@ -515,7 +515,7 @@
   "stopHosting": "停止托管",
   "localHostStopFailed": "未能停止：请再次停止",
   "localHostRestartNeeded": "需要重启",
-  "localHostBoundElsewhere": "在其他账号或中继下启动。重启后才能在这里使用。",
+  "localHostBoundElsewhere": "在其他账号或中继下启动。",
   "localHostRestart": "重启",
   "localHostPort": "端口",
   "localHostName": "实例名",

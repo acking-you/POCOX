@@ -2801,7 +2801,7 @@ abstract class AppLocalizations {
   /// No description provided for @localHostBoundElsewhere.
   ///
   /// In en, this message translates to:
-  /// **'Started under another account or relay. Restart to use it here.'**
+  /// **'Started under another account or relay.'**
   String get localHostBoundElsewhere;
 
   /// No description provided for @localHostRestart.

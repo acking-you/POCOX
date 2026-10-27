@@ -1546,7 +1546,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get localHostBoundElsewhere =>
-      'Started under another account or relay. Restart to use it here.';
+      'Started under another account or relay.';
 
   @override
   String get localHostRestart => 'Restart';
