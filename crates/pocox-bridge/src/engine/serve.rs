@@ -266,7 +266,6 @@ pub struct ServeStatus {
     pub provider: String,
     /// Provider version, when known (ACP agents report it).
     pub provider_version: Option<String>,
-
     /// Wire protocol: `codex-app-server` or `acp`.
     pub protocol: String,
     /// Human-readable provider / agent name.
@@ -294,6 +293,11 @@ pub struct ServeStatus {
     /// What holds the host right now (`starting`, `stopping`, `restarting`,
     /// `applying`), when anything does.
     pub busy: Option<String>,
+    /// The host still publishes under an account or relay other than the
+    /// current one, and only a restart moves it to the current one. False
+    /// while no account or relay is current, and from hosts that predate it.
+    #[serde(default)]
+    pub bound_elsewhere: bool,
 }
 
 fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
@@ -301,15 +305,6 @@ fn hosts() -> &'static Mutex<HashMap<String, LocalServe>> {
     HOSTS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-/// Lock the process-global host map, RECOVERING a poisoned lock instead of
-/// panicking. The guarded value is a plain registry of `JoinHandle`s +
-/// metadata with no cross-field invariant a panic could half-update, so a
-/// previous panic-while-holding leaves it perfectly usable. Without this,
-/// `.lock().expect(...)` would turn one unlucky panic into a cascade: every
-/// later serve/status/stop call would panic on the poisoned lock — under the
-/// release `panic = "unwind"` that just errors the call, but recovering keeps
-/// hosting fully operational. Prefer this over `.lock().expect(...)`
-/// everywhere.
 /// Loopback ports this process's Codex hosts listen on (the app-server, API
 /// proxy and meta service), read from their records without probing.
 pub(crate) fn listen_ports() -> Vec<u16> {
@@ -319,6 +314,9 @@ pub(crate) fn listen_ports() -> Vec<u16> {
         .collect()
 }
 
+/// Lock the process-global host map, recovering a poisoned lock: it guards a
+/// plain registry with no cross-field invariant a panic could half-update, so
+/// one panic never turns every later serve, status or stop call into another.
 fn hosts_locked() -> std::sync::MutexGuard<'static, HashMap<String, LocalServe>> {
     hosts().lock().unwrap_or_else(|poison| poison.into_inner())
 }
@@ -407,9 +405,7 @@ fn reuse_or_retire_host(name: &str, port: u16) -> Result<Option<ServeReport>> {
         bail!("`{other}` is already hosting under the same name; choose another name");
     }
     if let Some(ls) = guard.get_mut(name) {
-        let rebind = current
-            .as_ref()
-            .is_some_and(|current| *current != ls.context);
+        let rebind = ls.context.is_superseded_by(current.as_ref());
         // A restart whose respawn failed leaves the route restarting:
         // whatever holds the port then is not this host's codex.
         let serving = ls.app_route.as_ref().is_none_or(|route| route.is_serving());
@@ -885,6 +881,8 @@ pub fn serve_status() -> Vec<ServeStatus> {
 
 /// The Codex rows of [`serve_status`], without its relay recovery.
 fn codex_status() -> Vec<ServeStatus> {
+    // Read before the hosts lock: the context's lock never nests inside it.
+    let current = transport::current_context();
     let guard = hosts_locked();
     // Hosts whose owned codex did not exit, whether or not their record is
     // still here: listed (and so stoppable again) until it exited.
@@ -918,6 +916,7 @@ fn codex_status() -> Vec<ServeStatus> {
             incarnation: Some(ls.incarnation.clone()),
             busy: host_lease::holder(&ls.name).map(|op| op.label().to_string()),
             agent_error: stuck(&ls.name).then(|| NOT_EXITED.to_string()),
+            bound_elsewhere: ls.context.is_superseded_by(current.as_ref()),
             ..ServeStatus::default()
         })
         .collect();

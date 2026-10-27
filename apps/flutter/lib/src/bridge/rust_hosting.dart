@@ -411,4 +411,5 @@ AppServeStatus _serveStatus(frb.AppServeStatusDto s) => AppServeStatus(
   configRevision: s.configRevision?.toInt(),
   incarnation: s.incarnation,
   busy: s.busy,
+  boundElsewhere: s.boundElsewhere,
 );

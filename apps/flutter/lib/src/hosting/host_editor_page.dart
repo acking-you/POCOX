@@ -182,6 +182,10 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
     final dirty = editorDirty;
     final ready = load == EditorLoad.ready;
     final gone = hostGone(live);
+    // A restart is the fix for a host still on another account or relay,
+    // with or without a configuration change.
+    final restartable =
+        configPending || dirty || (live?.boundElsewhere ?? false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
@@ -221,7 +225,7 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
                   scheme.primary,
                   scheme.onPrimary,
                 ),
-                onPressed: busy || !ready || gone || !(configPending || dirty)
+                onPressed: busy || !ready || gone || !restartable
                     ? null
                     : applyConfig,
                 child: BusyLabel(
@@ -286,6 +290,12 @@ class _HostingEditorState extends ConsumerState<HostingEditor>
             onPressed: busy ? null : loadConfig,
             child: Text(l10n.hostConfigReload),
           ),
+        )
+      else if (live?.boundElsewhere ?? false)
+        EditorNote(
+          l10n.localHostBoundElsewhere,
+          key: const Key('host-bound-elsewhere'),
+          color: cautionColor(scheme),
         ),
       if (newerConfig case final newer?)
         EditorNote(

@@ -287,6 +287,35 @@ fn a_changed_context_restarts_codex_instead_of_republishing() {
     assert!(super::super::local_services::lookup(&context, &key).is_err(), "with its local route");
 }
 
+/// A host keeps publishing under the account or relay it started in. Its row
+/// says so once another one is current, and never while none is (offline,
+/// or right after a sign-in until the next resolution).
+#[test]
+fn a_host_reports_when_it_is_bound_to_another_account_or_relay() {
+    let _serial = transport::test_serial();
+    let name = "bound-elsewhere";
+    let host = fake_host(name, "inc-1", true);
+    let own = host.context.clone();
+    hosts_locked().insert(name.into(), host);
+    let bound_elsewhere = || {
+        codex_status()
+            .into_iter()
+            .find(|row| row.name == name)
+            .expect("listed")
+            .bound_elsewhere
+    };
+    transport::test_context(own);
+    assert!(!bound_elsewhere(), "the context it started in is current");
+    transport::test_context(transport::Context::of(&transport::Transport {
+        session: pocox_pb::RelaySession::for_test("other-relay.test:1"),
+        namespace: None,
+    }));
+    assert!(bound_elsewhere(), "another relay is current");
+    transport::context_changed();
+    assert!(!bound_elsewhere(), "unknown until the next resolution");
+    stop_host_tasks(hosts_locked().remove(name).expect("recorded"));
+}
+
 #[test]
 fn a_host_committed_after_the_quit_began_is_torn_down_not_recorded() {
     use std::sync::atomic::AtomicBool;

@@ -1542,6 +1542,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get localHostStopFailed => 'Did not stop: stop again';
 
   @override
+  String get localHostRestartNeeded => 'Restart needed';
+
+  @override
+  String get localHostBoundElsewhere =>
+      'Started under another account or relay.';
+
+  @override
+  String get localHostRestart => 'Restart';
+
+  @override
   String get localHostPort => 'Port';
 
   @override

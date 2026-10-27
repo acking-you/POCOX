@@ -608,6 +608,12 @@ class AppServeStatusDto {
   /// `restarting` or `applying`; `None` when idle.
   final String? busy;
 
+  /// The host still publishes under an account or relay other than the
+  /// current one: this device reaches it only after a restart
+  /// ([`super::host_config::app_serve_apply`]). False while no account or
+  /// relay is current; never restarted automatically.
+  final bool boundElsewhere;
+
   const AppServeStatusDto({
     required this.name,
     required this.device,
@@ -638,6 +644,7 @@ class AppServeStatusDto {
     this.configRevision,
     this.incarnation,
     this.busy,
+    required this.boundElsewhere,
   });
 
   @override
@@ -670,7 +677,8 @@ class AppServeStatusDto {
       configSource.hashCode ^
       configRevision.hashCode ^
       incarnation.hashCode ^
-      busy.hashCode;
+      busy.hashCode ^
+      boundElsewhere.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -705,7 +713,8 @@ class AppServeStatusDto {
           configSource == other.configSource &&
           configRevision == other.configRevision &&
           incarnation == other.incarnation &&
-          busy == other.busy;
+          busy == other.busy &&
+          boundElsewhere == other.boundElsewhere;
 }
 
 /// Installed external OpenCode; detection never starts or resumes a session.
