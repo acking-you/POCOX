@@ -86,6 +86,29 @@ class HarnessSkip {
   final String reason;
 }
 
+/// Measurements for the current download, when the installer reports them.
+class HarnessDownload {
+  /// Creates installer-reported measurements; absent values are unknown.
+  const HarnessDownload({
+    this.downloadedBytes,
+    this.totalBytes,
+    this.bytesPerSecond,
+    this.percent,
+  });
+
+  /// Bytes received for the current file.
+  final int? downloadedBytes;
+
+  /// Size of the current file, when known.
+  final int? totalBytes;
+
+  /// Current download speed reported by the installer.
+  final int? bytesPerSecond;
+
+  /// Download percentage, not overall installation progress.
+  final int? percent;
+}
+
 /// The running or most recent update on a device.
 class HarnessJob {
   /// Creates an update.
@@ -94,6 +117,8 @@ class HarnessJob {
     required this.kind,
     required this.state,
     this.stage,
+    this.download,
+    this.elapsedMs,
     this.automatic = false,
     this.fromVersion,
     this.toVersion,
@@ -113,8 +138,15 @@ class HarnessJob {
   /// `running`, `done` or `failed`.
   final String state;
 
-  /// `stopping`, `updating` or `restarting` while running.
+  /// `stopping`, `updating`, `downloading`, `installing`, `verifying` or
+  /// `restarting` while running.
   final String? stage;
+
+  /// Measurements reported by the installer; silent installers omit them.
+  final HarnessDownload? download;
+
+  /// Elapsed milliseconds measured on the host, absent on older hosts.
+  final int? elapsedMs;
 
   /// Started by the device's automatic update.
   final bool automatic;

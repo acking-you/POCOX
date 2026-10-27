@@ -101,7 +101,47 @@ pub(super) struct Installed {
     pub(super) source: Source,
 }
 
+/// What the executable confirmed after an installer finished.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Change {
+    /// A newer version is runnable (or a successful install made it readable).
+    Updated,
+    /// The installer succeeded and the executable still reports the old
+    /// version.
+    Unchanged,
+}
+
 impl Installed {
+    /// Probe the same launch path again, following its current symlink. Do
+    /// not fall back to another installation when the installer removed it.
+    pub(super) fn recheck(&self) -> Option<Self> {
+        self.path.exists().then(|| Self {
+            version: version_of(&self.path),
+            ..self.clone()
+        })
+    }
+
+    /// Verify the installation independently of the installer's exit code:
+    /// package managers can fail unrelated maintenance after replacing it.
+    /// A failed or unchanged probe cannot turn an installer error into success.
+    pub(super) fn verify(
+        &self,
+        after: Option<&Self>,
+        installer: Result<(), command::Failure>,
+    ) -> Result<Change, command::Failure> {
+        let failure = installer.err().unwrap_or(command::Failure::Failed);
+        let version = after
+            .filter(|after| after.path == self.path)
+            .and_then(|after| after.version.as_deref())
+            .ok_or(failure)?;
+        match self.version.as_deref() {
+            Some(before) if is_newer(version, before, self.line()) => Ok(Change::Updated),
+            Some(before) if version == before => installer.map(|()| Change::Unchanged),
+            None => installer.map(|()| Change::Updated),
+            _ => Err(failure),
+        }
+    }
+
     /// The vendor command that updates it, when it can be updated and its
     /// tool is found.
     pub(super) fn update(&self) -> Option<Invocation> {

@@ -8,10 +8,12 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use pocox_core::process::bounded::{self, Failure as RunFailure};
 
+use super::progress;
 use crate::engine::{network, runtime};
 
 /// A version probe or update check finishes within this.
@@ -155,9 +157,23 @@ pub(super) fn probe(program: &Path, args: &[&str]) -> Option<String> {
 
 /// Run an installer to its end. Its output stays in this host's
 /// diagnostics (its last lines, with the proxy withheld).
-pub(super) fn install(invocation: &Invocation) -> Result<(), Failure> {
+pub(super) fn install(
+    invocation: &Invocation,
+    on_progress: impl Fn(progress::Update) + Send + Sync + 'static,
+) -> Result<(), Failure> {
     let started = Instant::now();
-    let result = bounded::run(&mut command(invocation), started + UPDATE_TIMEOUT, UPDATE_CAP);
+    let parser = Mutex::new(progress::Parser::default());
+    let result = bounded::run_observed(
+        &mut command(invocation),
+        started + UPDATE_TIMEOUT,
+        UPDATE_CAP,
+        move |stream, bytes| {
+            let mut parser = parser.lock().unwrap_or_else(|poison| poison.into_inner());
+            if let Some(update) = parser.push(stream, bytes) {
+                on_progress(update);
+            }
+        },
+    );
     let program = invocation
         .program
         .file_name()

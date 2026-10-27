@@ -115,14 +115,16 @@ Future<void> _scene(
   Locale locale = const Locale('zh'),
   Brightness brightness = Brightness.light,
   required String open,
+  String? updating,
 }) async {
   debugDefaultTargetPlatformOverride = platform;
   try {
     t.view.physicalSize = size;
     t.view.devicePixelRatio = 1;
+    final api = _api();
     await t.pumpWidget(
       ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(_api())],
+        overrides: [bridgeApiProvider.overrideWithValue(api)],
         child: MaterialApp(
           locale: locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
@@ -145,6 +147,35 @@ Future<void> _scene(
       scrollable: find.byType(Scrollable).last,
     );
     await t.pumpAndSettle();
+    if (updating case final stage?) {
+      final device = open == 'studio' ? _studio : '';
+      final current = api.harnessOverviews[device]!;
+      api.harnessOverviews[device] = HarnessOverview(
+        harnesses: current.harnesses,
+        checkedAtMs: current.checkedAtMs,
+        job: HarnessJob(
+          run: 4,
+          kind: 'codex',
+          state: 'running',
+          stage: stage,
+          fromVersion: '0.46.0',
+          elapsedMs: 42000,
+          download: stage == 'downloading'
+              ? const HarnessDownload(
+                  downloadedBytes: 25000000,
+                  totalBytes: 100000000,
+                  bytesPerSecond: 1500000,
+                  percent: 25,
+                )
+              : null,
+        ),
+      );
+      await t.tap(find.byKey(const Key('harness-check')));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 200));
+      // The progress has eased in.
+      await t.pump(const Duration(milliseconds: 400));
+    }
     expect(t.takeException(), isNull, reason: name);
     await capturePreview(t, name);
     await t.pumpWidget(const SizedBox());
@@ -182,6 +213,7 @@ void main() {
       platform: TargetPlatform.macOS,
       locale: const Locale('en'),
       open: '@local',
+      updating: 'downloading',
     );
   });
 
@@ -202,6 +234,7 @@ void main() {
       platform: TargetPlatform.iOS,
       brightness: Brightness.dark,
       open: 'studio',
+      updating: 'installing',
     );
   });
 }

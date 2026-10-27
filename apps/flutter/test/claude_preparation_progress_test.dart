@@ -11,6 +11,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/hosting/claude_preparation_progress.dart';
 import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/transfer_format.dart';
 
 Future<void> _mount(
   WidgetTester t,

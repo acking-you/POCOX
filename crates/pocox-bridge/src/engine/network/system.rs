@@ -121,14 +121,14 @@ fn platform() -> Option<(String, Vec<String>)> {
     let proxies = SCDynamicStoreBuilder::new("pocox").build()?.get_proxies()?;
     let number = |key: &'static str| {
         proxies
-            .find(&CFString::from_static_string(key))?
+            .find(CFString::from_static_string(key))?
             .downcast::<CFNumber>()?
             .to_i32()
     };
     let text = |key: &'static str| {
         Some(
             proxies
-                .find(&CFString::from_static_string(key))?
+                .find(CFString::from_static_string(key))?
                 .downcast::<CFString>()?
                 .to_string(),
         )

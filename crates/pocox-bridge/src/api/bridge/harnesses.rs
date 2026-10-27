@@ -41,6 +41,18 @@ pub struct HarnessSkipDto {
     pub reason: String,
 }
 
+/// Installer-reported measurements for the current download.
+pub struct HarnessDownloadDto {
+    /// Bytes received, when reported.
+    pub downloaded_bytes: Option<i64>,
+    /// Total bytes, when reported.
+    pub total_bytes: Option<i64>,
+    /// Bytes per second, when reported.
+    pub bytes_per_second: Option<i64>,
+    /// Percentage of the download, not of the entire update.
+    pub percent: Option<u8>,
+}
+
 /// The running or most recent update of a device.
 pub struct HarnessJobDto {
     /// Its number on that device.
@@ -49,8 +61,13 @@ pub struct HarnessJobDto {
     pub kind: String,
     /// `running`, `done` or `failed`.
     pub state: String,
-    /// `stopping`, `updating` or `restarting` while running.
+    /// `stopping`, `updating`, `downloading`, `installing`, `verifying` or
+    /// `restarting` while running.
     pub stage: Option<String>,
+    /// Measurements reported by the installer, absent for silent installers.
+    pub download: Option<HarnessDownloadDto>,
+    /// Elapsed milliseconds measured on the host; absent on older hosts.
+    pub elapsed_ms: Option<i64>,
     /// Started by the device's automatic update.
     pub automatic: bool,
     /// The version before it.
@@ -84,7 +101,9 @@ pub struct HarnessOverviewDto {
     pub job: Option<HarnessJobDto>,
 }
 
-fn millis(value: u64) -> i64 {
+/// A counter, byte count or timestamp as a Dart integer; beyond `i64` it
+/// saturates.
+fn signed(value: u64) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
@@ -107,14 +126,21 @@ impl From<harnesses::Overview> for HarnessOverviewDto {
                     services: harness.services,
                 })
                 .collect(),
-            checked_at_ms: value.checked_at_ms.map(millis),
+            checked_at_ms: value.checked_at_ms.map(signed),
             checking: value.checking,
             restart_services: value.restart_services,
             job: value.job.map(|job| HarnessJobDto {
-                run: millis(job.run),
+                run: signed(job.run),
                 kind: job.kind,
                 state: job.state,
                 stage: job.stage,
+                download: job.download.map(|download| HarnessDownloadDto {
+                    downloaded_bytes: download.downloaded_bytes.map(signed),
+                    total_bytes: download.total_bytes.map(signed),
+                    bytes_per_second: download.bytes_per_second.map(signed),
+                    percent: download.percent,
+                }),
+                elapsed_ms: job.elapsed_ms.map(signed),
                 automatic: job.automatic,
                 from_version: job.from_version,
                 to_version: job.to_version,
@@ -128,8 +154,8 @@ impl From<harnesses::Overview> for HarnessOverviewDto {
                         reason: skipped.reason,
                     })
                     .collect(),
-                started_at_ms: millis(job.started_at_ms),
-                finished_at_ms: job.finished_at_ms.map(millis),
+                started_at_ms: signed(job.started_at_ms),
+                finished_at_ms: job.finished_at_ms.map(signed),
             }),
         }
     }

@@ -46,6 +46,45 @@ Future<HarnessOverviewDto> harnessSettings({
   restartServices: restartServices,
 );
 
+/// Installer-reported measurements for the current download.
+class HarnessDownloadDto {
+  /// Bytes received, when reported.
+  final PlatformInt64? downloadedBytes;
+
+  /// Total bytes, when reported.
+  final PlatformInt64? totalBytes;
+
+  /// Bytes per second, when reported.
+  final PlatformInt64? bytesPerSecond;
+
+  /// Percentage of the download, not of the entire update.
+  final int? percent;
+
+  const HarnessDownloadDto({
+    this.downloadedBytes,
+    this.totalBytes,
+    this.bytesPerSecond,
+    this.percent,
+  });
+
+  @override
+  int get hashCode =>
+      downloadedBytes.hashCode ^
+      totalBytes.hashCode ^
+      bytesPerSecond.hashCode ^
+      percent.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is HarnessDownloadDto &&
+          runtimeType == other.runtimeType &&
+          downloadedBytes == other.downloadedBytes &&
+          totalBytes == other.totalBytes &&
+          bytesPerSecond == other.bytesPerSecond &&
+          percent == other.percent;
+}
+
 /// One harness of a device.
 class HarnessDto {
   /// `codex`, `opencode`, `claude` or `grok`.
@@ -132,8 +171,15 @@ class HarnessJobDto {
   /// `running`, `done` or `failed`.
   final String state;
 
-  /// `stopping`, `updating` or `restarting` while running.
+  /// `stopping`, `updating`, `downloading`, `installing`, `verifying` or
+  /// `restarting` while running.
   final String? stage;
+
+  /// Measurements reported by the installer, absent for silent installers.
+  final HarnessDownloadDto? download;
+
+  /// Elapsed milliseconds measured on the host; absent on older hosts.
+  final PlatformInt64? elapsedMs;
 
   /// Started by the device's automatic update.
   final bool automatic;
@@ -165,6 +211,8 @@ class HarnessJobDto {
     required this.kind,
     required this.state,
     this.stage,
+    this.download,
+    this.elapsedMs,
     required this.automatic,
     this.fromVersion,
     this.toVersion,
@@ -181,6 +229,8 @@ class HarnessJobDto {
       kind.hashCode ^
       state.hashCode ^
       stage.hashCode ^
+      download.hashCode ^
+      elapsedMs.hashCode ^
       automatic.hashCode ^
       fromVersion.hashCode ^
       toVersion.hashCode ^
@@ -199,6 +249,8 @@ class HarnessJobDto {
           kind == other.kind &&
           state == other.state &&
           stage == other.stage &&
+          download == other.download &&
+          elapsedMs == other.elapsedMs &&
           automatic == other.automatic &&
           fromVersion == other.fromVersion &&
           toVersion == other.toVersion &&

@@ -8591,6 +8591,30 @@ abstract class AppLocalizations {
   /// **'Updating…'**
   String get harnessStageUpdating;
 
+  /// No description provided for @harnessStageDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading…'**
+  String get harnessStageDownloading;
+
+  /// No description provided for @harnessStageInstalling.
+  ///
+  /// In en, this message translates to:
+  /// **'Installing…'**
+  String get harnessStageInstalling;
+
+  /// No description provided for @harnessStageVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying installed version…'**
+  String get harnessStageVerifying;
+
+  /// No description provided for @harnessElapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'{time} elapsed'**
+  String harnessElapsed(String time);
+
   /// No description provided for @harnessStageRestarting.
   ///
   /// In en, this message translates to:

@@ -9297,6 +9297,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto dco_decode_box_autoadd_harness_download_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_harness_download_dto(raw);
+  }
+
+  @protected
   HarnessJobDto dco_decode_box_autoadd_harness_job_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_harness_job_dto(raw);
@@ -9414,6 +9420,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BigInt dco_decode_box_autoadd_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_u_64(raw);
+  }
+
+  @protected
+  int dco_decode_box_autoadd_u_8(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -9743,6 +9755,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto dco_decode_harness_download_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return HarnessDownloadDto(
+      downloadedBytes: dco_decode_opt_box_autoadd_i_64(arr[0]),
+      totalBytes: dco_decode_opt_box_autoadd_i_64(arr[1]),
+      bytesPerSecond: dco_decode_opt_box_autoadd_i_64(arr[2]),
+      percent: dco_decode_opt_box_autoadd_u_8(arr[3]),
+    );
+  }
+
+  @protected
   HarnessDto dco_decode_harness_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -9766,21 +9792,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   HarnessJobDto dco_decode_harness_job_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 14)
+      throw Exception('unexpected arr length: expect 14 but see ${arr.length}');
     return HarnessJobDto(
       run: dco_decode_i_64(arr[0]),
       kind: dco_decode_String(arr[1]),
       state: dco_decode_String(arr[2]),
       stage: dco_decode_opt_String(arr[3]),
-      automatic: dco_decode_bool(arr[4]),
-      fromVersion: dco_decode_opt_String(arr[5]),
-      toVersion: dco_decode_opt_String(arr[6]),
-      failure: dco_decode_opt_String(arr[7]),
-      restarted: dco_decode_list_String(arr[8]),
-      notRestarted: dco_decode_list_harness_skip_dto(arr[9]),
-      startedAtMs: dco_decode_i_64(arr[10]),
-      finishedAtMs: dco_decode_opt_box_autoadd_i_64(arr[11]),
+      download: dco_decode_opt_box_autoadd_harness_download_dto(arr[4]),
+      elapsedMs: dco_decode_opt_box_autoadd_i_64(arr[5]),
+      automatic: dco_decode_bool(arr[6]),
+      fromVersion: dco_decode_opt_String(arr[7]),
+      toVersion: dco_decode_opt_String(arr[8]),
+      failure: dco_decode_opt_String(arr[9]),
+      restarted: dco_decode_list_String(arr[10]),
+      notRestarted: dco_decode_list_harness_skip_dto(arr[11]),
+      startedAtMs: dco_decode_i_64(arr[12]),
+      finishedAtMs: dco_decode_opt_box_autoadd_i_64(arr[13]),
     );
   }
 
@@ -10680,6 +10708,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto? dco_decode_opt_box_autoadd_harness_download_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null
+        ? null
+        : dco_decode_box_autoadd_harness_download_dto(raw);
+  }
+
+  @protected
   HarnessJobDto? dco_decode_opt_box_autoadd_harness_job_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_harness_job_dto(raw);
@@ -10779,6 +10817,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BigInt? dco_decode_opt_box_autoadd_u_64(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_box_autoadd_u_64(raw);
+  }
+
+  @protected
+  int? dco_decode_opt_box_autoadd_u_8(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_u_8(raw);
   }
 
   @protected
@@ -12214,6 +12258,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto sse_decode_box_autoadd_harness_download_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_harness_download_dto(deserializer));
+  }
+
+  @protected
   HarnessJobDto sse_decode_box_autoadd_harness_job_dto(
     SseDeserializer deserializer,
   ) {
@@ -12355,6 +12407,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   BigInt sse_decode_box_autoadd_u_64(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_64(deserializer));
+  }
+
+  @protected
+  int sse_decode_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_u_8(deserializer));
   }
 
   @protected
@@ -12734,6 +12792,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto sse_decode_harness_download_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_downloadedBytes = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_totalBytes = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_bytesPerSecond = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_percent = sse_decode_opt_box_autoadd_u_8(deserializer);
+    return HarnessDownloadDto(
+      downloadedBytes: var_downloadedBytes,
+      totalBytes: var_totalBytes,
+      bytesPerSecond: var_bytesPerSecond,
+      percent: var_percent,
+    );
+  }
+
+  @protected
   HarnessDto sse_decode_harness_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_kind = sse_decode_String(deserializer);
@@ -12767,6 +12842,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_kind = sse_decode_String(deserializer);
     var var_state = sse_decode_String(deserializer);
     var var_stage = sse_decode_opt_String(deserializer);
+    var var_download = sse_decode_opt_box_autoadd_harness_download_dto(
+      deserializer,
+    );
+    var var_elapsedMs = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_automatic = sse_decode_bool(deserializer);
     var var_fromVersion = sse_decode_opt_String(deserializer);
     var var_toVersion = sse_decode_opt_String(deserializer);
@@ -12780,6 +12859,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       kind: var_kind,
       state: var_state,
       stage: var_stage,
+      download: var_download,
+      elapsedMs: var_elapsedMs,
       automatic: var_automatic,
       fromVersion: var_fromVersion,
       toVersion: var_toVersion,
@@ -14176,6 +14257,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  HarnessDownloadDto? sse_decode_opt_box_autoadd_harness_download_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_harness_download_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   HarnessJobDto? sse_decode_opt_box_autoadd_harness_job_dto(
     SseDeserializer deserializer,
   ) {
@@ -14344,6 +14438,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_u_64(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  int? sse_decode_opt_box_autoadd_u_8(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_u_8(deserializer));
     } else {
       return null;
     }
@@ -15855,6 +15960,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_harness_download_dto(
+    HarnessDownloadDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_harness_download_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_harness_job_dto(
     HarnessJobDto self,
     SseSerializer serializer,
@@ -16014,6 +16128,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_u_64(BigInt self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_64(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_u_8(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_u_8(self, serializer);
   }
 
   @protected
@@ -16297,6 +16417,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_harness_download_dto(
+    HarnessDownloadDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_box_autoadd_i_64(self.downloadedBytes, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.totalBytes, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.bytesPerSecond, serializer);
+    sse_encode_opt_box_autoadd_u_8(self.percent, serializer);
+  }
+
+  @protected
   void sse_encode_harness_dto(HarnessDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.kind, serializer);
@@ -16321,6 +16453,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.kind, serializer);
     sse_encode_String(self.state, serializer);
     sse_encode_opt_String(self.stage, serializer);
+    sse_encode_opt_box_autoadd_harness_download_dto(self.download, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.elapsedMs, serializer);
     sse_encode_bool(self.automatic, serializer);
     sse_encode_opt_String(self.fromVersion, serializer);
     sse_encode_opt_String(self.toVersion, serializer);
@@ -17473,6 +17607,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_harness_download_dto(
+    HarnessDownloadDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_harness_download_dto(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_harness_job_dto(
     HarnessJobDto? self,
     SseSerializer serializer,
@@ -17642,6 +17789,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_u_64(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_u_8(int? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_u_8(self, serializer);
     }
   }
 

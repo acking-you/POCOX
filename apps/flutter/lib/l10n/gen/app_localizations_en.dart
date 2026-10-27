@@ -5002,6 +5002,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get harnessStageUpdating => 'Updating…';
 
   @override
+  String get harnessStageDownloading => 'Downloading…';
+
+  @override
+  String get harnessStageInstalling => 'Installing…';
+
+  @override
+  String get harnessStageVerifying => 'Verifying installed version…';
+
+  @override
+  String harnessElapsed(String time) {
+    return '$time elapsed';
+  }
+
+  @override
   String get harnessStageRestarting => 'Restarting services…';
 
   @override

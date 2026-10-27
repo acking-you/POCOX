@@ -28,6 +28,16 @@ mixin _RustHarnesses implements BridgeApi {
             kind: job.kind,
             state: job.state,
             stage: job.stage,
+            download: switch (job.download) {
+              null => null,
+              final d => HarnessDownload(
+                downloadedBytes: d.downloadedBytes,
+                totalBytes: d.totalBytes,
+                bytesPerSecond: d.bytesPerSecond,
+                percent: d.percent,
+              ),
+            },
+            elapsedMs: job.elapsedMs,
             automatic: job.automatic,
             fromVersion: job.fromVersion,
             toVersion: job.toVersion,

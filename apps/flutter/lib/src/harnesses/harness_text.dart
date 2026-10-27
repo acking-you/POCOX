@@ -14,8 +14,13 @@ String harnessName(String kind) => switch (kind) {
   _ => kind,
 };
 
-/// Its installed version and how it updates (`0.46.0 · npm`).
-String harnessVersionLine(AppLocalizations l10n, HarnessInfo harness) {
+/// Its installed version and how it updates (`0.46.0 · npm`); while
+/// [updating], the version it is updating to as well (`0.46.0 → 0.47.0`).
+String harnessVersionLine(
+  AppLocalizations l10n,
+  HarnessInfo harness, {
+  bool updating = false,
+}) {
   if (!harness.installed) return l10n.harnessNotInstalled;
   final method = switch (harness.method) {
     'brew' => l10n.harnessMethodBrew,
@@ -24,7 +29,14 @@ String harnessVersionLine(AppLocalizations l10n, HarnessInfo harness) {
     'own' || null => null,
     final other => other,
   };
-  return [harness.version ?? l10n.harnessVersionUnknown, ?method].join(' · ');
+  final version = harness.version ?? l10n.harnessVersionUnknown;
+  final target = updating ? harness.latest : null;
+  return [
+    target == null || target == harness.version
+        ? version
+        : '$version → $target',
+    ?method,
+  ].join(' · ');
 }
 
 /// Why [harness] cannot be checked or updated, when it cannot.
@@ -42,6 +54,9 @@ String? harnessProblemText(AppLocalizations l10n, HarnessInfo harness) =>
 String harnessStageText(AppLocalizations l10n, HarnessJob job) =>
     switch (job.stage) {
       'stopping' => l10n.harnessStageStopping,
+      'downloading' => l10n.harnessStageDownloading,
+      'installing' => l10n.harnessStageInstalling,
+      'verifying' => l10n.harnessStageVerifying,
       'restarting' => l10n.harnessStageRestarting,
       _ => l10n.harnessStageUpdating,
     };

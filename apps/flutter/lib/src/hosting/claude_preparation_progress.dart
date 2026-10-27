@@ -8,33 +8,9 @@ import 'package:pocox/src/hosting/claude_environment_group.dart';
 import 'package:pocox/src/hosting/editor_block.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/theme.dart';
+import 'package:pocox/src/transfer_format.dart';
+import 'package:pocox/src/widgets/progress_track.dart';
 import 'package:pocox/src/app_icons.dart';
-
-/// [bytes] in decimal units, as Finder counts them: `0 B`, `840 B`,
-/// `3.2 KB`, `12 MB`. One decimal below ten, whole numbers above.
-String formatByteCount(int bytes) {
-  if (bytes < 1000) return '${math.max(bytes, 0)} B';
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  var value = bytes / 1000;
-  var unit = 0;
-  // 999.5 would print as "1000"; it belongs to the next unit.
-  while (value >= 999.5 && unit < units.length - 1) {
-    value /= 1000;
-    unit++;
-  }
-  final digits = value < 9.95 ? 1 : 0;
-  return '${value.toStringAsFixed(digits)} ${units[unit]}';
-}
-
-/// [ms] as a clock: `0:42`, `12:05`, `1:02:09`.
-String formatElapsed(int ms) {
-  final seconds = math.max(ms, 0) ~/ 1000;
-  String two(int v) => v.toString().padLeft(2, '0');
-  final h = seconds ~/ 3600;
-  final m = seconds ~/ 60 % 60;
-  final s = seconds % 60;
-  return h > 0 ? '$h:${two(m)}:${two(s)}' : '$m:${two(s)}';
-}
 
 /// The preparation of Claude's ACP adapter, as it happens.
 ///
@@ -241,7 +217,16 @@ class _ClaudePreparationProgressState extends State<ClaudePreparationProgress> {
               ],
             ),
             const SizedBox(height: 12),
-            _PreparationBar(state: setup.state),
+            ProgressTrack(
+              key: const Key('claude-prepare-bar'),
+              // npm has no total: indeterminate until the run settles.
+              value: switch (setup.state) {
+                'running' => null,
+                'done' || 'failed' => 1,
+                _ => 0,
+              },
+              color: _accent(scheme),
+            ),
             if (metrics.isNotEmpty) ...[
               const SizedBox(height: 10),
               Wrap(
@@ -408,165 +393,6 @@ class _StepMark extends StatelessWidget {
           : null,
     );
   }
-}
-
-enum _BarMode { sweep, hatch, full, empty }
-
-/// An indeterminate track: a soft band easing across it while running, a
-/// still hatch with reduced motion, and a settled fill once it ends.
-class _PreparationBar extends StatefulWidget {
-  const _PreparationBar({required this.state});
-
-  final String state;
-
-  @override
-  State<_PreparationBar> createState() => _PreparationBarState();
-}
-
-class _PreparationBarState extends State<_PreparationBar>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1800),
-  );
-
-  void _sync() {
-    if (widget.state == 'running' && Motion.ambientAllowed(context)) {
-      if (!_c.isAnimating) _c.repeat();
-    } else {
-      _c.stop();
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(_PreparationBar old) {
-    super.didUpdateWidget(old);
-    if (old.state != widget.state) _sync();
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (mode, fill) = switch (widget.state) {
-      'running' => (
-        Motion.ambientAllowed(context) ? _BarMode.sweep : _BarMode.hatch,
-        signalColor(scheme),
-      ),
-      'done' => (_BarMode.full, successColor(scheme)),
-      'failed' => (_BarMode.full, scheme.error),
-      _ => (_BarMode.empty, scheme.onSurfaceVariant),
-    };
-    return ExcludeSemantics(
-      child: RepaintBoundary(
-        child: SizedBox(
-          key: const Key('claude-prepare-bar'),
-          height: 6,
-          width: double.infinity,
-          child: CustomPaint(
-            painter: _BarPainter(
-              _c,
-              mode: mode,
-              fill: fill,
-              track: scheme.surfaceContainerHighest,
-              rtl: Directionality.of(context) == TextDirection.rtl,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BarPainter extends CustomPainter {
-  _BarPainter(
-    this.cycle, {
-    required this.mode,
-    required this.fill,
-    required this.track,
-    required this.rtl,
-  }) : super(repaint: mode == _BarMode.sweep ? cycle : null);
-
-  final Animation<double> cycle;
-  final _BarMode mode;
-  final Color fill;
-  final Color track;
-  final bool rtl;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
-    final radius = Radius.circular(size.height / 2);
-    final whole = RRect.fromRectAndRadius(Offset.zero & size, radius);
-    canvas.drawRRect(whole, Paint()..color = track);
-    switch (mode) {
-      case _BarMode.empty:
-        return;
-      case _BarMode.full:
-        canvas.drawRRect(whole, Paint()..color = fill);
-        return;
-      case _BarMode.hatch:
-        canvas
-          ..save()
-          ..clipRRect(whole);
-        final stripe = Paint()
-          ..color = fill.withValues(alpha: 0.4)
-          ..strokeWidth = 2;
-        for (var x = -size.height; x < size.width + size.height; x += 7) {
-          canvas.drawLine(
-            Offset(x, size.height),
-            Offset(x + size.height, 0),
-            stripe,
-          );
-        }
-        canvas.restore();
-        return;
-      case _BarMode.sweep:
-        canvas
-          ..save()
-          ..clipRRect(whole)
-          // A faint steady wash keeps the track reading as live between
-          // passes of the band.
-          ..drawRRect(whole, Paint()..color = fill.withValues(alpha: 0.12));
-        final band = math.max(size.width * 0.32, 24.0);
-        final travelled =
-            (size.width + band) * Curves.easeInOut.transform(cycle.value);
-        final left = rtl ? size.width - travelled : travelled - band;
-        final rect = Rect.fromLTWH(left, 0, band, size.height);
-        canvas
-          ..drawRRect(
-            RRect.fromRectAndRadius(rect, radius),
-            Paint()
-              ..shader = LinearGradient(
-                colors: [
-                  fill.withValues(alpha: 0.2),
-                  fill,
-                  fill.withValues(alpha: 0.2),
-                ],
-              ).createShader(rect),
-          )
-          ..restore();
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BarPainter old) =>
-      old.cycle != cycle ||
-      old.mode != mode ||
-      old.fill != fill ||
-      old.track != track ||
-      old.rtl != rtl;
 }
 
 /// The polled speeds as a line over a hairline baseline, scaled to their own

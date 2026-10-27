@@ -93,12 +93,17 @@ own behaviour.
 
 One update runs at a time per computer. It looks the harness up again, runs
 its installer in a temporary directory with no console window (at most 15
-minutes; output beyond 16 MiB stops it), reads the version again, and records
-the outcome: `done`, or `failed` with `tool_missing`, `in_use`, `permission`,
-`timed_out` or `failed` (from its exit and output). The installer's last
-lines stay in that computer's diagnostics with the proxy withheld. An
+minutes; output beyond 16 MiB stops it), reads the version from the same
+launch path again, and records the outcome: `done`, or `failed` with
+`tool_missing`, `in_use`, `permission`, `timed_out` or `failed`. A verified
+newer version counts as updated even if the installer exits unsuccessfully:
+Homebrew can install the harness while unrelated maintenance fails. The
+installer's exit status and last lines stay in that computer's diagnostics
+with the proxy withheld. A missing or unreadable executable never counts as
+an update, and verification never falls back to another installation. An
 installer that succeeded but left the same version installed is reported as
-such, not as an update (OpenCode 1.x exits 0 even when it fails).
+unchanged (OpenCode 1.x exits 0 even when it fails); an installer error with
+no verified upgrade remains a failure.
 
 With restarting on, every running service of that harness restarts on the
 installed version, keeping everything else as it ran: Codex respawns its
@@ -127,6 +132,23 @@ The app polls the computer every second while it checks or updates, then
 refreshes that computer's services. A lost answer is reported as unknown and
 the state read again; nothing is sent again by itself. Updates ask for
 confirmation, naming the services that restart.
+
+Every running update has an inline progress bar, its current phase and elapsed
+time, for both local and remote devices. The elapsed sample comes from the
+host, so different device clocks do not change it. Installer stdout and stderr
+are observed while running, with separate bounded line buffers. Recognized
+download/install messages become phase codes; curl transfer meters and Grok
+byte bars can provide download percentage, byte counts and speed. Raw text,
+paths and URLs never enter the management response. Speeds expire after three
+seconds without a new sample and all download measurements clear before
+version verification or service restart.
+
+The bar stays indeterminate when an installer provides no measurements
+(many suppress their terminal meter when run in the background). No percentage
+or download speed is estimated from elapsed time or output volume. Download
+percentages describe the current file, not the entire installation. Older hosts
+without progress fields still show an indeterminate bar and time since the
+controller began watching. Reduced motion keeps the indeterminate track still.
 
 ## Limits
 
