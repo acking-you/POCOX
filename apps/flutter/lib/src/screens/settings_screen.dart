@@ -12,6 +12,7 @@ import 'package:pocox/src/hosting/host_picker.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/network/network_settings.dart';
 import 'package:pocox/src/network/connection_paths.dart';
+import 'package:pocox/src/network/connection_window.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/tools/tools_settings.dart';
 import 'package:pocox/src/theme_transition.dart';
@@ -161,6 +162,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
       const Card(child: UpdateRow()),
       const Card(child: NetworkProxyRow()),
       const ConnectionPathSettings(),
+      const ConnectionWindowSettings(),
       const SizedBox(height: 4),
       Card(
         clipBehavior: Clip.antiAlias,
@@ -390,6 +392,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
                   // How this device reaches the services below, then what
                   // each subscription actually goes through.
                   const ConnectionPathSettings(),
+                  const ConnectionWindowSettings(),
                   const SizedBox(height: 10),
                   const _SubscriptionsGroup(),
                   const SizedBox(height: 10),

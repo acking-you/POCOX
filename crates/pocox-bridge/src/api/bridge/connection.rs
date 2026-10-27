@@ -40,9 +40,25 @@ pub async fn app_agent_identity(service_key: String) -> Result<AgentIdentityDto>
 /// websocket, run `initialize`) or an ACP gateway (`/acp/v1` snapshot, then
 /// its event stream). Idempotent.
 pub async fn app_connect(service_key: String, local_port: u16) -> Result<()> {
+    let epoch = crate::engine::transport::epoch();
+    execution::run(Lane::Control, move || {
+        anyhow::ensure!(
+            crate::engine::transport::is_current(epoch),
+            "the account or relay changed; reconnect"
+        );
+        let _connecting = connect_stage::begin(&service_key);
+        crate::engine::connection_window::connect(service_key, local_port, epoch)
+    })
+    .await
+}
+
+/// Recover only the currently selected controller connection. An obsolete
+/// screen's automatic retry cannot reopen an evicted service or old account.
+pub async fn app_reconnect(service_key: String, local_port: u16) -> Result<()> {
+    let epoch = crate::engine::transport::epoch();
     execution::run(Lane::Control, move || {
         let _connecting = connect_stage::begin(&service_key);
-        engine(&service_key).connect(service_key.clone(), local_port)
+        crate::engine::connection_window::reconnect(service_key, local_port, epoch)
     })
     .await
 }
@@ -78,8 +94,50 @@ pub fn app_is_connected(service_key: String) -> bool {
 /// Work owned by a host (ACP turns, permissions) keeps running there.
 pub async fn app_disconnect(service_key: String) -> Result<()> {
     execution::run(Lane::Control, move || {
-        engine(&service_key).disconnect(&service_key);
+        crate::engine::connection_window::disconnect(&service_key);
         Ok(())
+    })
+    .await
+}
+
+/// Persisted controller connection retention settings.
+pub struct ConnectionWindowDto {
+    /// Conversation services including the selected one; 1–32, default 5.
+    pub capacity: u32,
+    /// `lru` (least recently selected) or `fifo` (earliest connected).
+    pub eviction: String,
+}
+
+/// Read this installation's connection window preferences.
+pub async fn app_connection_window() -> Result<ConnectionWindowDto> {
+    execution::run(Lane::Read, || {
+        let value = crate::engine::connection_window::preferences()?;
+        Ok(ConnectionWindowDto {
+            capacity: value.capacity,
+            eviction: match value.eviction {
+                pocox_core::config::ConnectionEviction::Lru => "lru",
+                pocox_core::config::ConnectionEviction::Fifo => "fifo",
+            }
+            .into(),
+        })
+    })
+    .await
+}
+
+/// Save and apply retention limits. Running work and unanswered requests are
+/// protected; a reduced limit takes effect as protected services become idle.
+pub async fn app_set_connection_window(value: ConnectionWindowDto) -> Result<()> {
+    execution::run(Lane::Control, move || {
+        use pocox_core::config::{ConnectionEviction, ConnectionWindowConfig};
+        let eviction = match value.eviction.as_str() {
+            "lru" => ConnectionEviction::Lru,
+            "fifo" => ConnectionEviction::Fifo,
+            _ => anyhow::bail!("unknown connection eviction policy"),
+        };
+        crate::engine::connection_window::set_preferences(ConnectionWindowConfig {
+            capacity: value.capacity,
+            eviction,
+        })
     })
     .await
 }

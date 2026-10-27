@@ -241,9 +241,11 @@ fn base_url_for(
     let origin = target.open(&meta_key, registry, 0, false)?;
     let url = Url::parse(&origin.url()).context("parsing host endpoint")?;
     let epoch = target.epoch();
+    let lifetime = origin.retain_transport()?;
     // Capture the exact resolution, including same-port restarts; deriving a
     // new lifetime from the URL later could authorize a replacement host.
     let current = move || {
+        let _lease = &lifetime;
         anyhow::ensure!(
             transport::is_current(epoch) && origin.is_current(),
             "the host or connection changed; retry the request"
@@ -258,12 +260,18 @@ pub(super) fn context_changed() {
     runtime::unsubscribe_prefix(META_TUNNEL);
 }
 
-/// Build an endpoint URL under the meta base, percent-encoding each segment.
-pub(super) fn endpoint(service_key: &str, segments: &[&str]) -> Result<Url> {
-    guarded_endpoint(service_key, segments).map(|(url, _)| url)
+/// Release the companion tunnel with its controller's retained service.
+pub(super) fn release_service(service: &str) {
+    let Some(context) = transport::current_context() else { return };
+    let Ok(meta) = meta_key_of(service) else { return };
+    runtime::unsubscribe_service(&format!("{META_TUNNEL}{}\u{1f}{meta}", context.id()));
 }
 
-fn guarded_endpoint(
+/// Build an endpoint URL under the meta base, percent-encoding each segment,
+/// with its guard: it fails once the host or connection the URL was resolved
+/// for is gone, and it holds that connection's tunnel while it lives, so a
+/// transfer keeps it until the guard drops even if its service is released.
+pub(super) fn guarded_endpoint(
     service_key: &str,
     segments: &[&str],
 ) -> Result<(Url, impl Fn() -> Result<()> + Send + Sync)> {
@@ -595,8 +603,9 @@ pub fn force_resume(service_key: &str, thread_id: &str) -> Result<ForceResumeOut
             "this provider has no verified safe takeover operation; continue viewing read-only"
         ));
     }
-    let url = endpoint(service_key, &["sessions", thread_id, "resume"])?;
+    let (url, current) = guarded_endpoint(service_key, &["sessions", thread_id, "resume"])?;
     runtime::runtime().block_on(async move {
+        current()?;
         let resp = client()
             .post(url)
             .send()

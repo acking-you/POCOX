@@ -295,6 +295,15 @@ extension _SessionProjects on _AppSessionState {
   /// the user always sees WHERE the conversation runs and what is changing.
   Widget _serviceSwitcher(AppLocalizations l10n) => HostSwitcher(
     services: widget.services,
+    localKeys: {
+      for (final service in ref.read(bridgeApiProvider).localServices())
+        service.key,
+    },
+    connectedKeys: {
+      for (final service in widget.services)
+        if (ref.read(bridgeApiProvider).appIsConnected(service.key))
+          service.key,
+    },
     current: widget.serviceKey,
     pending: widget.hostSwitch,
     identities: _hostIdentities(),

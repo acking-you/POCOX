@@ -70,6 +70,8 @@ class HostSwitcher extends StatefulWidget {
     required this.onPick,
     this.pending,
     this.identities = const {},
+    this.localKeys = const {},
+    this.connectedKeys = const {},
     this.onManage,
     this.onRefresh,
   });
@@ -89,6 +91,12 @@ class HostSwitcher extends StatefulWidget {
   /// Known agent identity per service key; unknown keys show the protocol's
   /// generic mark.
   final Map<String, AgentIdentity> identities;
+
+  /// Exact keys from the current process's native listener registry.
+  final Set<String> localKeys;
+
+  /// Services with a healthy retained controller connection.
+  final Set<String> connectedKeys;
 
   /// Opens host management (add, host, stop); null hides the entry.
   final VoidCallback? onManage;
@@ -171,6 +179,8 @@ class _HostSwitcherState extends State<HostSwitcher> {
         current: state.current,
         pending: state.pending,
         identities: state.identities,
+        localKeys: state.localKeys,
+        connectedKeys: state.connectedKeys,
         touch: true,
         onPick: (key) {
           Navigator.of(c).pop();
@@ -305,6 +315,8 @@ class _HostSwitcherState extends State<HostSwitcher> {
               current: widget.current,
               pending: pending,
               identities: widget.identities,
+              localKeys: widget.localKeys,
+              connectedKeys: widget.connectedKeys,
               touch: false,
               onPick: _pick,
               onManage: widget.onManage == null ? null : _manage,
@@ -375,6 +387,8 @@ class _HostList extends StatelessWidget {
     required this.current,
     required this.pending,
     required this.identities,
+    required this.localKeys,
+    required this.connectedKeys,
     required this.touch,
     required this.onPick,
     this.onManage,
@@ -386,6 +400,8 @@ class _HostList extends StatelessWidget {
   final HostSwitch? pending;
   final Map<String, AgentIdentity> identities;
   final bool touch;
+  final Set<String> localKeys;
+  final Set<String> connectedKeys;
   final ValueChanged<String> onPick;
   final VoidCallback? onManage;
   final Future<void> Function()? onRefresh;
@@ -394,7 +410,38 @@ class _HostList extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final sameNamed = sameNamedDevices(services.map((s) => s.device));
+    final groups = <String, List<ServiceEntry>>{};
+    for (final service in services) {
+      final identity = localKeys.contains(service.key)
+          ? 'local'
+          : serviceDeviceIdentity(service.key);
+      (groups[identity] ??= []).add(service);
+    }
+    final ordered = groups.entries.toList()
+      ..sort((a, b) {
+        if (a.key == 'local') return -1;
+        if (b.key == 'local') return 1;
+        return deviceLabel(
+          a.value.first.device,
+        ).compareTo(deviceLabel(b.value.first.device));
+      });
+    String? distinction(MapEntry<String, List<ServiceEntry>> group) {
+      final device = group.value.first.device;
+      final others = ordered.where(
+        (other) =>
+            other.key != group.key &&
+            deviceLabel(other.value.first.device) == deviceLabel(device),
+      );
+      if (others.isEmpty || group.key == 'local') return null;
+      final id = deviceShortId(device);
+      return id != null &&
+              others.every(
+                (other) => deviceShortId(other.value.first.device) != id,
+              )
+          ? id
+          : group.key;
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -408,7 +455,44 @@ class _HostList extends StatelessWidget {
             ).textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
           ),
         ),
-        for (final s in services) _item(context, s, sameNamed),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .55,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final group in ordered)
+                  Column(
+                    key: Key('host-switch-device-${group.key}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          touch ? 20 : 12,
+                          12,
+                          12,
+                          6,
+                        ),
+                        child: Text(
+                          [
+                            deviceLabel(group.value.first.device),
+                            if (group.key == 'local') l10n.servicesLocalDevice,
+                            ?distinction(group),
+                          ].join(' · '),
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                      for (final service in group.value)
+                        _item(context, service),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
         if (onRefresh != null || onManage != null) const Divider(height: 9),
         if (onRefresh case final refresh?)
           _RefreshServicesRow(onRefresh: refresh, touch: touch),
@@ -441,74 +525,92 @@ class _HostList extends StatelessWidget {
     );
   }
 
-  Widget _item(BuildContext context, ServiceEntry s, Set<String> sameNamed) {
+  /// One service of a device: its mark, name and provider, and one mark at
+  /// the end for its connection: the check of the current one, a dot for a
+  /// connection kept from earlier, none for one that connects when picked.
+  /// Only a failed switch adds a line.
+  Widget _item(BuildContext context, ServiceEntry s) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final isCurrent = s.key == current;
+    final retained = !isCurrent && connectedKeys.contains(s.key);
     final failed =
         pending?.target == s.key && pending?.phase == HostSwitchPhase.failed;
-    return InkWell(
-      key: Key('host-switch-item-${s.key}'),
-      mouseCursor: clickable,
-      onTap: () => onPick(s.key),
-      child: Padding(
-        padding: _rowPadding(touch),
-        child: Row(
-          children: [
-            _identityIcon(identities, s.key, scheme.onSurfaceVariant),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Two lines on touch: a long device or instance name (or the
-                  // failure) stays recognisable in a phone's sheet.
-                  Text(
-                    deviceLabel(s.device),
-                    maxLines: touch ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: touch ? 14 : 13,
-                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
+    final state = isCurrent
+        ? l10n.hostConnectionCurrent
+        : retained
+        ? l10n.hostConnectionRetained
+        : null;
+    return Semantics(
+      selected: isCurrent,
+      value: failed ? l10n.hostSwitchLastFailed : state,
+      child: InkWell(
+        key: Key('host-switch-item-${s.key}'),
+        mouseCursor: clickable,
+        onTap: () => onPick(s.key),
+        child: Padding(
+          padding: _rowPadding(touch).add(const EdgeInsets.only(left: 12)),
+          child: Row(
+            children: [
+              _identityIcon(identities, s.key, scheme.onSurfaceVariant),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Two lines on touch: a long instance name stays
+                    // recognisable in a phone's sheet.
+                    Text(
+                      s.name,
+                      maxLines: touch ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: touch ? 14 : 13,
+                        fontWeight: isCurrent
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  Text(
-                    [
-                      if (failed)
-                        l10n.hostSwitchLastFailed
-                      else if (isCurrent)
-                        l10n.hostInUse(s.name)
-                      else
-                        s.name,
-                      // Same-name installations differ only by their ID.
-                      if (sameNamed.contains(s.device))
-                        ?deviceShortId(s.device),
-                    ].join(' · '),
-                    maxLines: touch ? 2 : 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: failed ? scheme.error : scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                    if (failed)
+                      Text(
+                        l10n.hostSwitchLastFailed,
+                        maxLines: touch ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, color: scheme.error),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            _badge(identities, s.key),
-            const SizedBox(width: 6),
-            StatusDot(
-              color: failed
-                  ? scheme.error
-                  : isCurrent
-                  ? successColor(scheme)
-                  : scheme.outline,
-              size: 8,
-            ),
-            if (isCurrent)
-              Icon(AppIcons.check, size: 16, color: signalColor(scheme)),
-          ],
+              const SizedBox(width: 8),
+              _badge(identities, s.key),
+              // One slot, so names and pills line up whatever the state.
+              SizedBox(
+                width: 24,
+                child: Center(
+                  child: isCurrent
+                      ? Icon(
+                          AppIcons.check,
+                          key: const Key('host-switch-current'),
+                          size: 16,
+                          color: signalColor(scheme),
+                        )
+                      : retained
+                      ? Tooltip(
+                          message: l10n.hostConnectionRetained,
+                          child: StatusDot(
+                            key: Key('host-switch-retained-${s.key}'),
+                            color: successColor(scheme),
+                            size: 7,
+                          ),
+                        )
+                      : failed
+                      ? StatusDot(color: scheme.error, size: 7)
+                      : null,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

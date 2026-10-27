@@ -76,9 +76,11 @@ async fn follow(
     wake: Arc<Notify>,
 ) -> Result<()> {
     let key = host_key.clone();
-    let url =
-        tokio::task::spawn_blocking(move || meta::endpoint(&key, &["services", "v1", "events"]))
-            .await??;
+    // Held for as long as the stream is read: it keeps the meta tunnel.
+    let (url, _lease) = tokio::task::spawn_blocking(move || {
+        meta::guarded_endpoint(&key, &["services", "v1", "events"])
+    })
+    .await??;
     let response = stream_client()
         .get(url)
         .header("accept", "text/event-stream")

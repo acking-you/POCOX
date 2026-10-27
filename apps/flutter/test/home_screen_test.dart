@@ -800,8 +800,8 @@ void main() {
     expect(api.discoverCalls - discovered, 1);
     expect(
       api.appConnectCount - before,
-      5,
-      reason: 'two bounded local retries, one remote connect',
+      3,
+      reason: 'one handshake per local candidate, one remote connect',
     );
     expect(find.byKey(const Key('send-btn')), findsOneWidget);
     await t.pumpWidget(const SizedBox());

@@ -668,6 +668,13 @@ class FieldBorder extends InputBorder {
   int get hashCode => Object.hash(borderSide, borderRadius, glow);
 }
 
+/// The recessed track the app's small controls ([GlassSegmented] and
+/// `GlassStepper`) sit in.
+Color glassTrackColor(ColorScheme scheme) =>
+    scheme.brightness == Brightness.light
+    ? Colors.black.withValues(alpha: 0.055)
+    : Colors.white.withValues(alpha: 0.06);
+
 /// One choice of a [GlassSegmented].
 @immutable
 class GlassSegment<T> {
@@ -723,32 +730,54 @@ class GlassSegmented<T> extends StatelessWidget {
   final double height;
 
   static const double _inset = 3;
+  static const _labelStyle = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+  );
+
+  /// The widest segment's natural width at the current text scale; every
+  /// segment takes it when the control does not [expand].
+  static double _segmentWidth<T>(
+    BuildContext context,
+    List<GlassSegment<T>> segments,
+  ) {
+    var widest = 0.0;
+    for (final s in segments) {
+      final width =
+          measureTextLine(context, s.label, _labelStyle).width.ceilToDouble() +
+          (s.icon == null ? 0 : 22) +
+          28;
+      if (width > widest) widest = width;
+    }
+    return widest;
+  }
+
+  /// The width of [segments] when the control does not [expand], so a row
+  /// can tell whether it fits beside a title.
+  static double naturalWidth<T>(
+    BuildContext context,
+    List<GlassSegment<T>> segments,
+  ) => _segmentWidth(context, segments) * segments.length + 2 * _inset;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final light = scheme.brightness == Brightness.light;
-    const labelStyle = TextStyle(fontSize: 13, fontWeight: FontWeight.w500);
+    const labelStyle = _labelStyle;
     final index = segments.indexWhere((s) => s.value == selected);
     final scaled = MediaQuery.textScalerOf(context).scale(height);
-    double natural(GlassSegment<T> s) =>
-        measureTextLine(context, s.label, labelStyle).width.ceilToDouble() +
-        (s.icon == null ? 0 : 22) +
-        28;
     return LayoutBuilder(
       builder: (context, box) {
         final width = expand && box.maxWidth.isFinite
             ? (box.maxWidth - 2 * _inset) / segments.length
-            : segments.map(natural).fold(0.0, (a, b) => a > b ? a : b);
+            : _segmentWidth(context, segments);
         final radius = BorderRadius.circular(scaled / 2);
         return Container(
           height: scaled,
           width: width * segments.length + 2 * _inset,
           padding: const EdgeInsets.all(_inset),
           decoration: BoxDecoration(
-            color: light
-                ? Colors.black.withValues(alpha: 0.055)
-                : Colors.white.withValues(alpha: 0.06),
+            color: glassTrackColor(scheme),
             borderRadius: radius,
           ),
           child: Stack(

@@ -67,6 +67,27 @@ for Flutter diagnostics. Native console lifetime tests live in
 
 ## Home, connection and relay problems
 
+- The host switcher groups conversation services under their authoritative
+  device/installation segment and namespace. Only keys in the native
+  process-owned service registry enter the **This device** group; hostname,
+  OS and matching labels never establish locality. Different installations
+  with the same display name show their short identity; ambiguous legacy or
+  account-scoped labels retain the full device prefix for distinction. A row
+  is one line (agent mark, service name, provider pill) with one mark in a
+  fixed slot at its end: the check of the current service, a green dot for a
+  retained connection, nothing for one that connects when picked; only a
+  failed switch adds a line. Desktop menu and phone sheet use the same
+  scrollable grouped list.
+- Settings › Retained connections (`lib/src/network/connection_window.dart`)
+  is a `GroupCard` in both layouts, its behaviour behind the title's info mark.
+  **Service limit** is a `GlassStepper` (1–32, default five, the current
+  service included) and **Eviction policy** a `GlassSegmented` (**Least recent**
+  / **First connected**, under its title below 480 px); rows are the shared
+  `SettingRow` of the connection path group. Each change saves at once,
+  latest first; a failed save puts the saved value back with a state line on
+  its row. See
+  [retention ownership](harness-connection-lifecycle.md#retained-conversation-services).
+
 - Settings › Connection path (`lib/src/network/connection_paths.dart`) is a
   `GroupCard` in both layouts: outgoing **Relay only / P2P first** as a
   `GlassSegmented` (under its title below 480 px) and, on desktop only, an

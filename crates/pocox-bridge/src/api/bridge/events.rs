@@ -244,7 +244,8 @@ pub fn app_projected_events(
     // Dart on an unawaited future instead of the stream.
     runtime::runtime().spawn(async move {
         let Ok(rx) = engine(&service_key).subscribe_events(&service_key) else { return };
-        forward_projected_events(rx, thread, topic, |update| {
+        let initial = app_session::pending_requests(&service_key);
+        forward_projected_events(rx, thread, topic, initial, |update| {
             let ev = update.event;
             sink.add(AppEventDto {
                 diff: update.diff.map(Into::into),
@@ -275,13 +276,17 @@ async fn forward_projected_events(
     mut rx: broadcast::Receiver<app_session::AppEvent>,
     thread: watch::Receiver<Option<String>>,
     topic: EventTopic,
+    initial: Vec<app_session::AppEvent>,
     mut send: impl FnMut(ProjectedEvent) -> bool,
 ) {
     let mut view = Projection::default();
     let mut pending: Option<app_session::AppEvent> = None;
     let mut deadline = Instant::now();
+    let mut initial = initial.into_iter();
     loop {
-        let received = if pending.is_some() {
+        let received = if let Some(event) = initial.next() {
+            Some(Ok(event))
+        } else if pending.is_some() {
             tokio::select! {
                 event = rx.recv() => Some(event),
                 () = tokio::time::sleep_until(deadline) => None,

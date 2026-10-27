@@ -30,6 +30,20 @@ mixin _FakeConnection on _FakeBridgeState {
   @override
   Future<void> historyCacheSetLimit(int limitMb) async {}
 
+  ConnectionWindowPreferences savedConnectionWindow =
+      const ConnectionWindowPreferences();
+  Object? connectionWindowSaveError;
+  @override
+  Future<ConnectionWindowPreferences> connectionWindowPreferences() async =>
+      savedConnectionWindow;
+  @override
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  ) async {
+    if (connectionWindowSaveError case final error?) throw error;
+    savedConnectionWindow = value;
+  }
+
   String? savedNetworkProxy;
   ProxyMode savedProxyMode = ProxyMode.system;
 
@@ -348,11 +362,26 @@ mixin _FakeConnection on _FakeBridgeState {
       throw error;
     }
     _appConnected.add(serviceKey);
+    appReconnectRefused.remove(serviceKey);
     _appEvents.putIfAbsent(serviceKey, StreamController<AppEvent>.broadcast);
   }
 
   @override
   bool appIsConnected(String serviceKey) => _appConnected.contains(serviceKey);
+
+  /// Services the connection window never admitted: recovering one is
+  /// refused, as the bridge refuses it, until it is selected.
+  final Set<String> appReconnectRefused = {};
+
+  @override
+  Future<void> appReconnect(String serviceKey, int localPort) async {
+    if (appReconnectRefused.contains(serviceKey)) {
+      throw StateError(
+        'the service is no longer retained; select it again to connect',
+      );
+    }
+    await appConnect(serviceKey, localPort);
+  }
 
   /// The stage [appConnectStage] reports, per service key.
   final Map<String, ConnectStage> connectStages = {};

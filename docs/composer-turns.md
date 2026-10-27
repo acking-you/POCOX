@@ -15,6 +15,14 @@ Engine wire details stay in [ACP agents](acp-agents.md#turns-and-permissions),
 [Grok Build](grok-build.md#supplements); layout and styling are in
 [Flutter app UI](app-ui.md).
 
+Switching conversation services retains each service's last thread or project
+view in the app-scoped draft store, alongside its existing unsent text and
+attachments. Returning to a project draft restores that view even when another
+thread is newer. The bookmark and drafts last for the controller app session;
+this does not introduce a new on-disk draft format. View teardown releases its
+subscriptions but does not disconnect a retained service, answer pending
+requests or change read-only/write admission.
+
 ## Composer
 
 - Compact by default; resizable with mouse, touch and accessibility actions.

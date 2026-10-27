@@ -507,3 +507,52 @@ class AccountService {
   /// The local `pcx:<device>:<kind>:<name>` key the app/session layer uses.
   String get key => 'pcx:$device:$kind:$name';
 }
+
+/// Which idle conversation service the connection window releases first.
+enum ConnectionEviction {
+  /// The one selected least recently.
+  lru,
+
+  /// The one connected earliest.
+  fifo,
+}
+
+/// How many conversation services stay connected across switches, the
+/// selected one included, and which idle one goes first. Persisted.
+class ConnectionWindowPreferences {
+  /// Creates the preferences; the defaults are the bridge's.
+  const ConnectionWindowPreferences({
+    this.capacity = 5,
+    this.eviction = ConnectionEviction.lru,
+  });
+
+  /// The fewest services the window retains.
+  static const minCapacity = 1;
+
+  /// The most services the window retains.
+  static const maxCapacity = 32;
+
+  /// Services retained, from [minCapacity] to [maxCapacity].
+  final int capacity;
+
+  /// Which idle service goes first when [capacity] is reached.
+  final ConnectionEviction eviction;
+
+  /// These preferences with [capacity] or [eviction] changed.
+  ConnectionWindowPreferences copyWith({
+    int? capacity,
+    ConnectionEviction? eviction,
+  }) => ConnectionWindowPreferences(
+    capacity: capacity ?? this.capacity,
+    eviction: eviction ?? this.eviction,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      other is ConnectionWindowPreferences &&
+      other.capacity == capacity &&
+      other.eviction == eviction;
+
+  @override
+  int get hashCode => Object.hash(capacity, eviction);
+}

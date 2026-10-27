@@ -173,6 +173,16 @@ fn local_protocols_bypass_relay_and_retire_with_the_host() {
             engine.thread_resume(gateway, "foreign").is_err(),
             "gateway admission is preserved"
         );
+        let evicted = match session_engine::protocol_of(gateway) {
+            session_engine::Protocol::Acp => crate::engine::acp::evict_idle(gateway),
+            session_engine::Protocol::OpenCode => crate::engine::opencode::evict_idle(gateway),
+            _ => unreachable!("gateway fixture"),
+        };
+        assert!(evicted, "idle gateway streams release their retained connections");
+        assert!(!engine.is_connected(gateway));
+        engine
+            .connect(gateway.into(), 0)
+            .expect("fresh gateway connection after eviction");
     }
     let status = runtime::list_subscriptions()
         .into_iter()

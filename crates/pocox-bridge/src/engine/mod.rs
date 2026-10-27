@@ -13,6 +13,7 @@ pub mod daemon;
 pub mod discovery;
 pub mod execution;
 // The galaxy's frame geometry, called by the app through `dart:ffi`.
+pub(crate) mod connection_window;
 #[cfg(feature = "flutter")]
 pub mod galaxy;
 pub mod git_diff;

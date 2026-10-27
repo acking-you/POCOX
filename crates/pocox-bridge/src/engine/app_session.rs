@@ -57,9 +57,9 @@ use self::config::{
 pub use self::config::{model_list, thread_runtime_config, ThreadRuntimeConfig};
 #[cfg(test)]
 pub use self::connection::probe_endpoint_error;
-pub(crate) use self::connection::{connect, probe_api, probe_reason};
+pub(crate) use self::connection::{connect, evict_idle, is_idle, probe_api, probe_reason};
 pub use self::connection::{
-    connect_local, disconnect, is_connected, probe_endpoint, probe_http_endpoint,
+    connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };
 use self::history::{
     fetch_item_page, fetch_older_item_page, fetch_turn_page, is_unknown_method,
@@ -402,6 +402,22 @@ pub fn subscribe_events(service_key: &str) -> Result<broadcast::Receiver<AppEven
         .get(service_key)
         .ok_or_else(|| anyhow!("not connected to {service_key}"))?;
     Ok(s.events.subscribe())
+}
+
+/// Requests still owned by this live connection, for a newly attached view.
+pub(crate) fn pending_requests(service: &str) -> Vec<AppEvent> {
+    let map = sessions().lock().expect("sessions poisoned");
+    map.get(service)
+        .filter(|session| session.is_current())
+        .map(|session| {
+            session
+                .client
+                .pending_server_requests()
+                .into_iter()
+                .map(map_event)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn client_for(service_key: &str) -> Result<Arc<AppClient>> {

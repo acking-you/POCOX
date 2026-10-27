@@ -101,6 +101,67 @@ fn pending_upload_context_changes_with_credentials_but_not_ui_settings() {
 
 use super::*;
 
+#[test]
+fn file_writes_keep_their_owner_and_reject_a_retired_hosts_answer() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use axum::routing::post;
+    use axum::{Json, Router};
+    use pocox_pb::{RelaySession, Transport};
+
+    use crate::engine::local_services::Registration;
+
+    let _serial = transport::test_serial();
+    runtime::init(std::env::temp_dir()).expect("runtime");
+    let context = transport::Context::of(&Transport {
+        session: RelaySession::for_test("127.0.0.1:1"),
+        namespace: None,
+    });
+    transport::test_context(context.clone());
+    let listener = runtime::runtime()
+        .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
+        .expect("listen");
+    let address = listener.local_addr().expect("address");
+    let service = "pcx:file-write:app:test";
+    let host = Arc::new(
+        Registration::new(&context, &[
+            (service.into(), address),
+            ("pcx:file-write:meta:test".into(), address),
+        ])
+        .expect("host"),
+    );
+    let requests = Arc::new(AtomicUsize::new(0));
+    let received = requests.clone();
+    let router = Router::new().fallback_service(post(move |body: axum::body::Bytes| {
+        let host = host.clone();
+        let received = received.clone();
+        async move {
+            assert_eq!(body.as_ref(), b"attachment", "the original body reaches the host once");
+            if received.fetch_add(1, Ordering::SeqCst) == 1 {
+                host.suspend();
+            }
+            Json(serde_json::json!({"path":"/project/file"}))
+        }
+    }));
+    let server = runtime::runtime().spawn(async move {
+        axum::serve(listener, router).await.expect("serve");
+    });
+    assert_eq!(
+        upload_file(service, "file", b"attachment".to_vec())
+            .expect("upload")
+            .path,
+        "/project/file"
+    );
+    assert!(
+        write_file(service, "/project", "file", b"attachment".to_vec()).is_err(),
+        "a retired host cannot grant an attachment to the new view"
+    );
+    assert_eq!(requests.load(Ordering::SeqCst), 2, "writes are never retried automatically");
+    server.abort();
+    transport::context_changed();
+}
+
 async fn file_server(responses: Vec<String>) -> (Url, tokio::task::JoinHandle<Vec<String>>) {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0")

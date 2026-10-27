@@ -144,17 +144,21 @@ pub(super) fn register(key: Key, conn: Conn, epoch: u64) -> Result<()> {
     Ok(())
 }
 
-/// Whether `key`'s connection is alive, its stream healthy, and — for a
-/// local host — still pointing at the host currently published here.
+/// Whether `conn`'s event loop still runs (perhaps retrying an outage) and,
+/// for a local host, still points at the host currently published here.
+fn running(conn: &Conn) -> bool {
+    !conn.task.is_finished()
+        && conn
+            .local
+            .as_ref()
+            .is_none_or(crate::engine::local_services::Endpoint::is_current)
+}
+
+/// Whether `key`'s connection is running and its stream healthy.
 pub(super) fn is_current(key: &Key, _context: &Context) -> bool {
-    let conns = conns();
-    let Some(conn) = conns.get(key) else { return false };
-    if conn.task.is_finished() || !lock(&conn.shared).healthy {
-        return false;
-    }
-    conn.local
-        .as_ref()
-        .is_none_or(crate::engine::local_services::Endpoint::is_current)
+    conns()
+        .get(key)
+        .is_some_and(|conn| running(conn) && lock(&conn.shared).healthy)
 }
 
 /// Whether a live, healthy connection exists in the current context.
@@ -162,6 +166,15 @@ pub fn is_connected(service_key: &str) -> bool {
     let Some(context) = transport::current_context() else { return false };
     let Ok(key) = key_in(&context, service_key) else { return false };
     is_current(&key, &context)
+}
+
+/// Whether a connection in the current context may still come back on its
+/// own: its event loop retries a dropped stream, so an outage alone never
+/// ends it.
+pub fn is_retained(service_key: &str) -> bool {
+    let Some(context) = transport::current_context() else { return false };
+    let Ok(key) = key_in(&context, service_key) else { return false };
+    conns().get(&key).is_some_and(running)
 }
 
 pub(super) fn disconnect_inner(key: &Key) {
@@ -193,6 +206,38 @@ pub fn disconnect(service_key: &str) {
             .unwrap_or_else(|poison| poison.into_inner());
         disconnect_inner(&key);
     }
+}
+
+/// The event loop holds one shared reference; additional references belong
+/// to outstanding operations or follow readers. Running turns and unanswered
+/// permissions pin it too.
+fn busy(conn: &Conn) -> bool {
+    let view = lock(&conn.shared);
+    Arc::strong_count(&conn.shared) > 2 || !view.running.is_empty() || !view.permissions.is_empty()
+}
+
+/// Whether [`evict_idle`] would release `service_key` now, without
+/// releasing it.
+pub(crate) fn is_idle(service_key: &str) -> bool {
+    let Ok(key) = current_key(service_key) else { return true };
+    !conns().get(&key).is_some_and(busy)
+}
+
+/// Release only idle controller state (see [`busy`]).
+pub(crate) fn evict_idle(service_key: &str) -> bool {
+    let Ok(key) = current_key(service_key) else { return true };
+    let lifecycle = lifecycle(&key);
+    let _guard = lifecycle.lock().unwrap_or_else(|e| e.into_inner());
+    let mut registry = conns();
+    if registry.get(&key).is_some_and(busy) {
+        return false;
+    }
+    let removed = registry.remove(&key);
+    drop(registry);
+    if let Some(conn) = removed {
+        release(conn);
+    }
+    true
 }
 
 /// The transport context changed: every connection belongs to the old one.
@@ -316,6 +361,7 @@ mod tests {
                     address: address.to_string(),
                     subscription: None,
                     local: None,
+                    remote: None,
                     transient: None,
                 },
                 epoch,

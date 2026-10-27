@@ -135,6 +135,7 @@ impl SubEntry {
                 path: PathStatus::default(),
                 health: TunnelHealth::default(),
                 events: Vec::new(),
+                lifetime: None,
             },
         }
     }
@@ -154,6 +155,8 @@ impl SubEntry {
             },
             health: TunnelHealth::default(),
             events: Vec::new(),
+            // No SDK connection to outlive its registry slot.
+            lifetime: None,
         }
     }
 }
@@ -162,7 +165,7 @@ impl SubEntry {
 fn observe(
     key: &str,
     local_addr: &str,
-    connection: &Connection,
+    connection: &Arc<Connection>,
     path: ConnectionPath,
     ready: bool,
 ) -> SubStatus {
@@ -181,6 +184,7 @@ fn observe(
         path: PathStatus::observe(path, diagnostics.direct),
         health,
         events: diagnostics.events,
+        lifetime: Some(Arc::downgrade(connection)),
     }
 }
 
@@ -296,6 +300,8 @@ pub struct SubStatus {
     pub health: TunnelHealth,
     /// What happened to it lately, oldest first.
     pub events: Vec<TunnelEvent>,
+    /// Exact SDK owner observed atomically with this endpoint address.
+    pub(crate) lifetime: Option<std::sync::Weak<Connection>>,
 }
 
 /// Track direct use of an owned service without binding or forwarding a port.

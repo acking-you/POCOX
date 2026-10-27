@@ -120,6 +120,14 @@ pub struct ErrorPayload {
     pub data: Option<serde_json::Value>,
 }
 
+impl std::fmt::Display for ErrorPayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.message.fmt(f)
+    }
+}
+
+impl std::error::Error for ErrorPayload {}
+
 /// Image references from a native image-generation item (wire or rollout).
 /// Prefer the saved artifact so materialized transcripts do not duplicate
 /// base64 payloads. Hosts authorize this exact path against the typed rollout

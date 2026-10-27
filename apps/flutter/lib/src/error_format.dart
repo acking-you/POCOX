@@ -123,6 +123,11 @@ bool isAccountSessionExpired(String message) {
   return refreshRejected || servicesRejected;
 }
 
+/// True when the bridge refused a selection because every retained
+/// connection is busy (`engine::connection_window`).
+bool isConnectionWindowFull(String message) =>
+    message.toLowerCase().contains('connection window is full');
+
 /// True when the probe never got an answer at all — the far end is genuinely
 /// silent (not listening, wedged, or gone). Distinct from
 /// [isRelayAuthRejection], where it answered and said no.

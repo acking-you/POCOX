@@ -17,7 +17,8 @@ import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/services_screen.dart';
 import 'package:pocox/src/screens/settings_screen.dart';
 import 'package:pocox/src/screens/welcome_guide_screen.dart';
-import 'package:pocox/src/service_key.dart' show deviceLabel;
+import 'package:pocox/src/service_key.dart'
+    show deviceLabel, serviceDeviceIdentity;
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/share_card.dart';
 
@@ -773,7 +774,13 @@ void main() {
         await t.ensureVisible(item);
         await t.pump();
         _reachable(t, item, Offset.zero & size, '${s.key} $at');
-        final device = find.descendant(of: item, matching: find.text(s.device));
+        final group = find.byKey(
+          Key('host-switch-device-${serviceDeviceIdentity(s.key)}'),
+        );
+        final device = find.descendant(
+          of: group,
+          matching: find.text(deviceLabel(s.device)),
+        );
         expect(
           t.renderObject<RenderParagraph>(device).didExceedMaxLines,
           isFalse,

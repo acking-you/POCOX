@@ -14,6 +14,16 @@ pub(crate) enum Target {
 }
 
 impl Target {
+    pub(crate) fn at_epoch(service: &str, epoch: u64) -> Result<Self> {
+        ensure!(transport::is_current(epoch), "the account or relay changed; reconnect");
+        let target = Self::resolve(service)?;
+        ensure!(
+            target.epoch() == epoch && transport::is_current(epoch),
+            "the account or relay changed; reconnect"
+        );
+        Ok(target)
+    }
+
     pub(crate) fn resolve(service: &str) -> Result<Self> {
         let epoch = transport::epoch();
         if let Some(context) = transport::current_context() {
@@ -134,6 +144,7 @@ impl Target {
                 Ok(Origin {
                     address: endpoint.address(),
                     local: Some(endpoint.clone()),
+                    remote: None,
                     subscription,
                     transient: None,
                 })
@@ -144,6 +155,7 @@ impl Target {
                 Ok(Origin {
                     address,
                     local: None,
+                    remote: None,
                     subscription: None,
                     transient: Some(transient),
                 })
@@ -159,6 +171,7 @@ impl Target {
                 Ok(Origin {
                     address: sub.local_addr,
                     local: None,
+                    remote: sub.lifetime,
                     subscription: Some(registry),
                     transient: None,
                 })
@@ -172,6 +185,7 @@ impl Target {
 pub(crate) struct Origin {
     pub(crate) address: String,
     pub(crate) local: Option<Endpoint>,
+    pub(crate) remote: Option<std::sync::Weak<pocox_pb::Connection>>,
     pub(crate) subscription: Option<String>,
     pub(crate) transient: Option<runtime::TransientSubscription>,
 }
@@ -181,8 +195,30 @@ impl Origin {
         format!("http://{}/", self.address)
     }
 
+    /// Keep the exact tunnel alive until a metadata operation finishes.
+    /// Removing its retention slot must not cut an upload or redirect a
+    /// retry to a new listener at the same address.
+    pub(crate) fn retain_transport(&self) -> Result<Option<std::sync::Arc<pocox_pb::Connection>>> {
+        self.remote
+            .as_ref()
+            .map(|owner| {
+                owner
+                    .upgrade()
+                    .ok_or_else(|| anyhow::anyhow!("the connection was retired; retry the request"))
+            })
+            .transpose()
+    }
+
     pub(crate) fn is_current(&self) -> bool {
         self.local.as_ref().is_none_or(Endpoint::is_current)
+            && self.remote.as_ref().is_none_or(|owner| {
+                owner.upgrade().is_some_and(|connection| {
+                    !matches!(
+                        connection.status(),
+                        pocox_pb::TunnelStatus::Stopped | pocox_pb::TunnelStatus::Failed(_)
+                    )
+                })
+            })
     }
 
     pub(crate) fn release(&self) {

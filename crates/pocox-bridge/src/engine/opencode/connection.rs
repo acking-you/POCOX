@@ -25,13 +25,10 @@ pub(crate) fn connect(service: &str, port: u16, owned: &Target) -> Result<()> {
     let key = key_in(&context, service)?;
     let lifecycle = lifecycle(&key);
     let _guard = lock(&lifecycle);
-    if lock(&CONNS).get(&key).is_some_and(|c| {
-        !c.task.is_finished()
-            && lock(&c.shared).healthy
-            && c.local
-                .as_ref()
-                .is_none_or(super::super::local_services::Endpoint::is_current)
-    }) {
+    if lock(&CONNS)
+        .get(&key)
+        .is_some_and(|c| running(c) && lock(&c.shared).healthy)
+    {
         return Ok(());
     }
     // A stale connection goes, but its live tunnel stays for the new one: the
@@ -109,16 +106,29 @@ pub(crate) fn connect(service: &str, port: u16, owned: &Target) -> Result<()> {
     Ok(())
 }
 
+/// Whether `conn`'s event task still runs (perhaps retrying an outage) and,
+/// for a local host, still points at the host currently published here.
+fn running(conn: &Conn) -> bool {
+    !conn.task.is_finished()
+        && conn
+            .local
+            .as_ref()
+            .is_none_or(super::super::local_services::Endpoint::is_current)
+}
+
 /// Live health of this controller, independently of host-owned turns.
 pub fn is_connected(service: &str) -> bool {
     let Ok(key) = current_key(service) else { return false };
-    lock(&CONNS).get(&key).is_some_and(|c| {
-        !c.task.is_finished()
-            && lock(&c.shared).healthy
-            && c.local
-                .as_ref()
-                .is_none_or(super::super::local_services::Endpoint::is_current)
-    })
+    lock(&CONNS)
+        .get(&key)
+        .is_some_and(|c| running(c) && lock(&c.shared).healthy)
+}
+
+/// Whether this controller's connection may still come back on its own: its
+/// event task retries a dropped stream, so an outage alone never ends it.
+pub fn is_retained(service: &str) -> bool {
+    let Ok(key) = current_key(service) else { return false };
+    lock(&CONNS).get(&key).is_some_and(running)
 }
 
 /// Release only this controller's subscription and task.
@@ -128,6 +138,42 @@ pub fn disconnect(service: &str) {
         let _guard = lock(&lifecycle);
         remove(&key);
     }
+}
+
+/// The registry and event loop own two references; any other reference pins
+/// outstanding operations. Running turns and unanswered requests also pin it.
+fn busy(conn: &Conn) -> bool {
+    let view = lock(&conn.shared);
+    Arc::strong_count(&conn.shared) > 2
+        || !view.admitted.is_empty()
+        || view.sessions.values().any(|snapshot| {
+            snapshot.turn_id.is_some()
+                || !snapshot.permissions.is_empty()
+                || !snapshot.questions.is_empty()
+        })
+}
+
+/// Whether [`evict_idle`] would release `service` now, without releasing it.
+pub(crate) fn is_idle(service: &str) -> bool {
+    let Ok(key) = current_key(service) else { return true };
+    !lock(&CONNS).get(&key).is_some_and(busy)
+}
+
+/// Release `service` unless it is [`busy`].
+pub(crate) fn evict_idle(service: &str) -> bool {
+    let Ok(key) = current_key(service) else { return true };
+    let lifecycle = lifecycle(&key);
+    let _guard = lock(&lifecycle);
+    let mut registry = lock(&CONNS);
+    if registry.get(&key).is_some_and(busy) {
+        return false;
+    }
+    let removed = registry.remove(&key);
+    drop(registry);
+    if let Some(conn) = removed {
+        dispose(conn);
+    }
+    true
 }
 
 /// Invalidate every connection of the previous account or relay.

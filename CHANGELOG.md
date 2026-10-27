@@ -22,6 +22,17 @@ breaking change goes.
   scrubs through the conversation. A jump flashes the message it lands on.
   Long conversations scroll the rail with faded edges instead of thinning
   its marks, and the `n / total` outline button shows while you use the rail.
+
+- **Host switching groups services by device and reuses connections.** The
+  picker distinguishes this app's own services and marks the current one and
+  those whose connection is retained. Returning restores the previous thread
+  or project draft. Settings lets you retain 1–32 conversation services
+  (default five) with a stepper, releasing the least recently selected or the
+  first connected idle one; changes save at once. Running tasks and
+  unanswered requests protect their connections, and a relay outage never
+  releases one that is recovering; a full window explains why switching
+  cannot proceed. Failed switches keep the current service, and account
+  changes, stopped hosts and stale recovery cannot revive old owners.
 - **Local services connect directly throughout the app.** Discovery, session
   setup, probes, metadata, Responses API access and recovery use this app's
   owned loopback listeners before resolving relay credentials. A selected

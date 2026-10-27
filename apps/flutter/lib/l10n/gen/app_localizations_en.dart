@@ -9,6 +9,39 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get hostConnectionCurrent => 'In use';
+
+  @override
+  String get hostConnectionRetained => 'Connection retained';
+
+  @override
+  String get connectionWindowTitle => 'Retained connections';
+
+  @override
+  String get connectionWindowCapacity => 'Service limit';
+
+  @override
+  String get connectionWindowPolicy => 'Eviction policy';
+
+  @override
+  String get connectionWindowPolicyInfo =>
+      'When the limit is reached, the idle service released first: the one you selected least recently, or the one that connected first. Busy services are never released.';
+
+  @override
+  String get connectionWindowLru => 'Least recent';
+
+  @override
+  String get connectionWindowFifo => 'First connected';
+
+  @override
+  String get connectionWindowDescription =>
+      'Counts conversation services, including the selected one. Default: 5. Switching reuses healthy connections. Running tasks and unanswered requests are protected. A lower limit applies as protected services become idle; a full window asks you to wait or raise the limit. One temporary connection may be opened during a switch. API forwarding and shared ports have separate lifetimes.';
+
+  @override
+  String get connectionWindowFull =>
+      'All retained connections are busy or awaiting a response. Increase the service limit in Settings or wait for a task to finish.';
+
+  @override
   String get connectionPathTitle => 'Connection path';
 
   @override

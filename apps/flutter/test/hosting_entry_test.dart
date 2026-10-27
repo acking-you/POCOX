@@ -430,6 +430,7 @@ void main() {
       await _pump(t, api, initial: '/settings');
       await _frames(t);
       expect(find.byKey(const Key('settings-hosting-btn')), findsNothing);
+      await t.scrollUntilVisible(find.byKey(const Key('codex-setup-btn')), 200);
       expect(find.byKey(const Key('codex-setup-btn')), findsOneWidget);
     });
 

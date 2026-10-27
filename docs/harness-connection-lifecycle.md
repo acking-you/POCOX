@@ -138,6 +138,59 @@ keys. Active turns remain host-owned when an idle controller disconnects. This
 policy bounds idle retention; it is not a global admission limit against an
 arbitrary number of simultaneously active clients. Descriptor limits are unchanged.
 
+### Retained conversation services
+
+`engine::connection_window` owns controller retention across Flutter screen
+changes. `[connection_window]` in the existing config stores `capacity` (1–32,
+default 5) and `eviction` (`lru`, default, or `fifo`). Capacity counts conversation
+services, including the selected service, across Codex, ACP and OpenCode. API
+proxies, shared ports, device-management connections and probes are separate.
+Selections update LRU recency; FIFO preserves original connection age. Reading
+history, probing and rebuilding a screen never count as a visit.
+
+A switch reuses a healthy client, stream and tunnel. A new service finishes its
+handshake before idle candidates are evicted, allowing one temporary staging
+connection above capacity. A failed handshake preserves the current selection.
+Protocol registries check idleness atomically with removing their connection:
+outstanding operations, running turns, unanswered approvals and questions pin
+it. Codex and ACP pin a submitted turn before its start notification arrives;
+the marker names no turn, so Stop or a supplement in that window addresses the
+host's active turn, and an ACP prompt that fails or is refused drops it (a
+start event that still comes records the turn). An ACP prompt answered after
+another connection replaced its own is reported as possibly running, never as
+one to send again. If every
+candidate is protected, the staging connection is released and the switch fails
+with a capacity message. No eviction interrupts a host turn, answers a request,
+or changes session admission.
+
+Reducing capacity defers eviction of the selected or busy services. Maintenance
+checks every five seconds and finishes shrinking as services become idle. Idle
+eviction drops the protocol reader, client and subscription and releases its
+companion metadata tunnel. Every metadata request (uploads, downloads, file
+reads and previews, history windows, device management and event streams)
+holds its exact tunnel until it finishes; eviction cannot cut a transfer or
+redirect a retry to a replacement listener after port reuse. Transport epoch checks still reject
+old-account results. An outage is not an eviction: a connection stays in the
+window, with every protection of its work, while it can still come back (an
+ACP or OpenCode stream retrying after a relay blip, a Codex session whose
+reconnect reuses its tunnel, and keeps its slot, so a window of busy services
+cannot strand it). It leaves only once it cannot: gone from its registry, its
+event task finished, its local host restarted or stopped, or its account/relay
+epoch replaced (account/relay changes and logout). Automatic recovery may
+reconnect the selected service or one still retained, in the current epoch,
+and it is no visit (selection and recency stay); it cannot resurrect a service
+that a switch evicted. Explicit selection is required to admit it again: a
+switch, or opening a conversation from elsewhere (the session browser, say),
+which admits its service on entry. A switch evicts nothing unless enough idle
+services can go to admit it, so a refused switch leaves the conversation on
+screen connected. A saved capacity outside 1–32 reads as the nearest allowed
+value.
+
+Codex keeps unanswered server requests with the client. A new view subscribes
+first, replays that snapshot, then reads queued live events, including host
+resolution notifications. View teardown never answers them. ACP and OpenCode
+continue to use their existing host snapshot and admission flows.
+
 ## Failure reporting and recovery
 
 Process inspection retains spawn, permission, missing executable, timeout,
