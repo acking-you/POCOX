@@ -42,6 +42,18 @@ void main() {
         false,
       );
       expect(order, [1, 0, 3]);
+      expect(
+        await api.historyMerge(
+          ['tool-b', 'answer', 'tool-a'],
+          ['turn', 'turn', 'turn'],
+          ['tool-a', 'tool-b', 'answer'],
+          ['turn', 'turn', 'turn'],
+          ['turn'],
+          false,
+        ),
+        [2, 0, 1],
+        reason: 'history corrects order while retaining the existing bodies',
+      );
       final index = await api.reviewIndex([
         diffFixture('中文.dart'),
         diffFixture('中文.dart', added: ['a', 'b']),

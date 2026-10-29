@@ -63,11 +63,16 @@ forwards retained requests and closes so the controller reloads history.
 
 `engine/history_projection.rs` merges ordered identities and turn IDs, returning
 indices into the caller's existing rows. Text and images are not copied back
-to Rust for each merge. Shared IDs keep the live row, disjoint turns retain
-their order, and older pages preserve their overlap anchors. Flutter checks
+to Rust for each merge. Shared IDs keep the live row but follow the incoming
+host page's order, allowing a refresh to repair an already misordered view.
+Disjoint turns retain their order, and older pages preserve their overlap
+anchors. Current-only runs attach immediately before their next shared identity
+or at the end; page-only rows before that anchor come first. Flutter checks
 navigation/connection generations and retries projection when live identities
 change while awaiting it. The input limit is 100,000 combined rows and 16 MiB
-of identities.
+of identities. Native thread restoration also uses this projection; recovery's
+bounded handling of unanchored live fragments is described in
+[history synchronization](session-cache-sync.md#cache-policy-and-ui).
 
 `api/bridge/composer.rs` owns the queue's ordered command identities, exclusive
 send lease, paused/unknown outcome state and attachment admission generation.

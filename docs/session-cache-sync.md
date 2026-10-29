@@ -140,6 +140,27 @@ Live snapshots are coalesced to roughly one second and final turn events, with a
 most two ordinary checkpoint jobs per connection; app death can lose the latest
 uncommitted snapshot, which the next delta repairs.
 
+History membership and message content have separate owners during reconciliation.
+The incoming host page determines the order of every identity it contains, even
+when the current view has those identities in a different order. Live updates
+retain their newer bodies; they do not reorder shared rows by event arrival.
+Retained rows outside a page stay next to their overlap anchors, and a repeated
+page leaves the order unchanged. Native restoration uses this same identity
+projection to reconcile the 100-item live tail with the 20-item history window;
+an older buffered tool must not be appended after the final reply merely because
+the short history window omitted it.
+
+During opening/recovery, a live fragment of a retained turn with no shared item
+triggers at most one additional bounded read, guarded by the same navigation and
+connection generations. If the fragment still has no anchor in a completed turn,
+it remains outside the displayed window rather than being assigned an invented
+position after the answer. This does not delete host history or the native live
+cache; ordinary history paging can recover it. An active turn's new output and
+new turns remain visible while the host catches up. Complete history restores
+missing text prefixes; async questions and newer approval reviews retain their
+live ownership. No message-type sorting or renderer indentation workaround is
+used to establish chronology.
+
 Another writer is monitored with `follow?metadata_only=true`: liveness and an
 opaque rollout revision, then coalesced bounded app-server history refreshes that
 keep loaded prefixes and the reading position. The legacy full-snapshot follow

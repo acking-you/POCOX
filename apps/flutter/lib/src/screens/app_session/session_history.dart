@@ -231,12 +231,23 @@ extension _SessionHistory on _AppSessionState {
         byId[item.id] = item;
       }
       final shape = _historyShape(overlay);
+      final unanchored = unanchoredLiveTurns([
+        ...history.items,
+        for (final page in history.turnPages) ...page.items,
+      ], overlay)..remove(history.activeTurnId);
       final merged = await mergeHistoryItems(
         api,
+        // Updates can arrive in any order (including repeated completions).
+        // They replace bodies, never the authoritative history order. A
+        // disjoint fragment of a completed turn is outside this window until
+        // a read supplies an anchor; active-turn output stays visible.
+        [
+          for (final item in overlay)
+            if (!unanchored.contains(item.turnId)) byId[item.id] ?? item,
+        ],
         [for (final item in base) byId[item.id]!],
-        overlay,
         turnOrder: order,
-        olderPage: false,
+        olderPage: true,
       );
       if (!current()) return null;
       if (!listEquals(shape, _historyShape(live.values)) ||
