@@ -50,35 +50,36 @@ List<TranscriptItem> _mergeTurn(
   List<TranscriptItem> incoming,
   bool olderPage,
 ) {
-  final positions = {for (var i = 0; i < current.length; i++) current[i].id: i};
-  final seen = <String>{};
-  final out = <TranscriptItem>[];
-  final pending = <TranscriptItem>[];
-  var next = 0;
-  var anchored = false;
-  for (final item in incoming) {
-    if (!seen.add(item.id)) continue;
-    final at = positions[item.id];
-    if (at == null) {
-      pending.add(item);
-    } else if (at >= next) {
-      out
-        ..addAll(current.getRange(next, at))
-        ..addAll(pending)
-        ..add(current[at]);
-      pending.clear();
-      next = at + 1;
-      anchored = true;
+  final byId = {for (final item in current) item.id: item};
+  final incomingIds = incoming.map((item) => item.id).toSet();
+  final before = <String, List<TranscriptItem>>{};
+  var retained = <TranscriptItem>[];
+  for (final item in current) {
+    if (incomingIds.contains(item.id)) {
+      before[item.id] = retained;
+      retained = [];
+    } else {
+      retained.add(item);
     }
   }
-  if (anchored || olderPage) {
-    out
-      ..addAll(pending)
-      ..addAll(current.skip(next));
-  } else {
-    out
-      ..addAll(current)
-      ..addAll(pending);
+  final anchored = before.isNotEmpty;
+  final out = <TranscriptItem>[if (!anchored && !olderPage) ...current];
+  final seen = <String>{};
+  final pending = <TranscriptItem>[];
+  for (final item in incoming) {
+    if (!seen.add(item.id)) continue;
+    final existing = byId[item.id];
+    if (existing == null) {
+      pending.add(item);
+    } else {
+      out
+        ..addAll(pending)
+        ..addAll(before[item.id] ?? [])
+        ..add(existing);
+      pending.clear();
+    }
   }
+  out.addAll(pending);
+  if (anchored || olderPage) out.addAll(retained);
   return out;
 }

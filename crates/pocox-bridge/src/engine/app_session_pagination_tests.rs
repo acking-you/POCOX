@@ -544,6 +544,58 @@ fn reopening_an_idle_thread_reuses_pages_and_the_exhausted_cursor() {
 }
 
 #[test]
+fn reading_a_short_tail_reconciles_the_wider_live_buffer_in_source_order() {
+    runtime::init(std::env::temp_dir()).expect("runtime");
+    let metadata =
+        json!({"thread": {"id": "buffered", "historyMode": "paginated", "updatedAt": 1}});
+    let turn = json!({"id": "turn", "status": "completed", "items": []});
+    let items: Vec<_> = (0..100)
+        .map(|i| {
+            json!({
+                "id": format!("item-{i}"),
+                "type": if i == 99 { "agentMessage" } else { "reasoning" },
+                "text": format!("body-{i}"),
+            })
+        })
+        .collect();
+    let tail: Vec<_> = items[80..]
+        .iter()
+        .rev()
+        .map(|item| json!({"turnId": "turn", "item": item}))
+        .collect();
+    let (client, peer) = mock_client(vec![
+        ("thread/read", metadata.clone()),
+        ("thread/turns/list", json!({"data": [turn.clone()], "nextCursor": null})),
+        ("thread/items/list", json!({"data": tail, "nextCursor": "older"})),
+        ("thread/turns/list", json!({"data": [turn], "nextCursor": null})),
+        ("thread/read", metadata),
+    ]);
+    let session = TestSession::new(client);
+    let transcript = Arc::clone(&sessions().lock().expect("sessions")[&session.0].transcript);
+    for item in items {
+        buffer_item(&transcript, &Inbound {
+            method: "item/completed".into(),
+            params: Some(json!({"threadId": "buffered", "turnId": "turn", "item": item})),
+            request_id: None,
+        });
+    }
+    for _ in 0..2 {
+        let history = thread_read(&session.0, "buffered").expect("history");
+        assert_eq!(
+            history
+                .items
+                .iter()
+                .map(|i| i.id.clone())
+                .collect::<Vec<_>>(),
+            (0..100).map(|i| format!("item-{i}")).collect::<Vec<_>>()
+        );
+        assert_eq!(history.items.last().expect("answer").item_type, "agentMessage");
+        assert!(history.has_older, "reconciliation must preserve the paging cursor");
+    }
+    runtime::runtime().block_on(peer).expect("peer");
+}
+
+#[test]
 fn empty_older_page_ends_pagination_even_with_a_bogus_cursor() {
     runtime::init(std::env::temp_dir()).expect("init");
     let (client, peer) =

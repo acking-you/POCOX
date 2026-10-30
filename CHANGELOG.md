@@ -9,6 +9,11 @@ breaking change goes.
 
 ## Unreleased
 
+- Fix session history reconciliation placing older tool activity after the final
+  reply and folding the reply into the activity group. Host history now repairs
+  existing message order without an app restart, while preserving live content,
+  loaded history, and active-turn output during recovery.
+
 - **Harness updates verify the installed executable.** A newer version at
   the same launch path is reported as updated and its services restart even
   when the installer returns an error, such as Homebrew failing unrelated

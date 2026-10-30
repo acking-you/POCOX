@@ -459,36 +459,12 @@ fn thread_read_inner(
         cache_history(service_key, thread_id, before.source_revision, metadata, &loaded);
     }
     let LoadedHistory {
-        mut items,
+        items,
         turns,
         skeletons,
         has_older,
     } = loaded;
     let thread = res.get("thread");
-    // Merge in any items this session streamed that `thread/read` didn't return
-    // — an in-progress turn's thinking/tool items are buffered by the forwarder
-    // but the server omits them here — preserving their stream order so a
-    // re-opened conversation shows the live progress instead of a blank turn.
-    {
-        let positions: HashMap<String, usize> = items
-            .iter()
-            .enumerate()
-            .map(|(index, item)| (item.id.clone(), index))
-            .collect();
-        for buffered in buffered_items(service_key, thread_id) {
-            if let Some(index) = positions.get(&buffered.id) {
-                if buffered.item_type == "autoApprovalReview"
-                    && (items[*index].title == "inProgress" || buffered.title != "inProgress")
-                {
-                    items[*index] = buffered;
-                } else {
-                    items[*index].questions_json = buffered.questions_json;
-                }
-            } else {
-                items.push(buffered);
-            }
-        }
-    }
     // A turn is live if the last turn's status is still in progress.
     let running = turns
         .last()
@@ -496,6 +472,16 @@ fn thread_read_inner(
         .and_then(Value::as_str)
         .map(|s| s == "inProgress" || s == "in_progress")
         .unwrap_or(false);
+    // The live buffer can be wider than the history tail. Missing identities
+    // are not necessarily newer: stitch their shared anchors, with history
+    // authoritative about order, instead of appending old work after an answer.
+    let active_turn = turns.last().filter(|_| running).and_then(extract_turn_id);
+    let items = history_merge::reconcile(
+        items,
+        buffered_items(service_key, thread_id),
+        &skeletons,
+        active_turn.as_ref().and_then(Value::as_str),
+    )?;
     // On a cold open the forwarder may not have seen this turn's `turn/started`,
     // so seed the active turn id from the last (running) turn for interrupt.
     if running {

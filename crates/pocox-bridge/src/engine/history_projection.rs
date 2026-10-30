@@ -1,6 +1,8 @@
 //! Chronological history merging using identity metadata only. The controller
-//! keeps its presentation objects; existing indices always win shared IDs.
+//! keeps its presentation objects; existing indices always win shared IDs,
+//! while the incoming history page owns the order of the identities it names.
 use std::collections::{HashMap, HashSet};
+use std::mem;
 
 use anyhow::{ensure, Result};
 
@@ -23,6 +25,12 @@ fn group<'a>(ids: &'a [String], turns: &'a [String], offset: usize) -> (Vec<Key<
 
 /// Return indices into `current_ids` followed by `incoming_ids`. Unknown turns
 /// retain their relative position, and repeated incoming identities emit once.
+///
+/// An incoming page is authoritative about its own order, including identities
+/// already present in a different order. Current-only runs stay attached to
+/// their next shared identity (or the end). With no overlap, `older_page` says
+/// which side the page belongs on. Payload precedence is independent of order:
+/// a shared identity still returns the current index, preserving live text.
 pub fn merge(
     current_ids: &[String],
     current_turns: &[String],
@@ -96,32 +104,40 @@ fn merge_turn(
         .enumerate()
         .map(|(at, index)| (ids[*index], at))
         .collect();
+    let incoming_ids: HashSet<_> = incoming.iter().map(|index| ids[*index]).collect();
+    let mut before = HashMap::new();
+    let mut retained = Vec::new();
+    for &index in current {
+        if incoming_ids.contains(ids[index]) {
+            before.insert(ids[index], mem::take(&mut retained));
+        } else {
+            retained.push(index);
+        }
+    }
+    let anchored = !before.is_empty();
+    if !anchored && !older {
+        out.extend_from_slice(current);
+    }
     let mut seen = HashSet::new();
     let mut pending = Vec::new();
-    let mut next = 0;
-    let mut anchored = false;
     for index in incoming {
         if !seen.insert(ids[*index]) {
             continue;
         }
         match positions.get(ids[*index]) {
             None => pending.push(*index),
-            Some(&at) if at >= next => {
-                out.extend_from_slice(&current[next..at]);
+            Some(&at) => {
                 out.append(&mut pending);
+                if let Some(mut prefix) = before.remove(ids[*index]) {
+                    out.append(&mut prefix);
+                }
                 out.push(current[at]);
-                next = at + 1;
-                anchored = true;
             },
-            _ => {},
         }
     }
+    out.append(&mut pending);
     if anchored || older {
-        out.append(&mut pending);
-        out.extend_from_slice(&current[next..]);
-    } else {
-        out.extend_from_slice(current);
-        out.append(&mut pending);
+        out.append(&mut retained);
     }
 }
 
@@ -184,5 +200,80 @@ mod tests {
     #[test]
     fn rejects_misaligned_columns_before_reading_indices() {
         assert!(merge(&["a".into()], &[], &[], &[], &[], false).is_err());
+    }
+
+    #[test]
+    fn a_fresh_page_repairs_order_without_replacing_live_values() {
+        assert_eq!(
+            run(
+                &[("tool-b", "t"), ("answer", "t"), ("tool-a", "t")],
+                &[("tool-a", "t"), ("tool-b", "t"), ("answer", "t")],
+                &["t"],
+                false,
+            ),
+            [2, 0, 1],
+        );
+        // A stale prefix and a genuinely newer suffix outside the page remain.
+        assert_eq!(
+            run(
+                &[("prefix", "t"), ("b", "t"), ("a", "t"), ("suffix", "t")],
+                &[("a", "t"), ("middle", "t"), ("b", "t")],
+                &["t"],
+                false,
+            ),
+            [2, 5, 0, 1, 3],
+        );
+    }
+
+    #[test]
+    fn buffered_prefix_and_live_suffix_survive_a_shorter_history_window() {
+        assert_eq!(
+            run(
+                &[("early", "t"), ("recent", "t"), ("answer", "t"), ("live", "t")],
+                &[("recent", "t"), ("answer", "t")],
+                &["t"],
+                false,
+            ),
+            [0, 1, 2, 3],
+        );
+    }
+
+    #[test]
+    fn history_keeps_the_prompt_before_stream_only_work() {
+        assert_eq!(
+            run(
+                &[("live-tool", "t"), ("answer", "t")],
+                &[("user", "t"), ("stored-tool", "t"), ("answer", "t")],
+                &["t"],
+                true,
+            ),
+            [2, 3, 0, 1],
+        );
+    }
+
+    #[test]
+    fn every_observation_order_converges_and_reapplying_the_page_is_idempotent() {
+        let canonical = [("user", "t"), ("a", "t"), ("b", "t"), ("answer", "t")];
+        for a in 0..4 {
+            for b in 0..4 {
+                for c in 0..4 {
+                    for d in 0..4 {
+                        let permutation = [a, b, c, d];
+                        if permutation.iter().collect::<HashSet<_>>().len() != 4 {
+                            continue;
+                        }
+                        let current: Vec<_> = permutation.iter().map(|i| canonical[*i]).collect();
+                        for older in [false, true] {
+                            let indices = run(&current, &canonical, &["t"], older);
+                            assert!(indices.iter().all(|i| *i < 4), "live payloads must survive");
+                            let result: Vec<_> =
+                                indices.iter().map(|i| current[*i as usize]).collect();
+                            assert_eq!(result, canonical, "observation order: {permutation:?}");
+                            assert_eq!(run(&result, &canonical, &["t"], older), [0, 1, 2, 3]);
+                        }
+                    }
+                }
+            }
+        }
     }
 }

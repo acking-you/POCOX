@@ -38,6 +38,8 @@ mod config;
 mod connection;
 #[path = "app_session_history.rs"]
 mod history;
+#[path = "app_session_history_merge.rs"]
+mod history_merge;
 #[path = "app_session_items.rs"]
 mod items;
 #[path = "app_session_threads.rs"]

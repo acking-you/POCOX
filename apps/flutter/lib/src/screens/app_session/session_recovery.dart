@@ -194,15 +194,34 @@ extension _SessionRecovery on _AppSessionState {
       // all-unset config and we fall back to the server / in-memory restore).
       final historyFuture = api.appThreadRead(widget.serviceKey, startTid);
       final persistedFuture = _loadPersistedConfig(startTid);
-      final history = await historyFuture;
+      var history = await historyFuture;
       if (!current()) return;
-      final projected = await _projectHistory(
+      var projected = await _projectHistory(
         history,
         liveItems,
         partialItems,
         current,
       );
       if (projected == null || !current()) return;
+      // An event can cross the read's snapshot boundary without sharing an
+      // identity with its bounded tail. Read once after observing it, so the
+      // native history/buffer reconciliation can establish order. Repeatedly
+      // disjoint old events must not turn this into an unbounded read loop.
+      if (unanchoredLiveTurns([
+        ...history.items,
+        for (final page in history.turnPages) ...page.items,
+      ], liveItems.values).isNotEmpty) {
+        history = await api.appThreadRead(widget.serviceKey, startTid);
+        if (!current()) return;
+        projected = await _projectHistory(
+          history,
+          liveItems,
+          partialItems,
+          current,
+        );
+      }
+      if (projected == null || !current()) return;
+      final reconciled = projected;
       final liveTurnChanged = turnStateRevision != _turnStateRevision;
       final activeTurnId = liveTurnChanged ? _turnId : history.activeTurnId;
       final liveQuestions = _asyncQuestions.entries
@@ -218,7 +237,7 @@ extension _SessionRecovery on _AppSessionState {
         _historyEpoch = history.historyEpoch;
         _loading = false;
         _restoreHistoryQuestions(history.items);
-        _installHistory(projected);
+        _installHistory(reconciled);
         _turnSummaries = history.turns;
         _hasOlder = history.hasOlder;
         _historyError = false;
