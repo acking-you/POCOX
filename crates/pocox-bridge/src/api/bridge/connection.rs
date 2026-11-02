@@ -217,6 +217,8 @@ pub struct AppCapabilitiesDto {
     pub rate_limits: bool,
     /// Taking over a session held by another local process.
     pub takeover: bool,
+    /// Branching a session into an independent one.
+    pub fork: bool,
     /// Monitoring another writer of the same session.
     pub external_writer_monitor: bool,
     /// Sessions read directly from this device's disk.
@@ -290,6 +292,7 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
         guardian: c.guardian,
         rate_limits: c.rate_limits,
         takeover: c.takeover,
+        fork: c.fork,
         external_writer_monitor: c.external_writer_monitor,
         local_sessions: c.local_sessions,
         plan_mode: c.plan_mode,

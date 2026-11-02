@@ -36,6 +36,8 @@ mod account;
 mod config;
 #[path = "app_session_connection.rs"]
 mod connection;
+#[path = "app_session_fork.rs"]
+mod fork;
 #[path = "app_session_history.rs"]
 mod history;
 #[path = "app_session_history_merge.rs"]
@@ -63,6 +65,9 @@ pub(crate) use self::connection::{connect, evict_idle, is_idle, probe_api, probe
 pub use self::connection::{
     connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };
+#[cfg(test)]
+pub use self::fork::ThreadFork;
+pub use self::fork::{thread_fork, ForkOutcome};
 use self::history::{
     fetch_item_page, fetch_older_item_page, fetch_turn_page, is_unknown_method,
     load_paginated_window, load_whole_history, LoadedHistory, INITIAL_TURN_LIMIT, ITEM_PAGE_LIMIT,
@@ -146,6 +151,9 @@ pub struct ThreadMeta {
     /// Parent thread, when this is a spawned child.
     #[serde(default)]
     pub parent_thread_id: Option<String>,
+    /// The thread this one branched from: its own conversation, not a child.
+    #[serde(default)]
+    pub forked_from_id: Option<String>,
     /// Working directory (the "project" the thread controls).
     pub cwd: String,
     /// The repository's remote (`gitInfo.originUrl`), when the agent reports

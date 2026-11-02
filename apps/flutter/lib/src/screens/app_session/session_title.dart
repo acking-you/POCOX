@@ -13,8 +13,9 @@ extension _SessionTitle on _AppSessionState {
   String _barTitle(AppLocalizations l10n) {
     final tid = _threadId;
     if (tid != null) {
-      final match = _threads.where((t) => t.id == tid);
-      final meta = match.isEmpty ? null : match.first;
+      final meta =
+          _threads.where((t) => t.id == tid).firstOrNull ??
+          _discoveredThreads[tid];
       // A user-set name wins outright — that's the whole point of renaming.
       final named = meta?.title;
       if (named != null) return named;
@@ -253,8 +254,16 @@ extension _SessionTitle on _AppSessionState {
                     if (v == 'compact') _compact();
                     if (v == 'rename') _beginTitleEdit();
                     if (v == 'session-release') unawaited(_releaseSession());
+                    if (v == 'fork') unawaited(_forkConversation());
                   },
                   itemBuilder: (c) => [
+                    if (_canFork)
+                      PopupMenuItem(
+                        key: const Key('session-fork'),
+                        value: 'fork',
+                        enabled: !_fork.pending,
+                        child: Text(l10n.forkConversation),
+                      ),
                     if (_canReleaseSession)
                       PopupMenuItem(
                         key: const Key('session-release'),

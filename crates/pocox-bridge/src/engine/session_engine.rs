@@ -20,7 +20,7 @@ use tokio::sync::broadcast;
 
 use super::acp;
 use super::app_session::{
-    self, AppEvent, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
+    self, AppEvent, ForkOutcome, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
     ThreadRuntimeConfig, TurnItemsPage,
 };
 use super::service_connection::Target;
@@ -162,6 +162,9 @@ pub struct Capabilities {
     pub rate_limits: bool,
     /// Taking over a session held by another local process.
     pub takeover: bool,
+    /// Branching a session into an independent one, through a completed turn
+    /// or from its latest saved state.
+    pub fork: bool,
     /// Monitoring another writer.
     pub external_writer_monitor: bool,
     /// Sessions read from this device's disk.
@@ -224,6 +227,7 @@ impl Capabilities {
             guardian: true,
             rate_limits: true,
             takeover: true,
+            fork: true,
             external_writer_monitor: true,
             local_sessions: true,
             plan_mode: true,
@@ -299,6 +303,18 @@ pub trait SessionEngine: Sync {
     fn thread_start(&self, service_key: &str, options: StartOptions) -> Result<String>;
     /// Reopen a session before reading it or sending turns.
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()>;
+    /// Branch a session into a new independent one on the host serving it,
+    /// through `through_turn_id` (inclusive) or from its latest saved state.
+    /// Never resumes, signals or writes the source.
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        let _ = (service_key, thread_id, through_turn_id);
+        Err(unsupported(self.protocol(), "forking conversations"))
+    }
     /// Newest history window. `include_turn_pages` keeps the native
     /// monitoring semantics (omit cached selected-turn windows when false).
     fn thread_read(
@@ -507,6 +523,15 @@ impl SessionEngine for CodexEngine {
 
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()> {
         app_session::thread_resume(service_key, thread_id)
+    }
+
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        app_session::thread_fork(service_key, thread_id, through_turn_id)
     }
 
     fn thread_read(

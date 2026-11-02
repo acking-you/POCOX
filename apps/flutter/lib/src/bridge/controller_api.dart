@@ -5,6 +5,15 @@ abstract interface class ControllerBridgeApi {
   /// Create the native memory-only controller for one composer draft.
   ComposerControl composerCreate();
 
+  /// Branch a conversation into a new independent one on the host serving it,
+  /// through [throughTurnId] (inclusive) or from its latest saved state. Throws
+  /// when the host refuses: nothing was created.
+  Future<ThreadForkResult> appThreadFork(
+    String serviceKey,
+    String threadId, {
+    String? throughTurnId,
+  });
+
   /// Whether a host explicitly refused a turn before admitting it.
   bool turnErrorIsRefusal(String message);
 

@@ -24,7 +24,7 @@ import 'package:pocox/src/ide_context.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/realtime_delegation.dart';
 import 'package:pocox/src/screens/local_sessions_screen.dart'
-    show SessionSource, resumeLocalSession;
+    show SessionSource, forkLocalSession, resumeLocalSession;
 import 'package:pocox/src/screens/app_session/generated_image_card.dart';
 import 'package:pocox/src/screens/app_session/model_feedback.dart';
 import 'package:pocox/src/screens/app_session/message_actions.dart';
@@ -117,6 +117,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   final _native = NativeHistoryWindow();
   bool _loadingOlder = false;
   bool _resuming = false;
+  bool _forking = false;
   bool _foreground = true;
 
   // Resolved (base64-decoded) attachments cached by item id: rows rebuild on
@@ -308,6 +309,27 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       });
     } finally {
       if (epoch == _loadEpoch) _reading = false;
+    }
+  }
+
+  /// Keep working from this session without touching whoever holds it.
+  Future<void> _fork() async {
+    final live = _live;
+    if (_forking || _source.isNative || widget.guardian || live == null) return;
+    final epoch = _loadEpoch;
+    setState(() => _forking = true);
+    try {
+      await forkLocalSession(
+        context,
+        ref,
+        threadId: widget.threadId,
+        cwd: widget.cwd,
+        running: !live.allowsResume,
+        source: _source,
+        isCurrent: () => mounted && epoch == _loadEpoch,
+      );
+    } finally {
+      if (mounted) setState(() => _forking = false);
     }
   }
 
@@ -535,40 +557,61 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: !_source.isNative && live.allowsResume && !widget.guardian
-            ? FilledButton.icon(
-                key: const Key('view-resume'),
-                onPressed: _resume,
-                icon: Icon(
-                  live.requiresTakeover
-                      ? AppIcons.bolt
-                      : AppIcons.play_circle_outline,
-                ),
-                label: Text(
-                  live.requiresTakeover
-                      ? l10n.forceTakeover
-                      : l10n.resumeSession,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    AppIcons.lock_clock,
-                    size: 16,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      _source.isNative
-                          ? l10n.nativeHistoryReadOnly
-                          : l10n.readOnlyViewing,
-                      style: TextStyle(color: scheme.onSurfaceVariant),
+        child: Row(
+          children: [
+            Expanded(
+              child: !_source.isNative && live.allowsResume && !widget.guardian
+                  ? FilledButton.icon(
+                      key: const Key('view-resume'),
+                      onPressed: _resume,
+                      icon: Icon(
+                        live.requiresTakeover
+                            ? AppIcons.bolt
+                            : AppIcons.play_circle_outline,
+                      ),
+                      label: Text(
+                        live.requiresTakeover
+                            ? l10n.forceTakeover
+                            : l10n.resumeSession,
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          AppIcons.lock_clock,
+                          size: 16,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _source.isNative
+                                ? l10n.nativeHistoryReadOnly
+                                : l10n.readOnlyViewing,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+            ),
+            if (!_source.isNative && !widget.guardian) ...[
+              const SizedBox(width: 8),
+              TextButton.icon(
+                key: const Key('view-fork'),
+                onPressed: _forking ? null : _fork,
+                icon: _forking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(AppIcons.account_tree_outlined, size: 18),
+                label: Text(l10n.forkConfirm),
               ),
+            ],
+          ],
+        ),
       ),
     );
   }

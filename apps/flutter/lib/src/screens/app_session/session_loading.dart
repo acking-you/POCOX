@@ -60,6 +60,7 @@ extension _SessionLoading on _AppSessionState {
         }
         mine = [
           local ??
+              _discoveredThreads[tid] ??
               ThreadMeta(
                 id: tid,
                 preview: _lastSent?.text ?? '',
@@ -81,6 +82,7 @@ extension _SessionLoading on _AppSessionState {
                   preview: localPreview[t.id]!,
                   name: t.name,
                   threadSource: t.threadSource,
+                  forkedFromId: t.forkedFromId,
                   parentThreadId: t.parentThreadId,
                   cwd: t.cwd,
                   originUrl: t.originUrl,
@@ -250,6 +252,7 @@ extension _SessionLoading on _AppSessionState {
       _externalWriterMode = false;
       _guardianReadOnly = false;
       _parentThreadId = null;
+      _fork.source = null;
       _externalWriterLiveness = null;
       _access = null;
       _takingOver = false;

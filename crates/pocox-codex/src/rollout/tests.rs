@@ -248,3 +248,70 @@ fn voice_handoff_shows_what_the_user_said() {
     assert_eq!(items.len(), 1);
     assert!(items[0].text.contains("<transcript_delta>"));
 }
+
+/// One rollout header naming its parent and the inherited byte count.
+fn fork_header(id: &str, parent: &str, end_byte_offset: usize) -> String {
+    json!({"type": "session_meta", "payload": {
+        "id": id,
+        "forked_from_id": parent,
+        "history_base": {
+            "thread_id": parent,
+            "end_ordinal_exclusive": 2,
+            "end_byte_offset": end_byte_offset,
+        },
+    }})
+    .to_string()
+}
+
+#[test]
+fn a_referenced_fork_reads_its_inherited_prefix_and_nothing_later() {
+    const SOURCE: &str = "01000000-0000-7000-8000-000000000001";
+    const FORK: &str = "01000000-0000-7000-8000-000000000002";
+    const NESTED: &str = "01000000-0000-7000-8000-000000000003";
+    let home = tempfile::tempdir().expect("tempdir");
+    let active = home.path().join("sessions/2026/11/02");
+    let archived = home.path().join("archived_sessions");
+    std::fs::create_dir_all(&active).expect("sessions");
+    std::fs::create_dir_all(&archived).expect("archive");
+
+    // The source sits in the archive and went on after the fork took its prefix.
+    let header = json!({"type": "session_meta", "payload": {"id": SOURCE}}).to_string();
+    let inherited = format!("{header}\n{}\n", user_line("before the fork"));
+    let source = format!("{inherited}{}\n", user_line("source after the fork"));
+    std::fs::write(archived.join(format!("rollout-2026-11-02T10-00-00-{SOURCE}.jsonl")), source)
+        .expect("source");
+
+    let fork_prefix = format!("{}\n", fork_header(FORK, SOURCE, inherited.len()));
+    let fork_path = active.join(format!("rollout-2026-11-02T10-00-01-{FORK}.jsonl"));
+    std::fs::write(&fork_path, &fork_prefix).expect("fresh fork");
+    assert_eq!(
+        read_session_info(&fork_path).expect("info").preview,
+        "before the fork",
+        "a fork with no prompt of its own lists by the history it inherited"
+    );
+
+    let fork = format!("{fork_prefix}{}\n", user_line("in the fork"));
+    std::fs::write(&fork_path, &fork).expect("fork");
+    let texts = |path: &Path| -> Vec<String> {
+        read_transcript(path)
+            .expect("transcript")
+            .into_iter()
+            .map(|item| item.text)
+            .collect()
+    };
+    assert_eq!(texts(&fork_path), ["before the fork", "in the fork"]);
+
+    // A fork of a fork walks the chain, each file cut at its own boundary.
+    let nested_path = active.join(format!("rollout-2026-11-02T10-00-02-{NESTED}.jsonl"));
+    std::fs::write(
+        &nested_path,
+        format!("{}\n{}\n", fork_header(NESTED, FORK, fork.len()), user_line("nested")),
+    )
+    .expect("nested");
+    assert_eq!(texts(&nested_path), ["before the fork", "in the fork", "nested"]);
+
+    // A missing ancestor leaves the fork's own record readable.
+    std::fs::remove_file(archived.join(format!("rollout-2026-11-02T10-00-00-{SOURCE}.jsonl")))
+        .expect("remove source");
+    assert_eq!(texts(&fork_path), ["in the fork"]);
+}

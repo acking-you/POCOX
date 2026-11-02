@@ -132,6 +132,7 @@ extension _SessionTranscript on _AppSessionState {
       onEdit: _externalWriterMode || _historySyncing || _showingCachedHistory
           ? null
           : _editMessage,
+      onFork: _forkTurnAction(item),
       flash: _turnFlashRow == _rowKey(row) ? _turnFlashRevision : null,
     );
   }

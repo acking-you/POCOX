@@ -14,8 +14,8 @@ That path reads the host's configured provider data, never the remote
 controller's filesystem. A historical inventory entry alone does not grant
 write access: writing goes through a connected host's session access (below).
 
-A native session is continued, never forked or copied, by opening it on a
-running host that serves its provider: **Continue in <host>** in the viewer
+Opening a native session continues it and never forks or copies it. It
+continues by opening on a running host that serves its provider: **Continue in <host>** in the viewer
 (a native OpenCode host on OpenCode's shared history for OpenCode, never
 one with a history of its own; a Claude ACP host for Claude; a Grok host on
 the user's own Grok home, never a custom provider's, for Grok), or

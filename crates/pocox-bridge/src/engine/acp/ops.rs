@@ -44,6 +44,7 @@ fn meta_of(session: &Value) -> Option<ThreadMeta> {
         name: title,
         thread_source: None,
         parent_thread_id: None,
+        forked_from_id: None,
         cwd: session["cwd"].as_str().unwrap_or("").to_string(),
         origin_url: None,
         updated_at: session["updatedAt"]

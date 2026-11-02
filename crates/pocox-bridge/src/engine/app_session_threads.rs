@@ -246,10 +246,12 @@ fn thread_list_remote(service_key: &str) -> Result<Vec<ThreadMeta>> {
 /// Inspect a thread's classification and parent without attaching a writer.
 pub fn thread_metadata(service_key: &str, thread_id: &str) -> Result<ThreadMeta> {
     let client = client_for(service_key)?;
-    read_thread_metadata(&client, thread_id)
+    let mut metadata = read_thread_metadata(&client, thread_id)?;
+    super::fork::inherit_preview(&client, &mut metadata);
+    Ok(metadata)
 }
 
-fn read_thread_metadata(client: &Arc<AppClient>, thread_id: &str) -> Result<ThreadMeta> {
+pub(super) fn read_thread_metadata(client: &Arc<AppClient>, thread_id: &str) -> Result<ThreadMeta> {
     let response = runtime::runtime().block_on(
         client.request("thread/read", json!({"threadId": thread_id, "includeTurns": false})),
     )?;
@@ -266,6 +268,7 @@ pub(super) fn parse_thread_meta(t: &Value) -> Option<ThreadMeta> {
         id,
         thread_source: pocox_codex::rollout::thread_source(t),
         parent_thread_id: pocox_codex::rollout::parent_thread_id(t),
+        forked_from_id: pocox_codex::rollout::forked_from_id(t),
         preview: t
             .get("preview")
             .and_then(Value::as_str)

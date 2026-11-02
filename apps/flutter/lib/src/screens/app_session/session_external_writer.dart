@@ -465,10 +465,20 @@ extension _SessionExternalWriter on _AppSessionState {
               ],
             ),
           );
+    final actions = [
+      if (_caps.fork) _forkFootButton(l10n),
+      if (hasCwd) _externalDiffButton(l10n),
+    ];
     return _readOnlyFoot(
       child: _footRow(
         lead: state,
-        trail: hasCwd ? _externalDiffButton(l10n) : null,
+        trail: actions.isEmpty
+            ? null
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: actions,
+              ),
       ),
     );
   }

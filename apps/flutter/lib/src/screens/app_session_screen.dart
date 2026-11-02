@@ -89,6 +89,7 @@ import 'package:pocox/src/widgets/middle_click_scroll.dart';
 import 'package:pocox/src/widgets/project_menu.dart';
 import 'package:pocox/src/widgets/project_section_header.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/fork_dialog.dart';
 import 'package:pocox/src/widgets/takeover_dialog.dart';
 import 'package:pocox/src/widgets/theme_toggle.dart';
 import 'package:pocox/src/widgets/turn_minimap.dart';
@@ -115,6 +116,7 @@ part 'app_session/session_draft_options.dart';
 part 'app_session/session_conversations.dart';
 part 'app_session/session_events.dart';
 part 'app_session/session_external_writer.dart';
+part 'app_session/session_fork.dart';
 part 'app_session/session_history.dart';
 part 'app_session/session_keyboard.dart';
 part 'app_session/session_layout.dart';
@@ -547,6 +549,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _externalWriterMode = false;
   bool _guardianReadOnly = false;
   String? _parentThreadId;
+  final _fork = _ForkState();
   final Set<String> _expandedSessionParents = {};
   // Manual folds also override automatic reveals for search or selection.
   final Set<String> _collapsedSessionParents = {};

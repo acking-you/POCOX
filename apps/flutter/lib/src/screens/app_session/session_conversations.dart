@@ -646,6 +646,10 @@ extension _SessionConversations on _AppSessionState {
     // it lives when no project heading above says so.
     final facts = [
       if (thread.isVoice) l10n.voiceLive,
+      if ((thread.forkedFromId ??
+              _discoveredThreads[thread.id]?.forkedFromId) !=
+          null)
+        l10n.forkedTag,
       if (_drafts.hasDraft(thread.id)) l10n.draft,
       if (_drafts.queuedCount(thread.id) > 0)
         l10n.queuedCount(_drafts.queuedCount(thread.id)),

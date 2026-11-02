@@ -138,6 +138,7 @@ class ThreadMeta {
     this.name,
     this.threadSource,
     this.parentThreadId,
+    this.forkedFromId,
     this.originUrl,
   });
 
@@ -155,6 +156,9 @@ class ThreadMeta {
 
   /// Explicit spawning parent, independent of project and session titles.
   final String? parentThreadId;
+
+  /// The conversation this one branched from; never a spawning parent.
+  final String? forkedFromId;
 
   bool get isGuardian => threadSource == 'guardian_review';
 
@@ -186,10 +190,32 @@ class ThreadMeta {
     name: name,
     threadSource: threadSource,
     parentThreadId: parentThreadId,
+    forkedFromId: forkedFromId,
     cwd: cwd,
     originUrl: originUrl,
     updatedAt: updatedAt,
   );
+}
+
+/// What a fork request did. A refusal is thrown instead: nothing was created.
+class ThreadForkResult {
+  /// Creates a fork result.
+  const ThreadForkResult({
+    this.thread,
+    this.lastTurnInterrupted = false,
+    this.boundaryConfirmed = false,
+  });
+
+  /// The new conversation; null when the outcome is unknown: the request was
+  /// sent but its answer was lost, so one may exist and a retry could add
+  /// another.
+  final ThreadMeta? thread;
+
+  /// The new conversation's newest turn is marked interrupted.
+  final bool lastTurnInterrupted;
+
+  /// The new conversation ends at the requested boundary.
+  final bool boundaryConfirmed;
 }
 
 /// A thread's recovered history plus whether a turn is still running, and the

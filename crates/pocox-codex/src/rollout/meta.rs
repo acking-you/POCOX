@@ -58,6 +58,17 @@ pub fn parent_thread_id(value: &Value) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Read which thread this one branched from. Distinct from
+/// [`parent_thread_id`]: a fork is its own conversation, not a spawned agent.
+pub fn forked_from_id(value: &Value) -> Option<String> {
+    value
+        .get("forkedFromId")
+        .or_else(|| value.get("forked_from_id"))
+        .and_then(Value::as_str)
+        .filter(|id| !id.is_empty())
+        .map(str::to_owned)
+}
+
 /// Read an explicit classification; recognize the legacy Guardian source too.
 pub fn thread_source(value: &Value) -> Option<String> {
     non_empty(

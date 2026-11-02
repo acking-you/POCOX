@@ -58,6 +58,7 @@ mixin _RustThreads implements BridgeApi {
       guardian: c.guardian,
       rateLimits: c.rateLimits,
       takeover: c.takeover,
+      fork: c.fork,
       externalWriterMonitor: c.externalWriterMonitor,
       localSessions: c.localSessions,
       planMode: c.planMode,
@@ -205,6 +206,27 @@ mixin _RustThreads implements BridgeApi {
     serviceTier: serviceTier,
     sandbox: sandbox,
   );
+
+  @override
+  Future<ThreadForkResult> appThreadFork(
+    String serviceKey,
+    String threadId, {
+    String? throughTurnId,
+  }) async {
+    final fork = await frb.appThreadFork(
+      serviceKey: serviceKey,
+      threadId: threadId,
+      throughTurnId: throughTurnId,
+    );
+    return ThreadForkResult(
+      thread: switch (fork.thread) {
+        final thread? => _threadMeta(thread),
+        null => null,
+      },
+      lastTurnInterrupted: fork.lastTurnInterrupted,
+      boundaryConfirmed: fork.boundaryConfirmed,
+    );
+  }
 
   @override
   Future<void> appThreadResume(String serviceKey, String threadId) =>
@@ -582,6 +604,7 @@ ThreadMeta _threadMeta(frb.ThreadMetaDto t) => ThreadMeta(
   name: t.name,
   threadSource: t.threadSource,
   parentThreadId: t.parentThreadId,
+  forkedFromId: t.forkedFromId,
   cwd: t.cwd,
   originUrl: t.originUrl,
   updatedAt: t.updatedAt.toInt(),

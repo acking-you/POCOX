@@ -33,6 +33,7 @@ must keep. Start with [architecture](architecture.md); contributor rules are in
 | [Provider-native history](native-agent-history.md) | Local sessions for Codex, Claude, Grok and OpenCode, session access |
 | [History cache and sync](session-cache-sync.md) | controller disk cache, history windows, monitoring |
 | [Guardian sessions](guardian-sessions.md) | automatic approval reviews and session hierarchy |
+| [Forking conversations](session-fork.md) | branching ordinary and held Codex sessions, boundaries, outcomes and storage |
 | [Session file links](session-file-links.md) | previews and downloads of files named in a conversation |
 | [Native image generation](native-image-generation.md) | generated images in live and read-only views |
 | [Live voice](live-voice.md) | voice calls and composer dictation |

@@ -222,6 +222,10 @@ extension _SessionStatus on _AppSessionState {
               ),
             ),
             const SizedBox(width: 12),
+            if (_fork.source case final source?) ...[
+              _forkSourceMark(l10n, source),
+              const SizedBox(width: 6),
+            ],
             // How the session travels (P2P or relay); opens the same sheet.
             LinkPathMark(serviceKey: widget.serviceKey, onTap: _showLink),
             const SizedBox(width: 6),
@@ -302,7 +306,13 @@ extension _SessionStatus on _AppSessionState {
     // Icon, gap, label (and the step dots while reconnecting), gap, then the
     // link mark and its gap.
     final state =
-        13 + 6 + line(label, labelStyle) + (_reconnecting ? 46 : 0) + 12 + 29;
+        13 +
+        6 +
+        line(label, labelStyle) +
+        (_reconnecting ? 46 : 0) +
+        12 +
+        29 +
+        (_fork.source == null ? 0 : 28);
     // Padding, glyph, gap, counts.
     final branchChip = branch == null ? 0.0 : 12 + 12 + 4 + counts;
     // Padding, gap, dot, gap after.

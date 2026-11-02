@@ -8836,6 +8836,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} disk log drops or write failures.'**
   String logsDiskLost(int count);
+
+  /// No description provided for @forkConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork conversation'**
+  String get forkConversation;
+
+  /// No description provided for @forkThroughTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork through this turn'**
+  String get forkThroughTurn;
+
+  /// No description provided for @forkDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This creates a new conversation with its own history. The original stays as it is, and its later changes won\'t reach the new one.'**
+  String get forkDialogBody;
+
+  /// No description provided for @forkDialogThroughTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'The new conversation includes this whole turn and everything before it.'**
+  String get forkDialogThroughTurn;
+
+  /// No description provided for @forkDialogRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'A turn is still running. The new conversation keeps what has been saved so far and marks that turn interrupted; the original keeps running.'**
+  String get forkDialogRunning;
+
+  /// No description provided for @forkDialogFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Both conversations work in the same folder, so their file changes can affect each other.'**
+  String get forkDialogFiles;
+
+  /// No description provided for @forkConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork'**
+  String get forkConfirm;
+
+  /// No description provided for @forkCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked into a new conversation'**
+  String get forkCreated;
+
+  /// No description provided for @forkCreatedInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked into a new conversation. Its last turn is marked interrupted.'**
+  String get forkCreatedInterrupted;
+
+  /// No description provided for @forkReadyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get forkReadyOpen;
+
+  /// No description provided for @forkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t fork the conversation'**
+  String get forkFailed;
+
+  /// No description provided for @forkOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t confirm the fork because the host\'s answer was lost. A new conversation may already exist, so check the list before trying again.'**
+  String get forkOutcomeUnknown;
+
+  /// No description provided for @forkBoundaryUnconfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'A new conversation was created, but it may not stop at the selected turn. It\'s in the list; check it before continuing.'**
+  String get forkBoundaryUnconfirmed;
+
+  /// No description provided for @forkHostChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The host connection changed during the fork. A new conversation may exist on the previous host.'**
+  String get forkHostChanged;
+
+  /// No description provided for @forkedTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork'**
+  String get forkedTag;
+
+  /// No description provided for @forkedFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked from {title}'**
+  String forkedFrom(String title);
+
+  /// No description provided for @forkedFromUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked conversation. Open the original.'**
+  String get forkedFromUnknown;
 }
 
 class _AppLocalizationsDelegate

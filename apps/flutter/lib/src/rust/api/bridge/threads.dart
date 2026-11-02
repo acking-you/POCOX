@@ -174,6 +174,18 @@ Future<void> appThreadResume({
   threadId: threadId,
 );
 
+/// Branch a session into a new independent one on the host serving it, through
+/// `through_turn_id` (inclusive) or from its latest saved state.
+Future<ThreadForkDto> appThreadFork({
+  required String serviceKey,
+  required String threadId,
+  String? throughTurnId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppThreadFork(
+  serviceKey: serviceKey,
+  threadId: threadId,
+  throughTurnId: throughTurnId,
+);
+
 /// Read a thread's conversation items (oldest first) and whether a turn is
 /// still running, so re-opening an in-flight thread restores live state.
 ///
@@ -521,6 +533,46 @@ class OlderPageDto {
           hasOlder == other.hasOlder;
 }
 
+/// What a fork request did. A refusal arrives as an error instead.
+class ThreadForkDto {
+  /// The new session, or `None` when the outcome is unknown.
+  final ThreadMetaDto? thread;
+
+  /// Why the outcome is unknown: the request was sent but its answer was
+  /// lost, so a session may exist and a retry could create another.
+  final String? unknownReason;
+
+  /// The new session's newest turn is marked interrupted.
+  final bool lastTurnInterrupted;
+
+  /// The new session ends at the requested boundary (true with none asked).
+  final bool boundaryConfirmed;
+
+  const ThreadForkDto({
+    this.thread,
+    this.unknownReason,
+    required this.lastTurnInterrupted,
+    required this.boundaryConfirmed,
+  });
+
+  @override
+  int get hashCode =>
+      thread.hashCode ^
+      unknownReason.hashCode ^
+      lastTurnInterrupted.hashCode ^
+      boundaryConfirmed.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThreadForkDto &&
+          runtimeType == other.runtimeType &&
+          thread == other.thread &&
+          unknownReason == other.unknownReason &&
+          lastTurnInterrupted == other.lastTurnInterrupted &&
+          boundaryConfirmed == other.boundaryConfirmed;
+}
+
 /// A thread's recovered history + whether a turn is still running, plus the
 /// metadata the status bar / git chip seed from on open.
 class ThreadHistoryDto {
@@ -770,6 +822,9 @@ class ThreadMetaDto {
   /// Parent thread for a spawned child.
   final String? parentThreadId;
 
+  /// The thread this one branched from; never a spawning parent.
+  final String? forkedFromId;
+
   /// Working directory (the project the thread controls).
   final String cwd;
 
@@ -785,6 +840,7 @@ class ThreadMetaDto {
     this.name,
     this.threadSource,
     this.parentThreadId,
+    this.forkedFromId,
     required this.cwd,
     this.originUrl,
     required this.updatedAt,
@@ -797,6 +853,7 @@ class ThreadMetaDto {
       name.hashCode ^
       threadSource.hashCode ^
       parentThreadId.hashCode ^
+      forkedFromId.hashCode ^
       cwd.hashCode ^
       originUrl.hashCode ^
       updatedAt.hashCode;
@@ -811,6 +868,7 @@ class ThreadMetaDto {
           name == other.name &&
           threadSource == other.threadSource &&
           parentThreadId == other.parentThreadId &&
+          forkedFromId == other.forkedFromId &&
           cwd == other.cwd &&
           originUrl == other.originUrl &&
           updatedAt == other.updatedAt;

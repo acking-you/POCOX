@@ -135,6 +135,9 @@ flowchart LR
   to every connection for every loaded thread, and re-list on
   `thread/started`, `thread/archived` and `thread/unarchived`.
 - When the app-server does not answer, the file-only inventory stands in.
+- `thread/fork` runs over the connection serving a session and only reads its
+  source; rollout readers follow a paginated fork's `history_base`
+  ([forking](session-fork.md)).
 - This device's own Local sessions view has no app-server and stays
   file-only.
 

@@ -63,6 +63,7 @@ class MessageView extends StatefulWidget {
     this.hostImageLoader,
     this.imageCacheScope,
     this.onEdit,
+    this.onFork,
     this.errorActions,
     this.flash,
   });
@@ -77,6 +78,10 @@ class MessageView extends StatefulWidget {
 
   /// Reuses the visible user prompt in the conversation's draft editor.
   final ValueChanged<String>? onEdit;
+
+  /// Branches a new conversation through this reply's whole turn; null when
+  /// the turn cannot be a fork boundary.
+  final VoidCallback? onFork;
 
   /// Each new value flashes the user's bubble, marking the message a turn
   /// jump landed on; null for none.
@@ -393,6 +398,13 @@ class _MessageViewState extends State<MessageView> {
                       tooltip: AppLocalizations.of(context).copy,
                       onPressed: _copy,
                     ),
+                    if (widget.onFork case final fork?)
+                      MessageAction(
+                        key: const Key('message-fork'),
+                        icon: AppIcons.account_tree_outlined,
+                        tooltip: AppLocalizations.of(context).forkThroughTurn,
+                        onPressed: fork,
+                      ),
                     // The turn's completion time, from the server's own
                     // `Turn.completedAt` — so it survives a reload, unlike the
                     // locally-observed duration marker.
@@ -439,6 +451,7 @@ class _MessageViewState extends State<MessageView> {
                 onEdit: isUser && refs.text.trim().isNotEmpty && onEdit != null
                     ? () => onEdit(refs.text)
                     : null,
+                onFork: widget.onFork,
                 child: content,
               )
             else

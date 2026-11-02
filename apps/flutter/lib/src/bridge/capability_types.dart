@@ -179,6 +179,7 @@ class AppCapabilities {
     this.draftOptions = false,
     this.questionMultiple = false,
     this.permissionFeedback = false,
+    this.fork = false,
   });
 
   /// The Codex app-server's capabilities.
@@ -189,6 +190,7 @@ class AppCapabilities {
     guardian: true,
     rateLimits: true,
     takeover: true,
+    fork: true,
     externalWriterMonitor: true,
     localSessions: true,
     planMode: true,
@@ -357,6 +359,9 @@ class AppCapabilities {
 
   /// Taking over a session held by another local process.
   final bool takeover;
+
+  /// Branching a session into an independent one.
+  final bool fork;
 
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;

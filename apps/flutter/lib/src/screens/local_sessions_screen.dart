@@ -18,6 +18,7 @@ import 'package:pocox/src/time_ago.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/fork_dialog.dart';
 import 'package:pocox/src/widgets/loading.dart';
 import 'package:pocox/src/widgets/search_field.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
@@ -834,6 +835,8 @@ Future<String?> ensureResumeTarget(WidgetRef ref) async {
 /// caller must ensure no other process is running a turn in the session (its
 /// `allowsResume` is false then); a turn the host's own app-server runs is
 /// joined.
+///
+/// [_sessionTarget] resolves the app-server to resume into.
 Future<void> resumeLocalSession(
   BuildContext context,
   WidgetRef ref, {
@@ -848,34 +851,9 @@ Future<void> resumeLocalSession(
   if (source.isNative || !current()) return;
   final l10n = AppLocalizations.of(context);
   final messenger = ToastMessenger.of(context);
-  // Resolve the app-server to resume into. For a remote host that IS the host
-  // behind the source key: it evicts + resumes into its own colocated
-  // app-server, so the target is simply that key. For the local source, ensure
-  // a live app-server (connect one if needed) rather than requiring the user to
-  // have opened one first.
-  final String? target;
-  if (source.isRemote) {
-    target = source.serviceKey;
-    // The Sessions tab / viewer reach the host only over the meta tunnel, so the
-    // app-server session isn't connected yet. Connect it now (mirroring the
-    // local path's ensureResumeTarget) — otherwise the conversation we open
-    // below resolves to "not connected" and shows an error after the success.
-    final bridge = ref.read(bridgeApiProvider);
-    if (target != null && !bridge.appIsConnected(target)) {
-      try {
-        await bridge.appConnect(target, appLocalPort);
-      } catch (e) {
-        if (current()) {
-          messenger.error(friendlyError(e));
-        }
-        return;
-      }
-    }
-    if (!context.mounted || !current()) return;
-  } else {
-    target = await ensureResumeTarget(ref);
-    if (!context.mounted || !current()) return;
-  }
+  final resolved = await _sessionTarget(ref, source, messenger, current);
+  if (!resolved.ok || !context.mounted || !current()) return;
+  final target = resolved.target;
 
   if (requiresTakeover) {
     final confirmed = await showAppDialog<bool>(
@@ -917,4 +895,85 @@ Future<void> resumeLocalSession(
   // Open the resumed conversation (only reached on success).
   if (!context.mounted || !current()) return;
   context.push(conversationRoute(target, threadId, cwd: cwd));
+}
+
+/// The app-server that serves [source]'s sessions, connected. For a remote host
+/// that IS the host behind the source key, whose own app-server holds the
+/// history. For the local source, a live app-server is ensured (connecting one
+/// if needed) rather than requiring the user to have opened one first. `ok` is
+/// false when connecting failed, which is already reported.
+Future<({String? target, bool ok})> _sessionTarget(
+  WidgetRef ref,
+  SessionSource source,
+  ToastMessenger messenger,
+  bool Function() current,
+) async {
+  if (!source.isRemote) {
+    return (target: await ensureResumeTarget(ref), ok: true);
+  }
+  final target = source.serviceKey;
+  // The Sessions tab / viewer reach the host only over the meta tunnel, so the
+  // app-server session isn't connected yet. Connect it now (mirroring the
+  // local path's ensureResumeTarget) — otherwise the conversation opened
+  // afterwards resolves to "not connected" and shows an error after the success.
+  final bridge = ref.read(bridgeApiProvider);
+  if (target != null && !bridge.appIsConnected(target)) {
+    try {
+      await bridge.appConnect(target, appLocalPort);
+    } catch (e) {
+      if (current()) messenger.error(friendlyError(e));
+      return (target: target, ok: false);
+    }
+  }
+  return (target: target, ok: true);
+}
+
+/// Branch a session seen in the browser or viewer into a new conversation on
+/// the host serving it, then open that. The source is only read, so this works
+/// while another client holds it or is running a turn there, and [running] says
+/// which of those the viewer last saw.
+Future<void> forkLocalSession(
+  BuildContext context,
+  WidgetRef ref, {
+  required String threadId,
+  String? cwd,
+  required bool running,
+  SessionSource source = const SessionSource.local(),
+  bool Function()? isCurrent,
+}) async {
+  bool current() => context.mounted && (isCurrent?.call() ?? true);
+  if (source.isNative || !current()) return;
+  final l10n = AppLocalizations.of(context);
+  final messenger = ToastMessenger.of(context);
+  final resolved = await _sessionTarget(ref, source, messenger, current);
+  if (!resolved.ok || !context.mounted || !current()) return;
+  final target = resolved.target;
+  if (target == null) {
+    messenger.error(l10n.takeoverNoTarget);
+    return;
+  }
+  if (!await confirmFork(context, running: running) || !current()) return;
+  final bridge = ref.read(bridgeApiProvider);
+  final ThreadForkResult result;
+  try {
+    result = await bridge.appThreadFork(target, threadId);
+  } catch (e) {
+    messenger.error('${l10n.forkFailed}: ${friendlyError(e)}');
+    return;
+  }
+  final thread = result.thread;
+  if (thread == null) {
+    messenger.error(l10n.forkOutcomeUnknown);
+    return;
+  }
+  await copyForkSettings(bridge, target, source: threadId, fork: thread.id);
+  messenger.notice(forkCreatedMessage(l10n, result));
+  if (!context.mounted || !current()) return;
+  context.push(
+    conversationRoute(
+      target,
+      thread.id,
+      cwd: thread.cwd.isEmpty ? cwd : thread.cwd,
+    ),
+  );
 }

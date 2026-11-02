@@ -40,6 +40,7 @@ use self::message::extract_preview;
 use self::meta::parse_session_meta;
 
 mod inline_image;
+mod lineage;
 mod message;
 mod meta;
 mod state_cache;
@@ -48,7 +49,7 @@ mod turn_state;
 
 pub use inline_image::inline_user_image;
 pub use message::{is_context_fragment, realtime_delegation_input};
-pub use meta::{parent_thread_id, thread_source, SessionMeta};
+pub use meta::{forked_from_id, parent_thread_id, thread_source, SessionMeta};
 pub use transcript::{guardian_review, read_transcript, TranscriptItem};
 pub use turn_state::{classify_turn_state, TurnState};
 
@@ -237,7 +238,10 @@ pub fn read_session_info(path: &Path) -> Result<SessionInfo> {
         .ok_or_else(|| Error::Config(format!("no thread id for rollout {}", path.display())))?;
     let updated_at = mtime_unix_secs(path);
     let turn_state = classify_turn_state(path)?;
-    let preview = extract_preview(&head);
+    let mut preview = extract_preview(&head);
+    if preview.is_empty() {
+        preview = inherited_preview(path);
+    }
     Ok(SessionInfo {
         thread_id,
         rollout_path: path.to_path_buf(),
@@ -249,6 +253,27 @@ pub fn read_session_info(path: &Path) -> Result<SessionInfo> {
         updated_at,
         turn_state,
     })
+}
+
+/// The preview a fork with no prompt of its own takes from the history it
+/// references.
+fn inherited_preview(path: &Path) -> String {
+    for segment in lineage::segments(path) {
+        if !segment.is_ancestor() {
+            break;
+        }
+        let Ok(mut reader) = segment.open() else {
+            continue;
+        };
+        let Ok(head) = read_lines(&mut reader, PREVIEW_HEAD_LINES) else {
+            continue;
+        };
+        let preview = extract_preview(&head);
+        if !preview.is_empty() {
+            return preview;
+        }
+    }
+    String::new()
 }
 
 /// `value` as a string, when it is a non-empty one.
@@ -292,7 +317,10 @@ fn mtime_unix_secs(path: &Path) -> i64 {
 /// errors on the first invalid-UTF-8 byte): rollouts are written by external
 /// processes, and one malformed byte must not hide the whole session.
 fn read_head(path: &Path, max_lines: usize) -> Result<String> {
-    let mut reader = open_rollout(path)?;
+    read_lines(&mut open_rollout(path)?, max_lines)
+}
+
+fn read_lines(reader: &mut dyn std::io::BufRead, max_lines: usize) -> Result<String> {
     let mut out = String::new();
     let mut line = Vec::new();
     for _ in 0..max_lines {

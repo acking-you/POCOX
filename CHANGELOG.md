@@ -9,6 +9,18 @@ breaking change goes.
 
 ## Unreleased
 
+- **Fork a Codex conversation.** The conversation menu, the read-only footer of a
+  session another client holds, the session viewer and a finished turn's reply
+  create a new, persistent conversation with the inherited context, on the host
+  serving the source. The source is only read: its writer keeps running, and its
+  drafts and queue stay. A running turn is frozen as interrupted in the branch. A
+  refusal, a lost answer and an ignored turn boundary are each reported rather
+  than retried or hidden. Other providers offer no fork yet.
+  ([details](docs/session-fork.md))
+- Read-only views of a forked Codex conversation show the history it inherited.
+  They used to show only what happened after it branched, and a fresh fork listed
+  with no preview.
+
 - Fix session history reconciliation placing older tool activity after the final
   reply and folding the reply into the activity group. Host history now repairs
   existing message order without an app restart, while preserving live content,

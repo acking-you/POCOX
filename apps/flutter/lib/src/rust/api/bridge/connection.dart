@@ -178,6 +178,9 @@ class AppCapabilitiesDto {
   /// Taking over a session held by another local process.
   final bool takeover;
 
+  /// Branching a session into an independent one.
+  final bool fork;
+
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;
 
@@ -271,6 +274,7 @@ class AppCapabilitiesDto {
     required this.guardian,
     required this.rateLimits,
     required this.takeover,
+    required this.fork,
     required this.externalWriterMonitor,
     required this.localSessions,
     required this.planMode,
@@ -309,6 +313,7 @@ class AppCapabilitiesDto {
       guardian.hashCode ^
       rateLimits.hashCode ^
       takeover.hashCode ^
+      fork.hashCode ^
       externalWriterMonitor.hashCode ^
       localSessions.hashCode ^
       planMode.hashCode ^
@@ -349,6 +354,7 @@ class AppCapabilitiesDto {
           guardian == other.guardian &&
           rateLimits == other.rateLimits &&
           takeover == other.takeover &&
+          fork == other.fork &&
           externalWriterMonitor == other.externalWriterMonitor &&
           localSessions == other.localSessions &&
           planMode == other.planMode &&

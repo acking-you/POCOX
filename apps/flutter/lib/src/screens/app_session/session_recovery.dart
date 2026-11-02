@@ -168,6 +168,7 @@ extension _SessionRecovery on _AppSessionState {
           : _threads.where((t) => t.id == startTid).firstOrNull;
       if (!current()) return;
       _parentThreadId = metadata?.parentThreadId;
+      _fork.source = metadata?.forkedFromId;
       if (metadata != null) _discoveredThreads[metadata.id] = metadata;
       if (metadata?.isGuardian ?? false) {
         _guardianReadOnly = true;
@@ -498,7 +499,8 @@ extension _SessionRecovery on _AppSessionState {
       _caps.compact && !_guardianReadOnly && !(_caps.isAcp && _streaming);
 
   /// Whether the desktop more-actions menu has any item.
-  bool get _moreActions => _canReleaseSession || _caps.rename || _canCompact;
+  bool get _moreActions =>
+      _canReleaseSession || _caps.rename || _canCompact || _canFork;
 
   /// Manually compact the conversation after a confirm.
   Future<void> _compact() async {

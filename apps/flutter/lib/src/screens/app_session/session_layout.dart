@@ -254,14 +254,23 @@ extension _SessionLayout on _AppSessionState {
           // Same place as on desktop. It has to be here rather than in the
           // sessions pane, which on a phone lies under the conversation.
           const ThemeToggle(),
-          if (_threadId != null && (_canReleaseSession || _canCompact))
+          if (_threadId != null &&
+              (_canReleaseSession || _canCompact || _canFork))
             PopupMenuButton<String>(
               tooltip: l10n.moreActions,
               onSelected: (v) {
                 if (v == 'compact') _compact();
                 if (v == 'session-release') unawaited(_releaseSession());
+                if (v == 'fork') unawaited(_forkConversation());
               },
               itemBuilder: (c) => [
+                if (_canFork)
+                  PopupMenuItem(
+                    key: const Key('session-fork'),
+                    value: 'fork',
+                    enabled: !_fork.pending,
+                    child: Text(l10n.forkConversation),
+                  ),
                 if (_canReleaseSession)
                   PopupMenuItem(
                     key: const Key('session-release'),

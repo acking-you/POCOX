@@ -1,6 +1,22 @@
 part of '../../fake_bridge_api.dart';
 
 mixin _FakeThreads on _FakeBridgeState {
+  /// Every [appThreadFork] call: service, source thread and turn boundary.
+  final List<(String, String, String?)> forkCalls = [];
+
+  /// Holds the next [appThreadFork] until completed.
+  Completer<void>? forkGate;
+
+  /// Thrown by the next [appThreadFork]: a refusal.
+  Object? forkError;
+
+  /// Answered by the next [appThreadFork] instead of creating a session.
+  ThreadForkResult? forkResult;
+
+  /// Sessions [appThreadFork] created. As on a real host they have metadata but
+  /// stay out of [appThreadList] until they have a turn of their own.
+  final List<ThreadMeta> forkedThreads = [];
+
   @override
   Future<ThreadMeta?> appThreadMetadata(
     String serviceKey,
@@ -12,7 +28,7 @@ mixin _FakeThreads on _FakeBridgeState {
     if (sessionProtocolOf(serviceKey) != SessionProtocol.codexAppServer) {
       throw StateError('thread metadata is not available for this service');
     }
-    for (final thread in appThreads) {
+    for (final thread in [...appThreads, ...forkedThreads]) {
       if (thread.id == threadId) return thread;
     }
     return null;
@@ -234,6 +250,41 @@ mixin _FakeThreads on _FakeBridgeState {
     String method,
     String paramsJson,
   ) async => '{}';
+
+  @override
+  Future<ThreadForkResult> appThreadFork(
+    String serviceKey,
+    String threadId, {
+    String? throughTurnId,
+  }) async {
+    forkCalls.add((serviceKey, threadId, throughTurnId));
+    final gate = forkGate;
+    if (gate != null) {
+      forkGate = null;
+      await gate.future;
+    }
+    final error = forkError;
+    if (error != null) {
+      forkError = null;
+      throw error;
+    }
+    final scripted = forkResult;
+    if (scripted != null) {
+      forkResult = null;
+      return scripted;
+    }
+    final source = appThreads.where((t) => t.id == threadId).firstOrNull;
+    final thread = ThreadMeta(
+      id: 'fork-${_threadSeq++}',
+      preview: source?.preview ?? '',
+      name: source?.name,
+      forkedFromId: threadId,
+      cwd: source?.cwd ?? '',
+      updatedAt: 1,
+    );
+    forkedThreads.add(thread);
+    return ThreadForkResult(thread: thread, boundaryConfirmed: true);
+  }
 
   @override
   Future<void> appThreadResume(String serviceKey, String threadId) async {

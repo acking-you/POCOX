@@ -5158,4 +5158,65 @@ class AppLocalizationsEn extends AppLocalizations {
   String logsDiskLost(int count) {
     return '$count disk log drops or write failures.';
   }
+
+  @override
+  String get forkConversation => 'Fork conversation';
+
+  @override
+  String get forkThroughTurn => 'Fork through this turn';
+
+  @override
+  String get forkDialogBody =>
+      'This creates a new conversation with its own history. The original stays as it is, and its later changes won\'t reach the new one.';
+
+  @override
+  String get forkDialogThroughTurn =>
+      'The new conversation includes this whole turn and everything before it.';
+
+  @override
+  String get forkDialogRunning =>
+      'A turn is still running. The new conversation keeps what has been saved so far and marks that turn interrupted; the original keeps running.';
+
+  @override
+  String get forkDialogFiles =>
+      'Both conversations work in the same folder, so their file changes can affect each other.';
+
+  @override
+  String get forkConfirm => 'Fork';
+
+  @override
+  String get forkCreated => 'Forked into a new conversation';
+
+  @override
+  String get forkCreatedInterrupted =>
+      'Forked into a new conversation. Its last turn is marked interrupted.';
+
+  @override
+  String get forkReadyOpen => 'Open';
+
+  @override
+  String get forkFailed => 'Couldn\'t fork the conversation';
+
+  @override
+  String get forkOutcomeUnknown =>
+      'Couldn\'t confirm the fork because the host\'s answer was lost. A new conversation may already exist, so check the list before trying again.';
+
+  @override
+  String get forkBoundaryUnconfirmed =>
+      'A new conversation was created, but it may not stop at the selected turn. It\'s in the list; check it before continuing.';
+
+  @override
+  String get forkHostChanged =>
+      'The host connection changed during the fork. A new conversation may exist on the previous host.';
+
+  @override
+  String get forkedTag => 'Fork';
+
+  @override
+  String forkedFrom(String title) {
+    return 'Forked from $title';
+  }
+
+  @override
+  String get forkedFromUnknown => 'Forked conversation. Open the original.';
 }

@@ -85,6 +85,7 @@ impl SessionEngine for OpenCodeEngine {
                 name: Some(s.title),
                 thread_source: None,
                 parent_thread_id: s.parent_id,
+                forked_from_id: None,
                 cwd: s.directory,
                 origin_url: None,
                 updated_at: i64::try_from(s.time.updated / 1000).unwrap_or(i64::MAX),
