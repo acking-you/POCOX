@@ -18,7 +18,6 @@ import 'package:pocox/src/time_ago.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/field_help.dart';
-import 'package:pocox/src/widgets/fork_dialog.dart';
 import 'package:pocox/src/widgets/loading.dart';
 import 'package:pocox/src/widgets/search_field.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
@@ -836,7 +835,7 @@ Future<String?> ensureResumeTarget(WidgetRef ref) async {
 /// `allowsResume` is false then); a turn the host's own app-server runs is
 /// joined.
 ///
-/// [_sessionTarget] resolves the app-server to resume into.
+/// [resolveSessionTarget] resolves the app-server to resume into.
 Future<void> resumeLocalSession(
   BuildContext context,
   WidgetRef ref, {
@@ -851,7 +850,7 @@ Future<void> resumeLocalSession(
   if (source.isNative || !current()) return;
   final l10n = AppLocalizations.of(context);
   final messenger = ToastMessenger.of(context);
-  final resolved = await _sessionTarget(ref, source, messenger, current);
+  final resolved = await resolveSessionTarget(ref, source, messenger, current);
   if (!resolved.ok || !context.mounted || !current()) return;
   final target = resolved.target;
 
@@ -902,7 +901,7 @@ Future<void> resumeLocalSession(
 /// history. For the local source, a live app-server is ensured (connecting one
 /// if needed) rather than requiring the user to have opened one first. `ok` is
 /// false when connecting failed, which is already reported.
-Future<({String? target, bool ok})> _sessionTarget(
+Future<({String? target, bool ok})> resolveSessionTarget(
   WidgetRef ref,
   SessionSource source,
   ToastMessenger messenger,
@@ -926,54 +925,4 @@ Future<({String? target, bool ok})> _sessionTarget(
     }
   }
   return (target: target, ok: true);
-}
-
-/// Branch a session seen in the browser or viewer into a new conversation on
-/// the host serving it, then open that. The source is only read, so this works
-/// while another client holds it or is running a turn there, and [running] says
-/// which of those the viewer last saw.
-Future<void> forkLocalSession(
-  BuildContext context,
-  WidgetRef ref, {
-  required String threadId,
-  String? cwd,
-  required bool running,
-  SessionSource source = const SessionSource.local(),
-  bool Function()? isCurrent,
-}) async {
-  bool current() => context.mounted && (isCurrent?.call() ?? true);
-  if (source.isNative || !current()) return;
-  final l10n = AppLocalizations.of(context);
-  final messenger = ToastMessenger.of(context);
-  final resolved = await _sessionTarget(ref, source, messenger, current);
-  if (!resolved.ok || !context.mounted || !current()) return;
-  final target = resolved.target;
-  if (target == null) {
-    messenger.error(l10n.takeoverNoTarget);
-    return;
-  }
-  if (!await confirmFork(context, running: running) || !current()) return;
-  final bridge = ref.read(bridgeApiProvider);
-  final ThreadForkResult result;
-  try {
-    result = await bridge.appThreadFork(target, threadId);
-  } catch (e) {
-    messenger.error('${l10n.forkFailed}: ${friendlyError(e)}');
-    return;
-  }
-  final thread = result.thread;
-  if (thread == null) {
-    messenger.error(l10n.forkOutcomeUnknown);
-    return;
-  }
-  await copyForkSettings(bridge, target, source: threadId, fork: thread.id);
-  messenger.notice(forkCreatedMessage(l10n, result));
-  if (!context.mounted || !current()) return;
-  context.push(
-    conversationRoute(
-      target,
-      thread.id,
-      cwd: thread.cwd.isEmpty ? cwd : thread.cwd,
-    ),
-  );
 }

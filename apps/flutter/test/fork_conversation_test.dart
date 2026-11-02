@@ -356,33 +356,41 @@ void main() {
     expect(api.forkCalls, hasLength(1));
   });
 
-  desktop('a fork answered after the host changed is not adopted', (t) async {
-    final api = await openSource(t);
-    final gate = Completer<void>();
-    api.forkGate = gate;
-    await forkFromMenu(t);
+  for (final duringSettings in [false, true]) {
+    desktop('a fork finishing after the host changed is not adopted '
+        '(during settings copy: $duringSettings)', (t) async {
+      final api = await openSource(t);
+      final gate = Completer<void>();
+      if (duringSettings) {
+        api.configReadGate = gate;
+      } else {
+        api.forkGate = gate;
+      }
+      await forkFromMenu(t);
 
-    const elsewhere = 'pcx:fork2:app:default';
-    await api.appConnect(elsewhere, 28081);
-    await t.pumpWidget(
-      host(
-        const AppSessionScreen(
-          serviceKey: elsewhere,
-          threadId: 'other',
-          home: true,
+      const elsewhere = 'pcx:fork2:app:default';
+      await api.appConnect(elsewhere, 28081);
+      await t.pumpWidget(
+        host(
+          const AppSessionScreen(
+            serviceKey: elsewhere,
+            threadId: 'other',
+            home: true,
+          ),
+          api,
         ),
-        api,
-      ),
-    );
-    await frames(t);
-    final resumed = api.lastResumed;
+      );
+      await frames(t);
+      final resumed = api.lastResumed;
 
-    gate.complete();
-    await frames(t);
-    expect(api.lastResumed, resumed, reason: 'the late fork opened nothing');
-    expect(find.text(l10n.forkHostChanged), findsOneWidget);
-    expect(find.byKey(const Key('conv-tile-fork-0')), findsNothing);
-  });
+      gate.complete();
+      await frames(t);
+      final fork = api.forkedThreads.single;
+      expect(api.lastResumed, resumed, reason: 'the fork opened nothing');
+      expect(find.text(l10n.forkHostChanged), findsOneWidget);
+      expect(find.byKey(Key('conv-tile-${fork.id}')), findsNothing);
+    });
+  }
 
   desktop('the session viewer forks on the host serving the session', (
     t,
@@ -416,13 +424,84 @@ void main() {
     await frames(t);
     expect(find.byKey(const Key('view-resume')), findsNothing);
 
+    // The viewer keeps re-reading the session, and that must not cancel a fork
+    // waiting on the confirmation or on the host.
+    final gate = Completer<void>();
+    api.forkGate = gate;
     await t.tap(find.byKey(const Key('view-fork')));
     await frames(t);
+    await t.pump(const Duration(seconds: 4));
     await t.tap(find.byKey(const Key('fork-confirm')));
+    await frames(t);
+    await t.pump(const Duration(seconds: 4));
+    gate.complete();
     await frames(t);
 
     expect(api.forkCalls, [(service, 'source', null)]);
     expect(api.lastMetaResumedKey, isNull);
     expect(find.text('opened ${api.forkedThreads.single.id}'), findsOneWidget);
+  });
+
+  desktop('a session on this device forks only on a host this device runs', (
+    t,
+  ) async {
+    const localHost = 'pcx:thisdevice:app:default';
+    // Reachable and connected, but the session read from this device's disk
+    // is not there.
+    final api =
+        FakeBridgeApi(
+            services: const [
+              ServiceEntry(
+                device: 'fork',
+                kind: 'app',
+                name: 'default',
+                key: service,
+              ),
+            ],
+          )
+          ..appThreads.clear()
+          ..appThreads.add(source);
+    api.transcripts['source'] = items;
+    api.liveness['source'] = held(running: false);
+    await api.appConnect(service, 28080);
+    await t.pumpWidget(
+      routerHost(
+        api,
+        initial: '/',
+        routes: [
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const LocalSessionViewScreen(threadId: 'source'),
+          ),
+          GoRoute(
+            path: '/app/:key/session',
+            builder: (_, state) =>
+                Text('opened ${state.uri.queryParameters['tid']}'),
+          ),
+        ],
+      ),
+    );
+    await frames(t);
+
+    await t.tap(find.byKey(const Key('view-fork')));
+    await frames(t);
+    expect(find.text(l10n.forkNoLocalHost), findsOneWidget);
+    expect(find.byKey(const Key('fork-dialog')), findsNothing);
+    expect(api.forkCalls, isEmpty);
+    await t.pump(const Duration(seconds: 5));
+
+    api.serveHosts.add(
+      const AppServeStatus(
+        name: 'local',
+        device: 'thisdevice',
+        alive: true,
+        appServiceKey: localHost,
+      ),
+    );
+    await t.tap(find.byKey(const Key('view-fork')));
+    await frames(t);
+    await t.tap(find.byKey(const Key('fork-confirm')));
+    await frames(t);
+    expect(api.forkCalls, [(localHost, 'source', null)]);
   });
 }

@@ -85,6 +85,11 @@ extension _SessionFork on _AppSessionState {
     }
     await copyForkSettings(api, service, source: source, fork: thread.id);
     if (!mounted) return;
+    if (!sameLink()) {
+      _updateState(() => _fork.pending = false);
+      messenger.notice(l10n.forkHostChanged);
+      return;
+    }
     _updateState(() {
       _fork.pending = false;
       // The host lists a fork only once it has a turn of its own.
@@ -94,9 +99,7 @@ extension _SessionFork on _AppSessionState {
       }
     });
     _loadThreads();
-    if (!sameLink()) {
-      messenger.notice(l10n.forkHostChanged);
-    } else if (!result.boundaryConfirmed) {
+    if (!result.boundaryConfirmed) {
       messenger.error(l10n.forkBoundaryUnconfirmed);
     } else if (_threadId == source && generation == _threadLoadGeneration) {
       messenger.notice(forkCreatedMessage(l10n, result));

@@ -8938,6 +8938,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Forked conversation. Open the original.'**
   String get forkedFromUnknown;
+
+  /// No description provided for @forkNoLocalHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host Codex on this device to fork this session.'**
+  String get forkNoLocalHost;
 }
 
 class _AppLocalizationsDelegate

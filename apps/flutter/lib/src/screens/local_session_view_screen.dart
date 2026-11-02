@@ -23,8 +23,9 @@ import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/ide_context.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/realtime_delegation.dart';
+import 'package:pocox/src/screens/local_sessions/local_fork.dart';
 import 'package:pocox/src/screens/local_sessions_screen.dart'
-    show SessionSource, forkLocalSession, resumeLocalSession;
+    show SessionSource, resumeLocalSession;
 import 'package:pocox/src/screens/app_session/generated_image_card.dart';
 import 'package:pocox/src/screens/app_session/model_feedback.dart';
 import 'package:pocox/src/screens/app_session/message_actions.dart';
@@ -316,7 +317,10 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   Future<void> _fork() async {
     final live = _live;
     if (_forking || _source.isNative || widget.guardian || live == null) return;
-    final epoch = _loadEpoch;
+    // The view's identity, not [_loadEpoch]: every background read moves that,
+    // and a read during the confirmation or the request changes nothing here.
+    final thread = widget.threadId;
+    final service = widget.serviceKey;
     setState(() => _forking = true);
     try {
       await forkLocalSession(
@@ -326,7 +330,10 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
         cwd: widget.cwd,
         running: !live.allowsResume,
         source: _source,
-        isCurrent: () => mounted && epoch == _loadEpoch,
+        isCurrent: () =>
+            mounted &&
+            widget.threadId == thread &&
+            widget.serviceKey == service,
       );
     } finally {
       if (mounted) setState(() => _forking = false);

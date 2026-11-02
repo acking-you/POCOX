@@ -5219,4 +5219,8 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forkedFromUnknown => 'Forked conversation. Open the original.';
+
+  @override
+  String get forkNoLocalHost =>
+      'Host Codex on this device to fork this session.';
 }

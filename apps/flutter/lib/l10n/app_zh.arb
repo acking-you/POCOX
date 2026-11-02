@@ -1637,5 +1637,6 @@
   "forkedTag": "分叉",
   "forkedFrom": "分叉自 {title}",
   "@forkedFrom": {"placeholders": {"title": {"type": "String"}}},
-  "forkedFromUnknown": "这是分叉出的会话，点击打开原会话。"
+  "forkedFromUnknown": "这是分叉出的会话，点击打开原会话。",
+  "forkNoLocalHost": "请先在这台设备上托管 Codex，才能分叉这个会话。"
 }

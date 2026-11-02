@@ -41,8 +41,9 @@ on the host and is reopened as the last conversation if it was. The sidebar's
 
 - **The serving host does it.** The request goes over the connection serving the
   source, so a remote session forks on that host against that host's history.
-  `path` is never sent, so a controller's files cannot be involved. Fresh source
-  metadata is read at request time.
+  `path` is never sent, so a controller's files cannot be involved. A session read
+  from this device's disk forks only on a Codex host this app runs here, never on a
+  connected service elsewhere. Fresh source metadata is read at request time.
 - **Snapshot of a changing source.** A fork sees what the source has saved. A turn
   running in another process is frozen as `interrupted` in the branch while the
   original keeps running, and later source output never reaches the branch. Text

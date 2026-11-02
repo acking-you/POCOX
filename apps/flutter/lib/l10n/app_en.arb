@@ -1906,5 +1906,6 @@
   "forkedTag": "Fork",
   "forkedFrom": "Forked from {title}",
   "@forkedFrom": {"placeholders": {"title": {"type": "String"}}},
-  "forkedFromUnknown": "Forked conversation. Open the original."
+  "forkedFromUnknown": "Forked conversation. Open the original.",
+  "forkNoLocalHost": "Host Codex on this device to fork this session."
 }

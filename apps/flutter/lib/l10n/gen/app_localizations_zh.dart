@@ -4922,4 +4922,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get forkedFromUnknown => '这是分叉出的会话，点击打开原会话。';
+
+  @override
+  String get forkNoLocalHost => '请先在这台设备上托管 Codex，才能分叉这个会话。';
 }
