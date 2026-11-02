@@ -17,6 +17,13 @@ breaking change goes.
   refusal, a lost answer and an ignored turn boundary are each reported rather
   than retried or hidden. Other providers offer no fork yet.
   ([details](docs/session-fork.md))
+- **Fix a takeover stopping a session's owner for nothing.** Resuming a session
+  from this device's Local sessions could pick a connected service on another
+  device. A takeover then stopped the local client and failed to resume, because
+  the session does not exist there. Local sessions now go only to a Codex host this
+  app runs here, and a takeover checks that its target can open the session before
+  stopping anything. A session hosted by a separate `pocox serve` is resumed from
+  that host's own session browser.
 - Read-only views of a forked Codex conversation show the history it inherited.
   They used to show only what happened after it branched, and a fresh fork listed
   with no preview.

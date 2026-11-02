@@ -5,33 +5,12 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/providers.dart';
-import 'package:pocox/src/screens/app_session_screen.dart' show appLocalPort;
 import 'package:pocox/src/screens/local_sessions_screen.dart'
     show resolveSessionTarget;
 import 'package:pocox/src/screens/session_source.dart';
 import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/fork_dialog.dart';
-
-/// A connected app-server this app runs on this device, which is what serves a
-/// session read from this device's disk. A connected service elsewhere never
-/// qualifies: the thread does not exist there.
-Future<String?> _thisDeviceHost(WidgetRef ref) async {
-  final bridge = ref.read(bridgeApiProvider);
-  final hosts = bridge.localServices().where((s) => s.kind == 'app').toList();
-  for (final host in hosts) {
-    if (bridge.appIsConnected(host.key)) return host.key;
-  }
-  for (final host in hosts) {
-    try {
-      await bridge.appConnect(host.key, appLocalPort);
-      return host.key;
-    } catch (_) {
-      // Stopping or not answering: try the next one this device runs.
-    }
-  }
-  return null;
-}
 
 /// Branch a session seen in the browser or viewer into a new conversation on
 /// the host serving it, then open that. The source is only read, so this works
@@ -50,20 +29,9 @@ Future<void> forkLocalSession(
   if (source.isNative || !current()) return;
   final l10n = AppLocalizations.of(context);
   final messenger = ToastMessenger.of(context);
-  final String? target;
-  if (source.isRemote) {
-    final resolved = await resolveSessionTarget(
-      ref,
-      source,
-      messenger,
-      current,
-    );
-    if (!resolved.ok) return;
-    target = resolved.target;
-  } else {
-    target = await _thisDeviceHost(ref);
-  }
-  if (!context.mounted || !current()) return;
+  final resolved = await resolveSessionTarget(ref, source, messenger, current);
+  if (!resolved.ok || !context.mounted || !current()) return;
+  final target = resolved.target;
   if (target == null) {
     messenger.error(l10n.forkNoLocalHost);
     return;

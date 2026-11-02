@@ -306,46 +306,55 @@ void main() {
     expect(find.text('conversation'), findsOneWidget);
   });
 
-  desktopTest('resume connects a reachable app-server when none is connected', (
-    t,
-  ) async {
-    // A discoverable, reachable app-server that the user has NOT opened yet.
-    final api = FakeBridgeApi(
-      services: const [
-        ServiceEntry(
-          device: 'lb7666',
-          kind: 'app',
-          name: 'default',
-          key: 'pcx:lb7666:app:default',
-        ),
-      ],
-    );
-    expect(api.appIsConnected('pcx:lb7666:app:default'), isFalse);
-
-    String? resolved;
-    await t.pumpWidget(
-      ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(api)],
-        child: MaterialApp(
-          home: Consumer(
-            builder: (ctx, ref, _) => TextButton(
-              onPressed: () async => resolved = await ensureResumeTarget(ref),
-              child: const Text('go'),
+  for (final takeover in [false, true]) {
+    desktopTest('a local resume never targets a service on another device '
+        '(takeover: $takeover)', (t) async {
+      const elsewhere = 'pcx:elsewhere:app:default';
+      // Reachable and connected, but a session read from this device's disk is
+      // not there: taking it over would stop its owner and then fail.
+      final api = FakeBridgeApi(
+        services: const [
+          ServiceEntry(
+            device: 'elsewhere',
+            kind: 'app',
+            name: 'default',
+            key: elsewhere,
+          ),
+        ],
+      );
+      await api.appConnect(elsewhere, 28080);
+      await t.pumpWidget(
+        _host(
+          Scaffold(
+            body: Consumer(
+              builder: (context, ref, _) => TextButton(
+                onPressed: () => resumeLocalSession(
+                  context,
+                  ref,
+                  threadId: 't-local',
+                  requiresTakeover: takeover,
+                ),
+                child: const Text('go'),
+              ),
             ),
           ),
+          api,
         ),
-      ),
-    );
-    await t.tap(find.text('go'));
-    await t.pump();
-    await t.pump();
-
-    // It actively connected the reachable server instead of reporting
-    // "no app-server" — the bug was requiring a pre-existing connection.
-    expect(resolved, 'pcx:lb7666:app:default');
-    expect(api.appConnectCount, 1);
-    expect(api.appIsConnected('pcx:lb7666:app:default'), isTrue);
-  });
+      );
+      await t.tap(find.text('go'));
+      await _settle(t);
+      if (takeover) {
+        final confirm = t.widget<FilledButton>(
+          find.byKey(const Key('takeover-confirm')),
+        );
+        expect(confirm.onPressed, isNull);
+      } else {
+        final l10n = lookupAppLocalizations(const Locale('zh'));
+        expect(find.text(l10n.takeoverNoTarget), findsOneWidget);
+      }
+      expect(api.lastForceResumedKey, isNull);
+    });
+  }
 
   desktopTest('local resume does not wait for relay discovery', (t) async {
     final api = FakeBridgeApi()..discoverError = StateError('relay offline');
@@ -355,7 +364,7 @@ void main() {
       _host(
         Consumer(
           builder: (context, ref, _) => TextButton(
-            onPressed: () async => resolved = await ensureResumeTarget(ref),
+            onPressed: () async => resolved = await thisDeviceHost(ref),
             child: const Text('go'),
           ),
         ),

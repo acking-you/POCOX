@@ -565,7 +565,7 @@
   "@takeoverResumeFailed": {
     "placeholders": { "error": { "type": "String" } }
   },
-  "takeoverNoTarget": "Connect to an app-server service first to resume.",
+  "takeoverNoTarget": "Host Codex on this device first to resume this session.",
   "holderRow": "{name} · PID {pid}",
   "@holderRow": {
     "placeholders": {

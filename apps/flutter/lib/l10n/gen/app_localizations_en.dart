@@ -1513,7 +1513,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get takeoverNoTarget =>
-      'Connect to an app-server service first to resume.';
+      'Host Codex on this device first to resume this session.';
 
   @override
   String holderRow(String name, int pid) {

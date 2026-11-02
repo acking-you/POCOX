@@ -139,7 +139,12 @@ flowchart LR
   source; rollout readers follow a paginated fork's `history_base`
   ([forking](session-fork.md)).
 - This device's own Local sessions view has no app-server and stays
-  file-only.
+  file-only. Resuming, taking over or forking from it goes only to a Codex host
+  this app runs on this device, never to a connected service elsewhere. A session
+  hosted by a separate `pocox serve` is reached through that host's own session
+  browser, where the host does the work.
+- A local takeover asks its target to read the session before stopping the owner.
+  A host that cannot open it is refused with nothing stopped.
 
 ## Dependency rules
 

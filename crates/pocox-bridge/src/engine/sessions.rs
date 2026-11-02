@@ -157,6 +157,11 @@ pub fn force_resume(service_key: &str, thread_id: &str) -> Result<ForceResumeOut
              resuming"
         ));
     }
+    // Releasing stops the owner, and that cannot be undone. A host that cannot
+    // open this session would only fail afterwards, so ask it first.
+    app_session::thread_metadata(service_key, thread_id).map_err(|err| {
+        anyhow!("this host cannot open the session, so nothing was stopped: {err:#}")
+    })?;
     let protected = protected_pids();
     let report = takeover::force_release(&path, &protected);
 

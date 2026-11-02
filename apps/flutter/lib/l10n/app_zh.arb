@@ -505,7 +505,7 @@
   "takeoverKilled": "已终止 {n} 个进程",
   "takeoverStillHeld": "仍被占用——已照常恢复",
   "takeoverResumeFailed": "恢复失败：{error}",
-  "takeoverNoTarget": "请先连接一个 app-server 服务再恢复。",
+  "takeoverNoTarget": "请先在这台设备上托管 Codex，才能恢复这个会话。",
   "holderRow": "{name} · PID {pid}",
   "localHostingSection": "本地托管",
   "localHostRunning": "托管中",

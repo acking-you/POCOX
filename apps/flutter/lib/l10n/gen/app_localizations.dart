@@ -2741,7 +2741,7 @@ abstract class AppLocalizations {
   /// No description provided for @takeoverNoTarget.
   ///
   /// In en, this message translates to:
-  /// **'Connect to an app-server service first to resume.'**
+  /// **'Host Codex on this device first to resume this session.'**
   String get takeoverNoTarget;
 
   /// No description provided for @holderRow.

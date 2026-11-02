@@ -1450,7 +1450,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get takeoverNoTarget => '请先连接一个 app-server 服务再恢复。';
+  String get takeoverNoTarget => '请先在这台设备上托管 Codex，才能恢复这个会话。';
 
   @override
   String holderRow(String name, int pid) {

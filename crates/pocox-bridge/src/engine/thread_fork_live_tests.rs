@@ -33,7 +33,7 @@ const WAIT: Duration = Duration::from_secs(60);
 /// The Responses endpoint both processes call: records every request and
 /// answers each with a canned reply, holding back those that ask for it.
 #[derive(Default)]
-struct ModelEndpoint {
+pub(super) struct ModelEndpoint {
     requests: Mutex<Vec<String>>,
     hold_used: AtomicBool,
     held: Notify,
@@ -53,7 +53,7 @@ impl ModelEndpoint {
             .clone()
     }
 
-    async fn serve(self: Arc<Self>, listener: TcpListener) {
+    pub(super) async fn serve(self: Arc<Self>, listener: TcpListener) {
         while let Ok((stream, _)) = listener.accept().await {
             tokio::spawn(Arc::clone(&self).answer(stream));
         }
@@ -129,14 +129,14 @@ impl ModelEndpoint {
 }
 
 /// A real `codex app-server` with its own process and listener.
-struct AppServer {
+pub(super) struct AppServer {
     process: tokio::process::Child,
-    address: String,
+    pub(super) address: String,
     log: PathBuf,
 }
 
 impl AppServer {
-    fn start(binary: &Path, home: &Path, scratch: &Path, name: &str) -> Self {
+    pub(super) fn start(binary: &Path, home: &Path, scratch: &Path, name: &str) -> Self {
         runtime::runtime().block_on(async {
             let reserved = std::net::TcpListener::bind("127.0.0.1:0").expect("reserve port");
             let address = reserved.local_addr().expect("port").to_string();
@@ -166,12 +166,12 @@ impl AppServer {
         self.process.id().expect("running process")
     }
 
-    fn is_running(&mut self) -> bool {
+    pub(super) fn is_running(&mut self) -> bool {
         matches!(self.process.try_wait(), Ok(None))
     }
 
     /// A raw controller of this process, as another client would be.
-    fn client(&self) -> (AppClient, mpsc::UnboundedReceiver<Inbound>) {
+    pub(super) fn client(&self) -> (AppClient, mpsc::UnboundedReceiver<Inbound>) {
         runtime::runtime().block_on(async {
             let url = format!("ws://{}", self.address);
             let deadline = Instant::now() + WAIT;
@@ -196,7 +196,7 @@ impl AppServer {
 }
 
 /// Run one turn in another client and wait until it reaches the given state.
-fn start_turn(client: &AppClient, thread: &str, text: &str) -> String {
+pub(super) fn start_turn(client: &AppClient, thread: &str, text: &str) -> String {
     let response = runtime::runtime()
         .block_on(client.request(
             "turn/start",
@@ -206,7 +206,7 @@ fn start_turn(client: &AppClient, thread: &str, text: &str) -> String {
     response["turn"]["id"].as_str().expect("turn id").to_owned()
 }
 
-fn wait_for_completion(events: &mut mpsc::UnboundedReceiver<Inbound>, thread: &str) {
+pub(super) fn wait_for_completion(events: &mut mpsc::UnboundedReceiver<Inbound>, thread: &str) {
     runtime::runtime().block_on(async {
         tokio::time::timeout(WAIT, async {
             while let Some(event) = events.recv().await {
@@ -301,7 +301,7 @@ fn rollout_of(home: &Path, thread: &str) -> PathBuf {
         .expect("rollout exists")
 }
 
-fn write_config(home: &Path, model: &str) {
+pub(super) fn write_config(home: &Path, model: &str) {
     std::fs::create_dir_all(home).expect("home");
     std::fs::write(
         home.join("config.toml"),
