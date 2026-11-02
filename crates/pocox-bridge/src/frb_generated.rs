@@ -42,7 +42,8 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1245175217;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 1360608425;
+
 
 // Section: executor
 
@@ -7714,6 +7715,41 @@ fn wire__crate__api__bridge__network__relay_preferences_impl(
         },
     )
 }
+fn wire__crate__api__bridge__network__relay_quic_port_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "relay_quic_port",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, flutter_rust_bridge::for_generated::anyhow::Error>(
+                    (move || async move {
+                        let output_ok = crate::api::bridge::network::relay_quic_port().await?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__bridge__network__relay_set_preferences_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -8581,6 +8617,44 @@ fn wire__crate__api__bridge__agent_tools__tools_watch_impl(
         },
     )
 }
+fn wire__crate__api__bridge__services__tunnel_changes_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "tunnel_changes",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_sink =
+                <StreamSink<u32, flutter_rust_bridge::for_generated::SseCodec>>::sse_decode(
+                    &mut deserializer,
+                );
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok({
+                        crate::api::bridge::services::tunnel_changes(api_sink);
+                    })?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__bridge__composer__turn_error_is_refusal_impl(
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
     rust_vec_len_: i32,
@@ -8938,7 +9012,9 @@ flutter_rust_bridge::frb_generated_moi_arc_impl_value!(
     flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>
 );
 
+
 // Section: dart2rust
+
 
 impl SseDecode for flutter_rust_bridge::for_generated::anyhow::Error {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -10371,6 +10447,7 @@ impl SseDecode for crate::api::bridge::services::LinkEventKindDto {
             2 => crate::api::bridge::services::LinkEventKindDto::NetworkChanged,
             3 => crate::api::bridge::services::LinkEventKindDto::DirectEstablished,
             4 => crate::api::bridge::services::LinkEventKindDto::DirectFallback,
+            5 => crate::api::bridge::services::LinkEventKindDto::Stopped,
             _ => unreachable!("Invalid variant for LinkEventKindDto: {}", inner),
         };
     }
@@ -11540,6 +11617,32 @@ impl SseDecode for Option<crate::api::bridge::hosting::OpenCodeHostStatusDto> {
     }
 }
 
+impl SseDecode for Option<crate::api::bridge::services::PortMappingStatusDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::bridge::services::PortMappingStatusDto>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::bridge::network::RelayTransportDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::bridge::network::RelayTransportDto>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::api::bridge::session_config::SessionSettingsDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11671,6 +11774,53 @@ impl SseDecode for Option<Vec<u8>> {
     }
 }
 
+impl SseDecode for crate::api::bridge::network::PortMappingDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::bridge::network::PortMappingDto::Off,
+            1 => crate::api::bridge::network::PortMappingDto::Auto,
+            2 => crate::api::bridge::network::PortMappingDto::Always,
+            _ => unreachable!("Invalid variant for PortMappingDto: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::services::PortMappingStateDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::bridge::services::PortMappingStateDto::Standby,
+            1 => crate::api::bridge::services::PortMappingStateDto::Asking,
+            2 => crate::api::bridge::services::PortMappingStateDto::Active,
+            3 => crate::api::bridge::services::PortMappingStateDto::Failed,
+            4 => crate::api::bridge::services::PortMappingStateDto::Stopped,
+            _ => unreachable!("Invalid variant for PortMappingStateDto: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::services::PortMappingStatusDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_state =
+            <crate::api::bridge::services::PortMappingStateDto>::sse_decode(deserializer);
+        let mut var_stage = <String>::sse_decode(deserializer);
+        let mut var_protocol = <Option<String>>::sse_decode(deserializer);
+        let mut var_externalAddr = <Option<String>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::bridge::services::PortMappingStatusDto {
+            state: var_state,
+            stage: var_stage,
+            protocol: var_protocol,
+            external_addr: var_externalAddr,
+            error: var_error,
+        };
+    }
+}
+
 impl SseDecode for crate::api::bridge::attachments::PreparedImageDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -11759,9 +11909,27 @@ impl SseDecode for crate::api::bridge::network::RelayPreferencesDto {
         let mut var_path =
             <crate::api::bridge::network::ConnectionPathDto>::sse_decode(deserializer);
         let mut var_allowDirect = <bool>::sse_decode(deserializer);
+        let mut var_relayTransport =
+            <crate::api::bridge::network::RelayTransportDto>::sse_decode(deserializer);
+        let mut var_portMapping =
+            <crate::api::bridge::network::PortMappingDto>::sse_decode(deserializer);
         return crate::api::bridge::network::RelayPreferencesDto {
             path: var_path,
             allow_direct: var_allowDirect,
+            relay_transport: var_relayTransport,
+            port_mapping: var_portMapping,
+        };
+    }
+}
+
+impl SseDecode for crate::api::bridge::network::RelayTransportDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::api::bridge::network::RelayTransportDto::Tcp,
+            1 => crate::api::bridge::network::RelayTransportDto::Quic,
+            _ => unreachable!("Invalid variant for RelayTransportDto: {}", inner),
         };
     }
 }
@@ -12037,6 +12205,8 @@ impl SseDecode for crate::api::bridge::services::SubStatusDto {
         let mut var_lastFailure =
             <Option<crate::api::bridge::services::TunnelFailureDto>>::sse_decode(deserializer);
         let mut var_setupLatencyMs = <Option<u32>>::sse_decode(deserializer);
+        let mut var_relayTransport =
+            <Option<crate::api::bridge::network::RelayTransportDto>>::sse_decode(deserializer);
         let mut var_relayPhase =
             <crate::api::bridge::services::RelayPhaseDto>::sse_decode(deserializer);
         let mut var_nextRetryMs = <Option<u32>>::sse_decode(deserializer);
@@ -12044,6 +12214,8 @@ impl SseDecode for crate::api::bridge::services::SubStatusDto {
             <Option<crate::api::bridge::services::DirectStageDto>>::sse_decode(deserializer);
         let mut var_attemptMs = <Option<u32>>::sse_decode(deserializer);
         let mut var_attemptsInFlight = <u32>::sse_decode(deserializer);
+        let mut var_portMapping =
+            <Option<crate::api::bridge::services::PortMappingStatusDto>>::sse_decode(deserializer);
         let mut var_events =
             <Vec<crate::api::bridge::services::LinkEventDto>>::sse_decode(deserializer);
         return crate::api::bridge::services::SubStatusDto {
@@ -12062,11 +12234,13 @@ impl SseDecode for crate::api::bridge::services::SubStatusDto {
             consecutive_failures: var_consecutiveFailures,
             last_failure: var_lastFailure,
             setup_latency_ms: var_setupLatencyMs,
+            relay_transport: var_relayTransport,
             relay_phase: var_relayPhase,
             next_retry_ms: var_nextRetryMs,
             attempt_stage: var_attemptStage,
             attempt_ms: var_attemptMs,
             attempts_in_flight: var_attemptsInFlight,
+            port_mapping: var_portMapping,
             events: var_events,
         };
     }
@@ -13601,137 +13775,149 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        194 => wire__crate__api__bridge__network__relay_set_preferences_impl(
+        194 => wire__crate__api__bridge__network__relay_quic_port_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        195 => wire__crate__api__bridge__diff__review_index_impl(port, ptr, rust_vec_len, data_len),
-        196 => wire__crate__api__bridge__device_metadata__service_device_metadata_impl(
+        195 => wire__crate__api__bridge__network__relay_set_preferences_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        197 => wire__crate__api__bridge__set_key_impl(port, ptr, rust_vec_len, data_len),
-        198 => wire__crate__api__bridge__set_locale_impl(port, ptr, rust_vec_len, data_len),
-        199 => wire__crate__api__bridge__set_relay_impl(port, ptr, rust_vec_len, data_len),
-        200 => wire__crate__api__bridge__services__subscriptions_impl(
+        196 => wire__crate__api__bridge__diff__review_index_impl(port, ptr, rust_vec_len, data_len),
+        197 => wire__crate__api__bridge__device_metadata__service_device_metadata_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        201 => wire__crate__api__bridge__agent_tools__tools_answer_impl(
+        198 => wire__crate__api__bridge__set_key_impl(port, ptr, rust_vec_len, data_len),
+        199 => wire__crate__api__bridge__set_locale_impl(port, ptr, rust_vec_len, data_len),
+        200 => wire__crate__api__bridge__set_relay_impl(port, ptr, rust_vec_len, data_len),
+        201 => wire__crate__api__bridge__services__subscriptions_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        202 => wire__crate__api__bridge__agent_tools__tools_connect_impl(
+        202 => wire__crate__api__bridge__agent_tools__tools_answer_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        203 => wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
+        203 => wire__crate__api__bridge__agent_tools__tools_connect_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        204 => wire__crate__api__bridge__agent_tools__tools_grant_impl(
+        204 => wire__crate__api__bridge__agent_tools__tools_disconnect_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        205 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
+        205 => wire__crate__api__bridge__agent_tools__tools_grant_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        206 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
+        206 => wire__crate__api__bridge__agent_tools__tools_harness_config_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        207 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
+        207 => wire__crate__api__bridge__agent_tools__tools_keep_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        208 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
+        208 => wire__crate__api__bridge__agent_tools__tools_overview_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        209 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
+        209 => wire__crate__api__bridge__agent_tools__tools_revoke_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        210 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
+        210 => wire__crate__api__bridge__agent_tools__tools_set_ask_before_sharing_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        211 => wire__crate__api__bridge__agent_tools__tools_share_impl(
+        211 => wire__crate__api__bridge__agent_tools__tools_set_enabled_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        212 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
+        212 => wire__crate__api__bridge__agent_tools__tools_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        214 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
+        213 => wire__crate__api__bridge__agent_tools__tools_share_on_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        216 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
+        215 => wire__crate__api__bridge__agent_tools__tools_stop_share_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        218 => wire__crate__api__bridge__updates__update_announce_impl(
+        217 => wire__crate__api__bridge__agent_tools__tools_watch_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        220 => {
+        218 => wire__crate__api__bridge__services__tunnel_changes_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        220 => wire__crate__api__bridge__updates__update_announce_impl(
+            port,
+            ptr,
+            rust_vec_len,
+            data_len,
+        ),
+        222 => {
             wire__crate__api__bridge__updates__update_check_impl(port, ptr, rust_vec_len, data_len)
         },
-        221 => wire__crate__api__bridge__updates__update_download_impl(
+        223 => wire__crate__api__bridge__updates__update_download_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        222 => wire__crate__api__bridge__updates__update_install_impl(
+        224 => wire__crate__api__bridge__updates__update_install_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        223 => {
+        225 => {
             wire__crate__api__bridge__updates__update_report_impl(port, ptr, rust_vec_len, data_len)
         },
-        226 => {
+        228 => {
             wire__crate__api__bridge__updates__update_watch_impl(port, ptr, rust_vec_len, data_len)
         },
         _ => unreachable!(),
@@ -13819,29 +14005,31 @@ fn pde_ffi_dispatcher_sync_impl(
         147 => wire__crate__api__bridge__services__local_services_impl(ptr, rust_vec_len, data_len),
         149 => wire__crate__api__bridge__events__log_clear_impl(ptr, rust_vec_len, data_len),
         151 => wire__crate__api__bridge__events__log_record_impl(ptr, rust_vec_len, data_len),
-        213 => {
+        214 => {
             wire__crate__api__bridge__agent_tools__tools_status_impl(ptr, rust_vec_len, data_len)
         },
-        215 => {
+        216 => {
             wire__crate__api__bridge__agent_tools__tools_tokens_impl(ptr, rust_vec_len, data_len)
         },
-        217 => wire__crate__api__bridge__composer__turn_error_is_refusal_impl(
+        219 => wire__crate__api__bridge__composer__turn_error_is_refusal_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        219 => wire__crate__api__bridge__updates__update_cancel_impl(ptr, rust_vec_len, data_len),
-        224 => wire__crate__api__bridge__updates__update_start_background_impl(
+        221 => wire__crate__api__bridge__updates__update_cancel_impl(ptr, rust_vec_len, data_len),
+        226 => wire__crate__api__bridge__updates__update_start_background_impl(
             ptr,
             rust_vec_len,
             data_len,
         ),
-        225 => wire__crate__api__bridge__updates__update_state_impl(ptr, rust_vec_len, data_len),
+        227 => wire__crate__api__bridge__updates__update_state_impl(ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
 
+
 // Section: rust2dart
+
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<ComposerController> {
@@ -13861,6 +14049,7 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<ComposerController>> for Compo
     }
 }
 
+
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<EventFeed> {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
@@ -13875,6 +14064,7 @@ impl flutter_rust_bridge::IntoIntoDart<FrbWrapper<EventFeed>> for EventFeed {
         self.into()
     }
 }
+
 
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for FrbWrapper<PreparedFile> {
@@ -15416,6 +15606,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::LinkEventKi
             Self::NetworkChanged => 2.into_dart(),
             Self::DirectEstablished => 3.into_dart(),
             Self::DirectFallback => 4.into_dart(),
+            Self::Stopped => 5.into_dart(),
             _ => unreachable!(),
         }
     }
@@ -15835,6 +16026,76 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::hosting::OpenCodeHost
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::PortMappingDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Off => 0.into_dart(),
+            Self::Auto => 1.into_dart(),
+            Self::Always => 2.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::network::PortMappingDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::PortMappingDto>
+    for crate::api::bridge::network::PortMappingDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::network::PortMappingDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::PortMappingStateDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Standby => 0.into_dart(),
+            Self::Asking => 1.into_dart(),
+            Self::Active => 2.into_dart(),
+            Self::Failed => 3.into_dart(),
+            Self::Stopped => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::services::PortMappingStateDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::services::PortMappingStateDto>
+    for crate::api::bridge::services::PortMappingStateDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::services::PortMappingStateDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::PortMappingStatusDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.state.into_into_dart().into_dart(),
+            self.stage.into_into_dart().into_dart(),
+            self.protocol.into_into_dart().into_dart(),
+            self.external_addr.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::services::PortMappingStatusDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::services::PortMappingStatusDto>
+    for crate::api::bridge::services::PortMappingStatusDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::services::PortMappingStatusDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::attachments::PreparedImageDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -15956,8 +16217,13 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::services::RelayPhaseD
 // Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::RelayPreferencesDto {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
-        [self.path.into_into_dart().into_dart(), self.allow_direct.into_into_dart().into_dart()]
-            .into_dart()
+        [
+            self.path.into_into_dart().into_dart(),
+            self.allow_direct.into_into_dart().into_dart(),
+            self.relay_transport.into_into_dart().into_dart(),
+            self.port_mapping.into_into_dart().into_dart(),
+        ]
+        .into_dart()
     }
 }
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
@@ -15968,6 +16234,27 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::RelayPrefere
     for crate::api::bridge::network::RelayPreferencesDto
 {
     fn into_into_dart(self) -> crate::api::bridge::network::RelayPreferencesDto {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::bridge::network::RelayTransportDto {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Tcp => 0.into_dart(),
+            Self::Quic => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::bridge::network::RelayTransportDto
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::bridge::network::RelayTransportDto>
+    for crate::api::bridge::network::RelayTransportDto
+{
+    fn into_into_dart(self) -> crate::api::bridge::network::RelayTransportDto {
         self
     }
 }
@@ -16309,11 +16596,13 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::services::SubStatusDt
             self.consecutive_failures.into_into_dart().into_dart(),
             self.last_failure.into_into_dart().into_dart(),
             self.setup_latency_ms.into_into_dart().into_dart(),
+            self.relay_transport.into_into_dart().into_dart(),
             self.relay_phase.into_into_dart().into_dart(),
             self.next_retry_ms.into_into_dart().into_dart(),
             self.attempt_stage.into_into_dart().into_dart(),
             self.attempt_ms.into_into_dart().into_dart(),
             self.attempts_in_flight.into_into_dart().into_dart(),
+            self.port_mapping.into_into_dart().into_dart(),
             self.events.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -17936,6 +18225,7 @@ impl SseEncode for crate::api::bridge::services::LinkEventKindDto {
                 crate::api::bridge::services::LinkEventKindDto::NetworkChanged => 2,
                 crate::api::bridge::services::LinkEventKindDto::DirectEstablished => 3,
                 crate::api::bridge::services::LinkEventKindDto::DirectFallback => 4,
+                crate::api::bridge::services::LinkEventKindDto::Stopped => 5,
                 _ => {
                     unimplemented!("");
                 },
@@ -18831,6 +19121,26 @@ impl SseEncode for Option<crate::api::bridge::hosting::OpenCodeHostStatusDto> {
     }
 }
 
+impl SseEncode for Option<crate::api::bridge::services::PortMappingStatusDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::bridge::services::PortMappingStatusDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::bridge::network::RelayTransportDto> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::bridge::network::RelayTransportDto>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::api::bridge::session_config::SessionSettingsDto> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -18943,6 +19253,53 @@ impl SseEncode for Option<Vec<u8>> {
     }
 }
 
+impl SseEncode for crate::api::bridge::network::PortMappingDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::bridge::network::PortMappingDto::Off => 0,
+                crate::api::bridge::network::PortMappingDto::Auto => 1,
+                crate::api::bridge::network::PortMappingDto::Always => 2,
+                _ => {
+                    unimplemented!("");
+                },
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::bridge::services::PortMappingStateDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::bridge::services::PortMappingStateDto::Standby => 0,
+                crate::api::bridge::services::PortMappingStateDto::Asking => 1,
+                crate::api::bridge::services::PortMappingStateDto::Active => 2,
+                crate::api::bridge::services::PortMappingStateDto::Failed => 3,
+                crate::api::bridge::services::PortMappingStateDto::Stopped => 4,
+                _ => {
+                    unimplemented!("");
+                },
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::api::bridge::services::PortMappingStatusDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::api::bridge::services::PortMappingStateDto>::sse_encode(self.state, serializer);
+        <String>::sse_encode(self.stage, serializer);
+        <Option<String>>::sse_encode(self.protocol, serializer);
+        <Option<String>>::sse_encode(self.external_addr, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
 impl SseEncode for crate::api::bridge::attachments::PreparedImageDto {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -19010,6 +19367,27 @@ impl SseEncode for crate::api::bridge::network::RelayPreferencesDto {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::api::bridge::network::ConnectionPathDto>::sse_encode(self.path, serializer);
         <bool>::sse_encode(self.allow_direct, serializer);
+        <crate::api::bridge::network::RelayTransportDto>::sse_encode(
+            self.relay_transport,
+            serializer,
+        );
+        <crate::api::bridge::network::PortMappingDto>::sse_encode(self.port_mapping, serializer);
+    }
+}
+
+impl SseEncode for crate::api::bridge::network::RelayTransportDto {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::api::bridge::network::RelayTransportDto::Tcp => 0,
+                crate::api::bridge::network::RelayTransportDto::Quic => 1,
+                _ => {
+                    unimplemented!("");
+                },
+            },
+            serializer,
+        );
     }
 }
 
@@ -19195,6 +19573,10 @@ impl SseEncode for crate::api::bridge::services::SubStatusDto {
             serializer,
         );
         <Option<u32>>::sse_encode(self.setup_latency_ms, serializer);
+        <Option<crate::api::bridge::network::RelayTransportDto>>::sse_encode(
+            self.relay_transport,
+            serializer,
+        );
         <crate::api::bridge::services::RelayPhaseDto>::sse_encode(self.relay_phase, serializer);
         <Option<u32>>::sse_encode(self.next_retry_ms, serializer);
         <Option<crate::api::bridge::services::DirectStageDto>>::sse_encode(
@@ -19203,6 +19585,10 @@ impl SseEncode for crate::api::bridge::services::SubStatusDto {
         );
         <Option<u32>>::sse_encode(self.attempt_ms, serializer);
         <u32>::sse_encode(self.attempts_in_flight, serializer);
+        <Option<crate::api::bridge::services::PortMappingStatusDto>>::sse_encode(
+            self.port_mapping,
+            serializer,
+        );
         <Vec<crate::api::bridge::services::LinkEventDto>>::sse_encode(self.events, serializer);
     }
 }
@@ -19587,10 +19973,12 @@ impl SseEncode for crate::api::bridge::hosted_account::WebLoginStartDto {
     }
 }
 
+
 #[cfg(not(target_family = "wasm"))]
 mod io {
     // This file is automatically generated, so please do not edit it.
     // @generated by `flutter_rust_bridge`@ 2.12.0.
+
 
     // Section: imports
 
@@ -19616,12 +20004,14 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::increment_strong_count(ptr as _);
     }
 
+
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::decrement_strong_count(ptr as _);
     }
+
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
@@ -19630,6 +20020,7 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::increment_strong_count(ptr as _);
     }
 
+
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
         ptr: *const std::ffi::c_void,
@@ -19637,12 +20028,14 @@ mod io {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::decrement_strong_count(ptr as _);
     }
 
+
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>>::increment_strong_count(ptr as _);
     }
+
 
     #[unsafe(no_mangle)]
     pub extern "C" fn frbgen_pocox_rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
@@ -19654,11 +20047,13 @@ mod io {
 #[cfg(not(target_family = "wasm"))]
 pub use io::*;
 
+
 /// cbindgen:ignore
 #[cfg(target_family = "wasm")]
 mod web {
     // This file is automatically generated, so please do not edit it.
     // @generated by `flutter_rust_bridge`@ 2.12.0.
+
 
     // Section: imports
 
@@ -19676,6 +20071,7 @@ mod web {
     use crate::api::bridge::composer::*;
     use crate::api::bridge::events::*;
 
+
     // Section: boilerplate
 
     flutter_rust_bridge::frb_generated_boilerplate_web!();
@@ -19687,12 +20083,14 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::increment_strong_count(ptr as _);
     }
 
+
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ComposerController>>::decrement_strong_count(ptr as _);
     }
+
 
     #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
@@ -19701,6 +20099,7 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::increment_strong_count(ptr as _);
     }
 
+
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
         ptr: *const std::ffi::c_void,
@@ -19708,12 +20107,14 @@ mod web {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<EventFeed>>::decrement_strong_count(ptr as _);
     }
 
+
     #[wasm_bindgen]
     pub fn rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(
         ptr: *const std::ffi::c_void,
     ) {
         MoiArc::<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PreparedFile>>::increment_strong_count(ptr as _);
     }
+
 
     #[wasm_bindgen]
     pub fn rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPreparedFile(

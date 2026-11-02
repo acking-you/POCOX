@@ -41,9 +41,10 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 
 Run `pocox <command> --help` for every flag.
 
-New workers try direct (P2P) paths first and accept incoming direct connections
-unless `config.toml` opts out with `[pb_mapper] path = "relay_only"` or
-`allow_direct = false`. See [direct connections](relay-worker-recovery.md#direct-connections)
+New workers use the relay over TCP unless `config.toml` opts in under
+`[pb_mapper]`: `path = "auto"` and `allow_direct = true` for direct (P2P) paths,
+`port_mapping` for asking the router to help them, `relay_transport = "quic"`
+for the carrier. See [direct connections](relay-worker-recovery.md#direct-connections)
 for relay prerequisites, lifetime and restart behavior.
 
 ## Hosted account

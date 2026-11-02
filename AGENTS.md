@@ -166,8 +166,8 @@ only reproducible build artifacts.
 
 ## Dependencies and submodules
 
-- pb-mapper is a Cargo Git dependency on its `pocox` branch, pinned by
-  `Cargo.lock`: push SDK fixes there, run `cargo update -p pb-mapper`, commit
+- pb-mapper is a Cargo Git dependency on its `master` branch, pinned by
+  `Cargo.lock`: land SDK fixes there, run `cargo update -p pb-mapper`, commit
   the lockfile. Builds stay `--locked`.
 - `git submodule update --init --recursive` materialises `deps/`. Fork
   branches take upstream by merge, never by rebasing published history.

@@ -49,16 +49,29 @@ class RelayPreferencesStore extends AutoDisposeAsyncNotifier<RelayPreferences> {
   }
 }
 
-/// How often live path counters refresh while something shows them.
+/// The UDP port the current relay offers QUIC on; null when it offers none.
+final relayQuicPortProvider = FutureProvider.autoDispose<int?>(
+  (ref) => ref.watch(bridgeApiProvider).relayQuicPort(),
+);
+
+/// Notices that a tunnel changed, from the moment something first watches.
+final tunnelChangesProvider = StreamProvider<int>(
+  (ref) => ref.watch(bridgeApiProvider).tunnelChanges(),
+);
+
+/// How often live path counters refresh while something shows them, as a
+/// safety net: what a tunnel does arrives as [tunnelChangesProvider] notices,
+/// but this app's own listeners send none.
 const _pollInterval = Duration(seconds: 3);
 
 /// How often they refresh while a tunnel is coming up, recovering or trying
-/// a direct path: often enough to show a stage that lasts a second or two.
-const _busyPollInterval = Duration(milliseconds: 500);
+/// a direct path, which keeps a countdown to its next attempt moving.
+const _busyPollInterval = Duration(seconds: 1);
 
-/// Active subscriptions with their live path counters, refreshed only while
-/// something watches them. The timer stops with the last listener, not at
-/// disposal: a container a test or caller owns can outlive its widgets.
+/// Active subscriptions with their live path counters, refreshed on each
+/// tunnel notice and on a timer, only while something watches them. The timer
+/// stops with the last listener, not at disposal: a container a test or caller
+/// owns can outlive its widgets.
 final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
   ref,
 ) async {
@@ -85,7 +98,8 @@ final liveSubscriptionsProvider = FutureProvider.autoDispose<List<SubInfo>>((
     ..onResume(() {
       watched = true;
       schedule();
-    });
+    })
+    ..listen(tunnelChangesProvider, (_, _) => ref.invalidateSelf());
   try {
     final subs = await api.subscriptions();
     busy = subs.any(
@@ -270,6 +284,25 @@ String fallbackReasonLabel(AppLocalizations l10n, String code) =>
       _ => code,
     };
 
+/// A relay carrier's name.
+String relayTransportLabel(RelayTransport transport) => switch (transport) {
+  RelayTransport.tcp => 'TCP',
+  RelayTransport.quic => 'QUIC',
+};
+
+/// What a tunnel's router port mapping amounts to, in words.
+String portMappingLabel(AppLocalizations l10n, PortMappingStatus mapping) =>
+    switch (mapping.state) {
+      PortMappingState.standby => l10n.tunnelMappingStandby,
+      PortMappingState.asking => l10n.tunnelMappingAsking,
+      PortMappingState.active => switch (mapping.externalAddr) {
+        final address? => l10n.tunnelMappingActiveAt(address),
+        null => l10n.tunnelMappingActive,
+      },
+      PortMappingState.failed => l10n.tunnelMappingFailed,
+      PortMappingState.stopped => l10n.tunnelMappingStopped,
+    };
+
 /// Why a tunnel's attempt to reach the relay failed, in words.
 String tunnelFailureLabel(AppLocalizations l10n, TunnelFailure failure) =>
     switch (failure) {
@@ -365,6 +398,12 @@ class _TunnelDetails extends ConsumerWidget {
                   fallbackReasonLabel(l10n, reason),
                   detail: reason,
                 ),
+              if (sub.portMapping case final mapping?)
+                _Fact(
+                  l10n.tunnelPortMapping,
+                  portMappingLabel(l10n, mapping),
+                  detail: mapping.error ?? mapping.protocol ?? mapping.stage,
+                ),
             ],
             _Heading(l10n.tunnelSectionRelay),
             _Fact(
@@ -384,6 +423,8 @@ class _TunnelDetails extends ConsumerWidget {
             if (sub.lastFailure case final failure?
                 when sub.consecutiveFailures > 0)
               _Fact(l10n.tunnelLastFailure, tunnelFailureLabel(l10n, failure)),
+            if (sub.relayTransport case final transport?)
+              _Fact(l10n.tunnelRelayCarrier, relayTransportLabel(transport)),
             if (sub.setupLatencyMs case final ms?)
               _Fact(l10n.tunnelSetupLatency, l10n.tunnelMilliseconds(ms)),
             _Fact(l10n.tunnelLocalAddress, sub.localAddr, mono: true),
@@ -516,7 +557,7 @@ class _Fact extends StatelessWidget {
 }
 
 /// Which preference a save or its failure belongs to.
-enum _Preference { outgoing, incoming }
+enum _Preference { outgoing, incoming, carrier, mapping }
 
 /// Settings › Connection path: how this installation reaches other devices,
 /// and (on desktop) whether they may reach it directly. Choices apply
@@ -567,8 +608,42 @@ class _ConnectionPathSettingsState
         ? switch (preference) {
             _Preference.outgoing => l10n.connectionPathOutgoingPending,
             _Preference.incoming => l10n.connectionPathIncomingPending,
+            _Preference.carrier ||
+            _Preference.mapping => l10n.connectionPathTunnelsPending,
           }
         : null;
+    final carrierChanged =
+        opened != null && prefs?.relayTransport != opened.relayTransport;
+    // Only a saved QUIC choice depends on what the relay offers.
+    final quic = prefs?.relayTransport == RelayTransport.quic
+        ? ref.watch(relayQuicPortProvider)
+        : null;
+    final quicRefused = quic?.hasValue == true && quic?.value == null;
+    final carriers = <GlassSegment<RelayTransport?>>[
+      for (final transport in RelayTransport.values)
+        GlassSegment(
+          key: Key('relay-transport-${transport.name}'),
+          value: transport,
+          label: relayTransportLabel(transport),
+        ),
+    ];
+    final mappings = <GlassSegment<PortMappingPreference?>>[
+      GlassSegment(
+        key: const Key('port-mapping-off'),
+        value: PortMappingPreference.off,
+        label: l10n.connectionPathMappingOff,
+      ),
+      GlassSegment(
+        key: const Key('port-mapping-auto'),
+        value: PortMappingPreference.auto,
+        label: l10n.connectionPathMappingAuto,
+      ),
+      GlassSegment(
+        key: const Key('port-mapping-always'),
+        value: PortMappingPreference.always,
+        label: l10n.connectionPathMappingAlways,
+      ),
+    ];
     final paths = <GlassSegment<ConnectionPath?>>[
       GlassSegment(
         key: const Key('connection-path-relay-only'),
@@ -649,6 +724,77 @@ class _ConnectionPathSettingsState
                     : null,
               ),
             ),
+          // A tunnel that keeps to the relay never asks the router.
+          if (prefs?.mayGoDirect ?? false)
+            SettingRow(
+              key: const Key('port-mapping-row'),
+              icon: AppIcons.lan_outlined,
+              title: l10n.connectionPathMapping,
+              info: l10n.connectionPathMappingInfo,
+              state: state(
+                _Preference.mapping,
+                changed:
+                    opened != null && prefs?.portMapping != opened.portMapping,
+              ),
+              stateKey: const Key('port-mapping-state'),
+              failed: _failed == _Preference.mapping,
+              stackWhenNarrow: true,
+              controlWidth: GlassSegmented.naturalWidth(context, mappings),
+              control: (expand) => IgnorePointer(
+                ignoring: !ready,
+                child: GlassSegmented<PortMappingPreference?>(
+                  key: const Key('port-mapping'),
+                  expand: expand,
+                  selected: prefs?.portMapping,
+                  onChanged: (mapping) {
+                    if (prefs != null && mapping != null) {
+                      _save(
+                        prefs.copyWith(portMapping: mapping),
+                        _Preference.mapping,
+                      );
+                    }
+                  },
+                  segments: mappings,
+                ),
+              ),
+            ),
+          SettingRow(
+            icon: AppIcons.server,
+            title: l10n.connectionPathCarrier,
+            info: l10n.connectionPathCarrierInfo,
+            state:
+                state(_Preference.carrier, changed: false) ??
+                (quicRefused
+                    ? l10n.connectionPathQuicRefused
+                    : carrierChanged
+                    ? l10n.connectionPathTunnelsPending
+                    : quic?.valueOrNull != null
+                    ? l10n.connectionPathQuicOffered(quic!.value!)
+                    : quic?.hasError == true
+                    ? l10n.connectionPathQuicUnknown
+                    : null),
+            stateKey: const Key('relay-transport-state'),
+            failed: _failed == _Preference.carrier || quicRefused,
+            stackWhenNarrow: true,
+            controlWidth: GlassSegmented.naturalWidth(context, carriers),
+            control: (expand) => IgnorePointer(
+              ignoring: !ready,
+              child: GlassSegmented<RelayTransport?>(
+                key: const Key('relay-transport'),
+                expand: expand,
+                selected: prefs?.relayTransport,
+                onChanged: (transport) {
+                  if (prefs != null && transport != null) {
+                    _save(
+                      prefs.copyWith(relayTransport: transport),
+                      _Preference.carrier,
+                    );
+                  }
+                },
+                segments: carriers,
+              ),
+            ),
+          ),
         ],
       ],
     );

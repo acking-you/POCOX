@@ -15,7 +15,8 @@ use anyhow::{anyhow, Context, Result};
 use once_cell::sync::OnceCell;
 use pocox_core::config::ConnectionPath;
 use pocox_pb::{
-    subscribe_background, subscribed, Connection, RelaySession, SubscribeOptions, TunnelEvent,
+    subscribe_background, subscribed, Connection, PortMappingDiagnostics, RelaySession,
+    SubscribeOptions, TunnelEvent,
 };
 use tokio::runtime::{Builder, Runtime};
 #[cfg(test)]
@@ -23,7 +24,8 @@ use tokio::task::JoinHandle;
 
 mod local_forward;
 mod path_status;
-pub use path_status::{PathStatus, TunnelHealth, TunnelPath};
+pub mod tunnel_changes;
+pub use path_status::{MappingState, PathStatus, TunnelHealth, TunnelPath};
 
 use crate::engine::local_services::Standing;
 use crate::engine::transport::Transport;
@@ -134,6 +136,7 @@ impl SubEntry {
                 ready: true,
                 path: PathStatus::default(),
                 health: TunnelHealth::default(),
+                port_mapping: None,
                 events: Vec::new(),
                 lifetime: None,
             },
@@ -154,6 +157,7 @@ impl SubEntry {
                 ..PathStatus::default()
             },
             health: TunnelHealth::default(),
+            port_mapping: None,
             events: Vec::new(),
             // No SDK connection to outlive its registry slot.
             lifetime: None,
@@ -183,6 +187,7 @@ fn observe(
         ready,
         path: PathStatus::observe(path, diagnostics.direct),
         health,
+        port_mapping: diagnostics.port_mapping,
         events: diagnostics.events,
         lifetime: Some(Arc::downgrade(connection)),
     }
@@ -298,6 +303,8 @@ pub struct SubStatus {
     pub path: PathStatus,
     /// How its tunnel's own link to the relay is doing.
     pub health: TunnelHealth,
+    /// Its router port mapping, when it may have one.
+    pub port_mapping: Option<PortMappingDiagnostics>,
     /// What happened to it lately, oldest first.
     pub events: Vec<TunnelEvent>,
     /// Exact SDK owner observed atomically with this endpoint address.
@@ -489,6 +496,8 @@ fn subscribe_with(
     let replaced = reg.insert(registry_key, created);
     drop(reg);
     drop(replaced);
+    // Ready now, which no SDK event says: it was reported before registering.
+    tunnel_changes::notify();
     Ok(status)
 }
 
@@ -546,6 +555,7 @@ fn open_subscription(
             })
             .await?,
         );
+        tunnel_changes::follow(&connection);
         let _shown = shown_as
             .map(|shown_as| ShowComing::new(shown_as, &local_addr, &connection, session.path));
         subscribed(&connection, &session, &key).await?;

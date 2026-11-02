@@ -230,7 +230,7 @@ async fn services(caller: &Caller, args: &JsonObject) -> CallToolResult {
         tokio::task::spawn_blocking(catalog::overview_blocking)
             .await
             .map_err(|e| ToolError::Relay(e.to_string()))
-            .and_then(|r| r.map_err(|e| ToolError::Relay(format!("{e:#}"))));
+            .and_then(|r| r.map_err(|e| ToolError::relay(&e)));
     let overview = match overview {
         Ok(overview) => overview,
         Err(error) => return failed(&error),

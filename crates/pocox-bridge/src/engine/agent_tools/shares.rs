@@ -613,7 +613,7 @@ async fn publish(
 ) -> Result<Option<(Published, u64)>, ToolError> {
     let owned = transport::resolve_owned()
         .await
-        .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+        .map_err(|e| ToolError::relay(&e))?;
     if epoch.is_some_and(|epoch| epoch != owned.epoch) {
         return Err(ToolError::ContextChanged);
     }

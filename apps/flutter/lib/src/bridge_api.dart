@@ -53,6 +53,12 @@ abstract interface class BridgeApi
   /// Save [value] for new tunnels; open tunnels keep what they started with.
   Future<void> relaySetPreferences(RelayPreferences value);
 
+  /// The UDP port the current relay offers QUIC on; null when it offers none.
+  Future<int?> relayQuicPort();
+
+  /// Coalesced notices that a tunnel changed: [subscriptions] has news.
+  Stream<int> tunnelChanges();
+
   /// Validate and save the proxy [mode] and [custom] URL (required by
   /// [ProxyMode.custom]; blank removes it).
   Future<void> networkSetProxySetting(ProxyMode mode, String custom);

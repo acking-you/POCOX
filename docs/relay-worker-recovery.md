@@ -2,21 +2,25 @@
 
 ## Direct connections
 
-POCOX follows pb-mapper's dedicated `pocox` branch, currently locked to
-`ec76b82ea142071a110135c58ec4d666a7b0fa6a` (SDK 0.7.0 plus live direct stages,
-recovery history and the Windows UDP source-hint fix), with its `p2p` feature.
+POCOX follows pb-mapper's `master`, currently locked to
+`0439242abd3098428bb9ee6c7f269822e33e8318` (SDK 0.10.0), with its default
+`p2p`, `relay-quic` and `port-mapping` features.
 The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
 the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.
 The relay server is a test-only dependency, never
 embedded into the shipping app or CLI.
 
-**Settings › Connection path** has two independent preferences, saved as soon
-as they are chosen:
+**Settings › Connection path** has independent preferences, saved as soon as
+they are chosen:
 
 - **Connect to other devices**: **Relay only** (the default) or
   **P2P first** for outgoing subscriptions.
 - **Accept direct connections** (off by default, desktop only) for
   incoming connections to newly published services.
+- **Router port mapping**, shown only while one of those is on: **When needed**
+  (the default), **Off** or **Always**. See [port mapping](#router-port-mapping).
+- **Relay carrier**: **TCP** (the default) or **QUIC**. See
+  [carrier](#relay-carrier).
 
 The same preferences live in each installation's `config.toml` and apply to
 both account and self-host modes, including CLI workers:
@@ -25,6 +29,8 @@ both account and self-host modes, including CLI workers:
 [pb_mapper]
 path = "auto"              # opt in; "relay_only" is the default
 allow_direct = true         # opt in; false is the default
+port_mapping = "off"        # "auto" is the default; or "always"
+relay_transport = "quic"    # "tcp" is the default
 ```
 
 Default values are not written, so only an opt-in appears in `config.toml`.
@@ -40,12 +46,18 @@ that changed, for as long as it differs from what the page opened with. CLI
 Share strings still carry only relay/key; importing one does not enable direct
 access.
 
-The relay must also support and enable direct coordination, with a public UDP
-STUN listener in addition to its TCP relay listener. For example:
+The relay must also serve direct coordination. Since pb-mapper 0.8 it does by
+default, on UDP at its TCP port number, unless started with `--relay-only`:
 
 ```sh
-pb-mapper server --port 7666 --enable-direct \
-  --direct-listen 0.0.0.0:10811 --direct-advertise PUBLIC_IP:10811
+pb-mapper server --port 7666    # 7666/tcp and 7666/udp must both be reachable
+```
+
+Clients before pb-mapper 0.8, which includes POCOX 0.7.7, need the relay to
+announce a whole address to go direct, and otherwise use the relay:
+
+```sh
+pb-mapper server --port 7666 --direct-advertise PUBLIC_IP:7666
 ```
 
 POCOX delegates negotiation, authenticated peer selection and fallback to the
@@ -76,6 +88,45 @@ handshake and recovery still run through the original protocol client (see
 CLI diagnostics include the
 same SDK `direct` counters.
 
+### Router port mapping
+
+Punching fails where a NAT drops what it has not seen. A tunnel allowed to go
+direct can then ask this network's router (PCP, NAT-PMP or UPnP) to map its direct
+UDP port, and offers the mapped address first to later sessions:
+
+- **When needed** (`auto`, the SDK's default) asks only once a direct attempt of
+  that tunnel failed to punch through. Where punching works, the router is never
+  asked.
+- **Always** asks as soon as the tunnel's direct endpoint opens.
+- **Off** never asks. A tunnel that keeps to the relay never asks either, so
+  nothing reaches the router until the user opts in to a direct path.
+
+No connection waits for a mapping: the one whose punch failed uses the relay. A
+lease is renewed while its tunnel runs and released when it stops; a process that
+is killed leaves it until the lease expires. Mapping the home router does not get
+through a carrier NAT that will not cooperate, and upstream has exercised UPnP and
+NAT-PMP only against test gateways, not real routers.
+
+Tunnel details show where a mapping stands, and CLI diagnostics report it as
+`port_mapping`. The public and gateway addresses stay on the device: agent tools
+report the state and protocol only.
+
+### Relay carrier
+
+A session reaches the relay over TCP unless **Relay carrier** selects QUIC, which
+carries every tunnel of a process over one connection per relay and credential,
+pinned to the certificate the relay gave over an authenticated TCP exchange. The
+relay has to offer it (`pb-mapper server --quic-listen 0.0.0.0:7667`; its TCP
+port stays necessary), and all of a session's relay calls, status and
+administrator ones included, follow the carrier.
+
+Nothing falls back to TCP. A relay without QUIC refuses the session with
+`quic_unavailable`, for good, so **Relay carrier** says whether the current relay
+offers QUIC and warns while it does not. Like the other preferences the carrier is
+captured when a tunnel starts: a running tunnel keeps its own, shown in its
+details and in CLI diagnostics as `relay_transport`. The backend's own session to
+the relay always uses TCP.
+
 ### Watching a link recover
 
 Every tunnel reports how it is doing as it happens, not just "retrying". The
@@ -92,9 +143,12 @@ SDK records, on control-path transitions only (never per packet):
   with consecutive repeats folded into one entry.
 
 A tunnel is listed while it is still coming up (not yet *ready*), so its very
-first relay phases and P2P attempt are visible. Lists poll every 3 s, every
-500 ms while any tunnel is coming up, recovering or trying a direct path, and
-a connection sheet or tunnel details on screen every 400 ms.
+first relay phases and P2P attempt are visible. The app follows each tunnel's SDK
+event stream, so what is on screen refreshes when something happens, at most ten
+times a second however many events arrive. Timers remain for what sends no events:
+lists every 3 s (every second while any tunnel is coming up, recovering or trying a
+direct path, to keep a countdown moving), a connection sheet or tunnel details every
+second, and every 400 ms while a connect runs, whose steps are not tunnel events.
 
 A session keeps reconnecting for as long as it is on screen, waiting 1, 2, 4,
 8, 15 and then 30 s between attempts; after four failures the banner also offers
@@ -143,7 +197,8 @@ ECN and segmentation metadata. A different route source, failed lookup, IPv6
 or another error keeps the original behavior. Healthy sends do not perform
 route lookups; there is no interface cache to become stale after network changes.
 
-The fix belongs to the host's transport dependency; updating the phone alone
+The fix belongs to the host's transport dependency, now the `quinn-plus` fork the
+SDK builds on; updating the phone alone
 does not replace a running Windows host's code. Both POCOX 0.7.5 and 0.7.7 used
 the earlier SDK pin, so success on a Linux host does not establish a version
 regression. The WSAEINVAL reproduction and socket tests run on Windows;

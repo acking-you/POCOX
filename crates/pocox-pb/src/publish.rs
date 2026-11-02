@@ -26,7 +26,7 @@
 //!   the handle; the SDK keeps trying.
 
 use anyhow::Result;
-use pb_mapper::{Registration, TunnelStatus};
+use pb_mapper::{Registration, TunnelDiagnostics, TunnelStatus};
 
 use crate::session::{RegisterOptions, RelaySession};
 
@@ -88,6 +88,12 @@ impl Published {
             TunnelStatus::Failed(reason) => Some(reason),
             _ => None,
         }
+    }
+
+    /// A snapshot of how the tunnel is doing: its carrier, direct sessions and
+    /// port mapping.
+    pub fn diagnostics(&self) -> TunnelDiagnostics {
+        self.registration.diagnostics()
     }
 
     /// Unpublish, awaiting the teardown.

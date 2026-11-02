@@ -20,9 +20,13 @@ class LinkWatch {
   final ConnectStage? stage;
 }
 
-/// How often a link on screen refreshes: often enough that a hole-punching
-/// stage, which lasts a second or two, is seen as it happens.
-const _linkPollInterval = Duration(milliseconds: 400);
+/// How often a link on screen refreshes while a connect runs: its steps are
+/// not tunnel events, and one can pass in a moment.
+const _connectPollInterval = Duration(milliseconds: 400);
+
+/// How often it refreshes otherwise. What its tunnel does arrives as events;
+/// this keeps a countdown to the next attempt moving.
+const _linkPollInterval = Duration(seconds: 1);
 
 /// The link of the service [serviceKey], refreshed only while something
 /// watches it. Like [liveSubscriptionsProvider], the timer stops with the
@@ -35,7 +39,7 @@ final linkWatchProvider = FutureProvider.autoDispose.family<LinkWatch, String>((
   Timer? next;
   var watched = true;
   var loaded = false;
-  var interval = _linkPollInterval;
+  var interval = _connectPollInterval;
   void schedule() {
     next?.cancel();
     next = watched && loaded ? Timer(interval, ref.invalidateSelf) : null;
@@ -52,16 +56,22 @@ final linkWatchProvider = FutureProvider.autoDispose.family<LinkWatch, String>((
     ..onResume(() {
       watched = true;
       schedule();
-    });
+    })
+    ..listen(tunnelChangesProvider, (_, _) => ref.invalidateSelf());
   try {
     final subs = await api.subscriptions();
     final tunnel = tunnelFor(subs, serviceKey);
+    final stage = api.appConnectStage(serviceKey);
     // A serving local listener has nothing to follow closely; one
     // restarting comes back within seconds.
-    interval = tunnel?.path == TunnelPath.local && tunnel!.ready
+    interval = stage != null
+        ? _connectPollInterval
+        : tunnel?.path == TunnelPath.local && tunnel!.ready
         ? const Duration(seconds: 3)
+        : tunnel?.path == TunnelPath.local
+        ? _connectPollInterval
         : _linkPollInterval;
-    return LinkWatch(tunnel: tunnel, stage: api.appConnectStage(serviceKey));
+    return LinkWatch(tunnel: tunnel, stage: stage);
   } finally {
     loaded = true;
     schedule();
@@ -432,6 +442,7 @@ String linkEventLabel(AppLocalizations l10n, LinkEvent event) {
     LinkEventKind.directFallback => l10n.linkEventFallback(
       directStageWords(l10n, event.stage ?? DirectStage.negotiating),
     ),
+    LinkEventKind.stopped => l10n.linkEventStopped,
   };
   return event.repeats > 1
       ? '$text ${l10n.linkEventRepeats(event.repeats)}'

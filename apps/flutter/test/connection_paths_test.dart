@@ -216,6 +216,105 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('a tunnel notice refreshes the details at once', (t) async {
+    const mapped = SubInfo(
+      key: 'pcx:studio:app:default',
+      localAddr: '127.0.0.1:52011',
+      alive: true,
+      path: TunnelPath.direct,
+      activeDirect: 1,
+      relayTransport: RelayTransport.quic,
+      portMapping: PortMappingStatus(
+        state: PortMappingState.active,
+        stage: 'active',
+        protocol: 'pcp',
+        externalAddr: '198.51.100.7:42000',
+      ),
+    );
+    final api = _ObservedBridge()
+      ..observed = [_sub(TunnelPath.relay, relay: 1)];
+    await t.pumpWidget(
+      host(
+        Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () =>
+                  showTunnelDetails(context, 'pcx:studio:app:default'),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+        api,
+      ),
+    );
+    await t.tap(find.text('open'));
+    await t.pumpAndSettle();
+    expect(find.text('QUIC'), findsNothing);
+
+    api.observed = [mapped];
+    api.tunnelChangeNotices.add(1);
+    // No timer has run: only the notice can have refreshed it.
+    await t.pump();
+    await t.pump();
+    await t.pump();
+    expect(find.text('P2P 直连'), findsWidgets);
+    expect(find.text('QUIC'), findsOneWidget);
+    expect(find.text('已映射到 198.51.100.7:42000'), findsOneWidget);
+    expect(find.text('pcp'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a router port mapping is offered only where it can matter', (
+    t,
+  ) async {
+    final api = FakeBridgeApi();
+    await t.pumpWidget(_settings(api));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('port-mapping-row')), findsNothing);
+
+    await t.tap(find.byKey(const Key('connection-path-auto')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('port-mapping-off')));
+    await t.pumpAndSettle();
+    expect(api.savedRelayPreferences.portMapping, PortMappingPreference.off);
+    expect(api.savedRelayPreferences.path, ConnectionPath.auto);
+
+    await t.tap(find.byKey(const Key('connection-path-relay-only')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('port-mapping-row')), findsNothing);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('choosing QUIC says whether this relay offers it', (t) async {
+    final api = FakeBridgeApi();
+    await t.pumpWidget(_settings(api));
+    await t.pumpAndSettle();
+    final state = find.byKey(const Key('relay-transport-state'));
+    expect(state, findsNothing);
+
+    await t.tap(find.byKey(const Key('relay-transport-quic')));
+    await t.pumpAndSettle();
+    expect(api.savedRelayPreferences.relayTransport, RelayTransport.quic);
+    expect(find.text('此中继不提供 QUIC：选择 TCP 之前，新连接都会失败。'), findsOneWidget);
+
+    await t.tap(find.byKey(const Key('relay-transport-tcp')));
+    await t.pumpAndSettle();
+    expect(state, findsNothing);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a saved QUIC choice shows where the relay offers it', (t) async {
+    final api = FakeBridgeApi()
+      ..relayQuic = 7667
+      ..savedRelayPreferences = const RelayPreferences(
+        relayTransport: RelayTransport.quic,
+      );
+    await t.pumpWidget(_settings(api));
+    await t.pumpAndSettle();
+    expect(find.text('此中继在 UDP 7667 提供 QUIC。'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('a connected service says how it travels once observed', (
     t,
   ) async {
@@ -253,14 +352,22 @@ void main() {
       testWidgets('the group fits at $width px, $brightness', (t) async {
         await t.binding.setSurfaceSize(Size(width, 800));
         addTearDown(() => t.binding.setSurfaceSize(null));
+        // Every row at once, with the longest state a saved choice can show.
+        final api = FakeBridgeApi()
+          ..savedRelayPreferences = const RelayPreferences(
+            path: ConnectionPath.auto,
+            relayTransport: RelayTransport.quic,
+          );
         await t.pumpWidget(
-          _settings(FakeBridgeApi(), theme: ThemeData(brightness: brightness)),
+          _settings(api, theme: ThemeData(brightness: brightness)),
         );
         await t.pumpAndSettle();
-        expect(
-          find.byKey(const Key('connection-path-auto')).hitTestable(),
-          findsOneWidget,
-        );
+        for (final key in const [
+          'connection-path-auto',
+          'port-mapping-always',
+        ]) {
+          expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
+        }
         expect(t.takeException(), isNull);
       });
     }

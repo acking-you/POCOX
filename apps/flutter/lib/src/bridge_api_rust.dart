@@ -106,8 +106,20 @@ class RustBridgeApi
         frb.ConnectionPathDto.auto => ConnectionPath.auto,
       },
       allowDirect: value.allowDirect,
+      relayTransport: _relayTransport(value.relayTransport),
+      portMapping: switch (value.portMapping) {
+        frb.PortMappingDto.off => PortMappingPreference.off,
+        frb.PortMappingDto.auto => PortMappingPreference.auto,
+        frb.PortMappingDto.always => PortMappingPreference.always,
+      },
     );
   }
+
+  static RelayTransport _relayTransport(frb.RelayTransportDto transport) =>
+      switch (transport) {
+        frb.RelayTransportDto.tcp => RelayTransport.tcp,
+        frb.RelayTransportDto.quic => RelayTransport.quic,
+      };
 
   @override
   Future<void> relaySetPreferences(RelayPreferences value) =>
@@ -118,8 +130,23 @@ class RustBridgeApi
             ConnectionPath.auto => frb.ConnectionPathDto.auto,
           },
           allowDirect: value.allowDirect,
+          relayTransport: switch (value.relayTransport) {
+            RelayTransport.tcp => frb.RelayTransportDto.tcp,
+            RelayTransport.quic => frb.RelayTransportDto.quic,
+          },
+          portMapping: switch (value.portMapping) {
+            PortMappingPreference.off => frb.PortMappingDto.off,
+            PortMappingPreference.auto => frb.PortMappingDto.auto,
+            PortMappingPreference.always => frb.PortMappingDto.always,
+          },
         ),
       );
+
+  @override
+  Future<int?> relayQuicPort() => frb.relayQuicPort();
+
+  @override
+  Stream<int> tunnelChanges() => frb.tunnelChanges();
 
   static SubInfo _subscription(frb.SubStatusDto s) => SubInfo(
     key: s.key,
@@ -144,6 +171,10 @@ class RustBridgeApi
     lastFailure: _failure(s.lastFailure),
     setupLatencyMs: s.setupLatencyMs,
     ready: s.ready,
+    relayTransport: switch (s.relayTransport) {
+      null => null,
+      final transport => _relayTransport(transport),
+    },
     relayPhase: switch (s.relayPhase) {
       frb.RelayPhaseDto.starting => RelayPhase.starting,
       frb.RelayPhaseDto.queued => RelayPhase.queued,
@@ -163,6 +194,22 @@ class RustBridgeApi
         inFlight: s.attemptsInFlight,
       ),
     },
+    portMapping: switch (s.portMapping) {
+      null => null,
+      final mapping => PortMappingStatus(
+        state: switch (mapping.state) {
+          frb.PortMappingStateDto.standby => PortMappingState.standby,
+          frb.PortMappingStateDto.asking => PortMappingState.asking,
+          frb.PortMappingStateDto.active => PortMappingState.active,
+          frb.PortMappingStateDto.failed => PortMappingState.failed,
+          frb.PortMappingStateDto.stopped => PortMappingState.stopped,
+        },
+        stage: mapping.stage,
+        protocol: mapping.protocol,
+        externalAddr: mapping.externalAddr,
+        error: mapping.error,
+      ),
+    },
     events: [
       for (final e in s.events)
         LinkEvent(
@@ -176,6 +223,7 @@ class RustBridgeApi
             frb.LinkEventKindDto.directEstablished =>
               LinkEventKind.directEstablished,
             frb.LinkEventKindDto.directFallback => LinkEventKind.directFallback,
+            frb.LinkEventKindDto.stopped => LinkEventKind.stopped,
           },
           failure: _failure(e.failure),
           stage: switch (e.stage) {

@@ -55,7 +55,9 @@ pub fn failure(error: ToolError) -> Response {
         | ToolError::Declined
         | ToolError::Revoked
         | ToolError::ContextChanged => StatusCode::FORBIDDEN,
-        ToolError::NotHosting | ToolError::Relay(_) => StatusCode::SERVICE_UNAVAILABLE,
+        ToolError::NotHosting | ToolError::Relay(_) | ToolError::QuicUnavailable => {
+            StatusCode::SERVICE_UNAVAILABLE
+        },
         ToolError::Conflict(_) => StatusCode::CONFLICT,
         ToolError::NotSaved => StatusCode::INTERNAL_SERVER_ERROR,
     };

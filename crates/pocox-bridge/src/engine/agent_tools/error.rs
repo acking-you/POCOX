@@ -26,9 +26,20 @@ pub enum ToolError {
     ContextChanged,
     /// The relay cannot be reached or refused.
     Relay(String),
+    /// This device reaches relays over QUIC, which this relay does not offer.
+    QuicUnavailable,
 }
 
 impl ToolError {
+    /// The failure a relay operation came back with.
+    pub fn relay(error: &anyhow::Error) -> Self {
+        if pocox_pb::is_quic_refusal(error) {
+            Self::QuicUnavailable
+        } else {
+            Self::Relay(format!("{error:#}"))
+        }
+    }
+
     /// Stable code for programs.
     pub fn code(&self) -> &'static str {
         match self {
@@ -43,6 +54,7 @@ impl ToolError {
             Self::NotSaved => "not_saved",
             Self::ContextChanged => "connection_changed",
             Self::Relay(_) => "relay_unavailable",
+            Self::QuicUnavailable => "relay_quic_unavailable",
         }
     }
 
@@ -74,6 +86,11 @@ impl ToolError {
                                      shared. Refresh, then try again."
                 .into(),
             Self::Relay(why) => format!("The relay is unavailable: {why}. Try again later."),
+            Self::QuicUnavailable => "This device reaches the relay over QUIC, which this relay \
+                                      does not offer, so trying again will not help. The user can \
+                                      select TCP under Connection path in POCOX settings, or set \
+                                      `relay_transport` in `config.toml`."
+                .into(),
         }
     }
 }
@@ -117,5 +134,19 @@ impl Pending {
                  `connect` again with the same arguments."
             ),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_a_relay_without_quic_stops_being_worth_retrying() {
+        let refused = anyhow::anyhow!("quic_unavailable: the relay does not offer QUIC")
+            .context("listing keys on relay:7666");
+        assert_eq!(ToolError::relay(&refused).code(), "relay_quic_unavailable");
+        let down = anyhow::anyhow!("connection refused").context("listing keys on relay:7666");
+        assert_eq!(ToolError::relay(&down).code(), "relay_unavailable");
     }
 }

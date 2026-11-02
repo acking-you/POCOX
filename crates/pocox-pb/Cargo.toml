@@ -25,7 +25,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 url = { workspace = true }
 
-# The workspace selects the SDK's dedicated Git branch and locks its commit.
+# The workspace selects the SDK's mainline and locks its commit.
 # `pb-mapper` is a one-line re-export of `pb_mapper_client::sdk`, which is the
 # whole surface we need — no `uni-stream` type parameters to thread any more,
 # because the SDK picks the TCP providers itself.

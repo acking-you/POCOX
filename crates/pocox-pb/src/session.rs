@@ -41,7 +41,7 @@ use pb_mapper::{
     Client, ClientConfig, ConnectRequest, Connection, RegisterRequest, Registration,
     ServiceConnection, Transport,
 };
-use pocox_core::config::{ConnectionPath, PbMapperConfig};
+use pocox_core::config::{ConnectionPath, PbMapperConfig, PortMapping, RelayTransport};
 
 /// Relay address plus the credential to present to it.
 ///
@@ -65,6 +65,10 @@ pub struct RelaySession {
     pub path: ConnectionPath,
     /// Whether new registrations accept authenticated direct setup.
     pub allow_direct: bool,
+    /// Carrier for this session's relay connections.
+    pub relay_transport: RelayTransport,
+    /// Router port mapping for new tunnels allowed to go direct.
+    pub port_mapping: PortMapping,
 }
 
 impl std::fmt::Debug for RelaySession {
@@ -82,6 +86,8 @@ impl std::fmt::Debug for RelaySession {
             .field("keep_alive", &self.keep_alive)
             .field("path", &self.path)
             .field("allow_direct", &self.allow_direct)
+            .field("relay_transport", &self.relay_transport)
+            .field("port_mapping", &self.port_mapping)
             .finish()
     }
 }
@@ -100,6 +106,8 @@ impl RelaySession {
             keep_alive: true,
             path: ConnectionPath::RelayOnly,
             allow_direct: false,
+            relay_transport: RelayTransport::Tcp,
+            port_mapping: PortMapping::Auto,
         }
     }
 
@@ -109,6 +117,8 @@ impl RelaySession {
     pub fn with_preferences(mut self, config: &PbMapperConfig) -> Self {
         self.path = config.path;
         self.allow_direct = config.allow_direct;
+        self.relay_transport = config.relay_transport;
+        self.port_mapping = config.port_mapping;
         self
     }
 
@@ -135,7 +145,7 @@ impl RelaySession {
             .map_err(|err| anyhow!("admin access on {}: {err}", self.relay_addr))
     }
 
-    /// Build the SDK client for this session.
+    /// Build the SDK client for this session, on its carrier.
     fn client(&self) -> Result<Client> {
         Client::new(ClientConfig {
             server: self.relay_addr.clone(),
@@ -146,7 +156,22 @@ impl RelaySession {
             // and nothing here has a reason to.
             namespace: None,
         })
+        .and_then(|client| {
+            client.with_relay_transport(match self.relay_transport {
+                RelayTransport::Tcp => pb_mapper::RelayTransport::Tcp,
+                RelayTransport::Quic => pb_mapper::RelayTransport::Quic,
+            })
+        })
         .map_err(|err| anyhow!("building pb-mapper client for {}: {err}", self.relay_addr))
+    }
+
+    /// The SDK's form of this session's port mapping preference.
+    fn sdk_port_mapping(&self) -> pb_mapper::PortMapping {
+        match self.port_mapping {
+            PortMapping::Off => pb_mapper::PortMapping::Off,
+            PortMapping::Auto => pb_mapper::PortMapping::Auto,
+            PortMapping::Always => pb_mapper::PortMapping::Always,
+        }
     }
 }
 
@@ -212,6 +237,7 @@ pub async fn register_background(
         .register_with_options(request, pb_mapper::RegisterOptions {
             allow_direct: session.allow_direct,
             idle_timeout: service_idle_timeout(&opts.key),
+            port_mapping: session.sdk_port_mapping(),
         })
         .await;
     registration.with_context(|| format!("registering `{}` on {}", opts.key, session.relay_addr))
@@ -276,6 +302,7 @@ pub async fn subscribe_background(
                     ConnectionPath::RelayOnly => pb_mapper::PathPolicy::RelayOnly,
                     ConnectionPath::Auto => pb_mapper::PathPolicy::Auto,
                 },
+                port_mapping: session.sdk_port_mapping(),
             },
         )
         .await
@@ -338,6 +365,27 @@ pub async fn service_connections(
         .service_status(key.clone())
         .await
         .with_context(|| format!("querying `{key}` status on {}", session.relay_addr))
+}
+
+/// The UDP port this session's relay offers QUIC on, or `None` when it offers
+/// none. Asked over TCP whatever the session's carrier, so it answers before a
+/// tunnel depends on the carrier.
+pub async fn relay_quic_port(session: &RelaySession) -> Result<Option<u16>> {
+    session
+        .client()?
+        .relay_quic_port()
+        .await
+        .with_context(|| format!("asking {} about QUIC", session.relay_addr))
+}
+
+/// Whether `error` is a relay's refusal to carry a QUIC session because it
+/// offers no QUIC.
+///
+/// Read from the whole chain's text because a tunnel's final failure flattens
+/// the relay's code into a string. Retrying cannot fix this one: only choosing
+/// another carrier or relay can.
+pub fn is_quic_refusal(error: &anyhow::Error) -> bool {
+    format!("{error:#}").contains(pb_mapper::QUIC_UNAVAILABLE)
 }
 
 /// Check that `addr` is a `host:port` a relay session could dial.

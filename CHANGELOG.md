@@ -9,6 +9,26 @@ breaking change goes.
 
 ## Unreleased
 
+- **pb-mapper 0.10.** POCOX now follows pb-mapper's `master` instead of its
+  dedicated branch, bringing direct connections through more NATs, including a
+  peer's destination-dependent port. Relay-only stays the default.
+- **Router port mapping.** With a direct path opted in, a tunnel whose hole punch
+  failed can ask the router (PCP, NAT-PMP or UPnP) to map its direct UDP port for
+  later connections. **Settings › Connection path › Router port mapping** chooses
+  **When needed** (the default), **Off** or **Always**; `port_mapping` under
+  `[pb_mapper]` does the same. Relay-only tunnels never ask. iOS and macOS may ask
+  for local network permission the first time one does.
+- **QUIC relay carrier.** **Relay carrier** (`relay_transport`) can carry tunnels
+  over one QUIC connection to a relay that offers it, and says whether the current
+  relay does. TCP stays the default, and nothing falls back to it on its own.
+- **Tunnels refresh as things happen.** Tunnel lists and details follow the SDK's
+  event streams and poll less often. Details add the carrier and the port mapping,
+  and a tunnel's history can say it stopped.
+- **Agent tools report the same.** `connect` and `services` add the carrier and
+  the port mapping's state to a connection's `link`, shared ports gain a `link` of
+  their own, and a relay without QUIC fails with `relay_quic_unavailable` instead
+  of suggesting a retry. Public and gateway addresses are never reported to them.
+
 - Fix session history reconciliation placing older tool activity after the final
   reply and folding the reply into the activity group. Host history now repairs
   existing message order without an app restart, while preserving live content,
