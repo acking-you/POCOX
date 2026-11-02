@@ -48,7 +48,7 @@ impl Probe {
         if !self.program.is_absolute() || !self.home.is_absolute() || !self.root.is_absolute() {
             return None;
         }
-        let output = command::read_json_with_timeout(
+        let output = command::read_json(
             &self.program,
             &["--bare".into(), "agents".into(), "--json".into()],
             &[
@@ -57,7 +57,6 @@ impl Probe {
                 ("DISABLE_TELEMETRY".into(), "1".into()),
             ],
             &serde_json::Value::Null,
-            Duration::from_secs(5),
         )
         .await
         .ok()?;
@@ -102,11 +101,7 @@ impl Probe {
             .filter(|r| r.session_id == session)
             .collect();
         anyhow::ensure!(records.len() <= 8, "too many native session owners");
-        let program = self.program.clone();
         tokio::task::spawn_blocking(move || {
-            let program = program
-                .canonicalize()
-                .map_err(|_| anyhow::anyhow!("Claude executable changed"))?;
             let mut owners = Vec::new();
             for record in records {
                 anyhow::ensure!(
@@ -121,7 +116,7 @@ impl Probe {
                     .canonicalize()
                     .map_err(|_| anyhow::anyhow!("Claude owner directory changed"))?;
                 anyhow::ensure!(
-                    matches_identity(&record, &program, &cwd, &process),
+                    matches_identity(&record, &cwd, &process),
                     "Claude owner identity changed"
                 );
                 anyhow::ensure!(!owners.contains(&process), "ambiguous Claude ownership");
@@ -157,9 +152,8 @@ impl Probe {
             .cloned()
             .collect();
         drop(cached);
-        let program = self.program.clone();
         let id = session.to_owned();
-        tokio::task::spawn_blocking(move || inspect_records(&id, &program, &records))
+        tokio::task::spawn_blocking(move || inspect_records(&id, &records))
             .await
             .unwrap_or_else(|_| unknown(session))
     }
@@ -178,29 +172,23 @@ impl Probe {
             view.safety = "nativeUnowned".into();
             return view;
         }
-        let program = self.program.clone();
         let id = session.to_owned();
-        tokio::task::spawn_blocking(move || inspect_records(&id, &program, &records))
+        tokio::task::spawn_blocking(move || inspect_records(&id, &records))
             .await
             .unwrap_or_else(|_| unknown(session))
     }
 }
 
-fn inspect_records(
-    session: &str,
-    program: &std::path::Path,
-    records: &[Record],
-) -> SessionLiveness {
+fn inspect_records(session: &str, records: &[Record]) -> SessionLiveness {
     let mut result = unknown(session);
     if records.is_empty() || records.len() > 8 {
         return result;
     }
-    let Ok(program) = program.canonicalize() else { return result };
     let mut states = Vec::new();
     for record in records {
         let Some(process) = process_identity(record.pid) else { return unknown(session) };
         let Ok(cwd) = record.cwd.canonicalize() else { return unknown(session) };
-        if !matches_identity(record, &program, &cwd, &process) {
+        if !matches_identity(record, &cwd, &process) {
             return unknown(session);
         }
         if result
@@ -230,22 +218,21 @@ fn inspect_records(
     result
 }
 
-fn matches_identity(
-    record: &Record,
-    program: &std::path::Path,
-    cwd: &std::path::Path,
-    process: &ProcessIdentity,
-) -> bool {
+fn matches_identity(record: &Record, cwd: &std::path::Path, process: &ProcessIdentity) -> bool {
     // The CLI stamps `startedAt` itself once it has booted, seconds after the
     // OS created it on a first launch or a busy machine. A process that was
     // already alive at that stamp is the one that wrote it under this PID; only
     // a stamp from before it existed is an earlier holder's. OS creation time
     // has second precision.
+    //
+    // The binary is not compared: an update repoints `claude` while a client
+    // keeps running the version it started with. A mismatch could only keep a
+    // session read-only, and writing also needs this owner to descend from the
+    // host's own adapter.
     record.started_at > 0
         && process.started > 0
         && record.pid == process.pid
         && record.started_at / 1000 + 1 >= process.started
-        && process.executable == program
         && process.cwd == cwd
 }
 

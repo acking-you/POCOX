@@ -15,23 +15,22 @@ fn path(key: &str) -> PathBuf {
     path
 }
 
-fn fixture_host(root: &Path) -> AgentHost {
+fn fixture_host(root: &Path, cli: &Path) -> AgentHost {
     let node = path("POCOX_TEST_NODE");
     let adapter = path("POCOX_TEST_CLAUDE_ADAPTER");
-    let cli = path("POCOX_TEST_CLAUDE_CLI");
     let endpoint = std::env::var("POCOX_TEST_MODEL_ENDPOINT").expect("local model");
     assert!(endpoint.starts_with("http://127.0.0.1:"));
     let config = root.join("config");
     let home = root.join("home");
     let reader = ClaudeHistory::from_adapter(node.clone(), &adapter, config.clone())
         .expect("reader")
-        .with_owner_probe(cli.clone(), home.clone());
+        .with_owner_probe(cli.to_path_buf(), home.clone());
     let args = vec![adapter.to_string_lossy().into_owned()];
     let store = SessionStore::memory(SourceId::with_key(&"f".repeat(32), &node, &args));
     let env = vec![
         ("HOME".into(), home.into_os_string()),
         ("CLAUDE_CONFIG_DIR".into(), config.into_os_string()),
-        ("CLAUDE_CODE_EXECUTABLE".into(), cli.into_os_string()),
+        ("CLAUDE_CODE_EXECUTABLE".into(), cli.as_os_str().to_owned()),
         ("ANTHROPIC_BASE_URL".into(), endpoint.into()),
         ("ANTHROPIC_API_KEY".into(), "pcx-disposable-fixture-key".into()),
         ("DISABLE_TELEMETRY".into(), "1".into()),
@@ -104,7 +103,8 @@ async fn native_claude_release_and_contended_original_session_acquire() {
     for dir in ["home", "config", "work"] {
         std::fs::create_dir_all(root.join(dir)).expect("fixture directory");
     }
-    let hosts = [fixture_host(&root), fixture_host(&root), fixture_host(&root)];
+    let cli = path("POCOX_TEST_CLAUDE_CLI");
+    let hosts = [fixture_host(&root, &cli), fixture_host(&root, &cli), fixture_host(&root, &cli)];
     let run = std::panic::AssertUnwindSafe(async {
         for host in &hosts {
             host.launch().await.expect("adapter launch");
@@ -264,6 +264,86 @@ async fn native_claude_release_and_contended_original_session_acquire() {
             .to_string(),
         )
         .expect("fixture evidence");
+    })
+    .catch_unwind()
+    .await;
+    for host in &hosts {
+        host.stop().await;
+    }
+    if let Err(panic) = run {
+        std::panic::resume_unwind(panic);
+    }
+}
+
+#[tokio::test]
+#[ignore = "requires POCOX_TEST_CLAUDE_* paths and isolated loopback Messages fixture"]
+async fn native_claude_session_stays_writable_across_a_cli_update() {
+    let root = path("POCOX_TEST_FIXTURE_ROOT");
+    for dir in ["home", "config", "work", "versions"] {
+        std::fs::create_dir_all(root.join(dir)).expect("fixture directory");
+    }
+    // Two versions and the link an update repoints, as the native installer
+    // lays them out. Each copy is a fresh binary, slow on its first launch.
+    let installed = path("POCOX_TEST_CLAUDE_CLI").canonicalize().expect("CLI");
+    let (old, new) = (root.join("versions/old"), root.join("versions/new"));
+    std::fs::copy(&installed, &old).expect("old version");
+    std::fs::copy(&installed, &new).expect("new version");
+    let current = root.join("claude");
+    std::os::unix::fs::symlink(&old, &current).expect("link");
+    let hosts = [fixture_host(&root, &current), fixture_host(&root, &current)];
+    let run = std::panic::AssertUnwindSafe(async {
+        for host in &hosts {
+            host.launch().await.expect("adapter launch");
+        }
+        let owner = &hosts[0];
+        let opened = owner
+            .new_session(&root.join("work").to_string_lossy(), Some(&identity(owner)))
+            .await
+            .expect("new");
+        let session = opened["sessionId"].as_str().expect("session");
+        reply(owner, session, "SEED").await;
+
+        let next = root.join("claude.next");
+        std::os::unix::fs::symlink(&new, &next).expect("next link");
+        std::fs::rename(&next, &current).expect("update");
+        reply(owner, session, "AFTER_UPDATE").await;
+        std::fs::remove_file(&old).expect("old version removed");
+        reply(owner, session, "AFTER_REMOVAL").await;
+
+        let outside = hosts[1]
+            .session_open(session, &identity(&hosts[1]))
+            .await
+            .expect("follow");
+        assert_eq!(outside.reason, "external_idle", "{outside:?}");
+        // A second writer on the new version is still refused.
+        let (_, outside_peer, _) = hosts[1].ready().expect("outside fixture peer");
+        outside_peer
+            .request(
+                "session/load",
+                json!({"sessionId":session,"cwd":root.join("work"),"mcpServers":[]}),
+                Some(Duration::from_secs(60)),
+            )
+            .await
+            .expect("independent original-session load");
+        assert_eq!(
+            owner
+                .prompt(session, "MUST NOT SEND", &[], Some(&identity(owner)))
+                .await,
+            Err(HostError::ReadOnly)
+        );
+        outside_peer
+            .request("session/close", json!({"sessionId":session}), Some(Duration::from_secs(20)))
+            .await
+            .expect("close only the fixture's outside writer");
+        reply(owner, session, "AFTER_OUTSIDE_RELEASE").await;
+
+        let access = owner
+            .session_access(session, &identity(owner))
+            .await
+            .expect("access");
+        assert_eq!(access.mode, "write", "{access:?}");
+        let released = owner.session_release(&access).await.expect("hand back");
+        assert_eq!(released.reason, "released_here");
     })
     .catch_unwind()
     .await;

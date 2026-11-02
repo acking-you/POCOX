@@ -67,11 +67,15 @@ separate dialog and no Take Over step: the host decides from fresh evidence,
 and the view follows its answer.
 
 That evidence is fresh ownership, source and native-child checks. A Claude
-owner matches only on native session ID, PID, start time, executable and cwd;
-unavailable evidence stays unknown. The CLI stamps its start time once it has
-booted, seconds after the OS created it on a first launch after an update, so
-the stamp may follow the creation time by any amount; one from before the
-process existed belongs to an earlier holder of the PID. Hosts also hold a POCOX
+owner matches only on native session ID, PID, start time and cwd; unavailable
+evidence stays unknown. The CLI stamps its start time once it has booted, seconds
+after the OS created it on a first launch after an update, so the stamp may
+follow the creation time by any amount; one from before the process existed
+belongs to an earlier holder of the PID. The binary is not compared: an update
+repoints `claude` and may remove the old version while a client keeps running it,
+so a session stays writable across an update and a terminal client on the older
+version is still named as the holder. Writing needs exactly one such owner, and
+it must descend from this host's own adapter. Hosts also hold a POCOX
 cross-process claim, retained through uncertain cleanup, which native clients do
 not honour.
 
@@ -188,6 +192,10 @@ process identity. This is not a claim of a provider-wide lock or arbitrary
 external-client termination. With CLI 2.1.316 a freshly copied binary, whose
 first launch took 3 to 5 s on one Mac, answered the first prompt of a new
 session, where it was refused before; that fixture's second writer stays refused.
+An opt-in test keeps a session on one copy of the CLI, repoints its link to
+another and removes the first: the session keeps answering, a second writer on
+the new copy is refused, and hand-back still works. This ran on macOS only; on
+Linux the regular tests cover a removed image and a differing binary.
 
 Automatic session access has its own evidence on one Mac (latest suites:
 Rust 815 passed, 24 ignored; Flutter 1503 passed, 5 skipped). An opt-in host test with the

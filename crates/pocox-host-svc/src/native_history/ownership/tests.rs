@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn stale_pid_replaced_image_or_changed_directory_never_matches() {
+fn stale_pid_or_changed_directory_never_matches() {
     let record = Record {
         pid: 42,
         session_id: "session".into(),
@@ -15,9 +15,7 @@ fn stale_pid_replaced_image_or_changed_directory_never_matches() {
         executable: "/cli".into(),
         cwd: "/work".into(),
     };
-    let matches = |value: &ProcessIdentity| {
-        matches_identity(&record, &process.executable, &record.cwd, value)
-    };
+    let matches = |value: &ProcessIdentity| matches_identity(&record, &record.cwd, value);
     assert!(matches(&process));
     assert!(!matches(&ProcessIdentity {
         pid: 43,
@@ -25,10 +23,6 @@ fn stale_pid_replaced_image_or_changed_directory_never_matches() {
     }));
     assert!(!matches(&ProcessIdentity {
         started: 102,
-        ..process.clone()
-    }));
-    assert!(!matches(&ProcessIdentity {
-        executable: "/another".into(),
         ..process.clone()
     }));
     assert!(!matches(&ProcessIdentity {
@@ -53,12 +47,12 @@ fn a_cli_that_boots_slowly_still_owns_its_record() {
         executable: "/cli".into(),
         cwd: "/work".into(),
     };
-    assert!(matches_identity(&record, &process.executable, &record.cwd, &process));
+    assert!(matches_identity(&record, &record.cwd, &process));
 }
 
 #[test]
 fn empty_inventory_is_not_permission_to_resume() {
-    let status = inspect_records("session", std::path::Path::new("/missing"), &[]);
+    let status = inspect_records("session", &[]);
     assert_eq!(status.safety, "nativeUnknown");
     assert!(!status.allows_resume);
     assert!(!status.requires_takeover);
@@ -81,14 +75,14 @@ fn verified_activity_never_implies_an_exclusive_write_lease() {
         ("future-state", "nativeUnknown"),
     ] {
         record.status = state.into();
-        let live = inspect_records("session", &process.executable, &[record.clone()]);
+        let live = inspect_records("session", &[record.clone()]);
         assert_eq!(live.safety, expected);
         assert!(live.held_open);
         assert_eq!(live.holders.len(), 1);
         assert!(!live.allows_resume);
         assert!(!live.requires_takeover);
     }
-    let duplicate = inspect_records("session", &process.executable, &[record.clone(), record]);
+    let duplicate = inspect_records("session", &[record.clone(), record]);
     assert_eq!(duplicate, unknown("session"));
 }
 
@@ -145,6 +139,28 @@ async fn handoff_probe_bypasses_display_cache_and_distinguishes_failure_from_emp
     std::fs::write(&program, "#!/bin/sh\ncat >/dev/null\nprintf 'not-json'\n").expect("failure");
     assert!(probe.idle_owners(id).await.is_err(), "parse failure is not a released session");
     assert!(probe.idle_owners("invalid").await.is_err());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn a_client_on_another_cli_version_is_an_owner_not_an_unknown() {
+    use std::os::unix::fs::PermissionsExt;
+    // This test process stands in for a client started before an update: the
+    // configured `claude` is something else by now.
+    let process = process_identity(std::process::id()).expect("own identity");
+    let id = "a0000000-0000-4000-8000-000000000000";
+    let root = tempfile::tempdir().expect("fixture");
+    let program = root.path().join("inventory");
+    let inventory = serde_json::json!([{
+        "pid": process.pid, "sessionId": id, "cwd": process.cwd,
+        "startedAt": process.started * 1000, "status": "idle",
+    }]);
+    std::fs::write(&program, format!("#!/bin/sh\ncat >/dev/null\nprintf '%s' '{inventory}'\n"))
+        .expect("script");
+    std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o700)).expect("mode");
+    let probe = Probe::new(program, root.path().into(), root.path().into());
+    assert_eq!(probe.idle_owners(id).await.expect("verified owner"), [process]);
+    assert_eq!(probe.inspect_fresh(id).await.safety, "nativeOwnedIdle");
 }
 
 #[tokio::test]

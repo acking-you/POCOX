@@ -36,6 +36,10 @@ breaking change goes.
   machine, the host did not recognise its own child, and every message in that
   session was refused. A slow start no longer matters, and a stale record of an
   earlier process still does not count as an owner.
+- **Claude sessions stay writable across a Claude Code update.** A session open
+  while the CLI updated used to refuse its next message as read-only. It now keeps
+  working, even after the old version is removed, and a terminal client still on
+  the old version is named as the holder. A second writer is still refused.
 - Read-only views of a forked Codex conversation show the history it inherited.
   They used to show only what happened after it branched, and a fresh fork listed
   with no preview.

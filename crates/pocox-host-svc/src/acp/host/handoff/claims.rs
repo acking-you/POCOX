@@ -108,7 +108,15 @@ impl AgentHost {
             .get_mut(id)
             .filter(|c| c.generation == generation)
             .ok_or(HostError::Stale)?;
-        if !claim.owners.is_empty() && claim.owners != owners {
+        // The same running process as before. Its reported image says nothing
+        // here: an update can repoint or remove it under a live child.
+        let unchanged = claim.owners.len() == owners.len()
+            && claim
+                .owners
+                .iter()
+                .zip(&owners)
+                .all(|(held, current)| held.same_process(current));
+        if !claim.owners.is_empty() && !unchanged {
             return Err(HostError::ReadOnly);
         }
         claim.owners = owners;
