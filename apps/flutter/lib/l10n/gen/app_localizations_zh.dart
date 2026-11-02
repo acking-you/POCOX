@@ -4882,7 +4882,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get forkDialogThroughTurn => '新会话包含这一整轮及之前的全部内容。';
 
   @override
-  String get forkDialogRunning => '有一轮仍在运行。新会话只保留目前已保存的内容，并把这一轮标记为中断；原会话继续运行。';
+  String get forkDialogRunning =>
+      '有一轮仍在运行。新会话只保留目前已保存的内容，这一轮在新会话里不再继续；原会话继续运行。';
 
   @override
   String get forkDialogFiles => '两个会话使用同一个工作目录，文件改动会相互影响。';
@@ -4894,7 +4895,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get forkCreated => '已分叉为新会话';
 
   @override
-  String get forkCreatedInterrupted => '已分叉为新会话，最后一轮已标记为中断。';
+  String get forkCreatedInterrupted => '已分叉为新会话，最后一轮在新会话里未完成。';
 
   @override
   String get forkReadyOpen => '打开';

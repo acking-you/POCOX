@@ -230,6 +230,7 @@ pub(super) fn turns(messages: Vec<Message>) -> (Vec<Turn>, bool) {
                 replayed: true,
                 next_item: 0,
                 omitted: 0,
+                prompt_index: None,
             });
         }
         if let Some(turn) = turns.last_mut() {

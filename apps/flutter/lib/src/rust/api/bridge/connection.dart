@@ -181,6 +181,12 @@ class AppCapabilitiesDto {
   /// Branching a session into an independent one.
   final bool fork;
 
+  /// Forking through a chosen completed turn.
+  final bool forkThroughTurn;
+
+  /// Forking a source another process holds or a running turn changes.
+  final bool forkBusySource;
+
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;
 
@@ -275,6 +281,8 @@ class AppCapabilitiesDto {
     required this.rateLimits,
     required this.takeover,
     required this.fork,
+    required this.forkThroughTurn,
+    required this.forkBusySource,
     required this.externalWriterMonitor,
     required this.localSessions,
     required this.planMode,
@@ -314,6 +322,8 @@ class AppCapabilitiesDto {
       rateLimits.hashCode ^
       takeover.hashCode ^
       fork.hashCode ^
+      forkThroughTurn.hashCode ^
+      forkBusySource.hashCode ^
       externalWriterMonitor.hashCode ^
       localSessions.hashCode ^
       planMode.hashCode ^
@@ -355,6 +365,8 @@ class AppCapabilitiesDto {
           rateLimits == other.rateLimits &&
           takeover == other.takeover &&
           fork == other.fork &&
+          forkThroughTurn == other.forkThroughTurn &&
+          forkBusySource == other.forkBusySource &&
           externalWriterMonitor == other.externalWriterMonitor &&
           localSessions == other.localSessions &&
           planMode == other.planMode &&

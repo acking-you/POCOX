@@ -219,6 +219,10 @@ pub struct AppCapabilitiesDto {
     pub takeover: bool,
     /// Branching a session into an independent one.
     pub fork: bool,
+    /// Forking through a chosen completed turn.
+    pub fork_through_turn: bool,
+    /// Forking a source another process holds or a running turn changes.
+    pub fork_busy_source: bool,
     /// Monitoring another writer of the same session.
     pub external_writer_monitor: bool,
     /// Sessions read directly from this device's disk.
@@ -293,6 +297,8 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
         rate_limits: c.rate_limits,
         takeover: c.takeover,
         fork: c.fork,
+        fork_through_turn: c.fork_through_turn,
+        fork_busy_source: c.fork_busy_source,
         external_writer_monitor: c.external_writer_monitor,
         local_sessions: c.local_sessions,
         plan_mode: c.plan_mode,

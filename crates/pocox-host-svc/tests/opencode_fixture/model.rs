@@ -1,7 +1,7 @@
 //! Local deterministic model transport, never a real provider or account.
 
 use std::convert::Infallible;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
 use axum::response::sse::Event;
@@ -13,9 +13,14 @@ use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 use tokio_stream::wrappers::ReceiverStream;
 
+type Shared = (Arc<Notify>, Arc<Mutex<Vec<String>>>);
+
 pub struct Fixture {
     pub address: String,
     pub gate: Arc<Notify>,
+    /// The messages of every request that offered tools: a real turn's, not a
+    /// title's or a summary's.
+    pub turns: Arc<Mutex<Vec<String>>>,
     task: JoinHandle<()>,
 }
 
@@ -32,24 +37,35 @@ pub async fn start() -> Fixture {
         .expect("model fixture listener");
     let address = format!("http://{}/v1", listener.local_addr().expect("fixture address"));
     let gate = Arc::new(Notify::new());
+    let turns = Arc::new(Mutex::new(Vec::new()));
     let router = Router::new()
         .route("/v1/chat/completions", post(answer))
-        .with_state(gate.clone());
+        .with_state((gate.clone(), turns.clone()));
     let task = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
     });
     Fixture {
         address,
         gate,
+        turns,
         task,
     }
 }
 
 async fn answer(
-    State(gate): State<Arc<Notify>>,
+    State((gate, turns)): State<Shared>,
     Json(body): Json<Value>,
 ) -> Sse<ReceiverStream<Result<Event, Infallible>>> {
     let messages = body["messages"].as_array().cloned().unwrap_or_default();
+    if body["tools"]
+        .as_array()
+        .is_some_and(|tools| !tools.is_empty())
+    {
+        turns
+            .lock()
+            .expect("fixture log")
+            .push(Value::Array(messages.clone()).to_string());
+    }
     let user = messages
         .iter()
         .rev()

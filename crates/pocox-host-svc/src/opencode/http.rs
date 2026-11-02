@@ -22,6 +22,8 @@ pub(super) const MAX_BODY: usize = 8 * 1024 * 1024;
 // before applying the ordinary public history-window bound.
 pub(super) const MAX_NATIVE_HISTORY_BODY: usize = 48 * 1024 * 1024;
 pub(super) const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
+/// A native fork's budget. The gateway's own, around it, is a little longer.
+pub(super) const FORK_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// How one peer reports a rejected request.
 pub(crate) trait Peer {
@@ -80,6 +82,8 @@ impl Peer for Pocox {
                     | "capacity"
                     | "session_not_found"
                     | "native_request_failed"
+                    | "source_held"
+                    | "fork_unknown"
             ) =>
             {
                 ClientError::Gateway {

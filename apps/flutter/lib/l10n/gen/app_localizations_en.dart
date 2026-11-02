@@ -5175,7 +5175,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forkDialogRunning =>
-      'A turn is still running. The new conversation keeps what has been saved so far and marks that turn interrupted; the original keeps running.';
+      'A turn is still running. The new conversation keeps what has been saved so far and leaves that turn unfinished; the original keeps running.';
 
   @override
   String get forkDialogFiles =>
@@ -5189,7 +5189,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get forkCreatedInterrupted =>
-      'Forked into a new conversation. Its last turn is marked interrupted.';
+      'Forked into a new conversation. Its last turn stays unfinished.';
 
   @override
   String get forkReadyOpen => 'Open';

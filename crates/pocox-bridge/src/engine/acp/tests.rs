@@ -200,6 +200,10 @@ struct Script {
     queued: VecDeque<Value>,
     live: Option<broadcast::Sender<Value>>,
     streams: usize,
+    /// The status and answer of `sessions/fork`; none closes the connection.
+    fork: Option<(&'static str, Value)>,
+    /// Request bodies `sessions/fork` received.
+    forked: Vec<Value>,
     /// The status and answer of `sessions/steer`.
     steer: Option<(&'static str, Value)>,
     prompt: Option<(&'static str, Value)>,
@@ -303,7 +307,18 @@ async fn serve_one(mut socket: TcpStream, script: Arc<Mutex<Script>>) {
     if socket.read_exact(&mut body).await.is_err() {
         return;
     }
-    if path.starts_with("/acp/v1/sessions/steer") {
+    if path.starts_with("/acp/v1/sessions/fork") {
+        let answer = {
+            let mut script = script.lock().unwrap_or_else(|poison| poison.into_inner());
+            script
+                .forked
+                .push(serde_json::from_slice(&body).unwrap_or(Value::Null));
+            script.fork.clone()
+        };
+        if let Some((status, answer)) = answer {
+            reply(&mut socket, status, &answer).await;
+        }
+    } else if path.starts_with("/acp/v1/sessions/steer") {
         let (status, answer, gate) = {
             let mut script = script.lock().unwrap_or_else(|poison| poison.into_inner());
             script
@@ -975,3 +990,5 @@ fn submitted_turn_is_pinned_before_its_start_event_and_refusal_releases_it() {
     script(&gateway).gate = None;
     disconnect_inner(&key);
 }
+
+mod fork;

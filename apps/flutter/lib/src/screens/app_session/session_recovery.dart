@@ -168,8 +168,12 @@ extension _SessionRecovery on _AppSessionState {
           : _threads.where((t) => t.id == startTid).firstOrNull;
       if (!current()) return;
       _parentThreadId = metadata?.parentThreadId;
-      _fork.source = metadata?.forkedFromId;
-      if (metadata != null) _discoveredThreads[metadata.id] = metadata;
+      // A provider's listing may name no source; a fork made here remembers it.
+      final known = _discoveredThreads[startTid];
+      _fork.source = metadata?.forkedFromId ?? known?.forkedFromId;
+      if (metadata != null && metadata.forkedFromId == _fork.source) {
+        _discoveredThreads[metadata.id] = metadata;
+      }
       if (metadata?.isGuardian ?? false) {
         _guardianReadOnly = true;
         _enterExternalWriterMode(startTid);

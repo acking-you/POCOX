@@ -59,6 +59,8 @@ mixin _RustThreads implements BridgeApi {
       rateLimits: c.rateLimits,
       takeover: c.takeover,
       fork: c.fork,
+      forkThroughTurn: c.forkThroughTurn,
+      forkBusySource: c.forkBusySource,
       externalWriterMonitor: c.externalWriterMonitor,
       localSessions: c.localSessions,
       planMode: c.planMode,

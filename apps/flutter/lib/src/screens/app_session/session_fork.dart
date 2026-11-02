@@ -10,28 +10,72 @@ class _ForkState {
 }
 
 extension _SessionFork on _AppSessionState {
-  /// Whether this conversation can branch. Reading it is enough: a held source
-  /// forks just as an ordinary one does, while a Guardian review stays
-  /// read-only and an unconnected host has nothing to ask.
-  bool get _canFork =>
+  /// Whether the host can be asked at all: a Guardian review stays read-only,
+  /// an unconnected host has nothing to ask, and one that says this session
+  /// cannot be written or is gone has nothing to branch.
+  bool get _forkReachable =>
       _caps.fork &&
       _threadId != null &&
       !_guardianReadOnly &&
       !_connectionLost &&
-      !_reconnecting;
+      !_reconnecting &&
+      !(_caps.hostAccess &&
+          _externalWriterMode &&
+          const {
+            'not_found',
+            'host_stopped',
+            'unsupported',
+          }.contains(_accessReason));
+
+  /// Another process holds this host-access session, or the host cannot rule
+  /// that out. Handed back or never opened here, nobody else is known to.
+  bool get _forkSourceHeld =>
+      _caps.hostAccess &&
+      _externalWriterMode &&
+      !const {
+        'owned',
+        'released',
+        'released_here',
+        'not_opened',
+      }.contains(_accessReason);
+
+  /// Whether this conversation can branch. Reading it is enough where the
+  /// provider takes a snapshot of a source that is held or changing; where it
+  /// does not, that waits.
+  bool get _canFork =>
+      _forkReachable &&
+      (_caps.forkBusySource || !(_streaming || _forkSourceHeld));
 
   /// The action for a finished turn's reply: the boundary needs the turn's
   /// real id from the host, so cached or still-syncing history offers nothing.
+  /// A finished turn stays a boundary while a later one runs.
   VoidCallback? _forkTurnAction(TranscriptItem item) {
-    if (!_canFork ||
+    if (!_forkReachable ||
+        !_caps.forkThroughTurn ||
+        (!_caps.forkBusySource && _forkSourceHeld) ||
         _historySyncing ||
         _showingCachedHistory ||
         item.type != 'agentMessage' ||
-        item.turnCompletedAt == null ||
-        item.turnId.isEmpty) {
+        item.turnId.isEmpty ||
+        !_forkTurnEnded(item)) {
       return null;
     }
     return () => unawaited(_forkConversation(throughTurnId: item.turnId));
+  }
+
+  /// Whether [item]'s turn is over. An ACP agent stamps no completion time, so
+  /// every turn but the running one is; following another writer, the newest
+  /// may still run there unless the host says otherwise. The host checks again.
+  bool _forkTurnEnded(TranscriptItem item) {
+    if (item.turnCompletedAt != null) return true;
+    if (!_caps.hostAccess || item.streaming) return false;
+    if (_streaming && (_turnId == null || _turnId == item.turnId)) return false;
+    if (!_externalWriterMode || _access?.turn == 'idle') return true;
+    final newest = _items.lastWhere(
+      (it) => it.turnId.isNotEmpty,
+      orElse: () => item,
+    );
+    return newest.turnId != item.turnId;
   }
 
   /// Branch the open conversation, then open the new one if this view is still
@@ -39,11 +83,15 @@ extension _SessionFork on _AppSessionState {
   /// attachments and queue stay as they are, and nothing is sent.
   Future<void> _forkConversation({String? throughTurnId}) async {
     final source = _threadId;
-    if (source == null || !_canFork || _fork.pending) return;
+    final allowed = throughTurnId != null
+        ? _forkReachable && _caps.forkThroughTurn
+        : _canFork;
+    if (source == null || !allowed || _fork.pending) return;
     final confirmed = await confirmFork(
       context,
       throughTurn: throughTurnId != null,
-      running: _streaming || _externalWriterRunning,
+      running:
+          _streaming || _externalWriterRunning || (_access?.running ?? false),
     );
     if (!confirmed || !mounted || _fork.pending || _threadId != source) return;
 
@@ -83,7 +131,11 @@ extension _SessionFork on _AppSessionState {
       messenger.notice(l10n.forkHostChanged);
       return;
     }
-    await copyForkSettings(api, service, source: source, fork: thread.id);
+    // A host-access provider restores what it keeps itself; only Codex keeps
+    // per-thread settings with the host.
+    if (!_caps.hostAccess) {
+      await copyForkSettings(api, service, source: source, fork: thread.id);
+    }
     if (!mounted) return;
     if (!sameLink()) {
       _updateState(() => _fork.pending = false);
@@ -121,7 +173,7 @@ extension _SessionFork on _AppSessionState {
     height: 42,
     child: TextButton.icon(
       key: const Key('chat-fork-action'),
-      onPressed: _fork.pending || _takingOver || !_canFork
+      onPressed: _fork.pending || _takingOver
           ? null
           : () => unawaited(_forkConversation()),
       icon: _fork.pending

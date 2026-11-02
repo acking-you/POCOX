@@ -9135,8 +9135,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   AppCapabilitiesDto dco_decode_app_capabilities_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 35)
-      throw Exception('unexpected arr length: expect 35 but see ${arr.length}');
+    if (arr.length != 37)
+      throw Exception('unexpected arr length: expect 37 but see ${arr.length}');
     return AppCapabilitiesDto(
       provider: dco_decode_String(arr[0]),
       fast: dco_decode_bool(arr[1]),
@@ -9145,34 +9145,36 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       rateLimits: dco_decode_bool(arr[4]),
       takeover: dco_decode_bool(arr[5]),
       fork: dco_decode_bool(arr[6]),
-      externalWriterMonitor: dco_decode_bool(arr[7]),
-      localSessions: dco_decode_bool(arr[8]),
-      planMode: dco_decode_bool(arr[9]),
-      protocol: dco_decode_String(arr[10]),
-      providerName: dco_decode_String(arr[11]),
-      profileId: dco_decode_String(arr[12]),
-      negotiated: dco_decode_bool(arr[13]),
-      generation: dco_decode_u_64(arr[14]),
-      voice: dco_decode_bool(arr[15]),
-      dictation: dco_decode_bool(arr[16]),
-      imageInput: dco_decode_bool(arr[17]),
-      steer: dco_decode_bool(arr[18]),
-      rename: dco_decode_bool(arr[19]),
-      compact: dco_decode_bool(arr[20]),
-      gitDiff: dco_decode_bool(arr[21]),
-      modelCatalog: dco_decode_bool(arr[22]),
-      sessionConfig: dco_decode_bool(arr[23]),
-      permissionOptions: dco_decode_bool(arr[24]),
-      commands: dco_decode_bool(arr[25]),
-      draftOptions: dco_decode_bool(arr[26]),
-      questionMultiple: dco_decode_bool(arr[27]),
-      permissionFeedback: dco_decode_bool(arr[28]),
-      nativeMetadata: dco_decode_bool(arr[29]),
-      sessionReopen: dco_decode_String(arr[30]),
-      sessionList: dco_decode_String(arr[31]),
-      historyScope: dco_decode_String(arr[32]),
-      runningInventory: dco_decode_String(arr[33]),
-      authRequired: dco_decode_bool(arr[34]),
+      forkThroughTurn: dco_decode_bool(arr[7]),
+      forkBusySource: dco_decode_bool(arr[8]),
+      externalWriterMonitor: dco_decode_bool(arr[9]),
+      localSessions: dco_decode_bool(arr[10]),
+      planMode: dco_decode_bool(arr[11]),
+      protocol: dco_decode_String(arr[12]),
+      providerName: dco_decode_String(arr[13]),
+      profileId: dco_decode_String(arr[14]),
+      negotiated: dco_decode_bool(arr[15]),
+      generation: dco_decode_u_64(arr[16]),
+      voice: dco_decode_bool(arr[17]),
+      dictation: dco_decode_bool(arr[18]),
+      imageInput: dco_decode_bool(arr[19]),
+      steer: dco_decode_bool(arr[20]),
+      rename: dco_decode_bool(arr[21]),
+      compact: dco_decode_bool(arr[22]),
+      gitDiff: dco_decode_bool(arr[23]),
+      modelCatalog: dco_decode_bool(arr[24]),
+      sessionConfig: dco_decode_bool(arr[25]),
+      permissionOptions: dco_decode_bool(arr[26]),
+      commands: dco_decode_bool(arr[27]),
+      draftOptions: dco_decode_bool(arr[28]),
+      questionMultiple: dco_decode_bool(arr[29]),
+      permissionFeedback: dco_decode_bool(arr[30]),
+      nativeMetadata: dco_decode_bool(arr[31]),
+      sessionReopen: dco_decode_String(arr[32]),
+      sessionList: dco_decode_String(arr[33]),
+      historyScope: dco_decode_String(arr[34]),
+      runningInventory: dco_decode_String(arr[35]),
+      authRequired: dco_decode_bool(arr[36]),
     );
   }
 
@@ -12038,6 +12040,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_rateLimits = sse_decode_bool(deserializer);
     var var_takeover = sse_decode_bool(deserializer);
     var var_fork = sse_decode_bool(deserializer);
+    var var_forkThroughTurn = sse_decode_bool(deserializer);
+    var var_forkBusySource = sse_decode_bool(deserializer);
     var var_externalWriterMonitor = sse_decode_bool(deserializer);
     var var_localSessions = sse_decode_bool(deserializer);
     var var_planMode = sse_decode_bool(deserializer);
@@ -12074,6 +12078,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       rateLimits: var_rateLimits,
       takeover: var_takeover,
       fork: var_fork,
+      forkThroughTurn: var_forkThroughTurn,
+      forkBusySource: var_forkBusySource,
       externalWriterMonitor: var_externalWriterMonitor,
       localSessions: var_localSessions,
       planMode: var_planMode,
@@ -15866,6 +15872,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.rateLimits, serializer);
     sse_encode_bool(self.takeover, serializer);
     sse_encode_bool(self.fork, serializer);
+    sse_encode_bool(self.forkThroughTurn, serializer);
+    sse_encode_bool(self.forkBusySource, serializer);
     sse_encode_bool(self.externalWriterMonitor, serializer);
     sse_encode_bool(self.localSessions, serializer);
     sse_encode_bool(self.planMode, serializer);

@@ -3,7 +3,8 @@
 use serde_json::Value;
 
 use super::super::app_session::{
-    ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta, ThreadRuntimeConfig, TurnItemsPage,
+    ForkOutcome, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta, ThreadRuntimeConfig,
+    TurnItemsPage,
 };
 use super::super::session_engine::{
     Capabilities, Protocol, SessionEngine, StartOptions, Supplement, TurnOptions,
@@ -69,6 +70,9 @@ impl SessionEngine for OpenCodeEngine {
         caps.commands = true;
         caps.draft_options = true;
         caps.question_multiple = true;
+        // A held source is refused, as is a boundary inside a running turn.
+        caps.fork = view.info.fork;
+        caps.fork_through_turn = view.info.fork;
         caps
     }
     fn thread_list(&self, service: &str) -> Result<Vec<ThreadMeta>> {
@@ -100,6 +104,14 @@ impl SessionEngine for OpenCodeEngine {
     }
     fn thread_resume(&self, service: &str, session: &str) -> Result<()> {
         open(service, session).map(|_| ())
+    }
+    fn thread_fork(
+        &self,
+        service: &str,
+        session: &str,
+        through_turn: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        ops::fork(service, session, through_turn)
     }
     fn thread_read(&self, service: &str, session: &str, _: bool) -> Result<ThreadHistory> {
         ops::read(service, session)

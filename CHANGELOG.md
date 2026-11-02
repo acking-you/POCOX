@@ -15,8 +15,15 @@ breaking change goes.
   serving the source. The source is only read: its writer keeps running, and its
   drafts and queue stay. A running turn is frozen as interrupted in the branch. A
   refusal, a lost answer and an ignored turn boundary are each reported rather
-  than retried or hidden. Other providers offer no fork yet.
-  ([details](docs/session-fork.md))
+  than retried or hidden. ([details](docs/session-fork.md))
+- **Fork Claude, Grok and OpenCode conversations.** Each uses its own native fork
+  on the host serving the session, and goes through ordinary session access when
+  opened. Claude and Grok also fork a session another client holds, including from
+  its read-only panel, as a snapshot of what it has stored. Grok and OpenCode can
+  stop at a finished turn; Claude forks only from the latest saved state. OpenCode
+  1.x refuses while another process holds its history or the turn is still running
+  (a finished earlier turn stays a boundary). OpenCode 2.x and custom ACP agents
+  offer no fork. ([details](docs/session-fork.md#claude-grok-and-opencode))
 - **Fix a takeover stopping a session's owner for nothing.** Resuming a session
   from this device's Local sessions could pick a connected service on another
   device. A takeover then stopped the local client and failed to resume, because

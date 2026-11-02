@@ -50,7 +50,9 @@ Future<void> forkLocalSession(
     messenger.error(l10n.forkOutcomeUnknown);
     return;
   }
-  await copyForkSettings(bridge, target, source: threadId, fork: thread.id);
+  if (!bridge.appCapabilities(target).hostAccess) {
+    await copyForkSettings(bridge, target, source: threadId, fork: thread.id);
+  }
   messenger.notice(forkCreatedMessage(l10n, result));
   if (!context.mounted || !current()) return;
   context.push(

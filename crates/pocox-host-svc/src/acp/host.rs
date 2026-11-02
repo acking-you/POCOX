@@ -88,6 +88,7 @@ use super::state::{ActiveTurn, LogEntry, Permission, Phase, RequestKind, State, 
 use super::store::{Change, Pending, SessionStore};
 use crate::process::{self, AgentProcess};
 
+mod fork;
 mod grok;
 pub(crate) use self::grok::grok_permission_option;
 mod handoff;
@@ -500,6 +501,7 @@ impl AgentHost {
     fn info_with_state(&self, state: &State) -> Value {
         let mut info = info_of(&self.inner.host_id, &self.inner.spec, state);
         info["nativeHistory"] = json!(self.inner.native_history.is_some());
+        info["fork"] = self.fork_support(state.negotiated.as_ref().map(|n| &n.capabilities));
         info
     }
 
@@ -533,6 +535,8 @@ fn info_of(host_id: &str, spec: &AgentSpec, state: &State) -> Value {
     })
 }
 
+#[cfg(all(test, unix))]
+mod fork_tests;
 #[cfg(all(test, unix))]
 mod grok_tests;
 #[cfg(all(test, unix))]
