@@ -31,6 +31,11 @@ breaking change goes.
   app runs here, and a takeover checks that its target can open the session before
   stopping anything. A session hosted by a separate `pocox serve` is resumed from
   that host's own session browser.
+- **Fix a new Claude conversation refusing its messages as read-only.** When the
+  Claude CLI started slowly, as on its first launch after an update or on a busy
+  machine, the host did not recognise its own child, and every message in that
+  session was refused. A slow start no longer matters, and a stale record of an
+  earlier process still does not count as an owner.
 - Read-only views of a forked Codex conversation show the history it inherited.
   They used to show only what happened after it branched, and a fresh fork listed
   with no preview.

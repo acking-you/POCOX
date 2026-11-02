@@ -68,8 +68,12 @@ and the view follows its answer.
 
 That evidence is fresh ownership, source and native-child checks. A Claude
 owner matches only on native session ID, PID, start time, executable and cwd;
-unavailable evidence stays unknown. Hosts also hold a POCOX cross-process
-claim, retained through uncertain cleanup, which native clients do not honour.
+unavailable evidence stays unknown. The CLI stamps its start time once it has
+booted, seconds after the OS created it on a first launch after an update, so
+the stamp may follow the creation time by any amount; one from before the
+process existed belongs to an earlier holder of the PID. Hosts also hold a POCOX
+cross-process claim, retained through uncertain cleanup, which native clients do
+not honour.
 
 - **Write.** The host admitted the session for this host (`owned`): the
   composer is live at once. When the host had to load it first, that happens
@@ -181,7 +185,9 @@ its verified native child replied, and the old host could not send. Final
 release removed the native owner and freed the POCOX claim. Regular regressions
 cover failed close, stale host/source, uncertain load, claim contention and
 process identity. This is not a claim of a provider-wide lock or arbitrary
-external-client termination.
+external-client termination. With CLI 2.1.316 a freshly copied binary, whose
+first launch took 3 to 5 s on one Mac, answered the first prompt of a new
+session, where it was refused before; that fixture's second writer stays refused.
 
 Automatic session access has its own evidence on one Mac (latest suites:
 Rust 815 passed, 24 ignored; Flutter 1503 passed, 5 skipped). An opt-in host test with the

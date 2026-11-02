@@ -236,12 +236,15 @@ fn matches_identity(
     cwd: &std::path::Path,
     process: &ProcessIdentity,
 ) -> bool {
-    // CLI metadata is millisecond wall time; OS creation time has second
-    // precision. A larger discrepancy (including clock changes) is unknown.
+    // The CLI stamps `startedAt` itself once it has booted, seconds after the
+    // OS created it on a first launch or a busy machine. A process that was
+    // already alive at that stamp is the one that wrote it under this PID; only
+    // a stamp from before it existed is an earlier holder's. OS creation time
+    // has second precision.
     record.started_at > 0
         && process.started > 0
         && record.pid == process.pid
-        && (record.started_at / 1000).abs_diff(process.started) <= 1
+        && record.started_at / 1000 + 1 >= process.started
         && process.executable == program
         && process.cwd == cwd
 }

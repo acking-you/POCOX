@@ -228,19 +228,8 @@ async fn idle(host: &AgentHost, session: &str) {
     .await;
 }
 
-/// Send `text`. The Claude adapter's native child registers shortly after a
-/// new session starts, and until then a prompt is refused before it is sent.
 async fn send(host: &AgentHost, session: &str, text: &str) -> String {
-    let deadline = tokio::time::Instant::now() + WAIT;
-    loop {
-        match host.prompt(session, text, &[], None).await {
-            Ok(turn) => return turn,
-            Err(HostError::ReadOnly) if tokio::time::Instant::now() < deadline => {
-                tokio::time::sleep(Duration::from_millis(200)).await;
-            },
-            Err(error) => panic!("prompt: {error}"),
-        }
-    }
+    host.prompt(session, text, &[], None).await.expect("prompt")
 }
 
 async fn turn(host: &AgentHost, session: &str, text: &str) -> String {

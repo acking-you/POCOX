@@ -24,7 +24,7 @@ fn stale_pid_replaced_image_or_changed_directory_never_matches() {
         ..process.clone()
     }));
     assert!(!matches(&ProcessIdentity {
-        started: 104,
+        started: 102,
         ..process.clone()
     }));
     assert!(!matches(&ProcessIdentity {
@@ -35,6 +35,25 @@ fn stale_pid_replaced_image_or_changed_directory_never_matches() {
         cwd: "/another".into(),
         ..process.clone()
     }));
+}
+
+#[test]
+fn a_cli_that_boots_slowly_still_owns_its_record() {
+    // Stamped 30 s after the OS created it, as on a first launch after an update.
+    let record = Record {
+        pid: 42,
+        session_id: "session".into(),
+        cwd: "/work".into(),
+        started_at: 130_000,
+        status: "idle".into(),
+    };
+    let process = ProcessIdentity {
+        pid: 42,
+        started: 100,
+        executable: "/cli".into(),
+        cwd: "/work".into(),
+    };
+    assert!(matches_identity(&record, &process.executable, &record.cwd, &process));
 }
 
 #[test]
