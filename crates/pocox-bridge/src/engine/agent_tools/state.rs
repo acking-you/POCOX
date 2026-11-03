@@ -17,8 +17,8 @@ use tokio::sync::{watch, Notify};
 use super::builtin::{CONNECT, SHARE};
 use super::error::ToolError;
 use super::model::{
-    ConnectionView, ConsentView, Decision, HostedView, OwnerKind, OwnerView, PortStatus, PortView,
-    ShareView,
+    relay_transport_label, ConnectionView, ConsentView, Decision, HostedView, OwnerKind, OwnerView,
+    PortLinkView, PortMappingView, PortStatus, PortView, ShareView,
 };
 use super::settings::Settings;
 use super::shares::Caller;
@@ -90,6 +90,18 @@ impl SharedPort {
         }
     }
 
+    /// How others reach it, while published.
+    fn link(&self) -> Option<PortLinkView> {
+        let diagnostics = self.published.as_ref()?.diagnostics();
+        let direct = diagnostics.direct.unwrap_or_default();
+        Some(PortLinkView {
+            relay_transport: relay_transport_label(diagnostics.relay_transport),
+            active_direct: direct.active_direct,
+            active_relay: direct.active_relay,
+            port_mapping: diagnostics.port_mapping.as_ref().map(PortMappingView::from),
+        })
+    }
+
     fn status(&self) -> PortStatus {
         if self.published.as_ref().is_some_and(|p| p.is_live()) {
             return if self.reachable { PortStatus::Online } else { PortStatus::Unreachable };
@@ -139,6 +151,7 @@ impl Share {
                     port: port.port,
                     key: port.key.clone(),
                     status: port.status(),
+                    link: port.link(),
                 })
                 .collect(),
             owner: self.owner.clone(),

@@ -10,7 +10,9 @@ use pocox_core::service::{sanitize_component, ServiceId, ServiceKind};
 
 use super::consent;
 use super::error::{Pending, ToolError};
-use super::model::{bounded, ConnectionView, Lifetime, LinkView};
+use super::model::{
+    bounded, relay_transport_label, ConnectionView, Lifetime, LinkView, PortMappingView,
+};
 use super::shares::Caller;
 use super::state::{self, now_ms, Connection, OwnerKey, Restore};
 use crate::engine::{discovery, runtime, transport};
@@ -93,12 +95,12 @@ pub async fn connect(
     }
     let owned = transport::resolve_owned()
         .await
-        .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+        .map_err(|e| ToolError::relay(&e))?;
     let services =
         tokio::time::timeout(Duration::from_secs(10), discovery::discover(&owned.transport))
             .await
             .map_err(|_| ToolError::Relay("listing services timed out".into()))?
-            .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+            .map_err(|e| ToolError::relay(&e))?;
     // A full account key names its account: one of another account or relay
     // (a stale or foreign link) is not this one's same-named service.
     let wanted = request.service.trim();
@@ -157,7 +159,7 @@ pub async fn connect(
     })
     .await
     .map_err(|e| ToolError::Relay(format!("{e}")))?
-    .map_err(|e| ToolError::Relay(format!("{e:#}")))?;
+    .map_err(|e| ToolError::relay(&e))?;
     // Only the service's own number keeps absolute localhost URLs working.
     let same_port = status
         .local_addr
@@ -299,6 +301,8 @@ fn link_of(status: Option<&runtime::SubStatus>, restore: &Restore) -> Option<Lin
             last_fallback_stage: None,
             attempting: None,
             restore_failures: restore.failures,
+            relay_transport: None,
+            port_mapping: None,
         });
     };
     let path = &status.path;
@@ -327,7 +331,7 @@ fn link_of(status: Option<&runtime::SubStatus>, restore: &Restore) -> Option<Lin
             .events
             .iter()
             .rev()
-            .find_map(|event| match event.kind {
+            .find_map(|event| match &event.kind {
                 pocox_pb::TunnelEventKind::DirectFallback {
                     stage,
                 } => Some(stage.as_str().to_string()),
@@ -337,6 +341,8 @@ fn link_of(status: Option<&runtime::SubStatus>, restore: &Restore) -> Option<Lin
             .attempt
             .map(|attempt| attempt.stage.as_str().to_string()),
         restore_failures: 0,
+        relay_transport: status.health.relay_transport.map(relay_transport_label),
+        port_mapping: status.port_mapping.as_ref().map(PortMappingView::from),
     })
 }
 

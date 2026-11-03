@@ -9,6 +9,29 @@ enum ConnectionPath {
   auto,
 }
 
+/// How new tunnels reach the relay.
+enum RelayTransport {
+  /// One TCP connection per relay stream, which every relay accepts (the
+  /// default).
+  tcp,
+
+  /// Every tunnel shares one QUIC connection. A relay that does not offer
+  /// QUIC refuses the tunnel; nothing falls back to TCP.
+  quic,
+}
+
+/// When a tunnel allowed to go direct asks the router to map its UDP port.
+enum PortMappingPreference {
+  /// Never.
+  off,
+
+  /// Once a direct attempt failed to punch through (the default).
+  auto,
+
+  /// As soon as its direct endpoint opens.
+  always,
+}
+
 /// Where the application's own requests find their proxy.
 enum ProxyMode {
   /// The proxy environment variables, else this computer's proxy setting.
@@ -51,6 +74,8 @@ class RelayPreferences {
   const RelayPreferences({
     this.path = ConnectionPath.relayOnly,
     this.allowDirect = false,
+    this.relayTransport = RelayTransport.tcp,
+    this.portMapping = PortMappingPreference.auto,
   });
 
   /// Path preference for new subscriptions.
@@ -59,21 +84,39 @@ class RelayPreferences {
   /// Whether newly published local services accept direct setup.
   final bool allowDirect;
 
+  /// Carrier for new tunnels' relay connections.
+  final RelayTransport relayTransport;
+
+  /// Router port mapping for new tunnels allowed to go direct.
+  final PortMappingPreference portMapping;
+
+  /// Whether any tunnel may go direct, so that a port mapping can matter.
+  bool get mayGoDirect => path == ConnectionPath.auto || allowDirect;
+
   /// A copy with the given fields replaced.
-  RelayPreferences copyWith({ConnectionPath? path, bool? allowDirect}) =>
-      RelayPreferences(
-        path: path ?? this.path,
-        allowDirect: allowDirect ?? this.allowDirect,
-      );
+  RelayPreferences copyWith({
+    ConnectionPath? path,
+    bool? allowDirect,
+    RelayTransport? relayTransport,
+    PortMappingPreference? portMapping,
+  }) => RelayPreferences(
+    path: path ?? this.path,
+    allowDirect: allowDirect ?? this.allowDirect,
+    relayTransport: relayTransport ?? this.relayTransport,
+    portMapping: portMapping ?? this.portMapping,
+  );
 
   @override
   bool operator ==(Object other) =>
       other is RelayPreferences &&
       other.path == path &&
-      other.allowDirect == allowDirect;
+      other.allowDirect == allowDirect &&
+      other.relayTransport == relayTransport &&
+      other.portMapping == portMapping;
 
   @override
-  int get hashCode => Object.hash(path, allowDirect);
+  int get hashCode =>
+      Object.hash(path, allowDirect, relayTransport, portMapping);
 }
 
 /// What a subscription's data connections go through right now: a local SDK
@@ -196,6 +239,54 @@ enum LinkEventKind {
 
   /// A connection gave up on direct and used the relay.
   directFallback,
+
+  /// The tunnel stopped.
+  stopped,
+}
+
+/// What a tunnel's router port mapping amounts to.
+enum PortMappingState {
+  /// Nothing asked yet: it waits for a failed punch or a first direct session.
+  standby,
+
+  /// Looking for the router, or asking it for a mapping.
+  asking,
+
+  /// A lease is usable now.
+  active,
+
+  /// The router gave none; it is asked again later.
+  failed,
+
+  /// Released, or ended with its tunnel.
+  stopped,
+}
+
+/// A tunnel's router port mapping as it stands.
+class PortMappingStatus {
+  /// Creates a status.
+  const PortMappingStatus({
+    required this.state,
+    this.stage = '',
+    this.protocol,
+    this.externalAddr,
+    this.error,
+  });
+
+  /// What it amounts to.
+  final PortMappingState state;
+
+  /// The SDK's exact stage, for a bug report.
+  final String stage;
+
+  /// `pcp`, `nat_pmp` or `upnp`, once one is in use.
+  final String? protocol;
+
+  /// The public address of its lease.
+  final String? externalAddr;
+
+  /// What the router said about a failure.
+  final String? error;
 }
 
 /// One entry of a tunnel's recent history.
@@ -289,9 +380,11 @@ class SubInfo {
     this.lastFailure,
     this.setupLatencyMs,
     this.ready = true,
+    this.relayTransport,
     this.relayPhase = RelayPhase.ready,
     this.nextRetryMs,
     this.attempt,
+    this.portMapping,
     this.events = const [],
   });
 
@@ -340,6 +433,9 @@ class SubInfo {
   /// Whether it has been ready; false while it is still coming up.
   final bool ready;
 
+  /// The carrier it started on; null for this app's own loopback service.
+  final RelayTransport? relayTransport;
+
   /// The phase its link to the relay entered last.
   final RelayPhase relayPhase;
 
@@ -348,6 +444,9 @@ class SubInfo {
 
   /// The direct attempt in flight, if any.
   final DirectAttempt? attempt;
+
+  /// Its router port mapping, when it may have one.
+  final PortMappingStatus? portMapping;
 
   /// What happened to it lately, oldest first.
   final List<LinkEvent> events;

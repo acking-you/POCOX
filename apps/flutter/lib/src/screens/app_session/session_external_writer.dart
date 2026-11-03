@@ -118,6 +118,7 @@ extension _SessionExternalWriter on _AppSessionState {
       _externalWriterLiveness = update.liveness;
       if (!paginated) {
         _replaceTranscriptItems(update.items);
+        _historyUnread = false;
         _historySyncing = false;
         _showingCachedHistory = false;
         _historyEpoch = null;
@@ -207,6 +208,7 @@ extension _SessionExternalWriter on _AppSessionState {
           _historyGeneration++;
         }
         _historyEpoch = history.historyEpoch;
+        _historyUnread = false;
         _showingCachedHistory = false;
         _historySyncing = false;
         _turnSummaries = history.turns;

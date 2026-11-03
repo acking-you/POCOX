@@ -60,6 +60,14 @@ locally; if anything was skipped, say why.
 - [ ] `flutter_rust_bridge_codegen generate` (only if `crates/pocox-bridge/src/api/` changed)
 - [ ] Manual flow exercised (describe):
 
+## Screenshots
+
+<!--
+Required when this changes what users see: screenshots or a video of the
+running app (`AGENTS.md` › Workflow and communication). Otherwise delete this
+section.
+-->
+
 ## Linked issues
 
 <!--

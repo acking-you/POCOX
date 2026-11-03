@@ -69,6 +69,43 @@ class AppLocalizationsZh extends AppLocalizations {
   String get connectionPathIncomingPending => '重启托管后生效。';
 
   @override
+  String get connectionPathTunnelsPending => '新连接将使用此设置；重新连接会话或重启托管即可切换。';
+
+  @override
+  String get connectionPathMapping => '路由器端口映射';
+
+  @override
+  String get connectionPathMappingInfo =>
+      '直连打洞失败时，POCOX 可以请求当前网络的路由器（PCP、NAT-PMP 或 UPnP）为直连路径映射一个 UDP 端口，并在隧道停止时释放。连接不会等待映射：打洞失败的那次连接会改用中继。只走中继的连接从不请求。';
+
+  @override
+  String get connectionPathMappingOff => '关闭';
+
+  @override
+  String get connectionPathMappingAuto => '按需';
+
+  @override
+  String get connectionPathMappingAlways => '始终';
+
+  @override
+  String get connectionPathCarrier => '中继通道';
+
+  @override
+  String get connectionPathCarrierInfo =>
+      'TCP 适用于所有中继。QUIC 让所有隧道共用一条连接；需要中继提供 QUIC，不提供时隧道会被拒绝，不会自动改用 TCP。';
+
+  @override
+  String connectionPathQuicOffered(int port) {
+    return '此中继在 UDP $port 提供 QUIC。';
+  }
+
+  @override
+  String get connectionPathQuicRefused => '此中继不提供 QUIC：选择 TCP 之前，新连接都会失败。';
+
+  @override
+  String get connectionPathQuicUnknown => '无法确认此中继是否提供 QUIC。';
+
+  @override
   String get connectionPathReadFailed => '无法读取连接偏好。';
 
   @override
@@ -136,6 +173,32 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get tunnelFallbackUnreachable => '两端无法直接互通（NAT、防火墙或 UDP 被拦截）。';
+
+  @override
+  String get tunnelPortMapping => '路由器端口映射';
+
+  @override
+  String get tunnelMappingStandby => '待命';
+
+  @override
+  String get tunnelMappingAsking => '正在请求路由器';
+
+  @override
+  String get tunnelMappingActive => '已映射';
+
+  @override
+  String tunnelMappingActiveAt(String address) {
+    return '已映射到 $address';
+  }
+
+  @override
+  String get tunnelMappingFailed => '未映射，稍后重试';
+
+  @override
+  String get tunnelMappingStopped => '已释放';
+
+  @override
+  String get tunnelRelayCarrier => '通道';
 
   @override
   String get tunnelRelayState => '状态';
@@ -301,6 +364,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String linkEventFallback(String stage) {
     return '在$stage时回退到中继';
   }
+
+  @override
+  String get linkEventStopped => '已停止';
 
   @override
   String linkEventRepeats(int count) {
@@ -627,6 +693,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get historyRetry => '加载失败，点击重试';
+
+  @override
+  String get historyAwaitsConnection => '连接恢复后加载历史';
+
+  @override
+  String get historyLoadFailed => '历史加载失败';
 
   @override
   String get turnFailed =>

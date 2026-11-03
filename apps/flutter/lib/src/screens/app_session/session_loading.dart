@@ -245,6 +245,7 @@ extension _SessionLoading on _AppSessionState {
     _historyPartialItems = null;
     _updateState(() {
       _threadId = tid;
+      _historyUnread = tid != null;
       _historySyncing = false;
       _showingCachedHistory = false;
       _historyEpoch = null;

@@ -72,6 +72,46 @@ class AppLocalizationsEn extends AppLocalizations {
   String get connectionPathIncomingPending => 'Restart hosting to apply.';
 
   @override
+  String get connectionPathTunnelsPending =>
+      'New connections use this. Reconnect a session or restart hosting to switch.';
+
+  @override
+  String get connectionPathMapping => 'Router port mapping';
+
+  @override
+  String get connectionPathMappingInfo =>
+      'When a direct attempt cannot punch through, POCOX can ask this network\'s router (PCP, NAT-PMP or UPnP) to map a UDP port for the direct path, and releases it when the tunnel stops. No connection waits for it: the one whose punch failed uses the relay. Connections that keep to the relay never ask.';
+
+  @override
+  String get connectionPathMappingOff => 'Off';
+
+  @override
+  String get connectionPathMappingAuto => 'When needed';
+
+  @override
+  String get connectionPathMappingAlways => 'Always';
+
+  @override
+  String get connectionPathCarrier => 'Relay carrier';
+
+  @override
+  String get connectionPathCarrierInfo =>
+      'TCP works with every relay. QUIC carries all tunnels over one connection; the relay has to offer it, and one that doesn\'t refuses the tunnel instead of falling back to TCP.';
+
+  @override
+  String connectionPathQuicOffered(int port) {
+    return 'This relay offers QUIC on UDP $port.';
+  }
+
+  @override
+  String get connectionPathQuicRefused =>
+      'This relay doesn\'t offer QUIC: new connections will fail until you select TCP.';
+
+  @override
+  String get connectionPathQuicUnknown =>
+      'Couldn\'t ask the relay whether it offers QUIC.';
+
+  @override
   String get connectionPathReadFailed =>
       'Couldn\'t read connection preferences.';
 
@@ -149,6 +189,32 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tunnelFallbackUnreachable =>
       'The two ends couldn\'t reach each other directly (NAT, firewall or blocked UDP).';
+
+  @override
+  String get tunnelPortMapping => 'Router port mapping';
+
+  @override
+  String get tunnelMappingStandby => 'On standby';
+
+  @override
+  String get tunnelMappingAsking => 'Asking the router';
+
+  @override
+  String get tunnelMappingActive => 'Mapped';
+
+  @override
+  String tunnelMappingActiveAt(String address) {
+    return 'Mapped at $address';
+  }
+
+  @override
+  String get tunnelMappingFailed => 'Not mapped; will ask again';
+
+  @override
+  String get tunnelMappingStopped => 'Released';
+
+  @override
+  String get tunnelRelayCarrier => 'Carrier';
 
   @override
   String get tunnelRelayState => 'State';
@@ -326,6 +392,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String linkEventFallback(String stage) {
     return 'Fell back to the relay while $stage';
   }
+
+  @override
+  String get linkEventStopped => 'Stopped';
 
   @override
   String linkEventRepeats(int count) {
@@ -659,6 +728,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get historyRetry => 'Couldn’t load history. Retry';
+
+  @override
+  String get historyAwaitsConnection => 'History will load once reconnected';
+
+  @override
+  String get historyLoadFailed => 'Couldn’t load history';
 
   @override
   String get turnFailed =>

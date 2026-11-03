@@ -94,11 +94,12 @@ POCOX 直接使用该 Git 分支，不再等待 crates.io 版本发布：
 cargo test --workspace --locked
 ```
 
-`Cargo.toml` 使用 `git = "https://github.com/acking-you/pb-mapper"` 和
-`branch = "pocox"`；`Cargo.lock` 固定到包含本次修复的
-`f0ed4271de962b8759d11171bcf901aa6df458cc`。普通构建不会自动追随分支变化。
-以后将兼容修复推送到该分支，再在本仓库运行 `cargo update -p pb-mapper`，
-检查锁定提交并完成回归验证后提交 Cargo.lock。
+当时 `Cargo.toml` 使用 `git = "https://github.com/acking-you/pb-mapper"` 和
+`branch = "pocox"`，`Cargo.lock` 固定到包含本次修复的
+`f0ed4271de962b8759d11171bcf901aa6df458cc`。现在依赖跟随 pb-mapper 的 `master`
+（见 [relay-worker-recovery](relay-worker-recovery.md#direct-connections)）。普通构建
+不会自动追随分支变化：以后将兼容修复合入该分支，再在本仓库运行
+`cargo update -p pb-mapper`，检查锁定提交并完成回归验证后提交 Cargo.lock。
 
 上述 300 次切换在该 Git 接入之前，使用相同修复源码的临时本地联编完成；
 现在正常依赖解析即可包含这些修复，无需绝对路径依赖或本地 patch。

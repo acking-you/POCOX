@@ -55,6 +55,22 @@ mixin _FakeConnection on _FakeBridgeState {
   Object? relayReadError;
   Object? relaySaveError;
 
+  /// What [relayQuicPort] answers; the relay offers none by default.
+  int? relayQuic;
+  Object? relayQuicError;
+
+  /// Sends what [tunnelChanges] delivers.
+  final tunnelChangeNotices = StreamController<int>.broadcast();
+
+  @override
+  Future<int?> relayQuicPort() async {
+    if (relayQuicError case final error?) throw error;
+    return relayQuic;
+  }
+
+  @override
+  Stream<int> tunnelChanges() => tunnelChangeNotices.stream;
+
   @override
   Future<RelayPreferences> relayPreferences() async {
     if (relayReadError case final error?) throw error;

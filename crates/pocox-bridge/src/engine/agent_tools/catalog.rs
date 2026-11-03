@@ -357,11 +357,13 @@ mod tests {
                     port: 5173,
                     key: "pcx:studio:port:5173".into(),
                     status: PortStatus::Online,
+                    link: None,
                 },
                 PortView {
                     port: 8000,
                     key: "pcx:studio:port:8000".into(),
                     status: PortStatus::Starting,
+                    link: None,
                 },
             ],
             owner: OwnerView {

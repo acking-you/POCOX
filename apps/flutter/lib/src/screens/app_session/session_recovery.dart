@@ -237,6 +237,7 @@ extension _SessionRecovery on _AppSessionState {
           : null;
       _updateState(() {
         _historyAppliedLink = link;
+        _historyUnread = false;
         _historySyncing = false;
         _showingCachedHistory = false;
         _historyEpoch = history.historyEpoch;
@@ -570,10 +571,10 @@ extension _SessionRecovery on _AppSessionState {
 
   /// Re-establish the connection automatically, and keep at it while the
   /// screen is in front: a link that comes back is picked up without the
-  /// user. The waits grow to [_retryDelay]'s cap; after [_quickAttempts]
-  /// failures the "disconnected" banner offers to try at once as well. Each
-  /// attempt's progress (and the wait before the next) goes to [_relink], so
-  /// the status bar and connection sheet show it as it happens. Idempotent —
+  /// user. The waits grow to [_retryDelay]'s cap. Each attempt's progress (and
+  /// the wait before the next) goes to [_relink], so the status bar and
+  /// connection sheet show it as it happens, and the sheet's Retry now ends a
+  /// wait; no banner repeats them. Idempotent —
   /// concurrent triggers (stream close + health tick) collapse into one.
   /// [reload] re-reads the thread history after reconnecting (to catch events
   /// missed while the socket was down). Pass `false` from the send-failure path
@@ -713,15 +714,6 @@ extension _SessionRecovery on _AppSessionState {
           if (!current()) return;
           record('retry', attempt, error);
           lastError = friendlyError(error);
-          if (attempt == _quickAttempts) {
-            // Still trying, but say so: the user may want to try at once.
-            _updateState(() {
-              _connectionLost = true;
-              _error = AppLocalizations.of(context).connectionLost;
-              _retry = _relink.retryNow;
-            });
-            _publishLinkState(down: true);
-          }
           final delay = _retryDelay(attempt);
           _relink.publish(
             epoch,
@@ -740,9 +732,6 @@ extension _SessionRecovery on _AppSessionState {
     }
   }
 }
-
-/// Quick attempts before the banner offers to try at once.
-const _quickAttempts = 4;
 
 /// The wait after the [attempt]th failed attempt: short at first, then at
 /// most half a minute.
