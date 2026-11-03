@@ -127,6 +127,11 @@ captured when a tunnel starts: a running tunnel keeps its own, shown in its
 details and in CLI diagnostics as `relay_transport`. The backend's own session to
 the relay always uses TCP.
 
+A publication refused for lack of QUIC returns that error instead of retaining
+an ended worker as a pending registration. Sharing a port reports the refusal
+and withdraws the request; ordinary relay outages retain their retrying workers.
+Management reports the publication's cause, including a missing carrier.
+
 ### Watching a link recover
 
 Every tunnel reports how it is doing as it happens, not just "retrying". The

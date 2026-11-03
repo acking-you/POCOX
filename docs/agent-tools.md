@@ -201,7 +201,9 @@ One `action` with its fields:
 - Every failure says what to do next (`tools_off`, `not_hosting`,
   `declined`, `name_conflict`, `relay_unavailable`, …). `relay_quic_unavailable`
   means this device reaches relays over QUIC and this relay offers none, so
-  retrying will not help until the user changes the carrier.
+  retrying will not help until the user changes the carrier. A share refused
+  for this reason withdraws its reserved ports and is not saved or returned
+  as a pending share; transient relay outages still keep their retrying handle.
 
 ## Consent
 

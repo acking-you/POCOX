@@ -654,6 +654,9 @@ async fn publish(
                 .into(),
         )),
         Err(PublishError::Other(error)) => {
+            if pocox_pb::is_quic_refusal(&error) {
+                return Err(ToolError::relay(&error));
+            }
             tracing::debug!(%key, "sharing will retry: {error:#}");
             Ok(None)
         },

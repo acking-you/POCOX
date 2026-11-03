@@ -381,11 +381,21 @@ pub async fn relay_quic_port(session: &RelaySession) -> Result<Option<u16>> {
 /// Whether `error` is a relay's refusal to carry a QUIC session because it
 /// offers no QUIC.
 ///
-/// Read from the whole chain's text because a tunnel's final failure flattens
-/// the relay's code into a string. Retrying cannot fix this one: only choosing
-/// another carrier or relay can.
+/// Match the SDK's refusal code, including the code at the start of a
+/// tunnel's flattened final failure. Context such as a service name or relay
+/// address must not turn a transient outage into a permanent refusal.
 pub fn is_quic_refusal(error: &anyhow::Error) -> bool {
-    format!("{error:#}").contains(pb_mapper::QUIC_UNAVAILABLE)
+    match error.downcast_ref::<pb_mapper::Error>() {
+        Some(pb_mapper::Error::Remote {
+            code, ..
+        }) => code == pb_mapper::QUIC_UNAVAILABLE,
+        Some(pb_mapper::Error::TunnelFailed {
+            reason,
+        }) => reason
+            .split_once(':')
+            .is_some_and(|(code, _)| code == pb_mapper::QUIC_UNAVAILABLE),
+        _ => false,
+    }
 }
 
 /// Check that `addr` is a `host:port` a relay session could dial.

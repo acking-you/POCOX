@@ -136,17 +136,3 @@ impl Pending {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn only_a_relay_without_quic_stops_being_worth_retrying() {
-        let refused = anyhow::anyhow!("quic_unavailable: the relay does not offer QUIC")
-            .context("listing keys on relay:7666");
-        assert_eq!(ToolError::relay(&refused).code(), "relay_quic_unavailable");
-        let down = anyhow::anyhow!("connection refused").context("listing keys on relay:7666");
-        assert_eq!(ToolError::relay(&down).code(), "relay_unavailable");
-    }
-}

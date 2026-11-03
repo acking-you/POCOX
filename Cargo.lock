@@ -3434,6 +3434,7 @@ dependencies = [
  "json5",
  "once_cell",
  "parking_lot",
+ "pb-mapper-testkit",
  "pocox-account-proto",
  "pocox-api-proxy",
  "pocox-codex",

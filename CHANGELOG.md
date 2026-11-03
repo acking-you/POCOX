@@ -27,7 +27,9 @@ breaking change goes.
 - **Agent tools report the same.** `connect` and `services` add the carrier and
   the port mapping's state to a connection's `link`, shared ports gain a `link` of
   their own, and a relay without QUIC fails with `relay_quic_unavailable` instead
-  of suggesting a retry. Public and gateway addresses are never reported to them.
+  of suggesting a retry. A share refused for lack of QUIC is withdrawn rather
+  than saved with an unusable link. Public and gateway addresses are never
+  reported to them.
 
 - Self-hosted relay setup opens over the sign-in page. Back restores the compact
   sign-in view while retaining any entered backend address, using the standard

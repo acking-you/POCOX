@@ -198,6 +198,20 @@ async fn a_quic_session_carries_tunnels_and_a_relay_without_quic_says_so() {
         .await
         .expect_err("no QUIC to reach it over");
     assert!(pocox_pb::is_quic_refusal(&refused), "named as the carrier's fault: {refused:#}");
+    let refused = pocox_pb::publish_pending(&quic, RegisterOptions {
+        key: "pcx:quic-test:port:5173".into(),
+        local_addr: "127.0.0.1:5173".into(),
+        codec: true,
+    })
+    .await
+    .expect_err("a permanently refused publication must not become a pending share");
+    let pocox_pb::PublishError::Other(refused) = refused else {
+        panic!("a missing carrier is not a service-name conflict");
+    };
+    assert!(
+        pocox_pb::is_quic_refusal(&refused),
+        "publication keeps the carrier's error: {refused:#}"
+    );
 }
 
 #[tokio::test]
