@@ -78,10 +78,9 @@ GoRouter buildRouter({
       builder: (c, s) => AccountOnboardingScreen(
         sessionExpired: s.uri.queryParameters['reason'] == 'session-expired',
       ),
-    ),
-    GoRoute(
-      path: '/onboarding/self-host',
-      builder: (c, s) => const OnboardingScreen(),
+      routes: [
+        GoRoute(path: 'self-host', builder: (c, s) => const OnboardingScreen()),
+      ],
     ),
     // Chat-first home: resolves an app service + the latest conversation and
     // lands the user directly in the chat. All management moved to /manage.

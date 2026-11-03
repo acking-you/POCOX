@@ -49,20 +49,11 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final api = ref.read(bridgeApiProvider);
-    return Scaffold(
-      // A way back is not optional here. This page is reached from account
-      // onboarding via `go`, which REPLACES the stack, so there is nothing to
-      // pop — without this the only exits are completing self-host setup or
-      // killing the app, and a user who opened "Advanced" to look around is
-      // stranded. `go` rather than `pop` for the same reason: there is no
-      // previous route to return to.
+    final page = Scaffold(
       // The window's own title bar on a frameless desktop: it drags the window
       // and carries the Windows caption buttons.
       appBar: WindowTitleBar(
-        leading: BackButton(
-          key: const Key('self-host-back'),
-          onPressed: _busy ? null : () => context.go('/onboarding'),
-        ),
+        leading: const BackButton(key: Key('self-host-back')),
         title: Text(l10n.accountAdvancedSelfHost),
       ),
       body: SafeArea(
@@ -146,5 +137,7 @@ class _OnboardingState extends ConsumerState<OnboardingScreen> {
         ),
       ),
     );
+    // An import or save may still be writing the active connection mode.
+    return PopScope(canPop: !_busy, child: page);
   }
 }
