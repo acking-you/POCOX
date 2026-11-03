@@ -7,9 +7,9 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use anyhow::{anyhow, bail, ensure, Context, Result};
+use anyhow::{anyhow, ensure, Context, Result};
 use once_cell::sync::Lazy;
 use pocox_core::service::{ServiceId, ServiceKind};
 use pocox_host_svc::file_links::SessionDirResolver;

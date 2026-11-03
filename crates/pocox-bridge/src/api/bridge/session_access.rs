@@ -1,10 +1,11 @@
 //! Provider-neutral original-session access and native commands.
 
+use anyhow::Result;
 use pocox_host_svc::session_access::{AccessHolder, SessionAccess};
 
-use super::*;
 use crate::engine::execution::{self, Lane};
-use crate::engine::{acp, opencode};
+use crate::engine::session_engine::Protocol;
+use crate::engine::{acp, opencode, session_engine};
 
 /// Positive holder evidence without command lines or environments.
 pub struct AccessHolderDto {

@@ -2,9 +2,9 @@
 //! parsing or network waits are permitted on this synchronous boundary.
 use std::sync::Mutex;
 
-use anyhow::Context;
+use anyhow::{Context, Result};
+use flutter_rust_bridge::frb;
 
-use super::*;
 
 /// Explicit transitions of the native composer controller.
 #[derive(Clone, Copy)]
@@ -102,7 +102,10 @@ pub fn composer_apply(
 #[frb(ignore)]
 impl State {
     fn apply(&mut self, action: ComposerAction, id: Option<u32>, token: Option<u32>) -> Result<()> {
-        use ComposerAction::*;
+        use ComposerAction::{
+            Accept, BeginQueued, BeginSend, Drop, EndQueued, EndSend, Enqueue, Pause, Prepend,
+            Refused, Resume, RetryUnknown, Revoke, Unknown,
+        };
         let view = &mut self.view;
         match action {
             BeginSend => {
@@ -205,9 +208,13 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use ComposerAction::*;
+    use ComposerAction::{
+        Accept, BeginQueued, BeginSend, Drop, EndSend, Enqueue, Prepend, Resume, RetryUnknown,
+        Revoke, Unknown,
+    };
 
     use super::*;
+
     #[test]
     fn unknown_results_never_resume_automatically_and_active_commands_cannot_move() {
         let mut state = State::default();

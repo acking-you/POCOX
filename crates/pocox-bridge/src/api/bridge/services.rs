@@ -1,8 +1,12 @@
 //! Service discovery on the relay and local API-service subscriptions.
 
+use anyhow::Result;
+use flutter_rust_bridge::frb;
+
 use super::network::RelayTransportDto;
-use super::*;
 use crate::engine::execution::{self, Lane};
+use crate::engine::{discovery, runtime, transport};
+use crate::frb_generated::StreamSink;
 
 /// A discovered service, mirrored for Dart.
 pub struct ServiceIdDto {

@@ -1,5 +1,6 @@
 //! Identity-only history projection; transcript bodies stay with their owner.
-use super::*;
+use anyhow::Result;
+
 use crate::engine::execution::{self, Lane};
 use crate::engine::history_projection;
 

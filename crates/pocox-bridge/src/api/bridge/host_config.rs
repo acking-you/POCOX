@@ -2,12 +2,12 @@
 //! applying it to a running host, starting a new host with it, and the
 //! official Codex sign-in that needs no running host.
 
-use anyhow::bail;
+use anyhow::{anyhow, bail, Result};
+use flutter_rust_bridge::frb;
 use pocox_core::provider::{ApiProtocol, Secret};
 
 use super::codex_setup::CodexLoginStartDto;
 use super::hosting::AcpAgentSpecDto;
-use super::*;
 use crate::engine::execution::{self, Lane};
 use crate::engine::host_profiles::{
     self, Change, Engine, KeyChange, ProfileInput, Runtime, RuntimeChange, Source,
@@ -596,6 +596,7 @@ pub async fn codex_local_logout(session_id: String) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::engine::runtime;
 
     fn spec(profile: &str) -> AcpAgentSpecDto {
         AcpAgentSpecDto {

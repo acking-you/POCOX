@@ -1,10 +1,20 @@
 //! Context-scoped native gateway subscriptions and stream health.
 
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+
+use anyhow::{bail, Result};
+use pocox_host_svc::opencode::client::ClientError;
+use pocox_host_svc::opencode::gateway::Gateway;
+use tokio::sync::broadcast;
 
 use super::super::connect_stage::{self, ConnectStage};
 use super::super::service_connection::Target;
-use super::*;
+use super::{
+    current_key, events, key_in, lifecycle, lock, projection, Conn, Key, Link, Shared, CONNS,
+};
+use crate::engine::{runtime, transport};
 
 fn remove(key: &Key) {
     let removed = lock(&CONNS).remove(key);

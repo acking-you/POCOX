@@ -1,6 +1,11 @@
 //! Host configuration values shared by persistence and launch.
 
-use super::*;
+use anyhow::{anyhow, bail, Result};
+use pocox_core::provider::{ApiProtocol, ProviderEndpoint, Secret};
+use pocox_host_svc::acp::{provider as acp_provider, AgentSpec};
+use serde::{Deserialize, Serialize};
+
+use super::{environment, trimmed};
 
 /// Where a host gets its model service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
