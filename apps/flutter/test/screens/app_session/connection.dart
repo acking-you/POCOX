@@ -397,6 +397,84 @@ void _registerConnection() {
     await t.pump(const Duration(seconds: 1));
   });
 
+  testWidgets('a conversation waiting for its link never reads as empty, and '
+      'loads when the link returns', (t) async {
+    const service = 'pcx:lb7666:app:default';
+    final api = FakeBridgeApi(
+      config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
+    );
+    await api.appConnect(service, 28080);
+    final read = Completer<ThreadHistory>();
+    api.pendingReads['t1'] = [read.future];
+    await t.pumpWidget(
+      host(const AppSessionScreen(serviceKey: service, threadId: 't1'), api),
+    );
+    await t.pump();
+    api.appConnectError = StateError('relay down');
+    await api.appDisconnect(service);
+    await t.pump();
+    read.completeError(StateError('connection closed'));
+    await t.pump();
+    // Well past the quick attempts, the status line alone reports the reconnect.
+    for (var i = 0; i < 40; i++) {
+      await t.pump(const Duration(seconds: 1));
+    }
+    expect(find.byKey(const Key('conversation-empty-hint')), findsNothing);
+    expect(find.byKey(const Key('history-awaits-connection')), findsOneWidget);
+    expect(find.byKey(const Key('link-status-line')), findsOneWidget);
+    expect(find.byKey(const Key('session-error')), findsNothing);
+    api
+      ..appConnectError = null
+      ..readResult = const ThreadHistory(
+        items: [
+          ThreadItem(
+            id: 'answer',
+            itemType: 'agentMessage',
+            title: '',
+            text: 'History came back',
+          ),
+        ],
+        running: false,
+      );
+    for (var i = 0; i < 31; i++) {
+      await t.pump(const Duration(seconds: 1));
+    }
+    expect(find.byKey(const Key('history-awaits-connection')), findsNothing);
+    expect(
+      find.textContaining('History came back', findRichText: true),
+      findsOneWidget,
+    );
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a failed read offers a retry, and only a thread the host '
+      'answered for as empty invites a first message', (t) async {
+    const service = 'pcx:lb7666:app:default';
+    final api = FakeBridgeApi(
+      config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
+    );
+    await api.appConnect(service, 28080);
+    api.appThreadResumeError = StateError('host refused');
+    await t.pumpWidget(
+      host(const AppSessionScreen(serviceKey: service, threadId: 't1'), api),
+    );
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('conversation-empty-hint')), findsNothing);
+    expect(find.byKey(const Key('history-read-failed')), findsOneWidget);
+    // Dismissing the banner that offered the retry does not strand the thread.
+    await t.tap(find.byKey(const Key('session-error-dismiss')));
+    await t.pump();
+    expect(find.byKey(const Key('conversation-empty-hint')), findsNothing);
+    api.appThreadResumeError = null;
+    await t.tap(find.byKey(const Key('history-read-retry')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('history-read-retry')), findsNothing);
+    expect(find.byKey(const Key('conversation-empty-hint')), findsOneWidget);
+    await t.pumpWidget(const SizedBox());
+    await t.pump(const Duration(seconds: 1));
+  });
+
   testWidgets('A reconnect stays disconnected when the first RPC times out', (
     t,
   ) async {

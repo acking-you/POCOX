@@ -624,6 +624,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // Whether older items remain on the server for the open thread.
   bool _hasOlder = false;
   bool _historyError = false;
+  // No read of the host has answered for the open thread yet, so an empty
+  // transcript says nothing about it. A cached snapshot does not settle this.
+  bool _historyUnread = false;
   final Set<String> _fetchedTurns = {};
   final Map<String, TurnItemsPage> _turnWindows = {};
   final Set<String> _sequentialHistoryIds = {};
@@ -726,6 +729,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     // so the two never fight over it, and comes back once the call ends.
     _voice.addListener(_onVoiceForDictation);
     _threadId = widget.threadId;
+    _historyUnread = _threadId != null;
     _cwd = widget.cwd;
     _drafts = ref.read(_composerDraftsProvider(widget.serviceKey));
     _draft = _drafts.forThread(_threadId, cwd: _cwd);

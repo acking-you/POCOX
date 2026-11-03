@@ -1328,6 +1328,18 @@ abstract class AppLocalizations {
   /// **'Couldn’t load history. Retry'**
   String get historyRetry;
 
+  /// No description provided for @historyAwaitsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'History will load once reconnected'**
+  String get historyAwaitsConnection;
+
+  /// No description provided for @historyLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load history'**
+  String get historyLoadFailed;
+
   /// No description provided for @turnFailed.
   ///
   /// In en, this message translates to:

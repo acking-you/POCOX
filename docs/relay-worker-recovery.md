@@ -156,8 +156,10 @@ direct path, to keep a countdown moving), a connection sheet or tunnel details e
 second, and every 400 ms while a connect runs, whose steps are not tunnel events.
 
 A session keeps reconnecting for as long as it is on screen, waiting 1, 2, 4,
-8, 15 and then 30 s between attempts; after four failures the banner also offers
-to try at once, and **Retry now** cuts any wait short. A reconnect keeps a live
+8, 15 and then 30 s between attempts, and **Retry now** in the connection sheet
+cuts any wait short. The status bar alone reports this; no banner repeats it, so
+what a banner says about the connection is about a failed operation. A reconnect
+keeps a live
 tunnel — the SDK recovers its relay link and direct paths itself — and only a
 failed attempt rebuilds the tunnel too. While it reconnects, the session's status
 bar says where it stands (for example *Punching through NAT*, *Fell back to

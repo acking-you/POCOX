@@ -695,6 +695,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get historyRetry => '加载失败，点击重试';
 
   @override
+  String get historyAwaitsConnection => '连接恢复后加载历史';
+
+  @override
+  String get historyLoadFailed => '历史加载失败';
+
+  @override
   String get turnFailed =>
       '本轮未完成 —— 连接中断或远程 codex 异常。请重试，或检查主机上的 codex（可能需重新登录）。';
 

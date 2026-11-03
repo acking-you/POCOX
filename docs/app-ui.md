@@ -275,6 +275,13 @@ for Flutter diagnostics. Native console lifetime tests live in
   visible, with feedback only at the requested gap, top boundary or selected
   turn. Cancellation and new scroll intent beat late anchor restoration.
   Background tail updates stay quiet.
+- Only a read of the host says an opened thread is empty, and only then does
+  it invite a first message (`_historyUnread`, `_noRows`,
+  `screens/app_session/session_transcript.dart`). Until one answers, a thread
+  with no rows says its history loads once reconnected while the link is down.
+  After a failed read it says the history could not load while the error banner
+  offers the retry, and offers the retry itself once that banner is dismissed. A
+  read-only view invites nothing.
 - Render initial history before optional saved configuration and model
   discovery finish; late metadata never overwrites a new user selection.
 - Timeline selection jumps directly to the turn; only the latest selection may

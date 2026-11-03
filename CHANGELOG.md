@@ -24,6 +24,12 @@ breaking change goes.
   app runs here, and a takeover checks that its target can open the session before
   stopping anything. A session hosted by a separate `pocox serve` is resumed from
   that host's own session browser.
+- **Fix an existing conversation reading as empty while disconnected.** A
+  conversation whose history had not loaded said "Send a message to start the
+  conversation". It now says its history loads once reconnected, or offers a retry
+  after a failed read. The red "Connection lost" card no longer repeats a reconnect
+  the status bar already reports; its **Reconnect** button did nothing during one.
+  Use **Retry now** in the connection sheet, opened from the status bar.
 - Read-only views of a forked Codex conversation show the history it inherited.
   They used to show only what happened after it branched, and a fresh fork listed
   with no preview.

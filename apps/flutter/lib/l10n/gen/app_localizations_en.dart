@@ -730,6 +730,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyRetry => 'Couldn’t load history. Retry';
 
   @override
+  String get historyAwaitsConnection => 'History will load once reconnected';
+
+  @override
+  String get historyLoadFailed => 'Couldn’t load history';
+
+  @override
   String get turnFailed =>
       'Turn didn\'t finish — the connection dropped or the remote codex failed. Retry, or check codex on the host machine (it may need to be logged in again).';
 

@@ -490,7 +490,8 @@ extension _SessionReview on _AppSessionState {
                 ),
               if (_connectionLost)
                 TextButton(
-                  onPressed: _autoReconnect,
+                  // A reconnect under way ignores another start: end its wait.
+                  onPressed: _reconnecting ? _relink.retryNow : _autoReconnect,
                   child: Text(l10n.reconnect),
                 )
               else if (_retry != null)

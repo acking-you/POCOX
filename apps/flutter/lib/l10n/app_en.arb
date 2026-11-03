@@ -254,6 +254,8 @@
   "historyStart": "Start of conversation",
   "historyLoading": "Loading history…",
   "historyRetry": "Couldn’t load history. Retry",
+  "historyAwaitsConnection": "History will load once reconnected",
+  "historyLoadFailed": "Couldn’t load history",
   "@olderHistoryHint": {
     "description": "Leading row of a long conversation whose earlier history hasn't been loaded yet; scrolling to it fetches the previous page."
   },
