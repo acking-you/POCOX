@@ -38,13 +38,11 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
   DeviceCode? _device;
   String? _error;
   bool _busy = false;
-  bool _polling = false;
   bool _advanced = false;
   final _backend = TextEditingController();
 
   @override
   void dispose() {
-    _polling = false; // stop the poll loop if the screen goes away
     _backend.dispose();
     super.dispose();
   }
@@ -159,7 +157,6 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
 
   /// End the device flow on [error], dropping its code.
   void _stopPolling(String error) {
-    _polling = false;
     if (!mounted) return;
     setState(() {
       _device = null;
@@ -168,7 +165,6 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
   }
 
   Future<void> _poll(DeviceCode device) async {
-    _polling = true;
     final api = ref.read(bridgeApiProvider);
     final interval = Duration(
       seconds: device.intervalSecs < 1 ? 5 : device.intervalSecs,
@@ -179,9 +175,9 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       Duration(seconds: device.expiresInSecs < 1 ? 900 : device.expiresInSecs),
     );
     var delay = interval;
-    while (_polling && mounted) {
+    while (mounted && identical(_device, device)) {
       await Future<void>.delayed(delay);
-      if (!_polling || !mounted) return;
+      if (!mounted || !identical(_device, device)) return;
       if (DateTime.now().isAfter(deadline)) {
         _stopPolling(AppLocalizations.of(context).accountCodeExpired);
         return;
@@ -189,14 +185,18 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       // Resolve l10n fresh each iteration so a locale change mid-poll shows the
       // terminal message in the current language.
       final l10n = AppLocalizations.of(context);
+      // An authorized poll persists account mode before returning. Don't let
+      // the user switch to relay setup while that write may still happen.
+      setState(() => _busy = true);
       try {
         final poll = await api.accountLoginPoll(
           device.pollHandle,
           device.backend,
         );
+        if (!mounted) return;
         switch (poll.status) {
           case 'authorized':
-            _polling = false;
+            setState(() => _device = null);
             _showSignedIn(poll.login);
             await _goAfterSignIn();
             return;
@@ -214,8 +214,18 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       } catch (_) {
         // Transient network error: keep polling at the base interval.
         delay = interval;
+      } finally {
+        if (mounted) setState(() => _busy = false);
       }
     }
+  }
+
+  void _openSelfHost() {
+    // Welcome stays mounted under setup. Drop the pending device code so a
+    // sleeping poll can't sign in from behind the setup page.
+    setState(() => _device = null);
+    final uri = GoRouterState.of(context).uri;
+    context.go(uri.replace(path: '/onboarding/self-host').toString());
   }
 
   /// Land the signed-in user: the first sign-in on this device gets the
@@ -462,7 +472,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => context.go('/onboarding/self-host'),
+                    onPressed: _busy ? null : _openSelfHost,
                     child: Text(l10n.accountAdvancedSelfHost),
                   ),
                 ],
