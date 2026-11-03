@@ -1,7 +1,15 @@
 //! Per-thread runtime configuration (approval policy, sandbox, reviewer and
 //! collaboration mode) and the model catalog.
 
-use super::*;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use anyhow::Result;
+use pocox_codex::client::Inbound;
+use serde_json::{json, Value};
+
+use super::{client_for, sessions, ModelInfo};
+use crate::engine::runtime;
 
 /// The server-reported runtime configuration of a thread: what model /
 /// effort / permissions its turns actually run with. All fields are optional

@@ -1,14 +1,17 @@
 //! Event streams for Dart: the bridge log, meta-service retry progress and
 //! app-server session events.
 
+use anyhow::Result;
+use flutter_rust_bridge::frb;
 use tokio::sync::broadcast::error::RecvError;
 use tokio::sync::{broadcast, watch};
 use tokio::time::{Duration, Instant};
 
-use super::*;
 use crate::engine::execution::{self, Lane};
-use crate::engine::git_diff;
+use crate::engine::session_engine::engine;
 use crate::engine::session_projection::{self as projection, ProjectedEvent, Projection};
+use crate::engine::{app_session, git_diff, logging, meta, runtime};
+use crate::frb_generated::StreamSink;
 
 /// One app-server event mirrored for Dart. `kind` is the JSON-RPC method
 /// (e.g. `turn/started`, `item/agentMessage/delta`, `turn/completed`).

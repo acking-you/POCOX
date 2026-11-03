@@ -1,6 +1,18 @@
 //! Thread history loading: whole-history reads and bounded paginated windows.
 
-use super::*;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
+
+use anyhow::{bail, Result};
+use pocox_codex::client::AppClient;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+
+use super::history_cache::{ensure_pagination, set_pagination};
+use super::items::{parse_turn_item, parse_turn_items, turn_stamp, TurnStamp};
+use super::turn_pages::{TurnItemsPage, TurnWindow};
+use super::{advancing_cursor, ThreadItem, ThreadPagination};
+use crate::engine::runtime;
 
 /// A thread's recovered history plus whether a turn is still running, so the
 /// UI can restore the "thinking" state when re-opening an in-flight thread.

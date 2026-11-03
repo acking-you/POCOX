@@ -10,9 +10,13 @@
 //! app, the meta service is reached over loopback; otherwise by subscribing to
 //! it on the relay.
 
+use anyhow::Result;
+
 use super::threads::ThreadItemDto;
-use super::*;
 use crate::engine::execution::{self, Lane};
+use crate::engine::session_engine::require_native;
+use crate::engine::{meta, runtime, sessions};
+use crate::frb_generated::StreamSink;
 
 /// A process holding a session's rollout open (a would-be takeover
 /// target), mirrored for Dart.

@@ -39,23 +39,19 @@
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use once_cell::sync::OnceCell;
-use pocox_core::service::{ServiceId, ServiceKind};
-use pocox_host_svc::acp::{
-    self, claude, grok, spec, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId,
-};
-use pocox_host_svc::file_links::SessionDirResolver;
-use pocox_host_svc::native_history::{GrokHistory, NativeHistory};
+use pocox_core::service::ServiceKind;
+use pocox_host_svc::acp::{claude, spec, AgentHost, AgentSpec};
 use pocox_host_svc::process;
 use pocox_pb::Published;
 use tokio::task::JoinHandle;
 
 use super::host_lease::{self, Lease, Op};
-use super::host_services::{self, bind_loopback};
+use super::host_services::{self};
 use super::serve::ServeStatus;
 use super::{claude_setup, host_names, host_profiles, hosting, runtime, transport};
 
@@ -241,7 +237,7 @@ fn pause_point(at: &'static str) {
 fn pause_point(_: &'static str) {}
 
 #[cfg(test)]
-type TestPause = (Arc<std::sync::Barrier>, Arc<std::sync::Barrier>);
+type TestPause = (std::sync::Arc<std::sync::Barrier>, std::sync::Arc<std::sync::Barrier>);
 
 #[cfg(test)]
 fn test_pauses() -> MutexGuard<'static, HashMap<&'static str, TestPause>> {

@@ -59,12 +59,10 @@ use std::sync::{Arc, Mutex, MutexGuard, Weak};
 use std::time::Duration;
 
 pub use access::{session_access, session_open, session_release};
-use anyhow::{anyhow, bail, Context as _, Result};
-use futures::StreamExt;
+use anyhow::{anyhow, bail, Result};
 pub use native_history::{follow_native_session, native_liveness};
 use once_cell::sync::OnceCell;
 pub use ops::*;
-use pocox_host_svc::acp::client::EventStream;
 use pocox_host_svc::acp::{ClientError, GatewayClient, Identity, Replica};
 use serde_json::Value;
 use tokio::sync::broadcast;
@@ -72,7 +70,6 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 pub use translate::app_item as native_item;
 
-use self::connection::check_api;
 pub(crate) use self::connection::{
     connect, evict_idle, host_info, is_idle, local_stopped, probe_reason,
 };
@@ -81,7 +78,6 @@ pub use self::connection::{context_changed, disconnect, is_connected, is_retaine
 use self::connection::{disconnect_inner, is_current, register};
 #[cfg(test)]
 use self::events::recover;
-use self::events::{event_loop, Watch};
 use super::app_session::AppEvent;
 use super::runtime;
 use super::session_engine::{logical_key, Capabilities};

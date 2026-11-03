@@ -1,7 +1,11 @@
 //! App-server remote control: connecting, probing and capabilities.
 
-use super::*;
+use anyhow::Result;
+use flutter_rust_bridge::frb;
+
 use crate::engine::execution::{self, Lane};
+use crate::engine::session_engine::{engine, Protocol};
+use crate::engine::{app_session, connect_stage, session_engine};
 
 /// Display identity only; does not grant capabilities or establish a session.
 pub struct AgentIdentityDto {

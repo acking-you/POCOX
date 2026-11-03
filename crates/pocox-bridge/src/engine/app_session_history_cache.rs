@@ -1,6 +1,14 @@
 //! Bounded, session-local history snapshots; cursors remain server-owned.
 
-use super::*;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+use pocox_codex::client::Inbound;
+use serde_json::Value;
+
+use super::history::{LoadedHistory, TurnSummary};
+use super::{sessions, ThreadItem, ThreadPagination};
 
 const MAX_CACHED_THREADS: usize = 8;
 const MAX_CACHE_BYTES: usize = 32 * 1024 * 1024;
@@ -245,6 +253,8 @@ fn trim_cache(pages: &mut Pages) {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     fn snapshot() -> Arc<LoadedHistory> {

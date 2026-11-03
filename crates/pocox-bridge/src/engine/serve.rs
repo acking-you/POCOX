@@ -34,13 +34,11 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::OnceCell;
 use pocox_codex::{
-    locate_binary, spawn_ready_redacted, ListenSpec, SpawnOptions, SpawnReadyError, StartupFailure,
-    READY_TIMEOUT,
+    locate_binary, spawn_ready_redacted, ListenSpec, SpawnOptions, SpawnReadyError, READY_TIMEOUT,
 };
 use pocox_core::process::tcp_port_open;
 use pocox_core::service::{ServiceId, ServiceKind};
@@ -50,7 +48,7 @@ use tokio::task::JoinHandle;
 use crate::engine::config::{load_config, update_config};
 use crate::engine::host_lease::{self, Lease, Op};
 use crate::engine::owned_child::{OwnedChild, EXIT_WAIT};
-use crate::engine::{host_names, host_profiles, logging, runtime, transport};
+use crate::engine::{host_names, host_profiles, runtime, transport};
 
 #[path = "serve_codex.rs"]
 mod codex;
@@ -68,15 +66,14 @@ pub(super) use self::codex::{start_in_place, stop_in_place, Stopped};
 #[cfg(test)]
 pub use self::lifecycle::serve_stop;
 use self::lifecycle::{
-    commit_host, not_exited, quitting, settle_retained, stop_host_tasks, NATIVE, NOT_EXITED,
+    commit_host, not_exited, settle_retained, stop_host_tasks, NATIVE, NOT_EXITED,
 };
 pub use self::lifecycle::{serve_stop_all, serve_stop_remembered};
 pub(super) use self::lifecycle::{serve_stop_locked, serve_stop_remembered_checked};
 use self::registration::{republish_dropped, republish_refused};
 pub use self::registration::{serve_deregister, serve_reregister};
 use super::host_services::{
-    bind_loopback, config_store, host_store, is_published, needs_publishing, register_service,
-    supervise, MAX_RESTART_BACKOFF,
+    bind_loopback, config_store, host_store, is_published, register_service, supervise,
 };
 
 /// One active local host: a codex app-server + an in-process Responses API
