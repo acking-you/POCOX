@@ -140,9 +140,10 @@ for Flutter diagnostics. Native console lifetime tests live in
   `ui_state.json` (`lib/src/ui_prefs.dart`).
   Self-host setup is a child of account sign-in, including when opened by
   its URL. Back pops setup with the platform transition (on iOS, setup
-  slides right to reveal sign-in), keeping Advanced open and its backend
-  field intact. Opening setup abandons a pending device code and waits for
-  any in-flight sign-in operation to finish before allowing the switch.
+  slides right to reveal sign-in). Advanced is collapsed on return, but a typed
+  backend address is retained if reopened. Opening setup abandons a pending
+  device code and waits for any in-flight sign-in operation to finish before
+  allowing the switch.
   Back cannot leave setup while it saves; success replaces onboarding with home.
 - Connect to an in-app host through its registered loopback endpoint; never
   relay a device's own traffic or probe relay health to resolve it. Remote

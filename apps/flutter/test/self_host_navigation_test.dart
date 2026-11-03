@@ -21,6 +21,44 @@ const _back = Key('self-host-back');
 void main() {
   selfHostNavigationTests();
 
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.macOS,
+    TargetPlatform.windows,
+    TargetPlatform.linux,
+  ]) {
+    testWidgets('self-host back keeps sign-in compact on ${platform.name}', (
+      tester,
+    ) async {
+      final router = await _mount(
+        tester,
+        FakeBridgeApi(config: _config),
+        '/onboarding',
+        platform: platform,
+      );
+      expect(find.text('Advanced / self-hosted'), findsOneWidget);
+      expect(find.byType(TextField), findsNothing);
+      await tester.tap(find.text('Advanced / self-hosted'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), _backend);
+      await tester.tap(find.text('Use a self-hosted relay instead'));
+      await tester.pumpAndSettle();
+
+      if (platform == TargetPlatform.android) {
+        await tester.binding.handlePopRoute();
+      } else {
+        await tester.tap(find.byKey(_back));
+      }
+      await tester.pumpAndSettle();
+      expect(router.canPop(), isFalse);
+      expect(find.text('Advanced / self-hosted'), findsOneWidget);
+      expect(find.text(_backend), findsNothing);
+      await tester.tap(find.text('Advanced / self-hosted'));
+      await tester.pumpAndSettle();
+      expect(find.text(_backend), findsOneWidget);
+    });
+  }
+
   testWidgets(
     'relay import holds the setup route and success clears onboarding',
     (tester) async {
@@ -112,8 +150,9 @@ class _HeldLoginPoll extends FakeBridgeApi {
 Future<GoRouter> _mount(
   WidgetTester tester,
   FakeBridgeApi api,
-  String location,
-) async {
+  String location, {
+  TargetPlatform platform = TargetPlatform.iOS,
+}) async {
   await tester.binding.setSurfaceSize(const Size(393, 852));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   final router = buildRouter(initialLocation: location);
@@ -122,7 +161,7 @@ Future<GoRouter> _mount(
     ProviderScope(
       overrides: [bridgeApiProvider.overrideWithValue(api)],
       child: MaterialApp.router(
-        theme: lightTheme().copyWith(platform: TargetPlatform.iOS),
+        theme: lightTheme().copyWith(platform: platform),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -185,11 +224,18 @@ void selfHostNavigationTests() {
         );
       }
       if (!direct) {
-        expect(find.text('Advanced / self-hosted'), findsNothing);
+        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.text(_backend), findsNothing);
+        await tester.tap(find.text('Advanced / self-hosted'));
+        await tester.pumpAndSettle();
         expect(find.text(_backend), findsOneWidget);
         await tester.tap(find.text('Use a self-hosted relay instead'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_back));
+        await tester.pumpAndSettle();
+        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.text(_backend), findsNothing);
+        await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
         expect(find.text(_backend), findsOneWidget);
         expect(router.canPop(), isFalse);

@@ -9,9 +9,9 @@ breaking change goes.
 
 ## Unreleased
 
-- Self-hosted relay setup opens over the sign-in page. Back keeps the Advanced
-  section and entered backend address, using the standard rightward return
-  animation and edge gesture on iOS.
+- Self-hosted relay setup opens over the sign-in page. Back restores the compact
+  sign-in view while retaining any entered backend address, using the standard
+  rightward return animation and edge gesture on iOS.
 
 - Fix session history reconciliation placing older tool activity after the final
   reply and folding the reply into the activity group. Host history now repairs

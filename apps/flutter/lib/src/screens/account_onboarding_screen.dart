@@ -222,8 +222,12 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
 
   void _openSelfHost() {
     // Welcome stays mounted under setup. Drop the pending device code so a
-    // sleeping poll can't sign in from behind the setup page.
-    setState(() => _device = null);
+    // sleeping poll can't sign in from behind the setup page. Return to the
+    // compact sign-in view while retaining any typed backend address.
+    setState(() {
+      _device = null;
+      _advanced = false;
+    });
     final uri = GoRouterState.of(context).uri;
     context.go(uri.replace(path: '/onboarding/self-host').toString());
   }
