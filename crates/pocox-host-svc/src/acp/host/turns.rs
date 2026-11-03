@@ -2,7 +2,14 @@
 //! permission answers, all ordered by the dispatch lane and bounded by the
 //! delivery budgets (see the parent module docs).
 
-use super::*;
+use serde_json::{json, Value};
+use tokio::time::Instant;
+
+use super::{
+    clip, valid_id, ActiveTurn, AgentCapabilities, AgentHost, CallError, HostError, Identity, Peer,
+    Permission, RequestKind, RpcError, TurnOutcome, MAX_IMAGE_BYTES, MAX_PROMPT_IMAGES,
+    MAX_PROMPT_TEXT,
+};
 
 /// Turn a `data:<mime>;base64,<data>` URL into an ACP image block.
 fn image_block(url: &str) -> Result<Value, HostError> {
@@ -380,7 +387,7 @@ impl AgentHost {
 
     #[cfg(test)]
     async fn pause_before_cancel(&self) {
-        let pause = lock(&self.inner.cancel_pause).clone();
+        let pause = super::lock(&self.inner.cancel_pause).clone();
         if let Some((reached, resume)) = pause {
             reached.wait().await;
             resume.wait().await;

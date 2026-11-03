@@ -1,8 +1,10 @@
 use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::*;
 use crate::acp::host::tests::{eventually, mock_binary};
-use crate::acp::SourceId;
+use crate::acp::{AgentSpec, HostOptions, SessionStore, SourceId};
 use crate::native_history::{ClaimError, ClaudeHistory, SessionClaim};
 
 const SESSION: &str = "00000000-0000-4000-8000-000000000001";

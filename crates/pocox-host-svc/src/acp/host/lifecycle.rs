@@ -2,7 +2,18 @@
 //! a generation, all under the one lifecycle lock (see the parent module
 //! docs).
 
-use super::*;
+use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex, Weak};
+
+use serde_json::Value;
+use tokio::sync::{mpsc, watch};
+
+use super::{
+    clip, lock, process, schema, AgentHost, AgentInbound, AgentProcess, Apply, Budgets, CallError,
+    Change, CloseReason, HostError, HostOptions, Inner, Peer, Persist, Phase, Running, State,
+    EXIT_POLL, FLUSH_GRACE, INIT_TIMEOUT, MAX_RESTARTS, OUTPUT_GRACE, RESTART_DELAY,
+    RESTART_WINDOW, TERM_GRACE, WRITER_GRACE,
+};
 
 /// Close the connection and clean up the owned process (see the module
 /// docs for the order).
