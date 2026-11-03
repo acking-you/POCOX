@@ -402,7 +402,13 @@ class _TunnelDetails extends ConsumerWidget {
                 _Fact(
                   l10n.tunnelPortMapping,
                   portMappingLabel(l10n, mapping),
-                  detail: mapping.error ?? mapping.protocol ?? mapping.stage,
+                  // On standby the stage only repeats the state in raw words.
+                  detail:
+                      mapping.error ??
+                      mapping.protocol ??
+                      (mapping.state == PortMappingState.standby
+                          ? null
+                          : mapping.stage),
                 ),
             ],
             _Heading(l10n.tunnelSectionRelay),
