@@ -4,10 +4,11 @@
 // ignore_for_file: invalid_use_of_internal_member, unused_import, unnecessary_import
 
 import '../../frb_generated.dart';
+import 'network.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `count`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`
+// These functions are ignored because they are not marked as `pub`: `count`, `of_history`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 /// Discover this process's owned loopback services without contacting a relay.
 List<ServiceIdDto> localServices() =>
@@ -39,6 +40,11 @@ Future<void> apiUnsubscribe({required String serviceKey}) => RustLib
     .instance
     .api
     .crateApiBridgeServicesApiUnsubscribe(serviceKey: serviceKey);
+
+/// Coalesced notices that a tunnel changed: [`subscriptions`] has news. Not a
+/// log of what happened; ends when the Dart stream is cancelled.
+Stream<int> tunnelChanges() =>
+    RustLib.instance.api.crateApiBridgeServicesTunnelChanges();
 
 /// List all active subscriptions.
 Future<List<SubStatusDto>> subscriptions() =>
@@ -133,6 +139,73 @@ enum LinkEventKindDto {
 
   /// A connection gave up on direct and used the relay.
   directFallback,
+
+  /// The tunnel stopped.
+  stopped,
+}
+
+/// What a tunnel's router port mapping amounts to, mirrored for Dart.
+enum PortMappingStateDto {
+  /// Nothing asked yet: it waits for a failed punch or a first direct
+  /// session.
+  standby,
+
+  /// Looking for the router, or asking it for a mapping.
+  asking,
+
+  /// A lease is usable now.
+  active,
+
+  /// The router gave none; it is asked again later.
+  failed,
+
+  /// Released, or ended with its tunnel.
+  stopped,
+}
+
+/// A tunnel's router port mapping as it stands, mirrored for Dart.
+class PortMappingStatusDto {
+  /// What it amounts to.
+  final PortMappingStateDto state;
+
+  /// The SDK's exact stage, for a bug report.
+  final String stage;
+
+  /// `pcp`, `nat_pmp` or `upnp`, once one is in use.
+  final String? protocol;
+
+  /// The public address of its lease.
+  final String? externalAddr;
+
+  /// What the router said about a failure.
+  final String? error;
+
+  const PortMappingStatusDto({
+    required this.state,
+    required this.stage,
+    this.protocol,
+    this.externalAddr,
+    this.error,
+  });
+
+  @override
+  int get hashCode =>
+      state.hashCode ^
+      stage.hashCode ^
+      protocol.hashCode ^
+      externalAddr.hashCode ^
+      error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PortMappingStatusDto &&
+          runtimeType == other.runtimeType &&
+          state == other.state &&
+          stage == other.stage &&
+          protocol == other.protocol &&
+          externalAddr == other.externalAddr &&
+          error == other.error;
 }
 
 /// The phase a tunnel's link to the relay entered last, mirrored for Dart.
@@ -246,6 +319,9 @@ class SubStatusDto {
   /// How long the last answered setup took, in milliseconds.
   final int? setupLatencyMs;
 
+  /// The carrier it started on; none for this app's own loopback service.
+  final RelayTransportDto? relayTransport;
+
   /// The phase its link to the relay entered last.
   final RelayPhaseDto relayPhase;
 
@@ -260,6 +336,9 @@ class SubStatusDto {
 
   /// Direct attempts in flight.
   final int attemptsInFlight;
+
+  /// Its router port mapping, when it may have one.
+  final PortMappingStatusDto? portMapping;
 
   /// What happened to it lately, oldest first.
   final List<LinkEventDto> events;
@@ -280,11 +359,13 @@ class SubStatusDto {
     required this.consecutiveFailures,
     this.lastFailure,
     this.setupLatencyMs,
+    this.relayTransport,
     required this.relayPhase,
     this.nextRetryMs,
     this.attemptStage,
     this.attemptMs,
     required this.attemptsInFlight,
+    this.portMapping,
     required this.events,
   });
 
@@ -305,11 +386,13 @@ class SubStatusDto {
       consecutiveFailures.hashCode ^
       lastFailure.hashCode ^
       setupLatencyMs.hashCode ^
+      relayTransport.hashCode ^
       relayPhase.hashCode ^
       nextRetryMs.hashCode ^
       attemptStage.hashCode ^
       attemptMs.hashCode ^
       attemptsInFlight.hashCode ^
+      portMapping.hashCode ^
       events.hashCode;
 
   @override
@@ -332,11 +415,13 @@ class SubStatusDto {
           consecutiveFailures == other.consecutiveFailures &&
           lastFailure == other.lastFailure &&
           setupLatencyMs == other.setupLatencyMs &&
+          relayTransport == other.relayTransport &&
           relayPhase == other.relayPhase &&
           nextRetryMs == other.nextRetryMs &&
           attemptStage == other.attemptStage &&
           attemptMs == other.attemptMs &&
           attemptsInFlight == other.attemptsInFlight &&
+          portMapping == other.portMapping &&
           events == other.events;
 }
 

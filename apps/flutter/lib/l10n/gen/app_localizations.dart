@@ -212,6 +212,72 @@ abstract class AppLocalizations {
   /// **'Restart hosting to apply.'**
   String get connectionPathIncomingPending;
 
+  /// No description provided for @connectionPathTunnelsPending.
+  ///
+  /// In en, this message translates to:
+  /// **'New connections use this. Reconnect a session or restart hosting to switch.'**
+  String get connectionPathTunnelsPending;
+
+  /// No description provided for @connectionPathMapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Router port mapping'**
+  String get connectionPathMapping;
+
+  /// No description provided for @connectionPathMappingInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'When a direct attempt cannot punch through, POCOX can ask this network\'s router (PCP, NAT-PMP or UPnP) to map a UDP port for the direct path, and releases it when the tunnel stops. No connection waits for it: the one whose punch failed uses the relay. Connections that keep to the relay never ask.'**
+  String get connectionPathMappingInfo;
+
+  /// No description provided for @connectionPathMappingOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Off'**
+  String get connectionPathMappingOff;
+
+  /// No description provided for @connectionPathMappingAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'When needed'**
+  String get connectionPathMappingAuto;
+
+  /// No description provided for @connectionPathMappingAlways.
+  ///
+  /// In en, this message translates to:
+  /// **'Always'**
+  String get connectionPathMappingAlways;
+
+  /// No description provided for @connectionPathCarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay carrier'**
+  String get connectionPathCarrier;
+
+  /// No description provided for @connectionPathCarrierInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'TCP works with every relay. QUIC carries all tunnels over one connection; the relay has to offer it, and one that doesn\'t refuses the tunnel instead of falling back to TCP.'**
+  String get connectionPathCarrierInfo;
+
+  /// No description provided for @connectionPathQuicOffered.
+  ///
+  /// In en, this message translates to:
+  /// **'This relay offers QUIC on UDP {port}.'**
+  String connectionPathQuicOffered(int port);
+
+  /// No description provided for @connectionPathQuicRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'This relay doesn\'t offer QUIC: new connections will fail until you select TCP.'**
+  String get connectionPathQuicRefused;
+
+  /// No description provided for @connectionPathQuicUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t ask the relay whether it offers QUIC.'**
+  String get connectionPathQuicUnknown;
+
   /// No description provided for @connectionPathReadFailed.
   ///
   /// In en, this message translates to:
@@ -337,6 +403,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The two ends couldn\'t reach each other directly (NAT, firewall or blocked UDP).'**
   String get tunnelFallbackUnreachable;
+
+  /// No description provided for @tunnelPortMapping.
+  ///
+  /// In en, this message translates to:
+  /// **'Router port mapping'**
+  String get tunnelPortMapping;
+
+  /// No description provided for @tunnelMappingStandby.
+  ///
+  /// In en, this message translates to:
+  /// **'On standby'**
+  String get tunnelMappingStandby;
+
+  /// No description provided for @tunnelMappingAsking.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking the router'**
+  String get tunnelMappingAsking;
+
+  /// No description provided for @tunnelMappingActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapped'**
+  String get tunnelMappingActive;
+
+  /// No description provided for @tunnelMappingActiveAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Mapped at {address}'**
+  String tunnelMappingActiveAt(String address);
+
+  /// No description provided for @tunnelMappingFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not mapped; will ask again'**
+  String get tunnelMappingFailed;
+
+  /// No description provided for @tunnelMappingStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Released'**
+  String get tunnelMappingStopped;
+
+  /// No description provided for @tunnelRelayCarrier.
+  ///
+  /// In en, this message translates to:
+  /// **'Carrier'**
+  String get tunnelRelayCarrier;
 
   /// No description provided for @tunnelRelayState.
   ///
@@ -625,6 +739,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Fell back to the relay while {stage}'**
   String linkEventFallback(String stage);
+
+  /// No description provided for @linkEventStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Stopped'**
+  String get linkEventStopped;
 
   /// No description provided for @linkEventRepeats.
   ///

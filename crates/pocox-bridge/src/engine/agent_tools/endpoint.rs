@@ -233,9 +233,7 @@ fn local_routes(secret: Arc<str>) -> Router {
                 }
                 match tokio::task::spawn_blocking(catalog::overview_blocking).await {
                     Ok(Ok(overview)) => Json(overview).into_response(),
-                    Ok(Err(error)) => {
-                        failure(super::error::ToolError::Relay(format!("{error:#}")))
-                    },
+                    Ok(Err(error)) => failure(super::error::ToolError::relay(&error)),
                     Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                 }
             }),

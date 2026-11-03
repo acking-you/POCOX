@@ -280,11 +280,7 @@ async fn launch(generation: u64) -> Result<Serving> {
         codec: true,
     })
     .await
-    .map_err(|_| {
-        anyhow::anyhow!(
-            "device management could not register; check for another app using this device name"
-        )
-    })?;
+    .context("device management could not register")?;
     serving.published = Some(published);
     if !transport::is_current(owned.epoch) || !accepts(generation) {
         bail!("management context changed");

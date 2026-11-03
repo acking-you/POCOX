@@ -166,8 +166,8 @@ only reproducible build artifacts.
 
 ## Dependencies and submodules
 
-- pb-mapper is a Cargo Git dependency on its `pocox` branch, pinned by
-  `Cargo.lock`: push SDK fixes there, run `cargo update -p pb-mapper`, commit
+- pb-mapper is a Cargo Git dependency on its `master` branch, pinned by
+  `Cargo.lock`: land SDK fixes there, run `cargo update -p pb-mapper`, commit
   the lockfile. Builds stay `--locked`.
 - `git submodule update --init --recursive` materialises `deps/`. Fork
   branches take upstream by merge, never by rebasing published history.
@@ -207,3 +207,10 @@ hand off what changed (`path:line`), assumptions, risks and what was not
 verified. Reply in the user's language and lead with findings. Code, comments,
 commits (Conventional Commits) and PR text are English. Stop and ask when an
 assumption could break userspace or lose data.
+
+A PR that changes what users see shows it in its description: screenshots or a
+video of the running app, covering each changed state and each theme or layout
+where it differs. A rendered widget test stands in only for a state the app
+cannot reach in your environment, and says so. Upload media through GitHub's
+editor, or to a gist without a browser session; never commit it. Keep tokens,
+real relay addresses and personal data out of frame.

@@ -21,8 +21,8 @@ members = [
 #
 # `deps/pb-mapper` used to sit here too, alongside the `deps/kanal` and
 # `deps/uni-stream` forks it pulled in transitively. All three are gone:
-# pb-mapper is fetched by Cargo from its dedicated Git branch; its transitive
-# dependencies are locked here without vendoring additional submodules.
+# pb-mapper is fetched by Cargo from its mainline; its transitive dependencies
+# are locked here without vendoring additional submodules.
 #
 # `deps/grok-build` (Grok Build, its own Cargo workspace) is likewise a
 # source reference only: nothing here links its crates.
@@ -47,12 +47,12 @@ readme = "README.md"
 # from here via `dep = { workspace = true }` so we have a single source
 # of truth for upgrades.
 [workspace.dependencies]
-# The dedicated branch carries the SDK fixes used by POCOX. Cargo.lock
-# pins its exact commit; update it deliberately with `cargo update -p pb-mapper`.
-pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox", features = ["p2p"] }
+# POCOX follows pb-mapper's mainline. Cargo.lock pins its exact commit; update
+# it deliberately with `cargo update -p pb-mapper`.
+pb-mapper = { git = "https://github.com/acking-you/pb-mapper", branch = "master", features = ["p2p"] }
 # Test fixtures only; production crates embed the client SDK.
-pb-mapper-testkit = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox" }
-pb-mapper-server = { git = "https://github.com/acking-you/pb-mapper", branch = "pocox", features = ["p2p"] }
+pb-mapper-testkit = { git = "https://github.com/acking-you/pb-mapper", branch = "master" }
+pb-mapper-server = { git = "https://github.com/acking-you/pb-mapper", branch = "master", features = ["p2p", "relay-quic"] }
 
 # Internal crates
 pocox-core = { path = "crates/pocox-core" }

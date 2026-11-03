@@ -257,7 +257,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PortMappingStatusDto dco_decode_box_autoadd_port_mapping_status_dto(
+    dynamic raw,
+  );
+
+  @protected
   RelayPreferencesDto dco_decode_box_autoadd_relay_preferences_dto(dynamic raw);
+
+  @protected
+  RelayTransportDto dco_decode_box_autoadd_relay_transport_dto(dynamic raw);
 
   @protected
   SessionAccessDto dco_decode_box_autoadd_session_access_dto(dynamic raw);
@@ -717,6 +725,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PortMappingStatusDto? dco_decode_opt_box_autoadd_port_mapping_status_dto(
+    dynamic raw,
+  );
+
+  @protected
+  RelayTransportDto? dco_decode_opt_box_autoadd_relay_transport_dto(
+    dynamic raw,
+  );
+
+  @protected
   SessionSettingsDto? dco_decode_opt_box_autoadd_session_settings_dto(
     dynamic raw,
   );
@@ -759,6 +777,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  PortMappingDto dco_decode_port_mapping_dto(dynamic raw);
+
+  @protected
+  PortMappingStateDto dco_decode_port_mapping_state_dto(dynamic raw);
+
+  @protected
+  PortMappingStatusDto dco_decode_port_mapping_status_dto(dynamic raw);
+
+  @protected
   PreparedImageDto dco_decode_prepared_image_dto(dynamic raw);
 
   @protected
@@ -775,6 +802,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RelayPreferencesDto dco_decode_relay_preferences_dto(dynamic raw);
+
+  @protected
+  RelayTransportDto dco_decode_relay_transport_dto(dynamic raw);
 
   @protected
   RetryProgressDto dco_decode_retry_progress_dto(dynamic raw);
@@ -1168,7 +1198,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PortMappingStatusDto sse_decode_box_autoadd_port_mapping_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   RelayPreferencesDto sse_decode_box_autoadd_relay_preferences_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RelayTransportDto sse_decode_box_autoadd_relay_transport_dto(
     SseDeserializer deserializer,
   );
 
@@ -1778,6 +1818,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  PortMappingStatusDto? sse_decode_opt_box_autoadd_port_mapping_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RelayTransportDto? sse_decode_opt_box_autoadd_relay_transport_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   SessionSettingsDto? sse_decode_opt_box_autoadd_session_settings_dto(
     SseDeserializer deserializer,
   );
@@ -1826,6 +1876,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  PortMappingDto sse_decode_port_mapping_dto(SseDeserializer deserializer);
+
+  @protected
+  PortMappingStateDto sse_decode_port_mapping_state_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PortMappingStatusDto sse_decode_port_mapping_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   PreparedImageDto sse_decode_prepared_image_dto(SseDeserializer deserializer);
 
   @protected
@@ -1844,6 +1907,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RelayPreferencesDto sse_decode_relay_preferences_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  RelayTransportDto sse_decode_relay_transport_dto(
     SseDeserializer deserializer,
   );
 
@@ -2320,8 +2388,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_port_mapping_status_dto(
+    PortMappingStatusDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_relay_preferences_dto(
     RelayPreferencesDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_relay_transport_dto(
+    RelayTransportDto self,
     SseSerializer serializer,
   );
 
@@ -3100,6 +3180,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_port_mapping_status_dto(
+    PortMappingStatusDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_relay_transport_dto(
+    RelayTransportDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_session_settings_dto(
     SessionSettingsDto? self,
     SseSerializer serializer,
@@ -3157,6 +3249,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_port_mapping_dto(
+    PortMappingDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_port_mapping_state_dto(
+    PortMappingStateDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_port_mapping_status_dto(
+    PortMappingStatusDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_prepared_image_dto(
     PreparedImageDto self,
     SseSerializer serializer,
@@ -3186,6 +3296,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_relay_preferences_dto(
     RelayPreferencesDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_relay_transport_dto(
+    RelayTransportDto self,
     SseSerializer serializer,
   );
 

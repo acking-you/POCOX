@@ -1,5 +1,6 @@
 //! Service discovery on the relay and local API-service subscriptions.
 
+use super::network::RelayTransportDto;
 use super::*;
 use crate::engine::execution::{self, Lane};
 
@@ -165,6 +166,8 @@ pub enum LinkEventKindDto {
     DirectEstablished,
     /// A connection gave up on direct and used the relay.
     DirectFallback,
+    /// The tunnel stopped.
+    Stopped,
 }
 
 /// One entry of a tunnel's recent history, mirrored flat for Dart.
@@ -186,8 +189,10 @@ pub struct LinkEventDto {
     pub ms: Option<u32>,
 }
 
-impl From<pocox_pb::TunnelEvent> for LinkEventDto {
-    fn from(event: pocox_pb::TunnelEvent) -> Self {
+impl LinkEventDto {
+    /// An entry of a tunnel's history. The SDK's stream also carries steps
+    /// along the way, which a history never holds and this does not show.
+    fn of_history(event: pocox_pb::TunnelEvent) -> Option<Self> {
         use pocox_pb::TunnelEventKind as Kind;
         let (kind, failure, stage, ms) = match event.kind {
             Kind::RelayReady {
@@ -204,8 +209,27 @@ impl From<pocox_pb::TunnelEvent> for LinkEventDto {
             Kind::DirectFallback {
                 stage,
             } => (LinkEventKindDto::DirectFallback, None, Some(stage.into()), None),
+            Kind::Stopped => (LinkEventKindDto::Stopped, None, None, None),
+            Kind::PhaseChanged {
+                ..
+            }
+            | Kind::DirectStageChanged {
+                ..
+            }
+            | Kind::DirectAbandoned {
+                ..
+            }
+            | Kind::SessionOpened {
+                ..
+            }
+            | Kind::SessionClosed {
+                ..
+            }
+            | Kind::PortMappingChanged {
+                ..
+            } => return None,
         };
-        Self {
+        Some(Self {
             // Sequence numbers only grow; one tunnel never records 2^32 events.
             seq: event.seq as u32,
             age_ms: count(event.age_ms),
@@ -214,6 +238,60 @@ impl From<pocox_pb::TunnelEvent> for LinkEventDto {
             failure,
             stage,
             ms: ms.map(count),
+        })
+    }
+}
+
+/// What a tunnel's router port mapping amounts to, mirrored for Dart.
+pub enum PortMappingStateDto {
+    /// Nothing asked yet: it waits for a failed punch or a first direct
+    /// session.
+    Standby,
+    /// Looking for the router, or asking it for a mapping.
+    Asking,
+    /// A lease is usable now.
+    Active,
+    /// The router gave none; it is asked again later.
+    Failed,
+    /// Released, or ended with its tunnel.
+    Stopped,
+}
+
+impl From<runtime::MappingState> for PortMappingStateDto {
+    fn from(state: runtime::MappingState) -> Self {
+        match state {
+            runtime::MappingState::Standby => Self::Standby,
+            runtime::MappingState::Asking => Self::Asking,
+            runtime::MappingState::Active => Self::Active,
+            runtime::MappingState::Failed => Self::Failed,
+            runtime::MappingState::Stopped => Self::Stopped,
+        }
+    }
+}
+
+/// A tunnel's router port mapping as it stands, mirrored for Dart.
+pub struct PortMappingStatusDto {
+    /// What it amounts to.
+    pub state: PortMappingStateDto,
+    /// The SDK's exact stage, for a bug report.
+    pub stage: String,
+    /// `pcp`, `nat_pmp` or `upnp`, once one is in use.
+    pub protocol: Option<String>,
+    /// The public address of its lease.
+    pub external_addr: Option<String>,
+    /// What the router said about a failure.
+    pub error: Option<String>,
+}
+
+impl From<pocox_pb::PortMappingDiagnostics> for PortMappingStatusDto {
+    fn from(mapping: pocox_pb::PortMappingDiagnostics) -> Self {
+        let status = mapping.current;
+        Self {
+            state: runtime::MappingState::of(&status).into(),
+            stage: status.stage.as_str().into(),
+            protocol: status.protocol.map(|protocol| protocol.as_str().into()),
+            external_addr: status.external_addr.map(|addr| addr.to_string()),
+            error: status.error,
         }
     }
 }
@@ -255,6 +333,8 @@ pub struct SubStatusDto {
     pub last_failure: Option<TunnelFailureDto>,
     /// How long the last answered setup took, in milliseconds.
     pub setup_latency_ms: Option<u32>,
+    /// The carrier it started on; none for this app's own loopback service.
+    pub relay_transport: Option<RelayTransportDto>,
     /// The phase its link to the relay entered last.
     pub relay_phase: RelayPhaseDto,
     /// Milliseconds before the next attempt, while waiting for one.
@@ -265,6 +345,8 @@ pub struct SubStatusDto {
     pub attempt_ms: Option<u32>,
     /// Direct attempts in flight.
     pub attempts_in_flight: u32,
+    /// Its router port mapping, when it may have one.
+    pub port_mapping: Option<PortMappingStatusDto>,
     /// What happened to it lately, oldest first.
     pub events: Vec<LinkEventDto>,
 }
@@ -288,12 +370,18 @@ impl From<runtime::SubStatus> for SubStatusDto {
             consecutive_failures: count(s.health.consecutive_failures),
             last_failure: s.health.last_failure.map(TunnelFailureDto::from),
             setup_latency_ms: s.health.setup_latency_ms.map(count),
+            relay_transport: s.health.relay_transport.map(RelayTransportDto::from),
             relay_phase: s.health.phase.into(),
             next_retry_ms: s.health.next_retry_ms.map(count),
             attempt_stage: attempt.map(|a| a.stage.into()),
             attempt_ms: attempt.map(|a| count(a.elapsed_ms)),
             attempts_in_flight: attempt.map_or(0, |a| a.in_flight),
-            events: s.events.into_iter().map(LinkEventDto::from).collect(),
+            port_mapping: s.port_mapping.map(PortMappingStatusDto::from),
+            events: s
+                .events
+                .into_iter()
+                .filter_map(LinkEventDto::of_history)
+                .collect(),
         }
     }
 }
@@ -328,6 +416,21 @@ pub async fn api_subscribe(service_key: String, local_port: u16) -> Result<SubSt
 /// Stop an API-service subscription.
 pub fn api_unsubscribe(service_key: String) {
     runtime::unsubscribe_service(&service_key);
+}
+
+/// Coalesced notices that a tunnel changed: [`subscriptions`] has news. Not a
+/// log of what happened; ends when the Dart stream is cancelled.
+pub fn tunnel_changes(sink: StreamSink<u32>) {
+    runtime::runtime().spawn(async move {
+        let mut changes = runtime::tunnel_changes::subscribe();
+        while changes.changed().await.is_ok() {
+            let revision = *changes.borrow_and_update() as u32;
+            if sink.add(revision).is_err() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    });
 }
 
 /// List all active subscriptions.

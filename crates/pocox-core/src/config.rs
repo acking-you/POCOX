@@ -240,6 +240,32 @@ pub enum ConnectionPath {
     Auto,
 }
 
+/// How new tunnels reach the relay.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RelayTransport {
+    /// One TCP connection per relay stream, which every relay accepts.
+    #[default]
+    Tcp,
+    /// Every tunnel of the process shares one QUIC connection. A relay that
+    /// does not offer QUIC refuses the tunnel; nothing falls back to TCP.
+    Quic,
+}
+
+/// Whether a tunnel allowed to go direct may ask this network's router (PCP,
+/// NAT-PMP or UPnP) to map its direct UDP port. A relay-only tunnel never asks.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PortMapping {
+    /// Never ask the router.
+    Off,
+    /// Ask once a direct attempt of the tunnel failed to punch through.
+    #[default]
+    Auto,
+    /// Ask as soon as the tunnel's direct endpoint opens.
+    Always,
+}
+
 /// Whether `value` is its type's default (serde `skip_serializing_if`).
 fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
@@ -258,6 +284,14 @@ pub struct PbMapperConfig {
     /// Permit authenticated direct setup for newly published local services.
     #[serde(default, skip_serializing_if = "is_default")]
     pub allow_direct: bool,
+
+    /// Carrier for new tunnels' relay connections.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub relay_transport: RelayTransport,
+
+    /// Router port mapping for new tunnels allowed to go direct.
+    #[serde(default, skip_serializing_if = "is_default")]
+    pub port_mapping: PortMapping,
 
     /// Bare `host:port` of the upstream `pb-mapper` relay
     /// (e.g. `relay.example.com:7666`).
@@ -563,17 +597,22 @@ mod tests {
         let saved: toml::Table =
             toml::from_str(&toml::to_string(&old).expect("serialize")).expect("table");
         let written = saved["pb_mapper"].as_table().expect("pb_mapper table");
-        assert!(
-            !written.contains_key("path") && !written.contains_key("allow_direct"),
-            "defaults are not written: {written:?}"
-        );
+        assert_eq!(old.pb_mapper.relay_transport, RelayTransport::Tcp);
+        assert_eq!(old.pb_mapper.port_mapping, PortMapping::Auto);
+        for default in ["path", "allow_direct", "relay_transport", "port_mapping"] {
+            assert!(!written.contains_key(default), "defaults are not written: {written:?}");
+        }
         let mut updated = old;
         updated.pb_mapper.path = ConnectionPath::Auto;
         updated.pb_mapper.allow_direct = true;
+        updated.pb_mapper.relay_transport = RelayTransport::Quic;
+        updated.pb_mapper.port_mapping = PortMapping::Off;
         let restored: Config =
             toml::from_str(&toml::to_string(&updated).expect("serialize")).expect("restore");
         assert_eq!(restored.pb_mapper.path, ConnectionPath::Auto);
         assert!(restored.pb_mapper.allow_direct);
+        assert_eq!(restored.pb_mapper.relay_transport, RelayTransport::Quic);
+        assert_eq!(restored.pb_mapper.port_mapping, PortMapping::Off);
         assert_eq!(restored.relay(), Some("relay:7666"));
         assert_eq!(restored.relay_key(), Some("test"));
         assert!(toml::from_str::<Config>("[pb_mapper]\npath = 'direct_only'").is_err());

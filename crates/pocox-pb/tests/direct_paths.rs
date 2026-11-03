@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use pb_mapper_server::DirectServerConfig;
 use pb_mapper_testkit::{Relay, TEST_ADMIN_KEY};
-use pocox_core::config::{ConnectionPath, PbMapperConfig};
-use pocox_pb::{RegisterOptions, RelaySession, SubscribeOptions};
+use pocox_core::config::{ConnectionPath, PbMapperConfig, PortMapping, RelayTransport};
+use pocox_pb::{PortMappingStage, RegisterOptions, RelaySession, SubscribeOptions};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::{JoinHandle, JoinSet};
@@ -139,5 +139,135 @@ async fn wrapper_selects_direct_or_compatible_relay_without_duplicate_backend_di
             .expect("local stop closes data")
             .is_err());
         connection.stop().await.expect("stop subscriber");
+    }
+}
+
+#[tokio::test]
+async fn a_quic_session_carries_tunnels_and_a_relay_without_quic_says_so() {
+    let relay = Relay::start_with_quic("pocox-quic").await;
+    let tcp = RelaySession::new(relay.addr().to_string(), TEST_ADMIN_KEY);
+    assert!(pocox_pb::relay_quic_port(&tcp)
+        .await
+        .expect("the relay answers")
+        .is_some());
+    let quic = tcp.clone().with_preferences(&PbMapperConfig {
+        relay_transport: RelayTransport::Quic,
+        ..Default::default()
+    });
+    let (backend, _, _echo) = echo().await;
+    let key = "pcx:quic-test:app:default";
+    let registration = pocox_pb::register(&quic, RegisterOptions {
+        key: key.into(),
+        local_addr: backend,
+        codec: true,
+    })
+    .await
+    .expect("registered over QUIC");
+    let port = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("port")
+        .local_addr()
+        .expect("address")
+        .to_string();
+    let connection = pocox_pb::subscribe(&quic, SubscribeOptions {
+        key: key.into(),
+        local_addr: port.clone(),
+    })
+    .await
+    .expect("subscribed over QUIC");
+    roundtrip(&mut TcpStream::connect(&port).await.expect("dial")).await;
+    assert_eq!(connection.diagnostics().relay_transport, pocox_pb::RelayTransport::Quic);
+    assert_eq!(registration.diagnostics().relay_transport, pocox_pb::RelayTransport::Quic);
+    connection.stop().await.expect("stop connection");
+    registration.stop().await.expect("stop registration");
+
+    // The preference never quietly falls back to TCP.
+    let without = Relay::start_with_direct("pocox-no-quic", None).await;
+    let tcp = RelaySession::new(without.addr().to_string(), TEST_ADMIN_KEY);
+    assert_eq!(
+        pocox_pb::relay_quic_port(&tcp)
+            .await
+            .expect("the relay answers"),
+        None
+    );
+    let quic = tcp.with_preferences(&PbMapperConfig {
+        relay_transport: RelayTransport::Quic,
+        ..Default::default()
+    });
+    let refused = pocox_pb::keys(&quic)
+        .await
+        .expect_err("no QUIC to reach it over");
+    assert!(pocox_pb::is_quic_refusal(&refused), "named as the carrier's fault: {refused:#}");
+    let refused = pocox_pb::publish_pending(&quic, RegisterOptions {
+        key: "pcx:quic-test:port:5173".into(),
+        local_addr: "127.0.0.1:5173".into(),
+        codec: true,
+    })
+    .await
+    .expect_err("a permanently refused publication must not become a pending share");
+    let pocox_pb::PublishError::Other(refused) = refused else {
+        panic!("a missing carrier is not a service-name conflict");
+    };
+    assert!(
+        pocox_pb::is_quic_refusal(&refused),
+        "publication keeps the carrier's error: {refused:#}"
+    );
+}
+
+#[tokio::test]
+async fn a_port_mapping_follows_the_preference_and_waits_for_a_failed_punch() {
+    let relay = Relay::start_with_direct(
+        "pocox-mapping",
+        Some(DirectServerConfig {
+            listen: "127.0.0.1:0".parse().expect("listen address"),
+            advertise: "127.0.0.1:0".parse().expect("advertise address"),
+        }),
+    )
+    .await;
+    let (backend, _, _echo) = echo().await;
+    for (path, port_mapping, expected) in [
+        (ConnectionPath::Auto, PortMapping::Auto, Some(PortMappingStage::Standby)),
+        (ConnectionPath::Auto, PortMapping::Off, None),
+        (ConnectionPath::RelayOnly, PortMapping::Auto, None),
+    ] {
+        let session = RelaySession::new(relay.addr().to_string(), TEST_ADMIN_KEY).with_preferences(
+            &PbMapperConfig {
+                path,
+                allow_direct: path == ConnectionPath::Auto,
+                port_mapping,
+                ..Default::default()
+            },
+        );
+        let key = "pcx:mapping-test:app:default";
+        let registration = pocox_pb::register(&session, RegisterOptions {
+            key: key.into(),
+            local_addr: backend.clone(),
+            codec: true,
+        })
+        .await
+        .expect("registered");
+        let port = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("port")
+            .local_addr()
+            .expect("address")
+            .to_string();
+        let connection = pocox_pb::subscribe(&session, SubscribeOptions {
+            key: key.into(),
+            local_addr: port,
+        })
+        .await
+        .expect("subscribed");
+        for mapping in
+            [connection.diagnostics().port_mapping, registration.diagnostics().port_mapping]
+        {
+            assert_eq!(
+                mapping.map(|mapping| mapping.current.stage),
+                expected,
+                "{path:?} {port_mapping:?}"
+            );
+        }
+        connection.stop().await.expect("stop connection");
+        registration.stop().await.expect("stop registration");
     }
 }

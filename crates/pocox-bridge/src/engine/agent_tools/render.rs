@@ -7,7 +7,10 @@ use std::fmt::Write as _;
 
 use pocox_core::service::sanitize_component;
 
-use super::model::{in_words, ConnectionView, LinkView, Overview, OwnerKind, ShareView, Shared};
+use super::model::{
+    in_words, ConnectionView, LinkView, Overview, OwnerKind, PortLinkView, PortMappingView,
+    ShareView, Shared,
+};
 use super::state;
 
 /// What `services` narrows to.
@@ -129,6 +132,14 @@ pub fn table(overview: &Overview) -> String {
                 .find(|share| Some(&share.id) == service.share.as_ref())
             {
                 let _ = write!(out, "; {}", persistence_label(share));
+                if let Some(link) = share
+                    .ports
+                    .iter()
+                    .find(|port| port.key == service.key)
+                    .and_then(|port| port.link.as_ref())
+                {
+                    out.push_str(&port_link_in_words(link));
+                }
             }
             let _ = writeln!(out, "  [{}]", service.key);
         }
@@ -198,6 +209,35 @@ fn persistence_label(share: &ShareView) -> String {
             None => "temporary, no timer, ends with its agent or POCOX".into(),
         },
         None => "persistence unknown (older host)".into(),
+    }
+}
+
+/// How a shared port is reached right now, when that says anything: nothing
+/// while no connection is open and the router was not asked.
+fn port_link_in_words(link: &PortLinkView) -> String {
+    let mut out = String::new();
+    if link.active_direct + link.active_relay > 0 {
+        let _ = write!(
+            out,
+            "; {} open direct, {} via the relay",
+            link.active_direct, link.active_relay
+        );
+    }
+    if let Some(words) = link.port_mapping.as_ref().and_then(mapping_in_words) {
+        let _ = write!(out, "; {words}");
+    }
+    out
+}
+
+/// A router port mapping that matters to the path, in words.
+fn mapping_in_words(mapping: &PortMappingView) -> Option<String> {
+    match mapping.state.as_str() {
+        "active" => Some(match &mapping.protocol {
+            Some(protocol) => format!("the router maps its direct port ({protocol})"),
+            None => "the router maps its direct port".into(),
+        }),
+        "failed" => Some("the router gave no port mapping".into()),
+        _ => None,
     }
 }
 
@@ -275,6 +315,12 @@ pub fn travels(link: &LinkView) -> String {
         "restoring" => out.push_str("; POCOX is reopening its tunnel, which ended"),
         _ => {},
     }
+    if link.relay_transport.as_deref() == Some("quic") {
+        out.push_str("; it reaches the relay over QUIC");
+    }
+    if let Some(words) = link.port_mapping.as_ref().and_then(mapping_in_words) {
+        let _ = write!(out, "; {words}");
+    }
     if link.direct_sessions + link.relay_sessions > 0 {
         let _ = write!(
             out,
@@ -293,6 +339,39 @@ pub fn travels(link: &LinkView) -> String {
 mod tests {
     use super::*;
     use crate::engine::agent_tools::model::{DeviceView, ServiceEntry};
+
+    #[test]
+    fn a_link_names_a_quic_carrier_and_a_mapping_that_matters() {
+        let link = |relay_transport: Option<&str>, state: &str| LinkView {
+            policy: "p2p_first".into(),
+            path: "direct".into(),
+            state: "ready".into(),
+            direct_sessions: 0,
+            relay_sessions: 0,
+            fallbacks: 0,
+            last_fallback_stage: None,
+            attempting: None,
+            restore_failures: 0,
+            relay_transport: relay_transport.map(str::to_string),
+            port_mapping: Some(PortMappingView {
+                state: state.into(),
+                protocol: Some("pcp".into()),
+            }),
+        };
+        let quic = travels(&link(Some("quic"), "active"));
+        assert!(quic.contains("over QUIC") && quic.contains("(pcp)"), "{quic}");
+        let plain = travels(&link(Some("tcp"), "standby"));
+        assert!(!plain.contains("QUIC") && !plain.contains("router"), "{plain}");
+    }
+
+    #[test]
+    fn a_link_from_an_older_host_still_reads() {
+        let old = r#"{"policy":"relay_only","path":"relay","state":"ready","directSessions":0,
+            "relaySessions":1,"fallbacks":0}"#;
+        let link: LinkView = serde_json::from_str(old).expect("older catalog");
+        assert_eq!(link.relay_transport, None);
+        assert_eq!(link.port_mapping, None);
+    }
 
     fn entry(key: &str, kind: &str, status: &str) -> ServiceEntry {
         ServiceEntry {
