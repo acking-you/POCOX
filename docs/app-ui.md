@@ -138,6 +138,13 @@ for Flutter diagnostics. Native console lifetime tests live in
 - Onboarding takes relay + key (with `pcx1:` import/export) or an account and
   persists to `config.toml` (0600). Desktop restores hosting on boot from
   `ui_state.json` (`lib/src/ui_prefs.dart`).
+  Self-host setup is a child of account sign-in, including when opened by
+  its URL. Back pops setup with the platform transition (on iOS, setup
+  slides right to reveal sign-in). Advanced is collapsed on return, but a typed
+  backend address is retained if reopened. Opening setup abandons a pending
+  device code and waits for any in-flight sign-in operation to finish before
+  allowing the switch.
+  Back cannot leave setup while it saves; success replaces onboarding with home.
 - Connect to an in-app host through its registered loopback endpoint; never
   relay a device's own traffic or probe relay health to resolve it. Remote
   relay connections stay first-class.
@@ -446,6 +453,12 @@ git checkout -- apps/flutter/pubspec.yaml   # restore before committing
 
 ## UI tests
 
+- Self-host navigation: `test/self_host_navigation_test.dart` uses the real
+  router and screens with an in-memory bridge to check native iOS back motion,
+  Welcome state preservation, repeat visits and direct entry.
+  `integration_test/self_host_navigation_test.dart` runs
+  the same checks on iOS Simulator; it does not test account authentication or
+  saving real relay credentials.
 - Responsive coverage: `test/responsive_layout_test.dart` (320 px at 2.0
   text en/zh, 393 px, keyboard, landscape, tablet, short windows on phone
   and desktop, real fonts),
