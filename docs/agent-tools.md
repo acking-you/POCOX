@@ -178,9 +178,19 @@ One `action` with its fields:
   `relay_only`), what its open connections go through (`direct`, `relay`,
   `mixed`, or `idle` while none is open), the tunnel's state (`connecting`,
   `ready`, `reconnecting`, or `restoring` while POCOX reopens it), counts of
-  direct and relayed connections, the stage the last fallback gave up at, and
-  any direct attempt in flight. `services` lists every connection with the
-  same, in words for the model.
+  direct and relayed connections, the stage the last fallback gave up at, any
+  direct attempt in flight, its relay carrier (`relay_transport`: `tcp` or
+  `quic`) and its router port mapping (`port_mapping`: `state` of `standby`,
+  `asking`, `active`, `failed` or `stopped`, and the `protocol` once one is in
+  use). `services` lists every connection with the same, in words for the model.
+- A shared port's catalog entry carries `link` while it is published: the
+  sharing device's carrier, its open direct and relayed connections, and its port
+  mapping. `services` says so in words when connections are open or the router
+  was asked.
+- A mapping's public and gateway addresses are never reported here: results go
+  to the model's provider, and catalogs to the user's other devices. An agent
+  cannot choose a path, carrier or mapping either; those are the user's
+  [preferences](relay-worker-recovery.md#direct-connections).
 - A connection is kept until it expires or is ended, whatever happens to its
   tunnel: the SDK recovers the relay link (trying direct first when the device
   allows it), and a tunnel that ends is reopened at the same local port,
@@ -189,7 +199,11 @@ One `action` with its fields:
   Revocation and account changes cancel pending restores; their late results
   cannot overwrite or tear down a replacement connection.
 - Every failure says what to do next (`tools_off`, `not_hosting`,
-  `declined`, `name_conflict`, `relay_unavailable`, …).
+  `declined`, `name_conflict`, `relay_unavailable`, …). `relay_quic_unavailable`
+  means this device reaches relays over QUIC and this relay offers none, so
+  retrying will not help until the user changes the carrier. A share refused
+  for this reason withdraws its reserved ports and is not saved or returned
+  as a pending share; transient relay outages still keep their retrying handle.
 
 ## Consent
 

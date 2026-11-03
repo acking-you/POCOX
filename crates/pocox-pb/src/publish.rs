@@ -22,11 +22,12 @@
 //!
 //! * **Conflict** — another live instance owns this name. Retrying cannot fix
 //!   it (and retrying anyway IS the storm), so hosting must fail and say so.
-//! * **Everything else** — the relay is unreachable or unhappy for now. Hold
-//!   the handle; the SDK keeps trying.
+//! * **QUIC unavailable** — the selected carrier is not offered. Return the
+//!   error: the worker has ended, so retaining it cannot publish the service.
+//! * **Transient trouble** — hold the handle while the SDK keeps trying.
 
 use anyhow::Result;
-use pb_mapper::{Registration, TunnelStatus};
+use pb_mapper::{Registration, TunnelDiagnostics, TunnelStatus};
 
 use crate::session::{RegisterOptions, RelaySession};
 
@@ -46,8 +47,8 @@ pub enum PublishError {
         /// The relay's own words, kept for the log.
         detail: String,
     },
-    /// Anything else: the relay is unreachable, over quota, or refusing for a
-    /// reason that may clear on its own.
+    /// Other setup failures, including a relay that does not offer the
+    /// selected QUIC carrier.
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -90,6 +91,12 @@ impl Published {
         }
     }
 
+    /// A snapshot of how the tunnel is doing: its carrier, direct sessions and
+    /// port mapping.
+    pub fn diagnostics(&self) -> TunnelDiagnostics {
+        self.registration.diagnostics()
+    }
+
     /// Unpublish, awaiting the teardown.
     ///
     /// Preferred over dropping: the relay frees the key now rather than at its
@@ -107,7 +114,8 @@ impl Published {
 ///
 /// The returned handle owns the registration — hold it for as long as the
 /// service should stay published. Transient relay trouble is the SDK's to
-/// retry; only a name conflict comes back as [`PublishError::Conflict`].
+/// retry; a name conflict comes back as [`PublishError::Conflict`] and a
+/// missing QUIC carrier as [`PublishError::Other`].
 ///
 /// Succeeds even when the relay has not CONFIRMED the registration yet, because
 /// the handle's worker is still reconnecting and holding it is what lets the
@@ -134,6 +142,7 @@ pub async fn publish(
 /// publish in `tokio::time::timeout` CANCELS it, dropping the handle and with
 /// it the retrying worker, so a slow relay would leave the service permanently
 /// unpublished rather than merely late.
+/// A QUIC refusal is an error instead: its worker has permanently stopped.
 pub async fn publish_pending(
     session: &RelaySession,
     opts: RegisterOptions,
@@ -141,18 +150,26 @@ pub async fn publish_pending(
     let key = opts.key.clone();
     match crate::session::register_pending(session, opts).await {
         Ok((registration, ready)) => {
-            if let Err(err) = &ready {
-                tracing::warn!(
-                    key = %key,
-                    error = %format!("{err:#}"),
-                    "the relay has not confirmed this registration yet; it keeps retrying"
-                );
-            }
+            let ready = match ready {
+                Ok(()) => true,
+                Err(err) if crate::session::is_quic_refusal(&err) => {
+                    let _ = registration.stop().await;
+                    return Err(PublishError::Other(err));
+                },
+                Err(err) => {
+                    tracing::warn!(
+                        key = %key,
+                        error = %format!("{err:#}"),
+                        "the relay has not confirmed this registration yet; it keeps retrying"
+                    );
+                    false
+                },
+            };
             Ok((
                 Published {
                     registration,
                 },
-                ready.is_ok(),
+                ready,
             ))
         },
         Err(err) => {
@@ -213,7 +230,8 @@ mod tests {
         // would leave a host permanently unpublished after a blip.
         let session = RelaySession::for_test("127.0.0.1:1");
         let (published, ready) = publish_pending(&session, RegisterOptions {
-            key: "pcx:test:app:default".to_string(),
+            // A service name in the timeout's context is not a refusal code.
+            key: "pcx:quic_unavailable:app:default".to_string(),
             local_addr: "127.0.0.1:9".to_string(),
             codec: false,
         })

@@ -45,7 +45,8 @@ A new Flutter FFI plugin project.
   # System libraries the Rust staticlib expects at final link (same set as
   # the macOS podspec): z/bz2/lzma for flate2/bzip2/xz2 via
   # codex-core-plugins -> zip, SystemConfiguration for hyper-util's
-  # proxy/interface discovery (codex-aws-auth).
+  # proxy/interface discovery (codex-aws-auth). iOS alone also needs Network,
+  # for netdev's gateway discovery (pb-mapper's port mapping via netwatch).
   s.libraries = 'z', 'bz2', 'lzma'
-  s.frameworks = 'SystemConfiguration'
+  s.frameworks = 'SystemConfiguration', 'Network'
 end

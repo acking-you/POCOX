@@ -83,6 +83,7 @@ windows-registry = "0.6"
 system-configuration = "0.7"
 
 [dev-dependencies]
+pb-mapper-testkit = { workspace = true }
 tempfile = "3"
 tokio-tungstenite = { workspace = true }
 

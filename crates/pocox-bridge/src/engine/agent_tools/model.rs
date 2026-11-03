@@ -213,6 +213,61 @@ pub struct PortView {
     pub key: String,
     /// Reachability as the sharing device sees it.
     pub status: PortStatus,
+    /// How others reach it, while published. Absent from older catalogs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub link: Option<PortLinkView>,
+}
+
+/// How other devices reach a shared port, as its registration observes it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PortLinkView {
+    /// `tcp` or `quic`: how the sharing device reaches the relay.
+    pub relay_transport: String,
+    /// Open connections that came direct (hole-punched).
+    pub active_direct: u64,
+    /// Open connections that came through the relay, counted once direct is
+    /// in use.
+    pub active_relay: u64,
+    /// Its router port mapping, when it may have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port_mapping: Option<PortMappingView>,
+}
+
+/// A tunnel's router port mapping. Its addresses, the router's and the public
+/// one, stay on the device: neither a model nor a catalog reader needs them.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PortMappingView {
+    /// `standby` (asked for only if a direct attempt fails to punch through),
+    /// `asking`, `active`, `failed` (asked again later) or `stopped`.
+    pub state: String,
+    /// `pcp`, `nat_pmp` or `upnp`, once one is in use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
+}
+
+impl From<&pocox_pb::PortMappingDiagnostics> for PortMappingView {
+    fn from(mapping: &pocox_pb::PortMappingDiagnostics) -> Self {
+        Self {
+            state: crate::engine::runtime::MappingState::of(&mapping.current)
+                .as_str()
+                .into(),
+            protocol: mapping
+                .current
+                .protocol
+                .map(|protocol| protocol.as_str().into()),
+        }
+    }
+}
+
+/// The label a [`LinkView`] or [`PortLinkView`] gives a carrier.
+pub fn relay_transport_label(transport: pocox_pb::RelayTransport) -> String {
+    match transport {
+        pocox_pb::RelayTransport::Tcp => "tcp",
+        pocox_pb::RelayTransport::Quic => "quic",
+    }
+    .into()
 }
 
 /// A shared port's state on the device that shares it.
@@ -436,6 +491,12 @@ pub struct LinkView {
     /// Failed attempts to reopen it, while `restoring`.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub restore_failures: u32,
+    /// `tcp` or `quic`: how its tunnel reaches the relay.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub relay_transport: Option<String>,
+    /// Its router port mapping, when it may have one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port_mapping: Option<PortMappingView>,
 }
 
 fn is_zero(count: &u32) -> bool {

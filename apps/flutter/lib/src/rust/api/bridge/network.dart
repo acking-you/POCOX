@@ -7,11 +7,15 @@ import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These functions are ignored because they are not marked as `pub`: `mode_name`, `save_relay_preferences`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `from`, `from`, `from`, `from`, `from`, `from`, `from`
 
 /// Read this installation's relay preferences, shared by both account modes.
 Future<RelayPreferencesDto> relayPreferences() =>
     RustLib.instance.api.crateApiBridgeNetworkRelayPreferences();
+
+/// The UDP port the current relay offers QUIC on, or none when it offers none.
+Future<int?> relayQuicPort() =>
+    RustLib.instance.api.crateApiBridgeNetworkRelayQuicPort();
 
 /// Save preferences for new tunnels. Existing connections and hosts keep
 /// theirs.
@@ -83,6 +87,19 @@ class NetworkProxyDto {
           systemSource == other.systemSource;
 }
 
+/// When a tunnel allowed to go direct asks the router for a port, mirrored for
+/// Dart.
+enum PortMappingDto {
+  /// Never.
+  off,
+
+  /// Once a direct attempt failed to punch through (the default).
+  auto,
+
+  /// As soon as its direct endpoint opens.
+  always,
+}
+
 /// Preferences captured when a new network tunnel is created.
 class RelayPreferencesDto {
   /// Path preference for new subscriptions.
@@ -91,10 +108,25 @@ class RelayPreferencesDto {
   /// Allow direct setup for new local service registrations.
   final bool allowDirect;
 
-  const RelayPreferencesDto({required this.path, required this.allowDirect});
+  /// Carrier for new tunnels' relay connections.
+  final RelayTransportDto relayTransport;
+
+  /// Router port mapping for new tunnels allowed to go direct.
+  final PortMappingDto portMapping;
+
+  const RelayPreferencesDto({
+    required this.path,
+    required this.allowDirect,
+    required this.relayTransport,
+    required this.portMapping,
+  });
 
   @override
-  int get hashCode => path.hashCode ^ allowDirect.hashCode;
+  int get hashCode =>
+      path.hashCode ^
+      allowDirect.hashCode ^
+      relayTransport.hashCode ^
+      portMapping.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -102,5 +134,16 @@ class RelayPreferencesDto {
       other is RelayPreferencesDto &&
           runtimeType == other.runtimeType &&
           path == other.path &&
-          allowDirect == other.allowDirect;
+          allowDirect == other.allowDirect &&
+          relayTransport == other.relayTransport &&
+          portMapping == other.portMapping;
+}
+
+/// How a tunnel reaches the relay, mirrored for Dart.
+enum RelayTransportDto {
+  /// One TCP connection per relay stream (the default).
+  tcp,
+
+  /// Every tunnel of the process shares one QUIC connection.
+  quic,
 }

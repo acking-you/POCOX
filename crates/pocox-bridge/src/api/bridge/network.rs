@@ -2,10 +2,10 @@
 use std::path::Path;
 
 use anyhow::Result;
-use pocox_core::config::ConnectionPath;
+use pocox_core::config::{ConnectionPath, PortMapping, RelayTransport};
 
 use crate::engine::execution::{self, Lane};
-use crate::engine::{config, network, runtime};
+use crate::engine::{config, network, runtime, transport};
 
 /// Outgoing path preference for new subscriptions, mirrored for Dart.
 pub enum ConnectionPathDto {
@@ -33,12 +33,82 @@ impl From<ConnectionPathDto> for ConnectionPath {
     }
 }
 
+/// How a tunnel reaches the relay, mirrored for Dart.
+pub enum RelayTransportDto {
+    /// One TCP connection per relay stream (the default).
+    Tcp,
+    /// Every tunnel of the process shares one QUIC connection.
+    Quic,
+}
+
+impl From<RelayTransport> for RelayTransportDto {
+    fn from(transport: RelayTransport) -> Self {
+        match transport {
+            RelayTransport::Tcp => Self::Tcp,
+            RelayTransport::Quic => Self::Quic,
+        }
+    }
+}
+
+impl From<RelayTransportDto> for RelayTransport {
+    fn from(transport: RelayTransportDto) -> Self {
+        match transport {
+            RelayTransportDto::Tcp => Self::Tcp,
+            RelayTransportDto::Quic => Self::Quic,
+        }
+    }
+}
+
+impl From<pocox_pb::RelayTransport> for RelayTransportDto {
+    fn from(transport: pocox_pb::RelayTransport) -> Self {
+        match transport {
+            pocox_pb::RelayTransport::Tcp => Self::Tcp,
+            pocox_pb::RelayTransport::Quic => Self::Quic,
+        }
+    }
+}
+
+/// When a tunnel allowed to go direct asks the router for a port, mirrored for
+/// Dart.
+pub enum PortMappingDto {
+    /// Never.
+    Off,
+    /// Once a direct attempt failed to punch through (the default).
+    Auto,
+    /// As soon as its direct endpoint opens.
+    Always,
+}
+
+impl From<PortMapping> for PortMappingDto {
+    fn from(mapping: PortMapping) -> Self {
+        match mapping {
+            PortMapping::Off => Self::Off,
+            PortMapping::Auto => Self::Auto,
+            PortMapping::Always => Self::Always,
+        }
+    }
+}
+
+impl From<PortMappingDto> for PortMapping {
+    fn from(mapping: PortMappingDto) -> Self {
+        match mapping {
+            PortMappingDto::Off => Self::Off,
+            PortMappingDto::Auto => Self::Auto,
+            PortMappingDto::Always => Self::Always,
+        }
+    }
+}
+
 /// Preferences captured when a new network tunnel is created.
 pub struct RelayPreferencesDto {
     /// Path preference for new subscriptions.
     pub path: ConnectionPathDto,
     /// Allow direct setup for new local service registrations.
     pub allow_direct: bool,
+    /// Carrier for new tunnels' relay connections.
+    pub relay_transport: RelayTransportDto,
+    /// Router port mapping for new tunnels allowed to go direct.
+    pub port_mapping: PortMappingDto,
 }
 
 /// Read this installation's relay preferences, shared by both account modes.
@@ -48,7 +118,18 @@ pub async fn relay_preferences() -> Result<RelayPreferencesDto> {
         Ok(RelayPreferencesDto {
             path: saved.path.into(),
             allow_direct: saved.allow_direct,
+            relay_transport: saved.relay_transport.into(),
+            port_mapping: saved.port_mapping.into(),
         })
+    })
+    .await
+}
+
+/// The UDP port the current relay offers QUIC on, or none when it offers none.
+pub async fn relay_quic_port() -> Result<Option<u16>> {
+    execution::run(Lane::Background, move || {
+        let transport = transport::resolve_blocking()?;
+        runtime::runtime().block_on(pocox_pb::relay_quic_port(&transport.session))
     })
     .await
 }
@@ -66,6 +147,8 @@ fn save_relay_preferences(support: &Path, preferences: RelayPreferencesDto) -> R
     config::update_config(support, |config| {
         config.pb_mapper.path = preferences.path.into();
         config.pb_mapper.allow_direct = preferences.allow_direct;
+        config.pb_mapper.relay_transport = preferences.relay_transport.into();
+        config.pb_mapper.port_mapping = preferences.port_mapping.into();
         Ok(())
     })
 }
@@ -154,11 +237,15 @@ mod tests {
         save_relay_preferences(support.path(), RelayPreferencesDto {
             path: ConnectionPathDto::Auto,
             allow_direct: true,
+            relay_transport: RelayTransportDto::Quic,
+            port_mapping: PortMappingDto::Always,
         })
         .expect("save preferences");
         let saved = config::load_config(support.path()).expect("read config");
         assert_eq!(saved.pb_mapper.path, ConnectionPath::Auto);
         assert!(saved.pb_mapper.allow_direct);
+        assert_eq!(saved.pb_mapper.relay_transport, RelayTransport::Quic);
+        assert_eq!(saved.pb_mapper.port_mapping, PortMapping::Always);
         assert_eq!(saved.pb_mapper.key.as_deref(), Some("relay-key"));
         assert_eq!(saved.account.token.as_deref(), Some("account-token"));
     }

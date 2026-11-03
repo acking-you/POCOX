@@ -348,7 +348,8 @@ class LinkTimeline extends StatelessWidget {
       LinkEventKind.relayFailed => scheme.error,
       LinkEventKind.networkChanged => cautionColor(scheme),
       LinkEventKind.directEstablished => infoColor(scheme),
-      LinkEventKind.directFallback => scheme.onSurfaceVariant,
+      LinkEventKind.directFallback ||
+      LinkEventKind.stopped => scheme.onSurfaceVariant,
     };
     return Column(
       key: const Key('link-timeline'),
