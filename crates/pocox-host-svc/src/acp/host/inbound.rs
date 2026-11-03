@@ -1,7 +1,15 @@
 //! What the agent sends: session updates and permission requests, routed to
 //! the generation they belong to.
 
-use super::*;
+use std::sync::Weak;
+
+use serde_json::{json, Value};
+use tokio::time::Instant;
+
+use super::{
+    schema, session_signal, AgentHost, Inbound, Inner, Peer, Permission, RequestId, RequestKind,
+    RpcError, SessionSignal, State, MAX_PERMISSIONS,
+};
 
 impl AgentHost {
     fn on_update(&self, generation: u64, params: Option<Value>) {

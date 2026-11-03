@@ -1,5 +1,7 @@
-use super::*;
+use crate::acp::host::{valid_id, AgentHost, HostError, Identity};
+use crate::acp::peer::Peer;
 use crate::acp::session_control::SessionControl;
+use crate::acp::state::Phase;
 
 impl AgentHost {
     /// Inspect explicit session operations without loading or claiming a

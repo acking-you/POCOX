@@ -1,7 +1,12 @@
 //! The coalescing, bounded queue of session-record writes (see the parent
 //! module docs).
 
-use super::*;
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tokio::sync::{mpsc, oneshot};
+
+use super::{lock, Change, Pending};
 
 /// Pending session-record writes and flush waiters.
 pub(super) type Queue = Arc<Mutex<(Pending, Vec<oneshot::Sender<()>>)>>;

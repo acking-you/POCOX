@@ -1,7 +1,11 @@
 //! Explicit release on the connection that admitted the session. Browsing
 //! never enters this path, and an idle turn alone is not release evidence.
 
-use super::*;
+use std::time::Duration;
+
+use serde_json::{json, Value};
+
+use super::{lock, valid_id, AgentHost, HostError, Identity, CLOSE_TIMEOUT};
 
 mod access;
 mod acquire;
