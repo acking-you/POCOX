@@ -307,8 +307,7 @@ fn truncated_netstat_rows_cannot_be_told() {
 
 /// A port this process listens on at 127.0.0.1 is held by it for that
 /// address, the IPv4 wildcard and `localhost`, and for no other address or
-/// family; once closed, nothing holds it. Real sockets, the platform's own
-/// source.
+/// family. Real sockets, the platform's own source.
 #[test]
 fn a_real_listener_is_attributed_only_for_the_addresses_it_takes() {
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
@@ -329,7 +328,18 @@ fn a_real_listener_is_attributed_only_for_the_addresses_it_takes() {
         let free = at(elsewhere);
         assert!(free.is_empty(), "{elsewhere}: {free:?}");
     }
-    drop(listener);
-    let free = at("127.0.0.1");
+}
+
+#[test]
+fn a_reserved_port_without_a_listener_has_no_holders() {
+    // Keep the port bound without listening: after dropping a listener,
+    // another process may reuse its port before the platform probe runs.
+    let socket = tokio::net::TcpSocket::new_v4().expect("socket");
+    socket
+        .bind("127.0.0.1:0".parse().expect("address"))
+        .expect("bind");
+    let port = socket.local_addr().expect("addr").port();
+    let free = holders(&ips(&["127.0.0.1"]), port, &[std::process::id()])
+        .expect("the platform's listener source is readable");
     assert!(free.is_empty(), "{free:?}");
 }
