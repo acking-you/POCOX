@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use super::*;
 
 fn ips(list: &[&str]) -> Vec<IpAddr> {
@@ -330,6 +332,13 @@ fn a_real_listener_is_attributed_only_for_the_addresses_it_takes() {
         assert!(free.is_empty(), "{elsewhere}: {free:?}");
     }
     drop(listener);
-    let free = at("127.0.0.1");
+    // A child another test is starting holds a copy of every descriptor until
+    // its exec closes them, and that copy keeps the socket listening.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let mut free = at("127.0.0.1");
+    while !free.is_empty() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+        free = at("127.0.0.1");
+    }
     assert!(free.is_empty(), "{free:?}");
 }
