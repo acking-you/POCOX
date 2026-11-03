@@ -7,10 +7,17 @@
 //! A fresh server tail must overlap that prefix before it becomes live. A
 //! missing/evicted page keeps its cursor; it never becomes an end-of-history.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+use anyhow::Result;
+use pocox_core::history_sync::{HistoryWindow, WindowQuery};
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 
 use super::super::session_cache::{DiskCache, MAX_ENTRY_BYTES};
-use super::*;
+use super::{gate, key, query_for, source_generation, CachedContinuation, CachedView};
+use crate::engine::app_session::{ThreadHistory, ThreadItem};
+use crate::engine::session_cache::{application_cache, namespace};
 
 #[derive(Serialize, Deserialize)]
 struct LiveView {

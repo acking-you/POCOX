@@ -1,6 +1,8 @@
 //! Explicit original-session admission after the previous writer released it.
 
-use super::*;
+use serde_json::Value;
+
+use crate::acp::host::{lock, valid_id, validate_cwd, AgentHost, HostError, Identity};
 
 impl AgentHost {
     /// Restore the exact Claude session, after confirming that no registered

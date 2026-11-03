@@ -7,6 +7,7 @@ use serde_json::json;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
+use super::events::{event_loop, Watch};
 use super::*;
 use crate::engine::session_engine::Supplement;
 use crate::engine::transport::Transport;

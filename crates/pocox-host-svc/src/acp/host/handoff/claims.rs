@@ -3,7 +3,7 @@
 
 use pocox_core::process::{is_process_descendant, process_start_time, ProcessIdentity};
 
-use super::*;
+use crate::acp::host::{lock, AgentHost, HostError, Running};
 use crate::native_history::SessionClaim;
 
 pub(in crate::acp::host) struct HeldClaim {

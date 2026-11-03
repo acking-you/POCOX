@@ -1,8 +1,11 @@
 //! Local hosting (desktop): run and manage local Codex app-server and ACP agent
 //! hosts, the in-app equivalent of `pocox serve`.
 
-use super::*;
+use anyhow::Result;
+use flutter_rust_bridge::frb;
+
 use crate::engine::execution::{self, Lane};
+use crate::engine::{claude_setup, logging, serve, serve_acp};
 
 /// Result of starting local hosting, mirrored for Dart. One host publishes two
 /// tunnels (`app:<name>` remote control + `api:<name>` Responses proxy).

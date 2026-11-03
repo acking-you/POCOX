@@ -1,7 +1,15 @@
 //! Root-confined host file routes: folder browsing, file listing, download,
 //! writing into a project folder, and attachment uploads.
 
-use super::*;
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use anyhow::{anyhow, Context};
+use axum::extract::{Path, Query, State};
+use axum::Json;
+use serde::{Deserialize, Serialize};
+
+use crate::{fs, ApiError, AppState};
 
 /// Query for `GET /fs/list`.
 #[derive(Deserialize)]
@@ -256,7 +264,7 @@ fn sanitize_file_name(name: &str) -> Result<String, anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::HostConfig;
+    use crate::store::{ConfigStore, HostConfig, HostStore};
 
     #[test]
     fn file_upload_waits_for_background_write_before_success() {

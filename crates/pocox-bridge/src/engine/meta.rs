@@ -15,7 +15,6 @@ use anyhow::{anyhow, Context, Result};
 use once_cell::sync::OnceCell;
 use pocox_account_proto::BoundedRetry;
 use pocox_core::service::{ServiceId, ServiceKind};
-use pocox_host_svc::fs::{DirEntry, FileEntry};
 use pocox_host_svc::resume::ForceResumeOutcome;
 use pocox_host_svc::sessions::{
     LocalSession, SessionFollowUpdate, SessionLiveness, TranscriptItem,

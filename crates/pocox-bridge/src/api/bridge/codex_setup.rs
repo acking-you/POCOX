@@ -1,7 +1,9 @@
 //! External Codex bootstrap: `CODEX_HOME` provider setup, ChatGPT login and
 //! the system prompt variant.
 
-use super::*;
+use anyhow::Result;
+
+use crate::engine::app_session;
 use crate::engine::execution::{self, Lane};
 
 /// What the external codex has on disk in `CODEX_HOME`, for the onboarding

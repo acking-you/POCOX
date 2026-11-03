@@ -5,7 +5,24 @@
 //! the agent and publishes it. An apply prepares the new launch before it
 //! stops the old host, so an unusable configuration interrupts nothing.
 
-use super::*;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use anyhow::{anyhow, bail, Context, Result};
+use pocox_core::service::{ServiceId, ServiceKind};
+use pocox_host_svc::acp;
+use pocox_host_svc::acp::{
+    claude, grok, AgentHost, AgentSpec, HostOptions, SessionStore, SourceId,
+};
+use pocox_host_svc::file_links::SessionDirResolver;
+use pocox_host_svc::native_history::{GrokHistory, NativeHistory};
+
+use super::{
+    hosting_supported, hosts, locate, owners, report, stop_host, AcpServe, AcpServeReport, Owner,
+    Slot,
+};
+use crate::engine::host_services::bind_loopback;
+use crate::engine::{claude_setup, host_profiles, host_services, hosting, runtime, transport};
 
 /// A start ready to run (see the module docs).
 pub(crate) struct Prepared {

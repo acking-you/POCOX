@@ -33,23 +33,17 @@ mod codex_routes;
 mod file_routes;
 mod image_uploads;
 
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
-use anyhow::{anyhow, Context, Result};
-use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use anyhow::{Context, Result};
+use axum::extract::{DefaultBodyLimit, Path, State};
 use axum::http::StatusCode;
-use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use serde::{Deserialize, Serialize};
 use tokio::net::TcpListener;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
 
 use crate::codex_routes::{
     list_sessions, read_thread_image, session_follow, session_liveness, session_resume,

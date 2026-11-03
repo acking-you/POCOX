@@ -1,10 +1,14 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
+
 #[cfg(unix)]
 use futures::StreamExt;
 
 use super::*;
-use crate::acp::SourceId;
 #[cfg(unix)]
 use crate::acp::{api, ClientError, GatewayClient};
+use crate::acp::{AgentSpec, HostOptions, Identity, SessionStore, SourceId};
 use crate::native_history::ClaudeHistory;
 
 const SESSION: &str = "00000000-0000-4000-8000-000000000001";

@@ -1,8 +1,10 @@
 //! Native attachment preparation; picker and clipboard permissions stay in
 //! Flutter.
-use super::*;
-use crate::engine::attachments;
+use anyhow::{anyhow, Result};
+use flutter_rust_bridge::frb;
+
 use crate::engine::execution::{self, Lane};
+use crate::engine::{attachments, meta};
 
 /// Mirror an image into the host session's cwd or the selected draft project.
 /// The account/relay context must have been captured before preparing bytes.

@@ -1,9 +1,23 @@
 //! Connecting a session to its app-server, probing endpoints and disconnecting.
 
-use super::*;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use anyhow::{bail, Context, Result};
+use pocox_codex::client::AppClient;
+use serde_json::Value;
+use tokio::sync::broadcast;
+
+use super::config::{track_runtime_config, ThreadRuntimeConfig};
+use super::history_cache::invalidate_history;
+use super::items::{buffer_item, map_event};
+use super::live::LiveTranscript;
+use super::turns::{track_active_turn, track_pending_approval};
+use super::{history_cache, lifecycle, sessions, AppEvent, Session, SessionOwner};
 use crate::engine::connect_stage::{self, ConnectStage};
 use crate::engine::service_connection::Target;
-use crate::engine::transport;
+use crate::engine::{runtime, transport};
 
 /// Subscribe to `service_key` (materialising the local ws endpoint), open a
 /// JSON-RPC client over it and run the `initialize` handshake. Idempotent: a

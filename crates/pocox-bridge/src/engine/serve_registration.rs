@@ -1,9 +1,18 @@
 //! Relay registrations of native hosts: unpublish and re-publish one service,
 //! and the rate-limited self-healing re-publication run by status polls.
 
-use anyhow::ensure;
+use std::net::SocketAddr;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
-use super::*;
+use anyhow::{anyhow, ensure, Result};
+use pocox_core::service::ServiceKind;
+use pocox_pb::Published;
+
+use super::{hosts_locked, LocalServe};
+use crate::engine::host_services::{needs_publishing, register_service};
+use crate::engine::{runtime, transport};
+
 
 /// Re-publish whichever of `name`'s three services are not currently published.
 ///

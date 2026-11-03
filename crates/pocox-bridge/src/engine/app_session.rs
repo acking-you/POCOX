@@ -14,17 +14,16 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Result};
 use once_cell::sync::OnceCell;
-use pocox_codex::client::{AppClient, Inbound};
+use pocox_codex::client::AppClient;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
-use crate::engine::runtime;
 
 #[path = "app_session_live.rs"]
 mod live;
@@ -51,12 +50,7 @@ mod turns;
 
 // Read by the live hosting tests only (the connection keeps its own uses).
 pub use self::account::{
-    auth_status, codex_logout, login_cancel, login_chatgpt_start, parse_token_usage, rate_limits,
-    ChatgptLoginStart,
-};
-use self::config::{
-    insert_execution_options, nonempty_str, normalize_approval_policy, parse_collaboration_mode,
-    record_runtime_config, runtime_config_with_thread, track_runtime_config,
+    auth_status, codex_logout, login_cancel, login_chatgpt_start, rate_limits, ChatgptLoginStart,
 };
 pub use self::config::{model_list, thread_runtime_config, ThreadRuntimeConfig};
 #[cfg(test)]
@@ -66,16 +60,10 @@ pub use self::connection::{
     connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };
 pub use self::fork::{thread_fork, ForkOutcome, ThreadFork};
-use self::history::{
-    fetch_item_page, fetch_older_item_page, fetch_turn_page, is_unknown_method,
-    load_paginated_window, load_whole_history, LoadedHistory, INITIAL_TURN_LIMIT, ITEM_PAGE_LIMIT,
-    MAX_TURN_ITEM_PAGES,
-};
+use self::history::LoadedHistory;
 pub use self::history::{ThreadHistory, TurnSummary};
-use self::items::{
-    buffer_item, map_event, parse_turn_item, parse_turn_items, turn_stamp, TurnStamp,
-};
 pub(super) use self::items::{encode_plan, format_content_diff};
+use self::items::{map_event, TurnStamp};
 pub(super) use self::threads::{
     external_history_changed, history_continuation, parse_prefetched_items, reset_synced_history,
 };
@@ -87,7 +75,6 @@ pub use self::turns::{
     compact, git_diff, realtime_request, respond_approval, respond_user_input, set_thread_name,
     thread_start, turn_interrupt, turn_start, turn_steer,
 };
-use self::turns::{extract_turn_id, record_active_turn, track_active_turn, track_pending_approval};
 #[cfg(test)]
 use self::{
     account::auth_status_from_response,
@@ -393,14 +380,10 @@ fn lifecycle(service_key: &str) -> Arc<Mutex<()>> {
 
 #[path = "app_session_history_cache.rs"]
 mod history_cache;
-use history_cache::{
-    cache_history, ensure_pagination, invalidate_history, pagination_of, reset_pagination,
-    set_pagination,
-};
 
 #[path = "app_session_turn_pages.rs"]
 mod turn_pages;
-use turn_pages::{cached_turn_pages, TurnWindow};
+use turn_pages::TurnWindow;
 pub use turn_pages::{thread_turn_page, thread_turn_page_delta, TurnItemsPage};
 
 /// A fresh broadcast receiver for `service_key`'s event feed.

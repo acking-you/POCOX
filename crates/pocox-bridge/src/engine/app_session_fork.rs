@@ -12,8 +12,9 @@ use pocox_codex::client::AppClient;
 use pocox_codex::protocol::ErrorPayload;
 use serde_json::json;
 
+use super::config::record_runtime_config;
 use super::threads::{parse_thread_meta, read_thread_metadata};
-use super::{client_for, record_runtime_config, ThreadMeta};
+use super::{client_for, ThreadMeta};
 use crate::engine::runtime;
 
 /// JSON-RPC `invalid request`: the server checked the fork and declined it.

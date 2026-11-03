@@ -1,7 +1,14 @@
 //! Mapping app-server notifications and thread items into bridge events and
 //! display rows.
 
-use super::*;
+use std::collections::HashMap;
+use std::sync::Mutex;
+
+use pocox_codex::client::Inbound;
+use serde_json::{json, Value};
+
+use super::live::LiveTranscript;
+use super::{AppEvent, ThreadItem};
 
 /// Stable per-turn id for the synthesized `plan` item. The evolving plan
 /// streams as a `turn/plan/updated` notification (not a thread item), so it's

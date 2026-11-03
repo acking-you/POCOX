@@ -1,7 +1,7 @@
 //! Provider-neutral automatic admission. A native idle process is still an
 //! owner; only fresh no-owner evidence permits loading the original UUID.
 
-use super::*;
+use crate::acp::host::{lock, AgentHost, HostError, Identity};
 use crate::native_history::ClaimError;
 use crate::session_access::SessionAccess;
 

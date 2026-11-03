@@ -13,9 +13,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use disk::DiskLog;
 use once_cell::sync::OnceCell;
 use tracing::{Event, Level, Subscriber};
-use tracing_subscriber::layer::Context;
-use tracing_subscriber::prelude::*;
+use tracing_subscriber::layer::{Context, SubscriberExt};
 use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
 
 /// One captured log event, mirrored to Dart as `LogLineDto`.

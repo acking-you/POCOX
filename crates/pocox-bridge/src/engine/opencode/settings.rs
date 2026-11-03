@@ -1,8 +1,12 @@
 //! Native per-session choices, with draft defaults that never mutate the host.
 
+use anyhow::{bail, Result};
+use pocox_host_svc::opencode::catalog::Catalog;
+use pocox_host_svc::opencode::host::Snapshot;
 use serde_json::{json, Value};
 
-use super::*;
+use super::{block, conn, validate_snapshot, Link};
+
 
 /// Refresh native session choices, preserving read failures for async callers.
 pub fn refresh_settings(service: &str, session: &str) -> Result<Value> {

@@ -1,7 +1,16 @@
 //! Session operations: create, reopen, list, history, configuration and
 //! the working directory each session is authorized for.
 
-use super::*;
+use std::path::Path;
+use std::sync::Arc;
+
+use serde_json::{json, Value};
+
+use super::{
+    clip, grok, lock, schema, valid_id, validate_cwd, AgentCapabilities, AgentHost, HostError,
+    Identity, Peer, SessionSettings, CLOSE_TIMEOUT, CONFIG_TIMEOUT, DEFAULT_WINDOW_TURNS,
+    LIST_TIMEOUT, LOAD_TIMEOUT, MAX_ID, MAX_WINDOW_TURNS, SESSION_TIMEOUT,
+};
 
 impl AgentHost {
     /// `params` with this host's session `_meta`, if it has one.

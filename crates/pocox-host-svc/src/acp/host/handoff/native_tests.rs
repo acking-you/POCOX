@@ -1,12 +1,15 @@
 //! Opt-in installed-runtime test. Its parent supplies only disposable paths
 //! and a deterministic loopback model endpoint, never a user's credentials.
 
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
 use futures::FutureExt;
 
 use super::*;
 use crate::acp::host::tests::{eventually, outcome};
 use crate::acp::schema::TurnOutcome;
-use crate::acp::SourceId;
+use crate::acp::{AgentSpec, HostOptions, SessionStore, SourceId};
 use crate::native_history::{ClaimError, ClaudeHistory, SessionClaim};
 
 fn path(key: &str) -> PathBuf {

@@ -1,13 +1,16 @@
 //! Original-session operations through one captured native host identity.
 
+use anyhow::{anyhow, bail, Result};
 use pocox_host_svc::opencode::catalog::Command;
-use pocox_host_svc::opencode::host::{Answer, Input, Options};
+use pocox_host_svc::opencode::client::ClientError;
+use pocox_host_svc::opencode::host::{Answer, Identity, Input, Options};
 use pocox_host_svc::session_access::SessionAccess;
 use serde_json::Value;
 
 use super::super::app_session::{ForkOutcome, OlderPage, ThreadFork, ThreadHistory, ThreadMeta};
 use super::super::session_engine::{StartOptions, Supplement, TurnOptions};
-use super::*;
+use super::{block, conn, events, lock, projection, settings, validate_snapshot, Link};
+use crate::engine::runtime;
 
 /// Inspect fresh writer evidence without acquiring a session.
 pub fn access(service: &str, session: &str) -> Result<SessionAccess> {
