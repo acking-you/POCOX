@@ -1,5 +1,6 @@
 use super::*;
 use crate::acp::host::tests::{eventually, mock_binary, outcome, start_mock};
+use crate::acp::AgentSpec;
 
 async fn fixture(extra: &[&str]) -> (AgentHost, String, Identity, tempfile::TempDir) {
     let program = mock_binary();

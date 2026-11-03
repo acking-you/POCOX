@@ -1,8 +1,11 @@
 //! Follow native history through the selected host, without ACP admission.
 
+use anyhow::{bail, Context, Result};
+use futures::StreamExt;
 use pocox_host_svc::sessions::{SessionFollowUpdate, SessionLiveness};
 
-use super::*;
+use super::{block, conn, ops};
+
 
 /// Read ownership conservatively from this connection's host and generation.
 pub fn native_liveness(service_key: &str, session: &str) -> Result<SessionLiveness> {

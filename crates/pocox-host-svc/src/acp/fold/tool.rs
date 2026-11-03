@@ -2,7 +2,11 @@
 
 use serde_json::Value;
 
-use super::*;
+use super::{
+    block_content, clip, push_image, serialized_len, Diff, Item, Tool, MAX_DIFFS, MAX_ITEM_TEXT,
+    MAX_LOCATION, MAX_LOCATIONS, MAX_RAW_INPUT, OMITTED_CONTENT, OMITTED_DIFFS, OMITTED_IMAGES,
+    OMITTED_INPUT, OMITTED_LOCATIONS,
+};
 
 /// Apply supplied tool fields; collections are replaced, never appended, and
 /// so are the omissions they report.

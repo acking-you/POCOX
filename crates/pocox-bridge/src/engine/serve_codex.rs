@@ -2,7 +2,21 @@
 //! tailer (with the size cap), the health watchdog and restarts, and the
 //! startup-failure message.
 
-use super::*;
+use std::sync::Arc;
+use std::time::Duration;
+
+use anyhow::{bail, Context, Result};
+use pocox_codex::{
+    spawn_ready_redacted, SpawnOptions, SpawnReadyError, StartupFailure, READY_TIMEOUT,
+};
+use tokio::task::JoinHandle;
+
+use super::hosts_locked;
+use super::lifecycle::{not_exited, quitting, settle_retained, NATIVE};
+use crate::engine::host_lease::{Lease, Op};
+use crate::engine::host_services::MAX_RESTART_BACKOFF;
+use crate::engine::owned_child::{OwnedChild, EXIT_WAIT};
+use crate::engine::{host_lease, host_names, host_profiles, logging, runtime};
 
 /// How often the watchdog probes codex's `/readyz`.
 const HEALTH_INTERVAL: Duration = Duration::from_secs(15);

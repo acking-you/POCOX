@@ -1,6 +1,8 @@
 //! Native implementation of the shared session operation boundary.
 
+use anyhow::{bail, Result};
 use serde_json::Value;
+use tokio::sync::broadcast;
 
 use super::super::app_session::{
     ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta, ThreadRuntimeConfig, TurnItemsPage,
@@ -8,7 +10,13 @@ use super::super::app_session::{
 use super::super::session_engine::{
     Capabilities, Protocol, SessionEngine, StartOptions, Supplement, TurnOptions,
 };
-use super::*;
+use super::ops::open;
+use super::settings::refresh_settings;
+use super::{
+    block, conn, connect, disconnect, is_connected, is_retained, lock, ops, paging, probe_reason,
+    settings,
+};
+use crate::engine::app_session::AppEvent;
 
 /// External OpenCode HTTP/SSE engine, independent of ACP.
 pub struct OpenCodeEngine;
