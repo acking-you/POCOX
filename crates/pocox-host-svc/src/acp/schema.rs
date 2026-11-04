@@ -43,6 +43,10 @@ pub struct AgentCapabilities {
     pub resume_session: bool,
     /// `session/close` — `sessionCapabilities.close`.
     pub close_session: bool,
+    /// `session/fork` — `sessionCapabilities.fork`. Unstable in ACP, so the
+    /// host uses it only for an agent whose fork it verified.
+    #[serde(default)]
+    pub fork: bool,
     /// Image prompt content — `promptCapabilities.image`.
     pub image: bool,
     /// Audio prompt content — `promptCapabilities.audio`.
@@ -216,6 +220,7 @@ pub fn negotiate(result: &Value) -> Result<Negotiated, NegotiationError> {
         list_sessions: non_null_object(&session["list"]),
         resume_session: non_null_object(&session["resume"]),
         close_session: non_null_object(&session["close"]),
+        fork: non_null_object(&session["fork"]),
         // Grok takes image prompts (its terminal client sends them, and it
         // checks and forwards them to the model) without advertising them.
         image: prompt["image"] == true || grok_native(&result["_meta"]),
@@ -508,6 +513,18 @@ mod tests {
         assert!(full.capabilities.image);
         assert_eq!(full.agent.version.as_deref(), Some("2.0"));
         assert_eq!(full.auth_methods.len(), 1);
+    }
+
+    #[test]
+    fn session_fork_is_read_as_an_advertised_object_only() {
+        let fork = |value: Value| {
+            let result = json!({"protocolVersion": 1,
+                "agentCapabilities": {"sessionCapabilities": {"fork": value}}});
+            negotiate(&result).expect("valid").capabilities.fork
+        };
+        assert!(fork(json!({})));
+        assert!(!fork(Value::Null));
+        assert!(!fork(json!(true)));
     }
 
     #[test]

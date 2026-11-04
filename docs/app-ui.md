@@ -36,15 +36,17 @@ for Flutter diagnostics. Native console lifetime tests live in
   shadows, a backdrop lit only by white (multi-hue backdrops and iris accents
   proved tiring). The blue-and-white app icon is never recoloured.
 - Icons are Lucide through `AppIcons` (`lib/src/app_icons.dart`).
-- Desktop pages are layered (`widgets/glass.dart`, `lib/src/glass_recipe.dart`):
-  navigation on a lit neutral backdrop (`AppBackdrop`), content on an inset
-  rounded sheet (`ContentSheet`), floating controls (composer, navigation
-  cluster, toasts, minimap, turn progress) as translucent `Glass` (`GlassDepth`
-  chrome / floating / overlay: lit rim, blur, outer-only shadows). The
-  transcript scrolls beneath the composer.
-- The macOS title strip is 60 pt (`titleStripHeight` in
+- Wide pages are layered (`widgets/glass.dart`, `lib/src/glass_recipe.dart`):
+  navigation on a lit neutral backdrop (`AppBackdrop`), content on a rounded
+  sheet flush with the window's other edges (`ContentSheet`), floating controls
+  (composer, navigation cluster, toasts, minimap, turn progress) as translucent
+  `Glass` (`GlassDepth` chrome / floating / overlay: lit rim, blur, outer-only
+  shadows). The transcript scrolls beneath the composer.
+- The title strip is 44 px on macOS and Windows (`titleStripHeight` in
   `macos/Runner/MainFlutterWindow.swift`, `WindowChrome.barHeight` in
-  `widgets/window_title_bar.dart`), traffic lights centred on the sheet bars.
+  `widgets/window_title_bar.dart`), the traffic lights centred in it.
+- `signalColor` is for what is live: a running turn, a conversation working
+  in the background. An update on offer or a selected row takes ink instead.
 - Modals use `showAppDialog` (`widgets/app_dialog.dart`, blurred and dimmed
   backdrop); `fullscreen: true` for full-window editors, which keep their own
   safe areas.
@@ -65,9 +67,89 @@ for Flutter diagnostics. Native console lifetime tests live in
   desktop screenshot. Validate light and dark at phone, tablet and desktop
   widths.
 
+## Workspace and navigation
+
+- Every destination comes from one list, `workspaceDestinations`
+  (`widgets/workspace_navigation.dart`): Conversation, Services, Galaxy, session
+  history, Logs and Settings, each with its shortcut (⌘0–4 and ⌘,, Ctrl on other
+  systems). Rail, Pocket and page shortcuts all read it.
+- `workspaceHistoryRoute` decides where history leads. A service in account mode
+  whose host has a session list opens that host (`/sessions?svc=<key>`). A
+  computer's own service opens `/sessions`, which also lists its other agents.
+  With neither, a computer still has its own history, and a phone leaves the
+  destination out: bare `/sessions` is a dead page there.
+- Windows from 720 px use `WorkspaceShell` (`widgets/workspace_shell.dart`) on
+  every page: a full-width title strip, a 60 px icon rail on the backdrop, and
+  the sheet with an optional 296 px column beside the page. The strip holds the
+  window controls, the column's toggle, the page's name and its actions. There
+  is no theme toggle, notification bell or page history. A page with no list
+  spans the sheet.
+- Narrower windows have no rail or bottom bar. A page's bar has back and a title
+  with a chevron that opens the Pocket (`widgets/pocket_sheet.dart`). The drawer's
+  account row and the home's bar (`home_screen.dart`, when there is no
+  conversation) reach the same sheet, so a user with an unreachable host still
+  has Settings and Logs.
+- The Pocket's tiles are the destinations plus Appearance, reflowing to one
+  column for large text. Their state lines come from real data only: devices the
+  relay lists, live subscriptions, the current host, an update on offer. A tile
+  with nothing to report has no line, and a count is never invented.
+- Settings is one section model with two renderers
+  (`screens/settings/settings_sections.dart`): General, Connection, Agents and
+  hosting, Storage and diagnostics, Account, About. A compact root heads the
+  page with the account (or a self-hosted setup's relay), then lists each
+  section's rows as label, current value, chevron, and each section has a page at
+  `/settings/<section>`. A wide window lists the sections in the column beside the
+  chosen one's page. Root values are small widgets of their own (`settings_values.dart`),
+  so a polled list rebuilds only its value.
+
+## Conversation workspace
+
+- The title strip names the conversation (a click renames it) beside the folder
+  mark, then its `···` and the context card's toggle. While a turn runs and the
+  card makes the status bar unnecessary, the strip shows its state and clock.
+- The column on a computer groups by time by default: Active, Today, Yesterday,
+  weekdays, then dates (`_byDay`). Each row has its title, what waits in it (draft,
+  queue), its project at the line's end, a status mark and a two-line summary.
+  The `···` on the first heading switches between time and project. A touch tablet
+  and a phone start by project. Summaries stay lazy (`_conversationList`). A fork
+  carries a mark and sits under its source ([forking](session-fork.md)).
+- The context card (`session_context.dart`) floats in a 296 px slot beside the
+  chat, remembered in `ui_prefs` (`contextCardOpen`). It folds when under 520 px
+  would remain for the chat, and the review takes its place while open. Its toggle
+  then opens the same facts in a popover. The conversation column narrows to 640 px
+  beside it, so the turn rail keeps its gutter.
+- One model (`_contextModel`) feeds the card and the phone's context sheet: project,
+  a fork under way and a fork's source (`lineage`, which lead because they say what
+  the conversation is), changes (which open the review), branch, model (whose row opens the runtime
+  sheet), background processes, connection (`LinkPathMark`, `showLinkSheet`) and
+  usage (context, and the tightest quota window). A source also lists its forks. Actions are rename, fork,
+  compact, galaxy and hand back, each behind its existing capability gate.
+- Background processes come from `thread/backgroundTerminals/list`
+  (`app_background_terminals`) on Codex; other engines report no capability and
+  show no section. It is read when the diff is, and every 12 s while the card or
+  sheet shows it. A host that cannot answer is not asked again until the connection
+  or conversation changes. A process's panel has its folder, pid, CPU and memory,
+  and Terminate behind a confirm, for a view that writes the conversation.
+  Process lists and every open process panel belong to the connection and
+  conversation that supplied them. Terminate rechecks that ownership and write
+  access after confirmation; a reconnect or read-only transition cancels it.
+- A read-only foot (`widgets/read_only_foot.dart`), in a conversation or the session
+  viewer, keeps its state or main action and its other actions on one line. Where
+  names would crowd it, as on a phone, those actions become round marks of the same
+  height, named by their tooltips, and never drop to a second line.
+- With the card open the status bar stays out of the way at rest and while a turn
+  runs, and returns for any state that needs attention, a reconnect first of all:
+  the status line alone reports one.
+
 ## Home, connection and relay problems
 
-- The host switcher groups conversation services under their authoritative
+- A phone's drawer leads with one capsule per device, showing up to three of its
+  agents' marks. When the device in use hosts several agents, a row under the
+  capsules names them, one tap apart; a device with one agent adds no row. A device's
+  capsule returns to the agent last used there this run, else one still connected,
+  else the first. It opens the full list when it is the device in use.
+- The host switcher (a row in the column, capsules in a phone's drawer) groups
+  conversation services under their authoritative
   device/installation segment and namespace. Only keys in the native
   process-owned service registry enter the **This device** group; hostname,
   OS and matching labels never establish locality. Different installations
@@ -77,18 +159,22 @@ for Flutter diagnostics. Native console lifetime tests live in
   fixed slot at its end: the check of the current service, a green dot for a
   retained connection, nothing for one that connects when picked; only a
   failed switch adds a line. Desktop menu and phone sheet use the same
-  scrollable grouped list.
-- Settings › Retained connections (`lib/src/network/connection_window.dart`)
+  scrollable grouped list. The drawer's capsules share its grouping, identity
+  and retained-connection dot, one capsule per service in a row that scrolls. The
+  current capsule opens the full list, and so does a control at the row's end when
+  they overflow.
+- Settings › Connection › Retained connections (`lib/src/network/connection_window.dart`)
   is a `GroupCard` in both layouts, its behaviour behind the title's info mark.
   **Service limit** is a `GlassStepper` (1–32, default five, the current
   service included) and **Eviction policy** a `GlassSegmented` (**Least recent**
   / **First connected**, under its title below 480 px); rows are the shared
-  `SettingRow` of the connection path group. Each change saves at once,
+  `SettingRow` of the connection path group, names and controls with no mark
+  of their own. Each change saves at once,
   latest first; a failed save puts the saved value back with a state line on
   its row. See
   [retention ownership](harness-connection-lifecycle.md#retained-conversation-services).
 
-- Settings › Connection path (`lib/src/network/connection_paths.dart`) is a
+- Settings › Connection › Connection path (`lib/src/network/connection_paths.dart`) is a
   `GroupCard` in both layouts: outgoing **Relay only / P2P first** as a
   `GlassSegmented` (under its title below 480 px) and, on desktop only, an
   incoming switch. Choices save at once, optimistically; a failed write springs
@@ -129,7 +215,9 @@ for Flutter diagnostics. Native console lifetime tests live in
   local service's bridge error is not repeated under it. A reconnecting
   session's status bar shows `LinkStatusLine` in place of its state and a
   `LinkPathMark` at all times; both open the sheet, whose **Retry now** ends
-  the wait between attempts.
+  the wait between attempts. On a phone the top bar's second line carries that
+  status line, and a tap on the title opens the sheet directly while the link is
+  down. The sheet's other way in is the context sheet's connection row.
 
 - `/` is chat-first: it resolves a host (last used → locally hosted → first
   reachable), auto-connects and opens the latest session with all sessions in
@@ -174,9 +262,16 @@ for Flutter diagnostics. Native console lifetime tests live in
   (`widgets/layered_navigation.dart`). A touch/stylus horizontal drag anywhere
   on the page, past touch slop, moves the page with the finger and rests where
   held; the page's own horizontal scrollables and text gestures win first.
+- 52 pt of the conversation stay in view while it is open; a tap there closes it.
+  The drawer has no brand row or close button.
 - Release completes the direction the finger last clearly moved in, however
   short (a 16 px reversal flips it); no distance or velocity threshold. The
   open sidebar closes the same way.
+- The drawer holds the host capsules, search beside a compact new conversation
+  (which keeps its place when search hides at six threads or fewer), the list and
+  one account row at its foot that opens the Pocket. Rows are one line with the
+  time at the end, moving it below the title on narrow widths or large text. The
+  open conversation's row is revealed as the drawer opens.
 - One light haptic when a gesture settles open; recognition, the menu control
   and closing drags are silent.
 - Opening parks focus on the sidebar scope (`requestScopeFocus`), never its
@@ -189,9 +284,12 @@ for Flutter diagnostics. Native console lifetime tests live in
   the page alone.
 - Close it through `LayeredNavigation.maybeOf` (`isOpen` / `close`), never
   `Scaffold` drawers.
-- Touch-only polish: tonal new-conversation pill, 14 px row/search radius,
-  22 px composer radius with a quieter idle edge, 44 px sidebar heading
-  buttons, two-line host switcher names.
+- Touch-only polish: 14 px row/search radius, 22 px composer radius with a
+  quieter idle edge, 44 px sidebar heading buttons, two-line host switcher names.
+- The top bar has the menu, the title with a chevron and a second state line
+  (state, clock, change counts, measured by `_statusFit`), and new conversation. A
+  tap on the title opens the context sheet. Account quota moved from the drawer's
+  foot to that sheet.
 - Measured room, not the platform, decides how much chrome stands open. A
   window narrower than 720 px or shorter than 560 px (a phone, a phone in
   landscape, a split screen, a small desktop window) folds the composer into
@@ -234,8 +332,9 @@ for Flutter diagnostics. Native console lifetime tests live in
   - The status bar measures its line (`_statusFit`,
     `screens/app_session/session_status.dart`): the model name shortens, then
     the branch, then the model chip and clock give way; state and change
-    counts always show. The link mark always shows, and the reconnect
-    line's dots are reserved while reconnecting.
+    counts always show. The link mark always shows on the strip, and the
+    reconnect line's dots are reserved while reconnecting. A phone's second line
+    (`_stateLine`) measures the same way with only the clock to give way.
   - The narrow services device list scrolls, local session rows stack status
     and action under a narrow title, picker footers use `OverflowBar`.
 - Every engine's new-conversation view (`screens/app_session/agent_welcome.dart`)
@@ -244,10 +343,10 @@ for Flutter diagnostics. Native console lifetime tests live in
   just above the composer, mode chips such as Fast on the model's toolbar line.
   The Codex view shows the Codex mark like the other engines.
 - Settings lists subscriptions by service key, never the internal composite
-  identity.
-- Touch tablets (720 px and wider) keep a 480 px chat and give the inline
-  sidebar the rest (up to 520 px), so the default 280 px pane fits at 834 px;
-  saved widths still apply. Touch rules do not change the desktop layout.
+  identity. A row's address is in its details.
+- Touch tablets (720 px and wider) use the workspace, keep a 480 px chat and
+  give the column the rest (up to 520 px), so the default 296 px column fits at
+  834 px; saved widths still apply. Touch rules do not change the desktop layout.
 
 ## Transcript
 
@@ -345,6 +444,7 @@ for Flutter diagnostics. Native console lifetime tests live in
   row's fold control sits inside the row's plate (`SessionTreeRow.builder`
   receives the title inset), so a selected parent is one shape.
 - Narrow sidebars and large text put metadata below titles.
+- Ctrl+Tab brings the row it moved to into view.
 - Project headings reveal one new-conversation action on hover or keyboard
   focus, with right-click menus and touch long-press sheets
   (`widgets/project_section_header.dart`).
@@ -466,6 +566,9 @@ git checkout -- apps/flutter/pubspec.yaml   # restore before committing
   `integration_test/self_host_navigation_test.dart` runs
   the same checks on iOS Simulator; it does not test account authentication or
   saving real relay credentials.
+- Workspace coverage: `test/workspace_shell_test.dart` (destinations, the Pocket,
+  drawer, context card and sheet, Settings, background processes);
+  `POCOX_UI_PREVIEW_DIR` writes each screen as a PNG.
 - Responsive coverage: `test/responsive_layout_test.dart` (320 px at 2.0
   text en/zh, 393 px, keyboard, landscape, tablet, short windows on phone
   and desktop, real fonts),

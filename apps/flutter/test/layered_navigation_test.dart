@@ -6,6 +6,9 @@ import 'package:pocox/src/widgets/layered_navigation.dart';
 import 'package:pocox/src/app_icons.dart';
 
 const _width = 400.0;
+
+/// How far the page travels: what stays of it in view is the sidebar's way out.
+const _travel = _width - LayeredNavigation.peek;
 final _nav = find.byType(LayeredNavigation);
 final _sideList = find.byKey(const Key('side-list'), skipOffstage: false);
 
@@ -122,7 +125,7 @@ Future<TestGesture> _dragTo(
   double from = 8,
 }) async {
   final g = await t.startGesture(Offset(from, 400));
-  await _moveBy(t, g, fraction * _width);
+  await _moveBy(t, g, fraction * _travel);
   return g;
 }
 
@@ -142,7 +145,7 @@ void main() {
     final g = await _dragTo(t, 0.15, from: 200);
     expect(_state(t).progress, closeTo(0.15, 0.01));
     // The page moved aside by the same distance; the sidebar is onstage.
-    expect(t.getTopLeft(find.byType(Scaffold)).dx, closeTo(0.15 * _width, 1));
+    expect(t.getTopLeft(find.byType(Scaffold)).dx, closeTo(0.15 * _travel, 1));
     expect(find.text('row 0'), findsOneWidget);
     // Felt once, when it lands: nothing while the finger moves.
     expect(haptics, isEmpty);
@@ -156,10 +159,10 @@ void main() {
     expect(_state(t).isOpen, isTrue);
     expect(haptics, ['lightImpact']);
     expect(changes, [true]);
-    // Full screen: the page has left entirely.
+    // A sliver of the page stays in view.
     expect(
       t.getTopLeft(find.byType(Scaffold, skipOffstage: false)).dx,
-      closeTo(_width, 1),
+      closeTo(_travel, 1),
     );
   });
 
@@ -178,7 +181,7 @@ void main() {
     await t.pump(const Duration(milliseconds: 16));
     await g.moveBy(const Offset(10, 0));
     await t.pump(const Duration(milliseconds: 16));
-    await _moveBy(t, g, -0.5 * _width);
+    await _moveBy(t, g, -0.5 * _travel);
     expect(_state(t).progress, greaterThan(0.4));
     await g.up();
     await t.pumpAndSettle();
@@ -267,7 +270,7 @@ void main() {
     final close = await t.startGesture(const Offset(300, 400));
     await _moveBy(t, close, -60);
     await t.pump(const Duration(seconds: 1));
-    expect(_state(t).progress, closeTo(1 - 60 / _width, 0.01));
+    expect(_state(t).progress, closeTo(1 - 60 / _travel, 0.01));
     await close.up();
     await t.pumpAndSettle();
     expect(_state(t).isOpen, isFalse);

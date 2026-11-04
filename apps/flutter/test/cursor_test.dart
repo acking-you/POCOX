@@ -72,17 +72,23 @@ void main() {
     await t.pumpWidget(_desktopHost(api, threadId: 't1'));
     await t.pumpAndSettle();
 
+    // The project tree's controls are the ones under test.
+    await t.tap(find.byKey(const Key('activity-view-btn')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('group-by-project')));
+    await t.pumpAndSettle();
+
     final g = await t.createGesture(kind: PointerDeviceKind.mouse);
     await g.addPointer(location: Offset.zero);
     addTearDown(() => g.removePointer());
 
     // Clickable things: a pointing hand.
     for (final target in <(String, Finder)>[
-      ('conversation row', find.text('a conversation')),
+      ('conversation row', find.byKey(const Key('conv-tile-t1'))),
       ('project heading', find.text('alpha')),
       ('project shortcut', find.byKey(const Key('project-new-/work/alpha'))),
       ('new conversation', find.byKey(const Key('new-conversation-btn'))),
-      ('sidebar shortcut', find.byKey(const Key('sidebar-settings-btn'))),
+      ('rail destination', find.byKey(const Key('workspace-nav-/settings'))),
     ]) {
       expect(
         await cursorOver(t, g, target.$2),

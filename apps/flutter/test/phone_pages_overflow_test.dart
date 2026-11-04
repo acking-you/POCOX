@@ -14,8 +14,10 @@ import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/screens/local_sessions_screen.dart';
 import 'package:pocox/src/screens/services_screen.dart';
+import 'package:pocox/src/screens/settings_screen.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/widgets/folder_tree_picker.dart';
+import 'package:pocox/src/widgets/fork_dialog.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/ui_preview.dart';
@@ -128,6 +130,56 @@ void main() {
     });
   });
 
+  testWidgets('every section of Settings fits a phone at any text size', (
+    t,
+  ) async {
+    await _onIos(t, () async {
+      for (final (size, scale, locale) in const [
+        (Size(393, 852), 1.0, Locale('en')),
+        (Size(375, 667), 1.3, Locale('zh')),
+        (Size(360, 780), 2.0, Locale('en')),
+        (Size(320, 640), 2.0, Locale('zh')),
+      ]) {
+        for (final screen in const [
+          SettingsScreen(),
+          SettingsScreen(section: SettingsSection.general),
+          SettingsScreen(section: SettingsSection.connection),
+          SettingsScreen(section: SettingsSection.agents),
+          SettingsScreen(section: SettingsSection.storage),
+          SettingsScreen(section: SettingsSection.account),
+          SettingsScreen(section: SettingsSection.about),
+        ]) {
+          final api =
+              FakeBridgeApi(
+                config: const ConfigInfo(
+                  relay: 'relay.example.com:7666',
+                  hasKey: true,
+                  mode: 'account',
+                  accountLogin: 'fixture-user-with-a-long-login',
+                ),
+              )..putSubscription(
+                const SubInfo(
+                  key: _app,
+                  localAddr: '127.0.0.1:1',
+                  alive: true,
+                  path: TunnelPath.relay,
+                  ready: true,
+                ),
+              );
+          await _mount(
+            t,
+            api,
+            screen,
+            size: size,
+            scale: scale,
+            locale: locale,
+          );
+          expect(t.takeException(), isNull, reason: '$screen $size ×$scale');
+        }
+      }
+    });
+  });
+
   testWidgets('a session row puts its status and takeover under the title '
       'with large text, and beside it at default text', (t) async {
     await _onIos(t, () async {
@@ -204,6 +256,28 @@ void main() {
         await t.tap(use);
         await _frames(t);
         expect(use, findsNothing, reason: 'the folder was chosen');
+      }
+    });
+  });
+
+  testWidgets('the fork confirmation fits a small phone at large text', (
+    t,
+  ) async {
+    await _onIos(t, () async {
+      for (final locale in const [Locale('en'), Locale('zh')]) {
+        await _mount(
+          t,
+          FakeBridgeApi(),
+          const ForkDialog(throughTurn: true, running: false),
+          size: const Size(320, 640),
+          scale: 2,
+          locale: locale,
+        );
+        expect(t.takeException(), isNull);
+        final confirm = find.byKey(const Key('fork-confirm'));
+        await t.ensureVisible(confirm);
+        await _frames(t);
+        _onScreen(t, confirm, const Size(320, 640), locale.languageCode);
       }
     });
   });

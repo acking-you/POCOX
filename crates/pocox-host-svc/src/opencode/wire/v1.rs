@@ -10,7 +10,7 @@ use crate::opencode::catalog::{Catalog, Providers};
 use crate::opencode::client::ClientError;
 use crate::opencode::events::Event;
 use crate::opencode::http::{
-    decode, Http, Native, MAX_BODY, MAX_NATIVE_HISTORY_BODY, REQUEST_TIMEOUT,
+    decode, Http, Native, FORK_TIMEOUT, MAX_BODY, MAX_NATIVE_HISTORY_BODY, REQUEST_TIMEOUT,
 };
 use crate::opencode::schema::{CommandInput, Message, MessagePage, Prompt, Session, Statuses};
 
@@ -32,6 +32,7 @@ impl Wire for V1 {
     const EVENTS: &'static [&'static str] = &["global", "event"];
     const LISTENING: &'static str = "opencode server listening on ";
     const BACKGROUND_SERVER: bool = false;
+    const FORK: bool = true;
     const MIN: (u32, u32) = (1, 19);
 
     fn event(data: &[u8]) -> Result<Option<Event>, ClientError> {
@@ -72,6 +73,27 @@ impl Wire for V1 {
     async fn create(http: &Http<Native>, directory: &str) -> Result<Session, ClientError> {
         http.mutate(Method::POST, &["session"], Some(directory), &Empty {})
             .await
+    }
+
+    async fn fork(
+        http: &Http<Native>,
+        session: &str,
+        directory: &str,
+        before: Option<&str>,
+    ) -> Result<Session, ClientError> {
+        #[derive(Serialize)]
+        struct Fork<'a> {
+            #[serde(rename = "messageID", skip_serializing_if = "Option::is_none")]
+            message: Option<&'a str>,
+        }
+        // It copies a session's messages one by one, so a long one takes a while.
+        let request = http
+            .request(Method::POST, &["session", session, "fork"], Some(directory))?
+            .json(&Fork {
+                message: before,
+            })
+            .timeout(FORK_TIMEOUT);
+        http.call(request, MAX_BODY).await
     }
 
     async fn rename(

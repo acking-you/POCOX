@@ -181,6 +181,12 @@ class AppCapabilitiesDto {
   /// Branching a session into an independent one.
   final bool fork;
 
+  /// Forking through a chosen completed turn.
+  final bool forkThroughTurn;
+
+  /// Forking a source another process holds or a running turn changes.
+  final bool forkBusySource;
+
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;
 
@@ -267,6 +273,9 @@ class AppCapabilitiesDto {
   /// The agent reported that authentication is required.
   final bool authRequired;
 
+  /// Listing and stopping what a session runs in the background.
+  final bool backgroundTerminals;
+
   const AppCapabilitiesDto({
     required this.provider,
     required this.fast,
@@ -275,6 +284,8 @@ class AppCapabilitiesDto {
     required this.rateLimits,
     required this.takeover,
     required this.fork,
+    required this.forkThroughTurn,
+    required this.forkBusySource,
     required this.externalWriterMonitor,
     required this.localSessions,
     required this.planMode,
@@ -303,6 +314,7 @@ class AppCapabilitiesDto {
     required this.historyScope,
     required this.runningInventory,
     required this.authRequired,
+    required this.backgroundTerminals,
   });
 
   @override
@@ -314,6 +326,8 @@ class AppCapabilitiesDto {
       rateLimits.hashCode ^
       takeover.hashCode ^
       fork.hashCode ^
+      forkThroughTurn.hashCode ^
+      forkBusySource.hashCode ^
       externalWriterMonitor.hashCode ^
       localSessions.hashCode ^
       planMode.hashCode ^
@@ -341,7 +355,8 @@ class AppCapabilitiesDto {
       sessionList.hashCode ^
       historyScope.hashCode ^
       runningInventory.hashCode ^
-      authRequired.hashCode;
+      authRequired.hashCode ^
+      backgroundTerminals.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -355,6 +370,8 @@ class AppCapabilitiesDto {
           rateLimits == other.rateLimits &&
           takeover == other.takeover &&
           fork == other.fork &&
+          forkThroughTurn == other.forkThroughTurn &&
+          forkBusySource == other.forkBusySource &&
           externalWriterMonitor == other.externalWriterMonitor &&
           localSessions == other.localSessions &&
           planMode == other.planMode &&
@@ -382,7 +399,8 @@ class AppCapabilitiesDto {
           sessionList == other.sessionList &&
           historyScope == other.historyScope &&
           runningInventory == other.runningInventory &&
-          authRequired == other.authRequired;
+          authRequired == other.authRequired &&
+          backgroundTerminals == other.backgroundTerminals;
 }
 
 /// A step of connecting a session, mirrored for Dart.

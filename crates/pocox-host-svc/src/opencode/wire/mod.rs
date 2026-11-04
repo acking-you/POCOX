@@ -105,6 +105,8 @@ pub(crate) trait Wire {
     const EVENTS: &'static [&'static str];
     /// This line's own clients share one per-user background server.
     const BACKGROUND_SERVER: bool;
+    /// This line's session fork was verified against a real server.
+    const FORK: bool;
 
     /// Whether `version` is a tested release of this wire's line.
     fn tested(version: &Version) -> bool {
@@ -131,6 +133,15 @@ pub(crate) trait Wire {
     async fn session(http: &Http<Native>, id: &str) -> Result<Session, ClientError>;
 
     async fn create(http: &Http<Native>, directory: &str) -> Result<Session, ClientError>;
+
+    /// A new session with `session`'s messages, up to but not including
+    /// `before`, or all of them. A `before` it does not know is not refused.
+    async fn fork(
+        http: &Http<Native>,
+        session: &str,
+        directory: &str,
+        before: Option<&str>,
+    ) -> Result<Session, ClientError>;
 
     async fn rename(
         http: &Http<Native>,
@@ -241,6 +252,10 @@ impl Dialect {
 
     pub(crate) fn background_server(self) -> bool {
         dispatch!(self, W => W::BACKGROUND_SERVER)
+    }
+
+    pub(crate) fn fork(self) -> bool {
+        dispatch!(self, W => W::FORK)
     }
 
     pub(crate) fn listening(self) -> &'static str {

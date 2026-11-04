@@ -63,16 +63,12 @@ void _entryTests() {
         await _enter(t, 'host-base-url', 'https://models.example/v1');
       }
 
-      Future<void> menuTo(String label) async {
-        await _tapKey(t, 'utility-page-menu');
-        await t.tap(find.text(label).last);
-        await t.pumpAndSettle();
-      }
+      Future<void> menuTo(String section) =>
+          _tapKey(t, 'workspace-nav-$section');
 
       await openEdited();
-      final l10n = _l10n(t);
-      // The menu marks Manage (the parent) as current and asks first.
-      await menuTo(l10n.settingsTitle);
+      // The rail marks Manage (the parent) as current and asks first.
+      await menuTo('/settings');
       expect(find.byKey(const Key('host-leave-dialog')), findsOneWidget);
       // Keyboard: Escape means stay.
       await t.sendKeyEvent(LogicalKeyboardKey.escape);
@@ -81,7 +77,7 @@ void _entryTests() {
       expect(find.text('https://models.example/v1'), findsOneWidget);
 
       // Discarding replaces the page with the sibling, editor and all.
-      await menuTo(l10n.settingsTitle);
+      await menuTo('/settings');
       await _tapKey(t, 'host-leave-discard');
       expect(find.byType(HostingEditor), findsNothing);
       expect(find.text('settings-page'), findsOneWidget);
@@ -98,7 +94,7 @@ void _entryTests() {
 
       // The conversation origin asks too, then goes home.
       await openEdited();
-      await _tapKey(t, 'utility-chat-origin');
+      await _tapKey(t, 'workspace-nav-/');
       expect(find.byKey(const Key('host-leave-dialog')), findsOneWidget);
       await _tapKey(t, 'host-leave-discard');
       expect(find.byType(HostingEditor), findsNothing);

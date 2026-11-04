@@ -138,6 +138,11 @@ flowchart LR
 - `thread/fork` runs over the connection serving a session and only reads its
   source; rollout readers follow a paginated fork's `history_base`
   ([forking](session-fork.md)).
+- The conversation's background processes use the experimental
+  `thread/backgroundTerminals/list` and `/terminate` over the same connection,
+  through local envelopes (`engine/app_session_turns.rs`); `/clean` is not
+  called. A host that refuses them shows no section until the connection or
+  conversation changes ([workspace](app-ui.md#conversation-workspace)).
 - This device's own Local sessions view has no app-server and stays
   file-only. Resuming, taking over or forking from it goes only to a Codex host
   this app runs on this device, never to a connected service elsewhere. A session

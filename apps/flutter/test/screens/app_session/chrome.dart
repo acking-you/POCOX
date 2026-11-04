@@ -271,6 +271,10 @@ void _registerChrome() {
       ),
     );
     await t.pumpAndSettle();
+    t.view.devicePixelRatio = 1;
+    t.view.physicalSize = const Size(1400, 900);
+    addTearDown(t.view.reset);
+    await t.pumpAndSettle();
 
     // No gauge until a token-usage event arrives.
     expect(find.text('10%'), findsNothing);
@@ -287,7 +291,7 @@ void _registerChrome() {
     // 20000 / 200000 = 10%.
     expect(find.text('10%'), findsOneWidget);
 
-    // Tapping the gauge opens the context/quota detail sheet.
+    // Tapping the row opens the context/quota detail sheet.
     api.rateLimitsJson =
         '{"rateLimits":{"primary":{"usedPercent":42,"windowDurationMins":300}}}';
     await t.tap(find.text('10%'));
@@ -302,72 +306,6 @@ void _registerChrome() {
       ),
       findsOneWidget,
     );
-  });
-
-  testWidgets('Theme button flips between light and dark', (t) async {
-    final api = FakeBridgeApi(
-      config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
-    );
-    await api.appConnect('pcx:lb7666:app:default', 28080);
-    t.view.devicePixelRatio = 1.0;
-    t.view.physicalSize = const Size(1200, 900); // wide → left pane inline
-    addTearDown(t.view.reset);
-    // Its own host rather than `host`: the button reads the brightness in
-    // EFFECT, so the app has to actually carry a light and a dark theme (and
-    // honour the stored mode) the way main.dart does.
-    await t.pumpWidget(
-      ProviderScope(
-        overrides: [bridgeApiProvider.overrideWithValue(api)],
-        child: Consumer(
-          builder: (context, ref, _) {
-            final pref = ref.watch(uiPrefsProvider).valueOrNull?.themeMode;
-            return MaterialApp(
-              locale: const Locale('zh'),
-              theme: ThemeData(brightness: Brightness.light),
-              darkTheme: ThemeData(brightness: Brightness.dark),
-              themeMode: switch (pref) {
-                'light' => ThemeMode.light,
-                'dark' => ThemeMode.dark,
-                _ => ThemeMode.system,
-              },
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: const AppSessionScreen(
-                serviceKey: 'pcx:lb7666:app:default',
-                home: true,
-              ),
-            );
-          },
-        ),
-      ),
-    );
-    await t.pumpAndSettle();
-
-    // Two states only — no third "auto" icon to land on.
-    final btn = find.byKey(const Key('theme-toggle-btn'));
-    expect(btn, findsOneWidget);
-    expect(find.byIcon(AppIcons.brightness_auto_outlined), findsNothing);
-
-    // The test platform reports light, so the button offers dark and the icon
-    // shows what is currently in effect.
-    expect(find.byIcon(AppIcons.light_mode_outlined), findsOneWidget);
-    await t.tap(btn);
-    await t.pumpAndSettle();
-    expect(find.byIcon(AppIcons.dark_mode_outlined), findsOneWidget);
-    expect(find.byIcon(AppIcons.light_mode_outlined), findsNothing);
-
-    // And back — tapping twice returns to where it started rather than
-    // advancing into a third state.
-    await t.tap(btn);
-    await t.pumpAndSettle();
-    expect(find.byIcon(AppIcons.light_mode_outlined), findsOneWidget);
-    expect(find.byIcon(AppIcons.brightness_auto_outlined), findsNothing);
-
-    // It lives with the window's controls, not in the sessions pane, so
-    // collapsing the sidebar must not take appearance away with it.
-    await t.tap(find.byKey(const Key('sidebar-collapse-btn')));
-    await t.pumpAndSettle();
-    expect(btn, findsOneWidget);
   });
 
   testWidgets('Git branch badge shows changes and opens the review split', (
@@ -414,7 +352,7 @@ void _registerChrome() {
     // Tapping the branch chip opens the review split: the file tree names the
     // changed file, and its diff is shown highlighted (the single changed file
     // is selected by default).
-    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.tap(find.byKey(const Key('context-changes')));
     await t.pumpAndSettle();
     expect(find.text('审阅'), findsOneWidget); // reviewTitle (zh)
     expect(find.byKey(const Key('review-file-lib/x.dart')), findsOneWidget);
@@ -465,13 +403,13 @@ void _registerChrome() {
     await t.pump();
     await t.pump(const Duration(milliseconds: 100));
 
-    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.tap(find.byKey(const Key('context-changes')));
     await t.pump();
 
     // The press is acknowledged immediately: the badge spins instead of sitting
     // inert until the diff lands.
     final spinner = find.descendant(
-      of: find.byKey(const Key('status-branch-chip')),
+      of: find.byKey(const Key('context-changes')),
       matching: find.byType(CircularProgressIndicator),
     );
     expect(spinner, findsWidgets);
@@ -479,7 +417,7 @@ void _registerChrome() {
 
     // Tapping again while it's in flight cancels: the spinner goes away and the
     // review never opens, even once the underlying call finally returns.
-    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.tap(find.byKey(const Key('context-changes')));
     await t.pump();
     expect(spinner, findsNothing);
 
@@ -489,7 +427,7 @@ void _registerChrome() {
 
     // A fresh press still works — cancelling doesn't wedge the badge.
     api.gitDiffGate = null;
-    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.tap(find.byKey(const Key('context-changes')));
     await t.pumpAndSettle();
     expect(find.text('审阅'), findsOneWidget);
   });
@@ -530,7 +468,7 @@ void _registerChrome() {
     // the review from opening: it shows what it has and refreshes behind itself.
     final stuck = Completer<void>();
     api.gitDiffGate = stuck;
-    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.tap(find.byKey(const Key('context-changes')));
     await t.pump();
     expect(find.text('审阅'), findsOneWidget);
     expect(find.byKey(const Key('review-file-lib/x.dart')), findsOneWidget);
@@ -561,7 +499,7 @@ void _registerChrome() {
     );
     await t.pumpAndSettle();
 
-    await t.tap(find.byType(PopupMenuButton<String>));
+    await t.tap(find.byKey(const Key('conversation-menu')));
     await t.pumpAndSettle();
     await t.tap(find.text('压缩对话').last); // compact (zh)
     await t.pumpAndSettle();

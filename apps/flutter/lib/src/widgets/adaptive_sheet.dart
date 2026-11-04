@@ -56,7 +56,6 @@ Future<T?> showAdaptivePanel<T>({
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      backgroundColor: floatingSurface(scheme),
       // Lighter than Material's default: the panel is already lifted by its own
       // ground and hairline, so the page only needs dimming, not hiding. Always
       // a dark veil: a light one would wash a dark page out to grey.

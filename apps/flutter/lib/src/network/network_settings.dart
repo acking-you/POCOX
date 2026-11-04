@@ -7,6 +7,7 @@ import 'package:pocox/src/hosting/editor_block.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
 import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/setting_row.dart';
 
 /// The setting is read separately from the ordinary, non-secret config view.
 /// Each read looks at the system's proxy again.
@@ -21,6 +22,14 @@ String _bare(String url) {
   final host = uri.host.contains(':') ? '[${uri.host}]' : uri.host;
   return '${uri.scheme}://$host${uri.hasPort ? ':${uri.port}' : ''}';
 }
+
+/// The current choice in a word or two, for a row that only reports it.
+String networkProxyShort(AppLocalizations l10n, NetworkProxySetting setting) =>
+    switch (setting.mode) {
+      ProxyMode.system => l10n.networkProxyModeSystem,
+      ProxyMode.direct => l10n.networkProxyModeDirect,
+      _ => _bare(setting.custom ?? ''),
+    };
 
 /// What the system offers now, in a line.
 String _systemLine(AppLocalizations l10n, NetworkProxySetting setting) =>
@@ -45,18 +54,14 @@ class NetworkProxyRow extends ConsumerWidget {
         l10n.networkProxyDirectSummary,
       NetworkProxySetting(:final custom) => _bare(custom ?? ''),
     };
-    return ListTile(
+    return SettingValueRow(
       key: const Key('network-proxy-settings'),
-      leading: const Icon(AppIcons.public),
-      title: InfoTitle(
-        title: Text(l10n.networkProxyTitle),
-        info: l10n.networkProxyScope,
-      ),
-      subtitle: Text(
+      label: l10n.networkProxyTitle,
+      info: l10n.networkProxyScope,
+      value: Text(
         value.hasError ? l10n.networkProxyReadFailed : summary,
         key: const Key('network-proxy-summary'),
       ),
-      trailing: const Icon(AppIcons.edit_outlined),
       onTap: value.isLoading
           ? null
           : () async {

@@ -154,6 +154,7 @@ Supported optional features, each used only when negotiated:
 | `session/resume` | `sessionCapabilities.resume` is an object | reopen without replay (retained history only) |
 | `session/list` | `sessionCapabilities.list` is an object | agent-owned session list, cursor-paged |
 | `session/close` | `sessionCapabilities.close` is an object | release idle sessions evicted from the host |
+| `session/fork` | `sessionCapabilities.fork` is an object, on a Claude host only | [forking](session-fork.md); unstable in ACP, so another agent's is not used |
 | config options | `configOptions` in session responses | select-type options as chips (`session/set_config_option`) |
 | modes | `modes` in session responses | mode chip (`session/set_mode`), only while no `mode` config option exists |
 | images | `promptCapabilities.image: true` | image attachments |

@@ -42,7 +42,7 @@ Future<FakeBridgeApi> _mount(WidgetTester t, DiffModel diff) async {
 }
 
 Future<void> _tapEnv(WidgetTester t) async {
-  await t.tap(find.byKey(const Key('env-panel-btn')));
+  await t.tap(find.byKey(const Key('context-changes')));
   await t.pumpAndSettle();
 }
 
@@ -51,40 +51,41 @@ void main() {
     t,
   ) async {
     final api = await _mount(t, _diffOf('lib/start.dart'));
+    void changed() => api.pushEvent(
+      _service,
+      const AppEvent(kind: 'turn/diff/updated', threadId: 't', raw: '{}'),
+    );
     // A read of the old tree hangs while a newer read answers first.
     final slow = Completer<void>();
     api
       ..gitDiff = _diffOf('lib/old.dart')
       ..gitDiffGate = slow;
-    await _tapEnv(t);
-    await _tapEnv(t); // close
+    changed();
+    await t.pump();
     api
       ..gitDiff = _diffOf('lib/new.dart')
       ..gitDiffGate = null;
-    await _tapEnv(t);
-    expect(find.byKey(const Key('env-file-lib/new.dart')), findsOneWidget);
+    changed();
+    await t.pump();
     slow.complete();
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('env-file-lib/new.dart')), findsOneWidget);
-    expect(find.byKey(const Key('env-file-lib/old.dart')), findsNothing);
+    await _tapEnv(t);
+    expect(find.byKey(const Key('review-file-lib/new.dart')), findsOneWidget);
+    expect(find.byKey(const Key('review-file-lib/old.dart')), findsNothing);
   }, variant: _desktop);
 
-  testWidgets('Review all again returns the review to the working tree', (
+  testWidgets('the changes row returns the review to the working tree', (
     t,
   ) async {
     await _mount(t, _diffOf('lib/x.dart'));
-    Future<void> reviewAll() async {
-      await _tapEnv(t);
-      await t.tap(find.byKey(const Key('env-review-all')));
-      await t.pumpAndSettle();
-    }
-
-    await reviewAll();
+    await _tapEnv(t);
     expect(find.byKey(const Key('review-file-lib/x.dart')), findsOneWidget);
     await t.tap(find.byKey(const Key('review-source-session')));
     await t.pumpAndSettle();
     expect(find.byKey(const Key('review-file-lib/x.dart')), findsNothing);
-    await reviewAll();
+    // The review took the card's place: the status bar carries the way back.
+    await t.tap(find.byKey(const Key('status-branch-chip')));
+    await t.pumpAndSettle();
     expect(find.byKey(const Key('review-file-lib/x.dart')), findsOneWidget);
   }, variant: _desktop);
 }

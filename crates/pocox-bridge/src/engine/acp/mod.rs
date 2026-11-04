@@ -382,6 +382,11 @@ pub fn capabilities_of(info: &Value, generation: u64) -> Capabilities {
         caps.question_multiple = negotiated["grok"] == true;
         caps.rate_limits = negotiated["grok"] == true;
         caps.session_config = true;
+        // The host says what it verified; a fork only reads its source, which
+        // may be held or running elsewhere.
+        caps.fork = info["fork"]["supported"] == true;
+        caps.fork_through_turn = info["fork"]["throughTurn"] == true;
+        caps.fork_busy_source = caps.fork;
         caps.session_reopen = if negotiated["loadSession"] == true {
             "load"
         } else if negotiated["resumeSession"] == true {

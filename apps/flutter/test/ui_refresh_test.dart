@@ -70,9 +70,7 @@ GoRoute _logsRoute() => GoRoute(
 
 void main() {
   group('utility page shell', () {
-    testWidgets('wide macOS shows the conversation origin and page menu', (
-      tester,
-    ) async {
+    testWidgets('wide macOS moves between pages on the rail', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       _useSize(tester, const Size(1300, 768));
       final router = GoRouter(
@@ -91,22 +89,11 @@ void main() {
         await tester.pumpWidget(_routerHost(FakeBridgeApi(), router));
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('utility-chat-origin')), findsOneWidget);
-        expect(find.text('对话'), findsWidgets);
-        expect(find.text('/'), findsOneWidget);
+        expect(find.byKey(const Key('workspace-nav-/manage')), findsOneWidget);
         expect(find.text('服务管理'), findsWidgets);
-        expect(find.byKey(const Key('utility-page-menu')), findsOneWidget);
         expect(find.byType(BackButton), findsNothing);
 
-        await tester.tap(find.byKey(const Key('utility-page-menu')));
-        await tester.pumpAndSettle();
-        expect(find.text('页面'), findsOneWidget);
-        expect(find.text('本地会话'), findsWidgets);
-        expect(find.text('运行日志'), findsWidgets);
-
-        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const Key('utility-chat-origin')));
+        await tester.tap(find.byKey(const Key('workspace-nav-/')));
         await tester.pumpAndSettle();
         expect(find.text('chat-home'), findsOneWidget);
       } finally {
@@ -165,9 +152,8 @@ void main() {
         await tester.tap(find.text('open-detail'));
         await tester.pumpAndSettle();
 
-        // Three segments: the conversation origin, the list, then this page.
+        // Two segments: the list, then this page.
         expect(find.text('detail-body'), findsOneWidget);
-        expect(find.byKey(const Key('utility-chat-origin')), findsOneWidget);
         expect(find.byKey(const Key('utility-parent-origin')), findsOneWidget);
         expect(find.text('my-device'), findsOneWidget);
 
@@ -206,7 +192,7 @@ void main() {
 
         expect(find.byType(BackButton), findsOneWidget);
         expect(find.byKey(const Key('utility-chat-origin')), findsNothing);
-        expect(find.byKey(const Key('utility-page-menu')), findsNothing);
+        expect(find.byKey(const Key('pocket-title')), findsOneWidget);
 
         await tester.tap(find.byType(BackButton));
         await tester.pumpAndSettle();
@@ -249,13 +235,11 @@ void main() {
         await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
         await tester.pumpAndSettle();
         expect(find.text('manage-body'), findsOneWidget);
-        await tester.tap(find.byKey(const Key('utility-page-menu')));
-        await tester.pumpAndSettle();
-        await tester.tap(find.widgetWithText(PopupMenuItem<String>, '运行日志'));
+        await tester.tap(find.byKey(const Key('workspace-nav-/logs')));
         await tester.pumpAndSettle();
         expect(find.text('logs-body'), findsOneWidget);
 
-        await tester.tap(find.byKey(const Key('utility-chat-origin')));
+        await tester.tap(find.byKey(const Key('workspace-nav-/')));
         await tester.pumpAndSettle();
         final field = tester.widget<EditableText>(find.byType(EditableText));
         expect(field.controller.text, 'unsent draft');
@@ -289,7 +273,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.byKey(const Key('utility-chat-origin')), findsOneWidget);
-        expect(find.byKey(const Key('utility-page-menu')), findsOneWidget);
+        expect(find.byKey(const Key('pocket-title')), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;
       }
@@ -461,26 +445,18 @@ void main() {
         await tester.pumpWidget(_host(const SettingsScreen(), api));
         await tester.pumpAndSettle();
 
-        expect(find.byKey(const Key('settings-nav-0')), findsNothing);
-        expect(find.text('通用'), findsOneWidget);
-        expect(find.text('Codex'), findsOneWidget);
-        expect(find.text('账户与连接'), findsOneWidget);
-        expect(find.text('服务与订阅'), findsOneWidget);
-        expect(find.text('高级'), findsOneWidget);
+        // The sections sit in the column, General first.
+        for (final section in SettingsSection.values) {
+          expect(
+            find.byKey(Key('settings-section-${section.name}')),
+            findsOneWidget,
+          );
+        }
         expect(find.text('外观、语言与常用偏好。'), findsNothing);
-        expect(find.text('Provider、认证方式与 Codex 行为。'), findsNothing);
-        expect(find.text('配置导出与诊断工具。'), findsNothing);
         expect(find.byKey(const Key('theme-system')), findsOneWidget);
         expect(find.byKey(const Key('theme-light')), findsOneWidget);
         expect(find.byKey(const Key('theme-dark')), findsOneWidget);
         expect(find.text('在线'), findsNothing);
-        final exportButton = tester.widget<OutlinedButton>(
-          find.descendant(
-            of: find.byKey(const Key('export-btn')),
-            matching: find.byType(OutlinedButton),
-          ),
-        );
-        expect(exportButton.onPressed, isNull);
         expect(
           find.descendant(
             of: find.byKey(const Key('theme-system')),
@@ -511,6 +487,8 @@ void main() {
         expect(container.read(uiPrefsProvider).valueOrNull?.themeMode, 'dark');
         expect(find.byType(SimpleDialog), findsNothing);
 
+        await tester.tap(find.byKey(const Key('settings-section-storage')));
+        await tester.pumpAndSettle();
         expect(find.byKey(const Key('export-btn')), findsOneWidget);
       } finally {
         debugDefaultTargetPlatformOverride = null;

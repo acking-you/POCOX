@@ -11,14 +11,52 @@ breaking change goes.
 
 - Forked Codex conversations recover inherited image attachments from their
   stored history after the original temporary image files disappear.
-- **Fork a Codex conversation.** The conversation menu, the read-only footer of a
-  session another client holds, the session viewer and a finished turn's reply
+- Fork confirmations expire when their conversation view or host connection
+  changes, and recheck the provider's current fork restrictions before sending.
+  A delayed settings read also stops before writing if its host connection changed.
+- **A new shape for the app.** One list of destinations now drives every
+  navigation.
+  - **Wide windows** have a full-width title strip, an icon rail on every page and
+    a 296 px column: conversations grouped by time with their summaries, Settings'
+    sections, or Services' devices. The rail replaces the page menu.
+  - **Beside the transcript**, a floating context card shows the project, changes,
+    branch, background processes, connection and usage. It folds when the window
+    runs out of room, and the review takes its place while open. Appearance now
+    lives in Settings, not the title bar.
+  - **Phones** get a top bar with the conversation's state on a second line. A tap
+    on the title opens the same context as a sheet, with rename new on phones.
+  - **The drawer** leaves the conversation in view and leads with a capsule per
+    device. A device hosting several agents shows them in a row underneath, one
+    tap apart. **Usage moved from its foot into the context sheet**, so it is no
+    longer always visible on a phone.
+  - **The Pocket**, opened from the drawer's account row or a page's title, is
+    the one way to secondary pages on a phone. The bottom bar and the sidebar's
+    shortcut buttons are gone.
+  - **Settings** has one set of sections on phone and desktop: General, Connection,
+    Agents and hosting, Storage and diagnostics, Account, About.
+  ([details](docs/app-ui.md#workspace-and-navigation))
+- **See and stop what a conversation runs in the background.** On Codex hosts that
+  answer `thread/backgroundTerminals/list`, the context card and sheet list those
+  processes, each with its folder and resource use and a **Terminate** behind a
+  confirmation. A connection change, conversation switch or read-only transition
+  cancels an open termination action. Other agents show no section.
+- **Fork a Codex conversation.** The conversation menu (a phone's context sheet),
+  the read-only footer of a session another client holds, the session viewer and
+  any message of a finished turn (hover on a computer, long press on a phone)
   create a new, persistent conversation with the inherited context, on the host
-  serving the source. The source is only read: its writer keeps running, and its
-  drafts and queue stay. A running turn is frozen as interrupted in the branch. A
-  refusal, a lost answer and an ignored turn boundary are each reported rather
-  than retried or hidden. Other providers offer no fork yet.
-  ([details](docs/session-fork.md))
+  serving the source. A fork carries a mark and sits under its source in the list,
+  and a source's card and sheet list its forks. The source is only read: its writer
+  keeps running, and its drafts and queue stay. A running turn is frozen as
+  interrupted in the branch. A refusal, a lost answer and an ignored turn boundary
+  are each reported rather than retried or hidden. ([details](docs/session-fork.md))
+- **Fork Claude, Grok and OpenCode conversations.** Each uses its own native fork
+  on the host serving the session, and goes through ordinary session access when
+  opened. Claude and Grok also fork a session another client holds, including from
+  its read-only panel, as a snapshot of what it has stored. Grok and OpenCode can
+  stop at a finished turn; Claude forks only from the latest saved state. OpenCode
+  1.x refuses while another process holds its history or the turn is still running
+  (a finished earlier turn stays a boundary). OpenCode 2.x and custom ACP agents
+  offer no fork. ([details](docs/session-fork.md#claude-grok-and-opencode))
 - **Fix a takeover stopping a session's owner for nothing.** Resuming a session
   from this device's Local sessions could pick a connected service on another
   device. A takeover then stopped the local client and failed to resume, because
@@ -26,6 +64,15 @@ breaking change goes.
   app runs here, and a takeover checks that its target can open the session before
   stopping anything. A session hosted by a separate `pocox serve` is resumed from
   that host's own session browser.
+- **Fix a new Claude conversation refusing its messages as read-only.** When the
+  Claude CLI started slowly, as on its first launch after an update or on a busy
+  machine, the host did not recognise its own child, and every message in that
+  session was refused. A slow start no longer matters, and a stale record of an
+  earlier process still does not count as an owner.
+- **Claude sessions stay writable across a Claude Code update.** A session open
+  while the CLI updated used to refuse its next message as read-only. It now keeps
+  working, even after the old version is removed, and a terminal client still on
+  the old version is named as the holder. A second writer is still refused.
 - **Fix an existing conversation reading as empty while disconnected.** A
   conversation whose history had not loaded said "Send a message to start the
   conversation". It now says its history loads once reconnected, or offers a retry

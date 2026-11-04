@@ -223,6 +223,10 @@ pub struct AppCapabilitiesDto {
     pub takeover: bool,
     /// Branching a session into an independent one.
     pub fork: bool,
+    /// Forking through a chosen completed turn.
+    pub fork_through_turn: bool,
+    /// Forking a source another process holds or a running turn changes.
+    pub fork_busy_source: bool,
     /// Monitoring another writer of the same session.
     pub external_writer_monitor: bool,
     /// Sessions read directly from this device's disk.
@@ -281,6 +285,8 @@ pub struct AppCapabilitiesDto {
     pub running_inventory: String,
     /// The agent reported that authentication is required.
     pub auth_required: bool,
+    /// Listing and stopping what a session runs in the background.
+    pub background_terminals: bool,
 }
 
 /// Capabilities of the connection behind `service_key` (no network). Codex
@@ -297,6 +303,8 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
         rate_limits: c.rate_limits,
         takeover: c.takeover,
         fork: c.fork,
+        fork_through_turn: c.fork_through_turn,
+        fork_busy_source: c.fork_busy_source,
         external_writer_monitor: c.external_writer_monitor,
         local_sessions: c.local_sessions,
         plan_mode: c.plan_mode,
@@ -325,6 +333,7 @@ pub fn app_capabilities(service_key: String) -> AppCapabilitiesDto {
         history_scope: c.history_scope,
         running_inventory: c.running_inventory,
         auth_required: c.auth_required,
+        background_terminals: c.background_terminals,
     }
 }
 

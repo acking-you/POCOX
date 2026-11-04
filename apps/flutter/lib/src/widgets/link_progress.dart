@@ -443,6 +443,91 @@ class LinkStatusLine extends ConsumerWidget {
   }
 }
 
+/// How [serviceKey] travels now: its mark, the mark's colour and the words.
+(IconData, Color, String) _pathLook(
+  BuildContext context,
+  WidgetRef ref,
+  String serviceKey,
+) {
+  final l10n = AppLocalizations.of(context);
+  final scheme = Theme.of(context).colorScheme;
+  final state = ref.watch(
+    liveSubscriptionsProvider.select((subs) {
+      final tunnel = tunnelFor(subs.valueOrNull ?? const [], serviceKey);
+      return tunnel == null || !tunnel.alive
+          ? null
+          : (path: tunnel.path, recovering: tunnel.recovering);
+    }),
+  );
+  return switch (state) {
+    null => (
+      AppIcons.link_outlined,
+      onSurfaceMuted(scheme),
+      l10n.linkSheetTitle,
+    ),
+    (recovering: true, path: _) => (
+      AppIcons.sync,
+      cautionColor(scheme),
+      l10n.stateReconnecting,
+    ),
+    // The usual state of a desktop's own host: ink, like the rest of a
+    // resting status bar.
+    (path: TunnelPath.local, recovering: false) => (
+      AppIcons.computer,
+      scheme.onSurfaceVariant,
+      l10n.tunnelPathLocal,
+    ),
+    (path: TunnelPath.direct, recovering: false) => (
+      AppIcons.direct,
+      infoColor(scheme),
+      l10n.tunnelPathDirect,
+    ),
+    (path: TunnelPath.mixed, recovering: false) => (
+      AppIcons.direct,
+      infoColor(scheme),
+      l10n.tunnelShortMixed,
+    ),
+    (path: TunnelPath.idle, recovering: false) => (
+      AppIcons.link_outlined,
+      scheme.onSurfaceVariant,
+      l10n.tunnelPathIdle,
+    ),
+    (path: _, recovering: false) => (
+      AppIcons.route,
+      scheme.onSurfaceVariant,
+      l10n.tunnelPathRelay,
+    ),
+  };
+}
+
+/// How a session travels, in the words beside its [LinkPathMark]. Empty while
+/// no tunnel is up: the mark alone says so.
+class LinkPathLabel extends ConsumerWidget {
+  /// Creates the words for [serviceKey].
+  const LinkPathLabel({super.key, required this.serviceKey, this.style});
+
+  /// The session's service.
+  final String serviceKey;
+
+  /// The words' style.
+  final TextStyle? style;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final (_, _, label) = _pathLook(context, ref, serviceKey);
+    if (label == AppLocalizations.of(context).linkSheetTitle) {
+      return const SizedBox.shrink();
+    }
+    return Text(
+      label,
+      key: const Key('session-link-label'),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
+}
+
 /// How a session travels, as one small mark for its status bar: this
 /// device's own listener, direct, through the relay, or recovering. Tapping
 /// it opens the connection sheet.
@@ -452,6 +537,7 @@ class LinkPathMark extends ConsumerWidget {
     super.key,
     required this.serviceKey,
     required this.onTap,
+    this.size = 13,
   });
 
   /// The session's service.
@@ -460,57 +546,13 @@ class LinkPathMark extends ConsumerWidget {
   /// Open the connection sheet.
   final VoidCallback onTap;
 
+  /// The mark's side.
+  final double size;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
-    final state = ref.watch(
-      liveSubscriptionsProvider.select((subs) {
-        final tunnel = tunnelFor(subs.valueOrNull ?? const [], serviceKey);
-        return tunnel == null || !tunnel.alive
-            ? null
-            : (path: tunnel.path, recovering: tunnel.recovering);
-      }),
-    );
-    final (icon, color, label) = switch (state) {
-      null => (
-        AppIcons.link_outlined,
-        onSurfaceMuted(scheme),
-        l10n.linkSheetTitle,
-      ),
-      (recovering: true, path: _) => (
-        AppIcons.sync,
-        cautionColor(scheme),
-        l10n.stateReconnecting,
-      ),
-      // The usual state of a desktop's own host: ink, like the rest of a
-      // resting status bar.
-      (path: TunnelPath.local, recovering: false) => (
-        AppIcons.computer,
-        scheme.onSurfaceVariant,
-        l10n.tunnelPathLocal,
-      ),
-      (path: TunnelPath.direct, recovering: false) => (
-        AppIcons.direct,
-        infoColor(scheme),
-        l10n.tunnelPathDirect,
-      ),
-      (path: TunnelPath.mixed, recovering: false) => (
-        AppIcons.direct,
-        infoColor(scheme),
-        l10n.tunnelShortMixed,
-      ),
-      (path: TunnelPath.idle, recovering: false) => (
-        AppIcons.link_outlined,
-        scheme.onSurfaceVariant,
-        l10n.tunnelPathIdle,
-      ),
-      (path: _, recovering: false) => (
-        AppIcons.route,
-        scheme.onSurfaceVariant,
-        l10n.tunnelPathRelay,
-      ),
-    };
+    final (icon, color, label) = _pathLook(context, ref, serviceKey);
     return Tooltip(
       message: '${l10n.linkSheetTitle} · $label',
       child: InkWell(
@@ -520,7 +562,7 @@ class LinkPathMark extends ConsumerWidget {
         borderRadius: BorderRadius.circular(kControlRadius),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
-          child: Icon(icon, size: 13, color: color),
+          child: Icon(icon, size: size, color: color),
         ),
       ),
     );

@@ -15,9 +15,14 @@ extension _SessionLayout on _AppSessionState {
   Widget _buildSession(BuildContext context) {
     ref.watch(_composerDraftsProvider(widget.serviceKey));
     _showOutsideDraft();
+    // An open context panel is another route: tell it after this build.
+    if (_context.panelOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _context.changes.value++;
+      });
+    }
     ref.listen(uiPrefsProvider, (_, next) => _restoreLayout(next.valueOrNull));
     final l10n = AppLocalizations.of(context);
-    final scheme = Theme.of(context).colorScheme;
     final width = MediaQuery.of(context).size.width;
     final needsCodexSetup = _codexNeedsSetup(watch: true);
     // A new ACP conversation opens its agent session by itself.
@@ -25,11 +30,15 @@ extension _SessionLayout on _AppSessionState {
     // A draft that keeps its own options reads them; it opens nothing.
     _scheduleDraftOptionsCheck();
 
-    // Phones: the sessions list lies under the conversation, full screen,
-    // and the conversation slides aside to uncover it (see LayeredNavigation).
-    if (width < 720) {
+    // Phones: the sessions list lies under the conversation, and the
+    // conversation slides aside to uncover it (see LayeredNavigation).
+    if (width < workspaceCompactWidth) {
+      _context.cardShown = false;
       return LayeredNavigation(
         sidebarLabel: l10n.conversationsSection,
+        closeLabel: l10n.backToConversation,
+        ground: surfaceSidebar(Theme.of(context).colorScheme),
+        onOpening: _revealOpenConversation,
         onOpenChanged: (open) {
           if (open) return;
           final generation = _newDraftFocusAfterDrawer;
@@ -41,136 +50,64 @@ extension _SessionLayout on _AppSessionState {
       );
     }
 
-    // Desktop / tablet: no full-width app bar. The sidebar is a full-height
-    // tinted column reaching the window's top edge (the macOS traffic lights
-    // float over its top strip); the content column carries its own slim
-    // header with the conversation title and the session actions.
+    // The workspace: the title strip over the rail, the column and the
+    // conversation with its context card. The column gives up width before the
+    // chat goes under 480 px, so its rows stay readable at the default width.
     final canRight = width >= 1100; // inline review split
-    // Keep the transcript from being squeezed out when the window is narrow:
-    // the panes give up width before the chat does. A touch tablet keeps a
-    // 480 px chat and lets the sidebar have the rest, so its finger-sized
-    // rows and pill stay readable at the default width (an 834 px portrait
-    // tablet shows the full 280 px instead of the desktop rule's 207 px).
-    final maxLeft = isDesktop
-        ? ((width - 420) / 2).clamp(200.0, 520.0)
-        : (width - 480).clamp(200.0, 520.0);
+    final maxLeft = (width - workspaceRailWidth - 480).clamp(200.0, 520.0);
     final maxReview = (width - 360).clamp(400.0, 1200.0);
     final sidebarWidth = _leftWidth.clamp(200.0, maxLeft);
-    final slide = _paneDragging
-        ? Duration.zero
-        : Motion.of(context, Motion.medium);
-    // The window in its layers: the backdrop, the sidebar drawn straight on
-    // it, and the conversation on a rounded sheet beside it.
-    return Scaffold(
-      backgroundColor: backdropBase(scheme),
-      body: AppBackdrop(
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Row(
-                children: [
-                  _sidebarSlot(
-                    l10n,
-                    width: sidebarWidth,
-                    maxWidth: maxLeft,
-                    slide: slide,
-                  ),
-                  Expanded(
-                    child: AnimatedPadding(
-                      duration: slide,
-                      curve: Motion.move,
-                      padding: EdgeInsets.fromLTRB(
-                        _leftOpen ? 0 : kSheetInset,
-                        kSheetInset,
-                        kSheetInset,
-                        kSheetInset,
-                      ),
-                      child: ContentSheet(
-                        child: Column(
-                          children: [
-                            _contentTopBar(l10n, width),
-                            if (needsCodexSetup) _codexSetupBar(l10n),
-                            Expanded(
-                              child: _reviewLayer(
-                                canRight: canRight,
-                                width: _reviewWidth.clamp(400, maxReview),
-                                chat: _dropWrap(_chatPane(l10n), l10n),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // The gap above the sheet is window chrome too: it drags.
-            if (isFramelessDesktop)
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: kSheetInset,
-                child: WindowDragArea(),
-              ),
-          ],
+    // Measured room decides whether the card stands open; the review takes
+    // its place while it is open.
+    final room = width - workspaceRailWidth - (_leftOpen ? sidebarWidth : 0);
+    _context.cardFits =
+        room - _SessionContextCard.slotWidth >= _SessionContextCard.chatMinimum;
+    _context.cardShown = _context.cardOpen && _context.cardFits && !_reviewOpen;
+    return WorkspaceShell(
+      section: '/',
+      onOpen: (target) => openWorkspaceRoute(context, '/', target),
+      title: _stripTitle(l10n),
+      actions: _stripActions(l10n),
+      column: _sidebar(l10n),
+      columnOpen: _leftOpen,
+      columnWidth: sidebarWidth,
+      columnDragging: _paneDragging,
+      columnHandle: _splitter(
+        key: const Key('left-splitter'),
+        line: false,
+        onDragStart: () => _updateState(() => _paneDragging = true),
+        onDrag: (dx) => _updateState(
+          () => _leftWidth = (_leftWidth + dx).clamp(200, maxLeft),
         ),
+        onDragEnd: () {
+          _updateState(() => _paneDragging = false);
+          ref.read(uiPrefsProvider.notifier).setSidebarWidth(_leftWidth);
+        },
+      ),
+      onToggleColumn: () => _setLeftOpen(!_leftOpen),
+      leading: [
+        if (!_leftOpen)
+          StripButton(
+            key: const Key('sidebar-new-conversation-btn'),
+            tooltip: withShortcut(l10n.newConversation, 'N'),
+            icon: AppIcons.edit_square,
+            onPressed: () => _newConversationInProject(_cwd, context),
+          ),
+      ],
+      body: Column(
+        children: [
+          if (needsCodexSetup) _codexSetupBar(l10n),
+          Expanded(
+            child: _reviewLayer(
+              canRight: canRight,
+              width: _reviewWidth.clamp(400, maxReview),
+              chat: _withContextCard(_dropWrap(_chatPane(l10n), l10n), l10n),
+            ),
+          ),
+        ],
       ),
     );
   }
-
-  /// The desktop sidebar and the gap beside it, which is its resize handle.
-  ///
-  /// The sidebar slides rather than snapping: the sheet visibly takes over
-  /// the space, so the user sees where the list went. The content keeps its
-  /// open [width] and is clipped while it slides, so rows never reflow
-  /// mid-animation. A drag resizes (up to [maxWidth]) without easing.
-  Widget _sidebarSlot(
-    AppLocalizations l10n, {
-    required double width,
-    required double maxWidth,
-    required Duration slide,
-  }) => ClipRect(
-    child: AnimatedContainer(
-      duration: slide,
-      curve: Motion.move,
-      width: _leftOpen ? width + kSheetInset : 0,
-      onEnd: () {
-        if (_sidebarClosing && mounted) {
-          _updateState(() => _sidebarClosing = false);
-        }
-      },
-      child: OverflowBox(
-        alignment: Alignment.centerRight,
-        minWidth: width + kSheetInset,
-        maxWidth: width + kSheetInset,
-        child: _leftOpen || _sidebarClosing
-            ? Row(
-                children: [
-                  SizedBox(width: width, child: _sidebar(l10n)),
-                  // The gap before the sheet is the handle.
-                  _splitter(
-                    key: const Key('left-splitter'),
-                    width: kSheetInset,
-                    line: false,
-                    onDragStart: () => _updateState(() => _paneDragging = true),
-                    onDrag: (dx) => _updateState(
-                      () => _leftWidth = (_leftWidth + dx).clamp(200, maxWidth),
-                    ),
-                    onDragEnd: () {
-                      _updateState(() => _paneDragging = false);
-                      ref
-                          .read(uiPrefsProvider.notifier)
-                          .setSidebarWidth(_leftWidth);
-                    },
-                  ),
-                ],
-              )
-            : const SizedBox.shrink(),
-      ),
-    ),
-  );
 
   /// The phone's conversation page: a plain app bar naming the conversation
   /// over the chat. It slides aside to uncover [_phoneSidebar].
@@ -218,69 +155,35 @@ extension _SessionLayout on _AppSessionState {
   }
 
   Widget _phoneChat(AppLocalizations l10n, {required bool needsCodexSetup}) {
+    final scaler = MediaQuery.textScalerOf(context);
+    // The title and its state line, however large the text: the bar grows
+    // rather than cutting them off.
+    final height = math.max(
+      kToolbarHeight,
+      scaler.scale(16 * 1.25) + scaler.scale(12.5 * 1.3) + 10,
+    );
     return Scaffold(
       appBar: WindowTitleBar(
+        height: _inlineStatus || _editingTitle ? null : height,
+        centerTitle: false,
+        titleSpacing: 0,
         bottom: needsCodexSetup ? _codexSetupBar(l10n) : null,
         leading: Builder(
           builder: (ctx) => IconButton(
             key: const Key('sidebar-open-btn'),
             tooltip: l10n.conversationsSection,
-            icon: const Icon(AppIcons.menu),
+            icon: const Icon(AppIcons.menu, size: 22),
             onPressed: () => LayeredNavigation.maybeOf(ctx)?.open(),
           ),
         ),
-        title: () {
-          final title = Text(
-            _barTitle(l10n),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          );
-          return _inlineStatus ? _titleWithStatus(l10n, title) : title;
-        }(),
+        title: _phoneTitle(l10n),
         actions: [
-          if (_ctx != null)
-            ContextGauge(
-              status: _ctx!,
-              onTap: _showContextDetail,
-              tooltip: _contextTooltip(l10n),
-            ),
           IconButton(
-            key: const Key('session-show-in-galaxy'),
-            tooltip: l10n.sessionShowInGalaxy,
-            icon: const Icon(AppIcons.orbit),
-            onPressed: _showInGalaxy,
+            key: const Key('phone-new-conversation-btn'),
+            tooltip: l10n.newConversation,
+            icon: const Icon(AppIcons.edit_square, size: 22),
+            onPressed: () => _newConversationInProject(_cwd, context),
           ),
-          // Same place as on desktop. It has to be here rather than in the
-          // sessions pane, which on a phone lies under the conversation.
-          const ThemeToggle(),
-          if (_threadId != null &&
-              (_canReleaseSession || _canCompact || _canFork))
-            PopupMenuButton<String>(
-              tooltip: l10n.moreActions,
-              onSelected: (v) {
-                if (v == 'compact') _compact();
-                if (v == 'session-release') unawaited(_releaseSession());
-                if (v == 'fork') unawaited(_forkConversation());
-              },
-              itemBuilder: (c) => [
-                if (_canFork)
-                  PopupMenuItem(
-                    key: const Key('session-fork'),
-                    value: 'fork',
-                    enabled: !_fork.pending,
-                    child: Text(l10n.forkConversation),
-                  ),
-                if (_canReleaseSession)
-                  PopupMenuItem(
-                    key: const Key('session-release'),
-                    value: 'session-release',
-                    child: Text(l10n.sessionHandBack),
-                  ),
-                if (_canCompact)
-                  PopupMenuItem(value: 'compact', child: Text(l10n.compact)),
-              ],
-            ),
           const SizedBox(width: 4),
         ],
       ),
@@ -406,158 +309,36 @@ extension _SessionLayout on _AppSessionState {
     );
   }
 
-  /// The phone's full-screen sessions list, lying under the conversation:
-  /// the brand and a close control on top, then the same pane the desktop
-  /// sidebar shows.
-  Widget _phoneSidebar(AppLocalizations l10n) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      key: const Key('phone-sidebar'),
-      // The window's backdrop: the list lies on the same lit ground as the
-      // desktop sidebar, under the conversation that slides aside.
-      color: backdropBase(scheme),
-      child: AppBackdrop(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 8, 4),
-                child: Row(
-                  children: [
-                    const BrandLogo(size: 24),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        l10n.appTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Builder(
-                      builder: (ctx) => IconButton(
-                        key: const Key('sidebar-close-btn'),
-                        tooltip: l10n.hideSidebar,
-                        icon: const Icon(AppIcons.close),
-                        onPressed: () =>
-                            LayeredNavigation.maybeOf(ctx)?.close(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(child: _sessionsPane(l10n, inDrawer: true)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  /// The phone's sessions list, lying under the conversation.
+  Widget _phoneSidebar(AppLocalizations l10n) => Material(
+    key: const Key('phone-sidebar'),
+    color: surfaceSidebar(Theme.of(context).colorScheme),
+    child: SafeArea(child: _sessionsPane(l10n, inDrawer: true)),
+  );
 
-  /// The full-height left sidebar: a tinted column that reaches the window's
-  /// top edge, ChatGPT-desktop style. Its top strip hosts — once, quietly —
-  /// everything the old title bar duplicated: the macOS traffic lights float
-  /// over its leading inset, then the brand, then the collapse control. The
-  /// strip also drags the window.
-  Widget _sidebar(AppLocalizations l10n) {
-    final mac = isFramelessDesktop && isMacDesktop;
-    // The strip shares the content header's height, so the collapse control,
-    // the traffic lights and the title all sit on one centre line. On macOS
-    // the lights own the leading corner, so the brand moves out of the strip
-    // (the window title already names the app) and only the controls remain,
-    // pushed to the trailing edge the way Finder and Mail lay out a sidebar.
-    final strip = SizedBox(
-      height: WindowChrome.barHeight,
-      child: Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          const Positioned.fill(child: WindowDragArea()),
-          Row(
-            children: [
-              if (mac)
-                const SizedBox(width: WindowChrome.trafficLightsWidth)
-              else ...[
-                const SizedBox(width: 14),
-                const BrandLogo(size: 18),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    l10n.appTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              const Spacer(),
-              _chromeButton(
-                key: const Key('sidebar-collapse-btn'),
-                tooltip: _withShortcut(l10n.hideSidebar, 'B'),
-                icon: AppIcons.view_sidebar_outlined,
-                onPressed: () => _setLeftOpen(false),
-              ),
-              _chromeButton(
-                key: const Key('sidebar-new-conversation-btn'),
-                tooltip: _withShortcut(l10n.newConversation, 'N'),
-                icon: AppIcons.edit_square,
-                onPressed: () => _newConversationInProject(_cwd, context),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
-        ],
-      ),
-    );
-    return Material(
-      // Drawn straight on the backdrop: the sheet beside it is the page.
-      type: MaterialType.transparency,
-      child: Column(
-        children: [
-          strip,
-          Expanded(child: _sessionsPane(l10n)),
-        ],
-      ),
-    );
-  }
+  /// The workspace's column on a chat.
+  Widget _sidebar(AppLocalizations l10n) =>
+      Material(type: MaterialType.transparency, child: _sessionsPane(l10n));
 
-  /// Scroll the conversation list so row [index] — the open conversation —
-  /// sits a third of the way down, where the eye lands first.
-  void _revealConversationRow(int index) {
+  /// Bring the open conversation's row into view as the drawer opens, unless
+  /// a search is what the list shows or the row is already on screen.
+  void _revealOpenConversation() {
+    final index = _openConversationRow;
+    if (index == null || !mounted || _convQuery.trim().isNotEmpty) return;
     if (!_convListCtl.isAttached || !_convScroll.hasClients) return;
-    final duration = Motion.of(context, Motion.medium);
-    if (duration == Duration.zero) {
-      _convListCtl.jumpToItem(
-        index: index,
-        scrollController: _convScroll,
-        alignment: 0.33,
-      );
-      return;
-    }
-    _convListCtl.animateToItem(
+    final visible = _convListCtl.visibleRange;
+    if (visible != null && index >= visible.$1 && index <= visible.$2) return;
+    _convListCtl.jumpToItem(
       index: index,
       scrollController: _convScroll,
       alignment: 0.33,
-      duration: (_) => duration,
-      curve: (_) => Motion.move,
     );
   }
 
-  /// Show or hide the desktop sidebar, remembering the choice.
+  /// Show or hide the column, remembering the choice.
   void _setLeftOpen(bool open) {
     _layoutRestored = true;
-    _updateState(() {
-      // Keep the list built while it slides out; the animation's end drops
-      // it. With reduced motion there is no slide, so nothing to keep.
-      _sidebarClosing =
-          !open && Motion.of(context, Motion.medium) > Duration.zero;
-      _leftOpen = open;
-    });
+    _updateState(() => _leftOpen = open);
     ref.read(uiPrefsProvider.notifier).setSidebarOpen(open);
   }
 
@@ -568,10 +349,14 @@ extension _SessionLayout on _AppSessionState {
     _layoutRestored = true;
     final open = prefs.sidebarOpen ?? true;
     final width = prefs.sidebarWidth ?? _leftWidth;
-    if (open == _leftOpen && width == _leftWidth) return;
+    final card = prefs.contextCardOpen ?? true;
+    if (open == _leftOpen && width == _leftWidth && card == _context.cardOpen) {
+      return;
+    }
     _updateState(() {
       _leftOpen = open;
       _leftWidth = width;
+      _context.cardOpen = card;
     });
   }
 

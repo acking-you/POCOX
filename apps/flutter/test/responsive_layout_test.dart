@@ -18,7 +18,7 @@ import 'package:pocox/src/screens/services_screen.dart';
 import 'package:pocox/src/screens/settings_screen.dart';
 import 'package:pocox/src/screens/welcome_guide_screen.dart';
 import 'package:pocox/src/service_key.dart'
-    show deviceLabel, serviceDeviceIdentity;
+    show deviceLabel, deviceShortId, serviceDeviceIdentity;
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/tools/share_card.dart';
 
@@ -260,10 +260,15 @@ void main() {
       await t.tapAt(const Offset(5, 5));
       await t.pumpAndSettle();
 
-      // A tablet keeps the status beside the title.
+      // A large tablet keeps the status beside the title.
       final api = _api();
       await api.appConnect(_openCode, 1);
-      await _mount(t, api, const ServicesScreen(), size: const Size(834, 1112));
+      await _mount(
+        t,
+        api,
+        const ServicesScreen(),
+        size: const Size(1024, 1366),
+      );
       await t.tap(find.byKey(const Key('device-$_device')));
       await _frames(t);
       expect(t.takeException(), isNull);
@@ -554,7 +559,7 @@ void main() {
       await _mount(
         t,
         api,
-        const SettingsScreen(),
+        const SettingsScreen(section: SettingsSection.connection),
         size: const Size(393, 852),
         locale: const Locale('zh'),
       );
@@ -566,7 +571,6 @@ void main() {
       expect(find.textContaining(deviceLabel(_device)), findsWidgets);
       expect(find.textContaining('\u001f'), findsNothing);
       expect(find.textContaining('#0eb093e3'), findsNothing);
-      expect(find.text('127.0.0.1:64001'), findsOneWidget);
       expect(find.text('仅中继'), findsWidgets, reason: 'its live path');
       await capturePreview(t, 'responsive-settings-subscriptions');
     });
@@ -791,6 +795,69 @@ void main() {
     });
   });
 
+  testWidgets('the drawer\'s capsules say what the full list says: one per '
+      'device, retained connections marked, same-name devices told apart', (
+    t,
+  ) async {
+    await _onIos(t, () async {
+      const local =
+          'pcx:mac.studio.0123456789abcdef0123456789abcdef:app:default';
+      const other =
+          'pcx:mac.studio.fedcba9876543210fedcba9876543210:app:default';
+      const retained = 'pcx:nas:app:default';
+      const lookalike = 'pcx:mac:acp:claude';
+      final api = FakeBridgeApi(
+        config: const ConfigInfo(relay: 'relay.example.com:7666', hasKey: true),
+        services: [
+          for (final key in const [local, other, retained, lookalike])
+            ServiceEntry(
+              device: key.split(':')[1],
+              kind: key.split(':')[2],
+              name: key.split(':')[3],
+              key: key,
+            ),
+        ],
+      );
+      await api.appConnect(local, 1);
+      await api.appConnect(retained, 1);
+      await _mount(
+        t,
+        api,
+        AppSessionScreen(serviceKey: local, home: true, services: api.services),
+        size: const Size(393, 852),
+      );
+      await t.tap(find.byKey(const Key('sidebar-open-btn')));
+      await _frames(t);
+      // The service in use opens the full list; the rest switch.
+      expect(find.byKey(const Key('sidebar-service-switcher')), findsOneWidget);
+      for (final key in [other, retained, lookalike]) {
+        expect(find.byKey(Key('host-capsule-$key')), findsOneWidget);
+      }
+      // One agent per device: nothing to choose under the capsules.
+      expect(find.byKey(const Key('host-agents')), findsNothing);
+      // A connection kept from earlier has its dot; the current one has none.
+      expect(
+        find.byKey(const Key('host-switch-retained-$retained')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('host-switch-retained-$other')),
+        findsNothing,
+      );
+      // Two devices labelled alike carry their short identities.
+      for (final service in api.services.take(2)) {
+        expect(
+          find.textContaining(deviceShortId(service.device)!),
+          findsOneWidget,
+        );
+      }
+      // Tapping the current capsule opens the list, with a way to manage.
+      await t.tap(find.byKey(const Key('sidebar-service-switcher')));
+      await _frames(t);
+      expect(find.byKey(const Key('host-switch-manage')), findsOneWidget);
+    });
+  });
+
   testWidgets('the phone sidebar keeps every row in landscape; its heading '
       'controls are touch-sized', (t) async {
     await _onIos(t, () async {
@@ -799,6 +866,14 @@ void main() {
         const scale = 2.0;
         final api = _api();
         await api.appConnect(_codex, 1);
+        api.appThreads.add(
+          const ThreadMeta(
+            id: 't1',
+            preview: 'a conversation',
+            cwd: _cwd,
+            updatedAt: 1,
+          ),
+        );
         await _mount(
           t,
           api,
@@ -817,7 +892,7 @@ void main() {
         for (final key in [
           'new-conversation-btn',
           'activity-view-btn',
-          'sidebar-settings-btn',
+          if (menu.evaluate().isNotEmpty) 'drawer-account-row',
         ]) {
           final control = find.byKey(Key(key));
           // Portrait keeps the footer pinned: no scrolling needed there.

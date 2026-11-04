@@ -49,7 +49,7 @@ void openSettingsFromTray() {
   // repeated tray clicks did stack Settings.
   final matches = router.routerDelegate.currentConfiguration.matches;
   final top = matches.isEmpty ? '/' : matches.last.matchedLocation;
-  if (top == '/settings') return;
+  if (top.startsWith('/settings')) return;
   if (top == '/') {
     router.push('/settings');
   } else {
@@ -102,7 +102,19 @@ GoRouter buildRouter({
         serviceKey: s.uri.queryParameters['svc'],
       ),
     ),
-    GoRoute(path: '/settings', builder: (c, s) => const SettingsScreen()),
+    GoRoute(
+      path: '/settings',
+      builder: (c, s) => const SettingsScreen(),
+      routes: [
+        // One section's page; a wide window opens the page on that section.
+        GoRoute(
+          path: ':section',
+          builder: (c, s) => SettingsScreen(
+            section: SettingsSection.parse(s.pathParameters['section']),
+          ),
+        ),
+      ],
+    ),
     // External Codex setup: detect CODEX_HOME, configure login/provider and prompt.
     GoRoute(path: '/setup/codex', builder: (c, s) => const CodexSetupScreen()),
     GoRoute(path: '/logs', builder: (c, s) => const LogViewScreen()),

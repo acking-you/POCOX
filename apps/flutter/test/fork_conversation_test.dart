@@ -104,7 +104,7 @@ Future<FakeBridgeApi> openSource(
 }
 
 Future<void> openMenu(WidgetTester t) async {
-  await t.tap(find.byType(PopupMenuButton<String>).first);
+  await t.tap(find.byKey(const Key('conversation-menu')));
   await frames(t);
 }
 
@@ -145,15 +145,13 @@ void main() {
       final composer = find.byKey(const Key('composer-input'));
       expect(t.widget<TextField>(composer).controller?.text, isEmpty);
 
+      // No card has the room here, so the status line marks it.
       await t.tap(find.byKey(const Key('fork-source-mark')));
       await frames(t);
       expect(api.lastResumed, 'source');
       expect(t.widget<TextField>(composer).controller?.text, 'unsent draft');
       expect(
-        find.descendant(
-          of: find.byKey(Key('conv-tile-${fork.id}')),
-          matching: find.text(l10n.forkedTag),
-        ),
+        find.byKey(Key('fork-mark-${fork.id}')),
         findsOneWidget,
         reason: 'the host does not list a fork yet to have a turn of its own',
       );
@@ -188,14 +186,39 @@ void main() {
           activeTurnId: 'turn-2',
         ),
     );
+    // The finished turn's question and reply, and nothing of the running one.
     final action = find.byKey(const Key('message-fork'));
-    expect(action, findsOneWidget);
-    t.widget<MessageAction>(action).onPressed();
+    expect(action, findsNWidgets(2));
+    t.widget<MessageAction>(action.first).onPressed();
     await frames(t);
     expect(find.text(l10n.forkDialogThroughTurn), findsOneWidget);
     await t.tap(find.byKey(const Key('fork-confirm')));
     await frames(t);
     expect(api.forkCalls, [(service, 'source', 'turn-1')]);
+  });
+
+  desktop('with nothing running, a turn with no recorded end still offers', (
+    t,
+  ) async {
+    await openSource(
+      t,
+      api: FakeBridgeApi()
+        ..appThreads.clear()
+        ..appThreads.addAll([source, other])
+        ..readResult = const ThreadHistory(
+          items: [
+            ThreadItem(
+              id: 'a1',
+              itemType: 'agentMessage',
+              title: '',
+              text: 'answer',
+              turnId: 'turn-1',
+            ),
+          ],
+          running: false,
+        ),
+    );
+    expect(find.byKey(const Key('message-fork')), findsOneWidget);
   });
 
   testWidgets('a long press on a finished reply offers the boundary on touch', (
@@ -320,7 +343,24 @@ void main() {
     await forkFromMenu(t);
     expect(find.text(l10n.forkBoundaryUnconfirmed), findsOneWidget);
     expect(api.lastResumed, 'source');
-    expect(find.byKey(const Key('conv-tile-wider')), findsOneWidget);
+    expect(find.byKey(const Key('activity-tile-wider')), findsOneWidget);
+  });
+
+  desktop('a fork confirmation cannot cross a reconnect', (t) async {
+    final api = await openSource(t);
+    await openMenu(t);
+    await t.tap(find.byKey(const Key('session-fork')));
+    await frames(t);
+
+    await api.appDisconnect(service);
+    for (var i = 0; i < 3; i++) {
+      await frames(t);
+    }
+    expect(api.appIsConnected(service), isTrue);
+    await t.tap(find.byKey(const Key('fork-confirm')));
+    await frames(t);
+    expect(api.forkCalls, isEmpty);
+    expect(api.lastResumed, 'source');
   });
 
   desktop('a pending fork blocks another and a late answer moves no one', (
@@ -330,16 +370,17 @@ void main() {
     final gate = Completer<void>();
     api.forkGate = gate;
     await forkFromMenu(t);
+    expect(find.text(l10n.forkPending), findsOneWidget);
 
     await openMenu(t);
-    final item = t.widget<PopupMenuItem<String>>(
+    final item = t.widget<PopupMenuItem<Object?>>(
       find.byKey(const Key('session-fork')),
     );
     expect(item.enabled, isFalse);
     await t.tapAt(Offset.zero);
     await frames(t);
 
-    await t.tap(find.byKey(const Key('conv-tile-other')));
+    await t.tap(find.byKey(const Key('activity-tile-other')));
     await frames(t);
     expect(api.lastResumed, 'other');
 
@@ -350,6 +391,7 @@ void main() {
       'other',
       reason: 'the reader stays where they went',
     );
+    expect(find.text(l10n.forkPending), findsNothing);
     await t.tap(find.text(l10n.forkReadyOpen));
     await frames(t);
     expect(api.lastResumed, api.forkedThreads.single.id);
@@ -387,8 +429,13 @@ void main() {
       await frames(t);
       final fork = api.forkedThreads.single;
       expect(api.lastResumed, resumed, reason: 'the fork opened nothing');
+      expect(
+        api.threadConfigs.containsKey(fork.id),
+        isFalse,
+        reason: 'a delayed settings read cannot write after the host changes',
+      );
       expect(find.text(l10n.forkHostChanged), findsOneWidget);
-      expect(find.byKey(Key('conv-tile-${fork.id}')), findsNothing);
+      expect(find.byKey(Key('activity-tile-${fork.id}')), findsNothing);
     });
   }
 

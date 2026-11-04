@@ -197,6 +197,26 @@ impl GatewayClient {
             .await
     }
 
+    /// `POST sessions/fork`, refused when the host is not `expected`. Its
+    /// answer says `outcome`: `created`, or `unknown` when the agent's answer
+    /// left that open. A failed request says nothing either, unless the host
+    /// itself refused ([`ClientError::Host`]).
+    pub async fn fork_session(
+        &self,
+        session: &str,
+        through_turn: Option<&str>,
+        expected: &Identity,
+    ) -> Result<Value, ClientError> {
+        self.post(
+            "acp/v1/sessions/fork",
+            with_identity(
+                json!({"sessionId": session, "throughTurn": through_turn}),
+                Some(expected),
+            ),
+        )
+        .await
+    }
+
     /// `GET sessions/history`.
     pub async fn history(
         &self,

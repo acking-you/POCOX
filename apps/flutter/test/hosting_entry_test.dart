@@ -158,7 +158,18 @@ AppServeStatus? _edited(WidgetTester t) {
   return t.widget<HostingEditor>(find.byType(HostingEditor)).existing;
 }
 
+/// A wide Settings shows one section at a time: bring up Agents and hosting.
+Future<void> _showAgents(WidgetTester t, String key) async {
+  final section = find.byKey(const Key('settings-section-agents'));
+  if (find.byKey(Key(key)).evaluate().isEmpty &&
+      section.evaluate().isNotEmpty) {
+    await t.tap(section);
+    await _frames(t);
+  }
+}
+
 Future<void> _tap(WidgetTester t, String key) async {
+  await _showAgents(t, key);
   // Centred, so a page's floating title bar never covers the target.
   await Scrollable.ensureVisible(
     t.element(find.byKey(Key(key))),
@@ -301,6 +312,7 @@ void main() {
         final api = FakeBridgeApi(config: _accountConfig);
         await _pump(t, api, initial: initial);
         await _frames(t);
+        await _showAgents(t, button);
         await t.ensureVisible(find.byKey(Key(button)));
         await t.pump();
         await t.tap(find.byKey(Key(button)));
@@ -413,7 +425,7 @@ void main() {
           ..serveHosts.add(_acpHost);
         await _pump(t, api, initial: '/settings');
         await _frames(t);
-        expect(find.byType(ListTile), findsWidgets, reason: 'compact list');
+        expect(find.byKey(const Key('settings-identity')), findsOneWidget);
         await _tap(t, 'settings-hosting-btn');
         await _tap(t, 'host-pick-pcx:local:acp:tool');
         expect(_edited(t)?.name, 'tool');
@@ -429,8 +441,8 @@ void main() {
       final api = FakeBridgeApi(config: _accountConfig);
       await _pump(t, api, initial: '/settings');
       await _frames(t);
+      await _showAgents(t, 'codex-setup-btn');
       expect(find.byKey(const Key('settings-hosting-btn')), findsNothing);
-      await t.scrollUntilVisible(find.byKey(const Key('codex-setup-btn')), 200);
       expect(find.byKey(const Key('codex-setup-btn')), findsOneWidget);
     });
 

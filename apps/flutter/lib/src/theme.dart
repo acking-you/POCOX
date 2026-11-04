@@ -275,6 +275,11 @@ List<BoxShadow> floatingShadows(ColorScheme scheme, {double lift = 1}) {
   ];
 }
 
+/// A tile on a floating surface: a step off it, whichever way it is lit.
+Color floatingTile(ColorScheme scheme) => scheme.brightness == Brightness.light
+    ? scheme.surfaceContainer
+    : scheme.surfaceContainerHighest;
+
 /// The hairline that outlines floating surfaces in dark mode, where shadows
 /// alone disappear into the ground.
 Color floatingEdge(ColorScheme scheme) => scheme.brightness == Brightness.light
@@ -767,7 +772,7 @@ ThemeData _base(ColorScheme scheme) {
       ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: light ? Colors.white : scheme.surfaceContainer,
+      backgroundColor: floatingSurface(scheme),
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: scheme.outline,

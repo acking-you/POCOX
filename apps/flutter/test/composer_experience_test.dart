@@ -110,6 +110,13 @@ void main() {
 
   Future<void> switchProject(WidgetTester t, String cwd) async {
     if (find.byKey(const Key('project-switcher-btn')).evaluate().isEmpty) {
+      final group = find.byKey(const Key('group-by-project'));
+      if (find.byKey(Key('project-header-$cwd')).evaluate().isEmpty) {
+        await t.tap(find.byKey(const Key('activity-view-btn')));
+        await composerFrames(t);
+        await t.tap(group);
+        await composerFrames(t);
+      }
       await t.longPress(find.byKey(Key('project-header-$cwd')));
       await composerFrames(t);
       await t.tap(find.text('New conversation in ${cwd.split('/').last}'));
