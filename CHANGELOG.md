@@ -11,6 +11,7 @@ breaking change goes.
 
 - Fork confirmations expire when their conversation view or host connection
   changes, and recheck the provider's current fork restrictions before sending.
+  A delayed settings read also stops before writing if its host connection changed.
 - **A new shape for the app.** One list of destinations now drives every
   navigation.
   - **Wide windows** have a full-width title strip, an icon rail on every page and

@@ -429,6 +429,11 @@ void main() {
       await frames(t);
       final fork = api.forkedThreads.single;
       expect(api.lastResumed, resumed, reason: 'the fork opened nothing');
+      expect(
+        api.threadConfigs.containsKey(fork.id),
+        isFalse,
+        reason: 'a delayed settings read cannot write after the host changes',
+      );
       expect(find.text(l10n.forkHostChanged), findsOneWidget);
       expect(find.byKey(Key('activity-tile-${fork.id}')), findsNothing);
     });

@@ -99,7 +99,8 @@ is opened. The bridge names a fresh fork by the conversation it inherited.
   on a mismatch the conversation stays in the list and is not opened as if it were
   the selection.
 - **Late answers.** A result after navigation offers **Open** and moves no one. A
-  result after the host connection moved is not adopted.
+  result after the host connection moved is not adopted, and a settings read
+  awaiting its answer cannot write its result through the changed connection.
 - **Confirmation.** A confirmation belongs to the conversation view and host
   connection that opened it. Navigation, a reload or reconnect invalidates it;
   the provider's current fork and turn-boundary restrictions are checked again

@@ -230,7 +230,13 @@ extension _SessionFork on _AppSessionState {
     // A host-access provider restores what it keeps itself; only Codex keeps
     // per-thread settings with the host.
     if (!_caps.hostAccess) {
-      await copyForkSettings(api, service, source: source, fork: thread.id);
+      await copyForkSettings(
+        api,
+        service,
+        source: source,
+        fork: thread.id,
+        isCurrent: () => mounted && sameLink(),
+      );
     }
     if (!mounted) return;
     if (!sameLink()) {

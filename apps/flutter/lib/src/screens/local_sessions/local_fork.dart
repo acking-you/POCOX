@@ -51,7 +51,13 @@ Future<void> forkLocalSession(
     return;
   }
   if (!bridge.appCapabilities(target).hostAccess) {
-    await copyForkSettings(bridge, target, source: threadId, fork: thread.id);
+    await copyForkSettings(
+      bridge,
+      target,
+      source: threadId,
+      fork: thread.id,
+      isCurrent: current,
+    );
   }
   messenger.notice(forkCreatedMessage(l10n, result));
   if (!context.mounted || !current()) return;
