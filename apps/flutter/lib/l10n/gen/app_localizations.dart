@@ -8924,7 +8924,7 @@ abstract class AppLocalizations {
   /// No description provided for @forkDialogRunning.
   ///
   /// In en, this message translates to:
-  /// **'A turn is still running. The new conversation keeps what has been saved so far and marks that turn interrupted; the original keeps running.'**
+  /// **'A turn is still running. The new conversation keeps what has been saved so far and leaves that turn unfinished; the original keeps running.'**
   String get forkDialogRunning;
 
   /// No description provided for @forkDialogFiles.
@@ -8960,7 +8960,7 @@ abstract class AppLocalizations {
   /// No description provided for @forkCreatedInterrupted.
   ///
   /// In en, this message translates to:
-  /// **'Forked into a new conversation. Its last turn is marked interrupted.'**
+  /// **'Forked into a new conversation. Its last turn stays unfinished.'**
   String get forkCreatedInterrupted;
 
   /// No description provided for @forkReadyOpen.

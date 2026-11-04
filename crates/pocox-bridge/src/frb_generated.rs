@@ -9540,6 +9540,8 @@ impl SseDecode for crate::api::bridge::connection::AppCapabilitiesDto {
         let mut var_rateLimits = <bool>::sse_decode(deserializer);
         let mut var_takeover = <bool>::sse_decode(deserializer);
         let mut var_fork = <bool>::sse_decode(deserializer);
+        let mut var_forkThroughTurn = <bool>::sse_decode(deserializer);
+        let mut var_forkBusySource = <bool>::sse_decode(deserializer);
         let mut var_externalWriterMonitor = <bool>::sse_decode(deserializer);
         let mut var_localSessions = <bool>::sse_decode(deserializer);
         let mut var_planMode = <bool>::sse_decode(deserializer);
@@ -9577,6 +9579,8 @@ impl SseDecode for crate::api::bridge::connection::AppCapabilitiesDto {
             rate_limits: var_rateLimits,
             takeover: var_takeover,
             fork: var_fork,
+            fork_through_turn: var_forkThroughTurn,
+            fork_busy_source: var_forkBusySource,
             external_writer_monitor: var_externalWriterMonitor,
             local_sessions: var_localSessions,
             plan_mode: var_planMode,
@@ -14615,6 +14619,8 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::connection::AppCapabi
             self.rate_limits.into_into_dart().into_dart(),
             self.takeover.into_into_dart().into_dart(),
             self.fork.into_into_dart().into_dart(),
+            self.fork_through_turn.into_into_dart().into_dart(),
+            self.fork_busy_source.into_into_dart().into_dart(),
             self.external_writer_monitor.into_into_dart().into_dart(),
             self.local_sessions.into_into_dart().into_dart(),
             self.plan_mode.into_into_dart().into_dart(),
@@ -17807,6 +17813,8 @@ impl SseEncode for crate::api::bridge::connection::AppCapabilitiesDto {
         <bool>::sse_encode(self.rate_limits, serializer);
         <bool>::sse_encode(self.takeover, serializer);
         <bool>::sse_encode(self.fork, serializer);
+        <bool>::sse_encode(self.fork_through_turn, serializer);
+        <bool>::sse_encode(self.fork_busy_source, serializer);
         <bool>::sse_encode(self.external_writer_monitor, serializer);
         <bool>::sse_encode(self.local_sessions, serializer);
         <bool>::sse_encode(self.plan_mode, serializer);

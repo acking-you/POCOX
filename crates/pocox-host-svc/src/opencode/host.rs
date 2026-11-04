@@ -19,8 +19,10 @@ use super::runtime::Server;
 use super::schema::{Session, Status};
 use crate::session_access::{AccessHolder, SessionAccess};
 
+mod fork;
 mod operations;
 mod retention;
+pub use fork::Forked;
 pub use operations::{Answer, Input, Options};
 
 /// Host identity which must accompany every controller mutation.
@@ -63,6 +65,12 @@ pub enum Error {
     /// gone.
     #[error("The native OpenCode session no longer exists")]
     SessionNotFound,
+    /// Another process may hold the history source, so no fork was made.
+    #[error("Another OpenCode process has this history open; close it to fork here")]
+    SourceHeld,
+    /// A fork was sent and its answer does not say what became of it.
+    #[error("OpenCode did not confirm the fork, so a new session may exist")]
+    ForkUnknown,
     /// The native request failed; mutations are not retried.
     #[error(transparent)]
     Native(#[from] ClientError),
@@ -80,6 +88,8 @@ impl Error {
             Self::InvalidInput => "invalid_input",
             Self::Capacity => "capacity",
             Self::SessionNotFound => "session_not_found",
+            Self::SourceHeld => "source_held",
+            Self::ForkUnknown => "fork_unknown",
             Self::Native(_) => "native_request_failed",
         }
     }
@@ -132,6 +142,9 @@ pub struct Info {
     pub identity: Identity,
     /// Native external executable version.
     pub version: String,
+    /// This version's session fork was verified. An older host says nothing.
+    #[serde(default)]
+    pub fork: bool,
 }
 
 /// A read answer bound to one host and native database incarnation.
@@ -200,6 +213,7 @@ impl Host {
             protocol: "opencode-http".into(),
             identity: self.0.identity.clone(),
             version: self.0.version.clone(),
+            fork: self.0.client.forks(),
         }
     }
 

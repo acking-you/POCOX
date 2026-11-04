@@ -600,6 +600,213 @@ async fn native_host_stream_options_permissions_questions_commands_and_cancel() 
 }
 
 /// Run the fixture's executable with its isolated environment.
+/// The messages the model last saw for a turn carrying `marker`.
+async fn context_of(model: &model_fixture::Fixture, marker: &str) -> String {
+    for _ in 0..200 {
+        let turns = model.turns.lock().expect("fixture log").clone();
+        if let Some(context) = turns.iter().rev().find(|turn| turn.contains(marker)) {
+            return context.clone();
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("no model request carried {marker}");
+}
+
+#[tokio::test]
+#[ignore = "requires POCOX_OPENCODE_BIN pointing to installed OpenCode 1.19+ or 2.x"]
+async fn native_fork_copies_context_and_refuses_what_it_cannot_snapshot() {
+    use pocox_host_svc::opencode::host::{Error, Host, Input, Options};
+    async fn idle(host: &Host, session: &str) {
+        for _ in 0..200 {
+            let snapshot = host.snapshot(session, None).await.expect("snapshot");
+            if snapshot.turn_id.is_none() && snapshot.access.turn == "idle" {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("the turn did not end");
+    }
+    async fn turn(
+        host: &Host,
+        session: &str,
+        text: &str,
+        identity: &pocox_host_svc::opencode::host::Identity,
+    ) -> String {
+        let input = Input {
+            text: text.into(),
+            images: vec![],
+        };
+        let turn = host
+            .prompt(session, input, None, identity)
+            .await
+            .expect("prompt");
+        idle(host, session).await;
+        turn
+    }
+    let model = model_fixture::start().await;
+    let root = tempfile::tempdir().expect("disposable source");
+    let server = Server::start(&fixture_with_model(root.path(), &model))
+        .await
+        .expect("native start");
+    let database = server.detection.database.clone();
+    let version = server.detection.version.clone();
+    let host = Host::new(server).await.expect("host ready");
+    let identity = host.info().identity;
+    let directory = root.path().join("project");
+    std::fs::create_dir(&directory).expect("project");
+    let directory = directory.canonicalize().expect("project");
+    let directory = directory.to_str().expect("UTF8");
+    let session = host
+        .create(directory, Options::default(), &identity)
+        .await
+        .expect("session")
+        .id;
+    let first = turn(&host, &session, "first MARKER-A", &identity).await;
+    let second = turn(&host, &session, "second MARKER-B", &identity).await;
+    if !host.info().fork {
+        // Reported false until a real 2.x fork is verified, and never sent.
+        assert!(version.starts_with("2."), "{version}");
+        let error = host.fork(&session, None, &identity).await.expect_err("off");
+        assert!(matches!(error, Error::InvalidInput), "{error}");
+        host.stop().await.expect("stop");
+        return;
+    }
+
+    // The whole conversation, with nothing written to the source.
+    let messages = async || {
+        let window = host.snapshot(&session, None).await.expect("read").window;
+        serde_json::to_string(&window.messages).expect("messages")
+    };
+    let before = messages().await;
+    let forked = host.fork(&session, None, &identity).await.expect("fork");
+    assert!(forked.boundary_confirmed);
+    assert_ne!(forked.session.id, session);
+    assert_eq!(forked.session.directory, directory);
+    assert_eq!(forked.session.parent_id, None, "a fork is not a spawned agent");
+    assert_eq!(before, messages().await, "a fork writes nothing to its source");
+
+    // Its own admission, then each side's turns stay on their side.
+    let access = host.access(&forked.session.id).await.expect("access");
+    assert_eq!(access.reason, "not_opened", "a fork holds nothing until it is opened");
+    let opened = host
+        .open(&forked.session.id, &identity)
+        .await
+        .expect("open");
+    assert_eq!((opened.access.mode.as_str(), opened.access.reason.as_str()), ("write", "owned"));
+    turn(&host, &forked.session.id, "fork MARKER-C", &identity).await;
+    let context = context_of(&model, "MARKER-C").await;
+    assert!(context.contains("MARKER-A") && context.contains("MARKER-B"), "{context}");
+    turn(&host, &session, "source MARKER-D", &identity).await;
+    let context = context_of(&model, "MARKER-D").await;
+    assert!(context.contains("MARKER-B") && !context.contains("MARKER-C"), "{context}");
+
+    // Through a turn, inclusive.
+    let bounded = host
+        .fork(&session, Some(&first), &identity)
+        .await
+        .expect("fork through a turn");
+    assert!(bounded.boundary_confirmed);
+    host.open(&bounded.session.id, &identity)
+        .await
+        .expect("open");
+    turn(&host, &bounded.session.id, "bounded MARKER-E", &identity).await;
+    let context = context_of(&model, "MARKER-E").await;
+    assert!(context.contains("MARKER-A") && !context.contains("MARKER-B"), "{context}");
+
+    // OpenCode copies by comparing ids, so only real turns may be named.
+    let sessions = || async {
+        host.sessions(Some(directory))
+            .await
+            .expect("sessions")
+            .len()
+    };
+    let count = sessions().await;
+    let answer = host
+        .snapshot(&session, None)
+        .await
+        .expect("read")
+        .window
+        .messages
+        .iter()
+        .find(|message| message.info["role"] == "assistant")
+        .and_then(|message| message.info["id"].as_str().map(str::to_owned))
+        .expect("an assistant message");
+    for turn in ["msg_doesnotexist", answer.as_str()] {
+        let error = host
+            .fork(&session, Some(turn), &identity)
+            .await
+            .expect_err("not a turn");
+        assert!(matches!(error, Error::InvalidInput), "{turn}: {error}");
+    }
+    let error = host
+        .fork("ses_doesnotexist", None, &identity)
+        .await
+        .expect_err("no such session");
+    assert!(matches!(error, Error::SessionNotFound), "{error}");
+    assert_eq!(sessions().await, count, "a refusal creates nothing");
+
+    // A running turn: the copy would keep an unfinished message, unless the
+    // fork stops before it.
+    let input = Input {
+        text: "HOLD_FIXTURE MARKER-G".into(),
+        images: vec![],
+    };
+    let held = host
+        .prompt(&session, input, None, &identity)
+        .await
+        .expect("held prompt");
+    context_of(&model, "MARKER-G").await;
+    for through in [None, Some(held.as_str())] {
+        let error = host
+            .fork(&session, through, &identity)
+            .await
+            .expect_err("running");
+        assert!(matches!(error, Error::Busy), "{through:?}: {error}");
+    }
+    let before_it = host
+        .fork(&session, Some(&second), &identity)
+        .await
+        .expect("a finished turn stays a boundary");
+    assert!(before_it.boundary_confirmed);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    model.gate.notify_waiters();
+    idle(&host, &session).await;
+
+    // Another process on the database: a second engine, so nothing is created.
+    let count = sessions().await;
+    let process::Spawned {
+        mut process,
+        stdin,
+        mut stdout,
+    } = process::spawn(
+        std::path::Path::new("/usr/bin/python3"),
+        &["-c".into(), OUTSIDE_READER.into(), database.display().to_string()],
+        None,
+        &[],
+    )
+    .expect("outside reader");
+    drop(stdin);
+    use tokio::io::AsyncReadExt;
+    let mut ready = [0u8; 6];
+    tokio::time::timeout(Duration::from_secs(10), stdout.read_exact(&mut ready))
+        .await
+        .expect("reader ready deadline")
+        .expect("reader ready");
+    let error = host
+        .fork(&session, None, &identity)
+        .await
+        .expect_err("held source");
+    assert!(matches!(error, Error::SourceHeld), "{error}");
+    assert!(process.stop(Duration::from_millis(50)).await);
+    assert_eq!(sessions().await, count, "a refusal creates nothing");
+    let forked = host
+        .fork(&session, None, &identity)
+        .await
+        .expect("free again");
+    assert!(forked.boundary_confirmed);
+    host.stop().await.expect("stop");
+}
+
 async fn cli(launch: &Launch, args: &[&str]) -> String {
     let args: Vec<String> = args.iter().map(|arg| (*arg).to_owned()).collect();
     let output = process::inspect_output(

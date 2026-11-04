@@ -406,11 +406,14 @@ extension _SessionExternalWriter on _AppSessionState {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _accessPanel(l10n),
-            if (hasCwd) ...[
+            if (hasCwd || _canFork) ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: _externalDiffButton(l10n),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (_canFork) _forkFootButton(l10n),
+                  if (hasCwd) _externalDiffButton(l10n),
+                ],
               ),
             ],
           ],
@@ -473,7 +476,7 @@ extension _SessionExternalWriter on _AppSessionState {
       child: ReadOnlyFootRow(
         lead: state,
         actions: [
-          if (_caps.fork) _forkFootButton(l10n),
+          if (_canFork) _forkFootButton(l10n),
           if (hasCwd) _externalDiffButton(l10n),
         ],
       ),

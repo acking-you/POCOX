@@ -207,8 +207,10 @@ extension _SessionRecovery on _AppSessionState {
           : _threads.where((t) => t.id == startTid).firstOrNull;
       if (!current()) return;
       _parentThreadId = metadata?.parentThreadId;
-      _fork.source = metadata?.forkedFromId;
-      if (metadata != null) {
+      // A provider's listing may name no source; a fork made here remembers it.
+      final known = _discoveredThreads[startTid];
+      _fork.source = metadata?.forkedFromId ?? known?.forkedFromId;
+      if (metadata != null && metadata.forkedFromId == _fork.source) {
         _discoveredThreads[metadata.id] = metadata;
         _fork.origins[metadata.id] = metadata.forkedFromId;
       }

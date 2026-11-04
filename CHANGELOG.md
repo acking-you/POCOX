@@ -9,6 +9,9 @@ breaking change goes.
 
 ## Unreleased
 
+- Fork confirmations expire when their conversation view or host connection
+  changes, and recheck the provider's current fork restrictions before sending.
+  A delayed settings read also stops before writing if its host connection changed.
 - **A new shape for the app.** One list of destinations now drives every
   navigation.
   - **Wide windows** have a full-width title strip, an icon rail on every page and
@@ -43,8 +46,15 @@ breaking change goes.
   and a source's card and sheet list its forks. The source is only read: its writer
   keeps running, and its drafts and queue stay. A running turn is frozen as
   interrupted in the branch. A refusal, a lost answer and an ignored turn boundary
-  are each reported rather than retried or hidden. Other providers offer no fork
-  yet. ([details](docs/session-fork.md))
+  are each reported rather than retried or hidden. ([details](docs/session-fork.md))
+- **Fork Claude, Grok and OpenCode conversations.** Each uses its own native fork
+  on the host serving the session, and goes through ordinary session access when
+  opened. Claude and Grok also fork a session another client holds, including from
+  its read-only panel, as a snapshot of what it has stored. Grok and OpenCode can
+  stop at a finished turn; Claude forks only from the latest saved state. OpenCode
+  1.x refuses while another process holds its history or the turn is still running
+  (a finished earlier turn stays a boundary). OpenCode 2.x and custom ACP agents
+  offer no fork. ([details](docs/session-fork.md#claude-grok-and-opencode))
 - **Fix a takeover stopping a session's owner for nothing.** Resuming a session
   from this device's Local sessions could pick a connected service on another
   device. A takeover then stopped the local client and failed to resume, because
@@ -52,6 +62,15 @@ breaking change goes.
   app runs here, and a takeover checks that its target can open the session before
   stopping anything. A session hosted by a separate `pocox serve` is resumed from
   that host's own session browser.
+- **Fix a new Claude conversation refusing its messages as read-only.** When the
+  Claude CLI started slowly, as on its first launch after an update or on a busy
+  machine, the host did not recognise its own child, and every message in that
+  session was refused. A slow start no longer matters, and a stale record of an
+  earlier process still does not count as an owner.
+- **Claude sessions stay writable across a Claude Code update.** A session open
+  while the CLI updated used to refuse its next message as read-only. It now keeps
+  working, even after the old version is removed, and a terminal client still on
+  the old version is named as the holder. A second writer is still refused.
 - **Fix an existing conversation reading as empty while disconnected.** A
   conversation whose history had not loaded said "Send a message to start the
   conversation". It now says its history loads once reconnected, or offers a retry

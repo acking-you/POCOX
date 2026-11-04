@@ -346,6 +346,23 @@ void main() {
     expect(find.byKey(const Key('activity-tile-wider')), findsOneWidget);
   });
 
+  desktop('a fork confirmation cannot cross a reconnect', (t) async {
+    final api = await openSource(t);
+    await openMenu(t);
+    await t.tap(find.byKey(const Key('session-fork')));
+    await frames(t);
+
+    await api.appDisconnect(service);
+    for (var i = 0; i < 3; i++) {
+      await frames(t);
+    }
+    expect(api.appIsConnected(service), isTrue);
+    await t.tap(find.byKey(const Key('fork-confirm')));
+    await frames(t);
+    expect(api.forkCalls, isEmpty);
+    expect(api.lastResumed, 'source');
+  });
+
   desktop('a pending fork blocks another and a late answer moves no one', (
     t,
   ) async {
@@ -412,6 +429,11 @@ void main() {
       await frames(t);
       final fork = api.forkedThreads.single;
       expect(api.lastResumed, resumed, reason: 'the fork opened nothing');
+      expect(
+        api.threadConfigs.containsKey(fork.id),
+        isFalse,
+        reason: 'a delayed settings read cannot write after the host changes',
+      );
       expect(find.text(l10n.forkHostChanged), findsOneWidget);
       expect(find.byKey(Key('activity-tile-${fork.id}')), findsNothing);
     });

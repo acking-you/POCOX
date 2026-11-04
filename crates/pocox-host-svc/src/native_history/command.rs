@@ -12,22 +12,15 @@ use crate::process::{self, Spawned};
 
 const MAX_INPUT: usize = 64 * 1024;
 pub(super) const MAX_OUTPUT: usize = 10 * 1024 * 1024;
+/// A reader's whole budget. The first launch of a freshly updated CLI, which an
+/// owner probe can be, takes seconds by itself.
+const TIMEOUT: Duration = Duration::from_secs(20);
 
 pub(super) async fn read_json(
     program: &Path,
     args: &[String],
     env: &[(OsString, OsString)],
     input: &Value,
-) -> Result<Value> {
-    read_json_with_timeout(program, args, env, input, Duration::from_secs(20)).await
-}
-
-pub(super) async fn read_json_with_timeout(
-    program: &Path,
-    args: &[String],
-    env: &[(OsString, OsString)],
-    input: &Value,
-    timeout: Duration,
 ) -> Result<Value> {
     let input = serde_json::to_vec(input)?;
     if input.len() > MAX_INPUT {
@@ -41,7 +34,7 @@ pub(super) async fn read_json_with_timeout(
     let pid = process
         .id()
         .context("native history reader has no process id")?;
-    let result = tokio::time::timeout(timeout, async {
+    let result = tokio::time::timeout(TIMEOUT, async {
         stdin.write_all(&input).await?;
         stdin.shutdown().await?;
         drop(stdin);

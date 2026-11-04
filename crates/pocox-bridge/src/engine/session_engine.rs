@@ -162,9 +162,15 @@ pub struct Capabilities {
     pub rate_limits: bool,
     /// Taking over a session held by another local process.
     pub takeover: bool,
-    /// Branching a session into an independent one, through a completed turn
-    /// or from its latest saved state.
+    /// Branching a session into an independent one from its latest saved
+    /// state.
     pub fork: bool,
+    /// Forking through a chosen completed turn.
+    pub fork_through_turn: bool,
+    /// Forking a source another process holds or a running turn changes, as a
+    /// snapshot. Without it those wait, except a boundary before a running
+    /// turn.
+    pub fork_busy_source: bool,
     /// Monitoring another writer.
     pub external_writer_monitor: bool,
     /// Sessions read from this device's disk.
@@ -230,6 +236,8 @@ impl Capabilities {
             rate_limits: true,
             takeover: true,
             fork: true,
+            fork_through_turn: true,
+            fork_busy_source: true,
             external_writer_monitor: true,
             local_sessions: true,
             plan_mode: true,
@@ -734,6 +742,15 @@ impl SessionEngine for AcpEngine {
 
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()> {
         acp::thread_resume(service_key, thread_id)
+    }
+
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        acp::thread_fork(service_key, thread_id, through_turn_id)
     }
 
     fn thread_read(

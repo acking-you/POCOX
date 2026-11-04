@@ -181,6 +181,8 @@ class AppCapabilities {
     this.questionMultiple = false,
     this.permissionFeedback = false,
     this.fork = false,
+    this.forkThroughTurn = false,
+    this.forkBusySource = false,
   });
 
   /// The Codex app-server's capabilities.
@@ -193,6 +195,8 @@ class AppCapabilities {
     rateLimits: true,
     takeover: true,
     fork: true,
+    forkThroughTurn: true,
+    forkBusySource: true,
     externalWriterMonitor: true,
     localSessions: true,
     planMode: true,
@@ -367,6 +371,13 @@ class AppCapabilities {
 
   /// Branching a session into an independent one.
   final bool fork;
+
+  /// Forking through a chosen completed turn.
+  final bool forkThroughTurn;
+
+  /// Forking a source another process holds or a running turn changes, as a
+  /// snapshot. Without it those wait, except a boundary before a running turn.
+  final bool forkBusySource;
 
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;

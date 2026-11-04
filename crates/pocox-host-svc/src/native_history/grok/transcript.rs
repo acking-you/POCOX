@@ -53,6 +53,7 @@ const ACP: u8 = 0;
 const TURN_END: u8 = 1;
 const OTHER: u8 = 2;
 const OVERSIZED: u8 = 3;
+const COMPACTION: u8 = 4;
 
 #[derive(Clone, Copy)]
 struct Span {
@@ -197,6 +198,7 @@ fn classify(line: &str) -> (Step, u8, Option<u64>) {
         return match (update.session_update, update.target_prompt_index) {
             ("rewind_marker", Some(target)) => (Step::Rewind(target), OTHER, seq),
             ("turn_completed", _) => (Step::Other, TURN_END, seq),
+            ("compaction_checkpoint", _) => (Step::Other, COMPACTION, seq),
             _ => (Step::Other, OTHER, seq),
         };
     }
@@ -589,6 +591,65 @@ pub(in crate::native_history) fn read(
     })
 }
 
+/// One counted prompt of a session's log, as a fork boundary needs it.
+/// Positions are Grok's `targetPromptIndex`: both count the same user runs
+/// after the same rewind filter (`truncate_for_prompt_by`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PromptMark {
+    /// This prompt's turn id in this reader's pages.
+    pub turn: String,
+    /// Grok recorded the end of a turn during it.
+    pub ended: bool,
+    /// The prompt ids (a host's turn ids) of the turns that ended during it.
+    pub prompt_ids: Vec<String>,
+    /// Grok compacted the conversation during it, rewriting what came before.
+    pub compacted: bool,
+}
+
+/// Every counted prompt of the log, oldest first.
+pub(in crate::native_history) fn prompts(dir: &Path, index: &mut Index) -> Result<Vec<PromptMark>> {
+    let path = dir.join(UPDATES_FILE);
+    index.update(&path)?;
+    let mut file = File::open(&path).ok();
+    let mut marks = Vec::with_capacity(index.prompts.len());
+    for (n, &start) in index.prompts.iter().enumerate() {
+        let end = index
+            .prompts
+            .get(n + 1)
+            .copied()
+            .unwrap_or(index.spans.len());
+        let mut mark = PromptMark {
+            turn: format!("grok:{}", index.spans[start].offset),
+            ..PromptMark::default()
+        };
+        for span in &index.spans[start..end] {
+            mark.compacted |= span.kind == COMPACTION;
+            if span.kind != TURN_END {
+                continue;
+            }
+            mark.ended = true;
+            let Some(file) = file.as_mut() else {
+                bail!("the Grok session log is unavailable");
+            };
+            let mut bytes = vec![0; span.len as usize];
+            file.seek(SeekFrom::Start(span.offset))?;
+            file.read_exact(&mut bytes)
+                .context("the Grok session log changed while reading; retry")?;
+            let text = std::str::from_utf8(trim_line(&bytes)).unwrap_or_default();
+            let params = serde_json::from_str::<Value>(params_of(text).0).unwrap_or_default();
+            let update = &params["update"];
+            if let Some(id) = update["prompt_id"]
+                .as_str()
+                .or_else(|| update["promptId"].as_str())
+            {
+                mark.prompt_ids.push(id.to_owned());
+            }
+        }
+        marks.push(mark);
+    }
+    Ok(marks)
+}
+
 fn fold_turn(
     file: Option<&mut File>,
     id: &str,
@@ -601,7 +662,7 @@ fn fold_turn(
     let mut omitted = 0u64;
     if let Some(file) = file {
         for span in spans {
-            if span.kind == OTHER {
+            if matches!(span.kind, OTHER | COMPACTION) {
                 continue;
             }
             if span.kind == OVERSIZED || u64::from(span.len) > *budget {

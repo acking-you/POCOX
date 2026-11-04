@@ -181,6 +181,7 @@ UI is driven by capabilities, not by engine name:
 | `question_multiple` | questions may allow several answers |
 | `permission_feedback` | a permission answer may carry text (off for now) |
 | `session_config`, `permission_options`, `steer`, `rename` | as for ACP agents |
+| `fork`, `fork_through_turn` (1.x; the gateway's `fork`) | **Fork conversation** and **Fork through this turn**; refused while another process holds the source, and for a turn still running ([forking](session-fork.md#claude-grok-and-opencode)) |
 | `hostAccess` (every ACP and OpenCode host) | the host decides session access, not the Codex takeover path |
 
 The host reports a model catalog together with session and draft options.

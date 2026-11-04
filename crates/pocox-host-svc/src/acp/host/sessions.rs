@@ -441,6 +441,7 @@ impl AgentHost {
                 "sessionId": id,
                 "cwd": cwd,
                 "title": session["title"].as_str().map(|t| clip(t, 512)),
+                "forkedFrom": session["forkedFrom"].as_str().filter(|id| id.len() <= MAX_ID),
                 "updatedAt": session["updatedAt"].as_str().map(|t| clip(t, 64)),
             }));
         }

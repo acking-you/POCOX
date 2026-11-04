@@ -2,11 +2,12 @@
 
 use anyhow::{anyhow, bail, Result};
 use pocox_host_svc::opencode::catalog::Command;
+use pocox_host_svc::opencode::client::ClientError;
 use pocox_host_svc::opencode::host::{Answer, Identity, Input, Options};
 use pocox_host_svc::session_access::SessionAccess;
 use serde_json::Value;
 
-use super::super::app_session::{OlderPage, ThreadHistory};
+use super::super::app_session::{ForkOutcome, OlderPage, ThreadFork, ThreadHistory, ThreadMeta};
 use super::super::session_engine::{StartOptions, Supplement, TurnOptions};
 use super::{block, conn, events, lock, projection, settings, validate_snapshot, Link};
 use crate::engine::runtime;
@@ -116,6 +117,58 @@ pub(super) fn start(service: &str, options: StartOptions) -> Result<String> {
     let next = block(link.client.snapshot(&session.id, None))?;
     link.accept(&identity, next)?;
     Ok(session.id)
+}
+
+/// Branch a session on the host serving it, through a turn or whole. A refusal
+/// is an error: nothing was created. Anything short of the host's confirmation
+/// may follow a created session, and is never retried.
+pub(super) fn fork(
+    service: &str,
+    session: &str,
+    through_turn: Option<&str>,
+) -> Result<ForkOutcome> {
+    fork_on(&conn(service)?, session, through_turn)
+}
+
+pub(super) fn fork_on(
+    link: &Link,
+    session: &str,
+    through_turn: Option<&str>,
+) -> Result<ForkOutcome> {
+    let identity = link.identity();
+    let answer = runtime::runtime().block_on(link.client.fork(session, through_turn, &identity));
+    let forked = match answer {
+        Ok(forked) => forked,
+        Err(ClientError::Gateway {
+            code, ..
+        }) => match code.as_str() {
+            "fork_unknown" => return Ok(ForkOutcome::Unknown(code)),
+            "busy" => {
+                bail!("a turn is still running; fork through an earlier turn or wait for it to end")
+            },
+            "source_held" => {
+                bail!("another OpenCode process has this history open; close it to fork here")
+            },
+            _ => bail!("OpenCode refused the fork ({code})"),
+        },
+        Err(error) => return Ok(ForkOutcome::Unknown(error.to_string())),
+    };
+    let new = forked.session;
+    Ok(ForkOutcome::Created(ThreadFork {
+        thread: ThreadMeta {
+            preview: new.title.clone(),
+            name: Some(new.title),
+            thread_source: None,
+            parent_thread_id: None,
+            forked_from_id: Some(session.into()),
+            cwd: new.directory,
+            origin_url: None,
+            updated_at: i64::try_from(new.time.updated / 1000).unwrap_or(i64::MAX),
+            id: new.id,
+        },
+        last_turn_interrupted: false,
+        boundary_confirmed: forked.boundary_confirmed,
+    }))
 }
 
 pub(super) fn read(service: &str, session: &str) -> Result<ThreadHistory> {

@@ -33,6 +33,9 @@ impl Wire for V2 {
     const EVENTS: &'static [&'static str] = &["api", "event"];
     const LISTENING: &'static str = "server listening on ";
     const BACKGROUND_SERVER: bool = true;
+    /// Not verified: which of a shared server's clients show which session
+    /// cannot be seen, and no 2.x build was at hand to try its fork against.
+    const FORK: bool = false;
     const MIN: (u32, u32) = (2, 0);
 
     fn event(data: &[u8]) -> Result<Option<Event>, ClientError> {
@@ -90,6 +93,16 @@ impl Wire for V2 {
     async fn session(http: &Http<Native>, id: &str) -> Result<Session, ClientError> {
         let session: Data<shape::Session> = http.get(&["api", "session", id], None, &[]).await?;
         Ok(session.data.into())
+    }
+
+    /// Never reached: the host checks [`Self::FORK`] first.
+    async fn fork(
+        _http: &Http<Native>,
+        _session: &str,
+        _directory: &str,
+        _before: Option<&str>,
+    ) -> Result<Session, ClientError> {
+        Err(ClientError::Http(501))
     }
 
     async fn create(http: &Http<Native>, directory: &str) -> Result<Session, ClientError> {

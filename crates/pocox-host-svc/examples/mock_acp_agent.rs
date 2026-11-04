@@ -21,6 +21,8 @@
 //!   top-level `_meta`: `ok` injects into a running prompt (and streams
 //!   `steered:<text>`) or answers `promptRequired` when none runs, `odd`
 //!   answers `startedNewTurn`, `silent` never answers.
+//! - `--fork-log PATH` records `_x.ai/session/fork` params there; its answer is
+//!   `--fork-answer`: `created` (the default), `internal` or `missing`.
 //! - `--grok` speaks like Grok Build 1.0.62 (`_meta.grokShell`): its queue
 //!   names the running `_meta.promptId`, every turn ends with `turn_completed`,
 //!   `_x.ai/interject` streams ` still` and, in the next model response,
@@ -79,6 +81,10 @@ struct Agent {
     clear_title: bool,
     steering: Option<String>,
     grok: bool,
+    /// Where `_x.ai/session/fork` records its params.
+    fork_log: Option<String>,
+    /// How `_x.ai/session/fork` answers.
+    fork_answer: Option<String>,
     /// Grok's permission mode, as `_meta` and `_x.ai/yolo_mode_changed` set it.
     permission: Arc<Mutex<String>>,
     /// Sessions whose prompt is still unanswered.
@@ -108,6 +114,8 @@ fn fail(id: &Value, code: i64, message: &str) {
 /// The model response the next updates belong to (Grok's
 /// `_meta.streamStartMs`).
 static STREAM: AtomicU64 = AtomicU64::new(1);
+/// The session `_x.ai/session/fork` says it created.
+const FORK_ID: &str = "01a15501-b678-7db0-b062-a1f5b1edc8d2";
 
 fn update(session: &str, update: Value) {
     let stream = STREAM.load(Ordering::SeqCst);
@@ -343,6 +351,20 @@ impl Agent {
             "_session/steering" if self.steering.is_some() => self.steer(&id, &params),
             "_x.ai/interject" if self.grok => self.interject(&id, &params).await,
             "_x.ai/session/rename" if self.grok => respond(&id, json!({"success": true})),
+            "_x.ai/session/fork" if self.grok => {
+                if let Some(path) = &self.fork_log {
+                    let _ = std::fs::write(path, params.to_string());
+                }
+                match self.fork_answer.as_deref() {
+                    Some("internal") => fail(&id, -32603, "Internal error"),
+                    Some("missing") => fail(&id, -32601, "Method not found"),
+                    _ => respond(
+                        &id,
+                        json!({"newSessionId": FORK_ID, "parentSessionId":
+                        params["sourceSessionId"]}),
+                    ),
+                }
+            },
             "_x.ai/billing" if self.grok => respond(
                 &id,
                 json!({
@@ -672,6 +694,8 @@ async fn main() {
         clear_title: has("--clear-title"),
         steering: flag("--steering"),
         grok: has("--grok"),
+        fork_log: flag("--fork-log"),
+        fork_answer: flag("--fork-answer"),
         permission: Arc::new(Mutex::new("ask".into())),
         running: Arc::new(Mutex::new(HashSet::new())),
         args: args.clone(),

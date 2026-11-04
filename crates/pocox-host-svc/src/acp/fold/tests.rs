@@ -99,6 +99,25 @@ fn tool_updates_replace_supplied_collections() {
 }
 
 #[test]
+fn a_replayed_turn_keeps_the_agents_own_prompt_index() {
+    let mut transcript = Transcript::new(true);
+    let prompt = |index: u64, text: &str| {
+        json!({"sessionUpdate": "user_message_chunk", "content": {"type": "text", "text": text},
+            "_meta": {"promptIndex": index}})
+    };
+    transcript.apply(None, &prompt(3, "again"));
+    transcript.apply(None, &chunk("agent_message_chunk", "reply"));
+    // What this host sent itself has no replay to name it.
+    transcript.begin_turn("live", "hello", &[]);
+    let indexes: Vec<_> = transcript
+        .turns
+        .iter()
+        .map(|turn| turn.prompt_index)
+        .collect();
+    assert_eq!(indexes, [Some(3), None]);
+}
+
+#[test]
 fn replay_groups_by_user_message_and_plans_replace() {
     let mut transcript = Transcript::default();
     transcript.apply(None, &chunk("user_message_chunk", "q1"));

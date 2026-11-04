@@ -79,17 +79,22 @@ String forkCreatedMessage(AppLocalizations l10n, ThreadForkResult fork) =>
 /// [fork]. The server restores what it tracks itself; plan mode, for one, lives
 /// only here, and a fork must not silently leave it. Best effort: a slow or
 /// unreachable host keeps the fork on what the server reports.
+/// [isCurrent] keeps a delayed settings read from writing through a changed view
+/// or connection.
 Future<void> copyForkSettings(
   BridgeApi api,
   String serviceKey, {
   required String source,
   required String fork,
+  required bool Function() isCurrent,
 }) async {
   const limit = Duration(seconds: 5);
   try {
+    if (!isCurrent()) return;
     final config = await api
         .metaThreadConfigGet(serviceKey, source)
         .timeout(limit);
+    if (!isCurrent()) return;
     await api.metaThreadConfigSet(serviceKey, fork, config).timeout(limit);
   } catch (_) {
     // The fork exists either way, and opening it must not wait on this.

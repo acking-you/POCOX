@@ -46,6 +46,7 @@ impl Fixture {
             protocol: "opencode-http".into(),
             identity: identity(),
             version: "fixture".into(),
+            fork: false,
         };
         let shared = Arc::new(Mutex::new(Shared {
             info,

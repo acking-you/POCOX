@@ -98,6 +98,7 @@ pub fn router(host: AgentHost) -> Router {
         .route("/acp/v1/sessions", get(list_sessions))
         .route("/acp/v1/sessions/new", post(new_session))
         .route("/acp/v1/sessions/open", post(open_session))
+        .route("/acp/v1/sessions/fork", post(fork_session))
         .route("/acp/v1/sessions/history", get(history))
         .route("/acp/v1/sessions/native-events", get(native::follow))
         .route("/acp/v1/sessions/native-status", get(native::status))
@@ -266,6 +267,24 @@ async fn open_session(State(state): State<ApiState>, Json(body): Json<SessionBod
     state
         .host
         .open_session(&body.session_id, expected(&body.identity))
+        .await
+        .map(Json)
+        .map_err(ApiError)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ForkBody {
+    session_id: String,
+    through_turn: Option<String>,
+    #[serde(flatten)]
+    identity: Identity,
+}
+
+async fn fork_session(State(state): State<ApiState>, Json(body): Json<ForkBody>) -> ApiResult {
+    state
+        .host
+        .fork_session(&body.session_id, body.through_turn.as_deref(), &body.identity)
         .await
         .map(Json)
         .map_err(ApiError)

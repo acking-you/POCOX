@@ -59,9 +59,7 @@ pub(crate) use self::connection::{connect, evict_idle, is_idle, probe_api, probe
 pub use self::connection::{
     connect_local, disconnect, is_connected, is_retained, probe_endpoint, probe_http_endpoint,
 };
-#[cfg(test)]
-pub use self::fork::ThreadFork;
-pub use self::fork::{thread_fork, ForkOutcome};
+pub use self::fork::{thread_fork, ForkOutcome, ThreadFork};
 use self::history::LoadedHistory;
 pub use self::history::{ThreadHistory, TurnSummary};
 pub(super) use self::items::{encode_plan, format_content_diff};
