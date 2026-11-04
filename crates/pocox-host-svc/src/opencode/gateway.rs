@@ -1,13 +1,15 @@
 //! Typed controller client for the restricted Pocox native gateway.
 
+use std::time::Duration;
+
 use reqwest::Method;
 use serde_json::{json, Value};
 
 use super::catalog::Catalog;
 use super::client::ClientError;
 use super::events::EventStream;
-use super::host::{Answer, Identity, Info, Input, Options, ReadResult, Snapshot};
-use super::http::{Http, Pocox};
+use super::host::{Answer, Forked, Identity, Info, Input, Options, ReadResult, Snapshot};
+use super::http::{Http, Pocox, FORK_TIMEOUT, MAX_BODY};
 use super::schema::Session;
 use super::wire::Dialect;
 use crate::session_access::SessionAccess;
@@ -123,6 +125,22 @@ impl Gateway {
                 &json!({"identity":identity,"directory":directory,"options":options}),
             )
             .await
+    }
+
+    /// Branch a session on the host, through a turn or whole. Never retried: a
+    /// failed request says nothing, unless the gateway itself refused it.
+    pub async fn fork(
+        &self,
+        session: &str,
+        through_turn: Option<&str>,
+        identity: &Identity,
+    ) -> Result<Forked, ClientError> {
+        let request = self
+            .0
+            .request(Method::POST, &["opencode", "v1", "fork"], None)?
+            .json(&json!({"identity":identity,"sessionId":session,"throughTurn":through_turn}))
+            .timeout(FORK_TIMEOUT + Duration::from_secs(30));
+        self.0.call(request, MAX_BODY).await
     }
 
     /// Relinquish this session's admission without stopping the shared server.

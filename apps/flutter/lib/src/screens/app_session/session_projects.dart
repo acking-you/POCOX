@@ -203,42 +203,8 @@ extension _SessionProjects on _AppSessionState {
     return out;
   }
 
-  /// Sidebar footer: flip the app between light and dark without a trip to
-  /// settings — appearance is the one setting people change on a whim (and by
-  /// time of day), so it earns a one-tap control next to the other shortcuts.
-  ///
-  /// Two states, not three. It used to cycle system → light → dark to keep
-  /// "follow the OS" reachable, but a control whose next state you can't
-  /// predict from its icon is a worse trade than losing one-tap access to a
-  /// default that Settings still offers. The icon shows what is in effect now;
-  /// tapping shows the other one.
-  /// One sidebar-footer shortcut: closes the phone sidebar, then pushes.
-  Widget _paneShortcut({
-    required String key,
-    required IconData icon,
-    required String tooltip,
-    required BuildContext ctx,
-    required String route,
-  }) => IconButton(
-    key: Key(key),
-    icon: Icon(icon, size: isDesktop ? 18 : 20),
-    tooltip: tooltip,
-    style: IconButton.styleFrom(
-      minimumSize: isDesktop ? const Size(32, 32) : const Size(44, 44),
-      foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(kRowRadius),
-      ),
-    ),
-    onPressed: () {
-      final nav = LayeredNavigation.maybeOf(ctx);
-      if (nav?.isOpen ?? false) nav!.close();
-      context.push(route);
-    },
-  );
-
-  /// A labelled action row in the sidebar, drawn like a conversation row so
-  /// the list reads as one column. Touch layouts grow it to a 44 px target.
+  /// The column's new conversation: a row like the list's own, so it reads as
+  /// the first entry of the list it creates into. 44 px under a finger.
   Widget _sidebarAction({
     required Key key,
     required IconData icon,
@@ -246,43 +212,36 @@ extension _SessionProjects on _AppSessionState {
     required VoidCallback onTap,
   }) {
     final scheme = Theme.of(context).colorScheme;
-    // The list's primary action: a capsule of chrome glass on the backdrop,
-    // found by its lift rather than an accent. It yields under the pointer.
     final touch = !isDesktop;
-    final ink = scheme.onSurface;
-    const radius = BorderRadius.all(Radius.circular(999));
-    return PressScale(
-      scale: 0.97,
-      child: Glass(
-        depth: GlassDepth.chrome,
+    final radius = BorderRadius.circular(kControlRadius);
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        key: key,
+        mouseCursor: clickable,
         borderRadius: radius,
-        child: InkWell(
-          key: key,
-          mouseCursor: clickable,
-          borderRadius: radius,
-          onTap: onTap,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: touch ? 50 : 38),
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: touch ? 18 : 14),
-              child: Row(
-                children: [
-                  Icon(icon, size: touch ? 20 : 16, color: ink),
-                  SizedBox(width: touch ? 14 : 10),
-                  Expanded(
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: touch ? 15 : 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: ink,
-                      ),
+        hoverColor: softWash(scheme),
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: touch ? 44 : 36),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                Icon(icon, size: 16, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: touch ? 14.5 : 13.5,
+                      color: scheme.onSurface,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -293,30 +252,32 @@ extension _SessionProjects on _AppSessionState {
   /// Home-pane header row: the host currently serving this chat, and the way
   /// to change it. While a switch runs it names the host being reached, so
   /// the user always sees WHERE the conversation runs and what is changing.
-  Widget _serviceSwitcher(AppLocalizations l10n) => HostSwitcher(
-    services: widget.services,
-    localKeys: {
-      for (final service in ref.read(bridgeApiProvider).localServices())
-        service.key,
-    },
-    connectedKeys: {
-      for (final service in widget.services)
-        if (ref.read(bridgeApiProvider).appIsConnected(service.key))
-          service.key,
-    },
-    current: widget.serviceKey,
-    pending: widget.hostSwitch,
-    identities: _hostIdentities(),
-    onPick: (key) => widget.onSwitchService?.call(key),
-    onManage: () => context.push('/manage'),
-    // Re-discover: a host another device just started appears in this list
-    // (home watches discovery); the conversation and its draft stay.
-    onRefresh: () async {
-      ref.invalidate(appReachableProvider);
-      ref.invalidate(servicesProvider);
-      await ref.read(servicesProvider.future);
-    },
-  );
+  Widget _serviceSwitcher(AppLocalizations l10n, {bool capsules = false}) =>
+      HostSwitcher(
+        capsules: capsules,
+        services: widget.services,
+        localKeys: {
+          for (final service in ref.read(bridgeApiProvider).localServices())
+            service.key,
+        },
+        connectedKeys: {
+          for (final service in widget.services)
+            if (ref.read(bridgeApiProvider).appIsConnected(service.key))
+              service.key,
+        },
+        current: widget.serviceKey,
+        pending: widget.hostSwitch,
+        identities: _hostIdentities(),
+        onPick: (key) => widget.onSwitchService?.call(key),
+        onManage: () => context.push('/manage'),
+        // Re-discover: a host another device just started appears in this list
+        // (home watches discovery); the conversation and its draft stay.
+        onRefresh: () async {
+          ref.invalidate(appReachableProvider);
+          ref.invalidate(servicesProvider);
+          await ref.read(servicesProvider.future);
+        },
+      );
 
   /// Preserve project recency when opening another project's draft.
   List<({String cwd, List<ThreadMeta> threads})> _byProject(
@@ -370,8 +331,9 @@ extension _SessionProjects on _AppSessionState {
   /// claiming the epoch as their day.
   List<({String label, List<ThreadMeta> threads})> _byDay(
     List<ThreadMeta> threads,
-    DateTime now,
-  ) {
+    DateTime now, {
+    required int Function(ThreadMeta) at,
+  }) {
     final l10n = AppLocalizations.of(context);
     final locale = l10n.localeName;
     final today = DateTime(now.year, now.month, now.day);
@@ -380,12 +342,13 @@ extension _SessionProjects on _AppSessionState {
     final buckets = <String, List<ThreadMeta>>{};
     final undated = <ThreadMeta>[];
     for (final t in threads) {
-      if (t.updatedAt <= 0) {
+      final seconds = at(t);
+      if (seconds <= 0) {
         undated.add(t);
         continue;
       }
-      final at = DateTime.fromMillisecondsSinceEpoch(t.updatedAt * 1000);
-      final day = DateTime(at.year, at.month, at.day);
+      final when = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      final day = DateTime(when.year, when.month, when.day);
       final label = switch (today.difference(day).inDays) {
         <= 0 => l10n.groupToday,
         1 => l10n.groupYesterday,
@@ -476,7 +439,7 @@ extension _SessionProjects on _AppSessionState {
     child: Text(
       text,
       style: TextStyle(
-        fontSize: isDesktop ? 11.5 : 13,
+        fontSize: isDesktop ? 12.5 : 13,
         fontWeight: FontWeight.w600,
         color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),

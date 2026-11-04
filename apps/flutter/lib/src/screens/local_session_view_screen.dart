@@ -23,6 +23,7 @@ import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/ide_context.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/realtime_delegation.dart';
+import 'package:pocox/src/screens/local_sessions/local_fork.dart';
 import 'package:pocox/src/screens/local_sessions_screen.dart'
     show SessionSource, resumeLocalSession;
 import 'package:pocox/src/screens/app_session/generated_image_card.dart';
@@ -43,6 +44,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'local_session_view/native_window.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/read_only_foot.dart';
 
 part 'local_session_view/transcript_row.dart';
 part 'local_session_view/native_follow.dart';
@@ -56,6 +58,9 @@ part 'local_session_view/native_follow.dart';
 /// liveness, so the moment that other client's turn finishes and the session
 /// goes idle, it offers a confirmed force-resume to take it over. A free
 /// (unowned) session offers a plain resume.
+/// The reading column's width, so a wide window doesn't stretch bubbles.
+const double _readingWidth = 820;
+
 class LocalSessionViewScreen extends ConsumerStatefulWidget {
   /// Creates the viewer for [threadId].
   const LocalSessionViewScreen({
@@ -117,6 +122,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
   final _native = NativeHistoryWindow();
   bool _loadingOlder = false;
   bool _resuming = false;
+  bool _forking = false;
   bool _foreground = true;
 
   // Resolved (base64-decoded) attachments cached by item id: rows rebuild on
@@ -311,6 +317,33 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     }
   }
 
+  /// Keep working from this session without touching whoever holds it.
+  Future<void> _fork() async {
+    final live = _live;
+    if (_forking || _source.isNative || widget.guardian || live == null) return;
+    // The view's identity, not [_loadEpoch]: every background read moves that,
+    // and a read during the confirmation or the request changes nothing here.
+    final thread = widget.threadId;
+    final service = widget.serviceKey;
+    setState(() => _forking = true);
+    try {
+      await forkLocalSession(
+        context,
+        ref,
+        threadId: widget.threadId,
+        cwd: widget.cwd,
+        running: !live.allowsResume,
+        source: _source,
+        isCurrent: () =>
+            mounted &&
+            widget.threadId == thread &&
+            widget.serviceKey == service,
+      );
+    } finally {
+      if (mounted) setState(() => _forking = false);
+    }
+  }
+
   Future<void> _resume() async {
     final live = _live;
     if (_resuming ||
@@ -497,7 +530,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     return SelectionArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final side = (constraints.maxWidth - 820) / 2;
+          final side = (constraints.maxWidth - _readingWidth) / 2;
           final pad = side < 12 ? 12.0 : side;
           return SuperListView.builder(
             key: const ValueKey('view-transcript'),
@@ -531,23 +564,27 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     final live = _live;
     if (live == null) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: !_source.isNative && live.allowsResume && !widget.guardian
-            ? FilledButton.icon(
-                key: const Key('view-resume'),
-                onPressed: _resume,
-                icon: Icon(
-                  live.requiresTakeover
-                      ? AppIcons.bolt
-                      : AppIcons.play_circle_outline,
-                ),
-                label: Text(
-                  live.requiresTakeover
-                      ? l10n.forceTakeover
-                      : l10n.resumeSession,
+    return ReadOnlyFoot(
+      maxWidth: _readingWidth,
+      child: ReadOnlyFootRow(
+        lead: !_source.isNative && live.allowsResume && !widget.guardian
+            ? SizedBox(
+                height: ReadOnlyFoot.controlHeight,
+                child: FilledButton.icon(
+                  key: const Key('view-resume'),
+                  onPressed: _resume,
+                  icon: Icon(
+                    live.requiresTakeover
+                        ? AppIcons.bolt
+                        : AppIcons.play_circle_outline,
+                  ),
+                  label: Text(
+                    live.requiresTakeover
+                        ? l10n.forceTakeover
+                        : l10n.resumeSession,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               )
             : Row(
@@ -569,6 +606,16 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
                   ),
                 ],
               ),
+        actions: [
+          if (!_source.isNative && !widget.guardian)
+            ReadOnlyFootAction(
+              key: const Key('view-fork'),
+              icon: AppIcons.account_tree_outlined,
+              label: l10n.forkConfirm,
+              busy: _forking,
+              onPressed: _forking ? null : _fork,
+            ),
+        ],
       ),
     );
   }

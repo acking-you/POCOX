@@ -129,6 +129,23 @@ impl Client {
         dispatch!(self.dialect, W => W::create(&self.http, directory).await)
     }
 
+    /// Whether this server's fork was verified.
+    pub(crate) fn forks(&self) -> bool {
+        self.dialect.fork()
+    }
+
+    /// A new session with `session`'s messages up to but not including
+    /// `before`, or all of them. Never retried: a transport failure may follow
+    /// the copy.
+    pub async fn fork_session(
+        &self,
+        session: &str,
+        directory: &str,
+        before: Option<&str>,
+    ) -> Result<Session, ClientError> {
+        dispatch!(self.dialect, W => W::fork(&self.http, session, directory, before).await)
+    }
+
     /// Rename a session.
     pub async fn rename(
         &self,

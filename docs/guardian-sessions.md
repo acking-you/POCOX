@@ -32,8 +32,9 @@ and sidebar view changes. Expanding a parent again restores its nested expansion
 choices. These choices are view state and are not persisted between launches.
 
 Guardian reviewer sessions open through read-only history and monitoring, with a
-link back to the parent. They cannot be resumed or taken over, including through
-host force-resume routes. Automatic home selection chooses a normal root session.
+link back to the parent. They cannot be resumed, taken over or
+[forked](session-fork.md), including through host force-resume routes. Automatic
+home selection chooses a normal root session.
 The Rust resume boundary checks authoritative metadata too; direct FRB callers
 cannot bypass read-only mode, and failed metadata reads never proceed to resume.
 

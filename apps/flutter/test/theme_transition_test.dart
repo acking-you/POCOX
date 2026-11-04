@@ -5,7 +5,6 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/theme_transition.dart';
 import 'package:pocox/src/ui_prefs.dart';
-import 'package:pocox/src/widgets/theme_toggle.dart';
 
 class _MemoryPrefs extends UiPrefsStore {
   @override
@@ -17,13 +16,15 @@ class _MemoryPrefs extends UiPrefsStore {
 
 /// Shared by widget tests and the native Profile regression. No bridge, saved
 /// user settings, host process, or network connection is initialized.
-void themeToggleTests() {
+void themeTransitionTests() {
   for (final size in [
     const Size(390, 844),
     const Size(900, 900),
     const Size(1300, 900),
   ]) {
-    testWidgets('theme toggle changes the rendered theme at $size', (t) async {
+    testWidgets('a theme switch changes the rendered theme at $size', (
+      t,
+    ) async {
       t.view.devicePixelRatio = 1;
       t.view.physicalSize = size;
       addTearDown(t.view.reset);
@@ -42,14 +43,28 @@ void themeToggleTests() {
                   : ThemeMode.light,
               builder: (context, child) => ThemeTransitionHost(child: child!),
               home: Scaffold(
-                body: Column(
-                  children: [
-                    const ThemeToggle(),
-                    Builder(
-                      builder: (context) =>
-                          Text(Theme.of(context).brightness.name),
-                    ),
-                  ],
+                body: Builder(
+                  builder: (context) {
+                    final brightness = Theme.of(context).brightness;
+                    return Column(
+                      children: [
+                        TextButton(
+                          onPressed: () => ThemeTransition.run(
+                            context,
+                            () => ref
+                                .read(uiPrefsProvider.notifier)
+                                .setThemeMode(
+                                  brightness == Brightness.dark
+                                      ? 'light'
+                                      : 'dark',
+                                ),
+                          ),
+                          child: const Text('switch'),
+                        ),
+                        Text(brightness.name),
+                      ],
+                    );
+                  },
                 ),
               ),
             ),
@@ -59,7 +74,7 @@ void themeToggleTests() {
       await t.pumpAndSettle();
       expect(find.text('light'), findsOneWidget);
       for (final expected in ['dark', 'light', 'dark']) {
-        await t.tap(find.byKey(const Key('theme-toggle-btn')));
+        await t.tap(find.text('switch'));
         await t.pumpAndSettle();
         expect(find.text(expected), findsOneWidget);
         expect(t.takeException(), isNull);
@@ -88,4 +103,4 @@ void themeToggleTests() {
   });
 }
 
-void main() => themeToggleTests();
+void main() => themeTransitionTests();

@@ -1328,6 +1328,18 @@ abstract class AppLocalizations {
   /// **'Couldn’t load history. Retry'**
   String get historyRetry;
 
+  /// No description provided for @historyAwaitsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'History will load once reconnected'**
+  String get historyAwaitsConnection;
+
+  /// No description provided for @historyLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn’t load history'**
+  String get historyLoadFailed;
+
   /// No description provided for @turnFailed.
   ///
   /// In en, this message translates to:
@@ -2084,23 +2096,11 @@ abstract class AppLocalizations {
   /// **'No changes vs the main branch.'**
   String get noChanges;
 
-  /// No description provided for @envTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Environment'**
-  String get envTitle;
-
   /// No description provided for @envLocal.
   ///
   /// In en, this message translates to:
   /// **'Local'**
   String get envLocal;
-
-  /// No description provided for @envSource.
-  ///
-  /// In en, this message translates to:
-  /// **'Source'**
-  String get envSource;
 
   /// No description provided for @envRefresh.
   ///
@@ -2354,12 +2354,6 @@ abstract class AppLocalizations {
   /// **'Conversation'**
   String get utilityChat;
 
-  /// No description provided for @utilityPages.
-  ///
-  /// In en, this message translates to:
-  /// **'Pages'**
-  String get utilityPages;
-
   /// No description provided for @utilitySwitchPage.
   ///
   /// In en, this message translates to:
@@ -2371,24 +2365,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'General'**
   String get settingsGeneral;
-
-  /// No description provided for @settingsAccountConnection.
-  ///
-  /// In en, this message translates to:
-  /// **'Account & connection'**
-  String get settingsAccountConnection;
-
-  /// No description provided for @settingsServicesSubscriptions.
-  ///
-  /// In en, this message translates to:
-  /// **'Services & subscriptions'**
-  String get settingsServicesSubscriptions;
-
-  /// No description provided for @settingsAdvanced.
-  ///
-  /// In en, this message translates to:
-  /// **'Advanced'**
-  String get settingsAdvanced;
 
   /// No description provided for @settingsSelfHostedRelay.
   ///
@@ -2413,24 +2389,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Operation failed: {error}'**
   String settingsOperationFailed(String error);
-
-  /// No description provided for @settingsDiagnostics.
-  ///
-  /// In en, this message translates to:
-  /// **'Diagnostics'**
-  String get settingsDiagnostics;
-
-  /// No description provided for @settingsConfigure.
-  ///
-  /// In en, this message translates to:
-  /// **'Configure'**
-  String get settingsConfigure;
-
-  /// No description provided for @settingsEdit.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get settingsEdit;
 
   /// No description provided for @trayShow.
   ///
@@ -2611,12 +2569,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Earlier'**
   String get groupEarlier;
-
-  /// No description provided for @activityView.
-  ///
-  /// In en, this message translates to:
-  /// **'Activity'**
-  String get activityView;
 
   /// No description provided for @running.
   ///
@@ -2861,7 +2813,7 @@ abstract class AppLocalizations {
   /// No description provided for @takeoverNoTarget.
   ///
   /// In en, this message translates to:
-  /// **'Connect to an app-server service first to resume.'**
+  /// **'Host Codex on this device first to resume this session.'**
   String get takeoverNoTarget;
 
   /// No description provided for @holderRow.
@@ -4220,12 +4172,6 @@ abstract class AppLocalizations {
   /// **'Shared disk limit in MB. 0 disables caching.'**
   String get historyCacheDescription;
 
-  /// No description provided for @historyCacheUsage.
-  ///
-  /// In en, this message translates to:
-  /// **'{used} MB used · {limit} MB limit'**
-  String historyCacheUsage(String used, int limit);
-
   /// No description provided for @historyCacheInvalid.
   ///
   /// In en, this message translates to:
@@ -4777,12 +4723,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Show sidebar'**
   String get showSidebar;
-
-  /// No description provided for @locateConversation.
-  ///
-  /// In en, this message translates to:
-  /// **'Show current conversation'**
-  String get locateConversation;
 
   /// No description provided for @voiceReconnecting.
   ///
@@ -8956,6 +8896,300 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} disk log drops or write failures.'**
   String logsDiskLost(int count);
+
+  /// No description provided for @forkConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork conversation'**
+  String get forkConversation;
+
+  /// No description provided for @forkThroughTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork through this turn'**
+  String get forkThroughTurn;
+
+  /// No description provided for @forkDialogBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This creates a new conversation with its own history. The original stays as it is, and its later changes won\'t reach the new one.'**
+  String get forkDialogBody;
+
+  /// No description provided for @forkDialogThroughTurn.
+  ///
+  /// In en, this message translates to:
+  /// **'The new conversation includes this whole turn and everything before it.'**
+  String get forkDialogThroughTurn;
+
+  /// No description provided for @forkDialogRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'A turn is still running. The new conversation keeps what has been saved so far and leaves that turn unfinished; the original keeps running.'**
+  String get forkDialogRunning;
+
+  /// No description provided for @forkDialogFiles.
+  ///
+  /// In en, this message translates to:
+  /// **'Both conversations work in the same folder, so their file changes can affect each other.'**
+  String get forkDialogFiles;
+
+  /// No description provided for @forkConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork'**
+  String get forkConfirm;
+
+  /// No description provided for @forkPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Forking…'**
+  String get forkPending;
+
+  /// No description provided for @forksSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Forks'**
+  String get forksSection;
+
+  /// No description provided for @forkCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked into a new conversation'**
+  String get forkCreated;
+
+  /// No description provided for @forkCreatedInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked into a new conversation. Its last turn stays unfinished.'**
+  String get forkCreatedInterrupted;
+
+  /// No description provided for @forkReadyOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get forkReadyOpen;
+
+  /// No description provided for @forkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t fork the conversation'**
+  String get forkFailed;
+
+  /// No description provided for @forkOutcomeUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t confirm the fork because the host\'s answer was lost. A new conversation may already exist, so check the list before trying again.'**
+  String get forkOutcomeUnknown;
+
+  /// No description provided for @forkBoundaryUnconfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'A new conversation was created, but it may not stop at the selected turn. It\'s in the list; check it before continuing.'**
+  String get forkBoundaryUnconfirmed;
+
+  /// No description provided for @forkHostChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'The host connection changed during the fork. A new conversation may exist on the previous host.'**
+  String get forkHostChanged;
+
+  /// No description provided for @forkedTag.
+  ///
+  /// In en, this message translates to:
+  /// **'Fork'**
+  String get forkedTag;
+
+  /// No description provided for @forkedFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked from {title}'**
+  String forkedFrom(String title);
+
+  /// No description provided for @forkedFromUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Forked conversation. Open the original.'**
+  String get forkedFromUnknown;
+
+  /// No description provided for @forkNoLocalHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host Codex on this device to fork this session.'**
+  String get forkNoLocalHost;
+
+  /// No description provided for @backToConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to conversation'**
+  String get backToConversation;
+
+  /// No description provided for @pocketOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open pocket'**
+  String get pocketOpen;
+
+  /// No description provided for @pocketDevicesOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 device online} other{{count} devices online}}'**
+  String pocketDevicesOnline(int count);
+
+  /// No description provided for @pocketLiveLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 connection} other{{count} connections}}'**
+  String pocketLiveLinks(int count);
+
+  /// No description provided for @pocketUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get pocketUpdateAvailable;
+
+  /// No description provided for @githubAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'GitHub account'**
+  String get githubAccount;
+
+  /// No description provided for @contextCardShow.
+  ///
+  /// In en, this message translates to:
+  /// **'Show conversation details'**
+  String get contextCardShow;
+
+  /// No description provided for @contextCardHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide conversation details'**
+  String get contextCardHide;
+
+  /// No description provided for @backgroundProcesses.
+  ///
+  /// In en, this message translates to:
+  /// **'Background processes'**
+  String get backgroundProcesses;
+
+  /// No description provided for @backgroundProcessFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Folder'**
+  String get backgroundProcessFolder;
+
+  /// No description provided for @backgroundProcessMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory'**
+  String get backgroundProcessMemory;
+
+  /// No description provided for @backgroundProcessTerminate.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminate'**
+  String get backgroundProcessTerminate;
+
+  /// No description provided for @backgroundProcessTerminateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Terminate this process?'**
+  String get backgroundProcessTerminateTitle;
+
+  /// No description provided for @backgroundProcessGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That process has already ended.'**
+  String get backgroundProcessGone;
+
+  /// No description provided for @usageSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Usage'**
+  String get usageSection;
+
+  /// No description provided for @compactShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get compactShort;
+
+  /// No description provided for @sessionHandBackShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Hand back'**
+  String get sessionHandBackShort;
+
+  /// No description provided for @conversationGroupBy.
+  ///
+  /// In en, this message translates to:
+  /// **'Group conversations'**
+  String get conversationGroupBy;
+
+  /// No description provided for @groupByProject.
+  ///
+  /// In en, this message translates to:
+  /// **'By project'**
+  String get groupByProject;
+
+  /// No description provided for @groupByTime.
+  ///
+  /// In en, this message translates to:
+  /// **'By time'**
+  String get groupByTime;
+
+  /// No description provided for @settingsConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get settingsConnection;
+
+  /// No description provided for @settingsNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Network'**
+  String get settingsNetwork;
+
+  /// No description provided for @settingsAgents.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get settingsAgents;
+
+  /// No description provided for @settingsAgentsHosting.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents and hosting'**
+  String get settingsAgentsHosting;
+
+  /// No description provided for @settingsStorageDiagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage and diagnostics'**
+  String get settingsStorageDiagnostics;
+
+  /// No description provided for @settingsAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get settingsAbout;
+
+  /// No description provided for @settingsRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'Relay'**
+  String get settingsRelay;
+
+  /// No description provided for @connectionWindowServices.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{1 service} other{{count} services}}'**
+  String connectionWindowServices(int count);
+
+  /// No description provided for @historyCacheValue.
+  ///
+  /// In en, this message translates to:
+  /// **'{used} / {limit} MB'**
+  String historyCacheValue(String used, int limit);
 }
 
 class _AppLocalizationsDelegate

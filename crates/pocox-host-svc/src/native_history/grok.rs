@@ -31,6 +31,7 @@ mod transcript;
 pub use leader::NativeFollow;
 use owners::Probe;
 use pocox_core::history_sync::digest_bytes;
+pub use transcript::PromptMark;
 
 /// Read Grok Build's local sessions without an ACP process.
 ///
@@ -135,6 +136,7 @@ impl GrokHistory {
                     "cwd": summary.cwd,
                     "title": summary.title,
                     "parentSessionId": summary.parent,
+                    "forkedFrom": summary.forked_from,
                     "updatedAt": summary.updated,
                 })
             })
@@ -227,6 +229,36 @@ impl GrokHistory {
             indexes.insert(dir, index);
         }
         page
+    }
+
+    /// The counted prompts of `session`'s log, oldest first, as a fork
+    /// boundary needs them. Reads never grant write authority.
+    pub async fn prompts(&self, session: &str) -> Result<Vec<PromptMark>> {
+        let session = valid_session(session)?.to_owned();
+        let root = self.sessions_root();
+        let mut indexes = self.indexes.lock().await;
+        let dir = tokio::task::spawn_blocking(move || inventory::locate(&root, &session))
+            .await
+            .context("native history task failed")??;
+        let mut index = indexes.remove(&dir).unwrap_or_default();
+        let read = {
+            let dir = dir.clone();
+            tokio::task::spawn_blocking(move || {
+                let marks = transcript::prompts(&dir, &mut index);
+                (marks, index)
+            })
+            .await
+            .context("native history task failed")?
+        };
+        let (marks, index) = read;
+        // A failed read keeps no index, as in `read_page`.
+        if marks.is_ok() {
+            if indexes.len() >= MAX_INDEXES {
+                indexes.clear();
+            }
+            indexes.insert(dir, index);
+        }
+        marks
     }
 
     /// Verified native ownership; anything unverifiable is unknown. A

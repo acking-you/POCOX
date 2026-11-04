@@ -53,5 +53,9 @@ pub mod session_sync;
 pub mod sessions;
 #[cfg(feature = "flutter")]
 pub mod syntax;
+#[cfg(test)]
+mod takeover_target_tests;
+#[cfg(test)]
+mod thread_fork_live_tests;
 pub mod transport;
 pub mod updates;

@@ -160,7 +160,7 @@ mixin _FakeConnection on _FakeBridgeState {
     final gate = discoverGate;
     if (gate != null) await gate.future;
     if (discoverError != null) throw discoverError!;
-    return _services;
+    return List.of(_services);
   }
 
   @override

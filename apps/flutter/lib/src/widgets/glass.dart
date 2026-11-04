@@ -299,7 +299,12 @@ class _BackdropPainter extends CustomPainter {
 /// white cards sit on.
 class ContentSheet extends StatelessWidget {
   /// Lays [child] on a sheet.
-  const ContentSheet({super.key, required this.child, this.grouped = false});
+  const ContentSheet({
+    super.key,
+    required this.child,
+    this.grouped = false,
+    this.borderRadius = const BorderRadius.all(Radius.circular(kSheetRadius)),
+  });
 
   /// The page content.
   final Widget child;
@@ -307,10 +312,13 @@ class ContentSheet extends StatelessWidget {
   /// A page of cards rather than of reading.
   final bool grouped;
 
+  /// The sheet's corners: only the free ones, where it meets the window's edge.
+  final BorderRadius borderRadius;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    const radius = BorderRadius.all(Radius.circular(kSheetRadius));
+    final radius = borderRadius;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: radius,

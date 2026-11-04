@@ -41,6 +41,10 @@ import 'package:pocox/src/widgets/provider_badge.dart';
 import 'package:pocox/src/widgets/relay_problem.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 import 'package:pocox/src/widgets/utility_page.dart';
+import 'package:pocox/src/widgets/workspace_navigation.dart'
+    show workspaceRailWidth;
+import 'package:pocox/src/widgets/workspace_shell.dart'
+    show workspaceColumnWidth;
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
 

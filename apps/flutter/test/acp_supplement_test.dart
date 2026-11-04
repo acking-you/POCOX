@@ -29,6 +29,13 @@ import 'support/screen_harness.dart';
 
 part 'support/acp_supplement_harness.dart';
 
+/// A conversation's row, in whichever grouping the platform opens on.
+Finder _row(String id) => find.byWidgetPredicate(
+  (widget) =>
+      widget.key == Key('conv-tile-$id') ||
+      widget.key == Key('activity-tile-$id'),
+);
+
 void main() {
   setUp(AppSessionScreen.debugResetThreadMemory);
 
@@ -289,9 +296,9 @@ void main() {
         final gate = Completer<void>();
         api.supplementGate = gate;
         await supplement(t, 'away words');
-        await t.tap(find.byKey(const Key('conv-tile-ses-2')));
+        await t.tap(_row('ses-2'));
         await frames(t);
-        await t.tap(find.byKey(const Key('conv-tile-ses-1')));
+        await t.tap(_row('ses-1'));
         await frames(t);
         gate.complete();
         await frames(t);
@@ -564,7 +571,7 @@ void main() {
         final older = Completer<void>();
         api.supplementGate = older;
         await supplement(t, 'old words');
-        await t.tap(find.byKey(const Key('conv-tile-ses-2')));
+        await t.tap(_row('ses-2'));
         await frames(t);
         // "t1" still runs when the conversation is reopened.
         api.readResult = const ThreadHistory(
@@ -572,7 +579,7 @@ void main() {
           running: true,
           activeTurnId: 't1',
         );
-        await t.tap(find.byKey(const Key('conv-tile-ses-1')));
+        await t.tap(_row('ses-1'));
         await frames(t);
         expect(composerText(t), 'old words', reason: 'the retained draft');
 
@@ -656,14 +663,14 @@ void main() {
         final older = Completer<void>();
         api.supplementGate = older;
         await supplement(t, 'old words');
-        await t.tap(find.byKey(const Key('conv-tile-ses-2')));
+        await t.tap(_row('ses-2'));
         await frames(t);
         api.readResult = const ThreadHistory(
           items: [],
           running: true,
           activeTurnId: 't1',
         );
-        await t.tap(find.byKey(const Key('conv-tile-ses-1')));
+        await t.tap(_row('ses-1'));
         await frames(t);
 
         // The newer request fails and finishes first: its error and the
@@ -853,9 +860,9 @@ void main() {
           api.supplementGate = gate;
           await supplement(t, 'with images');
           expect(api.supplementCalls.single.$4, [redUrl]);
-          await t.tap(find.byKey(const Key('conv-tile-ses-2')));
+          await t.tap(_row('ses-2'));
           await frames(t);
-          await t.tap(find.byKey(const Key('conv-tile-ses-1')));
+          await t.tap(_row('ses-1'));
           await frames(t);
           // The retained draft: blue is added, red removed.
           await paste(t, blue);

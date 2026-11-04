@@ -288,3 +288,25 @@ Future<void> openTurnWork(WidgetTester t) async {
     }
   }
 }
+
+/// Group the conversation list by time, through its first heading's menu.
+Future<void> groupByTime(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('activity-view-btn')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('group-by-time')));
+  await t.pumpAndSettle();
+}
+
+/// Group the conversation list by project, through its first heading's menu.
+Future<void> groupByProject(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('activity-view-btn')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('group-by-project')));
+  await t.pumpAndSettle();
+}
+
+/// Open the column's search field, where it waits behind its icon.
+Future<void> openConversationSearch(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('conv-search-toggle')));
+  await t.pumpAndSettle();
+}

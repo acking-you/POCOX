@@ -730,6 +730,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyRetry => 'Couldn’t load history. Retry';
 
   @override
+  String get historyAwaitsConnection => 'History will load once reconnected';
+
+  @override
+  String get historyLoadFailed => 'Couldn’t load history';
+
+  @override
   String get turnFailed =>
       'Turn didn\'t finish — the connection dropped or the remote codex failed. Retry, or check codex on the host machine (it may need to be logged in again).';
 
@@ -1159,13 +1165,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noChanges => 'No changes vs the main branch.';
 
   @override
-  String get envTitle => 'Environment';
-
-  @override
   String get envLocal => 'Local';
-
-  @override
-  String get envSource => 'Source';
 
   @override
   String get envRefresh => 'Refresh';
@@ -1305,22 +1305,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get utilityChat => 'Conversation';
 
   @override
-  String get utilityPages => 'Pages';
-
-  @override
   String get utilitySwitchPage => 'Switch page';
 
   @override
   String get settingsGeneral => 'General';
-
-  @override
-  String get settingsAccountConnection => 'Account & connection';
-
-  @override
-  String get settingsServicesSubscriptions => 'Services & subscriptions';
-
-  @override
-  String get settingsAdvanced => 'Advanced';
 
   @override
   String get settingsSelfHostedRelay => 'Self-hosted relay fallback';
@@ -1336,15 +1324,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsOperationFailed(String error) {
     return 'Operation failed: $error';
   }
-
-  @override
-  String get settingsDiagnostics => 'Diagnostics';
-
-  @override
-  String get settingsConfigure => 'Configure';
-
-  @override
-  String get settingsEdit => 'Edit';
 
   @override
   String get trayShow => 'Show window';
@@ -1435,9 +1414,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get groupEarlier => 'Earlier';
-
-  @override
-  String get activityView => 'Activity';
 
   @override
   String get running => 'Running…';
@@ -1582,7 +1558,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get takeoverNoTarget =>
-      'Connect to an app-server service first to resume.';
+      'Host Codex on this device first to resume this session.';
 
   @override
   String holderRow(String name, int pid) {
@@ -2366,11 +2342,6 @@ class AppLocalizationsEn extends AppLocalizations {
       'Shared disk limit in MB. 0 disables caching.';
 
   @override
-  String historyCacheUsage(String used, int limit) {
-    return '$used MB used · $limit MB limit';
-  }
-
-  @override
   String get historyCacheInvalid => 'Enter a whole number from 0 to 64000.';
 
   @override
@@ -2673,9 +2644,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showSidebar => 'Show sidebar';
-
-  @override
-  String get locateConversation => 'Show current conversation';
 
   @override
   String get voiceReconnecting => 'Voice reconnecting…';
@@ -5226,5 +5194,189 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String logsDiskLost(int count) {
     return '$count disk log drops or write failures.';
+  }
+
+  @override
+  String get forkConversation => 'Fork conversation';
+
+  @override
+  String get forkThroughTurn => 'Fork through this turn';
+
+  @override
+  String get forkDialogBody =>
+      'This creates a new conversation with its own history. The original stays as it is, and its later changes won\'t reach the new one.';
+
+  @override
+  String get forkDialogThroughTurn =>
+      'The new conversation includes this whole turn and everything before it.';
+
+  @override
+  String get forkDialogRunning =>
+      'A turn is still running. The new conversation keeps what has been saved so far and leaves that turn unfinished; the original keeps running.';
+
+  @override
+  String get forkDialogFiles =>
+      'Both conversations work in the same folder, so their file changes can affect each other.';
+
+  @override
+  String get forkConfirm => 'Fork';
+
+  @override
+  String get forkPending => 'Forking…';
+
+  @override
+  String get forksSection => 'Forks';
+
+  @override
+  String get forkCreated => 'Forked into a new conversation';
+
+  @override
+  String get forkCreatedInterrupted =>
+      'Forked into a new conversation. Its last turn stays unfinished.';
+
+  @override
+  String get forkReadyOpen => 'Open';
+
+  @override
+  String get forkFailed => 'Couldn\'t fork the conversation';
+
+  @override
+  String get forkOutcomeUnknown =>
+      'Couldn\'t confirm the fork because the host\'s answer was lost. A new conversation may already exist, so check the list before trying again.';
+
+  @override
+  String get forkBoundaryUnconfirmed =>
+      'A new conversation was created, but it may not stop at the selected turn. It\'s in the list; check it before continuing.';
+
+  @override
+  String get forkHostChanged =>
+      'The host connection changed during the fork. A new conversation may exist on the previous host.';
+
+  @override
+  String get forkedTag => 'Fork';
+
+  @override
+  String forkedFrom(String title) {
+    return 'Forked from $title';
+  }
+
+  @override
+  String get forkedFromUnknown => 'Forked conversation. Open the original.';
+
+  @override
+  String get forkNoLocalHost =>
+      'Host Codex on this device to fork this session.';
+
+  @override
+  String get backToConversation => 'Back to conversation';
+
+  @override
+  String get pocketOpen => 'Open pocket';
+
+  @override
+  String pocketDevicesOnline(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count devices online',
+      one: '1 device online',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String pocketLiveLinks(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count connections',
+      one: '1 connection',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get pocketUpdateAvailable => 'Update available';
+
+  @override
+  String get githubAccount => 'GitHub account';
+
+  @override
+  String get contextCardShow => 'Show conversation details';
+
+  @override
+  String get contextCardHide => 'Hide conversation details';
+
+  @override
+  String get backgroundProcesses => 'Background processes';
+
+  @override
+  String get backgroundProcessFolder => 'Folder';
+
+  @override
+  String get backgroundProcessMemory => 'Memory';
+
+  @override
+  String get backgroundProcessTerminate => 'Terminate';
+
+  @override
+  String get backgroundProcessTerminateTitle => 'Terminate this process?';
+
+  @override
+  String get backgroundProcessGone => 'That process has already ended.';
+
+  @override
+  String get usageSection => 'Usage';
+
+  @override
+  String get compactShort => 'Compact';
+
+  @override
+  String get sessionHandBackShort => 'Hand back';
+
+  @override
+  String get conversationGroupBy => 'Group conversations';
+
+  @override
+  String get groupByProject => 'By project';
+
+  @override
+  String get groupByTime => 'By time';
+
+  @override
+  String get settingsConnection => 'Connection';
+
+  @override
+  String get settingsNetwork => 'Network';
+
+  @override
+  String get settingsAgents => 'Agents';
+
+  @override
+  String get settingsAgentsHosting => 'Agents and hosting';
+
+  @override
+  String get settingsStorageDiagnostics => 'Storage and diagnostics';
+
+  @override
+  String get settingsAbout => 'About';
+
+  @override
+  String get settingsRelay => 'Relay';
+
+  @override
+  String connectionWindowServices(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count services',
+      one: '1 service',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String historyCacheValue(String used, int limit) {
+    return '$used / $limit MB';
   }
 }

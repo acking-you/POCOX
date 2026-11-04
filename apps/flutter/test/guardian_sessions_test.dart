@@ -121,6 +121,8 @@ void main() {
       expect(reviewerRow, findsNothing);
       await t.tap(find.byKey(const Key('activity-view-btn')));
       await frames(t);
+      await t.tap(find.byKey(const Key('group-by-time')));
+      await frames(t);
       expect(reviewerRow, findsNothing);
       await t.tap(parentToggle);
       await frames(t);

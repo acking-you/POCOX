@@ -242,6 +242,10 @@ pub struct Turn {
     /// Items evicted from inside this turn (shown as a gap).
     #[serde(default)]
     pub omitted: u64,
+    /// The agent's own index of this replayed prompt (Grok's `promptIndex`),
+    /// which a fork boundary names; absent on a live turn.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_index: Option<u64>,
 }
 
 impl Turn {
@@ -253,6 +257,7 @@ impl Turn {
             replayed,
             next_item: 0,
             omitted: 0,
+            prompt_index: None,
         }
     }
 
@@ -695,6 +700,11 @@ impl Transcript {
         let message_id = update["messageId"].as_str().map(protocol_key);
         let index = self.target_turn(turn, kind == ItemKind::UserMessage);
         let turn = &mut self.turns[index];
+        if kind == ItemKind::UserMessage && turn.replayed {
+            turn.prompt_index = turn
+                .prompt_index
+                .or(update["_meta"]["promptIndex"].as_u64());
+        }
         let continues = turn
             .items
             .last()

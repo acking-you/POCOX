@@ -12,7 +12,8 @@ use serde_json::Value;
 
 use super::{block, conn, lock, translate, Link, Shared};
 use crate::engine::app_session::{
-    OlderPage, ThreadHistory, ThreadItem, ThreadMeta, TurnItemsPage, TurnSummary,
+    ForkOutcome, OlderPage, ThreadFork, ThreadHistory, ThreadItem, ThreadMeta, TurnItemsPage,
+    TurnSummary,
 };
 use crate::engine::runtime;
 use crate::engine::session_engine::Supplement;
@@ -44,6 +45,7 @@ fn meta_of(session: &Value) -> Option<ThreadMeta> {
         name: title,
         thread_source: None,
         parent_thread_id: None,
+        forked_from_id: session["forkedFrom"].as_str().map(str::to_string),
         cwd: session["cwd"].as_str().unwrap_or("").to_string(),
         origin_url: None,
         updated_at: session["updatedAt"]
@@ -134,6 +136,55 @@ pub fn thread_resume(service_key: &str, thread_id: &str) -> Result<()> {
         let _ = link.tx.send(translate::permission_event(&body));
     }
     Ok(())
+}
+
+/// Branch `thread_id` on the host serving it, through `through_turn`
+/// (inclusive) or from what it has saved now. The host refusing is an error:
+/// nothing was created. Anything short of its confirmation may follow a created
+/// session, and is never retried. A new session is reported even if this
+/// connection moved on meanwhile; the caller decides whether to adopt it.
+pub fn thread_fork(
+    service_key: &str,
+    thread_id: &str,
+    through_turn: Option<&str>,
+) -> Result<ForkOutcome> {
+    fork(&conn(service_key)?, thread_id, through_turn)
+}
+
+/// [`thread_fork`] through `link`.
+pub(super) fn fork(
+    link: &Link,
+    thread_id: &str,
+    through_turn: Option<&str>,
+) -> Result<ForkOutcome> {
+    let identity = link.identity();
+    let answer =
+        runtime::runtime().block_on(link.client.fork_session(thread_id, through_turn, &identity));
+    let answer = match answer {
+        Ok(answer) => answer,
+        Err(
+            error @ ClientError::Host {
+                ..
+            },
+        ) => return Err(error.into()),
+        Err(error) => return Ok(ForkOutcome::Unknown(error.to_string())),
+    };
+    if answer["outcome"] != "created" {
+        return Ok(ForkOutcome::Unknown(
+            answer["reason"]
+                .as_str()
+                .unwrap_or("the agent host did not confirm a new session")
+                .to_string(),
+        ));
+    }
+    let Some(thread) = meta_of(&answer) else {
+        return Ok(ForkOutcome::Unknown("the agent host named no new session".into()));
+    };
+    Ok(ForkOutcome::Created(ThreadFork {
+        thread,
+        last_turn_interrupted: answer["lastTurnInterrupted"] == true,
+        boundary_confirmed: answer["boundaryConfirmed"] == true,
+    }))
 }
 
 fn window_turns(history: &Value) -> Vec<Turn> {

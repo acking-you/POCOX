@@ -70,7 +70,6 @@ import 'package:pocox/src/widgets/animated_label.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/adaptive_sheet.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
-import 'package:pocox/src/widgets/brand_logo.dart';
 import 'package:pocox/src/widgets/centered_scroll.dart';
 import 'package:pocox/src/review/review_panel.dart';
 import 'package:pocox/src/review/session_changes.dart';
@@ -89,17 +88,21 @@ import 'package:pocox/src/widgets/middle_click_scroll.dart';
 import 'package:pocox/src/widgets/project_menu.dart';
 import 'package:pocox/src/widgets/project_section_header.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
+import 'package:pocox/src/widgets/fork_dialog.dart';
 import 'package:pocox/src/widgets/takeover_dialog.dart';
-import 'package:pocox/src/widgets/theme_toggle.dart';
 import 'package:pocox/src/widgets/turn_minimap.dart';
 import 'package:pocox/src/widgets/turn_navigation_handle.dart';
 import 'package:pocox/src/widgets/turn_outline.dart';
 import 'package:pocox/src/screens/app_session/approval_review.dart';
+import 'package:pocox/src/widgets/pocket_sheet.dart';
+import 'package:pocox/src/widgets/workspace_navigation.dart';
+import 'package:pocox/src/widgets/workspace_shell.dart';
 import 'package:pocox/src/widgets/window_title_bar.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/tools/builtin_tools.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
 import 'package:pocox/src/widgets/change_counts.dart';
+import 'package:pocox/src/widgets/read_only_foot.dart';
 
 part 'app_session/composer_drafts.dart';
 part 'app_session/composer_foot.dart';
@@ -111,10 +114,14 @@ part 'app_session/session_capabilities.dart';
 part 'app_session/session_composer.dart';
 part 'app_session/session_composer_toolbar.dart';
 part 'app_session/session_configuration.dart';
+part 'app_session/session_context.dart';
+part 'app_session/session_terminals.dart';
+part 'app_session/session_conversation_rows.dart';
 part 'app_session/session_draft_options.dart';
 part 'app_session/session_conversations.dart';
 part 'app_session/session_events.dart';
 part 'app_session/session_external_writer.dart';
+part 'app_session/session_fork.dart';
 part 'app_session/session_history.dart';
 part 'app_session/session_keyboard.dart';
 part 'app_session/session_layout.dart';
@@ -436,10 +443,12 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // splitter's drag end), so a restart reopens the window as it was left.
   bool _leftOpen = true;
   bool _reviewOpen = false; // the review sidebar (or page) is showing
-  double _leftWidth = 280;
+  double _leftWidth = workspaceColumnWidth;
   bool _paneDragging = false;
-  bool _sidebarClosing = false;
   bool _layoutRestored = false;
+
+  /// The context card and the context panel.
+  final _context = _ContextView();
   double? _composerHeight;
   // Live height while the resize edge is dragged. Only the input box listens,
   // so a drag re-lays out the composer instead of rebuilding the screen on
@@ -452,8 +461,6 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// Anchors the desktop turn-settings popover to the composer's model chip.
   final MenuController _modelMenu = MenuController();
 
-  /// Anchors the environment-info popover to the app-bar button.
-  final MenuController _envMenu = MenuController();
   List<ThreadMeta> _threads = const [];
 
   /// Whether the host has listed its conversations at least once: until then
@@ -484,11 +491,16 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   String _convQuery = '';
   // The search box, so ⌘K / Ctrl+K can reach it from anywhere.
   final FocusNode _convSearchFocus = FocusNode();
-  // The conversation list's scroll, so "locate" can bring the open row back.
+  final TextEditingController _convSearchCtrl = TextEditingController();
+  // Whether the column's search field stands open under its icon.
+  bool _convSearchOpen = false;
+  // The conversation list's scroll, so the open row can be brought back.
   final ScrollController _convScroll = ScrollController();
   final ListController _convListCtl = ListController();
   // Conversations in the order the sidebar last listed them, for Ctrl+Tab.
   List<ThreadMeta> _visibleConversationOrder = const [];
+  // The list row of the open conversation when it last built, to reveal it.
+  int? _openConversationRow;
 
   // Top-bar title rename: true while the title is a text field (click to
   // enter, Enter/blur to commit, Esc to cancel).
@@ -514,11 +526,14 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   /// How many conversations a project group shows before "show more".
   static const int _projectPeek = 5;
 
-  /// True while the sidebar groups conversations by WHEN they happened (with a
-  /// one-line gist each) instead of by which project they belong to. View state
-  /// only — a restart returns to the project tree, which is the default because
-  /// it answers "where am I working".
-  bool _activityView = false;
+  /// How the list groups conversations: by WHEN they happened (with a gist of
+  /// each) or by which project they belong to. Null until the user picks: a
+  /// computer's column reads by time, a finger's short rows by project. View
+  /// state only.
+  bool? _timeGrouping;
+  bool get _activityView =>
+      _timeGrouping ??
+      (isDesktop && MediaQuery.sizeOf(context).width >= workspaceCompactWidth);
 
   bool _streaming = false;
   int _turnStateRevision = 0;
@@ -547,6 +562,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   bool _externalWriterMode = false;
   bool _guardianReadOnly = false;
   String? _parentThreadId;
+  final _fork = _ForkState();
   final Set<String> _expandedSessionParents = {};
   // Manual folds also override automatic reveals for search or selection.
   final Set<String> _collapsedSessionParents = {};
@@ -621,6 +637,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
   // Whether older items remain on the server for the open thread.
   bool _hasOlder = false;
   bool _historyError = false;
+  // No read of the host has answered for the open thread yet, so an empty
+  // transcript says nothing about it. A cached snapshot does not settle this.
+  bool _historyUnread = false;
   final Set<String> _fetchedTurns = {};
   final Map<String, TurnItemsPage> _turnWindows = {};
   final Set<String> _sequentialHistoryIds = {};
@@ -698,6 +717,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       _layoutRestored = true;
       _leftOpen = layout.sidebarOpen ?? true;
       _leftWidth = layout.sidebarWidth ?? _leftWidth;
+      _context.cardOpen = layout.contextCardOpen ?? true;
     }
     _voice = VoiceController(
       api: ref.read(bridgeApiProvider),
@@ -723,6 +743,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     // so the two never fight over it, and comes back once the call ends.
     _voice.addListener(_onVoiceForDictation);
     _threadId = widget.threadId;
+    _historyUnread = _threadId != null;
     _cwd = widget.cwd;
     _drafts = ref.read(_composerDraftsProvider(widget.serviceKey));
     _draft = _drafts.forThread(_threadId, cwd: _cwd);
@@ -815,47 +836,15 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
       if (_connectionLost ||
           !ref.read(bridgeApiProvider).appIsConnected(widget.serviceKey)) {
         _onStreamClosed();
+      } else if (_context.cardShown || _context.panelOpen) {
+        unawaited(_loadTerminals());
       }
     });
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive) return;
-    _foreground = state == AppLifecycleState.resumed;
-    if (_foreground) {
-      _reconnectCooldown?.cancel();
-      _reconnectCooldown = null;
-      if (_connectionLost ||
-          !ref.read(bridgeApiProvider).appIsConnected(widget.serviceKey)) {
-        unawaited(_autoReconnect());
-      }
-    } else {
-      ++_reconnectEpoch;
-      if (_reconnecting) {
-        setState(() {
-          _reconnecting = false;
-          _connectionLost = true;
-        });
-      }
-    }
-    // A phone backgrounding the app loses the microphone anyway, so the call
-    // ends. A desktop window that loses focus, is covered or is minimised is
-    // still the user's live call — they switched to their editor to keep
-    // talking — so only the process going away ends it there.
-    final ends = isDesktop
-        ? state == AppLifecycleState.detached
-        : state == AppLifecycleState.paused ||
-              state == AppLifecycleState.hidden ||
-              state == AppLifecycleState.detached;
-    if (ends) {
-      ++_voiceIntentGeneration;
-      unawaited(_voice.stop());
-      // Same rule for the dictation line: a phone in the background has no
-      // microphone, and a held session would only idle against the quota.
-      unawaited(_dictation.close());
-    }
-  }
+  void didChangeAppLifecycleState(AppLifecycleState state) =>
+      _onLifecycleChanged(state);
 
   @override
   void activate() {
@@ -927,6 +916,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     _inputFocus.removeListener(_onComposerFocus);
     _inputFocus.dispose();
     _convSearchFocus.dispose();
+    _convSearchCtrl.dispose();
     _composerDragHeight.dispose();
     _foot.dispose();
     _convScroll.dispose();
@@ -938,6 +928,7 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
     _visibleRows.dispose();
     _elapsed.dispose();
     _quotaRev.dispose();
+    _context.dispose();
     _titleCtrl.dispose();
     _titleFocus.dispose();
     super.dispose();
@@ -955,8 +946,9 @@ class _AppSessionState extends ConsumerState<AppSessionScreen>
 
   /// Max width of the centred conversation column. The transcript computes its
   /// own side padding from this; the turn rail lives in what's left over, so both
-  /// have to agree on the number.
-  static const double _kColumnWidth = 820;
+  /// have to agree on the number. Narrower beside the context card, so the rail
+  /// keeps its gutter in the room the card leaves.
+  double get _columnWidth => _context.cardShown ? 640 : 820;
 
   @override
   Widget build(BuildContext context) => SessionFileLinks(

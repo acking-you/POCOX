@@ -13,10 +13,21 @@ pub struct ProcessIdentity {
     pub pid: u32,
     /// Process creation time in Unix seconds; use only for identity checks.
     pub started: u64,
-    /// Resolved executable image, not a mutable process title.
+    /// Executable image, not a mutable process title. It names what runs only
+    /// while its path still leads there: macOS reports the path the process was
+    /// started by, which an update can repoint, and the file can be removed.
     pub executable: PathBuf,
     /// Resolved current working directory.
     pub cwd: PathBuf,
+}
+
+impl ProcessIdentity {
+    /// Whether `other` is this same running process. Its image and directory
+    /// are not part of that, since both can change under it.
+    #[must_use]
+    pub fn same_process(&self, other: &Self) -> bool {
+        self.pid == other.pid && self.started == other.started
+    }
 }
 
 /// Inspect exactly one process without signaling it or reading its environment.
@@ -33,10 +44,14 @@ pub fn process_identity(pid: u32) -> Option<ProcessIdentity> {
     if matches!(process.status(), ProcessStatus::Zombie | ProcessStatus::Dead) {
         return None;
     }
+    let executable = process.exe()?;
     Some(ProcessIdentity {
         pid,
         started: process.start_time(),
-        executable: process.exe()?.canonicalize().ok()?,
+        // An image removed from disk while it runs no longer resolves.
+        executable: executable
+            .canonicalize()
+            .unwrap_or_else(|_| executable.to_path_buf()),
         cwd: process.cwd()?.canonicalize().ok()?,
     })
 }
@@ -104,15 +119,41 @@ mod tests {
     }
 
     #[cfg(unix)]
+    struct Child(std::process::Child);
+
+    #[cfg(unix)]
+    impl Drop for Child {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn identity_outlives_the_removal_of_a_running_image() {
+        let image = std::env::temp_dir().join(format!("pocox-identity-{}", std::process::id()));
+        std::fs::copy("/bin/sleep", &image).expect("copy image");
+        let spawn = || std::process::Command::new(&image).arg("30").spawn();
+        let mut spawned = spawn();
+        // Another test's fork can briefly hold the new file open for writing.
+        for _ in 0..50 {
+            if !matches!(&spawned, Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            spawned = spawn();
+        }
+        let child = Child(spawned.expect("child"));
+        let before = process_identity(child.0.id()).expect("running");
+        std::fs::remove_file(&image).expect("remove image");
+        let after = process_identity(child.0.id()).expect("a removed image still runs");
+        assert!(after.same_process(&before));
+    }
+
+    #[cfg(unix)]
     #[test]
     fn ancestry_rejects_replaced_identities_and_exited_children() {
-        struct Child(std::process::Child);
-        impl Drop for Child {
-            fn drop(&mut self) {
-                let _ = self.0.kill();
-                let _ = self.0.wait();
-            }
-        }
         let owner = process_identity(std::process::id()).expect("owner");
         let mut child = Child(
             std::process::Command::new("/bin/sleep")

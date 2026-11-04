@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pocox/src/motion.dart';
 
-/// The phone's navigation: a full-screen sidebar lying underneath the page,
-/// revealed by sliding the page aside.
+/// The phone's navigation: a sidebar lying underneath the page, revealed by
+/// sliding the page aside. A sliver of the page ([peek]) stays in view, and a
+/// tap on it closes the sidebar.
 ///
 /// A horizontal drag anywhere on the page (past ordinary touch slop) moves it
 /// with the finger; the sidebar beneath it brightens and settles into place
@@ -34,10 +35,17 @@ class LayeredNavigation extends StatefulWidget {
     required this.sidebar,
     required this.body,
     this.sidebarLabel,
+    this.closeLabel,
+    this.onOpening,
     this.onOpenChanged,
+    this.ground,
   });
 
-  /// The full-screen navigation shown when open.
+  /// What shows under the page's rounded corners and beside the sidebar: its
+  /// ground, or the theme's page colour.
+  final Color? ground;
+
+  /// The navigation shown when open.
   final Widget sidebar;
 
   /// The page that slides aside.
@@ -46,8 +54,18 @@ class LayeredNavigation extends StatefulWidget {
   /// Accessibility name of the sidebar, announced when it opens.
   final String? sidebarLabel;
 
+  /// Accessibility name of the sliver of page that closes the sidebar.
+  final String? closeLabel;
+
+  /// Called as the sidebar starts to come into view, after a frame in which
+  /// it was built.
+  final VoidCallback? onOpening;
+
   /// Called once the sidebar has settled fully open (true) or closed (false).
   final ValueChanged<bool>? onOpenChanged;
+
+  /// How much of the page stays in view while the sidebar is open.
+  static const double peek = 52;
 
   /// Logical pixels the finger must move back from its furthest point before
   /// a held drag's intended direction flips.
@@ -105,14 +123,16 @@ class LayeredNavigationState extends State<LayeredNavigation>
   /// claiming the gesture). An accepted drag reports that as an ordinary end,
   /// so a Listener above the recognizer marks it first.
   bool _pointerCancelled = false;
-  double _width = 1;
+
+  /// How far the page travels: the width less what stays in view.
+  double _travelWidth = 1;
   Widget? _shownSidebar;
 
   /// Whether the sidebar is open or committed to opening. Mirrors
   /// `ScaffoldState.isDrawerOpen` for callers that close it before acting.
   bool get isOpen => _target;
 
-  /// Open progress, 0 (page in place) to 1 (sidebar full screen).
+  /// Open progress, 0 (page in place) to 1 (sidebar open).
   @visibleForTesting
   double get progress => _progress.value;
 
@@ -128,8 +148,18 @@ class LayeredNavigationState extends State<LayeredNavigation>
   double get _sign =>
       Directionality.of(context) == TextDirection.rtl ? -1.0 : 1.0;
 
+  /// Tell [LayeredNavigation.onOpening] that a hidden sidebar is coming into
+  /// view; the frame building it has run by then.
+  void _announceOpening() {
+    if (!_hidden) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onOpening?.call();
+    });
+  }
+
   void _settle(bool open, {bool gesture = false}) {
     if (!mounted) return;
+    if (open) _announceOpening();
     setState(() {
       _target = open;
       _dragging = false;
@@ -181,6 +211,7 @@ class LayeredNavigationState extends State<LayeredNavigation>
 
   void _dragStart(DragStartDetails _) {
     _pointerCancelled = false;
+    _announceOpening();
     _progress.stop();
     setState(() {
       _dragging = true;
@@ -194,7 +225,7 @@ class LayeredNavigationState extends State<LayeredNavigation>
   void _dragUpdate(DragUpdateDetails d) {
     if (!_dragging) return;
     final dx = _sign * d.delta.dx;
-    _progress.value += dx / _width;
+    _progress.value += dx / _travelWidth;
     _travel += dx;
     final intent = _intentOpen;
     if (intent == null) {
@@ -251,7 +282,7 @@ class LayeredNavigationState extends State<LayeredNavigation>
     final keyboardUp = MediaQuery.viewInsetsOf(context).bottom > 0;
     // The page's drag must outlive its own gesture, or it is cancelled; with
     // the keyboard up the page belongs to the composer.
-    final pageDrag = _dragging || (!_target && !keyboardUp);
+    final pageDrag = _dragging || !keyboardUp;
     final dim = Theme.of(context).brightness == Brightness.dark ? 0.55 : 0.32;
 
     final sidebar = Offstage(
@@ -305,21 +336,30 @@ class LayeredNavigationState extends State<LayeredNavigation>
       },
       child: LayoutBuilder(
         builder: (context, box) {
-          _width = math.max(1, box.maxWidth);
+          _travelWidth = math.max(1, box.maxWidth - LayeredNavigation.peek);
           return AnimatedBuilder(
             animation: _progress,
             builder: (context, page) {
               final t = _progress.value;
               // The sidebar rises out of shade and drifts in under the page.
-              final under = (1 - t) * _width * 0.06 * -_sign;
+              final under = (1 - t) * _travelWidth * 0.06 * -_sign;
               return Stack(
                 fit: StackFit.expand,
                 children: [
+                  ColoredBox(
+                    color:
+                        widget.ground ??
+                        Theme.of(context).scaffoldBackgroundColor,
+                  ),
                   Transform.translate(
                     offset: Offset(under, 0),
                     child: Transform.scale(
                       scale: 0.97 + 0.03 * t,
-                      child: sidebar,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: SizedBox(width: _travelWidth, child: sidebar),
+                      ),
                     ),
                   ),
                   IgnorePointer(
@@ -330,18 +370,12 @@ class LayeredNavigationState extends State<LayeredNavigation>
                     ),
                   ),
                   Transform.translate(
-                    offset: Offset(_sign * t * _width, 0),
+                    offset: Offset(_sign * t * _travelWidth, 0),
                     child: _PageSurface(
                       lift: math.min(1, t * 4),
-                      // The shadow fades out as the page leaves, or its blur
-                      // would leave a seam along the open sidebar's edge.
-                      shade: math.min(1, t * 4) * math.min(1, (1 - t) * 6),
+                      shade: math.min(1, t * 4),
                       leadingEdge: _sign,
-                      // Fully aside, the page paints nothing (its state stays).
-                      child: Offstage(
-                        offstage: t == 1 && !_dragging,
-                        child: page,
-                      ),
+                      child: page!,
                     ),
                   ),
                 ],
@@ -365,7 +399,26 @@ class LayeredNavigationState extends State<LayeredNavigation>
                 onHorizontalDragUpdate: pageDrag ? _dragUpdate : null,
                 onHorizontalDragEnd: pageDrag ? _dragEnd : null,
                 onHorizontalDragCancel: pageDrag ? _dragCancel : null,
-                child: _PageGate(moved: !hidden || _target, child: widget.body),
+                child: Stack(
+                  fit: StackFit.passthrough,
+                  children: [
+                    _PageGate(moved: !hidden || _target, child: widget.body),
+                    // What stays of the page in view goes back to it.
+                    if (_target)
+                      Positioned.fill(
+                        child: Semantics(
+                          button: true,
+                          label: widget.closeLabel,
+                          onTap: close,
+                          child: GestureDetector(
+                            key: const Key('layered-navigation-scrim'),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: close,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           );

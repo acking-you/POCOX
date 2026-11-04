@@ -174,6 +174,18 @@ Future<void> appThreadResume({
   threadId: threadId,
 );
 
+/// Branch a session into a new independent one on the host serving it, through
+/// `through_turn_id` (inclusive) or from its latest saved state.
+Future<ThreadForkDto> appThreadFork({
+  required String serviceKey,
+  required String threadId,
+  String? throughTurnId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppThreadFork(
+  serviceKey: serviceKey,
+  threadId: threadId,
+  throughTurnId: throughTurnId,
+);
+
 /// Read a thread's conversation items (oldest first) and whether a turn is
 /// still running, so re-opening an in-flight thread restores live state.
 ///
@@ -241,6 +253,26 @@ Future<String> appGitDiff({required String serviceKey, required String cwd}) =>
       serviceKey: serviceKey,
       cwd: cwd,
     );
+
+/// What a conversation runs in the background now.
+Future<List<BackgroundTerminalDto>> appBackgroundTerminals({
+  required String serviceKey,
+  required String threadId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppBackgroundTerminals(
+  serviceKey: serviceKey,
+  threadId: threadId,
+);
+
+/// Stop one background process of a conversation. False when it was gone.
+Future<bool> appTerminateBackgroundTerminal({
+  required String serviceKey,
+  required String threadId,
+  required String processId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppTerminateBackgroundTerminal(
+  serviceKey: serviceKey,
+  threadId: threadId,
+  processId: processId,
+);
 
 /// Start a manual conversation compaction; the server emits `thread/compacted`
 /// when done.
@@ -413,6 +445,63 @@ class AppTurnSupplementDto {
           turnId == other.turnId;
 }
 
+/// A command a conversation runs in the background.
+class BackgroundTerminalDto {
+  /// The item that started it.
+  final String itemId;
+
+  /// The host's id for the process, which stops it.
+  final String processId;
+
+  /// The command line.
+  final String command;
+
+  /// Where it runs.
+  final String cwd;
+
+  /// Operating-system process id, when the host could read it.
+  final int? osPid;
+
+  /// CPU use in percent, when the host could read it.
+  final double? cpuPercent;
+
+  /// Resident memory in kilobytes, when the host could read it.
+  final BigInt? rssKb;
+
+  const BackgroundTerminalDto({
+    required this.itemId,
+    required this.processId,
+    required this.command,
+    required this.cwd,
+    this.osPid,
+    this.cpuPercent,
+    this.rssKb,
+  });
+
+  @override
+  int get hashCode =>
+      itemId.hashCode ^
+      processId.hashCode ^
+      command.hashCode ^
+      cwd.hashCode ^
+      osPid.hashCode ^
+      cpuPercent.hashCode ^
+      rssKb.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BackgroundTerminalDto &&
+          runtimeType == other.runtimeType &&
+          itemId == other.itemId &&
+          processId == other.processId &&
+          command == other.command &&
+          cwd == other.cwd &&
+          osPid == other.osPid &&
+          cpuPercent == other.cpuPercent &&
+          rssKb == other.rssKb;
+}
+
 /// Controller-wide persistent cache capacity and actual disk usage.
 class HistoryCacheStatusDto {
   /// Shared capacity in decimal MB; zero disables persistence.
@@ -519,6 +608,46 @@ class OlderPageDto {
           runtimeType == other.runtimeType &&
           items == other.items &&
           hasOlder == other.hasOlder;
+}
+
+/// What a fork request did. A refusal arrives as an error instead.
+class ThreadForkDto {
+  /// The new session, or `None` when the outcome is unknown.
+  final ThreadMetaDto? thread;
+
+  /// Why the outcome is unknown: the request was sent but its answer was
+  /// lost, so a session may exist and a retry could create another.
+  final String? unknownReason;
+
+  /// The new session's newest turn is marked interrupted.
+  final bool lastTurnInterrupted;
+
+  /// The new session ends at the requested boundary (true with none asked).
+  final bool boundaryConfirmed;
+
+  const ThreadForkDto({
+    this.thread,
+    this.unknownReason,
+    required this.lastTurnInterrupted,
+    required this.boundaryConfirmed,
+  });
+
+  @override
+  int get hashCode =>
+      thread.hashCode ^
+      unknownReason.hashCode ^
+      lastTurnInterrupted.hashCode ^
+      boundaryConfirmed.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ThreadForkDto &&
+          runtimeType == other.runtimeType &&
+          thread == other.thread &&
+          unknownReason == other.unknownReason &&
+          lastTurnInterrupted == other.lastTurnInterrupted &&
+          boundaryConfirmed == other.boundaryConfirmed;
 }
 
 /// A thread's recovered history + whether a turn is still running, plus the
@@ -770,6 +899,9 @@ class ThreadMetaDto {
   /// Parent thread for a spawned child.
   final String? parentThreadId;
 
+  /// The thread this one branched from; never a spawning parent.
+  final String? forkedFromId;
+
   /// Working directory (the project the thread controls).
   final String cwd;
 
@@ -785,6 +917,7 @@ class ThreadMetaDto {
     this.name,
     this.threadSource,
     this.parentThreadId,
+    this.forkedFromId,
     required this.cwd,
     this.originUrl,
     required this.updatedAt,
@@ -797,6 +930,7 @@ class ThreadMetaDto {
       name.hashCode ^
       threadSource.hashCode ^
       parentThreadId.hashCode ^
+      forkedFromId.hashCode ^
       cwd.hashCode ^
       originUrl.hashCode ^
       updatedAt.hashCode;
@@ -811,6 +945,7 @@ class ThreadMetaDto {
           name == other.name &&
           threadSource == other.threadSource &&
           parentThreadId == other.parentThreadId &&
+          forkedFromId == other.forkedFromId &&
           cwd == other.cwd &&
           originUrl == other.originUrl &&
           updatedAt == other.updatedAt;

@@ -18,7 +18,9 @@ use tokio_stream::wrappers::ReceiverStream;
 
 use super::catalog::Catalog;
 use super::client::ClientError;
-use super::host::{Answer, Error, Host, Identity, Info, Input, Options, ReadResult, Snapshot};
+use super::host::{
+    Answer, Error, Forked, Host, Identity, Info, Input, Options, ReadResult, Snapshot,
+};
 use super::live::Change;
 use super::schema::Session;
 use crate::session_access::SessionAccess;
@@ -40,14 +42,16 @@ impl From<Error> for Failure {
 impl IntoResponse for Failure {
     fn into_response(self) -> Response {
         let status = match &self.0 {
-            Error::Stale | Error::ReadOnly | Error::Busy | Error::TurnChanged => {
-                StatusCode::CONFLICT
-            },
+            Error::Stale
+            | Error::ReadOnly
+            | Error::Busy
+            | Error::TurnChanged
+            | Error::SourceHeld => StatusCode::CONFLICT,
             Error::NotReady => StatusCode::SERVICE_UNAVAILABLE,
             Error::InvalidInput => StatusCode::BAD_REQUEST,
             Error::Capacity => StatusCode::TOO_MANY_REQUESTS,
             Error::SessionNotFound | Error::Native(ClientError::Http(404)) => StatusCode::NOT_FOUND,
-            Error::Native(_) => StatusCode::BAD_GATEWAY,
+            Error::Native(_) | Error::ForkUnknown => StatusCode::BAD_GATEWAY,
         };
         (status, Json(json!({"code":self.0.code(),"message":self.0.to_string()}))).into_response()
     }
@@ -66,6 +70,7 @@ pub fn router(host: Host) -> Router {
         .route("/opencode/v1/access", get(access))
         .route("/opencode/v1/open", post(open))
         .route("/opencode/v1/create", post(create))
+        .route("/opencode/v1/fork", post(fork))
         .route("/opencode/v1/release", post(release))
         .route("/opencode/v1/options", post(options))
         .route("/opencode/v1/prompt", post(prompt).layer(DefaultBodyLimit::max(48 * 1024 * 1024)))
@@ -191,6 +196,22 @@ async fn create(
     Ok(Json(
         api.host
             .create(&body.directory, body.options, &body.identity)
+            .await?,
+    ))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct Fork {
+    identity: Identity,
+    session_id: String,
+    through_turn: Option<String>,
+}
+
+async fn fork(State(api): State<Api>, Json(body): Json<Fork>) -> Result<Json<Forked>, Failure> {
+    Ok(Json(
+        api.host
+            .fork(&body.session_id, body.through_turn.as_deref(), &body.identity)
             .await?,
     ))
 }

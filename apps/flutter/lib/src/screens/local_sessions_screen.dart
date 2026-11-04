@@ -780,46 +780,25 @@ class _SessionRow extends StatelessWidget {
   }
 }
 
-/// First connected app-server service key (the resume target), or null when
-/// none is connected yet. Shared by the sessions list and the read-only viewer.
-/// Codex only (`app`): these are Codex rollouts, which ACP agents cannot resume.
-String? connectedAppKey(WidgetRef ref) {
+/// A connected app-server this app runs on this device, which is what serves a
+/// session read from this device's disk. Connects one if needed, so the user
+/// need not have opened it first. A connected service elsewhere never qualifies:
+/// the session does not exist there, and a takeover would stop its owner for
+/// nothing. Codex only (`app`): these are Codex rollouts, which ACP agents cannot
+/// resume.
+Future<String?> thisDeviceHost(WidgetRef ref) async {
   final bridge = ref.read(bridgeApiProvider);
-  final services = [
-    ...bridge.localServices(),
-    ...?ref.read(discoveredServicesProvider),
-  ];
-  for (final s in services) {
-    if (s.kind == 'app' && bridge.appIsConnected(s.key)) return s.key;
-  }
-  return null;
-}
-
-/// Resolve a *live* app-server to resume into, connecting one if necessary.
-///
-/// Prefers an existing connection, then this process's owned app-servers.
-/// Remote discovery is needed only when no local host is available.
-Future<String?> ensureResumeTarget(WidgetRef ref) async {
-  final already = connectedAppKey(ref);
-  if (already != null) return already;
-  final bridge = ref.read(bridgeApiProvider);
-  var services = bridge.localServices().where((s) => s.kind == 'app').toList();
-  if (services.isEmpty) {
-    try {
-      services = await ref.read(servicesProvider.future);
-    } catch (_) {
-      services = ref.read(discoveredServicesProvider) ?? const [];
-    }
-    final connected = connectedAppKey(ref);
-    if (connected != null) return connected;
+  final hosts = bridge.localServices().where((s) => s.kind == 'app').toList();
+  for (final host in hosts) {
+    if (bridge.appIsConnected(host.key)) return host.key;
   }
   // The chosen transport does its own protocol handshake and bounded recovery.
-  for (final s in services.where((s) => s.kind == 'app')) {
+  for (final host in hosts) {
     try {
-      await bridge.appConnect(s.key, appLocalPort);
-      return s.key;
+      await bridge.appConnect(host.key, appLocalPort);
+      return host.key;
     } catch (_) {
-      // Unreachable / handshake failed — try the next app-server.
+      // Stopping or not answering: try the next one this device runs.
     }
   }
   return null;
@@ -834,6 +813,8 @@ Future<String?> ensureResumeTarget(WidgetRef ref) async {
 /// caller must ensure no other process is running a turn in the session (its
 /// `allowsResume` is false then); a turn the host's own app-server runs is
 /// joined.
+///
+/// [resolveSessionTarget] resolves the app-server to resume into.
 Future<void> resumeLocalSession(
   BuildContext context,
   WidgetRef ref, {
@@ -848,34 +829,9 @@ Future<void> resumeLocalSession(
   if (source.isNative || !current()) return;
   final l10n = AppLocalizations.of(context);
   final messenger = ToastMessenger.of(context);
-  // Resolve the app-server to resume into. For a remote host that IS the host
-  // behind the source key: it evicts + resumes into its own colocated
-  // app-server, so the target is simply that key. For the local source, ensure
-  // a live app-server (connect one if needed) rather than requiring the user to
-  // have opened one first.
-  final String? target;
-  if (source.isRemote) {
-    target = source.serviceKey;
-    // The Sessions tab / viewer reach the host only over the meta tunnel, so the
-    // app-server session isn't connected yet. Connect it now (mirroring the
-    // local path's ensureResumeTarget) — otherwise the conversation we open
-    // below resolves to "not connected" and shows an error after the success.
-    final bridge = ref.read(bridgeApiProvider);
-    if (target != null && !bridge.appIsConnected(target)) {
-      try {
-        await bridge.appConnect(target, appLocalPort);
-      } catch (e) {
-        if (current()) {
-          messenger.error(friendlyError(e));
-        }
-        return;
-      }
-    }
-    if (!context.mounted || !current()) return;
-  } else {
-    target = await ensureResumeTarget(ref);
-    if (!context.mounted || !current()) return;
-  }
+  final resolved = await resolveSessionTarget(ref, source, messenger, current);
+  if (!resolved.ok || !context.mounted || !current()) return;
+  final target = resolved.target;
 
   if (requiresTakeover) {
     final confirmed = await showAppDialog<bool>(
@@ -917,4 +873,34 @@ Future<void> resumeLocalSession(
   // Open the resumed conversation (only reached on success).
   if (!context.mounted || !current()) return;
   context.push(conversationRoute(target, threadId, cwd: cwd));
+}
+
+/// The app-server that serves [source]'s sessions, connected. For a remote host
+/// that IS the host behind the source key, whose own app-server holds the
+/// history. For the local source it is [thisDeviceHost], null when there is none.
+/// `ok` is false when connecting failed, which is already reported.
+Future<({String? target, bool ok})> resolveSessionTarget(
+  WidgetRef ref,
+  SessionSource source,
+  ToastMessenger messenger,
+  bool Function() current,
+) async {
+  if (!source.isRemote) {
+    return (target: await thisDeviceHost(ref), ok: true);
+  }
+  final target = source.serviceKey;
+  // The Sessions tab / viewer reach the host only over the meta tunnel, so the
+  // app-server session isn't connected yet. Connect it now, or the conversation
+  // opened afterwards resolves to "not connected" and shows an error after the
+  // success.
+  final bridge = ref.read(bridgeApiProvider);
+  if (target != null && !bridge.appIsConnected(target)) {
+    try {
+      await bridge.appConnect(target, appLocalPort);
+    } catch (e) {
+      if (current()) messenger.error(friendlyError(e));
+      return (target: target, ok: false);
+    }
+  }
+  return (target: target, ok: true);
 }

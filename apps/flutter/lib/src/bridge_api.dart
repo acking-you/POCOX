@@ -9,6 +9,8 @@ import 'package:pocox/src/git_diff.dart';
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show immutable;
+
 import 'package:pocox/src/service_key.dart';
 import 'package:pocox/src/updates/update_api.dart';
 
@@ -29,18 +31,6 @@ part 'bridge/controller_api.dart';
 
 abstract interface class BridgeApi
     implements UpdateApi, ControllerBridgeApi, HarnessBridgeApi {
-  /// Read only local disk; cached history is display-only until synchronized.
-  Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
-  Future<bool> appHistorySyncPrepare(String serviceKey);
-  Future<void> appHistoryPrefetch(String serviceKey, String threadId);
-  Future<void> appHistoryFocus(String serviceKey, String? threadId);
-  Future<HistoryCacheStatus> historyCacheStatus();
-  Future<void> historyCacheSetLimit(int limitMb);
-  Future<ConnectionWindowPreferences> connectionWindowPreferences();
-  Future<void> setConnectionWindowPreferences(
-    ConnectionWindowPreferences value,
-  );
-
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
 

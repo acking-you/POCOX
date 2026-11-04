@@ -5,6 +5,40 @@ abstract interface class ControllerBridgeApi {
   /// Create the native memory-only controller for one composer draft.
   ComposerControl composerCreate();
 
+  /// Branch a conversation into a new independent one on the host serving it,
+  /// through [throughTurnId] (inclusive) or from its latest saved state. Throws
+  /// when the host refuses: nothing was created.
+  Future<ThreadForkResult> appThreadFork(
+    String serviceKey,
+    String threadId, {
+    String? throughTurnId,
+  });
+
+  /// What a conversation runs in the background now.
+  Future<List<BackgroundTerminal>> appBackgroundTerminals(
+    String serviceKey,
+    String threadId,
+  );
+
+  /// Stop one background process of a conversation; false when it was gone.
+  Future<bool> appTerminateBackgroundTerminal(
+    String serviceKey,
+    String threadId,
+    String processId,
+  );
+
+  /// Read only local disk; cached history is display-only until synchronized.
+  Future<ThreadHistory?> appHistoryCached(String serviceKey, String threadId);
+  Future<bool> appHistorySyncPrepare(String serviceKey);
+  Future<void> appHistoryPrefetch(String serviceKey, String threadId);
+  Future<void> appHistoryFocus(String serviceKey, String? threadId);
+  Future<HistoryCacheStatus> historyCacheStatus();
+  Future<void> historyCacheSetLimit(int limitMb);
+  Future<ConnectionWindowPreferences> connectionWindowPreferences();
+  Future<void> setConnectionWindowPreferences(
+    ConnectionWindowPreferences value,
+  );
+
   /// Whether a host explicitly refused a turn before admitting it.
   bool turnErrorIsRefusal(String message);
 

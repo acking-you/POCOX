@@ -58,6 +58,9 @@ mixin _RustThreads implements BridgeApi {
       guardian: c.guardian,
       rateLimits: c.rateLimits,
       takeover: c.takeover,
+      fork: c.fork,
+      forkThroughTurn: c.forkThroughTurn,
+      forkBusySource: c.forkBusySource,
       externalWriterMonitor: c.externalWriterMonitor,
       localSessions: c.localSessions,
       planMode: c.planMode,
@@ -82,6 +85,7 @@ mixin _RustThreads implements BridgeApi {
       historyScope: c.historyScope,
       runningInventory: c.runningInventory,
       authRequired: c.authRequired,
+      backgroundTerminals: c.backgroundTerminals,
       commands: c.commands,
       draftOptions: c.draftOptions,
       questionMultiple: c.questionMultiple,
@@ -205,6 +209,27 @@ mixin _RustThreads implements BridgeApi {
     serviceTier: serviceTier,
     sandbox: sandbox,
   );
+
+  @override
+  Future<ThreadForkResult> appThreadFork(
+    String serviceKey,
+    String threadId, {
+    String? throughTurnId,
+  }) async {
+    final fork = await frb.appThreadFork(
+      serviceKey: serviceKey,
+      threadId: threadId,
+      throughTurnId: throughTurnId,
+    );
+    return ThreadForkResult(
+      thread: switch (fork.thread) {
+        final thread? => _threadMeta(thread),
+        null => null,
+      },
+      lastTurnInterrupted: fork.lastTurnInterrupted,
+      boundaryConfirmed: fork.boundaryConfirmed,
+    );
+  }
 
   @override
   Future<void> appThreadResume(String serviceKey, String threadId) =>
@@ -359,6 +384,37 @@ mixin _RustThreads implements BridgeApi {
   @override
   Future<void> appCompact(String serviceKey, String threadId) =>
       frb.appCompact(serviceKey: serviceKey, threadId: threadId);
+
+  @override
+  Future<List<BackgroundTerminal>> appBackgroundTerminals(
+    String serviceKey,
+    String threadId,
+  ) async => [
+    for (final t in await frb.appBackgroundTerminals(
+      serviceKey: serviceKey,
+      threadId: threadId,
+    ))
+      BackgroundTerminal(
+        itemId: t.itemId,
+        processId: t.processId,
+        command: t.command,
+        cwd: t.cwd,
+        osPid: t.osPid,
+        cpuPercent: t.cpuPercent,
+        rssKb: t.rssKb?.toInt(),
+      ),
+  ];
+
+  @override
+  Future<bool> appTerminateBackgroundTerminal(
+    String serviceKey,
+    String threadId,
+    String processId,
+  ) => frb.appTerminateBackgroundTerminal(
+    serviceKey: serviceKey,
+    threadId: threadId,
+    processId: processId,
+  );
 
   @override
   Future<String?> appThreadSummary(String serviceKey, String threadId) =>
@@ -582,6 +638,7 @@ ThreadMeta _threadMeta(frb.ThreadMetaDto t) => ThreadMeta(
   name: t.name,
   threadSource: t.threadSource,
   parentThreadId: t.parentThreadId,
+  forkedFromId: t.forkedFromId,
   cwd: t.cwd,
   originUrl: t.originUrl,
   updatedAt: t.updatedAt.toInt(),

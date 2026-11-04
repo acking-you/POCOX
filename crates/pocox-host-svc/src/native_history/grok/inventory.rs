@@ -22,6 +22,8 @@ pub(super) struct Summary {
     pub cwd: String,
     pub title: String,
     pub parent: Option<String>,
+    /// The session this one forked from; a subagent's parent is not one.
+    pub forked_from: Option<String>,
     /// RFC 3339, the time Grok sorts its own list by.
     pub updated: String,
     updated_ms: i64,
@@ -93,10 +95,14 @@ pub(super) fn summaries(root: &Path) -> Result<Vec<Summary>> {
             continue;
         }
         let updated = raw.last_active_at.unwrap_or(raw.updated_at);
+        let parent = raw.parent_session_id.clone().filter(|id| !id.is_empty());
         rows.push(Summary {
             title: clip(raw.title(), 4096),
             cwd: raw.info.cwd,
-            parent: raw.parent_session_id.filter(|id| !id.is_empty()),
+            forked_from: parent
+                .clone()
+                .filter(|_| raw.session_kind.as_deref() == Some("fork")),
+            parent,
             updated: updated.to_rfc3339_opts(SecondsFormat::Millis, true),
             updated_ms: updated.timestamp_millis(),
             id,

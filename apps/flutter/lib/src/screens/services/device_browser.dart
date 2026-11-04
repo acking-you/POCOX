@@ -99,7 +99,10 @@ class _DeviceFirstServices extends ConsumerWidget {
   static const double _splitWidth = 720;
 
   /// The device column's width beside the detail.
-  static const double _columnWidth = 260;
+  static const double _columnWidth = workspaceColumnWidth;
+
+  /// The narrowest detail worth standing beside the column, at unscaled text.
+  static const double _detailMinimum = 300;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -250,9 +253,12 @@ class _DeviceFirstServices extends ConsumerWidget {
     // Side by side only while the fixed-width column still holds its
     // identity row at the current text scale; large text gets the one-level
     // layout instead, with the column at full width.
+    final width = MediaQuery.sizeOf(context).width;
     final split =
-        MediaQuery.sizeOf(context).width >= _splitWidth &&
-        _identityRowWidth(context) <= _columnWidth;
+        width >= _splitWidth &&
+        _identityRowWidth(context) <= _columnWidth &&
+        width - workspaceRailWidth - _columnWidth >=
+            MediaQuery.textScalerOf(context).scale(_detailMinimum);
     // Wide always has a device in the detail pane — an empty pane beside a
     // populated column reads as broken. Narrow shows the list first and only
     // resolves a device once one is picked, so nothing is chosen on the user's
@@ -831,22 +837,10 @@ class _DeviceFirstServices extends ConsumerWidget {
       );
     }
 
-    return Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1160),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 18, 24, 24),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(width: _columnWidth, child: deviceColumn),
-              const SizedBox(width: 14),
-              Expanded(child: ListView(children: detail)),
-            ],
-          ),
-        ),
-      ),
+    return _SplitServices(
+      columnWidth: _columnWidth,
+      deviceColumn: deviceColumn,
+      detail: detail,
     );
   }
 

@@ -10,7 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
 
-enum _MessageAction { copy, select, edit, share }
+enum _MessageAction { copy, select, edit, fork, share }
 
 /// Mobile message actions, with text selection isolated from the transcript.
 class MessageActions extends StatefulWidget {
@@ -22,6 +22,7 @@ class MessageActions extends StatefulWidget {
     required this.child,
     this.completedAtLabel,
     this.onEdit,
+    this.onFork,
   });
 
   /// A snapshot of the message source to copy, select, or share.
@@ -38,6 +39,9 @@ class MessageActions extends StatefulWidget {
 
   /// Offers text reuse only when the caller has an editable conversation.
   final VoidCallback? onEdit;
+
+  /// Offers branching a new conversation through this message's turn.
+  final VoidCallback? onFork;
 
   @override
   State<MessageActions> createState() => _MessageActionsState();
@@ -101,6 +105,12 @@ class _MessageActionsState extends State<MessageActions> {
         ),
         if (onEdit != null)
           _entry(_MessageAction.edit, AppIcons.edit_outlined, l10n.editMessage),
+        if (widget.onFork != null)
+          _entry(
+            _MessageAction.fork,
+            AppIcons.account_tree_outlined,
+            l10n.forkThroughTurn,
+          ),
         _entry(
           _MessageAction.share,
           AppIcons.ios_share_outlined,
@@ -125,6 +135,9 @@ class _MessageActionsState extends State<MessageActions> {
       case _MessageAction.edit:
         // A monitoring refresh can revoke editing while the menu is open.
         if (widget.onEdit != null) onEdit?.call();
+      case _MessageAction.fork:
+        // A refresh can withdraw the boundary while the menu is open.
+        widget.onFork?.call();
       case _MessageAction.share:
         try {
           final size = MediaQuery.sizeOf(context);

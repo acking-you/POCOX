@@ -92,6 +92,11 @@ Future<FakeBridgeApi> _mount(
     ),
   );
   await _frames(t);
+  // A computer's column opens by time; these rows are the project tree's.
+  await t.tap(find.byKey(const Key('activity-view-btn')));
+  await _frames(t);
+  await t.tap(find.byKey(const Key('group-by-project')));
+  await _frames(t);
   return api;
 }
 

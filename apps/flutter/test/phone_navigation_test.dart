@@ -118,15 +118,16 @@ void main() {
     await t.pumpAndSettle();
     expect(_nav(t).isOpen, isTrue);
     expect(haptics, ['lightImpact']);
-    // Full screen: the sidebar spans the width.
+    // The conversation keeps a sliver in view.
     expect(
       t.getSize(find.byKey(const Key('phone-sidebar'))).width,
-      _phone.width,
+      _phone.width - LayeredNavigation.peek,
     );
     expect(find.byKey(const Key('new-conversation-btn')), findsOneWidget);
 
-    // Closing by its own control returns to the same draft.
-    await t.tap(find.byKey(const Key('sidebar-close-btn')));
+    // A tap on the sliver of conversation left in view returns to the same
+    // draft.
+    await t.tapAt(Offset(_phone.width - LayeredNavigation.peek / 2, 400));
     await t.pumpAndSettle();
     expect(_nav(t).isOpen, isFalse);
     expect(t.widget<TextField>(_input).controller!.text, 'unsent draft');

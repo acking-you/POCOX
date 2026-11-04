@@ -54,6 +54,56 @@ fn info() -> Value {
 }
 
 #[test]
+fn a_fork_separates_a_refusal_from_a_lost_answer() {
+    use crate::engine::app_session::ForkOutcome;
+    let _serial = transport::test_serial();
+    let answers = Arc::new(Mutex::new(vec![
+        (
+            200,
+            json!({"session": {"id": "ses_new", "title": "Source (fork #1)", "directory": "/p",
+            "time": {"created": 1, "updated": 2000}}, "boundaryConfirmed": true}),
+        ),
+        (409, json!({"code": "busy", "message": "busy"})),
+        (409, json!({"code": "source_held", "message": "held"})),
+        (502, json!({"code": "fork_unknown", "message": "unknown"})),
+    ]));
+    let seen = Arc::new(Mutex::new(0));
+    let (client, server) = {
+        let (answers, seen) = (answers.clone(), seen.clone());
+        server(move |path| {
+            assert!(path.ends_with("/opencode/v1/fork"), "{path}");
+            *lock(&seen) += 1;
+            lock(&answers).remove(0)
+        })
+    };
+    let fixture = super::tests::Fixture::with_client(client);
+    let ForkOutcome::Created(fork) =
+        ops::fork_on(&fixture.link, "ses_source", Some("msg_1")).expect("created")
+    else {
+        panic!("expected a new session");
+    };
+    assert_eq!(fork.thread.id, "ses_new");
+    assert_eq!(fork.thread.forked_from_id.as_deref(), Some("ses_source"));
+    assert_eq!(fork.thread.parent_thread_id, None, "a fork is not a spawned agent");
+    assert!(fork.boundary_confirmed && !fork.last_turn_interrupted);
+    for refused in ["still running", "another OpenCode process"] {
+        let error = ops::fork_on(&fixture.link, "ses_source", None).expect_err("refused");
+        assert!(error.to_string().contains(refused), "{error}");
+    }
+    assert!(matches!(
+        ops::fork_on(&fixture.link, "ses_source", None).expect("not a refusal"),
+        ForkOutcome::Unknown(_)
+    ));
+    // The server has gone: the answer is lost, not refused.
+    drop(server);
+    assert!(matches!(
+        ops::fork_on(&fixture.link, "ses_source", None).expect("not a refusal"),
+        ForkOutcome::Unknown(_)
+    ));
+    assert_eq!(*lock(&seen), 4, "and nothing was retried");
+}
+
+#[test]
 fn deleted_session_is_removed_without_blocking_other_session_updates() {
     let _serial = transport::test_serial();
     let (client, _server) = server(|path| {

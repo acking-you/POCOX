@@ -146,7 +146,8 @@ enum LinkEventKindDto {
 
 /// What a tunnel's router port mapping amounts to, mirrored for Dart.
 enum PortMappingStateDto {
-  /// Nothing asked yet: it waits for a failed punch or a first direct session.
+  /// Nothing asked yet: it waits for a failed punch or a first direct
+  /// session.
   standby,
 
   /// Looking for the router, or asking it for a mapping.

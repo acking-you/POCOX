@@ -132,6 +132,7 @@ extension _SessionTranscript on _AppSessionState {
       onEdit: _externalWriterMode || _historySyncing || _showingCachedHistory
           ? null
           : _editMessage,
+      onFork: _forkTurnAction(item),
       flash: _turnFlashRow == _rowKey(row) ? _turnFlashRevision : null,
     );
   }
@@ -211,8 +212,9 @@ extension _SessionTranscript on _AppSessionState {
     final hostSwitch = _hostSwitchBanner();
     final pane = Column(
       children: [
-        // A short window carries the status line in its title row.
-        if (!_inlineStatus) _statusBar(l10n),
+        // Its line rides in the title row where there is no room for a strip
+        // of its own, and a phone's top bar always carries it.
+        if (_statusStripShown(l10n)) _statusBar(l10n),
         // Where the reader is looking: the switch announces itself above the
         // conversation, which stays put until the new host has answered.
         Motion.resize(
@@ -365,19 +367,9 @@ extension _SessionTranscript on _AppSessionState {
   Widget _transcriptContent(AppLocalizations l10n) {
     if (_items.isEmpty && !_showTyping) {
       // A brand-new conversation (no thread yet) opens on its agent, project
-      // and readiness; an empty resumed thread keeps the plain hint. Either
-      // sits in the room the composer leaves, never beneath it.
-      final theme = Theme.of(context);
-      final empty = _threadId == null
-          ? _agentWelcome(l10n)
-          : Center(
-              child: Text(
-                l10n.emptyConversation,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.outline,
-                ),
-              ),
-            );
+      // and readiness; an opened thread says what is known about its history.
+      // Either sits in the room the composer leaves, never beneath it.
+      final empty = _threadId == null ? _agentWelcome(l10n) : _noRows(l10n);
       return _aboveComposer(
         (overlay) => Padding(
           padding: EdgeInsets.only(bottom: overlay),
@@ -413,6 +405,53 @@ extension _SessionTranscript on _AppSessionState {
         ),
       ],
     );
+  }
+
+  /// What stands in for an opened thread's rows. Only a read of the host can
+  /// say a thread is empty: until one answers, the history waits for the link
+  /// (whose status line owns the reconnect) or offers to read again, here once
+  /// no banner offers it.
+  Widget _noRows(AppLocalizations l10n) {
+    final theme = Theme.of(context);
+    Widget line(Key key, String text) => Center(
+      child: Text(
+        text,
+        key: key,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+    if (_historyUnread) {
+      if (_reconnecting || _connectionLost) {
+        return line(
+          const Key('history-awaits-connection'),
+          l10n.historyAwaitsConnection,
+        );
+      }
+      final retry = _externalWriterMode ? _retry : _resumeAndLoad;
+      if (_error != null && _retry != null) {
+        return line(const Key('history-read-failed'), l10n.historyLoadFailed);
+      }
+      if (retry != null) {
+        return Center(
+          child: TextButton.icon(
+            key: const Key('history-read-retry'),
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onSurfaceVariant,
+              textStyle: theme.textTheme.bodyMedium,
+            ),
+            onPressed: retry,
+            icon: const Icon(AppIcons.refresh_rounded, size: 18),
+            label: Text(l10n.historyRetry),
+          ),
+        );
+      }
+    }
+    // A read-only view has nothing to invite.
+    if (_externalWriterMode) return const SizedBox.shrink();
+    return line(const Key('conversation-empty-hint'), l10n.emptyConversation);
   }
 
   /// [build] placed against the composer's live height, rebuilt alone as it
@@ -564,9 +603,7 @@ extension _SessionTranscript on _AppSessionState {
         Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: _AppSessionState._kColumnWidth + 48,
-            ),
+            constraints: BoxConstraints(maxWidth: _columnWidth + 48),
             child: _voiceDock(),
           ),
         ),
@@ -590,9 +627,7 @@ extension _SessionTranscript on _AppSessionState {
             : Align(
                 alignment: Alignment.bottomCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: _AppSessionState._kColumnWidth + 48,
-                  ),
+                  constraints: BoxConstraints(maxWidth: _columnWidth + 48),
                   child: _composer(l10n),
                 ),
               ),

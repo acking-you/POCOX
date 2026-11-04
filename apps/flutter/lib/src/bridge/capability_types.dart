@@ -175,20 +175,28 @@ class AppCapabilities {
     this.historyScope = 'retained',
     this.runningInventory = 'none',
     this.authRequired = false,
+    this.backgroundTerminals = false,
     this.commands = false,
     this.draftOptions = false,
     this.questionMultiple = false,
     this.permissionFeedback = false,
+    this.fork = false,
+    this.forkThroughTurn = false,
+    this.forkBusySource = false,
   });
 
   /// The Codex app-server's capabilities.
   static const codex = AppCapabilities(
     provider: 'codex',
+    backgroundTerminals: true,
     fast: true,
     permissionPresets: true,
     guardian: true,
     rateLimits: true,
     takeover: true,
+    fork: true,
+    forkThroughTurn: true,
+    forkBusySource: true,
     externalWriterMonitor: true,
     localSessions: true,
     planMode: true,
@@ -310,6 +318,9 @@ class AppCapabilities {
   /// The agent reported that authentication is required.
   final bool authRequired;
 
+  /// Listing and stopping what a session runs in the background.
+  final bool backgroundTerminals;
+
   /// Native slash commands the engine lists ([BridgeApi.appCommandListForProject]).
   final bool commands;
 
@@ -358,6 +369,16 @@ class AppCapabilities {
   /// Taking over a session held by another local process.
   final bool takeover;
 
+  /// Branching a session into an independent one.
+  final bool fork;
+
+  /// Forking through a chosen completed turn.
+  final bool forkThroughTurn;
+
+  /// Forking a source another process holds or a running turn changes, as a
+  /// snapshot. Without it those wait, except a boundary before a running turn.
+  final bool forkBusySource;
+
   /// Monitoring another writer of the same session.
   final bool externalWriterMonitor;
 
@@ -366,4 +387,55 @@ class AppCapabilities {
 
   /// Plan collaboration mode.
   final bool planMode;
+}
+
+/// A command a conversation runs in the background.
+@immutable
+class BackgroundTerminal {
+  /// Creates the description.
+  const BackgroundTerminal({
+    required this.itemId,
+    required this.processId,
+    required this.command,
+    required this.cwd,
+    this.osPid,
+    this.cpuPercent,
+    this.rssKb,
+  });
+
+  /// The item that started it.
+  final String itemId;
+
+  /// The host's id for the process, which stops it.
+  final String processId;
+
+  /// The command line.
+  final String command;
+
+  /// Where it runs.
+  final String cwd;
+
+  /// Operating-system process id, when the host could read it.
+  final int? osPid;
+
+  /// CPU use in percent, when the host could read it.
+  final double? cpuPercent;
+
+  /// Resident memory in kilobytes, when the host could read it.
+  final int? rssKb;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BackgroundTerminal &&
+      other.itemId == itemId &&
+      other.processId == processId &&
+      other.command == command &&
+      other.cwd == cwd &&
+      other.osPid == osPid &&
+      other.cpuPercent == cpuPercent &&
+      other.rssKb == rssKb;
+
+  @override
+  int get hashCode =>
+      Object.hash(itemId, processId, command, cwd, osPid, cpuPercent, rssKb);
 }

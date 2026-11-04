@@ -43,7 +43,12 @@ void _registerHostingLayout() {
     const text = 'Host this device';
     final action = find.byKey(const Key('host-this-device-btn'));
     final labelled = find.descendant(of: action, matching: find.text(text));
-    final back = find.byKey(const Key('utility-chat-origin'));
+    // The way out: the rail on a wide window, the bar's back on a compact one.
+    final back = find.byWidgetPredicate(
+      (w) =>
+          w.key == const Key('workspace-nav-/') ||
+          w.key == const Key('utility-chat-origin'),
+    );
     Future<void> show(
       Size size,
       double scale, {
@@ -71,7 +76,6 @@ void _registerHostingLayout() {
         back,
         find.byKey(const Key('refresh-btn')),
         action,
-        find.byKey(const Key('utility-page-menu')),
       ]) {
         expect(control.hitTestable(), findsOneWidget, reason: '$control');
         final rect = t.getRect(control);

@@ -49,6 +49,10 @@ pub(super) fn reply(text: &str) -> String {
     acp(json!({"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": text}}))
 }
 
+fn done_as(prompt: &str) -> String {
+    xai(json!({"sessionUpdate": "turn_completed", "prompt_id": prompt, "stop_reason": "end_turn"}))
+}
+
 fn done() -> String {
     xai(json!({"sessionUpdate": "turn_completed", "prompt_id": "p", "stop_reason": "end_turn"}))
 }
@@ -405,4 +409,51 @@ fn grok_client_child() {
     if std::env::var_os("POCOX_GROK_CLIENT").is_some() {
         std::thread::sleep(std::time::Duration::from_secs(30));
     }
+}
+
+#[tokio::test]
+async fn prompts_mark_what_a_fork_boundary_needs_after_rewinds() {
+    let home = TempDir::new().expect("home");
+    let dir = session(home.path(), "bucket", ID, summary(ID, "T", "2026-10-19T16:32:19Z"));
+    append(&dir, &[
+        prompt(0, "first"),
+        reply("one"),
+        done_as("turn-0"),
+        // Rewound away, as Grok's own prompt cut filters it.
+        prompt(1, "abandoned"),
+        reply("gone"),
+        done_as("turn-gone"),
+        xai(json!({"sessionUpdate": "rewind_marker", "target_prompt_index": 1})),
+        prompt(1, "second"),
+        reply("two"),
+        xai(json!({"sessionUpdate": "compaction_checkpoint", "checkpoint_id": "c"})),
+        done_as("turn-1"),
+        prompt(2, "third"),
+    ]);
+    let history = GrokHistory::new(home.path().to_path_buf()).expect("reader");
+    let marks = history.prompts(ID).await.expect("prompts");
+    let page = history.read_page(ID, None, 10).await.expect("page");
+    assert_eq!(
+        marks.iter().map(|mark| &mark.turn).collect::<Vec<_>>(),
+        page.turns.iter().map(|turn| &turn.id).collect::<Vec<_>>(),
+        "a mark is named by the turn id this reader shows"
+    );
+    assert_eq!(
+        marks
+            .iter()
+            .map(|mark| (mark.ended, mark.compacted, mark.prompt_ids.as_slice()))
+            .collect::<Vec<_>>(),
+        [
+            (true, false, &["turn-0".to_string()][..]),
+            (true, true, &["turn-1".to_string()][..]),
+            (false, false, &[][..]),
+        ]
+    );
+    assert!(
+        page.turns[1]
+            .items
+            .iter()
+            .all(|item| item.text != "gone" && !item.text.contains("compaction")),
+        "a compaction record is not shown"
+    );
 }

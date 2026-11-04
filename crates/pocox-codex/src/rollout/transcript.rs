@@ -70,20 +70,32 @@ impl TranscriptItem {
 /// token events are skipped. Unreadable lines are skipped rather than failing
 /// the whole read, so a partially-written rollout (one a live writer is
 /// appending to) still renders what is parseable.
+///
+/// A paginated fork's rollout holds only what happened after it branched, so
+/// the history it references is read first.
 pub fn read_transcript(path: &Path) -> Result<Vec<TranscriptItem>> {
-    let reader = super::open_rollout(path)?;
     let mut transcript = Transcript::default();
-    for (idx, line) in reader.lines().enumerate() {
-        let line = line?;
-        if line.trim().is_empty() {
-            continue;
-        }
-        let Ok(value) = serde_json::from_str::<Value>(&line) else {
-            continue;
+    let mut index = 0;
+    for segment in super::lineage::segments(path) {
+        let reader = match segment.open() {
+            Ok(reader) => reader,
+            Err(_) if segment.is_ancestor() => continue,
+            Err(err) => return Err(err),
         };
-        if let Some(payload) = value.get("payload") {
-            let line_type = value.get("type").and_then(Value::as_str);
-            transcript.record(format!("t{idx}"), line_type, payload);
+        for line in reader.lines() {
+            let line = line?;
+            let idx = index;
+            index += 1;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let Ok(value) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
+            if let Some(payload) = value.get("payload") {
+                let line_type = value.get("type").and_then(Value::as_str);
+                transcript.record(format!("t{idx}"), line_type, payload);
+            }
         }
     }
     Ok(transcript.rows)

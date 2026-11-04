@@ -22,12 +22,27 @@ pub struct ThreadMetaDto {
     pub thread_source: Option<String>,
     /// Parent thread for a spawned child.
     pub parent_thread_id: Option<String>,
+    /// The thread this one branched from; never a spawning parent.
+    pub forked_from_id: Option<String>,
     /// Working directory (the project the thread controls).
     pub cwd: String,
     /// The repository's remote, when the agent reports one.
     pub origin_url: Option<String>,
     /// Unix seconds of last update.
     pub updated_at: i64,
+}
+
+/// What a fork request did. A refusal arrives as an error instead.
+pub struct ThreadForkDto {
+    /// The new session, or `None` when the outcome is unknown.
+    pub thread: Option<ThreadMetaDto>,
+    /// Why the outcome is unknown: the request was sent but its answer was
+    /// lost, so a session may exist and a retry could create another.
+    pub unknown_reason: Option<String>,
+    /// The new session's newest turn is marked interrupted.
+    pub last_turn_interrupted: bool,
+    /// The new session ends at the requested boundary (true with none asked).
+    pub boundary_confirmed: bool,
 }
 
 /// One model offered by the app-server, mirrored for Dart.
@@ -251,6 +266,7 @@ fn thread_meta_dto(t: app_session::ThreadMeta) -> ThreadMetaDto {
         name: t.name,
         thread_source: t.thread_source,
         parent_thread_id: t.parent_thread_id,
+        forked_from_id: t.forked_from_id,
         cwd: t.cwd,
         origin_url: t.origin_url,
         updated_at: t.updated_at,
@@ -452,6 +468,37 @@ pub async fn app_thread_resume(service_key: String, thread_id: String) -> Result
     .await
 }
 
+/// Branch a session into a new independent one on the host serving it, through
+/// `through_turn_id` (inclusive) or from its latest saved state.
+pub async fn app_thread_fork(
+    service_key: String,
+    thread_id: String,
+    through_turn_id: Option<String>,
+) -> Result<ThreadForkDto> {
+    execution::run(Lane::Control, move || {
+        let outcome = engine(&service_key).thread_fork(
+            &service_key,
+            &thread_id,
+            through_turn_id.as_deref(),
+        )?;
+        Ok(match outcome {
+            app_session::ForkOutcome::Created(fork) => ThreadForkDto {
+                thread: Some(thread_meta_dto(fork.thread)),
+                unknown_reason: None,
+                last_turn_interrupted: fork.last_turn_interrupted,
+                boundary_confirmed: fork.boundary_confirmed,
+            },
+            app_session::ForkOutcome::Unknown(reason) => ThreadForkDto {
+                thread: None,
+                unknown_reason: Some(reason),
+                last_turn_interrupted: false,
+                boundary_confirmed: false,
+            },
+        })
+    })
+    .await
+}
+
 pub(super) fn item_dto(i: app_session::ThreadItem) -> ThreadItemDto {
     ThreadItemDto {
         diff: super::diff::item_diff(&i.item_type, &i.text),
@@ -597,6 +644,59 @@ pub async fn app_rate_limits(service_key: String) -> Result<String> {
 /// the cwd isn't a git repo or there are no changes.
 pub async fn app_git_diff(service_key: String, cwd: String) -> Result<String> {
     execution::run(Lane::Read, move || engine(&service_key).git_diff(&service_key, &cwd)).await
+}
+
+/// A command a conversation runs in the background.
+pub struct BackgroundTerminalDto {
+    /// The item that started it.
+    pub item_id: String,
+    /// The host's id for the process, which stops it.
+    pub process_id: String,
+    /// The command line.
+    pub command: String,
+    /// Where it runs.
+    pub cwd: String,
+    /// Operating-system process id, when the host could read it.
+    pub os_pid: Option<u32>,
+    /// CPU use in percent, when the host could read it.
+    pub cpu_percent: Option<f64>,
+    /// Resident memory in kilobytes, when the host could read it.
+    pub rss_kb: Option<u64>,
+}
+
+/// What a conversation runs in the background now.
+pub async fn app_background_terminals(
+    service_key: String,
+    thread_id: String,
+) -> Result<Vec<BackgroundTerminalDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(engine(&service_key)
+            .background_terminals(&service_key, &thread_id)?
+            .into_iter()
+            .map(|t| BackgroundTerminalDto {
+                item_id: t.item_id,
+                process_id: t.process_id,
+                command: t.command,
+                cwd: t.cwd,
+                os_pid: t.os_pid,
+                cpu_percent: t.cpu_percent,
+                rss_kb: t.rss_kb,
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Stop one background process of a conversation. False when it was gone.
+pub async fn app_terminate_background_terminal(
+    service_key: String,
+    thread_id: String,
+    process_id: String,
+) -> Result<bool> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).terminate_background_terminal(&service_key, &thread_id, &process_id)
+    })
+    .await
 }
 
 /// Start a manual conversation compaction; the server emits `thread/compacted`

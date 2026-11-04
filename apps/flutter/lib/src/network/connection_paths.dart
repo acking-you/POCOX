@@ -671,7 +671,6 @@ class _ConnectionPathSettingsState
       children: [
         if (prefs == null && saved.hasError)
           SettingReadFailed(
-            icon: AppIcons.route,
             message: l10n.connectionPathReadFailed,
             retryLabel: l10n.retry,
             retryKey: const Key('connection-path-retry'),
@@ -679,7 +678,6 @@ class _ConnectionPathSettingsState
           )
         else ...[
           SettingRow(
-            icon: AppIcons.route,
             title: l10n.connectionPathOutgoing,
             state: state(
               _Preference.outgoing,
@@ -708,7 +706,6 @@ class _ConnectionPathSettingsState
           // Only a computer publishes services for others to reach.
           if (isDesktop)
             SettingRow(
-              icon: AppIcons.laptop,
               title: l10n.connectionPathIncoming,
               info: l10n.connectionPathIncomingInfo,
               state: state(
@@ -734,7 +731,6 @@ class _ConnectionPathSettingsState
           if (prefs?.mayGoDirect ?? false)
             SettingRow(
               key: const Key('port-mapping-row'),
-              icon: AppIcons.lan_outlined,
               title: l10n.connectionPathMapping,
               info: l10n.connectionPathMappingInfo,
               state: state(
@@ -765,7 +761,6 @@ class _ConnectionPathSettingsState
               ),
             ),
           SettingRow(
-            icon: AppIcons.server,
             title: l10n.connectionPathCarrier,
             info: l10n.connectionPathCarrierInfo,
             state:

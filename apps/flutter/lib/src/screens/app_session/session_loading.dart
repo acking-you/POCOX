@@ -60,6 +60,7 @@ extension _SessionLoading on _AppSessionState {
         }
         mine = [
           local ??
+              _discoveredThreads[tid] ??
               ThreadMeta(
                 id: tid,
                 preview: _lastSent?.text ?? '',
@@ -81,6 +82,7 @@ extension _SessionLoading on _AppSessionState {
                   preview: localPreview[t.id]!,
                   name: t.name,
                   threadSource: t.threadSource,
+                  forkedFromId: t.forkedFromId,
                   parentThreadId: t.parentThreadId,
                   cwd: t.cwd,
                   originUrl: t.originUrl,
@@ -102,6 +104,7 @@ extension _SessionLoading on _AppSessionState {
           _threads = mine;
           _threadsListed = true;
         });
+        unawaited(_readForkOrigins(all));
       }
       _openLoadDone(_kThreadsLoad);
       // Reaching here proves the service answers, which the subscribe-time
@@ -241,8 +244,12 @@ extension _SessionLoading on _AppSessionState {
     _threadLoadGeneration++;
     _historyLiveItems = null;
     _historyPartialItems = null;
+    _context.terminalsRead++;
+    _context.terminals = const [];
+    _context.terminalsUnavailable = false;
     _updateState(() {
       _threadId = tid;
+      _historyUnread = tid != null;
       _historySyncing = false;
       _showingCachedHistory = false;
       _historyEpoch = null;
@@ -250,6 +257,7 @@ extension _SessionLoading on _AppSessionState {
       _externalWriterMode = false;
       _guardianReadOnly = false;
       _parentThreadId = null;
+      _fork.source = null;
       _externalWriterLiveness = null;
       _access = null;
       _takingOver = false;

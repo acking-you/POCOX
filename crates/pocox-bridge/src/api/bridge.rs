@@ -127,13 +127,14 @@ pub use self::session_config::{
     SessionConfigValueDto, SessionModeDto, SessionSettingsDto,
 };
 pub use self::threads::{
-    app_compact, app_git_diff, app_history_cached, app_history_focus, app_history_prefetch,
-    app_history_sync_prepare, app_model_list, app_rate_limits, app_realtime_request,
-    app_respond_approval, app_respond_user_input, app_set_thread_name, app_thread_list,
-    app_thread_metadata, app_thread_older_page, app_thread_read, app_thread_resume,
-    app_thread_runtime_config, app_thread_start, app_thread_summary, app_thread_turn_items,
-    app_thread_turn_page, app_turn_interrupt, app_turn_start, app_turn_steer, app_turn_supplement,
-    history_cache_set_limit, history_cache_status, AppTurnSupplementDto, HistoryCacheStatusDto,
+    app_background_terminals, app_compact, app_git_diff, app_history_cached, app_history_focus,
+    app_history_prefetch, app_history_sync_prepare, app_model_list, app_rate_limits,
+    app_realtime_request, app_respond_approval, app_respond_user_input, app_set_thread_name,
+    app_terminate_background_terminal, app_thread_list, app_thread_metadata, app_thread_older_page,
+    app_thread_read, app_thread_resume, app_thread_runtime_config, app_thread_start,
+    app_thread_summary, app_thread_turn_items, app_thread_turn_page, app_turn_interrupt,
+    app_turn_start, app_turn_steer, app_turn_supplement, history_cache_set_limit,
+    history_cache_status, AppTurnSupplementDto, BackgroundTerminalDto, HistoryCacheStatusDto,
     ModelInfoDto, OlderPageDto, ThreadHistoryDto, ThreadItemDto, ThreadMetaDto,
     ThreadRuntimeConfigDto, TurnItemsPageDto, TurnSummaryDto,
 };

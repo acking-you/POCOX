@@ -70,7 +70,7 @@ CI does not run it; run it before a release that touches the theme animation:
 cd apps/flutter
 fvm flutter drive --profile -d macos \
   --driver=test_driver/integration_test.dart \
-  --target=integration_test/theme_toggle_native_test.dart
+  --target=integration_test/theme_transition_native_test.dart
 ```
 
 This builds a test harness. Rebuild the normal app before packaging a release.

@@ -695,6 +695,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get historyRetry => '加载失败，点击重试';
 
   @override
+  String get historyAwaitsConnection => '连接恢复后加载历史';
+
+  @override
+  String get historyLoadFailed => '历史加载失败';
+
+  @override
   String get turnFailed =>
       '本轮未完成 —— 连接中断或远程 codex 异常。请重试，或检查主机上的 codex（可能需重新登录）。';
 
@@ -1101,13 +1107,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noChanges => '与主分支相比没有变更。';
 
   @override
-  String get envTitle => '环境';
-
-  @override
   String get envLocal => '本地';
-
-  @override
-  String get envSource => '来源';
 
   @override
   String get envRefresh => '刷新';
@@ -1246,22 +1246,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get utilityChat => '对话';
 
   @override
-  String get utilityPages => '页面';
-
-  @override
   String get utilitySwitchPage => '切换页面';
 
   @override
   String get settingsGeneral => '通用';
-
-  @override
-  String get settingsAccountConnection => '账户与连接';
-
-  @override
-  String get settingsServicesSubscriptions => '服务与订阅';
-
-  @override
-  String get settingsAdvanced => '高级';
 
   @override
   String get settingsSelfHostedRelay => '自建 Relay 备用';
@@ -1276,15 +1264,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String settingsOperationFailed(String error) {
     return '操作失败：$error';
   }
-
-  @override
-  String get settingsDiagnostics => '诊断';
-
-  @override
-  String get settingsConfigure => '配置';
-
-  @override
-  String get settingsEdit => '编辑';
 
   @override
   String get trayShow => '显示主窗口';
@@ -1375,9 +1354,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get groupEarlier => '更早';
-
-  @override
-  String get activityView => '动态';
 
   @override
   String get running => '运行中…';
@@ -1516,7 +1492,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get takeoverNoTarget => '请先连接一个 app-server 服务再恢复。';
+  String get takeoverNoTarget => '请先在这台设备上托管 Codex，才能恢复这个会话。';
 
   @override
   String holderRow(String name, int pid) {
@@ -2262,11 +2238,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get historyCacheDescription => '所有主机共用的磁盘上限，单位 MB；0 表示关闭缓存。';
 
   @override
-  String historyCacheUsage(String used, int limit) {
-    return '已用 $used MB · 上限 $limit MB';
-  }
-
-  @override
   String get historyCacheInvalid => '请输入 0 到 64000 之间的整数。';
 
   @override
@@ -2547,9 +2518,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showSidebar => '显示侧边栏';
-
-  @override
-  String get locateConversation => '定位到当前会话';
 
   @override
   String get voiceReconnecting => '语音重连中…';
@@ -4933,5 +4901,164 @@ class AppLocalizationsZh extends AppLocalizations {
   @override
   String logsDiskLost(int count) {
     return '日志落盘发生 $count 次丢弃或写入失败。';
+  }
+
+  @override
+  String get forkConversation => '分叉会话';
+
+  @override
+  String get forkThroughTurn => '从这一轮分叉';
+
+  @override
+  String get forkDialogBody => '这会创建一个历史独立的新会话。原会话保持不变，之后的变化也不会同步到新会话。';
+
+  @override
+  String get forkDialogThroughTurn => '新会话包含这一整轮及之前的全部内容。';
+
+  @override
+  String get forkDialogRunning =>
+      '有一轮仍在运行。新会话只保留目前已保存的内容，这一轮在新会话里不再继续；原会话继续运行。';
+
+  @override
+  String get forkDialogFiles => '两个会话使用同一个工作目录，文件改动会相互影响。';
+
+  @override
+  String get forkConfirm => '分叉';
+
+  @override
+  String get forkPending => '正在分叉…';
+
+  @override
+  String get forksSection => '分叉会话';
+
+  @override
+  String get forkCreated => '已分叉为新会话';
+
+  @override
+  String get forkCreatedInterrupted => '已分叉为新会话，最后一轮在新会话里未完成。';
+
+  @override
+  String get forkReadyOpen => '打开';
+
+  @override
+  String get forkFailed => '无法分叉会话';
+
+  @override
+  String get forkOutcomeUnknown =>
+      '无法确认分叉结果：host 的响应丢失了。新会话可能已经存在，请先查看会话列表再决定是否重试。';
+
+  @override
+  String get forkBoundaryUnconfirmed => '新会话已创建，但可能没有停在所选的这一轮。它已在列表中，继续前请先检查。';
+
+  @override
+  String get forkHostChanged => '分叉期间 host 连接发生了变化。新会话可能已在之前的 host 上创建。';
+
+  @override
+  String get forkedTag => '分叉';
+
+  @override
+  String forkedFrom(String title) {
+    return '分叉自 $title';
+  }
+
+  @override
+  String get forkedFromUnknown => '这是分叉出的会话，点击打开原会话。';
+
+  @override
+  String get forkNoLocalHost => '请先在这台设备上托管 Codex，才能分叉这个会话。';
+
+  @override
+  String get backToConversation => '回到对话';
+
+  @override
+  String get pocketOpen => '打开口袋面板';
+
+  @override
+  String pocketDevicesOnline(int count) {
+    return '$count 台设备在线';
+  }
+
+  @override
+  String pocketLiveLinks(int count) {
+    return '$count 条连接';
+  }
+
+  @override
+  String get pocketUpdateAvailable => '有新版本';
+
+  @override
+  String get githubAccount => 'GitHub 账户';
+
+  @override
+  String get contextCardShow => '显示会话详情';
+
+  @override
+  String get contextCardHide => '收起会话详情';
+
+  @override
+  String get backgroundProcesses => '后台进程';
+
+  @override
+  String get backgroundProcessFolder => '目录';
+
+  @override
+  String get backgroundProcessMemory => '内存';
+
+  @override
+  String get backgroundProcessTerminate => '终止';
+
+  @override
+  String get backgroundProcessTerminateTitle => '终止这个进程？';
+
+  @override
+  String get backgroundProcessGone => '这个进程已经结束。';
+
+  @override
+  String get usageSection => '用量';
+
+  @override
+  String get compactShort => '压缩';
+
+  @override
+  String get sessionHandBackShort => '交回';
+
+  @override
+  String get conversationGroupBy => '会话分组方式';
+
+  @override
+  String get groupByProject => '按项目';
+
+  @override
+  String get groupByTime => '按时间';
+
+  @override
+  String get settingsConnection => '连接';
+
+  @override
+  String get settingsNetwork => '网络';
+
+  @override
+  String get settingsAgents => '智能体';
+
+  @override
+  String get settingsAgentsHosting => '智能体与托管';
+
+  @override
+  String get settingsStorageDiagnostics => '存储与诊断';
+
+  @override
+  String get settingsAbout => '关于';
+
+  @override
+  String get settingsRelay => '中继';
+
+  @override
+  String connectionWindowServices(int count) {
+    return '$count 个服务';
+  }
+
+  @override
+  String historyCacheValue(String used, int limit) {
+    return '$used / $limit MB';
   }
 }

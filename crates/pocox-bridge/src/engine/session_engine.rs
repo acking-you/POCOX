@@ -20,7 +20,7 @@ use tokio::sync::broadcast;
 
 use super::acp;
 use super::app_session::{
-    self, AppEvent, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
+    self, AppEvent, ForkOutcome, ModelInfo, OlderPage, ThreadHistory, ThreadItem, ThreadMeta,
     ThreadRuntimeConfig, TurnItemsPage,
 };
 use super::service_connection::Target;
@@ -162,6 +162,15 @@ pub struct Capabilities {
     pub rate_limits: bool,
     /// Taking over a session held by another local process.
     pub takeover: bool,
+    /// Branching a session into an independent one from its latest saved
+    /// state.
+    pub fork: bool,
+    /// Forking through a chosen completed turn.
+    pub fork_through_turn: bool,
+    /// Forking a source another process holds or a running turn changes, as a
+    /// snapshot. Without it those wait, except a boundary before a running
+    /// turn.
+    pub fork_busy_source: bool,
     /// Monitoring another writer.
     pub external_writer_monitor: bool,
     /// Sessions read from this device's disk.
@@ -210,6 +219,8 @@ pub struct Capabilities {
     pub question_multiple: bool,
     /// Permission responses accept textual feedback.
     pub permission_feedback: bool,
+    /// Listing and stopping what a session runs in the background.
+    pub background_terminals: bool,
 }
 
 impl Capabilities {
@@ -224,6 +235,9 @@ impl Capabilities {
             guardian: true,
             rate_limits: true,
             takeover: true,
+            fork: true,
+            fork_through_turn: true,
+            fork_busy_source: true,
             external_writer_monitor: true,
             local_sessions: true,
             plan_mode: true,
@@ -240,6 +254,7 @@ impl Capabilities {
             session_list: "native".into(),
             history_scope: "full".into(),
             running_inventory: "meta".into(),
+            background_terminals: true,
             ..Self::default()
         }
     }
@@ -299,6 +314,18 @@ pub trait SessionEngine: Sync {
     fn thread_start(&self, service_key: &str, options: StartOptions) -> Result<String>;
     /// Reopen a session before reading it or sending turns.
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()>;
+    /// Branch a session into a new independent one on the host serving it,
+    /// through `through_turn_id` (inclusive) or from its latest saved state.
+    /// Never resumes, signals or writes the source.
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        let _ = (service_key, thread_id, through_turn_id);
+        Err(unsupported(self.protocol(), "forking conversations"))
+    }
     /// Newest history window. `include_turn_pages` keeps the native
     /// monitoring semantics (omit cached selected-turn windows when false).
     fn thread_read(
@@ -406,6 +433,25 @@ pub trait SessionEngine: Sync {
         let _ = (service_key, thread_id);
         Ok(None)
     }
+    /// What a session runs in the background.
+    fn background_terminals(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+    ) -> Result<Vec<app_session::BackgroundTerminal>> {
+        let _ = (service_key, thread_id);
+        Err(unsupported(self.protocol(), "background processes"))
+    }
+    /// Stop one background process of a session; false when it was gone.
+    fn terminate_background_terminal(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        process_id: &str,
+    ) -> Result<bool> {
+        let _ = (service_key, thread_id, process_id);
+        Err(unsupported(self.protocol(), "background processes"))
+    }
     /// Sessions running now, from the engine itself.
     fn running_threads(&self, service_key: &str) -> Result<Vec<String>> {
         let _ = service_key;
@@ -507,6 +553,15 @@ impl SessionEngine for CodexEngine {
 
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()> {
         app_session::thread_resume(service_key, thread_id)
+    }
+
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        app_session::thread_fork(service_key, thread_id, through_turn_id)
     }
 
     fn thread_read(
@@ -622,6 +677,23 @@ impl SessionEngine for CodexEngine {
     fn thread_summary(&self, service_key: &str, thread_id: &str) -> Result<Option<String>> {
         app_session::thread_summary(service_key, thread_id)
     }
+
+    fn background_terminals(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+    ) -> Result<Vec<app_session::BackgroundTerminal>> {
+        app_session::background_terminals(service_key, thread_id)
+    }
+
+    fn terminate_background_terminal(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        process_id: &str,
+    ) -> Result<bool> {
+        app_session::terminate_background_terminal(service_key, thread_id, process_id)
+    }
 }
 
 /// The generic ACP gateway.
@@ -670,6 +742,15 @@ impl SessionEngine for AcpEngine {
 
     fn thread_resume(&self, service_key: &str, thread_id: &str) -> Result<()> {
         acp::thread_resume(service_key, thread_id)
+    }
+
+    fn thread_fork(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        through_turn_id: Option<&str>,
+    ) -> Result<ForkOutcome> {
+        acp::thread_fork(service_key, thread_id, through_turn_id)
     }
 
     fn thread_read(
@@ -832,6 +913,7 @@ mod tests {
         assert!(!acp.voice && !acp.dictation && !acp.fast && !acp.guardian);
         assert!(!acp.image_input && !acp.steer && !acp.model_catalog && !acp.session_config);
         assert!(!acp.native_metadata && !acp.plan_mode);
+        assert!(!acp.background_terminals);
         assert_eq!(acp.session_reopen, "unknown");
     }
 

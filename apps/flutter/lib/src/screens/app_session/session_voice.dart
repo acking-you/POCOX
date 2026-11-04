@@ -166,6 +166,7 @@ extension _SessionVoice on _AppSessionState {
       !_loading &&
       !_historySyncing &&
       !_showingCachedHistory &&
+      !_reconnecting &&
       !_connectionLost;
   // A call just hung up can be followed at once: the controller holds the
   // next one back until the last one's cleanup is done.
