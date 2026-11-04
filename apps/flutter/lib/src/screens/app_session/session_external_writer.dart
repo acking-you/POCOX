@@ -368,7 +368,7 @@ extension _SessionExternalWriter on _AppSessionState {
     if (_guardianReadOnly) {
       return _readOnlyFoot(
         key: const Key('guardian-read-only'),
-        child: _footRow(
+        child: ReadOnlyFootRow(
           lead: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Text(
@@ -379,20 +379,20 @@ extension _SessionExternalWriter on _AppSessionState {
               ),
             ),
           ),
-          trail: switch (_parentThreadId) {
-            final parent? => TextButton.icon(
-              key: const Key('open-parent-session'),
-              onPressed: () => _openThread(
-                parent,
-                _discoveredThreads[parent]?.cwd ??
-                    _threads.where((t) => t.id == parent).firstOrNull?.cwd ??
-                    _cwd,
+          actions: [
+            if (_parentThreadId case final parent?)
+              ReadOnlyFootAction(
+                key: const Key('open-parent-session'),
+                icon: AppIcons.subdirectory_arrow_left,
+                label: l10n.parentSession,
+                onPressed: () => _openThread(
+                  parent,
+                  _discoveredThreads[parent]?.cwd ??
+                      _threads.where((t) => t.id == parent).firstOrNull?.cwd ??
+                      _cwd,
+                ),
               ),
-              icon: const Icon(AppIcons.subdirectory_arrow_left),
-              label: Text(l10n.parentSession),
-            ),
-            null => null,
-          },
+          ],
         ),
       );
     }
@@ -438,6 +438,8 @@ extension _SessionExternalWriter on _AppSessionState {
                 liveness!.requiresTakeover
                     ? l10n.forceTakeover
                     : l10n.resumeSession,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           )
@@ -467,20 +469,13 @@ extension _SessionExternalWriter on _AppSessionState {
               ],
             ),
           );
-    final actions = [
-      if (_caps.fork) _forkFootButton(l10n),
-      if (hasCwd) _externalDiffButton(l10n),
-    ];
     return _readOnlyFoot(
-      child: _footRow(
+      child: ReadOnlyFootRow(
         lead: state,
-        trail: actions.isEmpty
-            ? null
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: actions,
-              ),
+        actions: [
+          if (_caps.fork) _forkFootButton(l10n),
+          if (hasCwd) _externalDiffButton(l10n),
+        ],
       ),
     );
   }
@@ -489,40 +484,11 @@ extension _SessionExternalWriter on _AppSessionState {
   Widget _readOnlyFoot({Key? key, required Widget child}) =>
       ReadOnlyFoot(key: key, maxWidth: _columnWidth, child: child);
 
-  /// [lead] filling the row with [trail] at its end; stacked when the row is
-  /// too narrow for both to read.
-  Widget _footRow({required Widget lead, Widget? trail}) {
-    if (trail == null) return lead;
-    return LayoutBuilder(
-      builder: (context, box) => box.maxWidth < 360
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [lead, const SizedBox(height: 6), trail],
-            )
-          : Row(
-              children: [
-                Expanded(child: lead),
-                const SizedBox(width: 8),
-                trail,
-              ],
-            ),
-    );
-  }
-
-  Widget _externalDiffButton(AppLocalizations l10n) => SizedBox(
-    height: ReadOnlyFoot.controlHeight,
-    child: TextButton.icon(
-      key: const Key('chat-external-diff-action'),
-      onPressed: _diffLoading ? _cancelDiff : _showDiff,
-      icon: _diffLoading
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(AppIcons.difference_outlined, size: 18),
-      label: Text(_diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff),
-    ),
+  Widget _externalDiffButton(AppLocalizations l10n) => ReadOnlyFootAction(
+    key: const Key('chat-external-diff-action'),
+    icon: AppIcons.difference_outlined,
+    label: _diffLoading ? l10n.cancelDiffLoad : l10n.viewDiff,
+    busy: _diffLoading,
+    onPressed: _diffLoading ? _cancelDiff : _showDiff,
   );
 }

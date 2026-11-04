@@ -202,22 +202,14 @@ extension _SessionFork on _AppSessionState {
   }
 
   /// The read-only footer's way to keep working from this conversation.
-  Widget _forkFootButton(AppLocalizations l10n) => SizedBox(
-    height: ReadOnlyFoot.controlHeight,
-    child: TextButton.icon(
-      key: const Key('chat-fork-action'),
-      onPressed: _fork.pending || _takingOver || !_canFork
-          ? null
-          : () => unawaited(_forkConversation()),
-      icon: _fork.pending
-          ? const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(AppIcons.account_tree_outlined, size: 18),
-      label: Text(l10n.forkConfirm),
-    ),
+  Widget _forkFootButton(AppLocalizations l10n) => ReadOnlyFootAction(
+    key: const Key('chat-fork-action'),
+    icon: AppIcons.account_tree_outlined,
+    label: l10n.forkConfirm,
+    busy: _fork.pending,
+    onPressed: _fork.pending || _takingOver || !_canFork
+        ? null
+        : () => unawaited(_forkConversation()),
   );
 
   /// What a fork's source is called, and the way back to it.

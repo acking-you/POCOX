@@ -642,8 +642,8 @@ void main() {
       _reset();
     });
 
-    testWidgets('a held conversation keeps its fork in the read-only foot, '
-        'at a finger\'s size on a phone', (t) async {
+    testWidgets('a held conversation keeps its fork in the read-only foot, on '
+        'one line at a finger\'s size on a phone', (t) async {
       FakeBridgeApi held() {
         final api = _api()
           ..appThreadResumeError = StateError(
@@ -666,8 +666,32 @@ void main() {
       await capturePreview(t, 'workspace-held-desktop');
       await _mount(t, size: _phone, platform: TargetPlatform.iOS, api: held());
       final action = find.byKey(const Key('chat-fork-action'));
-      expect(t.getSize(action).height, greaterThanOrEqualTo(44));
+      final takeover = find.byKey(const Key('chat-takeover-action'));
+      void oneLine() {
+        expect(t.takeException(), isNull);
+        expect(t.getCenter(action).dy, t.getCenter(takeover).dy);
+        expect(t.getSize(action).height, greaterThanOrEqualTo(44));
+        expect(t.getSize(action).width, greaterThanOrEqualTo(44));
+      }
+
+      oneLine();
       await capturePreview(t, 'workspace-held-phone');
+      await _mount(
+        t,
+        size: _phone,
+        platform: TargetPlatform.iOS,
+        api: held(),
+        dark: true,
+      );
+      await capturePreview(t, 'workspace-held-phone-dark');
+      await _mount(
+        t,
+        size: const Size(320, 640),
+        scale: 2,
+        platform: TargetPlatform.iOS,
+        api: held(),
+      );
+      oneLine();
       await t.pumpWidget(const SizedBox());
       await t.pump(const Duration(seconds: 1));
       _reset();

@@ -130,6 +130,10 @@ for Flutter diagnostics. Native console lifetime tests live in
   sheet shows it. A host that cannot answer is not asked again until the connection
   or conversation changes. A process's panel has its folder, pid, CPU and memory,
   and Terminate behind a confirm, for a view that writes the conversation.
+- A read-only foot (`widgets/read_only_foot.dart`), in a conversation or the session
+  viewer, keeps its state or main action and its other actions on one line. Where
+  names would crowd it, as on a phone, those actions become round marks of the same
+  height, named by their tooltips, and never drop to a second line.
 - With the card open the status bar stays out of the way at rest and while a turn
   runs, and returns for any state that needs attention, a reconnect first of all:
   the status line alone reports one.

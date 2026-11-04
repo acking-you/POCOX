@@ -2,7 +2,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:pocox/src/desktop_theme.dart';
-import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/motion.dart';
 import 'package:pocox/src/text_measure.dart';
 import 'package:pocox/src/theme.dart';
@@ -874,43 +873,4 @@ class GlassSegmented<T> extends StatelessWidget {
       ),
     );
   }
-}
-
-/// What stands in for a composer while a page only reads: the same pane of
-/// glass, so the conversation passes beneath it blurred rather than showing
-/// through between its controls.
-class ReadOnlyFoot extends StatelessWidget {
-  /// Creates the foot, no wider than the reading column's [maxWidth].
-  const ReadOnlyFoot({super.key, required this.maxWidth, required this.child});
-
-  /// The reading column's width.
-  final double maxWidth;
-
-  /// Its state and actions.
-  final Widget child;
-
-  /// The height of a control in it: a finger's target on touch.
-  static double get controlHeight => isDesktop ? 42 : 44;
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Center(
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: Glass(
-            depth: GlassDepth.floating,
-            borderRadius: BorderRadius.circular(
-              isDesktop ? kComposerRadius : kTouchComposerRadius,
-            ),
-            lift: 0.7,
-            child: Padding(padding: const EdgeInsets.all(8), child: child),
-          ),
-        ),
-      ),
-    ),
-  );
 }

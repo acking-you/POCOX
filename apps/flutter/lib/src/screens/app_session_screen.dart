@@ -102,6 +102,7 @@ import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/tools/builtin_tools.dart';
 import 'package:pocox/src/widgets/app_dialog.dart';
 import 'package:pocox/src/widgets/change_counts.dart';
+import 'package:pocox/src/widgets/read_only_foot.dart';
 
 part 'app_session/composer_drafts.dart';
 part 'app_session/composer_foot.dart';
