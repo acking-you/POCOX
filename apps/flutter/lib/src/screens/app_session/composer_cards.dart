@@ -13,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_modes.dart';
 import 'package:pocox/src/bridge_api.dart';
-import 'package:pocox/src/context_status.dart';
 import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/theme.dart';
@@ -419,70 +418,35 @@ class _EffortPainter extends CustomPainter {
       old.onFill != onFill;
 }
 
-/// A small circular context-window gauge for the app bar: a ring filled to the
-/// usage fraction with the percent in the middle. Hover shows [tooltip]
-/// (desktop); tap opens the detail sheet via [onTap].
-class ContextGauge extends StatelessWidget {
-  const ContextGauge({
-    super.key,
-    required this.status,
-    required this.onTap,
-    required this.tooltip,
-  });
-  final ContextStatus status;
-  final VoidCallback onTap;
-  final String tooltip;
+/// How full something is as a small ring, in ink until it is worth acting on:
+/// amber past 75%, error past 90%.
+class UsageRing extends StatelessWidget {
+  /// Creates the ring for [fraction].
+  const UsageRing({super.key, required this.fraction, this.size = 16});
+
+  /// How full, 0 to 1.
+  final double fraction;
+
+  /// The ring's side.
+  final double size;
+
+  /// The colour of a [fraction].
+  static Color colorOf(ColorScheme scheme, double fraction) => fraction >= 0.9
+      ? scheme.error
+      : fraction >= 0.75
+      ? cautionColor(scheme)
+      : scheme.onSurfaceVariant;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    // Warn (amber) past 75%, alert (error) past 90%.
-    final f = status.fraction;
-    // At rest the ring is ink: how full the context is only needs colour once
-    // it is worth acting on.
-    final color = f >= 0.9
-        ? scheme.error
-        : f >= 0.75
-        ? cautionColor(scheme)
-        : scheme.onSurfaceVariant;
-    return Tooltip(
-      message: tooltip,
-      child: Semantics(
-        button: true,
-        label: tooltip,
-        value: '${status.percent}%',
-        child: InkWell(
-          mouseCursor: clickable,
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(kRowRadius),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  width: 15,
-                  height: 15,
-                  child: CustomPaint(
-                    painter: _GaugePainter(
-                      fraction: f,
-                      color: color,
-                      track: scheme.outlineVariant,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  '${status.percent}%',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: color,
-                    fontFeatures: const [FontFeature.tabularFigures()],
-                  ),
-                ),
-              ],
-            ),
-          ),
+    return SizedBox.square(
+      dimension: size,
+      child: CustomPaint(
+        painter: _GaugePainter(
+          fraction: fraction,
+          color: colorOf(scheme, fraction),
+          track: scheme.outlineVariant,
         ),
       ),
     );

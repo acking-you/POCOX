@@ -219,6 +219,8 @@ pub struct Capabilities {
     pub question_multiple: bool,
     /// Permission responses accept textual feedback.
     pub permission_feedback: bool,
+    /// Listing and stopping what a session runs in the background.
+    pub background_terminals: bool,
 }
 
 impl Capabilities {
@@ -252,6 +254,7 @@ impl Capabilities {
             session_list: "native".into(),
             history_scope: "full".into(),
             running_inventory: "meta".into(),
+            background_terminals: true,
             ..Self::default()
         }
     }
@@ -429,6 +432,25 @@ pub trait SessionEngine: Sync {
     fn thread_summary(&self, service_key: &str, thread_id: &str) -> Result<Option<String>> {
         let _ = (service_key, thread_id);
         Ok(None)
+    }
+    /// What a session runs in the background.
+    fn background_terminals(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+    ) -> Result<Vec<app_session::BackgroundTerminal>> {
+        let _ = (service_key, thread_id);
+        Err(unsupported(self.protocol(), "background processes"))
+    }
+    /// Stop one background process of a session; false when it was gone.
+    fn terminate_background_terminal(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        process_id: &str,
+    ) -> Result<bool> {
+        let _ = (service_key, thread_id, process_id);
+        Err(unsupported(self.protocol(), "background processes"))
     }
     /// Sessions running now, from the engine itself.
     fn running_threads(&self, service_key: &str) -> Result<Vec<String>> {
@@ -655,6 +677,23 @@ impl SessionEngine for CodexEngine {
     fn thread_summary(&self, service_key: &str, thread_id: &str) -> Result<Option<String>> {
         app_session::thread_summary(service_key, thread_id)
     }
+
+    fn background_terminals(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+    ) -> Result<Vec<app_session::BackgroundTerminal>> {
+        app_session::background_terminals(service_key, thread_id)
+    }
+
+    fn terminate_background_terminal(
+        &self,
+        service_key: &str,
+        thread_id: &str,
+        process_id: &str,
+    ) -> Result<bool> {
+        app_session::terminate_background_terminal(service_key, thread_id, process_id)
+    }
 }
 
 /// The generic ACP gateway.
@@ -874,6 +913,7 @@ mod tests {
         assert!(!acp.voice && !acp.dictation && !acp.fast && !acp.guardian);
         assert!(!acp.image_input && !acp.steer && !acp.model_catalog && !acp.session_config);
         assert!(!acp.native_metadata && !acp.plan_mode);
+        assert!(!acp.background_terminals);
         assert_eq!(acp.session_reopen, "unknown");
     }
 

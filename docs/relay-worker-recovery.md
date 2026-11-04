@@ -157,15 +157,17 @@ second, and every 400 ms while a connect runs, whose steps are not tunnel events
 
 A session keeps reconnecting for as long as it is on screen, waiting 1, 2, 4,
 8, 15 and then 30 s between attempts, and **Retry now** in the connection sheet
-cuts any wait short. The status bar alone reports this; no banner repeats it, so
-what a banner says about the connection is about a failed operation. A reconnect
+cuts any wait short. The status line alone reports this: the status bar, or a
+phone's top bar. No banner repeats it, so what a banner says about the connection
+is about a failed operation. A reconnect
 keeps a live
 tunnel — the SDK recovers its relay link and direct paths itself — and only a
 failed attempt rebuilds the tunnel too. While it reconnects, the session's status
 bar says where it stands (for example *Punching through NAT*, *Fell back to
 the relay while punching*, *Retrying in 8s*) beside three dots for relay, P2P
-and session. Tapping the bar, or the small path mark beside it (P2P, relay or
-recovering), opens the connection sheet: the three steps live, the attempt
+and session. Tapping the bar, a phone's title, or the small path mark (P2P, relay
+or recovering, on the status bar and the context card), opens the connection
+sheet: the three steps live, the attempt
 number and last error, and the tunnel's recent events. Tunnel details show the
 same stage and history for any subscription, and the galaxy draws a link trying
 a direct path as a dashed beam and one recovering its relay link as an amber

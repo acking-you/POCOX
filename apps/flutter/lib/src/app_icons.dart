@@ -628,6 +628,27 @@ abstract final class AppIcons {
   /// `vertical_align_bottom`.
   static const IconData vertical_align_bottom = LucideIcons.arrowDownToLine300;
 
+  /// A branch of the working tree.
+  static const IconData git_branch = LucideIcons.gitBranch300;
+
+  /// Changes against the branch's upstream.
+  static const IconData git_compare = LucideIcons.gitCompare300;
+
+  /// A fold of a conversation's context.
+  static const IconData fold_vertical = LucideIcons.foldVertical300;
+
+  /// The Pocket: every other page, as tiles.
+  static const IconData layout_grid = LucideIcons.layoutGrid300;
+
+  /// Giving something back.
+  static const IconData hand_back = LucideIcons.undo2300;
+
+  /// A command running in the background.
+  static const IconData terminal_prompt = LucideIcons.terminal300;
+
+  /// The context card's toggle.
+  static const IconData panel_right = LucideIcons.panelRight300;
+
   /// `view_sidebar_outlined`.
   static const IconData view_sidebar_outlined = LucideIcons.panelLeftClose300;
 

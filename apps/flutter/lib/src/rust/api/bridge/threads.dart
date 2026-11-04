@@ -254,6 +254,26 @@ Future<String> appGitDiff({required String serviceKey, required String cwd}) =>
       cwd: cwd,
     );
 
+/// What a conversation runs in the background now.
+Future<List<BackgroundTerminalDto>> appBackgroundTerminals({
+  required String serviceKey,
+  required String threadId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppBackgroundTerminals(
+  serviceKey: serviceKey,
+  threadId: threadId,
+);
+
+/// Stop one background process of a conversation. False when it was gone.
+Future<bool> appTerminateBackgroundTerminal({
+  required String serviceKey,
+  required String threadId,
+  required String processId,
+}) => RustLib.instance.api.crateApiBridgeThreadsAppTerminateBackgroundTerminal(
+  serviceKey: serviceKey,
+  threadId: threadId,
+  processId: processId,
+);
+
 /// Start a manual conversation compaction; the server emits `thread/compacted`
 /// when done.
 Future<void> appCompact({
@@ -423,6 +443,63 @@ class AppTurnSupplementDto {
           runtimeType == other.runtimeType &&
           outcome == other.outcome &&
           turnId == other.turnId;
+}
+
+/// A command a conversation runs in the background.
+class BackgroundTerminalDto {
+  /// The item that started it.
+  final String itemId;
+
+  /// The host's id for the process, which stops it.
+  final String processId;
+
+  /// The command line.
+  final String command;
+
+  /// Where it runs.
+  final String cwd;
+
+  /// Operating-system process id, when the host could read it.
+  final int? osPid;
+
+  /// CPU use in percent, when the host could read it.
+  final double? cpuPercent;
+
+  /// Resident memory in kilobytes, when the host could read it.
+  final BigInt? rssKb;
+
+  const BackgroundTerminalDto({
+    required this.itemId,
+    required this.processId,
+    required this.command,
+    required this.cwd,
+    this.osPid,
+    this.cpuPercent,
+    this.rssKb,
+  });
+
+  @override
+  int get hashCode =>
+      itemId.hashCode ^
+      processId.hashCode ^
+      command.hashCode ^
+      cwd.hashCode ^
+      osPid.hashCode ^
+      cpuPercent.hashCode ^
+      rssKb.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BackgroundTerminalDto &&
+          runtimeType == other.runtimeType &&
+          itemId == other.itemId &&
+          processId == other.processId &&
+          command == other.command &&
+          cwd == other.cwd &&
+          osPid == other.osPid &&
+          cpuPercent == other.cpuPercent &&
+          rssKb == other.rssKb;
 }
 
 /// Controller-wide persistent cache capacity and actual disk usage.

@@ -47,8 +47,7 @@ void _registerActivityView() {
     expect(api.summaryCalls, isEmpty);
     expect(find.byKey(const Key('project-header-/work/alpha')), findsOneWidget);
 
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
 
     // Day headings replace the project headings.
     expect(find.byKey(const Key('project-header-/work/alpha')), findsNothing);
@@ -62,8 +61,7 @@ void _registerActivityView() {
     expect(api.summaryCalls, containsAll(<String>['a1', 'b1']));
 
     // And the toggle goes back to the project tree.
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByProject(t);
     expect(find.byKey(const Key('project-header-/work/alpha')), findsOneWidget);
     expect(find.byKey(const Key('activity-tile-a1')), findsNothing);
   });
@@ -104,8 +102,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
 
     // Each summary costs a full `thread/read` server-side, so the toggle must
     // not fan out over the whole history to fill one screen.
@@ -167,8 +164,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
 
     // a1 starts a turn, so it moves up into the "Active" group.
     api.pushEvent(
@@ -217,8 +213,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
     expect(find.text('Looked at the retry loop.'), findsOneWidget);
     expect(api.summaryCalls, ['a1']);
 
@@ -279,8 +274,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
     expect(find.text('First pass at the parser.'), findsOneWidget);
 
     // b1 finishes a turn while a1 stays selected. `_onEvent` drops events for
@@ -333,8 +327,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
     expect(find.text('今天'), findsNothing, reason: 'starts under an old day');
 
     // The user resumes it and a turn completes: the server moves `updatedAt` to
@@ -392,8 +385,7 @@ void _registerActivityView() {
       ),
     );
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('activity-view-btn')));
-    await t.pumpAndSettle();
+    await groupByTime(t);
 
     // Loading: the name leads and the preview stands in for the summary, so
     // the row reads immediately and the layout won't jump when the real one

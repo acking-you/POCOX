@@ -482,3 +482,46 @@ class _DeviceDetailHeader extends StatelessWidget {
     );
   }
 }
+
+/// A wide window's services: the workspace's column holds the devices, the
+/// page the chosen one.
+class _SplitServices extends StatelessWidget {
+  const _SplitServices({
+    required this.columnWidth,
+    required this.deviceColumn,
+    required this.detail,
+  });
+
+  final double columnWidth;
+  final Widget deviceColumn;
+  final List<Widget> detail;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      SizedBox(
+        width: columnWidth,
+        child: ColoredBox(
+          color: surfaceSidebar(Theme.of(context).colorScheme),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: deviceColumn,
+          ),
+        ),
+      ),
+      Expanded(
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+              child: ListView(children: detail),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}

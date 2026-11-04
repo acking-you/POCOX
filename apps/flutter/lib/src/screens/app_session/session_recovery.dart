@@ -1,6 +1,45 @@
 part of '../app_session_screen.dart';
 
 extension _SessionRecovery on _AppSessionState {
+  /// Foreground and background: reconnect on the way back, give up the link's
+  /// claim on the way out, and end what a phone cannot keep in the background.
+  void _onLifecycleChanged(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive) return;
+    _foreground = state == AppLifecycleState.resumed;
+    if (_foreground) {
+      _reconnectCooldown?.cancel();
+      _reconnectCooldown = null;
+      if (_connectionLost ||
+          !ref.read(bridgeApiProvider).appIsConnected(widget.serviceKey)) {
+        unawaited(_autoReconnect());
+      }
+    } else {
+      ++_reconnectEpoch;
+      if (_reconnecting) {
+        _updateState(() {
+          _reconnecting = false;
+          _connectionLost = true;
+        });
+      }
+    }
+    // A phone backgrounding the app loses the microphone anyway, so the call
+    // ends. A desktop window that loses focus, is covered or is minimised is
+    // still the user's live call — they switched to their editor to keep
+    // talking — so only the process going away ends it there.
+    final ends = isDesktop
+        ? state == AppLifecycleState.detached
+        : state == AppLifecycleState.paused ||
+              state == AppLifecycleState.hidden ||
+              state == AppLifecycleState.detached;
+    if (ends) {
+      ++_voiceIntentGeneration;
+      unawaited(_voice.stop());
+      // Same rule for the dictation line: a phone in the background has no
+      // microphone, and a held session would only idle against the quota.
+      unawaited(_dictation.close());
+    }
+  }
+
   String? get _threadId => _selectedThreadId;
 
   /// The running feed follows the shown conversation in place: replacing the
@@ -173,6 +212,7 @@ extension _SessionRecovery on _AppSessionState {
       _fork.source = metadata?.forkedFromId ?? known?.forkedFromId;
       if (metadata != null && metadata.forkedFromId == _fork.source) {
         _discoveredThreads[metadata.id] = metadata;
+        _fork.origins[metadata.id] = metadata.forkedFromId;
       }
       if (metadata?.isGuardian ?? false) {
         _guardianReadOnly = true;
@@ -503,10 +543,6 @@ extension _SessionRecovery on _AppSessionState {
   bool get _canCompact =>
       _caps.compact && !_guardianReadOnly && !(_caps.isAcp && _streaming);
 
-  /// Whether the desktop more-actions menu has any item.
-  bool get _moreActions =>
-      _canReleaseSession || _caps.rename || _canCompact || _canFork;
-
   /// Manually compact the conversation after a confirm.
   Future<void> _compact() async {
     if (!_canCompact) return;
@@ -692,6 +728,8 @@ extension _SessionRecovery on _AppSessionState {
           }
           if (_rate == null) unawaited(_loadQuota());
           unawaited(_ensureModels());
+          // A new connection may be able to say what the last one could not.
+          _context.terminalsUnavailable = false;
           _loadGit(); // the working tree may have moved on while we were away
           // Content loaders retain old data on failure. A timed-out RPC can
           // therefore close this new connection without throwing out of them.

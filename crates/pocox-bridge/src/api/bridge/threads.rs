@@ -646,6 +646,59 @@ pub async fn app_git_diff(service_key: String, cwd: String) -> Result<String> {
     execution::run(Lane::Read, move || engine(&service_key).git_diff(&service_key, &cwd)).await
 }
 
+/// A command a conversation runs in the background.
+pub struct BackgroundTerminalDto {
+    /// The item that started it.
+    pub item_id: String,
+    /// The host's id for the process, which stops it.
+    pub process_id: String,
+    /// The command line.
+    pub command: String,
+    /// Where it runs.
+    pub cwd: String,
+    /// Operating-system process id, when the host could read it.
+    pub os_pid: Option<u32>,
+    /// CPU use in percent, when the host could read it.
+    pub cpu_percent: Option<f64>,
+    /// Resident memory in kilobytes, when the host could read it.
+    pub rss_kb: Option<u64>,
+}
+
+/// What a conversation runs in the background now.
+pub async fn app_background_terminals(
+    service_key: String,
+    thread_id: String,
+) -> Result<Vec<BackgroundTerminalDto>> {
+    execution::run(Lane::Read, move || {
+        Ok(engine(&service_key)
+            .background_terminals(&service_key, &thread_id)?
+            .into_iter()
+            .map(|t| BackgroundTerminalDto {
+                item_id: t.item_id,
+                process_id: t.process_id,
+                command: t.command,
+                cwd: t.cwd,
+                os_pid: t.os_pid,
+                cpu_percent: t.cpu_percent,
+                rss_kb: t.rss_kb,
+            })
+            .collect())
+    })
+    .await
+}
+
+/// Stop one background process of a conversation. False when it was gone.
+pub async fn app_terminate_background_terminal(
+    service_key: String,
+    thread_id: String,
+    process_id: String,
+) -> Result<bool> {
+    execution::run(Lane::Control, move || {
+        engine(&service_key).terminate_background_terminal(&service_key, &thread_id, &process_id)
+    })
+    .await
+}
+
 /// Start a manual conversation compaction; the server emits `thread/compacted`
 /// when done.
 pub async fn app_compact(service_key: String, thread_id: String) -> Result<()> {

@@ -44,6 +44,7 @@ import 'package:super_sliver_list/super_sliver_list.dart';
 import 'local_session_view/native_window.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/field_help.dart';
+import 'package:pocox/src/widgets/read_only_foot.dart';
 
 part 'local_session_view/transcript_row.dart';
 part 'local_session_view/native_follow.dart';
@@ -57,6 +58,9 @@ part 'local_session_view/native_follow.dart';
 /// liveness, so the moment that other client's turn finishes and the session
 /// goes idle, it offers a confirmed force-resume to take it over. A free
 /// (unowned) session offers a plain resume.
+/// The reading column's width, so a wide window doesn't stretch bubbles.
+const double _readingWidth = 820;
+
 class LocalSessionViewScreen extends ConsumerStatefulWidget {
   /// Creates the viewer for [threadId].
   const LocalSessionViewScreen({
@@ -526,7 +530,7 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     return SelectionArea(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final side = (constraints.maxWidth - 820) / 2;
+          final side = (constraints.maxWidth - _readingWidth) / 2;
           final pad = side < 12 ? 12.0 : side;
           return SuperListView.builder(
             key: const ValueKey('view-transcript'),
@@ -560,65 +564,58 @@ class _LocalSessionViewState extends ConsumerState<LocalSessionViewScreen>
     final live = _live;
     if (live == null) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: !_source.isNative && live.allowsResume && !widget.guardian
-                  ? FilledButton.icon(
-                      key: const Key('view-resume'),
-                      onPressed: _resume,
-                      icon: Icon(
-                        live.requiresTakeover
-                            ? AppIcons.bolt
-                            : AppIcons.play_circle_outline,
-                      ),
-                      label: Text(
-                        live.requiresTakeover
-                            ? l10n.forceTakeover
-                            : l10n.resumeSession,
-                      ),
-                    )
-                  : Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          AppIcons.lock_clock,
-                          size: 16,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            _source.isNative
-                                ? l10n.nativeHistoryReadOnly
-                                : l10n.readOnlyViewing,
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          ),
-                        ),
-                      ],
+    return ReadOnlyFoot(
+      maxWidth: _readingWidth,
+      child: ReadOnlyFootRow(
+        lead: !_source.isNative && live.allowsResume && !widget.guardian
+            ? SizedBox(
+                height: ReadOnlyFoot.controlHeight,
+                child: FilledButton.icon(
+                  key: const Key('view-resume'),
+                  onPressed: _resume,
+                  icon: Icon(
+                    live.requiresTakeover
+                        ? AppIcons.bolt
+                        : AppIcons.play_circle_outline,
+                  ),
+                  label: Text(
+                    live.requiresTakeover
+                        ? l10n.forceTakeover
+                        : l10n.resumeSession,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    AppIcons.lock_clock,
+                    size: 16,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      _source.isNative
+                          ? l10n.nativeHistoryReadOnly
+                          : l10n.readOnlyViewing,
+                      style: TextStyle(color: scheme.onSurfaceVariant),
                     ),
-            ),
-            if (!_source.isNative && !widget.guardian) ...[
-              const SizedBox(width: 8),
-              TextButton.icon(
-                key: const Key('view-fork'),
-                onPressed: _forking ? null : _fork,
-                icon: _forking
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(AppIcons.account_tree_outlined, size: 18),
-                label: Text(l10n.forkConfirm),
+                  ),
+                ],
               ),
-            ],
-          ],
-        ),
+        actions: [
+          if (!_source.isNative && !widget.guardian)
+            ReadOnlyFootAction(
+              key: const Key('view-fork'),
+              icon: AppIcons.account_tree_outlined,
+              label: l10n.forkConfirm,
+              busy: _forking,
+              onPressed: _forking ? null : _fork,
+            ),
+        ],
       ),
     );
   }

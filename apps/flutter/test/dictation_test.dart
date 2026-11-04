@@ -398,6 +398,10 @@ void main() {
       final api = _Api();
       final media = _Media();
       await api.appConnect(_service, 28080);
+      // Room for the microphone beside the composer's other controls.
+      t.view.devicePixelRatio = 1;
+      t.view.physicalSize = const Size(1000, 800);
+      addTearDown(t.view.reset);
       await t.pumpWidget(
         ProviderScope(
           overrides: [

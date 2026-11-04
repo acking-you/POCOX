@@ -72,8 +72,9 @@ pub use self::threads::{
     thread_resume, thread_summary, thread_turn_items, OlderPage,
 };
 pub use self::turns::{
-    compact, git_diff, realtime_request, respond_approval, respond_user_input, set_thread_name,
-    thread_start, turn_interrupt, turn_start, turn_steer,
+    background_terminals, compact, git_diff, realtime_request, respond_approval,
+    respond_user_input, set_thread_name, terminate_background_terminal, thread_start,
+    turn_interrupt, turn_start, turn_steer, BackgroundTerminal,
 };
 #[cfg(test)]
 use self::{

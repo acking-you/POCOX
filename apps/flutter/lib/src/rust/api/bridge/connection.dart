@@ -273,6 +273,9 @@ class AppCapabilitiesDto {
   /// The agent reported that authentication is required.
   final bool authRequired;
 
+  /// Listing and stopping what a session runs in the background.
+  final bool backgroundTerminals;
+
   const AppCapabilitiesDto({
     required this.provider,
     required this.fast,
@@ -311,6 +314,7 @@ class AppCapabilitiesDto {
     required this.historyScope,
     required this.runningInventory,
     required this.authRequired,
+    required this.backgroundTerminals,
   });
 
   @override
@@ -351,7 +355,8 @@ class AppCapabilitiesDto {
       sessionList.hashCode ^
       historyScope.hashCode ^
       runningInventory.hashCode ^
-      authRequired.hashCode;
+      authRequired.hashCode ^
+      backgroundTerminals.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -394,7 +399,8 @@ class AppCapabilitiesDto {
           sessionList == other.sessionList &&
           historyScope == other.historyScope &&
           runningInventory == other.runningInventory &&
-          authRequired == other.authRequired;
+          authRequired == other.authRequired &&
+          backgroundTerminals == other.backgroundTerminals;
 }
 
 /// A step of connecting a session, mirrored for Dart.

@@ -61,6 +61,15 @@ extension _SessionStatus on _AppSessionState {
         nominal: false,
       );
     }
+    // Asked for and awaiting its answer, wherever the sheet that asked has gone.
+    if (_fork.pending) {
+      return (
+        color: scheme.onSurfaceVariant,
+        label: l10n.forkPending,
+        icon: AppIcons.account_tree_outlined,
+        nominal: true,
+      );
+    }
     if (_streaming) {
       return (
         color: signalColor(scheme),
@@ -129,9 +138,21 @@ extension _SessionStatus on _AppSessionState {
     return (id: id, confirmed: rtModel != null && id == rtModel);
   }
 
-  /// A thin, always-visible status bar: a colored state chip (plan / working /
-  /// ready / disconnected) + the active model + the git branch, so the
-  /// session's true state is glanceable and consistent with the chat.
+  /// Whether the status bar stands over the conversation. A phone's top bar
+  /// carries its line, and a short window's title row. With the context card
+  /// open all it says at rest is on the card and in the composer, so only a
+  /// state that needs attention brings it back: a reconnect's progress, for
+  /// one, is reported nowhere else.
+  bool _statusStripShown(AppLocalizations l10n) {
+    if (_inlineStatus) return false;
+    if (MediaQuery.sizeOf(context).width < workspaceCompactWidth) return false;
+    if (!_context.cardShown) return true;
+    return !_sessionState(l10n).nominal && !_streaming;
+  }
+
+  /// The status bar: a colored state chip (plan / working / ready /
+  /// disconnected) + the active model + the git branch, so the session's true
+  /// state is glanceable and consistent with the chat.
   Widget _statusBar(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
     final st = _sessionState(l10n);
@@ -222,7 +243,8 @@ extension _SessionStatus on _AppSessionState {
               ),
             ),
             const SizedBox(width: 12),
-            if (_fork.source case final source?) ...[
+            // The card leads with this; the bar only says it in the card's place.
+            if (_fork.source case final source? when !_context.cardShown) ...[
               _forkSourceMark(l10n, source),
               const SizedBox(width: 6),
             ],
@@ -274,6 +296,92 @@ extension _SessionStatus on _AppSessionState {
     );
   }
 
+  /// The phone top bar's second line: the state, the clock and the change
+  /// counts, fitted to its width. While reconnecting it is the reconnect's own
+  /// line. The state and the counts always show; the clock gives way.
+  Widget _stateLine(AppLocalizations l10n) {
+    final st = _sessionState(l10n);
+    final running = _streaming || _externalWriterRunning;
+    final d = _diff;
+    final changed = d != null && !d.isEmpty;
+    return LayoutBuilder(
+      builder: (context, box) {
+        final labelStyle = TextStyle(
+          fontSize: 12.5,
+          height: 1.3,
+          color: st.nominal
+              ? Theme.of(context).colorScheme.onSurfaceVariant
+              : st.color,
+          fontWeight: st.nominal ? FontWeight.w400 : FontWeight.w500,
+        );
+        final fit = _statusFit(
+          box.maxWidth,
+          label: st.label,
+          labelStyle: labelStyle,
+          model: null,
+          running: running,
+          branch: null,
+          countsAlone: true,
+          linkMark: false,
+        );
+        return Row(
+          key: const Key('session-state-line'),
+          children: [
+            if (running)
+              PulsingDot(
+                key: _externalWriterRunning
+                    ? const Key('chat-status-running-pulse')
+                    : null,
+                color: st.color,
+                size: 7,
+              )
+            else
+              Icon(st.icon, size: 13, color: labelStyle.color),
+            const SizedBox(width: 6),
+            Flexible(
+              child: _reconnecting
+                  ? LinkStatusLine(
+                      serviceKey: widget.serviceKey,
+                      reconnect: _relink.view,
+                      style: labelStyle,
+                    )
+                  : _withAccessScope(
+                      l10n,
+                      Text(
+                        st.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: labelStyle,
+                      ),
+                    ),
+            ),
+            if (running && fit.clock) ...[
+              const SizedBox(width: 6),
+              ValueListenableBuilder<int>(
+                valueListenable: _elapsed,
+                builder: (context, secs, _) => Text(
+                  _fmtElapsed(secs),
+                  style: labelStyle.copyWith(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ],
+            if (changed) ...[
+              const SizedBox(width: 6),
+              ChangeCounts(
+                added: d.added,
+                removed: d.removed,
+                fontSize: 12.5,
+                gap: 4,
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
   /// How much of the status bar's right side fits in [width]: the widths
   /// for the model and branch names, and whether the model chip and clock
   /// show at all. Mirrors the chips' own paddings and glyphs.
@@ -289,6 +397,8 @@ extension _SessionStatus on _AppSessionState {
     required String? model,
     required bool running,
     required String? branch,
+    bool countsAlone = false,
+    bool linkMark = true,
   }) {
     const name = TextStyle(fontSize: 12);
     const figures = [FontFeature.tabularFigures()];
@@ -310,11 +420,14 @@ extension _SessionStatus on _AppSessionState {
         6 +
         line(label, labelStyle) +
         (_reconnecting ? 46 : 0) +
-        12 +
-        29 +
-        (_fork.source == null ? 0 : 28);
+        (linkMark ? 12 + 29 : 0) +
+        (_fork.source == null || _context.cardShown || !linkMark ? 0 : 28);
     // Padding, glyph, gap, counts.
-    final branchChip = branch == null ? 0.0 : 12 + 12 + 4 + counts;
+    final branchChip = countsAlone
+        ? counts
+        : branch == null
+        ? 0.0
+        : 12 + 12 + 4 + counts;
     // Padding, gap, dot, gap after.
     const modelChip = 12 + 6 + 6 + 10.0;
     final clockWidth = running

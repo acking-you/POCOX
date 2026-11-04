@@ -31,13 +31,15 @@ stays connected.
 
 | Place | Action | Boundary |
 | --- | --- | --- |
-| Conversation menu | **Fork conversation** | the source's latest saved state |
+| Conversation menu on a computer, context sheet on a phone | **Fork conversation** | the source's latest saved state |
 | Read-only footer of a held conversation (the access panel's, for Claude and Grok) | **Fork**, beside the existing takeover or read-only state | the source's latest saved state |
 | Session viewer (`/sessions/view`) | **Fork**, beside resume or the read-only state | the source's latest saved state |
-| A finished turn's reply (hover on desktop, long press on touch) | **Fork through this turn** | the whole turn, inclusive |
+| Any message of a finished turn, the user's or the agent's (hover on desktop, long press on touch) | **Fork through this turn** | the whole turn, inclusive |
 
-There is no message-level boundary. A turn offers itself only with a real host
-turn id and a completion time, so a running reply or cached history has no action.
+Codex forks at turn boundaries, so every message of a turn offers the same one. A
+turn offers itself only with a real host turn id once it has ended, so a running
+turn or cached history has no action. An older host records no completion time;
+with nothing running, every turn it lists has ended.
 An ACP agent stamps no completion time, so there it is every turn but the running
 one, and not the newest while following a writer whose turn may still run. The host
 checks again.
@@ -45,17 +47,31 @@ A Guardian review forks nowhere: the view hides the action, and the bridge refus
 before sending anything, because Codex itself would accept it.
 
 A confirmation states the boundary and that both conversations share a working
-folder, so a fork isolates history, not files. A mark in the status line leads back
-to the source. That link is `forkedFromId`, read from `thread/read` and kept apart
-from `parentThreadId`: a fork is its own conversation, not a spawned agent, and
-never nests under its source.
+folder, so a fork isolates history, not files. While the request is out the context
+card and sheet say so, as do a phone's top bar and the status line, and the action
+is not offered again. Once in the fork, the card and sheet lead with a row back to
+the source, and the status line carries a mark for it where no card stands. That
+link is `forkedFromId`, read from `thread/read` and kept apart
+from `parentThreadId`: a fork is its own conversation, not a spawned agent,
+even though the list groups it under its source.
 
-Codex lists a fork only once it has a turn of its own, reports an empty preview
-until then, and names no source in `thread/list`. So the bridge names a fresh fork
-by the conversation it inherited, and this view keeps it in the sidebar for the
-session. A fork never sent a prompt is not listed after a restart, though it stays
-on the host and is reopened as the last conversation if it was. The sidebar's
-**Fork** tag appears on forks this view created or opened.
+A fork keeps its place in the family:
+
+- It carries a mark wherever it is named: its list row, the title strip, a phone's
+  top bar.
+- The list shows it under its source, in the session tree spawned agents use, and
+  the family moves with its newest member, so a fork in use today does not lie
+  under an old source. Forks stand open by default; the source's fold control hides
+  them, and a source no longer listed leaves the fork as a row of its own.
+- A fork's transcript opens with a link to its source in place of "start of
+  conversation", and the title strip, the card and the sheet lead there too.
+- A source's card and sheet list its forks.
+
+`forkedFromId` is what says so, and `thread/list` leaves it null: only `thread/read`
+names a source. So after each listing the app asks the host about the newest 200
+conversations it has not asked about yet, four at a time without turns. A source
+never changes, so each is asked once per run, and an older fork is marked once it
+is opened. The bridge names a fresh fork by the conversation it inherited.
 
 ## Rules
 

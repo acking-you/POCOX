@@ -104,6 +104,7 @@ extension _SessionLoading on _AppSessionState {
           _threads = mine;
           _threadsListed = true;
         });
+        unawaited(_readForkOrigins(all));
       }
       _openLoadDone(_kThreadsLoad);
       // Reaching here proves the service answers, which the subscribe-time
@@ -243,6 +244,9 @@ extension _SessionLoading on _AppSessionState {
     _threadLoadGeneration++;
     _historyLiveItems = null;
     _historyPartialItems = null;
+    _context.terminalsRead++;
+    _context.terminals = const [];
+    _context.terminalsUnavailable = false;
     _updateState(() {
       _threadId = tid;
       _historyUnread = tid != null;

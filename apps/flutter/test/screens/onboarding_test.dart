@@ -285,10 +285,12 @@ void main() {
     );
     await t.pumpWidget(host(const SettingsScreen(), api));
     await t.pumpAndSettle();
-    await _reveal(t, find.text('lb7666.top:7666'));
+    await t.tap(find.byKey(const Key('settings-section-account')));
+    await t.pumpAndSettle();
     expect(find.text('lb7666.top:7666'), findsOneWidget);
-    await _reveal(t, find.text('••••••••（已设置）'));
     expect(find.text('••••••••（已设置）'), findsOneWidget);
+    await t.tap(find.byKey(const Key('settings-section-storage')));
+    await t.pumpAndSettle();
     expect(find.byKey(const Key('export-btn')), findsOneWidget);
   });
 
@@ -297,6 +299,9 @@ void main() {
     // shortcut is in the chat drawer — unopenable for the user this matters to,
     // whose host is unreachable. Without a row here the logs explaining the
     // failure were only reachable after it was fixed.
+    t.view.devicePixelRatio = 1;
+    t.view.physicalSize = const Size(390, 700);
+    addTearDown(t.view.reset);
     final api = FakeBridgeApi(
       config: const ConfigInfo(relay: 'lb7666.top:7666', hasKey: true),
     );
@@ -613,7 +618,8 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    await _reveal(t, find.text('@octocat'));
+    await t.tap(find.byKey(const Key('settings-section-account')));
+    await t.pumpAndSettle();
     expect(find.text('@octocat'), findsOneWidget); // signed-in identity
     await _reveal(t, find.byKey(const Key('sign-out-btn')));
     // Centred: at the list's edge it would sit under the bottom navigation.
@@ -654,7 +660,8 @@ void main() {
 
     // The provider re-read the post-login config, so the identity is on screen.
     expect(container.read(configProvider).valueOrNull?.mode, 'account');
-    await _reveal(t, find.text('@octocat'));
+    await t.tap(find.byKey(const Key('settings-section-account')));
+    await t.pumpAndSettle();
     expect(find.text('@octocat'), findsOneWidget);
   });
 

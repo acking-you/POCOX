@@ -109,9 +109,15 @@ Future<void> disposeChat(WidgetTester t) async {
 
 /// The conversation menu offers Fork.
 Future<bool> menuOffersFork(WidgetTester t) async {
+  final contextButton = find.byKey(const Key('session-context-btn'));
   final menu = find.byType(PopupMenuButton<String>);
-  if (menu.evaluate().isEmpty) return false;
-  await t.tap(menu.first);
+  if (contextButton.evaluate().isNotEmpty) {
+    await t.tap(contextButton);
+  } else if (menu.evaluate().isNotEmpty) {
+    await t.tap(menu.first);
+  } else {
+    return false;
+  }
   await frames(t);
   final offered = find.byKey(const Key('session-fork')).evaluate().isNotEmpty;
   await t.tapAt(Offset.zero);
@@ -162,7 +168,7 @@ void main() {
 
     AppSessionScreen.debugResetThreadMemory();
     await openChat(t, caps: withBoundary());
-    expect(find.byKey(const Key('message-fork')), findsOneWidget);
+    expect(find.byKey(const Key('message-fork')), findsNWidgets(2));
     await disposeChat(t);
   });
 
@@ -197,7 +203,7 @@ void main() {
     // Held but idle, it is over.
     AppSessionScreen.debugResetThreadMemory();
     await openChat(t, caps: withBoundary(), opens: [follow('external_idle')]);
-    expect(find.byKey(const Key('message-fork')), findsOneWidget);
+    expect(find.byKey(const Key('message-fork')), findsNWidgets(2));
     await disposeChat(t);
   });
 
@@ -257,8 +263,8 @@ void main() {
     );
     expect(await menuOffersFork(t), isFalse);
     final boundary = find.byKey(const Key('message-fork'));
-    expect(boundary, findsOneWidget);
-    t.widget<MessageAction>(boundary).onPressed();
+    expect(boundary, findsNWidgets(2));
+    t.widget<MessageAction>(boundary.first).onPressed();
     await frames(t);
     await t.tap(find.byKey(const Key('fork-confirm')));
     await frames(t);

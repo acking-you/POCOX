@@ -31,6 +31,7 @@ class UiPrefs {
     this.composerHeight,
     this.sidebarOpen,
     this.sidebarWidth,
+    this.contextCardOpen,
   });
 
   /// Custom ACP agents the user saved (program + arguments, in plain text).
@@ -90,6 +91,9 @@ class UiPrefs {
   /// The desktop sidebar width the user dragged to; null uses the default.
   final double? sidebarWidth;
 
+  /// Whether the context card was left open; null means the default (open).
+  final bool? contextCardOpen;
+
   /// Copy with the given fields replaced. `clearThemeMode` returns to
   /// follow-system (a plain null argument means "keep").
   UiPrefs copyWith({
@@ -107,6 +111,7 @@ class UiPrefs {
     double? composerHeight,
     bool? sidebarOpen,
     double? sidebarWidth,
+    bool? contextCardOpen,
   }) => UiPrefs(
     preferredAppServiceKey:
         preferredAppServiceKey ?? this.preferredAppServiceKey,
@@ -123,6 +128,7 @@ class UiPrefs {
     composerHeight: composerHeight ?? this.composerHeight,
     sidebarOpen: sidebarOpen ?? this.sidebarOpen,
     sidebarWidth: sidebarWidth ?? this.sidebarWidth,
+    contextCardOpen: contextCardOpen ?? this.contextCardOpen,
   );
 
   /// Parse from JSON; any shape surprise degrades to defaults.
@@ -179,6 +185,7 @@ class UiPrefs {
         _ => null,
       },
       sidebarOpen: _as<bool>(json['sidebarOpen']),
+      contextCardOpen: _as<bool>(json['contextCardOpen']),
       sidebarWidth: switch (json['sidebarWidth']) {
         num value when value.isFinite => value.toDouble().clamp(200, 520),
         _ => null,
@@ -208,6 +215,7 @@ class UiPrefs {
     if (themeMode != null) 'themeMode': themeMode,
     if (composerHeight != null) 'composerHeight': composerHeight,
     if (sidebarOpen != null) 'sidebarOpen': sidebarOpen,
+    if (contextCardOpen != null) 'contextCardOpen': contextCardOpen,
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
   };
 }
@@ -566,6 +574,11 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
     if (!height.isFinite) return;
     _mutate((p) => p.copyWith(composerHeight: height.clamp(28, 280)));
   }
+
+  /// Remember whether the context card is open.
+  void setContextCardOpen(bool open) => _mutate(
+    (p) => p.contextCardOpen == open ? null : p.copyWith(contextCardOpen: open),
+  );
 
   /// Remember whether the desktop sidebar is open.
   void setSidebarOpen(bool open) => _mutate(
