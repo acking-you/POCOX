@@ -9,6 +9,8 @@ breaking change goes.
 
 ## Unreleased
 
+- Forked Codex conversations recover inherited image attachments from their
+  stored history after the original temporary image files disappear.
 - **Fork a Codex conversation.** The conversation menu, the read-only footer of a
   session another client holds, the session viewer and a finished turn's reply
   create a new, persistent conversation with the inherited context, on the host

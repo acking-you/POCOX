@@ -78,8 +78,9 @@ rollout and how many of its bytes are inherited. So:
   no Codex delete; another client's refusal comes from Codex.
 - `pocox_codex::rollout` follows `history_base` through active and archived
   sessions, stopping each ancestor at its inherited byte count. Read-only views,
-  a fresh fork's list preview and file-link authorization therefore see inherited
-  content. A missing ancestor leaves the fork's own records readable.
+  a fresh fork's list preview, file-link authorization and inline image recovery
+  therefore see inherited content, without reading the source's later additions.
+  A missing ancestor leaves the fork's own records readable.
 - Live views page through `thread/turns/list` and `thread/items/list`, which
   resolve the same chain on the server.
 
