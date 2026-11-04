@@ -405,6 +405,58 @@ void main() {
       _reset();
     });
 
+    testWidgets('a process confirmation cannot cross a reconnect', (t) async {
+      final api = _api();
+      await _mount(t, size: _phone, platform: TargetPlatform.iOS, api: api);
+      await t.tap(find.byKey(const Key('session-context-btn')));
+      await _frames(t);
+      await t.tap(find.byKey(const Key('context-terminals')));
+      await _frames(t);
+      await t.tap(find.byKey(const Key('context-terminal-p1')));
+      await _frames(t);
+      await t.tap(find.byKey(const Key('background-process-terminate')));
+      await _frames(t);
+
+      // The same service and thread now belong to a replacement connection.
+      // A process id shown before that change is not admitted on the new one.
+      await api.appDisconnect(_mac);
+      await _frames(t, 30);
+      expect(api.appIsConnected(_mac), isTrue);
+      await t.tap(find.widgetWithText(FilledButton, 'Terminate'));
+      await _frames(t);
+      expect(api.terminatedProcesses, isEmpty);
+      _reset();
+    });
+
+    testWidgets('a stale process panel cannot stop a different conversation', (
+      t,
+    ) async {
+      final api = _api();
+      await _mount(
+        t,
+        size: const Size(1440, 900),
+        platform: TargetPlatform.macOS,
+        api: api,
+      );
+      await t.tap(find.byKey(const Key('context-terminal-p1')));
+      await _frames(t);
+      // A keyboard/sidebar navigation can outlive an already-open panel.
+      final row = find
+          .descendant(
+            of: find.byKey(const Key('activity-tile-t2')),
+            matching: find.byType(InkWell),
+          )
+          .first;
+      t.widget<InkWell>(row).onTap!();
+      await _frames(t);
+      expect(api.lastResumed, 't2');
+      await t.tap(find.byKey(const Key('background-process-terminate')));
+      await _frames(t);
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(api.terminatedProcesses, isEmpty);
+      _reset();
+    });
+
     testWidgets('a fork from the sheet says it is under way on the top bar, '
         'lands in the fork, and the sheet leads back to its source', (t) async {
       final api = _api();

@@ -115,6 +115,7 @@ part 'app_session/session_composer.dart';
 part 'app_session/session_composer_toolbar.dart';
 part 'app_session/session_configuration.dart';
 part 'app_session/session_context.dart';
+part 'app_session/session_terminals.dart';
 part 'app_session/session_conversation_rows.dart';
 part 'app_session/session_draft_options.dart';
 part 'app_session/session_conversations.dart';

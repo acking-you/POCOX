@@ -89,6 +89,7 @@ extension _SessionFork on _AppSessionState {
             service,
             id,
           ))?.forkedFromId;
+          if (!current()) return;
           _fork.origins[id] = origin;
           found = found || origin != null;
         } catch (_) {
@@ -103,7 +104,7 @@ extension _SessionFork on _AppSessionState {
     } finally {
       _fork.sweeping = false;
     }
-    if (found && mounted) _updateState(() {});
+    if (found && current()) _updateState(() {});
   }
 
   /// A conversation's forks, newest first.

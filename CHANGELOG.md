@@ -33,7 +33,8 @@ breaking change goes.
 - **See and stop what a conversation runs in the background.** On Codex hosts that
   answer `thread/backgroundTerminals/list`, the context card and sheet list those
   processes, each with its folder and resource use and a **Terminate** behind a
-  confirmation. Other agents show no section.
+  confirmation. A connection change, conversation switch or read-only transition
+  cancels an open termination action. Other agents show no section.
 - **Fork a Codex conversation.** The conversation menu (a phone's context sheet),
   the read-only footer of a session another client holds, the session viewer and
   any message of a finished turn (hover on a computer, long press on a phone)

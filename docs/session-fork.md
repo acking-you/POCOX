@@ -32,8 +32,8 @@ card and sheet say so, as do a phone's top bar and the status line, and the acti
 is not offered again. Once in the fork, the card and sheet lead with a row back to
 the source, and the status line carries a mark for it where no card stands. That
 link is `forkedFromId`, read from `thread/read` and kept apart
-from `parentThreadId`: a fork is its own conversation, not a spawned agent, and
-never nests under its source.
+from `parentThreadId`: a fork is its own conversation, not a spawned agent,
+even though the list groups it under its source.
 
 A fork keeps its place in the family:
 
