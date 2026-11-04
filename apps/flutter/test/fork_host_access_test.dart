@@ -110,7 +110,7 @@ Future<void> disposeChat(WidgetTester t) async {
 /// The conversation menu offers Fork.
 Future<bool> menuOffersFork(WidgetTester t) async {
   final contextButton = find.byKey(const Key('session-context-btn'));
-  final menu = find.byType(PopupMenuButton<String>);
+  final menu = find.byKey(const Key('conversation-menu'));
   if (contextButton.evaluate().isNotEmpty) {
     await t.tap(contextButton);
   } else if (menu.evaluate().isNotEmpty) {
