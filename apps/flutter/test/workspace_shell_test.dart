@@ -615,6 +615,33 @@ void main() {
       _reset();
     });
 
+    testWidgets('the Pocket\'s Appearance saves a theme after the Pocket has '
+        'gone', (t) async {
+      await _mount(t, size: _phone, platform: TargetPlatform.iOS, api: _api());
+      await t.tap(find.byKey(const Key('sidebar-open-btn')));
+      await _frames(t);
+      final page = t.element(find.byKey(const Key('sidebar-open-btn')));
+      await t.tap(find.byKey(const Key('drawer-account-row')));
+      await _frames(t);
+      await t.tap(find.byKey(const Key('pocket-tile-appearance')));
+      await _frames(t);
+      expect(find.byKey(const Key('pocket-sheet')), findsNothing);
+      final l10n = lookupAppLocalizations(const Locale('en'));
+      await t.tap(find.text(l10n.appearanceDark).last);
+      await _frames(t);
+      expect(t.takeException(), isNull);
+      expect(
+        ProviderScope.containerOf(
+          page,
+          listen: false,
+        ).read(uiPrefsProvider).valueOrNull?.themeMode,
+        'dark',
+      );
+      await t.pumpWidget(const SizedBox());
+      await t.pump(const Duration(seconds: 1));
+      _reset();
+    });
+
     testWidgets('a held conversation keeps its fork in the read-only foot, '
         'at a finger\'s size on a phone', (t) async {
       FakeBridgeApi held() {

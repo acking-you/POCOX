@@ -28,6 +28,8 @@ String appearanceLabel(AppLocalizations l10n, String? mode) => switch (mode) {
 Future<void> pickAppearance(BuildContext context, WidgetRef ref) async {
   final l10n = AppLocalizations.of(context);
   final current = ref.read(uiPrefsProvider).valueOrNull?.themeMode ?? 'system';
+  // Read now: [ref] may belong to a Pocket that closes before the choice is made.
+  final prefs = ref.read(uiPrefsProvider.notifier);
   final choice = await showChoicePanel<String>(
     context: context,
     title: l10n.appearance,
@@ -45,9 +47,7 @@ Future<void> pickAppearance(BuildContext context, WidgetRef ref) async {
   if (!context.mounted) return;
   ThemeTransition.run(
     context,
-    () => ref
-        .read(uiPrefsProvider.notifier)
-        .setThemeMode(choice == 'system' ? null : choice),
+    () => prefs.setThemeMode(choice == 'system' ? null : choice),
   );
 }
 
