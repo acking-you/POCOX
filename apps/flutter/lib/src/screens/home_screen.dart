@@ -20,9 +20,11 @@ import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/brand_logo.dart';
 import 'package:pocox/src/widgets/host_switcher.dart';
 import 'package:pocox/src/widgets/local_host_dialog.dart';
+import 'package:pocox/src/widgets/pocket_sheet.dart';
 import 'package:pocox/src/widgets/relay_problem.dart';
-import 'package:pocox/src/widgets/utility_page.dart';
 import 'package:pocox/src/widgets/window_title_bar.dart';
+import 'package:pocox/src/widgets/workspace_navigation.dart';
+import 'package:pocox/src/widgets/workspace_shell.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/widgets/field_help.dart';
 
@@ -754,31 +756,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  /// App bar with the manage/settings escape hatches, shared by the splash
-  /// and the hero so no home state is ever a dead end. Text only — logo tiles
-  /// in a title bar read as clutter; the brand mark lives in the body hero.
-  PreferredSizeWidget _homeAppBar(AppLocalizations l10n) => WindowTitleBar(
-    title: Text(l10n.appTitle, overflow: TextOverflow.ellipsis),
-    actions: [
-      IconButton(
-        key: const Key('home-manage-btn'),
-        icon: const Icon(AppIcons.dns_outlined),
-        tooltip: l10n.manageServices,
-        onPressed: () => context.push('/manage'),
+  /// A home with no conversation, framed so it is never a dead end: a user
+  /// whose host is unreachable still needs Settings and Logs. A wide window
+  /// has the rail; a compact one has the Pocket. Text only in the title —
+  /// logo tiles in a title bar read as clutter; the brand mark lives in the
+  /// body.
+  Widget _homeFrame(AppLocalizations l10n, Widget body) {
+    if (MediaQuery.sizeOf(context).width >= workspaceCompactWidth) {
+      return WorkspaceShell(
+        section: '/',
+        onOpen: (target) => openWorkspaceRoute(context, '/', target),
+        title: Text(
+          l10n.appTitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        body: body,
+      );
+    }
+    return Scaffold(
+      appBar: WindowTitleBar(
+        title: Text(l10n.appTitle, overflow: TextOverflow.ellipsis),
+        actions: const [PocketButton(section: '/')],
       ),
-      IconButton(
-        key: const Key('home-settings-btn'),
-        icon: const Icon(AppIcons.settings_outlined),
-        tooltip: l10n.settingsTitle,
-        onPressed: () => context.push('/settings'),
-      ),
-    ],
-  );
+      body: body,
+    );
+  }
 
   /// Branded connecting splash (cold start / explicit retry).
-  Widget _splash(AppLocalizations l10n) => Scaffold(
-    appBar: _homeAppBar(l10n),
-    body: Center(
+  Widget _splash(AppLocalizations l10n) => _homeFrame(
+    l10n,
+    Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -815,9 +824,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       // What is wrong with the relay, in words, with the raw error folded
       // away; a desktop can still host here (it publishes once the relay
       // answers again).
-      return Scaffold(
-        appBar: _homeAppBar(l10n),
-        body: RelayProblem(
+      return _homeFrame(
+        l10n,
+        RelayProblem(
           detail: _error ?? '',
           relay: ref.watch(configProvider).valueOrNull?.relay,
           onRetry: _retry,
@@ -843,9 +852,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         : canHost
         ? l10n.homeNoServiceDesktopHint
         : l10n.homeNoServiceMobileHint;
-    return Scaffold(
-      appBar: _homeAppBar(l10n),
-      body: Center(
+    return _homeFrame(
+      l10n,
+      Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),
           child: Padding(

@@ -520,7 +520,6 @@ void _registerMonitoring() {
       findsOneWidget,
     );
     expect(find.text('进行中'), findsOneWidget);
-    expect(find.text('会话'), findsOneWidget);
     expect(api.metaSessionEventSubscriptions, 1);
 
     // The working-tree diff remains directly reviewable without taking over.
@@ -601,7 +600,6 @@ void _registerMonitoring() {
     expect(find.text('第 3 / 3 步'), findsOneWidget);
     expect(find.byKey(const Key('turn-progress-panel')), findsOneWidget);
     expect(find.byKey(const Key('turn-progress-diff')), findsOneWidget);
-    expect(find.text('1 个文件有变更'), findsWidgets);
 
     // A stream update flips the action immediately when the other turn ends.
     api.pushMetaSessionUpdate(

@@ -18,7 +18,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart'
     as fsel;
 import 'package:image_picker_platform_interface/image_picker_platform_interface.dart';
-import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/attachment_refs.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/image_attachments.dart';

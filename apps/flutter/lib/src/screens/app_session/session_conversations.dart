@@ -1,14 +1,11 @@
 part of '../app_session_screen.dart';
 
 extension _SessionConversations on _AppSessionState {
-  /// A row's inset from its plate edge to its content.
-  static const double _rowInset = 10;
-
   /// Where a conversation row's title starts. Rows under a project heading
   /// line up with its name, so the folder reads as their parent; the fold
   /// control of a parent row sits in that gutter.
   double _conversationInset({required bool showProject}) =>
-      widget.home && !showProject ? 28 : _rowInset;
+      widget.home && !showProject ? 28 : _SessionConversationRows._rowInset;
 
   Widget _sessionsPane(AppLocalizations l10n, {bool inDrawer = false}) {
     final scheme = Theme.of(context).colorScheme;
@@ -53,18 +50,29 @@ extension _SessionConversations on _AppSessionState {
                     (widget.home && t.cwd.toLowerCase().contains(q)),
               )
               .toList(growable: false);
+    // A spawned agent sits under its parent, and a fork under its source.
+    String? parentOf(ThreadMeta t) => t.parentThreadId ?? _originOf(t);
     final allTree = SessionTree(
       conversations,
       (ThreadMeta t) => t.id,
-      (t) => t.parentThreadId,
+      parentOf,
     );
     final matchingIds = allTree.withAncestors(matches.map((t) => t.id));
     final tree = SessionTree(
       conversations.where((t) => matchingIds.contains(t.id)),
       (ThreadMeta t) => t.id,
-      (t) => t.parentThreadId,
+      parentOf,
     );
-    final filtered = tree.roots;
+    // A family moves with its newest member, so a fork in use today does not
+    // lie folded under an old source.
+    final familyAt = <String, int>{};
+    int newestOf(ThreadMeta t) => familyAt[t.id] ??= [
+      t.updatedAt,
+      for (final child in tree.children[t.id] ?? const <ThreadMeta>[])
+        newestOf(child),
+    ].reduce(math.max);
+    final filtered = [...tree.roots]
+      ..sort((a, b) => newestOf(b).compareTo(newestOf(a)));
     final activeParents = tree.withAncestors(running);
     final reveal = tree.withAncestors([?_threadId])..remove(_threadId);
     // Running state controls the group, not whether children are expanded.
@@ -72,6 +80,9 @@ extension _SessionConversations on _AppSessionState {
       ..._expandedSessionParents,
       ...reveal,
       if (q.isNotEmpty) ...matchingIds,
+      // Forks stand open by default: finding them is the point of nesting them.
+      for (final t in conversations)
+        if (t.parentThreadId == null) ?_originOf(t),
     }..removeAll(_collapsedSessionParents);
     final now = DateTime.now();
     final active = <ThreadMeta>[];
@@ -80,7 +91,7 @@ extension _SessionConversations on _AppSessionState {
     for (final t in filtered) {
       if (activeParents.contains(t.id)) {
         active.add(t);
-      } else if (_isSameDay(t.updatedAt, now)) {
+      } else if (_isSameDay(newestOf(t), now)) {
         today.add(t);
       } else {
         earlier.add(t);
@@ -102,20 +113,21 @@ extension _SessionConversations on _AppSessionState {
           l10n: l10n,
           // Only rows NOT already sitting under a project heading carry
           // their own project name — under one it's just noise.
-          project: showProject ? _leafOf(t.cwd) : null,
+          project: showProject && _leafOf(t.cwd).isNotEmpty
+              ? _leafOf(t.cwd)
+              : null,
           onTap: () {
             closeDrawerIfOpen(ctx);
             if (t.id != _threadId) _openThread(t.id, t.cwd);
           },
         );
-        // The activity view's taller row: name in bold over a one-line summary
-        // of where the conversation got to.
+        // The activity view's taller row: name over a summary of where the
+        // conversation got to.
         Widget activityTile(ThreadMeta t, double inset) => _activityTile(
           thread: t,
           titleInset: inset,
           running: running.contains(t.id),
           selected: t.id == _threadId,
-          now: now,
           l10n: l10n,
           onTap: () {
             closeDrawerIfOpen(ctx);
@@ -131,7 +143,7 @@ extension _SessionConversations on _AppSessionState {
             id: t.id,
             depth: row.depth,
             leadingInset: _activityView
-                ? _rowInset
+                ? _SessionConversationRows._rowInset
                 : _conversationInset(showProject: showProject),
             childCount: tree.children[t.id]?.length ?? 0,
             childSession: t.parentThreadId != null,
@@ -162,7 +174,7 @@ extension _SessionConversations on _AppSessionState {
         // The thread rows in display order, for Ctrl+Tab. A plain field, not
         // state: it only has to be current by the time a key is pressed.
         final order = <ThreadMeta>[];
-        // Index in [rows] of the open conversation, for the locate button.
+        // Index in [rows] of the open conversation, to reveal it.
         int? selectedRow;
         void appendThreads(
           Iterable<ThreadMeta> items, {
@@ -177,13 +189,21 @@ extension _SessionConversations on _AppSessionState {
           }
         }
 
+        // The list's first heading carries the control that regroups it.
+        void heading(String label) {
+          final first = rows.isEmpty;
+          rows.add(
+            () => first ? _firstHeading(l10n, label) : _sectionLabel(label),
+          );
+        }
+
         void group(
           String label,
           List<ThreadMeta> items, {
           bool showProject = false,
         }) {
           if (items.isEmpty) return;
-          rows.add(() => _sectionLabel(label));
+          heading(label);
           appendThreads(items, showProject: showProject);
         }
 
@@ -194,10 +214,18 @@ extension _SessionConversations on _AppSessionState {
           // "When was I working on this", grouped by the day it last moved.
           // Each row carries a one-line summary of the newest agent reply, so
           // the list answers "what happened" without opening anything.
-          for (final d in _byDay(<ThreadMeta>[...today, ...earlier], now)) {
+          final days = _byDay(
+            <ThreadMeta>[...today, ...earlier],
+            now,
+            at: newestOf,
+          );
+          for (final d in days) {
             group(d.label, d.threads);
           }
         } else if (widget.home) {
+          if (rows.isEmpty && filtered.isNotEmpty) {
+            heading(l10n.conversationsSection);
+          }
           // The home pane spans every project, so the rest reads as a tree:
           // project → its conversations, newest project first. Switching the
           // open draft must not move these headings. Each shows its newest few
@@ -258,6 +286,8 @@ extension _SessionConversations on _AppSessionState {
           group(l10n.groupEarlier, earlier);
         }
         _visibleConversationOrder = order;
+        _openConversationRow = selectedRow;
+        final account = inDrawer ? _accountRow(ctx) : null;
 
         final pane = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -279,52 +309,74 @@ extension _SessionConversations on _AppSessionState {
               ),
               const Divider(height: 1),
             ],
-            // Home only: which host this chat runs on, switchable when several
-            // app services are available.
-            if (widget.home) _serviceSwitcher(l10n),
-            // The primary action of a conversation list, as a row rather than
-            // a coloured disc: it reads as the first entry of the list it
-            // creates into. On touch it is a full-width tonal pill.
-            Padding(
-              padding: isDesktop
-                  ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
-                  : const EdgeInsets.fromLTRB(12, 8, 12, 4),
-              child: _sidebarAction(
-                key: const Key('new-conversation-btn'),
-                icon: AppIcons.edit_square,
-                label: l10n.newConversation,
-                onTap: () => _newConversationInProject(_cwd, ctx),
-              ),
-            ),
-            _conversationSearch(l10n, scheme),
-            _conversationHeading(l10n, scheme, selectedRow),
-            // A project-scoped pane names its one project; the home pane lists
-            // every project as headings instead.
-            if (!widget.home)
+            if (inDrawer) ...[
+              // A phone's drawer: which host this chat runs on as capsules,
+              // then the search and, beside it, the new conversation.
+              if (widget.home)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 10),
+                  child: _serviceSwitcher(l10n, capsules: true),
+                ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+                padding: const EdgeInsetsDirectional.fromSTEB(12, 0, 8, 0),
                 child: Row(
                   children: [
-                    Icon(
-                      AppIcons.folder_outlined,
-                      size: 13,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        _projectName(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
+                    Expanded(child: _conversationSearch(l10n, scheme)),
+                    const SizedBox(width: 8),
+                    _roundNewConversation(l10n, ctx),
                   ],
                 ),
               ),
+            ] else ...[
+              // The workspace's column: the host and a search control, then
+              // the new conversation as the first row of the list it creates
+              // into.
+              SizedBox(
+                height: 50,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.fromSTEB(8, 0, 8, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: widget.home
+                            ? _serviceSwitcher(l10n)
+                            : Padding(
+                                padding: const EdgeInsetsDirectional.only(
+                                  start: 6,
+                                ),
+                                child: Text(
+                                  _projectName(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                      ),
+                      StripButton(
+                        key: const Key('conv-search-toggle'),
+                        tooltip: withShortcut(l10n.searchConversations, 'K'),
+                        icon: AppIcons.search,
+                        selected: _convSearchOpen,
+                        onPressed: _toggleConversationSearch,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 2),
+                child: _sidebarAction(
+                  key: const Key('new-conversation-btn'),
+                  icon: AppIcons.edit_square,
+                  label: l10n.newConversation,
+                  onTap: () => _newConversationInProject(_cwd, ctx),
+                ),
+              ),
+              _conversationSearch(l10n, scheme),
+            ],
             // Until the host first lists its conversations the pane is
             // loading, not empty: a skeleton, cross-fading into the list. The
             // open conversation's own metadata (or a running one discovered
@@ -338,14 +390,7 @@ extension _SessionConversations on _AppSessionState {
                 empty: filtered.isEmpty,
               ),
             ),
-            // Account quota, always visible rather than buried behind the
-            // gauge: it is warm from connect (see _loadQuota), so this row
-            // costs nothing and answers "how much have I got left" at a glance.
-            ?_quotaStrip(l10n),
-            // Home only: everything that used to require navigating away from
-            // the chat — management, the host's session browser (incl. force
-            // takeover), logs, settings — one tap from the sidebar.
-            if (widget.home) _paneShortcuts(l10n, ctx),
+            ?account,
           ],
         );
         return _shortPane(pane);
@@ -375,47 +420,73 @@ extension _SessionConversations on _AppSessionState {
     );
   }
 
-  /// The quick filter — shown once there are enough conversations to scan,
-  /// opening as the listing arrives rather than jolting the list down.
+  /// Open the column's search field, focused, or close it and clear it.
+  void _toggleConversationSearch() {
+    final open = !_convSearchOpen;
+    _updateState(() {
+      _convSearchOpen = open;
+      if (!open) _convQuery = '';
+    });
+    if (!open) {
+      _convSearchCtrl.clear();
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _convSearchFocus.requestFocus();
+    });
+  }
+
+  /// The quick filter. A phone's drawer shows it once there are enough
+  /// conversations to scan, opening as the listing arrives rather than jolting
+  /// the list down; the workspace's column opens it under its search control.
   Widget _conversationSearch(AppLocalizations l10n, ColorScheme scheme) {
-    final radius = BorderRadius.circular(
-      isDesktop ? kRowRadius + 1 : kTouchRowRadius,
-    );
+    final touch = !isDesktop;
+    final inColumn = MediaQuery.sizeOf(context).width >= workspaceCompactWidth;
+    final shown = inColumn
+        ? _convSearchOpen
+        : _threads.length > 6 || _convQuery.isNotEmpty;
+    final radius = BorderRadius.circular(touch ? kRowRadius : kRowRadius + 1);
     return Motion.resize(
       context,
       alignment: Alignment.topCenter,
-      child: _threads.length <= 6
+      child: !shown
           ? const SizedBox(width: double.infinity)
           : Padding(
-              padding: isDesktop
-                  ? const EdgeInsets.fromLTRB(8, 4, 8, 0)
-                  : const EdgeInsets.fromLTRB(12, 6, 12, 0),
+              padding: inColumn
+                  ? const EdgeInsets.fromLTRB(8, 2, 8, 2)
+                  : EdgeInsets.zero,
               child: SizedBox(
-                height: isDesktop ? 32 : 44,
+                height: touch ? 44 : 32,
                 child: TextField(
                   key: const Key('conv-search'),
+                  controller: _convSearchCtrl,
                   focusNode: _convSearchFocus,
                   onChanged: (v) => _updateState(() => _convQuery = v),
-                  style: TextStyle(fontSize: isDesktop ? 13 : 15),
+                  style: TextStyle(fontSize: touch ? 15 : 13),
+                  // The well fills its box: a finger's target under a finger.
+                  expands: true,
+                  maxLines: null,
                   textAlignVertical: TextAlignVertical.center,
                   decoration: InputDecoration(
                     isDense: true,
                     prefixIcon: Icon(
                       AppIcons.search,
-                      size: isDesktop ? 16 : 20,
+                      size: touch ? 20 : 16,
                       color: scheme.onSurfaceVariant,
                     ),
                     prefixIconConstraints: BoxConstraints(
-                      minWidth: isDesktop ? 32 : 44,
+                      minWidth: touch ? 44 : 32,
                       minHeight: 32,
                     ),
                     hintText: l10n.searchConversations,
                     hintStyle: TextStyle(
-                      fontSize: isDesktop ? 13 : 15,
+                      fontSize: touch ? 15 : 13,
                       color: scheme.onSurfaceVariant,
                     ),
                     filled: true,
-                    fillColor: backdropFieldFill(scheme),
+                    fillColor: touch && !inColumn
+                        ? scheme.surfaceContainer
+                        : backdropFieldFill(scheme),
                     contentPadding: EdgeInsets.zero,
                     border: FieldBorder(borderRadius: radius),
                     enabledBorder: FieldBorder(borderRadius: radius),
@@ -433,77 +504,142 @@ extension _SessionConversations on _AppSessionState {
     );
   }
 
-  /// The list heading: what the list is grouped by, with the toggle that
-  /// regroups it. Group by project, or by when it happened — two ways of
-  /// asking "what was I doing", so it's a toggle rather than a replacement.
-  /// While the open conversation has a row ([selectedRow]), a second control
-  /// scrolls back to it, wherever the user has wandered off to.
-  Widget _conversationHeading(
-    AppLocalizations l10n,
-    ColorScheme scheme,
-    int? selectedRow,
-  ) {
-    // 44 px on touch: these are the only controls on the list heading.
-    final target = isDesktop ? 26.0 : 44.0;
-    Widget button({
-      required Key key,
-      required IconData icon,
-      required Color color,
-      required String tooltip,
-      required VoidCallback onPressed,
-    }) => SizedBox(
-      width: target,
-      height: target,
-      child: IconButton(
-        key: key,
-        padding: EdgeInsets.zero,
-        style: IconButton.styleFrom(
-          minimumSize: Size.square(target),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(kRowRadius),
-          ),
-        ),
-        icon: Icon(icon, size: 15, color: color),
-        tooltip: tooltip,
-        onPressed: onPressed,
+  /// The drawer's compact new conversation, which keeps its place whether or
+  /// not the search beside it shows.
+  Widget _roundNewConversation(AppLocalizations l10n, BuildContext ctx) {
+    final scheme = Theme.of(context).colorScheme;
+    return IconButton(
+      key: const Key('new-conversation-btn'),
+      tooltip: l10n.newConversation,
+      style: IconButton.styleFrom(
+        minimumSize: const Size.square(44),
+        backgroundColor: scheme.surfaceContainerHighest,
+        foregroundColor: scheme.onSurface,
       ),
+      icon: const Icon(AppIcons.edit_square, size: 20),
+      onPressed: () => _newConversationInProject(_cwd, ctx),
     );
+  }
+
+  /// The list's first heading: its label, and the control that switches what
+  /// the list groups by. An ellipsis in a pointer's column, its current choice
+  /// in words in a phone's drawer.
+  Widget _firstHeading(AppLocalizations l10n, String label) {
+    final scheme = Theme.of(context).colorScheme;
+    final inColumn = MediaQuery.sizeOf(context).width >= workspaceCompactWidth;
+    final style = TextStyle(
+      fontSize: isDesktop ? 12.5 : 13,
+      fontWeight: inColumn ? FontWeight.w600 : FontWeight.w500,
+      color: scheme.onSurfaceVariant,
+    );
+    final byTime = _activityView;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
+      padding: isDesktop
+          ? const EdgeInsetsDirectional.fromSTEB(8, 6, 0, 2)
+          : const EdgeInsetsDirectional.fromSTEB(12, 6, 0, 2),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              _activityView ? l10n.activityView : l10n.conversationsSection,
+              label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: isDesktop ? 12 : 13,
-                fontWeight: FontWeight.w600,
-                color: scheme.onSurfaceVariant,
+              style: style.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+          PopupMenuButton<bool>(
+            key: const Key('activity-view-btn'),
+            tooltip: l10n.conversationGroupBy,
+            position: PopupMenuPosition.under,
+            padding: EdgeInsets.zero,
+            onSelected: (time) => _updateState(() => _timeGrouping = time),
+            itemBuilder: (_) => [
+              CheckedPopupMenuItem(
+                key: const Key('group-by-project'),
+                value: false,
+                checked: !byTime,
+                child: Text(l10n.groupByProject),
+              ),
+              CheckedPopupMenuItem(
+                key: const Key('group-by-time'),
+                value: true,
+                checked: byTime,
+                child: Text(l10n.groupByTime),
+              ),
+            ],
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: isDesktop ? 26 : 44,
+                minHeight: isDesktop ? 26 : 44,
+              ),
+              child: Center(
+                child: inColumn
+                    ? Icon(
+                        AppIcons.more_horiz,
+                        size: 16,
+                        color: scheme.onSurfaceVariant,
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              byTime ? l10n.groupByTime : l10n.groupByProject,
+                              style: style,
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              AppIcons.expand_more,
+                              size: 14,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
           ),
-          if (selectedRow != null)
-            button(
-              key: const Key('locate-conversation-btn'),
-              icon: AppIcons.my_location_rounded,
-              color: signalColor(scheme),
-              tooltip: l10n.locateConversation,
-              onPressed: () => _revealConversationRow(selectedRow),
-            ),
-          button(
-            key: const Key('activity-view-btn'),
-            icon: _activityView
-                ? AppIcons.folder_outlined
-                : AppIcons.history_toggle_off,
-            color: scheme.onSurfaceVariant,
-            tooltip: _activityView
-                ? l10n.conversationsSection
-                : l10n.activityView,
-            onPressed: () => _updateState(() => _activityView = !_activityView),
-          ),
         ],
+      ),
+    );
+  }
+
+  /// The drawer's foot: the account or relay, which opens the Pocket.
+  Widget _accountRow(BuildContext ctx) {
+    final l10n = AppLocalizations.of(context);
+    final scheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: Semantics(
+        button: true,
+        label: l10n.pocketOpen,
+        child: InkWell(
+          key: const Key('drawer-account-row'),
+          mouseCursor: clickable,
+          onTap: () => showPocket(ctx, section: '/'),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 4, 12, 4),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: PocketIdentity(size: 30, subtitle: false),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    AppIcons.layout_grid,
+                    size: 20,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -543,8 +679,8 @@ extension _SessionConversations on _AppSessionState {
                       ),
                     ),
                   )
-                // SuperListView so the locate button can reach a row that has
-                // never been built (a long list lays rows out lazily).
+                // SuperListView so the open row can be revealed before it has
+                // ever been built (a long list lays rows out lazily).
                 : SuperListView.builder(
                     listController: _convListCtl,
                     controller: _convScroll,
@@ -554,444 +690,4 @@ extension _SessionConversations on _AppSessionState {
                   ),
           ),
   );
-
-  /// The home pane's footer row of shortcuts. Each button keeps its own
-  /// share of the row instead of its intrinsic width: the sidebar drags down
-  /// to 200 px, where a fixed-width row of five (manage / sessions / logs /
-  /// theme / settings) would overflow rather than tighten.
-  Widget _paneShortcuts(AppLocalizations l10n, BuildContext ctx) => Padding(
-    padding: const EdgeInsets.fromLTRB(6, 2, 6, 6),
-    child: Row(
-      children: [
-        Expanded(
-          child: _paneShortcut(
-            key: 'sidebar-manage-btn',
-            icon: AppIcons.dns_outlined,
-            tooltip: l10n.manageServices,
-            ctx: ctx,
-            route: '/manage',
-          ),
-        ),
-        // The host session browser rides the meta tunnel, which is an
-        // account-mode feature (mirrors the manage page's Sessions tab gate).
-        if (_caps.localSessions &&
-            ref.watch(configProvider).valueOrNull?.mode == 'account')
-          Expanded(
-            child: _paneShortcut(
-              key: 'sidebar-history-btn',
-              icon: AppIcons.history,
-              tooltip: l10n.hostSessions,
-              ctx: ctx,
-              route: Uri(
-                path: '/sessions',
-                queryParameters: {'svc': widget.serviceKey},
-              ).toString(),
-            ),
-          ),
-        Expanded(
-          child: _paneShortcut(
-            key: 'sidebar-logs-btn',
-            icon: AppIcons.article_outlined,
-            tooltip: l10n.logsTitle,
-            ctx: ctx,
-            route: '/logs',
-          ),
-        ),
-        Expanded(
-          child: _paneShortcut(
-            key: 'sidebar-settings-btn',
-            icon: AppIcons.settings_outlined,
-            tooltip: l10n.settingsTitle,
-            ctx: ctx,
-            route: '/settings',
-          ),
-        ),
-      ],
-    ),
-  );
-
-  /// One conversation row: a soft rounded tile with a leading icon, the preview
-  /// as title, and a relative-time (or "running") subtitle — the same card
-  /// language used by the guidance/option cards across the app.
-  Widget _conversationTile({
-    required ThreadMeta thread,
-    required bool running,
-    required bool selected,
-    required DateTime now,
-    required AppLocalizations l10n,
-    required VoidCallback onTap,
-    required double titleInset,
-    String? project,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final fg = scheme.onSurface;
-    final muted = scheme.onSurfaceVariant;
-    final when = running
-        ? l10n.running
-        : _relativeTime(thread.updatedAt, now, l10n);
-    // Server previews are the first user message verbatim, which may be wire
-    // text (an attachment block) or codex's own machinery (a context
-    // fragment). Both resolve through the cleaner; nothing left means there is
-    // no title to show.
-    final cleaned = previewWithoutFileRefs(
-      thread.preview,
-      l10n.fileOnlyMessage,
-    ).trim();
-    // A user-set name wins over the preview, matching the top bar.
-    final title =
-        thread.title ?? (cleaned.isEmpty ? l10n.untitledThread : cleaned);
-    // Cross-project pane rows show "project · time" so the user always knows
-    // where a conversation lives.
-    // Facts about the row, ahead of the time: what is waiting in it, and where
-    // it lives when no project heading above says so.
-    final facts = [
-      if (thread.isVoice) l10n.voiceLive,
-      if ((thread.forkedFromId ??
-              _discoveredThreads[thread.id]?.forkedFromId) !=
-          null)
-        l10n.forkedTag,
-      if (_drafts.hasDraft(thread.id)) l10n.draft,
-      if (_drafts.queuedCount(thread.id) > 0)
-        l10n.queuedCount(_drafts.queuedCount(thread.id)),
-      if (project != null && project.isNotEmpty) project,
-    ];
-    final signal = signalColor(scheme);
-    // Desktop rows are one line — title, then the time at the trailing edge —
-    // the way a source list sits: twice as many conversations per screen, and
-    // the eye scans titles without a second line breaking the column. Touch
-    // keeps two lines, where the row height is a target and not a cost.
-    final dense = isDesktop;
-    final titleText = Text(
-      title,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontSize: dense ? 13 : 15,
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-        color: fg,
-      ),
-    );
-    final factsText = facts.isEmpty
-        ? null
-        : Text(
-            facts.join(' · '),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 11.5, color: muted),
-          );
-    final trailing = running
-        ? _runningMark(l10n, scheme)
-        : when.isEmpty
-        ? null
-        : Text(
-            when,
-            maxLines: 1,
-            style: TextStyle(
-              fontSize: 11.5,
-              color: muted,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          );
-    final content = Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(
-        titleInset,
-        dense ? 6 : 10,
-        _rowInset,
-        dense ? 6 : 10,
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // Preserve the title when large text or a narrow sidebar would let
-          // metadata consume its entire line.
-          final stacked =
-              !dense ||
-              constraints.maxWidth < 220 ||
-              MediaQuery.textScalerOf(context).scale(13) > 18;
-          if (stacked) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                titleText,
-                if (factsText != null || trailing != null) ...[
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      ?factsText,
-                      if (running)
-                        _runningMark(
-                          l10n,
-                          scheme,
-                          maxLabelWidth: (constraints.maxWidth - 17).clamp(
-                            0,
-                            double.infinity,
-                          ),
-                          wrap: true,
-                        )
-                      else
-                        ?trailing,
-                    ],
-                  ),
-                ],
-              ],
-            );
-          }
-          return Row(
-            children: [
-              if (thread.isVoice) ...[
-                Icon(AppIcons.graphic_eq, size: 15, color: muted),
-                const SizedBox(width: 6),
-              ],
-              Expanded(
-                child: Row(
-                  children: [
-                    Flexible(child: titleText),
-                    if (factsText != null) ...[
-                      const SizedBox(width: 6),
-                      Flexible(child: factsText),
-                    ],
-                  ],
-                ),
-              ),
-              if (trailing != null) ...[const SizedBox(width: 8), trailing],
-            ],
-          );
-        },
-      ),
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 0.5),
-      child: _rowPlate(
-        key: Key('conv-tile-${thread.id}'),
-        selected: selected,
-        radius: kRowRadius,
-        child: InkWell(
-          mouseCursor: clickable,
-          borderRadius: BorderRadius.circular(kRowRadius),
-          hoverColor: backdropHover(Theme.of(context).colorScheme),
-          onTap: onTap,
-          child: running
-              ? RunningSheen(color: signal, child: content)
-              : content,
-        ),
-      ),
-    );
-  }
-
-  /// A sidebar row's ground. The open conversation is a neutral plate raised
-  /// out of the source list, found by its lift rather than by a second
-  /// accent, so the blue stays the signal for live work alone.
-  Widget _rowPlate({
-    required Key key,
-    required bool selected,
-    required double radius,
-    required Widget child,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    // Touch: a soft tonal plate without edge or shadow — on a full-screen
-    // list the lift reads as clutter, the tone alone finds the row.
-    final touch = !isDesktop;
-    return Material(
-      key: key,
-      color: selected
-          ? (touch ? surfaceSelection(scheme) : sidebarSelection(scheme))
-          : Colors.transparent,
-      elevation: selected && !touch ? 1 : 0,
-      shadowColor: sidebarSelectionShadow(scheme),
-      surfaceTintColor: Colors.transparent,
-      animationDuration: Motion.of(context, Motion.fast),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(touch ? kTouchRowRadius : radius),
-        side: selected && !touch
-            ? BorderSide(color: sidebarSelectionEdge(scheme))
-            : BorderSide.none,
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Semantics(container: true, selected: selected, child: child),
-    );
-  }
-
-  /// The trailing mark of a running row: a turning orbit where the time
-  /// would be. With reduced motion the orbit holds still, so the word is
-  /// shown beside it and the state never depends on movement.
-  Widget _runningMark(
-    AppLocalizations l10n,
-    ColorScheme scheme, {
-    double maxLabelWidth = 96,
-    bool wrap = false,
-  }) {
-    final signal = signalColor(scheme);
-    return Semantics(
-      label: l10n.running,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!Motion.ambientAllowed(context)) ...[
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxLabelWidth),
-              child: ExcludeSemantics(
-                child: Text(
-                  l10n.running,
-                  key: const Key('conv-running-label'),
-                  maxLines: wrap ? null : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w500,
-                    color: signal,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-          ],
-          PulsingDot.orbit(color: signal, size: 11),
-        ],
-      ),
-    );
-  }
-
-  /// One activity-view row: the conversation's name in bold over a one-line
-  /// summary of where it got to, plus its project and time.
-  ///
-  /// The summary needs a `thread/read` per row, which is far too much to fetch
-  /// for a whole sidebar up front — so it loads when the row is first built
-  /// (i.e. when it scrolls into range) and Riverpod keeps it cached for the rest
-  /// of the session. Until it arrives the row shows the first user message,
-  /// which is already in hand: the layout never jumps, and a row is readable
-  /// immediately rather than blank behind a spinner.
-  Widget _activityTile({
-    required ThreadMeta thread,
-    required bool running,
-    required bool selected,
-    required DateTime now,
-    required AppLocalizations l10n,
-    required VoidCallback onTap,
-    required double titleInset,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    final fg = scheme.onSurface;
-    final muted = scheme.onSurfaceVariant;
-    final cleaned = previewWithoutFileRefs(
-      thread.preview,
-      l10n.fileOnlyMessage,
-    ).trim();
-    final title =
-        thread.title ?? (cleaned.isEmpty ? l10n.untitledThread : cleaned);
-    final summary =
-        ref
-            .watch(
-              threadSummaryProvider(
-                threadSummaryKey(widget.serviceKey, thread.id),
-              ),
-            )
-            .valueOrNull ??
-        // Fall back to the preview — unless the title already IS the preview,
-        // in which case repeating it twice tells the user nothing.
-        (thread.title == null ? '' : cleaned);
-    final when = running
-        ? l10n.running
-        : _relativeTime(thread.updatedAt, now, l10n);
-    // The home pane spans projects, so its rows say where they live; a
-    // project-scoped pane has only one, and repeating it per row is noise.
-    final meta = [
-      if (widget.home) _leafOf(thread.cwd),
-      if (when.isNotEmpty) when,
-    ].where((s) => s.isNotEmpty).join(' · ');
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1),
-      child: _rowPlate(
-        key: Key('activity-tile-${thread.id}'),
-        selected: selected,
-        radius: kControlRadius,
-        child: InkWell(
-          mouseCursor: clickable,
-          borderRadius: BorderRadius.circular(kControlRadius),
-          onTap: onTap,
-          child: _activitySheen(
-            running: running,
-            child: Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(
-                titleInset,
-                8,
-                _rowInset,
-                8,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 13,
-                            height: 1.35,
-                            // A step above the project tree's rows (the title
-                            // has a summary under it to stand apart from), and
-                            // bold only for the open conversation.
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
-                            color: fg,
-                          ),
-                        ),
-                        if (summary.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            summary,
-                            key: Key('activity-summary-${thread.id}'),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              height: 1.4,
-                              color: muted,
-                            ),
-                          ),
-                        ],
-                        if (meta.isNotEmpty) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            meta,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 11,
-                              height: 1.35,
-                              color: running
-                                  ? signalColor(scheme)
-                                  : onSurfaceMuted(scheme),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (running) ...[
-                    const SizedBox(width: 8),
-                    // The meta line already says "running" in words.
-                    PulsingDot.orbit(color: signalColor(scheme), size: 11),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _activitySheen({required bool running, required Widget child}) =>
-      running
-      ? RunningSheen(
-          color: signalColor(Theme.of(context).colorScheme),
-          child: child,
-        )
-      : child;
 }

@@ -30,6 +30,8 @@ class ForkDialog extends StatelessWidget {
     ];
     return AlertDialog(
       key: const Key('fork-dialog'),
+      // Its paragraphs outgrow a small phone at large text.
+      scrollable: true,
       title: Text(throughTurn ? l10n.forkThroughTurn : l10n.forkConversation),
       content: Column(
         mainAxisSize: MainAxisSize.min,

@@ -212,8 +212,9 @@ extension _SessionTranscript on _AppSessionState {
     final hostSwitch = _hostSwitchBanner();
     final pane = Column(
       children: [
-        // A short window carries the status line in its title row.
-        if (!_inlineStatus) _statusBar(l10n),
+        // Its line rides in the title row where there is no room for a strip
+        // of its own, and a phone's top bar always carries it.
+        if (_statusStripShown(l10n)) _statusBar(l10n),
         // Where the reader is looking: the switch announces itself above the
         // conversation, which stays put until the new host has answered.
         Motion.resize(
@@ -602,9 +603,7 @@ extension _SessionTranscript on _AppSessionState {
         Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(
-              maxWidth: _AppSessionState._kColumnWidth + 48,
-            ),
+            constraints: BoxConstraints(maxWidth: _columnWidth + 48),
             child: _voiceDock(),
           ),
         ),
@@ -628,9 +627,7 @@ extension _SessionTranscript on _AppSessionState {
             : Align(
                 alignment: Alignment.bottomCenter,
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: _AppSessionState._kColumnWidth + 48,
-                  ),
+                  constraints: BoxConstraints(maxWidth: _columnWidth + 48),
                   child: _composer(l10n),
                 ),
               ),

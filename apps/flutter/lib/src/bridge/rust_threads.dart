@@ -83,6 +83,7 @@ mixin _RustThreads implements BridgeApi {
       historyScope: c.historyScope,
       runningInventory: c.runningInventory,
       authRequired: c.authRequired,
+      backgroundTerminals: c.backgroundTerminals,
       commands: c.commands,
       draftOptions: c.draftOptions,
       questionMultiple: c.questionMultiple,
@@ -381,6 +382,37 @@ mixin _RustThreads implements BridgeApi {
   @override
   Future<void> appCompact(String serviceKey, String threadId) =>
       frb.appCompact(serviceKey: serviceKey, threadId: threadId);
+
+  @override
+  Future<List<BackgroundTerminal>> appBackgroundTerminals(
+    String serviceKey,
+    String threadId,
+  ) async => [
+    for (final t in await frb.appBackgroundTerminals(
+      serviceKey: serviceKey,
+      threadId: threadId,
+    ))
+      BackgroundTerminal(
+        itemId: t.itemId,
+        processId: t.processId,
+        command: t.command,
+        cwd: t.cwd,
+        osPid: t.osPid,
+        cpuPercent: t.cpuPercent,
+        rssKb: t.rssKb?.toInt(),
+      ),
+  ];
+
+  @override
+  Future<bool> appTerminateBackgroundTerminal(
+    String serviceKey,
+    String threadId,
+    String processId,
+  ) => frb.appTerminateBackgroundTerminal(
+    serviceKey: serviceKey,
+    threadId: threadId,
+    processId: processId,
+  );
 
   @override
   Future<String?> appThreadSummary(String serviceKey, String threadId) =>

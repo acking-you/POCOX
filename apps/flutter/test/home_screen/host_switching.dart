@@ -337,40 +337,36 @@ void _registerHostSwitching() {
     },
   );
 
-  testWidgets(
-    "Sidebar footer reaches host management and this host's history",
-    (t) async {
-      final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);
-      await _pumpHome(
-        t,
-        api,
-        extraRoutes: [
-          _stub('/manage', 'manage'),
-          _stub('/sessions', 'sessions'),
-        ],
-      );
-      await t.pumpAndSettle();
+  testWidgets("The rail reaches host management and this host's history", (
+    t,
+  ) async {
+    final api = FakeBridgeApi(config: _accountConfig, services: [_app1]);
+    await _pumpHome(
+      t,
+      api,
+      extraRoutes: [_stub('/manage', 'manage'), _stub('/sessions', 'sessions')],
+    );
+    await t.pumpAndSettle();
 
-      await t.tap(find.byKey(const Key('sidebar-manage-btn')));
-      await t.pumpAndSettle();
-      expect(find.textContaining('stub:manage'), findsOneWidget);
-      // pageBack() looks for the English 'Back' tooltip; tap the button itself
-      // (the app runs under the zh locale here).
-      await t.tap(find.byType(BackButton));
-      await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('workspace-nav-/manage')));
+    await t.pumpAndSettle();
+    expect(find.textContaining('stub:manage'), findsOneWidget);
+    // pageBack() looks for the English 'Back' tooltip; tap the button itself
+    // (the app runs under the zh locale here).
+    await t.tap(find.byType(BackButton));
+    await t.pumpAndSettle();
 
-      // The host-history shortcut carries the service key so the browser reads
-      // THIS host's sessions over its meta tunnel.
-      await t.tap(find.byKey(const Key('sidebar-history-btn')));
-      await t.pumpAndSettle();
-      expect(
-        find.textContaining('svc=pcx%3Adevbox%3Aapp%3Aalpha'),
-        findsOneWidget,
-      );
-    },
-  );
+    // The history destination carries the service key so the browser reads
+    // THIS host's sessions over its meta tunnel.
+    await t.tap(find.byKey(const Key('workspace-nav-/sessions')));
+    await t.pumpAndSettle();
+    expect(
+      find.textContaining('svc=pcx%3Adevbox%3Aapp%3Aalpha'),
+      findsOneWidget,
+    );
+  });
 
-  testWidgets('Home sidebar on a phone: no back tile, footer shortcuts shown', (
+  testWidgets('Home drawer on a phone: no back tile, the Pocket at its foot', (
     t,
   ) async {
     t.view.physicalSize = const Size(400, 800);
@@ -381,15 +377,18 @@ void _registerHostSwitching() {
     await t.pumpAndSettle();
 
     // Narrow layout: sessions lie under the chat, behind the hamburger.
-    expect(find.byKey(const Key('sidebar-manage-btn')), findsNothing);
+    expect(find.byKey(const Key('drawer-account-row')), findsNothing);
     await t.tap(find.byIcon(AppIcons.menu));
     await t.pumpAndSettle();
     final sidebar = t.widget<Material>(find.byKey(const Key('phone-sidebar')));
     expect(sidebar.color, isNotNull);
     expect(sidebar.color!.a, 1.0);
     expect(find.byKey(const Key('drawer-back-to-sessions')), findsNothing);
-    expect(find.byKey(const Key('sidebar-manage-btn')), findsOneWidget);
-    expect(find.byKey(const Key('sidebar-settings-btn')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-nav-/manage')), findsNothing);
+    await t.tap(find.byKey(const Key('drawer-account-row')));
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('pocket-tile-/manage')), findsOneWidget);
+    expect(find.byKey(const Key('pocket-tile-/settings')), findsOneWidget);
   });
 
   testWidgets('On a phone the host list is a sheet, and the drawer gets out '
@@ -420,7 +419,7 @@ void _registerHostSwitching() {
 
     // Sheet and drawer are gone, so the progress strip is visible.
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.byKey(const Key('sidebar-manage-btn')), findsNothing);
+    expect(find.byKey(const Key('drawer-account-row')), findsNothing);
     expect(find.byKey(const Key('host-switch-banner')), findsOneWidget);
     gate.complete();
     await t.pumpAndSettle();

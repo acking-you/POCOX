@@ -9,14 +9,41 @@ breaking change goes.
 
 ## Unreleased
 
-- **Fork a Codex conversation.** The conversation menu, the read-only footer of a
-  session another client holds, the session viewer and a finished turn's reply
+- **A new shape for the app.** One list of destinations now drives every
+  navigation.
+  - **Wide windows** have a full-width title strip, an icon rail on every page and
+    a 296 px column: conversations grouped by time with their summaries, Settings'
+    sections, or Services' devices. The rail replaces the page menu.
+  - **Beside the transcript**, a floating context card shows the project, changes,
+    branch, background processes, connection and usage. It folds when the window
+    runs out of room, and the review takes its place while open. Appearance now
+    lives in Settings, not the title bar.
+  - **Phones** get a top bar with the conversation's state on a second line. A tap
+    on the title opens the same context as a sheet, with rename new on phones.
+  - **The drawer** leaves the conversation in view and leads with a capsule per
+    device. A device hosting several agents shows them in a row underneath, one
+    tap apart. **Usage moved from its foot into the context sheet**, so it is no
+    longer always visible on a phone.
+  - **The Pocket**, opened from the drawer's account row or a page's title, is
+    the one way to secondary pages on a phone. The bottom bar and the sidebar's
+    shortcut buttons are gone.
+  - **Settings** has one set of sections on phone and desktop: General, Connection,
+    Agents and hosting, Storage and diagnostics, Account, About.
+  ([details](docs/app-ui.md#workspace-and-navigation))
+- **See and stop what a conversation runs in the background.** On Codex hosts that
+  answer `thread/backgroundTerminals/list`, the context card and sheet list those
+  processes, each with its folder and resource use and a **Terminate** behind a
+  confirmation. Other agents show no section.
+- **Fork a Codex conversation.** The conversation menu (a phone's context sheet),
+  the read-only footer of a session another client holds, the session viewer and
+  any message of a finished turn (hover on a computer, long press on a phone)
   create a new, persistent conversation with the inherited context, on the host
-  serving the source. The source is only read: its writer keeps running, and its
-  drafts and queue stay. A running turn is frozen as interrupted in the branch. A
-  refusal, a lost answer and an ignored turn boundary are each reported rather
-  than retried or hidden. Other providers offer no fork yet.
-  ([details](docs/session-fork.md))
+  serving the source. A fork carries a mark and sits under its source in the list,
+  and a source's card and sheet list its forks. The source is only read: its writer
+  keeps running, and its drafts and queue stay. A running turn is frozen as
+  interrupted in the branch. A refusal, a lost answer and an ignored turn boundary
+  are each reported rather than retried or hidden. Other providers offer no fork
+  yet. ([details](docs/session-fork.md))
 - **Fix a takeover stopping a session's owner for nothing.** Resuming a session
   from this device's Local sessions could pick a connected service on another
   device. A takeover then stopped the local client and failed to resume, because

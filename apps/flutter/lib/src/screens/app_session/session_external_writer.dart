@@ -423,7 +423,7 @@ extension _SessionExternalWriter on _AppSessionState {
     final canResume = liveness?.allowsResume ?? false;
     final state = canResume
         ? SizedBox(
-            height: 42,
+            height: ReadOnlyFoot.controlHeight,
             child: FilledButton.icon(
               key: const Key('chat-takeover-action'),
               onPressed: _takingOver ? null : _takeOverExternalWriter,
@@ -443,7 +443,7 @@ extension _SessionExternalWriter on _AppSessionState {
           )
         : SizedBox(
             key: const Key('chat-read-only-action'),
-            height: 42,
+            height: ReadOnlyFoot.controlHeight,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -485,31 +485,9 @@ extension _SessionExternalWriter on _AppSessionState {
     );
   }
 
-  /// What stands in for the composer while this view only reads: the same
-  /// pane of glass, so the conversation passes beneath it blurred rather than
-  /// showing through between its controls.
-  Widget _readOnlyFoot({Key? key, required Widget child}) => SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: _AppSessionState._kColumnWidth,
-          ),
-          child: Glass(
-            key: key,
-            depth: GlassDepth.floating,
-            borderRadius: BorderRadius.circular(
-              isDesktop ? kComposerRadius : kTouchComposerRadius,
-            ),
-            lift: 0.7,
-            child: Padding(padding: const EdgeInsets.all(8), child: child),
-          ),
-        ),
-      ),
-    ),
-  );
+  /// What stands in for the composer while this view only reads.
+  Widget _readOnlyFoot({Key? key, required Widget child}) =>
+      ReadOnlyFoot(key: key, maxWidth: _columnWidth, child: child);
 
   /// [lead] filling the row with [trail] at its end; stacked when the row is
   /// too narrow for both to read.
@@ -533,7 +511,7 @@ extension _SessionExternalWriter on _AppSessionState {
   }
 
   Widget _externalDiffButton(AppLocalizations l10n) => SizedBox(
-    height: 42,
+    height: ReadOnlyFoot.controlHeight,
     child: TextButton.icon(
       key: const Key('chat-external-diff-action'),
       onPressed: _diffLoading ? _cancelDiff : _showDiff,

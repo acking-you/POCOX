@@ -102,7 +102,7 @@ void main() {
         // An overflow is a FlutterError, which fails the test by itself.
         await _mount(t, size: size, scale: scale, running: running);
         final at = '$size ×$scale running=$running';
-        final branch = find.byKey(const Key('status-branch-chip'));
+        final branch = find.byKey(const Key('session-state-line'));
         expect(branch, findsOneWidget, reason: at);
         // The counts, the reason to open the review, always show whole.
         expect(
@@ -115,15 +115,22 @@ void main() {
           lessThanOrEqualTo(size.width),
           reason: at,
         );
-        if (!running && scale == 1) {
-          // With room to spare the model stays beside the branch.
-          expect(
-            find.byKey(const Key('active-model-chip')),
-            findsOneWidget,
-            reason: at,
-          );
-        }
       }
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+      t.view.reset();
+    }
+  });
+
+  testWidgets('a window too narrow for the card keeps the status bar: the '
+      'branch, its counts and the model on one line', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      await _mount(t, size: const Size(1000, 700), scale: 1, running: false);
+      expect(find.byKey(const Key('context-card')), findsNothing);
+      expect(find.byKey(const Key('status-branch-chip')), findsOneWidget);
+      expect(find.byKey(const Key('active-model-chip')), findsOneWidget);
+      expect(find.byKey(const Key('session-link-mark')), findsOneWidget);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       t.view.reset();

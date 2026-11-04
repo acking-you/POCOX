@@ -113,6 +113,7 @@ extension _SessionKeyboard on _AppSessionState {
     }
     if (key == LogicalKeyboardKey.keyK) {
       if (!_leftOpen) _setLeftOpen(true);
+      if (!_convSearchOpen) _updateState(() => _convSearchOpen = true);
       // The field mounts with the sidebar; focus it once it is built.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _convSearchFocus.requestFocus();
@@ -134,6 +135,10 @@ extension _SessionKeyboard on _AppSessionState {
     final target = order[next];
     if (target.id == _threadId) return false;
     _openThread(target.id, target.cwd);
+    // The list follows, so the row it moved to is never out of sight.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _revealOpenConversation();
+    });
     return true;
   }
 

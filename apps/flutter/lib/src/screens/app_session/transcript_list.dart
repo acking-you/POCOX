@@ -148,7 +148,7 @@ extension _TranscriptList on _AppSessionState {
       center: list.centerKey,
       slivers: [
         SliverColumn(
-          maxWidth: _AppSessionState._kColumnWidth,
+          maxWidth: _columnWidth,
           minGutter: 16,
           sliver: SuperSliverList.builder(
             key: ValueKey(('transcript-above', list.epoch)),
@@ -175,7 +175,7 @@ extension _TranscriptList on _AppSessionState {
         ),
         SliverColumn(
           key: list.centerKey,
-          maxWidth: _AppSessionState._kColumnWidth,
+          maxWidth: _columnWidth,
           minGutter: 16,
           sliver: SuperSliverList.builder(
             key: ValueKey(('transcript-below', list.epoch)),
