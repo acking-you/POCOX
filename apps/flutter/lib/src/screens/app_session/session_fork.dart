@@ -50,6 +50,11 @@ extension _SessionFork on _AppSessionState {
   /// real id from the host, so cached or still-syncing history offers nothing.
   /// A finished turn stays a boundary while a later one runs.
   VoidCallback? _forkTurnAction(TranscriptItem item) {
+    if (!_canForkThrough(item)) return null;
+    return () => unawaited(_forkConversation(throughTurnId: item.turnId));
+  }
+
+  bool _canForkThrough(TranscriptItem item) {
     if (!_forkReachable ||
         !_caps.forkThroughTurn ||
         (!_caps.forkBusySource && _forkSourceHeld) ||
@@ -58,10 +63,16 @@ extension _SessionFork on _AppSessionState {
         item.type != 'agentMessage' ||
         item.turnId.isEmpty ||
         !_forkTurnEnded(item)) {
-      return null;
+      return false;
     }
-    return () => unawaited(_forkConversation(throughTurnId: item.turnId));
+    return true;
   }
+
+  bool _forkAllowed(String? throughTurnId) => throughTurnId == null
+      ? _canFork
+      : _items.any(
+          (item) => item.turnId == throughTurnId && _canForkThrough(item),
+        );
 
   /// Whether [item]'s turn is over. An ACP agent stamps no completion time, so
   /// every turn but the running one is; following another writer, the newest
@@ -83,25 +94,30 @@ extension _SessionFork on _AppSessionState {
   /// attachments and queue stay as they are, and nothing is sent.
   Future<void> _forkConversation({String? throughTurnId}) async {
     final source = _threadId;
-    final allowed = throughTurnId != null
-        ? _forkReachable && _caps.forkThroughTurn
-        : _canFork;
-    if (source == null || !allowed || _fork.pending) return;
+    if (source == null || !_forkAllowed(throughTurnId) || _fork.pending) return;
+    final service = widget.serviceKey;
+    final link = _linkEpoch;
+    final generation = _threadLoadGeneration;
+    bool sameLink() => service == widget.serviceKey && link == _linkEpoch;
     final confirmed = await confirmFork(
       context,
       throughTurn: throughTurnId != null,
       running:
           _streaming || _externalWriterRunning || (_access?.running ?? false),
     );
-    if (!confirmed || !mounted || _fork.pending || _threadId != source) return;
+    if (!confirmed ||
+        !mounted ||
+        _fork.pending ||
+        !sameLink() ||
+        generation != _threadLoadGeneration ||
+        _threadId != source ||
+        !_forkAllowed(throughTurnId)) {
+      return;
+    }
 
     final l10n = AppLocalizations.of(context);
     final messenger = ToastMessenger.of(context);
     final api = ref.read(bridgeApiProvider);
-    final service = widget.serviceKey;
-    final link = _linkEpoch;
-    final generation = _threadLoadGeneration;
-    bool sameLink() => service == widget.serviceKey && link == _linkEpoch;
 
     _updateState(() => _fork.pending = true);
     final ThreadForkResult result;

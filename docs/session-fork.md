@@ -84,6 +84,10 @@ on the host and is reopened as the last conversation if it was. The sidebar's
   the selection.
 - **Late answers.** A result after navigation offers **Open** and moves no one. A
   result after the host connection moved is not adopted.
+- **Confirmation.** A confirmation belongs to the conversation view and host
+  connection that opened it. Navigation, a reload or reconnect invalidates it;
+  the provider's current fork and turn-boundary restrictions are checked again
+  before dispatch.
 - **Failure never falls back** to takeover or to resuming the original.
 
 ## Claude, Grok and OpenCode

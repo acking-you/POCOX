@@ -9,6 +9,8 @@ breaking change goes.
 
 ## Unreleased
 
+- Fork confirmations expire when their conversation view or host connection
+  changes, and recheck the provider's current fork restrictions before sending.
 - **Fork a Codex conversation.** The conversation menu, the read-only footer of a
   session another client holds, the session viewer and a finished turn's reply
   create a new, persistent conversation with the inherited context, on the host
