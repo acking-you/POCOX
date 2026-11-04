@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:pocox/src/app_icons.dart';
-import 'package:pocox/src/desktop_theme.dart';
 
 /// True on the desktop platforms that run frameless (macOS + Windows). Linux
 /// keeps its native title bar for now. Gated on [defaultTargetPlatform] (NOT
@@ -23,20 +22,11 @@ bool get isMacDesktop =>
 /// strip, a content header and a utility page all line up with the native
 /// window buttons instead of each guessing.
 abstract final class WindowChrome {
-  /// Height of the top strip that doubles as the title bar.
-  ///
-  /// macOS: 60 pt, a unified-toolbar height. The traffic lights are
-  /// re-centred into it natively (see `MainFlutterWindow.swift`), so controls
-  /// in the strip — and in a content sheet's bar, see [sheetBarHeight] —
-  /// share their centre line. Windows: 44 px, which the 46 px caption
-  /// buttons fill edge to edge.
-  static double get barHeight => isMacDesktop ? 60 : 44;
-
-  /// Height of a bar heading a content sheet, which sits [kSheetInset]
-  /// below the window's top edge: on macOS it is centred on the traffic
-  /// lights' line; elsewhere it keeps the full bar height.
-  static double get sheetBarHeight =>
-      isMacDesktop ? barHeight - 2 * kSheetInset : barHeight;
+  /// Height of the top strip that doubles as the title bar: 44 px. The macOS
+  /// traffic lights are re-centred into it natively (see
+  /// `MainFlutterWindow.swift`), so controls in the strip share their centre
+  /// line; the 46 px Windows caption buttons fill it edge to edge.
+  static const double barHeight = 44;
 
   /// Width the macOS traffic lights occupy from the window's leading edge,
   /// including the native 20 pt inset and the gap after the zoom button.
@@ -81,7 +71,11 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
     this.centerTitle,
     this.clearTrafficLights = true,
     this.height,
+    this.titleSpacing,
   });
+
+  /// The gap around the title; null keeps the toolbar's own.
+  final double? titleSpacing;
 
   /// Whether the bar keeps clear of the macOS traffic lights. False for a
   /// bar inside a content sheet, whose window corner the sidebar owns.
@@ -134,6 +128,8 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
         automaticallyImplyLeading: automaticallyImplyLeading,
         backgroundColor: backgroundColor,
         foregroundColor: foregroundColor,
+        centerTitle: centerTitle,
+        titleSpacing: titleSpacing,
       );
     }
 
@@ -178,7 +174,7 @@ class WindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
       leading: leadingWidget,
       titleSpacing: effectiveLeading == null && !insetTitle
           ? leadInset + NavigationToolbar.kMiddleSpacing
-          : NavigationToolbar.kMiddleSpacing,
+          : titleSpacing ?? NavigationToolbar.kMiddleSpacing,
       title: insetTitle
           ? Padding(
               padding: EdgeInsets.only(left: leadInset),

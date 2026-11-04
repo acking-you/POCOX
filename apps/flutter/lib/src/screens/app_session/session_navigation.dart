@@ -187,12 +187,15 @@ extension _SessionNavigation on _AppSessionState {
     height: isDesktop ? 36 : 44,
     child: Center(
       child: _startsAtBeginning
-          ? Text(
-              l10n.historyStart,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ? switch (_fork.source) {
+              final source? => _forkHistoryHead(l10n, source),
+              null => Text(
+                l10n.historyStart,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-            )
+            }
           : SizedBox(
               key: const Key('chat-older-history'),
               child: _historyAction(
@@ -394,7 +397,7 @@ extension _SessionNavigation on _AppSessionState {
   /// The space beside the conversation column, which is where the turn rail
   /// lives. Zero on a window narrow enough that the column fills it.
   double _gutterWidth(double available) =>
-      math.max(0, (available - _AppSessionState._kColumnWidth) / 2);
+      math.max(0, (available - _columnWidth) / 2);
 
   /// How many turns the rail would have ticks for.
   ///

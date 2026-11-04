@@ -86,7 +86,7 @@ void main() {
     'Ctrl+Tab walks the conversation list in sidebar order',
     (t) async {
       final api = await pump(t);
-      expect(find.byKey(const Key('conv-tile-t0')), findsOneWidget);
+      expect(find.byKey(const Key('activity-tile-t0')), findsOneWidget);
 
       await chord(t, LogicalKeyboardKey.tab);
       // From a new draft the first step lands on the newest conversation.

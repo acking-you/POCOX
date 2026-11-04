@@ -124,179 +124,185 @@ extension _SessionTitle on _AppSessionState {
     }
   }
 
-  /// [label] followed by its window shortcut in the platform's notation
-  /// (`⌘B` on macOS, `Ctrl+B` elsewhere), for a tooltip.
-  String _withShortcut(String label, String key) {
-    final mac = defaultTargetPlatform == TargetPlatform.macOS;
-    return '$label  ${mac ? '⌘$key' : 'Ctrl+$key'}';
-  }
-
-  /// A quiet 30 px icon button for the window strips, sized to sit on the
-  /// traffic lights' centre line.
-  Widget _chromeButton({
-    Key? key,
-    required String tooltip,
-    required IconData icon,
-    required VoidCallback? onPressed,
-  }) {
+  /// What the title strip names: the folder mark and the conversation, whose
+  /// title a click renames, then the running turn's state while nothing else
+  /// on screen shows it.
+  Widget _stripTitle(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
-    return IconButton(
-      key: key,
-      tooltip: tooltip,
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        minimumSize: const Size(30, 30),
-        fixedSize: const Size(30, 30),
-        padding: EdgeInsets.zero,
-        foregroundColor: scheme.onSurfaceVariant,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(kRowRadius),
+    final title = Row(
+      children: [
+        if (!widget.home) ...[
+          StripButton(
+            tooltip: l10n.backToSessions,
+            icon: AppIcons.arrow_back,
+            onPressed: _backToSessions,
+          ),
+          const SizedBox(width: 6),
+        ],
+        if (_fork.source == null)
+          Icon(
+            AppIcons.folder_outlined,
+            size: 16,
+            color: scheme.onSurfaceVariant,
+          )
+        else
+          _forkBadge(l10n, key: const Key('strip-fork-mark'), size: 20),
+        const SizedBox(width: 6),
+        // The title is a label, not a banner: cap it well short of the strip
+        // so a long conversation preview truncates and the rest of the strip
+        // stays empty (and draggable).
+        Flexible(
+          flex: 2,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: _barTitleWidget(l10n),
+          ),
         ),
-      ),
-      icon: Icon(icon, size: 18),
+        if (_fork.source case final source?)
+          Flexible(child: _stripForkOrigin(l10n, source)),
+        if (!_statusStripShown(l10n) && !_inlineStatus) ?_runningState(l10n),
+      ],
     );
+    return _inlineStatus ? _titleWithStatus(l10n, title) : title;
   }
 
-  /// The content pane's slim header (the desktop window has no full-width app
-  /// bar): the conversation title and the few session actions, over a
-  /// drag-to-move area. When the sidebar is collapsed it also carries the
-  /// expand control and — on macOS — the traffic-light inset; on frameless
-  /// Windows it draws the caption buttons at the trailing edge.
-  Widget _contentTopBar(AppLocalizations l10n, double width) {
-    final isMac = isMacDesktop;
-    final scheme = Theme.of(context).colorScheme;
-    // No rule under the header: the status line below it continues the same
-    // block (title, then its facts) and carries the one hairline.
-    // The bar heads the sheet: transparent on it, and centred on the traffic
-    // lights' line.
-    return SizedBox(
-      height: WindowChrome.sheetBarHeight,
-      child: Stack(
-        // Centre the row on the strip, so every control shares the traffic
-        // lights' centre line.
-        alignment: Alignment.centerLeft,
+  /// The running turn's state and clock, for the title strip.
+  Widget? _runningState(AppLocalizations l10n) {
+    if (!_streaming && !_externalWriterRunning) return null;
+    final st = _sessionState(l10n);
+    final style = TextStyle(
+      fontSize: 12,
+      color: st.color,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return Padding(
+      key: const Key('strip-running-state'),
+      padding: const EdgeInsets.only(left: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const Positioned.fill(child: WindowDragArea()),
-          Row(
-            children: [
-              // With the sidebar hidden this strip owns the leading corner, so
-              // it clears the traffic lights itself.
-              SizedBox(width: _leftOpen ? 10 : WindowChrome.leadingInset),
-              if (!_leftOpen) ...[
-                _chromeButton(
-                  key: const Key('sidebar-expand-btn'),
-                  tooltip: _withShortcut(l10n.showSidebar, 'B'),
-                  icon: AppIcons.panel_left_open,
-                  onPressed: () => _setLeftOpen(true),
-                ),
-                _chromeButton(
-                  tooltip: _withShortcut(l10n.newConversation, 'N'),
-                  icon: AppIcons.edit_square,
-                  onPressed: () => _newConversationInProject(_cwd, context),
-                ),
-                const SizedBox(width: 4),
-              ],
-              if (!widget.home)
-                _chromeButton(
-                  tooltip: l10n.backToSessions,
-                  icon: AppIcons.arrow_back,
-                  onPressed: _backToSessions,
-                ),
-              const SizedBox(width: 6),
-              // The title is a label, not a banner: cap it well short of the
-              // bar so a long conversation preview truncates and the rest of
-              // the strip stays empty (and draggable).
-              Expanded(
-                child: _inlineStatus
-                    ? _titleWithStatus(l10n, _barTitleWidget(l10n))
-                    : Align(
-                        alignment: Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 480),
-                          child: _barTitleWidget(l10n),
-                        ),
-                      ),
-              ),
-              if (_ctx != null)
-                ContextGauge(
-                  status: _ctx!,
-                  onTap: _showContextDetail,
-                  tooltip: _contextTooltip(l10n),
-                ),
-              // Environment info lives in a popover off this button — a
-              // desktop affordance, hidden when the window can't host it.
-              if (width >= 900) _envButton(l10n),
-              _chromeButton(
-                key: const Key('session-show-in-galaxy'),
-                tooltip: l10n.sessionShowInGalaxy,
-                icon: AppIcons.orbit,
-                onPressed: _showInGalaxy,
-              ),
-              // Appearance sits with the window's own controls rather than in
-              // the sidebar footer: it acts on the whole window, and it was the
-              // one frequently-used control that moved (or vanished) with the
-              // sidebar.
-              const ThemeToggle(),
-              if (_threadId != null && _moreActions)
-                PopupMenuButton<String>(
-                  tooltip: l10n.moreActions,
-                  icon: Icon(
-                    AppIcons.more_horiz,
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(30, 30),
-                    fixedSize: const Size(30, 30),
-                    padding: EdgeInsets.zero,
-                  ),
-                  onSelected: (v) {
-                    if (v == 'compact') _compact();
-                    if (v == 'rename') _beginTitleEdit();
-                    if (v == 'session-release') unawaited(_releaseSession());
-                    if (v == 'fork') unawaited(_forkConversation());
-                  },
-                  itemBuilder: (c) => [
-                    if (_canFork)
-                      PopupMenuItem(
-                        key: const Key('session-fork'),
-                        value: 'fork',
-                        enabled: !_fork.pending,
-                        child: Text(l10n.forkConversation),
-                      ),
-                    if (_canReleaseSession)
-                      PopupMenuItem(
-                        key: const Key('session-release'),
-                        value: 'session-release',
-                        child: Text(l10n.sessionHandBack),
-                      ),
-                    if (_caps.rename)
-                      PopupMenuItem(
-                        value: 'rename',
-                        child: Text(l10n.renameConversation),
-                      ),
-                    if (_canCompact)
-                      PopupMenuItem(
-                        value: 'compact',
-                        child: Text(l10n.compact),
-                      ),
-                  ],
-                ),
-              if (isFramelessDesktop && !isMac) ...[
-                const SizedBox(width: 6),
-                const WindowCaptionButtons(),
-              ] else
-                const SizedBox(width: 10),
-            ],
+          PulsingDot(color: st.color, size: 7),
+          const SizedBox(width: 6),
+          Text(st.label, style: style),
+          const SizedBox(width: 6),
+          ValueListenableBuilder<int>(
+            valueListenable: _elapsed,
+            builder: (context, secs, _) =>
+                Text(_fmtElapsed(secs), style: style),
           ),
         ],
       ),
     );
   }
 
+  /// The strip's end: the conversation's menu and the context card's toggle.
+  List<Widget> _stripActions(AppLocalizations l10n) => [
+    _conversationMenu(l10n),
+    const SizedBox(width: 2),
+    StripButton(
+      key: const Key('context-card-toggle'),
+      selected: _context.cardShown,
+      tooltip: _context.cardShown ? l10n.contextCardHide : l10n.contextCardShow,
+      icon: AppIcons.panel_right,
+      onPressed: _toggleContextCard,
+    ),
+  ];
+
+  /// The conversation's `···`: what can be done with it, by capability.
+  Widget _conversationMenu(AppLocalizations l10n) {
+    final scheme = Theme.of(context).colorScheme;
+    final actions = _contextActions(l10n);
+    return PopupMenuButton<_ContextAction>(
+      key: const Key('conversation-menu'),
+      tooltip: l10n.moreActions,
+      position: PopupMenuPosition.under,
+      icon: Icon(AppIcons.more_horiz, size: 18, color: scheme.onSurfaceVariant),
+      style: IconButton.styleFrom(
+        minimumSize: Size.square(StripButton.size),
+        fixedSize: Size.square(StripButton.size),
+        padding: EdgeInsets.zero,
+      ),
+      onSelected: (action) => action.onTap(),
+      itemBuilder: (_) => [
+        for (final action in actions)
+          PopupMenuItem(
+            key: action.key,
+            value: action,
+            enabled: !action.busy,
+            child: Text(action.menuLabel),
+          ),
+      ],
+    );
+  }
+
+  /// The phone's top bar title: the conversation with a chevron and its state
+  /// line under it, opening the context sheet. While the link is down it opens
+  /// the connection sheet directly, so Retry now stays one tap away.
+  Widget _phoneTitle(AppLocalizations l10n) {
+    if (_editingTitle) return _barTitleWidget(l10n);
+    final scheme = Theme.of(context).colorScheme;
+    final title = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_fork.source != null) ...[
+          _forkBadge(l10n, key: const Key('strip-fork-mark')),
+          const SizedBox(width: 6),
+        ],
+        Flexible(
+          child: Text(
+            _barTitle(l10n),
+            key: const Key('bar-title'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 16,
+              height: 1.25,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Icon(AppIcons.expand_more, size: 14, color: scheme.onSurfaceVariant),
+      ],
+    );
+    final linkDown = _reconnecting || _connectionLost;
+    return Semantics(
+      button: true,
+      label: _barTitle(l10n),
+      hint: linkDown ? l10n.linkSheetTitle : l10n.contextCardShow,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          key: const Key('session-context-btn'),
+          mouseCursor: clickable,
+          borderRadius: BorderRadius.circular(kControlRadius),
+          onTap: linkDown ? _showLink : _showContextPanel,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 44),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: _inlineStatus
+                  ? _titleWithStatus(l10n, title, phone: true)
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [title, _stateLine(l10n)],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// A short window's title row: [title], cut well short, then the status
   /// line taking the rest, which shortens itself as it does on its strip.
-  Widget _titleWithStatus(AppLocalizations l10n, Widget title) => LayoutBuilder(
+  Widget _titleWithStatus(
+    AppLocalizations l10n,
+    Widget title, {
+    bool phone = false,
+  }) => LayoutBuilder(
     builder: (context, box) => Row(
       key: const Key('title-with-status'),
       children: [
@@ -307,7 +313,7 @@ extension _SessionTitle on _AppSessionState {
           child: title,
         ),
         const SizedBox(width: 12),
-        Expanded(child: _statusLine(l10n)),
+        Expanded(child: phone ? _stateLine(l10n) : _statusLine(l10n)),
       ],
     ),
   );
@@ -331,7 +337,7 @@ extension _SessionTitle on _AppSessionState {
   /// focus commits too — a click elsewhere reads as "done", not "undo".
   Widget _barTitleWidget(AppLocalizations l10n) {
     final scheme = Theme.of(context).colorScheme;
-    const style = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+    const style = TextStyle(fontSize: 14, fontWeight: FontWeight.w500);
     if (_editingTitle) {
       return Shortcuts(
         shortcuts: const {

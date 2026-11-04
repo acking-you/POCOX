@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::{anyhow, bail, Context, Result};
 use pocox_codex::client::Inbound;
+use serde::Deserialize;
 use serde_json::{json, Value};
 
 use super::config::{insert_execution_options, normalize_approval_policy, record_runtime_config};
@@ -190,6 +191,76 @@ pub fn compact(service_key: &str, thread_id: &str) -> Result<()> {
     runtime::runtime()
         .block_on(client.request("thread/compact/start", json!({ "threadId": thread_id })))?;
     Ok(())
+}
+
+/// A command a thread runs in the background, from
+/// `thread/backgroundTerminals/list`.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundTerminal {
+    /// The item that started it.
+    pub item_id: String,
+    /// The host's id for the process, which stops it.
+    pub process_id: String,
+    /// The command line.
+    pub command: String,
+    /// Where it runs.
+    pub cwd: String,
+    /// Operating-system process id, when the host could read it.
+    pub os_pid: Option<u32>,
+    /// CPU use in percent, when the host could read it.
+    pub cpu_percent: Option<f64>,
+    /// Resident memory in kilobytes, when the host could read it.
+    pub rss_kb: Option<u64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BackgroundTerminalsPage {
+    data: Vec<BackgroundTerminal>,
+    next_cursor: Option<String>,
+}
+
+/// Most pages read for one list, so a host handing out cursors forever can
+/// neither stall nor grow it without bound.
+const BACKGROUND_TERMINAL_PAGES: usize = 8;
+
+/// What `thread_id` runs in the background now, across every page.
+pub fn background_terminals(service_key: &str, thread_id: &str) -> Result<Vec<BackgroundTerminal>> {
+    let client = client_for(service_key)?;
+    let mut terminals = Vec::new();
+    let mut cursor: Option<String> = None;
+    for _ in 0..BACKGROUND_TERMINAL_PAGES {
+        let res = runtime::runtime().block_on(client.request(
+            "thread/backgroundTerminals/list",
+            json!({ "threadId": thread_id, "cursor": cursor }),
+        ))?;
+        let page: BackgroundTerminalsPage = serde_json::from_value(res)?;
+        terminals.extend(page.data);
+        cursor = page.next_cursor;
+        if cursor.is_none() {
+            break;
+        }
+    }
+    Ok(terminals)
+}
+
+/// Stop one background process of `thread_id`. False when the host had no such
+/// process any more.
+pub fn terminate_background_terminal(
+    service_key: &str,
+    thread_id: &str,
+    process_id: &str,
+) -> Result<bool> {
+    let client = client_for(service_key)?;
+    let res = runtime::runtime().block_on(client.request(
+        "thread/backgroundTerminals/terminate",
+        json!({ "threadId": thread_id, "processId": process_id }),
+    ))?;
+    Ok(res
+        .get("terminated")
+        .and_then(Value::as_bool)
+        .unwrap_or(false))
 }
 
 /// Set a thread's user-facing title. The server persists it and echoes
@@ -510,4 +581,37 @@ pub fn turn_interrupt(service_key: &str, thread_id: &str, turn_id: Option<String
     }
     runtime::runtime().block_on(client.request("turn/interrupt", Value::Object(params)))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod background_terminal_tests {
+    use super::*;
+
+    #[test]
+    fn a_page_of_terminals_reads_from_the_wire() {
+        let page: BackgroundTerminalsPage = serde_json::from_value(json!({
+            "data": [{
+                "itemId": "item",
+                "processId": "1000",
+                "command": "cargo watch -x check",
+                "cwd": "/work/app",
+                "osPid": 4242,
+                "cpuPercent": 12.5,
+                "rssKb": 2048,
+            }, {
+                "itemId": "other",
+                "processId": "1001",
+                "command": "sleep 60",
+                "cwd": "/work/app",
+                "osPid": null,
+                "cpuPercent": null,
+                "rssKb": null,
+            }],
+            "nextCursor": "1001",
+        }))
+        .expect("the protocol's own example parses");
+        assert_eq!(page.next_cursor.as_deref(), Some("1001"));
+        assert_eq!(page.data[0].os_pid, Some(4242));
+        assert_eq!(page.data[1].rss_kb, None);
+    }
 }

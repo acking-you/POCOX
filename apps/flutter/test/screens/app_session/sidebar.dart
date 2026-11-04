@@ -138,7 +138,13 @@ void _registerSidebar() {
 
     // Rows carry no leading glyph of their own and the heading no folder:
     // the fold chevron is the tree's only icon.
-    expect(find.byIcon(AppIcons.chat_bubble_outline), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('conv-tile-t1')),
+        matching: find.byIcon(AppIcons.chat_bubble_outline),
+      ),
+      findsNothing,
+    );
     expect(find.byIcon(AppIcons.folder_open_outlined), findsNothing);
     expect(find.byIcon(AppIcons.keyboard_arrow_right), findsOneWidget);
   });
@@ -281,6 +287,7 @@ void _registerSidebar() {
 
     // A collapsed project must not swallow search hits: the filter found this
     // row, so hiding it would answer "nothing found" to a search that did.
+    await openConversationSearch(t);
     await t.enterText(find.byKey(const Key('conv-search')), 'findme');
     await t.pumpAndSettle();
     expect(find.text('findme needle'), findsOneWidget);
@@ -361,6 +368,7 @@ void _registerSidebar() {
 
     // The row shows the user's name, so that's the text a search must match —
     // filtering on the preview alone would miss it entirely.
+    await openConversationSearch(t);
     await t.enterText(find.byKey(const Key('conv-search')), 'zzz custom');
     await t.pumpAndSettle();
     expect(find.text('zzz custom name'), findsOneWidget);
@@ -507,6 +515,7 @@ void _registerSidebar() {
 
     // Typing a query filters the list to matching previews only — non-matches
     // disappear and exactly one conversation tile remains.
+    await openConversationSearch(t);
     await t.enterText(find.byKey(const Key('conv-search')), 'needle');
     await t.pumpAndSettle();
     expect(find.text('alpha'), findsNothing);
@@ -538,10 +547,14 @@ void _registerSidebar() {
     );
     await t.pumpAndSettle();
 
-    // No tap, no sheet — the numbers are already on screen because the quota
-    // is fetched with the subscription rather than on demand.
-    expect(find.byKey(const Key('sidebar-quota')), findsOneWidget);
-    expect(find.text('剩余用量'), findsOneWidget); // quotaRemaining (zh)
+    t.view.devicePixelRatio = 1;
+    t.view.physicalSize = const Size(1400, 900);
+    addTearDown(t.view.reset);
+    await t.pumpAndSettle();
+    // No tap, no sheet — the numbers are already on the context card because
+    // the quota is fetched with the subscription rather than on demand.
+    expect(find.byKey(const Key('context-quota')), findsOneWidget);
+    expect(find.textContaining('剩余用量'), findsOneWidget); // quotaRemaining (zh)
     expect(find.text('12%'), findsOneWidget);
   });
 
@@ -564,7 +577,7 @@ void _registerSidebar() {
       host(const AppSessionScreen(serviceKey: 'pcx:lb7666:app:default'), api),
     );
     await t.pumpAndSettle();
-    expect(find.text('会话'), findsOneWidget); // conversationsSection (zh)
+    expect(find.byKey(const Key('new-conversation-btn')), findsOneWidget);
     expect(find.text('past chat'), findsOneWidget);
 
     // Narrow: no inline pane (it moves into a closed drawer).

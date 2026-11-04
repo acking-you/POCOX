@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
-import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/widgets/glass.dart';
 import 'package:pocox/src/widgets/glass_stepper.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/setting_row.dart';
+
+/// What is saved, for a row that only reports it.
+final connectionWindowPreferencesProvider =
+    FutureProvider.autoDispose<ConnectionWindowPreferences>(
+      (ref) => ref.watch(bridgeApiProvider).connectionWindowPreferences(),
+    );
 
 /// How many conversation services stay connected across switches, and which
 /// idle one goes first: two quiet rows that save as they change, the same on
@@ -77,6 +82,7 @@ class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
       while (mounted) {
         await ref.read(bridgeApiProvider).setConnectionWindowPreferences(value);
         _saved = value;
+        if (mounted) ref.invalidate(connectionWindowPreferencesProvider);
         final queued = _queued;
         _queued = null;
         if (queued == null || queued.$1 == value) break;
@@ -120,7 +126,6 @@ class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
       children: [
         if (_readFailed)
           SettingReadFailed(
-            icon: AppIcons.layers_outlined,
             message: l10n.connectionPathReadFailed,
             retryLabel: l10n.retry,
             retryKey: const Key('connection-window-retry'),
@@ -128,7 +133,6 @@ class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
           )
         else ...[
           SettingRow(
-            icon: AppIcons.layers_outlined,
             title: l10n.connectionWindowCapacity,
             state: state(_Row.capacity),
             stateKey: const Key('connection-window-state'),
@@ -153,7 +157,6 @@ class _SettingsState extends ConsumerState<ConnectionWindowSettings> {
             ),
           ),
           SettingRow(
-            icon: AppIcons.history,
             title: l10n.connectionWindowPolicy,
             info: l10n.connectionWindowPolicyInfo,
             state: state(_Row.eviction),

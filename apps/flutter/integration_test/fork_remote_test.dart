@@ -146,7 +146,7 @@ void main() {
         () => turnAction.evaluate().isNotEmpty,
       );
 
-      await tester.tap(find.byType(PopupMenuButton<String>).first);
+      await tester.tap(find.byKey(const Key('conversation-menu')));
       await _until(
         tester,
         'the conversation menu',
@@ -166,11 +166,18 @@ void main() {
       expect(fork.forkedFromId, source);
       expect(fork.parentThreadId, isNull);
       expect(api.forks.single.boundaryConfirmed, isTrue);
-      final mark = find.byKey(const Key('fork-source-mark'));
+      // The card's row, or the status line's mark where no card has the room.
+      Finder sourceLink() {
+        final row = find.byKey(const Key('context-fork-source'));
+        return row.evaluate().isNotEmpty
+            ? row
+            : find.byKey(const Key('fork-source-mark'));
+      }
+
       await _until(
         tester,
         'the fork to open',
-        () => mark.evaluate().isNotEmpty,
+        () => sourceLink().evaluate().isNotEmpty,
       );
       await _until(
         tester,
@@ -193,11 +200,11 @@ void main() {
       await _settled(api, fork.id, 2);
 
       // The source is where it was: reachable, and without the fork's turn.
-      await tester.tap(mark);
+      await tester.tap(sourceLink());
       await _until(
         tester,
         'the source to open',
-        () => mark.evaluate().isEmpty && composer.evaluate().isNotEmpty,
+        () => sourceLink().evaluate().isEmpty && composer.evaluate().isNotEmpty,
       );
       final original = await _settled(api, source, 1);
       expect(

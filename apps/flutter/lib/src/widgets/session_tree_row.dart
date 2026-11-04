@@ -67,7 +67,7 @@ class SessionTreeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (childCount == 0 && !childSession && !guardian) {
+    if (depth == 0 && childCount == 0 && !childSession && !guardian) {
       return builder(leadingInset);
     }
     final box = _box();

@@ -17,6 +17,10 @@ mixin _FakeThreads on _FakeBridgeState {
   /// stay out of [appThreadList] until they have a turn of their own.
   final List<ThreadMeta> forkedThreads = [];
 
+  /// What listed conversations branched from. As on a real host only
+  /// [appThreadMetadata] says: [appThreadList] names no source.
+  final Map<String, String> threadOrigins = {};
+
   @override
   Future<ThreadMeta?> appThreadMetadata(
     String serviceKey,
@@ -29,7 +33,19 @@ mixin _FakeThreads on _FakeBridgeState {
       throw StateError('thread metadata is not available for this service');
     }
     for (final thread in [...appThreads, ...forkedThreads]) {
-      if (thread.id == threadId) return thread;
+      if (thread.id == threadId) {
+        final origin = threadOrigins[threadId];
+        return origin == null
+            ? thread
+            : ThreadMeta(
+                id: thread.id,
+                preview: thread.preview,
+                name: thread.name,
+                forkedFromId: origin,
+                cwd: thread.cwd,
+                updatedAt: thread.updatedAt,
+              );
+      }
     }
     return null;
   }
@@ -126,6 +142,38 @@ mixin _FakeThreads on _FakeBridgeState {
   @override
   Future<void> appCompact(String serviceKey, String threadId) async =>
       compacted = true;
+
+  /// What [appBackgroundTerminals] lists.
+  List<BackgroundTerminal> backgroundTerminals = const [];
+
+  /// Thrown by [appBackgroundTerminals]: a host that cannot list them.
+  Object? backgroundTerminalsError;
+
+  /// Every process [appTerminateBackgroundTerminal] stopped.
+  final List<String> terminatedProcesses = [];
+
+  @override
+  Future<List<BackgroundTerminal>> appBackgroundTerminals(
+    String serviceKey,
+    String threadId,
+  ) async {
+    if (backgroundTerminalsError case final error?) throw error;
+    return backgroundTerminals;
+  }
+
+  @override
+  Future<bool> appTerminateBackgroundTerminal(
+    String serviceKey,
+    String threadId,
+    String processId,
+  ) async {
+    terminatedProcesses.add(processId);
+    backgroundTerminals = [
+      for (final terminal in backgroundTerminals)
+        if (terminal.processId != processId) terminal,
+    ];
+    return true;
+  }
 
   @override
   Future<void> appSetThreadName(

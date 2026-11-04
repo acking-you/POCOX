@@ -13,6 +13,8 @@ import 'package:pocox/src/widgets/provider_badge.dart';
 import 'package:pocox/src/widgets/status_dots.dart';
 import 'package:pocox/src/app_icons.dart';
 
+part 'host_capsules.dart';
+
 /// Where a host switch stands. Owned by the home, which does the switching,
 /// and shown wherever the user is looking: the switcher row and the strip
 /// above the conversation.
@@ -50,11 +52,11 @@ enum HostSwitchPhase {
 String hostLabel(ServiceEntry entry) =>
     '${deviceLabel(entry.device)} · ${entry.name}';
 
-/// The sidebar's host row: the host this chat runs on, and the way to change
-/// it.
+/// The column's host row: the host this chat runs on, and the way to change
+/// it; a phone's drawer shows [capsules] instead.
 ///
-/// One trigger for every width. Desktop opens an anchored menu under the row,
-/// like the project menu; touch opens a sheet with full-height rows. While a
+/// A pointer opens an anchored menu under the row, like the project menu;
+/// touch opens a sheet with full-height rows. While a
 /// switch runs, the row names the host being reached and shows its progress,
 /// so the user can see that something is happening.
 ///
@@ -74,7 +76,12 @@ class HostSwitcher extends StatefulWidget {
     this.connectedKeys = const {},
     this.onManage,
     this.onRefresh,
+    this.capsules = false,
   });
+
+  /// One capsule per service in a row that scrolls, for a phone's drawer,
+  /// instead of one row naming the current host.
+  final bool capsules;
 
   /// Connectable app services, in display order.
   final List<ServiceEntry> services;
@@ -199,6 +206,18 @@ class _HostSwitcherState extends State<HostSwitcher> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.capsules) {
+      return _HostCapsules(
+        services: widget.services,
+        current: widget.current,
+        pending: widget.pending,
+        identities: widget.identities,
+        localKeys: widget.localKeys,
+        connectedKeys: widget.connectedKeys,
+        onPick: _pick,
+        onOpenList: _openSheet,
+      );
+    }
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final multiple = widget.services.length > 1;
@@ -266,17 +285,14 @@ class _HostSwitcherState extends State<HostSwitcher> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
-                _badge(
-                  widget.identities,
-                  busy ? pending!.target : widget.current,
-                ),
-                if (opens && !busy)
+                if (opens && !busy) ...[
+                  const SizedBox(width: 6),
                   Icon(
-                    AppIcons.unfold_more_rounded,
-                    size: 16,
+                    AppIcons.expand_more,
+                    size: 14,
                     color: scheme.onSurfaceVariant,
                   ),
+                ],
               ],
             ),
           ),
@@ -338,11 +354,53 @@ class _HostSwitcherState extends State<HostSwitcher> {
         ),
       );
     }
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-      child: trigger,
-    );
+    return trigger;
   }
+}
+
+/// [services] grouped by device: under their authoritative device identity,
+/// or as this device for exact keys of the native registry ([localKeys]), this
+/// device first and the rest by label. Hostname, OS and matching labels never
+/// establish locality.
+List<MapEntry<String, List<ServiceEntry>>> _hostGroups(
+  List<ServiceEntry> services,
+  Set<String> localKeys,
+) {
+  final groups = <String, List<ServiceEntry>>{};
+  for (final service in services) {
+    final identity = localKeys.contains(service.key)
+        ? 'local'
+        : serviceDeviceIdentity(service.key);
+    (groups[identity] ??= []).add(service);
+  }
+  return groups.entries.toList()..sort((a, b) {
+    if (a.key == 'local') return -1;
+    if (b.key == 'local') return 1;
+    return deviceLabel(
+      a.value.first.device,
+    ).compareTo(deviceLabel(b.value.first.device));
+  });
+}
+
+/// What tells [group] apart from another device of the same name in [ordered]:
+/// its short identity, or its full prefix for ambiguous legacy labels. Null
+/// when its name alone does.
+String? _groupDistinction(
+  MapEntry<String, List<ServiceEntry>> group,
+  List<MapEntry<String, List<ServiceEntry>>> ordered,
+) {
+  final device = group.value.first.device;
+  final others = ordered.where(
+    (other) =>
+        other.key != group.key &&
+        deviceLabel(other.value.first.device) == deviceLabel(device),
+  );
+  if (others.isEmpty || group.key == 'local') return null;
+  final id = deviceShortId(device);
+  return id != null &&
+          others.every((other) => deviceShortId(other.value.first.device) != id)
+      ? id
+      : group.key;
 }
 
 /// The agent mark of [key]: its known identity, else its protocol's.
@@ -410,37 +468,7 @@ class _HostList extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final groups = <String, List<ServiceEntry>>{};
-    for (final service in services) {
-      final identity = localKeys.contains(service.key)
-          ? 'local'
-          : serviceDeviceIdentity(service.key);
-      (groups[identity] ??= []).add(service);
-    }
-    final ordered = groups.entries.toList()
-      ..sort((a, b) {
-        if (a.key == 'local') return -1;
-        if (b.key == 'local') return 1;
-        return deviceLabel(
-          a.value.first.device,
-        ).compareTo(deviceLabel(b.value.first.device));
-      });
-    String? distinction(MapEntry<String, List<ServiceEntry>> group) {
-      final device = group.value.first.device;
-      final others = ordered.where(
-        (other) =>
-            other.key != group.key &&
-            deviceLabel(other.value.first.device) == deviceLabel(device),
-      );
-      if (others.isEmpty || group.key == 'local') return null;
-      final id = deviceShortId(device);
-      return id != null &&
-              others.every(
-                (other) => deviceShortId(other.value.first.device) != id,
-              )
-          ? id
-          : group.key;
-    }
+    final ordered = _hostGroups(services, localKeys);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -480,7 +508,7 @@ class _HostList extends StatelessWidget {
                           [
                             deviceLabel(group.value.first.device),
                             if (group.key == 'local') l10n.servicesLocalDevice,
-                            ?distinction(group),
+                            ?_groupDistinction(group, ordered),
                           ].join(' · '),
                           style: Theme.of(context).textTheme.labelMedium,
                         ),

@@ -28,6 +28,7 @@ import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/group_card.dart';
 import 'package:pocox/src/widgets/local_host_dialog.dart';
+import 'package:pocox/src/widgets/workspace_navigation.dart';
 
 import 'fake_bridge_api.dart';
 import 'support/acp_capabilities.dart';
@@ -560,7 +561,7 @@ void main() {
             await t.pumpAndSettle();
             expect(t.takeException(), isNull, reason: 'no overflow');
             // Labelled where it fits, else named by its tooltip; the way
-            // back to the chat stays on the bar either way.
+            // back to the chat stays on the rail either way.
             final labelled = _primaryActionShown(
               t,
               size,
@@ -569,7 +570,16 @@ void main() {
             if (size.width >= 1440) {
               expect(labelled, isTrue, reason: 'a desktop bar has room');
             }
-            _operable(t, find.byKey(const Key('utility-chat-origin')));
+            _operable(
+              t,
+              find.byKey(
+                Key(
+                  size.width >= workspaceCompactWidth
+                      ? 'workspace-nav-/'
+                      : 'utility-chat-origin',
+                ),
+              ),
+            );
             await capturePreview(t, 'hosting-manage-$variant');
             await t.pumpWidget(const SizedBox());
           } finally {

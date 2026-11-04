@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pocox/src/providers.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/log_manager.dart';
@@ -39,11 +41,14 @@ void main() {
       fake.pushLog(_line('ERROR', 'tunnel down', target: 'serve'));
 
       await t.pumpWidget(
-        MaterialApp(
-          locale: const Locale('zh'),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: const LogViewScreen(),
+        ProviderScope(
+          overrides: [bridgeApiProvider.overrideWithValue(fake)],
+          child: MaterialApp(
+            locale: const Locale('zh'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: const LogViewScreen(),
+          ),
         ),
       );
       // Past the LogManager emit-coalesce window so the streamed line renders.
