@@ -76,8 +76,8 @@ Contracts: changing one needs an explicit decision, never a side effect.
 - **No guessed locality** from hostname, OS, label or shared filesystem; reach
   an in-app host through its loopback endpoint. This decides whether a service
   runs here, not which device this is:
-  [pairing](docs/pairing-code-login.md#device-identity) may identify a device
-  by its hardware. **No unadmitted writes**: a
+  [pairing](docs/pairing-code-login.md#device-identity) may use hardware to
+  locate a device, never as proof of authorization. **No unadmitted writes**: a
   read-only view never resumes, takes over or answers for another writer.
 
 ## Engineering principles
@@ -195,7 +195,8 @@ Shipped work lives in the changelog and git history. Open, described only as
 planned until it ships:
 
 - **Pairing-code login**: backend-issued per-device codes, with linked devices
-  counting as one user and reinstalls keeping the code
+  counting as one user, authorized reinstall recovery and a bounded credential
+  overlap
   ([design](docs/pairing-code-login.md)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.
