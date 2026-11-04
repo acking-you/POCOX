@@ -100,7 +100,9 @@ before publishing. OS and native/WSL environments use separate identity records,
 even if they share an identity directory. Independently running hosts still
 require separate hosting/profile state directories. CLI publishers share `<state-dir>/identity`;
 the desktop app uses `<app-support-dir>/identity`. Different data directories
-are independent installations. Neither identity contains a hardware fingerprint.
+are independent installations. These hosting identities are random and name an
+installation; which physical device it runs on belongs to
+[pairing](pairing-code-login.md#device-identity).
 Identity persistence and default naming live in `pocox-core`
 (`crates/pocox-core/src/device/identity.rs`), shared by desktop and CLI
 publishers.

@@ -74,7 +74,10 @@ Contracts: changing one needs an explicit decision, never a side effect.
   `hosting/owner.lock` (CLI: `managed-host/owner.lock`) hosts or writes hosting
   state; new hosting services call `host_owner::require()` first.
 - **No guessed locality** from hostname, OS, label or shared filesystem; reach
-  an in-app host through its loopback endpoint. **No unadmitted writes**: a
+  an in-app host through its loopback endpoint. This decides whether a service
+  runs here, not which device this is:
+  [pairing](docs/pairing-code-login.md#device-identity) may identify a device
+  by its hardware. **No unadmitted writes**: a
   read-only view never resumes, takes over or answers for another writer.
 
 ## Engineering principles
@@ -191,6 +194,9 @@ upload route and respect draft admission; see
 Shipped work lives in the changelog and git history. Open, described only as
 planned until it ships:
 
+- **Pairing-code login**: backend-issued per-device codes, with linked devices
+  counting as one user and reinstalls keeping the code
+  ([design](docs/pairing-code-login.md)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.
 - **Session takeover for Claude and OpenCode**: an explicit, confirmed continue
