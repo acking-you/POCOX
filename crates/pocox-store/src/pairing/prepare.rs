@@ -7,6 +7,7 @@
 
 use sqlx::SqliteConnection;
 
+use super::budgets::{charge_budget_in, BudgetVerdict};
 use super::devices::{
     activate_in, device_in, group_size_in, new_user_id, user_in, HardwareBinding,
 };
@@ -80,6 +81,20 @@ pub struct LinkInput<'a> {
     pub hardware: Option<HardwareBinding<'a>>,
     /// The largest a group may grow.
     pub max_group_size: i64,
+    /// The backend-wide budget a link owing relay work draws from.
+    pub relay_budget: RelayBudget<'a>,
+}
+
+/// A backend-wide budget, charged inside the transaction that decides it is
+/// owed.
+#[derive(Debug, Clone, Copy)]
+pub struct RelayBudget<'a> {
+    /// The budget's name.
+    pub name: &'a str,
+    /// Its window.
+    pub window_secs: i64,
+    /// Units per window.
+    pub limit: i64,
 }
 
 /// What removing a peer names.
@@ -457,6 +472,33 @@ impl Store {
         }
         if group_size_in(&mut tx, &target.user_id).await? >= input.max_group_size {
             return Err(Refusal::GroupFull.into());
+        }
+        // Links are the one move with a backend-wide budget, and only one owing the
+        // relay work spends it: a no-op or a device with no keys costs the
+        // relay nothing here. Leave and removal never touch it, each needing a
+        // peer some link paid to bring in, so spending this budget can never
+        // stop anyone removing an intruder.
+        let (owed,): (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM device_relay_keys
+             WHERE device_id = ?1 AND state IN ('granting', 'active')",
+        )
+        .bind(&subject.id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if owed > 0 {
+            let budget = input.relay_budget;
+            let verdict =
+                charge_budget_in(&mut tx, budget.name, budget.window_secs, budget.limit, meta.now)
+                    .await?;
+            if let BudgetVerdict::Refused {
+                retry_after,
+            } = verdict
+            {
+                return Err(Refusal::TooSoon {
+                    retry_after,
+                }
+                .into());
+            }
         }
         let operation = insert_operation(&mut tx, &NewOperation {
             meta,

@@ -25,8 +25,7 @@ async fn a_token_cannot_renew_itself_without_the_secret() {
         assert!(view.session.is_none(), "a no-op moved nobody");
     }
 
-    // The same for a no-op link, a replay, and removing a peer: none moved the
-    // caller.
+    // The same for a no-op link and for removing a peer.
     let host = Device::activated(&harness, "host").await;
     lone.link_to(&host).await;
     let preview = lone.ticket_for(&host).await;
@@ -49,12 +48,12 @@ async fn a_token_cannot_renew_itself_without_the_secret() {
         .parse();
     assert!(view.session.is_none());
 
-    // A real move kills the old token, so its answer carries the next one once.
-    // Asking again with the same id gets the result and no session.
+    // Nor does a real move, or a JWT could live forever by cycling link and leave.
+    // A client holds the secret, so it refreshes.
     let id = op();
     let view: OperationView = lone.leave(&id).await.expect(StatusCode::OK).parse();
-    let moved = view.session.expect("the request that moved it");
-    lone.session = moved;
+    assert!(view.session.is_none());
+    lone.refresh().await.expect(StatusCode::OK);
     let replay: OperationView = lone.leave(&id).await.expect(StatusCode::OK).parse();
     assert!(replay.session.is_none());
 
@@ -276,22 +275,6 @@ async fn a_removed_device_keeps_its_use_based_retention_and_says_removed() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-async fn one_process_serves_a_pairing_database() {
-    let harness = Harness::start().await;
-    let held = harness
-        .store
-        .lock_database()
-        .expect("first")
-        .expect("a file database");
-    assert!(matches!(
-        harness.store.lock_database(),
-        Err(pocox_store::StoreError::DatabaseInUse { .. })
-    ));
-    drop(held);
-    assert!(harness.store.lock_database().expect("free again").is_some());
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn another_actors_operation_id_is_never_revealed() {
     let harness = Harness::start().await;
     let target = Device::activated(&harness, "target").await;
@@ -403,6 +386,35 @@ async fn a_device_token_gets_no_leeway_past_its_expiry() {
         .call(Method::GET, "/v1/pair/code", Some(&expired), None)
         .await
         .expect_error(StatusCode::UNAUTHORIZED, "session_stale");
+
+    // Past the leeway too: a pairing client on a shared route is told to refresh,
+    // and a client that does not speak pairing gets the answer it always got.
+    let long_expired = mint(&Claims {
+        sub: device.user().to_string(),
+        ns: format!("pcxu:{}", device.user()),
+        login: "device".to_string(),
+        gh_id: None,
+        did: Some(device.id().to_string()),
+        dgen: Some(device.session.generation),
+        iat: now - 3600,
+        exp: now - 600,
+        jti: "long-expired".to_string(),
+    });
+    let reply = harness
+        .call(Method::GET, "/v1/me", Some(&long_expired), None)
+        .await
+        .expect_error(StatusCode::UNAUTHORIZED, "session_stale");
+    assert_eq!(reply.cache.as_deref(), Some("no-store"));
+    let response = harness
+        .http
+        .get(format!("{}/v1/me", harness.base()))
+        .bearer_auth(&long_expired)
+        .send()
+        .await
+        .expect("request");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let body: serde_json::Value = response.json().await.expect("json");
+    assert_eq!(body["error"], "unauthorized");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -449,10 +461,11 @@ async fn shared_routes_follow_the_pairing_contract_for_a_device() {
 
     // A relay failure on a shared route is the same stable code as anywhere else.
     harness.link.cut();
-    device
+    let refused = device
         .get("/v1/services")
         .await
         .expect_error(StatusCode::SERVICE_UNAVAILABLE, "relay_unavailable");
+    assert_eq!(refused.cache.as_deref(), Some("no-store"));
     harness.link.point_at(harness.relay.addr());
 }
 
@@ -675,4 +688,69 @@ async fn a_group_change_after_approval_is_a_stale_preview_and_undecidable_reques
         .await
         .expect(StatusCode::OK);
     assert_eq!(status.body["status"], "stale");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_purge_leaves_alone_a_bystander_in_a_group_with_an_open_operation() {
+    let harness = Harness::start().await;
+    let bystander = Device::new(&harness, "bystander").await;
+    let mut member = Device::activated(&harness, "member").await;
+    member.link_to(&bystander).await;
+
+    // A link into this group waits on the relay. It names the member's code, not
+    // the bystander, who is old enough to purge.
+    let joiner = Device::activated(&harness, "joiner").await;
+    joiner.relay_key().await;
+    let ticket = joiner.ticket_for(&member).await;
+    harness.link.cut();
+    let id = op();
+    joiner
+        .link_with(&ticket.ticket, &id, false)
+        .await
+        .expect(StatusCode::ACCEPTED);
+
+    let later = time::OffsetDateTime::now_utc().unix_timestamp() + 31 * 24 * 3600;
+    harness.store.purge_pairing(later).await.expect("purge");
+    assert!(
+        harness
+            .store
+            .pairing_device(bystander.id())
+            .await
+            .expect("row")
+            .is_some(),
+        "purging it would move the revision that link confirmed"
+    );
+
+    // So the link commits rather than failing as stale.
+    harness.link.point_at(harness.relay.addr());
+    harness.restart().await;
+    let done: OperationView = joiner.operation(&id).await.expect(StatusCode::OK).parse();
+    assert_eq!(serde_json::to_value(done.status).expect("status"), "completed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_retiring_sessions_cached_credential_dies_with_its_relay_instance() {
+    let harness = Harness::with_settings(PairingSettings {
+        relay_status_ttl: Duration::ZERO,
+        ..test_settings()
+    })
+    .await;
+    let old = Device::activated(&harness, "old").await;
+    old.relay_key().await;
+    let code = old.code().await;
+    let new = Device::new(&harness, "new").await;
+    new.restore_by_code(&code, old.id(), "restore")
+        .await
+        .expect(StatusCode::OK);
+    old.relay_key().await;
+
+    harness
+        .relay
+        .auth()
+        .reset(harness.relay.admin_context())
+        .await
+        .expect("a reset changes the instance id");
+    old.get("/v1/relay")
+        .await
+        .expect_error(StatusCode::GONE, "retiring_key_gone");
 }

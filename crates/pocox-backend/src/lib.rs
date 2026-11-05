@@ -44,13 +44,26 @@ use tokio::net::TcpListener;
 
 /// Serve `router` over plain TCP through the real accept loop, forever. For
 /// local testing; a deployment goes through [`run`].
+///
+/// `limits` is `None` with pairing off, when connections are served as they
+/// always were.
 pub async fn serve_plain(
     listener: TcpListener,
     router: axum::Router,
-    limits: ConnectionLimits,
+    limits: Option<ConnectionLimits>,
     trusted_proxies: pairing::TrustedProxies,
 ) {
     serve::serve_http(listener, router, tls::TlsKind::Plain, limits, trusted_proxies).await;
+}
+
+/// Hold the database for this process when pairing is on, or refuse to start.
+/// Nothing is locked with pairing off, as before.
+fn claim_database(store: &Store, pairing_enabled: bool) -> anyhow::Result<Option<std::fs::File>> {
+    if pairing_enabled {
+        Ok(store.lock_database()?)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Run the backend (the HTTP API over the configured TLS layer) until a fatal
@@ -63,7 +76,7 @@ pub async fn run(cfg: ServerConfig) -> anyhow::Result<()> {
     // Relay work is serialized by locks in this process, so a second process on
     // this database could undo a removal. Held until this function returns,
     // which is never.
-    let _database_owner = if cfg.pairing_secret.is_some() { store.lock_database()? } else { None };
+    let _database_owner = claim_database(&store, cfg.pairing_secret.is_some())?;
 
     // Periodically purge expired device flows + refresh tokens so the tables
     // don't grow unbounded under device-flow churn / abandoned logins.
@@ -155,6 +168,37 @@ pub async fn run(cfg: ServerConfig) -> anyhow::Result<()> {
     );
 
     let trusted_proxies = pairing::TrustedProxies::parse(&cfg.trusted_proxies)?;
-    serve::serve_http(http_listener, app, tls, ConnectionLimits::default(), trusted_proxies).await;
+    // Only pairing opens an anonymous surface. With it off, a GitHub-only backend
+    // behind a proxy keeps serving connections as it always has.
+    let limits = cfg.pairing_secret.is_some().then(ConnectionLimits::default);
+    serve::serve_http(http_listener, app, tls, limits, trusted_proxies).await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn pairing_claims_the_database_and_a_github_only_backend_does_not() {
+        let dir = std::env::temp_dir().join(format!("pocox-owner-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("directory");
+        let store = Store::connect(&format!("sqlite://{}", dir.join("backend.db").display()))
+            .await
+            .expect("store");
+
+        assert!(claim_database(&store, false)
+            .expect("nothing to claim")
+            .is_none());
+        let held = claim_database(&store, true)
+            .expect("first")
+            .expect("a file database");
+        assert!(claim_database(&store, true).is_err(), "a second process refuses to start");
+        assert!(claim_database(&store, false)
+            .expect("github only")
+            .is_none());
+        drop(held);
+        assert!(claim_database(&store, true).expect("free again").is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

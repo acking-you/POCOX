@@ -269,13 +269,14 @@ impl Pairing {
 
     /// The response to a mutation: 202 while relay work is incomplete, the
     /// stable failure code if it failed, and the completed result
-    /// otherwise.
+    /// otherwise. It never carries a session: anything a JWT could turn
+    /// into a new JWT would let it live forever without the secret, and a
+    /// client holds the secret, so it refreshes.
     pub(super) async fn respond_to_operation(
         &self,
         operation: &PairOperation,
-        with_session: bool,
     ) -> PairingResult<Response> {
-        let view = self.operation_view(operation, with_session, now()).await?;
+        let view = self.operation_view(operation, false, now()).await?;
         match view.status {
             OperationStatus::Failed => {
                 Err(PairingError::code(view.error.unwrap_or(PairingErrorCode::PreviewStale)))
@@ -288,27 +289,12 @@ impl Pairing {
     }
 
     /// Drive what a mutation prepared and answer it.
-    ///
-    /// The answer carries a session only if this very request moved this
-    /// device, whose old token it just killed. A no-op, a replay or a
-    /// removal of a peer moved nobody, and a token that could renew itself
-    /// by asking for one would never need the secret again: a restored
-    /// `config.toml` would stay signed in forever.
     pub(super) async fn finish_mutation(
         self: &Arc<Self>,
         prepared: Prepared,
     ) -> PairingResult<Response> {
-        let moved_caller = prepared.is_new
-            && !prepared.operation.no_op
-            && matches!(
-                prepared.operation.kind,
-                OperationKind::Link
-                    | OperationKind::Leave
-                    | OperationKind::Restore
-                    | OperationKind::Retake
-            );
         let driven = self.drive_in_foreground(prepared.operation).await?;
-        self.respond_to_operation(&driven, moved_caller).await
+        self.respond_to_operation(&driven).await
     }
 
     /// `transition_pending` for a device reached by its secret. The operation's

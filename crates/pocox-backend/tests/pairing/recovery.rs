@@ -95,7 +95,8 @@ async fn a_members_approval_changes_nothing_until_the_requester_confirms() {
         .expect(StatusCode::OK)
         .parse();
     assert_eq!(view.status, OperationStatus::Completed);
-    reinstalled.session = view.session.expect("session");
+    assert!(view.session.is_none());
+    reinstalled.refresh().await.expect(StatusCode::OK);
     assert_eq!(reinstalled.id(), holder.id());
     assert_eq!(reinstalled.user(), holder.user());
     assert!(reinstalled.session.generation > generation);
@@ -198,7 +199,8 @@ async fn a_code_restores_with_no_hint_even_when_approval_slots_are_full() {
         .await
         .expect(StatusCode::OK)
         .parse();
-    restored.session = view.session.expect("session");
+    assert_eq!(view.status, OperationStatus::Completed);
+    restored.refresh().await.expect(StatusCode::OK);
     assert_eq!(restored.id(), holder.id());
     assert_eq!(restored.code().await, code, "the same code");
 

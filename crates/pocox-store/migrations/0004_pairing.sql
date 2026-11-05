@@ -38,6 +38,9 @@ CREATE TABLE devices (
     -- device that was once in use from a first screen nobody continued.
     first_activated_at    INTEGER,
     first_key_at          INTEGER,
+    -- The session generation of the last key issued. A later key in this generation
+    -- replaces one that merely ended, which nothing a fleet does can force.
+    key_generation        INTEGER,
     -- Days since the unix epoch.
     last_active_day       INTEGER NOT NULL,
     last_transition_kind  TEXT    CHECK (last_transition_kind IN

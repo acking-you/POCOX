@@ -79,6 +79,32 @@ impl NamedLocks {
         };
         lock.lock_owned().await
     }
+
+    /// The lock, if nobody holds it. A request holding a global slot uses this:
+    /// queueing there on its own device would let one device hold every
+    /// slot.
+    pub(super) fn try_acquire(&self, name: &str) -> Option<OwnedMutexGuard<()>> {
+        let lock = {
+            let mut locks = self.locks.lock().expect("named locks");
+            locks.retain(|_, lock| Arc::strong_count(lock) > 1 || lock.try_lock().is_err());
+            locks.entry(name.to_string()).or_default().clone()
+        };
+        lock.try_lock_owned().ok()
+    }
+}
+
+/// What a new relay key is, for what it costs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NewKey {
+    /// The device's first.
+    First,
+    /// For a device that moved since its last.
+    AfterMove,
+    /// Replacing one that merely ended, in this same generation: a laptop that
+    /// slept past it, or a relay reset. Nothing a fleet does can force it
+    /// faster than its keys end, so it stays out of any budget a fleet
+    /// could spend.
+    Replacement,
 }
 
 /// The in-memory limiters. Keys are keyed hashes of an address or a device id.
@@ -90,6 +116,7 @@ pub(super) struct Limiters {
     pub(super) moves_by_device: AddressLimiter,
     pub(super) moves_by_address: AddressLimiter,
     pub(super) key_grants_by_device: AddressLimiter,
+    pub(super) key_regrants_by_address: AddressLimiter,
     pub(super) deregistrations_by_device: AddressLimiter,
     pub(super) deregistrations_by_address: AddressLimiter,
 }
@@ -105,6 +132,7 @@ impl Limiters {
             &self.moves_by_device,
             &self.moves_by_address,
             &self.key_grants_by_device,
+            &self.key_regrants_by_address,
             &self.deregistrations_by_device,
             &self.deregistrations_by_address,
         ] {
@@ -173,6 +201,10 @@ impl Pairing {
                 moves_by_device: AddressLimiter::new(limits.moves_per_device, entries),
                 moves_by_address: AddressLimiter::new(limits.moves_per_address, entries),
                 key_grants_by_device: AddressLimiter::new(limits.key_grants_per_device, entries),
+                key_regrants_by_address: AddressLimiter::new(
+                    limits.key_regrants_per_address,
+                    entries,
+                ),
                 deregistrations_by_device: AddressLimiter::new(
                     limits.deregistrations_per_device,
                     entries,
@@ -279,12 +311,13 @@ impl Pairing {
     }
 
     /// Charge one membership move: each is several relay writes plus rows that
-    /// stay for days, so it is metered per device, per address and across
-    /// the backend.
-    async fn charge_move(
+    /// stay for days. Per device always. Per address only with a bucket: a
+    /// removal or leave has none, so whoever shares an address, or fills
+    /// the table of addresses, cannot stop anyone removing an intruder.
+    fn charge_move(
         &self,
         device_id: &str,
-        bucket: ClientBucket,
+        bucket: Option<ClientBucket>,
         now: i64,
     ) -> PairingResult<()> {
         let device_key = self.device_key(device_id);
@@ -292,32 +325,21 @@ impl Pairing {
             .moves_by_device
             .charge(device_key, now)
             .map_err(rate_limited)?;
-        if let Err(wait) = self.limiters.moves_by_address.charge(bucket.0, now) {
-            self.limiters.moves_by_device.refund(device_key);
-            return Err(rate_limited(wait));
+        if let Some(bucket) = bucket {
+            if let Err(wait) = self.limiters.moves_by_address.charge(bucket.0, now) {
+                self.limiters.moves_by_device.refund(device_key);
+                return Err(rate_limited(wait));
+            }
         }
-        let backend = self
-            .charge_backend("membership_moves", self.settings.limits.moves_backend, now)
-            .await;
-        if backend.is_err() {
-            self.limiters.moves_by_device.refund(device_key);
-            self.limiters.moves_by_address.refund(bucket.0);
-        }
-        backend
+        Ok(())
     }
 
-    async fn refund_move(&self, device_id: &str, bucket: ClientBucket, now: i64) {
+    fn refund_move(&self, device_id: &str, bucket: Option<ClientBucket>) {
         self.limiters
             .moves_by_device
             .refund(self.device_key(device_id));
-        self.limiters.moves_by_address.refund(bucket.0);
-        let window = self.settings.limits.moves_backend.window_secs;
-        if let Err(error) = self
-            .store
-            .refund_budget("membership_moves", window, now)
-            .await
-        {
-            tracing::warn!(%error, "refunding a membership move");
+        if let Some(bucket) = bucket {
+            self.limiters.moves_by_address.refund(bucket.0);
         }
     }
 
@@ -326,7 +348,7 @@ impl Pairing {
     pub(super) async fn metered_prepare<F, Fut>(
         &self,
         device_id: &str,
-        bucket: ClientBucket,
+        bucket: Option<ClientBucket>,
         now: i64,
         prepare: F,
     ) -> PairingResult<Prepared>
@@ -334,22 +356,23 @@ impl Pairing {
         F: FnOnce() -> Fut,
         Fut: Future<Output = pocox_store::Result<Prepared>>,
     {
-        self.charge_move(device_id, bucket, now).await?;
+        self.charge_move(device_id, bucket, now)?;
         match prepare().await {
             Ok(prepared) => {
                 if !prepared.is_new {
-                    self.refund_move(device_id, bucket, now).await;
+                    self.refund_move(device_id, bucket);
                 }
                 Ok(prepared)
             },
             Err(error) => {
-                self.refund_move(device_id, bucket, now).await;
+                self.refund_move(device_id, bucket);
                 Err(error.into())
             },
         }
     }
 
-    /// Bound relay issues per device, whatever kept the last one from sticking.
+    /// Bound attempts at a key per device, before they cost the relay a status
+    /// read.
     pub(super) fn limit_grant_attempts(&self, device_id: &str, now: i64) -> PairingResult<()> {
         self.limiters
             .key_grants_by_device
@@ -357,44 +380,56 @@ impl Pairing {
             .map_err(rate_limited)
     }
 
-    /// Charge a key that takes a new relay slot: a device's first per address
-    /// and across the backend, any later one across the backend. Renewing
-    /// an existing key is free.
+    /// Give an attempt back when the relay never got as far as issuing
+    /// anything.
+    pub(super) fn refund_grant_attempt(&self, device_id: &str) {
+        self.limiters
+            .key_grants_by_device
+            .refund(self.device_key(device_id));
+    }
+
+    /// Charge a key that takes a new relay slot. Renewing an existing key is
+    /// free.
     pub(super) async fn charge_new_key(
         &self,
-        first: bool,
+        kind: NewKey,
         bucket: ClientBucket,
         now: i64,
     ) -> PairingResult<()> {
         let limits = self.settings.limits;
-        if !first {
-            return self
-                .charge_backend("key_regrants", limits.key_regrants_backend, now)
-                .await;
-        }
-        self.limiters
-            .first_keys
-            .charge(bucket.0, now)
-            .map_err(rate_limited)?;
-        let backend = self
-            .charge_backend("first_keys", limits.first_keys_backend, now)
-            .await;
+        let (limiter, name, rate) = match kind {
+            NewKey::Replacement => return Ok(()),
+            NewKey::First => (&self.limiters.first_keys, "first_keys", limits.first_keys_backend),
+            NewKey::AfterMove => (
+                &self.limiters.key_regrants_by_address,
+                "key_regrants",
+                limits.key_regrants_backend,
+            ),
+        };
+        limiter.charge(bucket.0, now).map_err(rate_limited)?;
+        let backend = self.charge_backend(name, rate, now).await;
         if backend.is_err() {
-            self.limiters.first_keys.refund(bucket.0);
+            limiter.refund(bucket.0);
         }
         backend
     }
 
     /// Give a key's charge back when its grant was refused before anything
-    /// happened.
-    pub(super) async fn refund_new_key(&self, first: bool, bucket: ClientBucket, now: i64) {
+    /// happened, or the relay's table turned out to be full.
+    pub(super) async fn refund_new_key(&self, kind: NewKey, bucket: ClientBucket, now: i64) {
         let limits = self.settings.limits;
-        let (name, window) = if first {
-            self.limiters.first_keys.refund(bucket.0);
-            ("first_keys", limits.first_keys_backend.window_secs)
-        } else {
-            ("key_regrants", limits.key_regrants_backend.window_secs)
+        let (limiter, name, window) = match kind {
+            NewKey::Replacement => return,
+            NewKey::First => {
+                (&self.limiters.first_keys, "first_keys", limits.first_keys_backend.window_secs)
+            },
+            NewKey::AfterMove => (
+                &self.limiters.key_regrants_by_address,
+                "key_regrants",
+                limits.key_regrants_backend.window_secs,
+            ),
         };
+        limiter.refund(bucket.0);
         if let Err(error) = self.store.refund_budget(name, window, now).await {
             tracing::warn!(%error, "refunding a key grant");
         }

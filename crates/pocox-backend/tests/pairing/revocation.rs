@@ -243,11 +243,14 @@ async fn a_retake_that_fails_still_ends_the_suspect_devices_old_key() {
     assert_eq!(failed.status, OperationStatus::Failed);
     assert!(
         !harness.credential_works(&old_key.credential).await,
-        "a suspect device keeps no relay access through a failed retake"
+        "a failed retake still ends the old key"
     );
-    // It keeps its secret, and that is all: nothing moved.
+    // Nothing moved, so the secret stays current until a retake succeeds, and it
+    // can get a new key under a fresh generation.
     let mut suspect = suspect;
     suspect.refresh().await.expect(StatusCode::OK);
+    let new_key = suspect.relay_key().await;
+    assert_ne!(new_key.credential, old_key.credential);
     retaker.refresh_raw().await.expect(StatusCode::OK);
 }
 
@@ -314,12 +317,13 @@ async fn a_repeated_leave_is_a_no_op_and_never_another_new_group() {
 
     let id = op();
     let first: OperationView = member.leave(&id).await.expect(StatusCode::OK).parse();
-    let session = first.session.expect("session");
+    assert!(first.session.is_none());
+    member.refresh().await.expect(StatusCode::OK);
+    let session = member.session.clone();
     let read: OperationView = member.operation(&id).await.expect(StatusCode::OK).parse();
     assert_eq!(read.session.expect("session").account_id, session.account_id);
 
     // A device already alone: with a new id it is still a no-op, not another group.
-    member.session = session.clone();
     let again: OperationView = member.leave(&op()).await.expect(StatusCode::OK).parse();
     assert_eq!(again.status, OperationStatus::Completed);
     member.refresh().await.expect(StatusCode::OK);
@@ -486,7 +490,8 @@ async fn a_retake_revokes_every_generation_and_rotates_the_code() {
         .await
         .expect(StatusCode::OK)
         .parse();
-    restored.session = view.session.expect("session");
+    assert_eq!(view.status, OperationStatus::Completed);
+    restored.refresh().await.expect(StatusCode::OK);
     let restored_key = restored.relay_key().await;
     assert!(harness.credential_works(&stolen_key.credential).await, "inside its overlap");
 
@@ -496,7 +501,8 @@ async fn a_retake_revokes_every_generation_and_rotates_the_code() {
         .await
         .expect(StatusCode::OK)
         .parse();
-    retaker.session = view.session.expect("session");
+    assert_eq!(view.status, OperationStatus::Completed);
+    retaker.refresh().await.expect(StatusCode::OK);
 
     // Every old key is gone with no overlap, including the earlier retiring one.
     assert!(!harness.credential_works(&stolen_key.credential).await);
@@ -540,7 +546,8 @@ async fn retakes_are_bounded_per_device() {
             .await
             .expect(StatusCode::OK)
             .parse();
-        retaker.session = view.session.expect("session");
+        assert_eq!(view.status, OperationStatus::Completed);
+        retaker.refresh().await.expect(StatusCode::OK);
         code = retaker.code().await;
     }
     let late = Device::new(&harness, "late").await;

@@ -27,7 +27,9 @@ pub use models::{
     RelayKeyRow, RestoreRequest, RestoreRequestState, SessionState, TransitionKind,
 };
 pub use operations::CommitContext;
-pub use prepare::{LinkInput, OperationMeta, Prepared, RemoveInput, RestoreInput, RestoreProof};
+pub use prepare::{
+    LinkInput, OperationMeta, Prepared, RelayBudget, RemoveInput, RestoreInput, RestoreProof,
+};
 pub use refusal::Refusal;
 pub use requests::DecideInput;
 pub use retention::PurgeCounts;

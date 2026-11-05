@@ -173,6 +173,8 @@ pub struct Device {
     pub first_activated_at: Option<i64>,
     /// When it first received a relay key.
     pub first_key_at: Option<i64>,
+    /// The session generation of the last key issued.
+    pub key_generation: Option<i64>,
     /// The day it was last active, in days since the unix epoch.
     pub last_active_day: i64,
     /// Its last membership transition.

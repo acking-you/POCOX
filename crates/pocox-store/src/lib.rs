@@ -84,6 +84,20 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_charge_from_an_older_window_does_not_reset_a_budget() {
+        use pairing::BudgetVerdict;
+        let store = mem_store().await;
+        let charge = |now| store.charge_budget("budget", 3600, 2, now);
+        assert_eq!(charge(7200).await.expect("charge"), BudgetVerdict::Admitted);
+        assert_eq!(charge(7201).await.expect("charge"), BudgetVerdict::Admitted);
+        // A request that waited, or a clock that stepped back, counts against the
+        // window in progress rather than wiping it.
+        assert!(matches!(charge(3700).await.expect("charge"), BudgetVerdict::Refused { .. }));
+        assert!(matches!(charge(7202).await.expect("charge"), BudgetVerdict::Refused { .. }));
+        assert_eq!(charge(10800).await.expect("charge"), BudgetVerdict::Admitted);
+    }
+
+    #[tokio::test]
     async fn user_upsert_is_stable_across_logins() {
         let store = mem_store().await;
         let a = store

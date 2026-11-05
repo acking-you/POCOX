@@ -11,7 +11,7 @@ use crate::{Result, Store, StoreError};
 pub(super) const DEVICE_COLUMNS: &str =
     "id, user_id, label, platform, hardware_lookup, hardware_source, session_generation, \
      code_generation, code_lookup, code_issued_at, code_paused, code_pause_epoch, created_at, \
-     joined_at, activated_at, first_activated_at, first_key_at, last_active_day, \
+     joined_at, activated_at, first_activated_at, first_key_at, key_generation, last_active_day, \
      last_transition_kind, last_transition_at, pending_transition_id, retake_window_start, \
      retake_count";
 

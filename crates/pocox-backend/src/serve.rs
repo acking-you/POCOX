@@ -1,14 +1,15 @@
 //! The accept loop: wrap each connection in the configured TLS layer and hand
 //! it to the HTTP API (hyper).
 //!
-//! This listener faces the public, and pairing puts an anonymous surface on it,
-//! so a connection has to earn its file descriptor: there are caps in total and
-//! per address, hyper's header timer is running, and a failing `accept` backs
-//! off instead of spinning when descriptors run out.
+//! This listener faces the public, and pairing puts an anonymous surface on it.
+//! With pairing on, a connection has to earn its file descriptor: there are
+//! caps in total and per address, and timers on what it sends. With it off,
+//! connections are served as they always were. Either way a failing `accept`
+//! backs off instead of spinning when descriptors run out.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -46,7 +47,11 @@ const MAX_CONCURRENT_STREAMS: u32 = 64;
 const H2_KEEP_ALIVE: Duration = Duration::from_secs(30);
 const H2_KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(20);
 
-/// What one listener admits.
+/// How often refusals are logged at warn. A refusal can be someone's outage,
+/// but a flood of them must not become a flood of log lines.
+const REFUSAL_LOG_INTERVAL_SECS: i64 = 60;
+
+/// What one listener admits with pairing on.
 #[derive(Debug, Clone, Copy)]
 pub struct ConnectionLimits {
     /// Connections open at once.
@@ -55,7 +60,9 @@ pub struct ConnectionLimits {
     /// /64). A trusted proxy is exempt: all its clients share its address.
     pub per_address: usize,
     /// How long a client has to send a request's headers, which also ends an
-    /// idle HTTP/1 connection.
+    /// idle connection. Longer than any client's usual gap between
+    /// requests, whose poll intervals are multiples of 5 seconds or 6 + 5k,
+    /// so a poll does not race the close.
     pub header_read_timeout: Duration,
 }
 
@@ -64,7 +71,7 @@ impl Default for ConnectionLimits {
         Self {
             total: 8192,
             per_address: 128,
-            header_read_timeout: Duration::from_secs(15),
+            header_read_timeout: Duration::from_secs(18),
         }
     }
 }
@@ -74,6 +81,8 @@ struct ConnectionCounts {
     limits: ConnectionLimits,
     exempt: TrustedProxies,
     open: Mutex<(usize, HashMap<Vec<u8>, usize>)>,
+    refused: AtomicU64,
+    last_warned: AtomicI64,
 }
 
 /// One admitted connection. Dropping it gives the slot back.
@@ -83,18 +92,50 @@ struct Admitted {
 }
 
 impl ConnectionCounts {
+    fn new(limits: ConnectionLimits, exempt: TrustedProxies) -> Arc<Self> {
+        Arc::new(Self {
+            limits,
+            exempt,
+            open: Mutex::new((0, HashMap::new())),
+            refused: AtomicU64::new(0),
+            last_warned: AtomicI64::new(0),
+        })
+    }
+
+    /// Note a refusal, at warn no more than once per interval. An operator who
+    /// left a proxy out of `trusted_proxies` finds out here.
+    fn note_refusal(&self, peer: IpAddr) {
+        let refused = self.refused.fetch_add(1, Ordering::Relaxed) + 1;
+        let now = time::OffsetDateTime::now_utc().unix_timestamp();
+        let last = self.last_warned.load(Ordering::Relaxed);
+        if now - last >= REFUSAL_LOG_INTERVAL_SECS
+            && self
+                .last_warned
+                .compare_exchange(last, now, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+        {
+            tracing::warn!(
+                %peer,
+                refused,
+                "connection limit reached; is every proxy in trusted_proxies?"
+            );
+        }
+    }
+
     fn admit(self: &Arc<Self>, ip: IpAddr) -> Option<Admitted> {
         let bucket = (!self.exempt.contains(ip)).then(|| address_bucket(ip));
         let mut open = self.open.lock().expect("connection counts");
-        if open.0 >= self.limits.total {
+        let full = open.0 >= self.limits.total
+            || bucket.as_ref().is_some_and(|bucket| {
+                open.1.get(bucket).copied().unwrap_or(0) >= self.limits.per_address
+            });
+        if full {
+            drop(open);
+            self.note_refusal(ip);
             return None;
         }
         if let Some(bucket) = &bucket {
-            let from_address = open.1.entry(bucket.clone()).or_default();
-            if *from_address >= self.limits.per_address {
-                return None;
-            }
-            *from_address += 1;
+            *open.1.entry(bucket.clone()).or_default() += 1;
         }
         open.0 += 1;
         Some(Admitted {
@@ -143,18 +184,16 @@ async fn accept_tls(tls: &TlsKind, tcp: TcpStream) -> Option<Box<dyn Stream>> {
 /// Serve the HTTP API over the TLS layer, forever. Each request carries its
 /// socket peer as [`ConnectInfo`], in direct-TLS and plain modes alike, because
 /// per-address limits have nothing else to go on.
+///
+/// `limits` is `None` with pairing off: no caps and no timers, as before.
 pub async fn serve_http(
     listener: TcpListener,
     router: Router,
     tls: TlsKind,
-    limits: ConnectionLimits,
+    limits: Option<ConnectionLimits>,
     trusted_proxies: TrustedProxies,
 ) {
-    let counts = Arc::new(ConnectionCounts {
-        limits,
-        exempt: trusted_proxies,
-        open: Mutex::new((0, HashMap::new())),
-    });
+    let counts = limits.map(|limits| ConnectionCounts::new(limits, trusted_proxies));
     loop {
         let (tcp, peer) = match listener.accept().await {
             Ok(x) => x,
@@ -164,55 +203,65 @@ pub async fn serve_http(
                 continue;
             },
         };
-        let Some(admitted) = counts.admit(peer.ip()) else {
-            tracing::debug!("connection limit reached; closing a new connection");
-            continue;
+        let admitted = match &counts {
+            Some(counts) => match counts.admit(peer.ip()) {
+                Some(admitted) => Some(admitted),
+                None => continue,
+            },
+            None => None,
         };
         let tls = tls.clone();
         let router = router.clone();
         tokio::spawn(async move {
             let _admitted = admitted;
-            if let Some(stream) = accept_tls(&tls, tcp).await {
-                let io = TokioIo::new(stream);
-                let spoke = Arc::new(AtomicBool::new(false));
-                let heard = Arc::clone(&spoke);
-                let service = hyper::service::service_fn(move |mut request| {
-                    heard.store(true, Ordering::Relaxed);
-                    request.extensions_mut().insert(ConnectInfo(peer));
-                    router.clone().oneshot(request.map(axum::body::Body::new))
-                });
-                let mut builder = Builder::new(TokioExecutor::new());
-                builder
-                    .http1()
-                    .timer(TokioTimer::new())
-                    .header_read_timeout(limits.header_read_timeout);
-                builder
-                    .http2()
-                    .timer(TokioTimer::new())
-                    .max_concurrent_streams(MAX_CONCURRENT_STREAMS)
-                    .keep_alive_interval(H2_KEEP_ALIVE)
-                    .keep_alive_timeout(H2_KEEP_ALIVE_TIMEOUT);
-                let connection = builder.serve_connection_with_upgrades(io, service);
-                tokio::pin!(connection);
-                // Telling HTTP/1 from HTTP/2 waits for the first bytes with no timer of its
-                // own, and hyper's header timer starts only after that. A client that
-                // connects and says nothing is therefore closed here.
-                let first_words = tokio::time::sleep(limits.header_read_timeout);
-                let ended = tokio::select! {
-                    ended = connection.as_mut() => Some(ended),
-                    () = first_words => None,
-                };
-                let ended = match ended {
-                    Some(ended) => ended,
-                    None if spoke.load(Ordering::Relaxed) => connection.await,
-                    None => {
-                        tracing::debug!("closing a connection that sent nothing");
-                        return;
-                    },
-                };
-                if let Err(e) = ended {
+            let Some(stream) = accept_tls(&tls, tcp).await else {
+                return;
+            };
+            let io = TokioIo::new(stream);
+            let spoke = Arc::new(AtomicBool::new(false));
+            let heard = Arc::clone(&spoke);
+            let service = hyper::service::service_fn(move |mut request| {
+                heard.store(true, Ordering::Relaxed);
+                request.extensions_mut().insert(ConnectInfo(peer));
+                router.clone().oneshot(request.map(axum::body::Body::new))
+            });
+            let mut builder = Builder::new(TokioExecutor::new());
+            let Some(limits) = limits else {
+                if let Err(e) = builder.serve_connection_with_upgrades(io, service).await {
                     tracing::debug!(error = %e, "http connection ended");
                 }
+                return;
+            };
+            builder
+                .http1()
+                .timer(TokioTimer::new())
+                .header_read_timeout(limits.header_read_timeout);
+            builder
+                .http2()
+                .timer(TokioTimer::new())
+                .max_concurrent_streams(MAX_CONCURRENT_STREAMS)
+                .keep_alive_interval(H2_KEEP_ALIVE)
+                .keep_alive_timeout(H2_KEEP_ALIVE_TIMEOUT);
+            let connection = builder.serve_connection_with_upgrades(io, service);
+            tokio::pin!(connection);
+            // Telling HTTP/1 from HTTP/2 waits for the first bytes with no timer of its
+            // own, and hyper's header timer starts only after that. A client that
+            // connects and says nothing is therefore closed here.
+            let first_words = tokio::time::sleep(limits.header_read_timeout);
+            let ended = tokio::select! {
+                ended = connection.as_mut() => Some(ended),
+                () = first_words => None,
+            };
+            let ended = match ended {
+                Some(ended) => ended,
+                None if spoke.load(Ordering::Relaxed) => connection.await,
+                None => {
+                    tracing::debug!("closing a connection that sent nothing");
+                    return;
+                },
+            };
+            if let Err(e) = ended {
+                tracing::debug!(error = %e, "http connection ended");
             }
         });
     }

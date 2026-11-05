@@ -17,6 +17,7 @@
 //! - A retiring session only ever gets its own generation's existing key, with
 //!   no more than the time it has left. A current key is never shortened.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use pocox_account_proto::http::RelayCredentialResponse;
@@ -25,11 +26,12 @@ use pocox_account_proto::pairing::PairingErrorCode;
 use pocox_auth::{DeviceCaller, SessionMode};
 use pocox_pb::{IssuedCredential, RelayStatus};
 use pocox_store::pairing::{GrantFate, KeyAnswer, KeyState, NamespaceClaim, NewGrant, RelayKeyRow};
+use tokio::sync::OwnedMutexGuard;
 use uuid::Uuid;
 
 use super::error::{PairingError, PairingResult};
 use super::relay::{KeyCheck, RelayFailure};
-use super::service::{unix_now, CachedCredential, ClientBucket, CredentialKey, Pairing};
+use super::service::{unix_now, CachedCredential, ClientBucket, CredentialKey, NewKey, Pairing};
 
 /// The relay refuses a shorter lifetime.
 pub(super) const MIN_KEY_TTL_SECS: i64 = 10;
@@ -86,31 +88,51 @@ pub(super) fn expires_as_i64(expires_at: u64) -> i64 {
 }
 
 impl Pairing {
-    /// `GET /v1/relay` for a device session, bounded: a relay that says nothing
-    /// gets a 503 rather than holding this request's slot. A grant cut
-    /// short here stays open and is found again by label.
+    /// `GET /v1/relay` for a device session.
+    ///
+    /// The work is its own task, which the request waits on for a bounded time.
+    /// A renewal is a relay write, and the relay repeats a credential only
+    /// then, so a client closing between the relay's answer and this
+    /// backend remembering it must not throw that write away for the next
+    /// request to repeat. A relay that says nothing gets a 503 rather than
+    /// holding this request's slot.
     pub(crate) async fn relay_credential(
-        &self,
-        caller: &DeviceCaller,
+        self: &Arc<Self>,
+        caller: Box<DeviceCaller>,
         bucket: ClientBucket,
     ) -> PairingResult<RelayCredentialResponse> {
-        let work = async {
+        let namespace = NamespacedServiceId::namespace_of(&caller.access.user.id);
+        let pairing = Arc::clone(self);
+        let task = tokio::spawn(async move {
             match caller.mode {
-                SessionMode::Current => self.current_credential(caller, bucket).await,
+                SessionMode::Current => pairing.current_credential(&caller, bucket).await,
                 SessionMode::Retiring {
                     deadline,
-                } => self.retiring_credential(caller, deadline).await,
+                } => pairing.retiring_credential(&caller, deadline).await,
             }
-        };
-        let (credential, expires_at) = tokio::time::timeout(self.settings.foreground_wait, work)
-            .await
-            .map_err(|_| PairingError::retry_later(PairingErrorCode::RelayUnavailable, 5))??;
+        });
+        let (credential, expires_at) =
+            match tokio::time::timeout(self.settings.foreground_wait, task).await {
+                Ok(Ok(result)) => result?,
+                Ok(Err(panicked)) => return Err(PairingError::internal(panicked)),
+                Err(_) => {
+                    return Err(PairingError::retry_later(PairingErrorCode::RelayUnavailable, 5));
+                },
+            };
         Ok(RelayCredentialResponse {
             relay_addr: self.relay.relay_addr.clone(),
             credential,
             expires_at,
-            namespace: NamespacedServiceId::namespace_of(&caller.access.user.id),
+            namespace,
         })
+    }
+
+    /// The device's lock, or a retry-later. Whoever holds it is already doing
+    /// what this request would, and waiting would only hold a global slot.
+    fn device_lock_or_retry(&self, device_id: &str) -> PairingResult<OwnedMutexGuard<()>> {
+        self.device_locks
+            .try_acquire(device_id)
+            .ok_or_else(|| PairingError::retry_later(PairingErrorCode::RateLimited, 1))
     }
 
     fn key_ttl(&self, group_size: i64) -> Duration {
@@ -194,9 +216,9 @@ impl Pairing {
         if let Some(hit) = self.cached_current(&cache_key, known_instance, margin) {
             return Ok(hit);
         }
-        let _device_guard = self.device_locks.acquire(&device.id).await;
+        let _device_guard = self.device_lock_or_retry(&device.id)?;
         // Under the lock nothing else is granting for this device, but a transition
-        // may have begun while this request waited for it.
+        // may have begun since this request was authenticated.
         let latest = self
             .store
             .device_access(&device.id, generation)
@@ -209,7 +231,24 @@ impl Pairing {
             latest.device.activated_at.is_some(),
             latest.device.pending_transition_id.is_some(),
         )?;
-        let status = self.fresh_status().await?;
+        let row = self.store.generation_key(&device.id, generation).await?;
+        // Renewing a key on record is free: once done it is cached, so a client cannot
+        // force it. Anything else pays per device before the relay is asked
+        // anything, status reads and label walks included, so a refused device
+        // costs the relay nothing per request.
+        let metered = row.as_ref().is_none_or(|row| row.key_id.is_none());
+        if metered {
+            self.limit_grant_attempts(&device.id, unix_now())?;
+        }
+        let status = match self.fresh_status().await {
+            Ok(status) => status,
+            Err(failure) => {
+                if metered {
+                    self.refund_grant_attempt(&device.id);
+                }
+                return Err(failure.into());
+            },
+        };
         if !status.supports_key_namespaces {
             return Err(PairingError::code(PairingErrorCode::RelayTooOld));
         }
@@ -217,7 +256,7 @@ impl Pairing {
         if let Some(hit) = self.cached_current(&cache_key, Some(&instance), margin) {
             return Ok(hit);
         }
-        if let Some(row) = self.store.generation_key(&device.id, generation).await? {
+        if let Some(row) = row {
             if row.relay_instance != instance {
                 // Key ids started over, so this id means nothing here. Calling the
                 // relay with it would act on whichever key holds it now.
@@ -229,6 +268,9 @@ impl Pairing {
                 self.remember_credential(&cache_key, &found, &instance, false);
                 return Ok((found.credential, found.expires_at));
             }
+        }
+        if !metered {
+            self.limit_grant_attempts(&device.id, unix_now())?;
         }
         let issued = self.grant_new_key(&latest, ttl, &status, bucket).await?;
         self.remember_credential(&cache_key, &issued, &instance, false);
@@ -252,7 +294,6 @@ impl Pairing {
                     // Absent after a repeated walk: the relay never applied it. Keep
                     // the grant and label, so a crash during this issue is still
                     // recoverable the same way.
-                    self.limit_grant_attempts(&row.device_id, unix_now())?;
                     return self.issue_for_grant(&row, ttl).await.map(Some);
                 },
             },
@@ -366,10 +407,23 @@ impl Pairing {
         if self.store.pairing_key_slots(now).await? >= slot_limit {
             return Err(pocox_store::Refusal::CapacityFull.into());
         }
-        self.limit_grant_attempts(&device.id, now)?;
-        let namespace = self.ensure_namespace(&access.user.id, now).await?;
-        let first = !self.store.device_had_key(&device.id).await?;
-        self.charge_new_key(first, bucket, now).await?;
+        // A failed allocation issued nothing, so it spends no attempt and no key
+        // budget.
+        let namespace = match self.ensure_namespace(&access.user.id, now).await {
+            Ok(namespace) => namespace,
+            Err(error) => {
+                self.refund_grant_attempt(&device.id);
+                return Err(error);
+            },
+        };
+        let kind = if device.key_generation == Some(access.session.generation) {
+            NewKey::Replacement
+        } else if self.store.device_had_key(&device.id).await? {
+            NewKey::AfterMove
+        } else {
+            NewKey::First
+        };
+        self.charge_new_key(kind, bucket, now).await?;
         let grant_id = Uuid::new_v4().simple().to_string()[..16].to_string();
         let label = grant_label(&device.id, access.session.generation, &grant_id);
         let opened = self
@@ -389,11 +443,18 @@ impl Pairing {
         let row = match opened {
             Ok(row) => row,
             Err(error) => {
-                self.refund_new_key(first, bucket, now).await;
+                self.refund_new_key(kind, bucket, now).await;
                 return Err(error.into());
             },
         };
-        self.issue_for_grant(&row, ttl).await
+        let issued = self.issue_for_grant(&row, ttl).await;
+        if let Err(error) = &issued {
+            // The relay's table was full: it issued nothing, and this slot was never taken.
+            if error.refusal_code() == Some(PairingErrorCode::RelayCapacity) {
+                self.refund_new_key(kind, bucket, now).await;
+            }
+        }
+        issued
     }
 
     /// Ask the relay for this grant's key.
@@ -532,17 +593,26 @@ impl Pairing {
             device_id: device_id.clone(),
             generation,
         };
+        // A key that has ended or died with its instance is no answer, however recently
+        // it was recovered.
+        let known = self.known_status().await;
         let cached = || {
             let credentials = self.credentials.lock().expect("credential cache");
             credentials
                 .get(&cache_key)
-                .filter(|entry| entry.retiring)
+                .filter(|entry| {
+                    entry.retiring
+                        && entry.expires_at > unix_now().max(0) as u64
+                        && known
+                            .as_ref()
+                            .is_none_or(|status| status.instance_id == entry.relay_instance)
+                })
                 .map(|entry| (entry.credential.clone(), entry.expires_at))
         };
         if let Some(hit) = cached() {
             return Ok(hit);
         }
-        let _device_guard = self.device_locks.acquire(device_id).await;
+        let _device_guard = self.device_lock_or_retry(device_id)?;
         if let Some(hit) = cached() {
             return Ok(hit);
         }
@@ -551,6 +621,15 @@ impl Pairing {
             .generation_key(device_id, generation)
             .await?
             .ok_or_else(gone)?;
+        let end = [Some(deadline), row.hard_cutoff, row.local_end]
+            .into_iter()
+            .flatten()
+            .min()
+            .unwrap_or(deadline);
+        // Past saving, so there is nothing to ask the relay.
+        if end - unix_now() < MIN_KEY_TTL_SECS {
+            return Err(gone());
+        }
         let instance = self.fresh_status().await?.instance_id;
         if row.relay_instance != instance {
             self.store
@@ -581,13 +660,7 @@ impl Pairing {
                 return Err(gone());
             },
         }
-        let end = [Some(deadline), row.hard_cutoff, row.local_end]
-            .into_iter()
-            .flatten()
-            .min()
-            .unwrap_or(deadline);
-        let started = unix_now();
-        let remaining = end - started;
+        let remaining = end - unix_now();
         if remaining < MIN_KEY_TTL_SECS {
             return Err(gone());
         }

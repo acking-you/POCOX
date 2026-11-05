@@ -147,7 +147,9 @@ async fn a_device_with_peers_leaves_only_by_explicit_confirmation_and_groups_nev
         .await
         .expect(StatusCode::OK)
         .parse();
-    assert_eq!(moved.session.expect("session").account_id, c.user());
+    assert_eq!(moved.status, OperationStatus::Completed);
+    b.refresh().await.expect(StatusCode::OK);
+    assert_eq!(b.user(), c.user());
 
     // Only b moved: its old peer stays where it was, and d's group gained only b.
     let list = a.get("/v1/devices").await.expect(StatusCode::OK);
@@ -337,7 +339,8 @@ async fn an_operation_id_is_idempotent_and_bound_to_its_input() {
         .await
         .expect(StatusCode::OK)
         .parse();
-    let moved = first.session.expect("session");
+    assert_eq!(first.status, OperationStatus::Completed);
+    assert!(first.session.is_none(), "a JWT never gets another JWT");
 
     // The old session is gone with its generation; the secret reads the result.
     b.link_with(&preview.ticket, &id, false)
@@ -346,11 +349,11 @@ async fn an_operation_id_is_idempotent_and_bound_to_its_input() {
     let read: OperationView = b.operation(&id).await.expect(StatusCode::OK).parse();
     assert_eq!(read.status, OperationStatus::Completed);
     let session = read.session.expect("a current secret gets a fresh session");
-    assert_eq!(session.account_id, moved.account_id);
-    assert_ne!(session.token, moved.token, "a result stores no bearer material");
+    assert_eq!(session.account_id, a.user());
 
     // A duplicate after refreshing reads the result and applies nothing.
     b.refresh().await.expect(StatusCode::OK);
+    assert_ne!(session.token, b.token(), "a result stores no bearer material");
     let generation = b.session.generation;
     let again: OperationView = b
         .link_with(&preview.ticket, &id, false)

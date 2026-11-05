@@ -26,9 +26,11 @@ github_scope = "read:user"
 # Uncomment + set when enabling web login:
 #public_url = "https://lb7666.top:8443"
 
-# Proxies whose X-Forwarded-For is believed for pairing's per-address limits, as IPs
-# or CIDR ranges. Only list one whose ingress is restricted and that overwrites that
-# header. Leave unset when clients reach this backend directly.
+# With pairing enabled, list every proxy in front of this backend, as IPs or CIDR
+# ranges. The list decides whose X-Forwarded-For is believed for per-address limits,
+# so only list one whose ingress is restricted and that overwrites that header. It
+# also exempts that proxy from the 128-connection cap per address: an unlisted proxy
+# shares one cap among all its users. Leave unset when clients connect directly.
 #trusted_proxies = ["127.0.0.1"]
 
 # Session lifetimes.

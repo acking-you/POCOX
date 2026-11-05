@@ -26,7 +26,8 @@ async fn replace<'h>(harness: &'h Harness, code: &str, target: &str) -> Device<'
         .await
         .expect(StatusCode::OK)
         .parse();
-    device.session = view.session.expect("a session for the restored device");
+    assert!(view.session.is_none(), "a JWT never gets another JWT");
+    device.refresh().await.expect(StatusCode::OK);
     device
 }
 
@@ -214,4 +215,34 @@ async fn first_key_id(harness: &Harness, label: &str) -> u64 {
         .find(|key| key.label.as_deref() == Some(label))
         .expect("listed")
         .key_id
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_key_with_less_left_than_the_overlap_is_not_lengthened() {
+    // A single device's keys here last 900 seconds, and this overlap is longer.
+    let harness = Harness::with_settings(overlapping(1200)).await;
+    let old = Device::activated(&harness, "old").await;
+    old.relay_key().await;
+    let label = harness
+        .store
+        .generation_key(old.id(), old.session.generation)
+        .await
+        .expect("row")
+        .expect("key")
+        .label;
+    let before = key_row_expiry(&harness, &label).await;
+    let code = old.code().await;
+
+    replace(&harness, &code, old.id()).await;
+    assert_eq!(
+        key_row_expiry(&harness, &label).await,
+        before,
+        "the relay was not asked to move it"
+    );
+
+    // Its session recovers the credential, and the renewal that takes stays within
+    // the key's own end, not the longer overlap.
+    let retiring = old.relay_key().await;
+    assert!(retiring.expires_at <= before + 1, "{} vs {before}", retiring.expires_at);
+    assert!(key_row_expiry(&harness, &label).await <= before + 1);
 }

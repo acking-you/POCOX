@@ -49,17 +49,23 @@ pub struct PairingLimits {
     pub first_keys_per_address: Rate,
     /// First relay keys across the backend.
     pub first_keys_backend: Rate,
-    /// Later relay keys across the backend. Renewing an existing key is free.
+    /// Keys for a device that moved, per address.
+    pub key_regrants_per_address: Rate,
+    /// Keys for a device that moved, across the backend. Renewing an existing
+    /// key, or replacing one that merely ended, is outside this budget.
     pub key_regrants_backend: Rate,
-    /// Relay issues per device, whatever kept the last one from sticking.
+    /// Attempts at a key per device, whatever kept the last one from sticking.
     pub key_grants_per_device: Rate,
     /// Namespaces allocated across the backend.
     pub namespace_allocations_backend: Rate,
     /// Links, leaves, removals and restores per device.
     pub moves_per_device: Rate,
-    /// Links, leaves, removals and restores per address.
+    /// Links and restores per address. A removal or leave is not limited by
+    /// address, so whoever shares yours cannot stop you removing an
+    /// intruder.
     pub moves_per_address: Rate,
-    /// Links, leaves, removals and restores across the backend.
+    /// Links owing relay work, across the backend. Nothing else draws from
+    /// this, so spending it cannot stop a removal, a leave or a recovery.
     pub moves_backend: Rate,
     /// Service deregistrations per device.
     pub deregistrations_per_device: Rate,
@@ -87,6 +93,7 @@ impl Default for PairingLimits {
             new_devices_backend: Rate::new(1000, 3600),
             first_keys_per_address: Rate::new(10, 3600),
             first_keys_backend: Rate::new(1000, 3600),
+            key_regrants_per_address: Rate::new(120, 3600),
             key_regrants_backend: Rate::new(3600, 3600),
             key_grants_per_device: Rate::new(30, 3600),
             namespace_allocations_backend: Rate::new(1000, 3600),
@@ -197,11 +204,16 @@ impl AddressLimiter {
         Ok(())
     }
 
-    /// Give back one charge: the attempt turned out to prove a valid code.
+    /// Give back one charge. A counter with nothing left on it goes, or free
+    /// refused attempts from new addresses would fill the table and lock
+    /// everyone else out.
     pub fn refund(&self, key: [u8; 16]) {
         let mut slots = self.slots.lock().expect("limiter lock");
         if let Some(slot) = slots.get_mut(&key) {
             slot.used = (slot.used - 1).max(0);
+            if slot.used == 0 && slot.penalty == 0 {
+                slots.remove(&key);
+            }
         }
     }
 }
@@ -240,6 +252,24 @@ mod tests {
         assert_eq!(limiter.charge([2; 16], 1), Err(60), "no room while the entry is live");
         assert_eq!(limiter.charge(KEY, 2), Err(98), "and the live count survives");
         assert_eq!(limiter.charge([2; 16], 100), Ok(()), "an expired entry makes room");
+    }
+
+    #[test]
+    fn a_refund_leaves_nothing_behind_that_could_fill_the_table() {
+        let limiter = AddressLimiter::new(Rate::new(2, 100), 1);
+        assert_eq!(limiter.charge(KEY, 0), Ok(()));
+        limiter.refund(KEY);
+        assert_eq!(limiter.charge([2; 16], 1), Ok(()), "the refunded address left no entry");
+
+        // One that has been backed off keeps its entry, or a refund would forgive it.
+        let limiter = AddressLimiter::with_backoff(Rate::new(1, 100), 10);
+        assert_eq!(limiter.charge(KEY, 0), Ok(()));
+        assert_eq!(limiter.charge(KEY, 100), Ok(()));
+        assert_eq!(limiter.charge(KEY, 101), Err(199));
+        assert_eq!(limiter.charge(KEY, 300), Ok(()));
+        limiter.refund(KEY);
+        assert_eq!(limiter.charge(KEY, 301), Ok(()));
+        assert_eq!(limiter.charge(KEY, 302), Err(398), "the longer window still stands");
     }
 
     #[test]

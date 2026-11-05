@@ -11,7 +11,6 @@ use pocox_account_proto::pairing::{
 use pocox_store::pairing::{OperationKind, OperationMeta, RemoveInput};
 use serde::Deserialize;
 
-use super::address::PeerAddr;
 use super::error::{PairingError, PairingResult};
 use super::routes::{gate, now, require_current, require_operation_id, PairJson};
 use super::service::fingerprint;
@@ -108,7 +107,6 @@ pub(super) struct RemoveQuery {
 /// completion.
 pub(super) async fn remove(
     State(state): State<AppState>,
-    PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<RemoveQuery>,
@@ -122,13 +120,12 @@ pub(super) async fn remove(
     let hash = caller.access.session.secret_hash.clone();
     let print = fingerprint(OperationKind::Remove.as_str(), &hash, &[id.as_bytes()]);
     if let Some(operation) = pairing.replay(&operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation, false).await;
+        return pairing.respond_to_operation(&operation).await;
     }
     pairing.require_capable_relay().await?;
     let at = now();
-    let bucket = pairing.client_bucket(peer, &headers);
     let prepared = pairing
-        .metered_prepare(&caller.access.device.id, bucket, at, || {
+        .metered_prepare(&caller.access.device.id, None, at, || {
             pairing.store.prepare_remove(RemoveInput {
                 meta: OperationMeta {
                     id: &operation_id,

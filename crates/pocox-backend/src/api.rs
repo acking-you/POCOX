@@ -94,7 +94,7 @@ type ApiResult<T> = Result<T, ApiError>;
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
-            ApiError::Pairing(error) => return error.into_response(),
+            ApiError::Pairing(error) => return no_store(error.into_response()),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             ApiError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg),
@@ -142,10 +142,15 @@ enum Caller {
 
 async fn authed(state: &AppState, headers: &HeaderMap) -> ApiResult<Caller> {
     let token = bearer(headers).ok_or(ApiError::Unauthorized)?;
-    let claims = state
-        .auth
-        .verify(token)
-        .map_err(|_| ApiError::Unauthorized)?;
+    // A pairing client asked, so it gets the code that says to refresh. GitHub
+    // clients send no such header, and their answer stays what it always was.
+    let claims = state.auth.verify(token).map_err(|_| {
+        if pairing::check_protocol(headers).is_ok() {
+            ApiError::Pairing(PairingError::code(PairingErrorCode::SessionStale))
+        } else {
+            ApiError::Unauthorized
+        }
+    })?;
     if !pairing::is_device_token(&claims) {
         return Ok(Caller::GitHub(claims));
     }
@@ -546,7 +551,7 @@ async fn relay_credential(
             pairing::check_protocol(&headers)?;
             let _slot = service.enter()?;
             let bucket = service.client_bucket(peer, &headers);
-            return Ok(no_store(Json(service.relay_credential(&caller, bucket).await?)));
+            return Ok(no_store(Json(service.relay_credential(caller, bucket).await?)));
         },
     };
     let (credential, expires_at) = state

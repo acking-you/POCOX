@@ -177,7 +177,7 @@ pub(super) async fn confirm(
             .map_or(&b""[..], |hint| hint.key.as_bytes()),
     ]);
     if let Some(operation) = pairing.replay(&request.operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation, false).await;
+        return pairing.respond_to_operation(&operation).await;
     }
     pairing.require_capable_relay().await?;
     let at = now();
@@ -232,7 +232,7 @@ pub(super) async fn confirm(
             _ => return Err(invalid()),
         };
     let prepared = pairing
-        .metered_prepare(&caller.access.device.id, bucket, at, || {
+        .metered_prepare(&caller.access.device.id, Some(bucket), at, || {
             pairing.store.prepare_restore(RestoreInput {
                 meta: OperationMeta {
                     id: &request.operation_id,

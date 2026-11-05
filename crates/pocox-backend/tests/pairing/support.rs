@@ -165,7 +165,7 @@ async fn serve(
     let server = tokio::spawn(pocox_backend::serve_plain(
         listener,
         app,
-        pocox_backend::ConnectionLimits::default(),
+        Some(pocox_backend::ConnectionLimits::default()),
         trusted,
     ));
     (format!("http://{addr}"), server)
@@ -510,10 +510,8 @@ impl<'h> Device<'h> {
             .await
             .expect(StatusCode::OK)
             .parse();
-        self.session = view
-            .session
-            .clone()
-            .expect("a completed link carries a session");
+        assert!(view.session.is_none(), "a response to a JWT never carries a session");
+        self.refresh().await.expect(StatusCode::OK);
         view
     }
 

@@ -186,9 +186,12 @@ impl Store {
         .fetch_optional(&mut *tx)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
+        // A renewal racing a restore can land after that restore set this key's cutoff.
+        // Then the key runs past it, and the cutoff is owed again.
         sqlx::query(
             "UPDATE device_relay_keys SET key_id = ?2, expires_at = ?3, local_end = ?4, state = \
-             'active', updated_at = ?5 WHERE grant_id = ?1",
+             'active', cutoff_pending = CASE WHEN hard_cutoff IS NOT NULL AND ?4 > hard_cutoff \
+             THEN 1 ELSE cutoff_pending END, updated_at = ?5 WHERE grant_id = ?1",
         )
         .bind(grant_id)
         .bind(answer.key_id)
@@ -204,10 +207,12 @@ impl Store {
                     && device.pending_transition_id.is_none() =>
             {
                 sqlx::query(
-                    "UPDATE devices SET first_key_at = COALESCE(first_key_at, ?2) WHERE id = ?1",
+                    "UPDATE devices SET first_key_at = COALESCE(first_key_at, ?2), key_generation \
+                     = ?3 WHERE id = ?1",
                 )
                 .bind(&row.device_id)
                 .bind(answer.now)
+                .bind(row.generation)
                 .execute(&mut *tx)
                 .await?;
                 GrantFate::Expose
@@ -340,7 +345,7 @@ impl Store {
         Ok(count)
     }
 
-    /// Whether this device has ever held a relay key.
+    /// Whether this device has ever held a relay key, or come close.
     pub async fn device_had_key(&self, device_id: &str) -> Result<bool> {
         let (first, any): (Option<i64>, i64) = sqlx::query_as(
             "SELECT (SELECT first_key_at FROM devices WHERE id = ?1),

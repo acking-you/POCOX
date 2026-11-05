@@ -250,8 +250,62 @@ async fn a_recovered_credential_with_an_unexpected_identity_is_never_exposed() {
         .expect("row");
     assert_eq!(original.state, KeyState::Dead);
     let live = harness.live_keys().await;
-    assert!(live.iter().any(|key| key.key_id == foreign.key_id), "and it is not revoked either");
+    let still = live
+        .iter()
+        .find(|key| key.key_id == foreign.key_id)
+        .expect("and it is not revoked either");
+    assert_eq!(still.expires_at, foreign.expires_at, "nor renewed");
     assert!(harness.credential_works(&got.credential).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_retiring_session_with_a_foreign_key_id_gets_nothing_and_touches_nothing() {
+    let harness = Harness::start().await;
+    let old = Device::activated(&harness, "old").await;
+    old.relay_key().await;
+    let row = harness
+        .store
+        .generation_key(old.id(), old.session.generation)
+        .await
+        .expect("row")
+        .expect("key");
+    let code = old.code().await;
+    let new = Device::new(&harness, "new").await;
+    new.restore_by_code(&code, old.id(), "restore")
+        .await
+        .expect(StatusCode::OK);
+
+    let foreign = pocox_pb::issue_credential(
+        &harness.admin(),
+        Duration::from_secs(600),
+        Some("another-tenant".to_string()),
+    )
+    .await
+    .expect("foreign key");
+    sqlx::query("UPDATE device_relay_keys SET key_id = ?1 WHERE grant_id = ?2")
+        .bind(foreign.key_id.to_string())
+        .bind(&row.grant_id)
+        .execute(harness.store.pool())
+        .await
+        .expect("edit");
+    harness.relaunch().await;
+
+    old.get("/v1/relay")
+        .await
+        .expect_error(StatusCode::GONE, "retiring_key_gone");
+    let live = harness.live_keys().await;
+    let still = live
+        .iter()
+        .find(|key| key.key_id == foreign.key_id)
+        .expect("not revoked");
+    assert_eq!(still.expires_at, foreign.expires_at, "not renewed");
+    let ended = harness
+        .store
+        .grant(&row.grant_id)
+        .await
+        .expect("row")
+        .expect("row");
+    assert_eq!(ended.state, KeyState::Dead);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]

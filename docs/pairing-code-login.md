@@ -406,14 +406,15 @@ Details a client depends on:
 - `GET /v1/pair/operations/{id}` takes the device secret itself as the bearer value,
   because the JWT may already be dead by then.
 - `DELETE /v1/devices/{id}` takes its operation id as `?operation_id=`.
-- **A session comes back only when the secret proved it or the device really moved**: on
-  `GET /v1/pair/operations/{id}`, because the presented secret is current right now, and on the
-  response of the request that moved this device, whose old JWT it just killed. A no-op, a replay
-  and a removal of a peer carry none, or a JWT could renew itself and a restored `config.toml`
-  would never expire. Sessions are issued for that one response, never stored.
+- **Only the secret gets a session**: `POST /auth/refresh`, `POST /v1/pair/device` and
+  `GET /v1/pair/operations/{id}`, because the presented secret is current right now. A response to a
+  JWT never carries one, even when that request really moved the device, or a JWT could live forever
+  by cycling link and leave and a restored `config.toml` would never expire. **After any completed
+  mutation the client refreshes.** Sessions are issued for that one response, never stored.
 - A link to a device already in this user is a no-op that still activates this device, binds
-  its hint and cancels its requests, because the user confirmed that group. It carries no session,
-  so refresh to see `activated`.
+  its hint and cancels its requests, because the user confirmed that group.
+- `GET /v1/relay` answers 429 `rate_limited` with `Retry-After: 1` while another request is working on
+  this device, rather than queueing.
 - Last-active days are days since the unix epoch. Operation ids are 16 to 64 URL-safe
   characters chosen by the client.
 
@@ -576,9 +577,9 @@ if it changed, require a new preview and leave the source membership intact.
 Once any relay call may have been made, the subject gets a fresh generation there
 rather than its old one back: a shortened or revoked key is not restored, and the old
 generation keeps only the deadline it had. Whatever cutoff that operation put on a key stays
-owed: the worker enforces it on every pass until the relay confirms, so a failed retake leaves a
-suspect device no relay access, and an old key never runs on to its full life. Before any relay
-call, the transition mark is simply undone. Keep empty source users until no operation or
+owed: the worker enforces it on every pass until the relay confirms, so an old key never runs on to
+its full life. A failed retake therefore still ends the old key, and the secret stays current until
+a retake succeeds. Before any relay call, the transition mark is simply undone. Keep empty source users until no operation or
 potentially live old key refers to them. Client cache clearing is not server-side revocation.
 
 Membership changes are **serialized per group**: while an operation is open on a user,
@@ -613,11 +614,23 @@ bound and goes on without one, so a removal still persists and ends the old sess
 answers 202. `GET /v1/relay` and a device's service routes are bounded by the 5-second foreground
 wait and answer `relay_unavailable`. A status known to be too old still refuses.
 
+`GET /v1/relay` does its work in a task of its own that the request waits on, so a client closing
+between the relay's answer and the backend remembering it cannot throw away a relay write for the
+next request to repeat. It never queues on its device's lock while holding a global slot.
+
 **What a device can make the relay do is metered**, because the relay's replay window holds 65,536
 administrator writes per 10 minutes for the whole backend, GitHub included, and every write takes a
 slot before it is checked. Renewing an existing key stays free: the credential is cached until its
 renewal margin, so a client cannot force it. A retiring session's credential is cached too, however
-often it asks. `DELETE /v1/services/..` for a device reads a listing first, and a service that is not
+often it asks. A device with no key on record pays per device before the relay is asked anything,
+status reads and label walks included, so once refused it costs the relay nothing per request.
+
+**A shared budget must not stop anyone defending themselves.** Only a link owing the relay work
+draws from the backend-wide move budget, inside the transaction that decides it is owed. A no-op,
+a device with no keys, a leave, a removal and a recovery never do, each of the last three needing a
+peer or a code some metered step already paid for. Replacing a key that merely ended, in the same
+generation, is outside the key budgets too: a laptop that slept past its one-hour key, or every
+device after a relay reset, cannot be starved by a fleet. `DELETE /v1/services/..` for a device reads a listing first, and a service that is not
 there costs no write. `GET /v1/services` for a device reads one listing shared across all devices for
 3 seconds, so a service can take that long to appear. The limits are in the
 [table](#limits-and-transport).
@@ -666,17 +679,17 @@ or reconnection of unaffected peers is required.
 | `POST /v1/pair/device` per address | 20 new operations per hour; idempotent retries do not create rows |
 | First relay key per address | 10 per hour, activated devices only |
 | First relay keys across the backend | 1,000 per hour, charged once a namespace exists, so a failed allocation costs none |
-| Later relay keys across the backend | 3,600 per hour. Renewing an existing key is free |
-| Relay issues per device | 30 per hour |
+| Keys after a move | 120 per hour per address and 3,600 across the backend. Renewing a key, or replacing one that merely ended, is outside this |
+| Attempts at a key per device | 30 per hour, charged before the relay is asked anything; a failed allocation gets it back. Renewal is free |
 | Namespace allocations across the backend | 1,000 per hour |
-| Links, leaves, removals and restores | 20 per hour per device, 60 per address and 1,000 across the backend. A refused or replayed one costs nothing; a no-op counts |
+| Links, leaves, removals and restores | 20 per hour per device. Links and restores also 60 per address. Links owing the relay work also 1,000 across the backend. A refused or replayed one costs nothing; a no-op counts per device |
 | Service deregistrations | 30 per 10 minutes per device, 60 per address; those reaching the relay, 600 per 10 minutes across the backend |
 | Pairing keys' share of relay capacity | 50%; past it, 503 `relay_capacity` before side effects. Operators can raise `PB_MAPPER_AUTH_MAX_TEMP_KEYS`. |
 | Pending recovery requests | At most 3 per target, plus 1,000 new requests per hour across the backend |
 | New devices across the backend | 1,000 per hour |
 | Group size | 64 devices |
 | Concurrent device requests, pairing routes and a device's `/v1/relay` and `/v1/services*` | 256, past which 429. A body is read before taking a slot, under its own 5-second bound; relay grants in flight, 16 |
-| Connections | 8,192 in total and 128 per address, trusted proxies exempt. A client has 15 seconds to send its first request's headers, which also ends an idle HTTP/1 connection |
+| Connections, with pairing on | 8,192 in total and 128 per address, trusted proxies exempt, so every proxy must be listed. A client has 18 seconds to send a request's headers, which also ends an idle connection. Refusals are logged at warn, at most once a minute. With pairing off none of this applies |
 | Rotation | Once per 24 hours per device; an authorized retake may skip the wait, at most 3 times per device per 24 hours |
 
 An address is one IPv4 address or one IPv6 /64, since a single host commonly controls

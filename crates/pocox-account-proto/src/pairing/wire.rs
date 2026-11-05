@@ -385,11 +385,11 @@ pub struct OperationView {
     /// Why it failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<PairingErrorCode>,
-    /// A session freshly issued for this response, never stored. Present on
-    /// `GET /v1/pair/operations/{id}` when the presented secret is current and
-    /// idle, and on the response of the request that really moved this
-    /// device. A no-op, a replay or a removal of a peer carries none:
-    /// refresh with the secret.
+    /// A session freshly issued for this response, never stored. Present only
+    /// on `GET /v1/pair/operations/{id}`, whose bearer is the device
+    /// secret, when that secret is current and idle. A response to a
+    /// mutation never carries one: refresh with the secret after any
+    /// completed mutation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<DeviceSession>,
 }
