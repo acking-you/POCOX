@@ -89,6 +89,7 @@ fn cfg(web: bool) -> Config {
         jwt_ttl_secs: 3600,
         refresh_ttl_secs: 1000,
         web_callback_url: web.then(|| "https://lb7666.top:8443/auth/web/callback".to_string()),
+        pairing_secret: None,
     }
 }
 
@@ -161,7 +162,7 @@ async fn device_flow_authorizes_after_github_approval() {
     assert_eq!(credential.account_id.as_deref(), Some("42"));
     let claims = auth.verify(&credential.token).expect("session jwt");
     assert_eq!(claims.login, "octocat");
-    assert_eq!(claims.gh_id, 42);
+    assert_eq!(claims.gh_id, Some(42));
     assert_eq!(github.token_polls(), 3);
 
     let consumed = auth

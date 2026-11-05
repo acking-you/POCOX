@@ -31,6 +31,18 @@ pub struct ServerConfig {
     pub msg_header_key: Option<String>,
     /// HS256 secret used to sign session JWTs.
     pub jwt_secret: String,
+    /// Key for pairing codes and hardware indexes, independent of the JWT key.
+    /// Unset keeps pairing disabled while GitHub stays available.
+    ///
+    /// On a populated pairing database this is not a harmless setting to
+    /// change: startup refuses a key that does not match the database.
+    #[serde(default)]
+    pub pairing_secret: Option<String>,
+    /// Proxies whose `X-Forwarded-For` is believed for per-address limits, as
+    /// IPs or CIDR ranges. Each must have restricted ingress and overwrite
+    /// that header.
+    #[serde(default)]
+    pub trusted_proxies: Vec<String>,
     /// GitHub OAuth app client id (Device Flow enabled).
     pub github_client_id: String,
     /// GitHub OAuth app client secret. Required ONLY for the web
@@ -147,6 +159,23 @@ impl ServerConfig {
             !is_placeholder(&self.github_client_id),
             "POCOX_GITHUB_CLIENT_ID is unset or still the example placeholder"
         );
+        if let Some(secret) = &self.pairing_secret {
+            ensure!(
+                !is_placeholder(secret),
+                "POCOX_PAIRING_SECRET is empty or still the example placeholder; set a real \
+                 secret (e.g. `openssl rand -hex 32`), or remove it to keep pairing disabled"
+            );
+            ensure!(
+                secret.len() >= 32,
+                "POCOX_PAIRING_SECRET must be at least 32 bytes of random material (got {} bytes)",
+                secret.len()
+            );
+            ensure!(
+                *secret != self.jwt_secret,
+                "POCOX_PAIRING_SECRET must be independent of POCOX_JWT_SECRET"
+            );
+        }
+        crate::pairing::validate_trusted_proxies(&self.trusted_proxies)?;
         if let Some(key) = &self.msg_header_key {
             ensure!(
                 !key.contains("replace-with"),
@@ -206,6 +235,8 @@ mod tests {
         ServerConfig {
             msg_header_key: None,
             jwt_secret: "x".repeat(32),
+            pairing_secret: None,
+            trusted_proxies: Vec::new(),
             github_client_id: "Iv1.0123456789abcdef".to_string(),
             github_client_secret: None,
             public_url: None,
@@ -260,6 +291,22 @@ mod tests {
         c.msg_header_key = None;
         c.validate()
             .expect("an absent key adopts the relay machine key");
+    }
+
+    #[test]
+    fn a_pairing_secret_follows_the_jwt_secret_checks_and_stays_independent() {
+        let mut c = valid();
+        c.pairing_secret = Some("p".repeat(32));
+        c.validate().expect("a real pairing secret enables pairing");
+        c.pairing_secret = Some("replace-with-a-long-random-pairing-secret".to_string());
+        assert!(c.validate().is_err(), "shipped placeholder must fail closed");
+        c.pairing_secret = Some("short".to_string());
+        assert!(c.validate().is_err());
+        c.pairing_secret = Some(c.jwt_secret.clone());
+        assert!(c.validate().is_err(), "the two keys must be independent");
+        c.pairing_secret = None;
+        c.trusted_proxies = vec!["not-an-address".to_string()];
+        assert!(c.validate().is_err(), "a typo must not silently trust nothing");
     }
 
     #[test]

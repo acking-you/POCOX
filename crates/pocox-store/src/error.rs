@@ -9,6 +9,9 @@ pub enum StoreError {
     /// Applying the embedded migrations failed.
     #[error("migration: {0}")]
     Migrate(#[from] sqlx::migrate::MigrateError),
+    /// A pairing compare-and-set refused the change.
+    #[error("refused: {0}")]
+    Refused(#[from] crate::pairing::Refusal),
 }
 
 /// Convenience result alias for the store.

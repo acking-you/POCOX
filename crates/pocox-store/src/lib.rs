@@ -1,7 +1,8 @@
 //! SQLite persistence for the POCOX hosted backend.
 //!
 //! A thin, focused store over `sqlx` (SQLite, WAL, a connection pool): just the
-//! identity and credential tables — `users`, `refresh_tokens`, `device_flows`.
+//! identity and credential tables — `users`, `refresh_tokens`, `device_flows`,
+//! plus the separate tables of [`pairing`].
 //! Live service liveness comes from the relay, not here. Queries are runtime
 //! (no compile-time `DATABASE_URL` needed); timestamps are unix seconds
 //! supplied by the caller so the store is clock-injectable and fully testable.
@@ -11,6 +12,7 @@
 mod error;
 mod flows;
 mod models;
+pub mod pairing;
 mod tokens;
 mod users;
 mod web;
@@ -20,6 +22,7 @@ use std::time::Duration;
 
 pub use error::{Result, StoreError};
 pub use models::{DeviceFlow, RefreshToken, User, WebAuthFlow, WebExchangeCode};
+pub use pairing::Refusal;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use sqlx::SqlitePool;
 

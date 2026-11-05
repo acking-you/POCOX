@@ -59,8 +59,9 @@ pub mod transport;
 
 pub use admin::{
     all_services, allocate_namespace, issue_credential, issue_credential_in_namespace,
-    live_credentials, relay_instance_id, relay_supports_key_namespaces, renew_credential,
-    retire_service, revoke_credential, CredentialRecord, IssuedCredential, ServiceRecord,
+    live_credentials, relay_error_code, relay_instance_id, relay_status,
+    relay_supports_key_namespaces, renew_credential, retire_service, revoke_credential,
+    CredentialRecord, IssuedCredential, RelayStatus, ServiceRecord,
 };
 pub use keepalive::keep_credential_alive;
 /// Runtime tunnel state and diagnostics from the pinned pb-mapper SDK.

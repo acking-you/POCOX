@@ -3,12 +3,13 @@
 
 use std::time::Duration;
 
+use axum::extract::ConnectInfo;
 use axum::Router;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
-use hyper_util::service::TowerToHyperService;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
+use tower::ServiceExt as _;
 
 use crate::tls::TlsKind;
 
@@ -44,10 +45,12 @@ async fn accept_tls(tls: &TlsKind, tcp: TcpStream) -> Option<Box<dyn Stream>> {
     }
 }
 
-/// Serve the HTTP API over the TLS layer, forever.
+/// Serve the HTTP API over the TLS layer, forever. Each request carries its
+/// socket peer as [`ConnectInfo`], in direct-TLS and plain modes alike, because
+/// per-address limits have nothing else to go on.
 pub async fn serve_http(listener: TcpListener, router: Router, tls: TlsKind) {
     loop {
-        let (tcp, _) = match listener.accept().await {
+        let (tcp, peer) = match listener.accept().await {
             Ok(x) => x,
             Err(e) => {
                 tracing::warn!(error = %e, "http accept failed");
@@ -59,7 +62,10 @@ pub async fn serve_http(listener: TcpListener, router: Router, tls: TlsKind) {
         tokio::spawn(async move {
             if let Some(stream) = accept_tls(&tls, tcp).await {
                 let io = TokioIo::new(stream);
-                let service = TowerToHyperService::new(router);
+                let service = hyper::service::service_fn(move |mut request| {
+                    request.extensions_mut().insert(ConnectInfo(peer));
+                    router.clone().oneshot(request.map(axum::body::Body::new))
+                });
                 if let Err(e) = Builder::new(TokioExecutor::new())
                     .serve_connection_with_upgrades(io, service)
                     .await

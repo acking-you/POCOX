@@ -7,23 +7,26 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::extract::{Path, Query, State};
-use axum::http::header::AUTHORIZATION;
+use axum::http::header::{AUTHORIZATION, CACHE_CONTROL};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use pocox_account_proto::http::{
     DevicePollRequest, DevicePollResponse, DeviceStartRequest, DeviceStartResponse, LogoutRequest,
-    MeResponse, RefreshRequest, RefreshResponse, RelayCredentialResponse, ServiceEntry,
-    ServicesResponse, WebExchangeRequest, WebExchangeResponse, WebStartRequest, WebStartResponse,
+    MeResponse, RefreshResponse, RelayCredentialResponse, ServiceEntry, ServicesResponse,
+    WebExchangeRequest, WebExchangeResponse, WebStartRequest, WebStartResponse,
 };
 use pocox_account_proto::key::NamespacedServiceId;
-use pocox_auth::{Auth, AuthError, Claims};
+use pocox_account_proto::pairing::PairingErrorCode;
+use pocox_auth::{Auth, AuthError, Claims, DeviceCaller, SessionMode};
 use pocox_core::service::{ServiceId, ServiceKind};
 use serde::Deserialize;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
 use tower_http::trace::TraceLayer;
+
+use crate::pairing::{self, Pairing, PairingError, PeerAddr};
 
 /// Shared state for the HTTP handlers.
 #[derive(Clone)]
@@ -36,11 +39,16 @@ pub struct AppState {
     pub relay: pocox_pb::RelaySession,
     /// Vends each account its own short-lived relay credential.
     pub credentials: crate::credentials::Credentials,
+    /// Pairing-code login, or `None` when `POCOX_PAIRING_SECRET` is unset:
+    /// pairing routes then answer 503, device tokens fail closed and GitHub
+    /// is unaffected.
+    pub pairing: Option<Arc<Pairing>>,
 }
 
 /// Build the HTTP API router.
 pub fn router(state: AppState) -> Router {
     Router::new()
+        .merge(pairing::router(state.clone()))
         .route("/healthz", get(healthz))
         .route("/auth/device/start", post(device_start))
         .route("/auth/device/poll", post(device_poll))
@@ -70,6 +78,14 @@ enum ApiError {
     BadRequest(&'static str),
     Unavailable(&'static str),
     Internal(String),
+    /// A device session's failure, with its stable code.
+    Pairing(PairingError),
+}
+
+impl From<PairingError> for ApiError {
+    fn from(error: PairingError) -> Self {
+        Self::Pairing(error)
+    }
 }
 
 type ApiResult<T> = Result<T, ApiError>;
@@ -77,6 +93,7 @@ type ApiResult<T> = Result<T, ApiError>;
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match self {
+            ApiError::Pairing(error) => return error.into_response(),
             ApiError::Unauthorized => (StatusCode::UNAUTHORIZED, "unauthorized"),
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
             ApiError::Unavailable(msg) => (StatusCode::SERVICE_UNAVAILABLE, msg),
@@ -113,9 +130,33 @@ fn bearer(headers: &HeaderMap) -> Option<&str> {
         .strip_prefix("Bearer ")
 }
 
-fn authed(state: &AppState, headers: &HeaderMap) -> ApiResult<Claims> {
+/// Who a request on a route both kinds of session share speaks for.
+enum Caller {
+    /// A GitHub account: verified statelessly, exactly as it always was.
+    GitHub(Claims),
+    /// A device, checked against the database on this request: a token alone
+    /// would leave old-user access open on every route but `/v1/relay`.
+    Device(Arc<Pairing>, Box<DeviceCaller>),
+}
+
+async fn authed(state: &AppState, headers: &HeaderMap) -> ApiResult<Caller> {
     let token = bearer(headers).ok_or(ApiError::Unauthorized)?;
-    state.auth.verify(token).map_err(|_| ApiError::Unauthorized)
+    let claims = state
+        .auth
+        .verify(token)
+        .map_err(|_| ApiError::Unauthorized)?;
+    if !pairing::is_device_token(&claims) {
+        return Ok(Caller::GitHub(claims));
+    }
+    let Some(service) = state.pairing.clone() else {
+        return Err(ApiError::Unauthorized);
+    };
+    let caller = state
+        .auth
+        .authenticate_device(&claims, now())
+        .await
+        .map_err(PairingError::from)?;
+    Ok(Caller::Device(service, Box::new(caller)))
 }
 
 async fn healthz() -> &'static str {
@@ -227,18 +268,43 @@ async fn web_exchange(
     }))
 }
 
+/// `POST /auth/refresh` carries exactly one of a GitHub refresh token and a
+/// device secret. Both at once is a mixed principal, not a choice for this
+/// route to make.
+#[derive(Deserialize)]
+struct RefreshBody {
+    refresh_token: Option<String>,
+    device_secret: Option<String>,
+}
+
 async fn refresh(
     State(state): State<AppState>,
-    Json(req): Json<RefreshRequest>,
-) -> ApiResult<Json<RefreshResponse>> {
-    let credential = state
-        .auth
-        .refresh(&req.refresh_token, now())
-        .await
-        .map_err(auth_err)?;
-    Ok(Json(RefreshResponse {
-        credential,
-    }))
+    headers: HeaderMap,
+    Json(req): Json<RefreshBody>,
+) -> ApiResult<Response> {
+    match (req.refresh_token, req.device_secret) {
+        (Some(refresh_token), None) => {
+            let credential = state
+                .auth
+                .refresh(&refresh_token, now())
+                .await
+                .map_err(auth_err)?;
+            Ok(Json(RefreshResponse {
+                credential,
+            })
+            .into_response())
+        },
+        (None, Some(device_secret)) => {
+            pairing::check_protocol(&headers)?;
+            let session = state
+                .auth
+                .refresh_device(&device_secret, now())
+                .await
+                .map_err(PairingError::from)?;
+            Ok(([(CACHE_CONTROL, "no-store")], Json(session)).into_response())
+        },
+        _ => Err(ApiError::BadRequest("expected exactly one of refresh_token and device_secret")),
+    }
 }
 
 async fn logout(
@@ -254,11 +320,31 @@ async fn logout(
 }
 
 async fn me(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Json<MeResponse>> {
-    let claims = authed(&state, &headers)?;
-    Ok(Json(MeResponse {
-        login: claims.login,
-        account_id: Some(claims.gh_id.to_string()),
+    Ok(Json(match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => MeResponse {
+            account_id: claims.gh_id.map(|id| id.to_string()),
+            login: claims.login,
+        },
+        Caller::Device(_, caller) => MeResponse {
+            login: caller.access.device.label,
+            account_id: Some(caller.access.user.id),
+        },
     }))
+}
+
+/// The relay namespace a device's user holds, if it has ever needed one.
+fn stored_namespace(caller: &DeviceCaller) -> ApiResult<Option<u64>> {
+    caller
+        .access
+        .user
+        .namespace
+        .as_deref()
+        .map(|namespace| {
+            namespace
+                .parse()
+                .map_err(|_| ApiError::Internal(format!("stored namespace `{namespace}`")))
+        })
+        .transpose()
 }
 
 /// `GET /v1/services` query. ACP services are listed only on
@@ -292,13 +378,21 @@ async fn services(
     headers: HeaderMap,
     Query(query): Query<ServicesQuery>,
 ) -> ApiResult<Json<ServicesResponse>> {
-    let claims = authed(&state, &headers)?;
-    let Some(namespace) = state
-        .credentials
-        .namespace_of(&claims.sub)
-        .await
-        .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?
-    else {
+    let (namespace, user_id) = match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => (
+            state
+                .credentials
+                .namespace_of(&claims.sub)
+                .await
+                .map_err(|e| {
+                    ApiError::Internal(format!("resolving the account namespace: {e:#}"))
+                })?,
+            claims.sub,
+        ),
+        // A retiring session may look too, within its overlap: the same user's view.
+        Caller::Device(_, caller) => (stored_namespace(&caller)?, caller.access.user.id),
+    };
+    let Some(namespace) = namespace else {
         // No credential ever issued, so nothing can have been registered.
         return Ok(Json(ServicesResponse::default()));
     };
@@ -306,7 +400,7 @@ async fn services(
         .await
         .map_err(|e| ApiError::Internal(format!("relay status: {e}")))?;
     Ok(Json(ServicesResponse {
-        services: own_services(&all, namespace, &claims.sub, OptInKinds {
+        services: own_services(&all, namespace, &user_id, OptInKinds {
             acp: query.include_acp,
             opencode: query.include_opencode,
         }),
@@ -360,12 +454,21 @@ async fn deregister_service(
     headers: HeaderMap,
     Path((device, kind, name)): Path<(String, String, String)>,
 ) -> ApiResult<StatusCode> {
-    let claims = authed(&state, &headers)?;
+    let caller = authed(&state, &headers).await?;
+    let user_id = match &caller {
+        Caller::GitHub(claims) => claims.sub.clone(),
+        Caller::Device(_, caller) => {
+            // A retiring session reads but never deregisters.
+            if matches!(caller.mode, SessionMode::Retiring { .. }) {
+                return Err(PairingError::code(PairingErrorCode::GraceRestricted).into());
+            }
+            caller.access.user.id.clone()
+        },
+    };
     let kind: ServiceKind = kind
         .parse()
         .map_err(|_| ApiError::BadRequest("invalid service kind"))?;
-    let relay_key =
-        NamespacedServiceId::new(&claims.sub, ServiceId::new(&device, kind, &name)).key();
+    let relay_key = NamespacedServiceId::new(&user_id, ServiceId::new(&device, kind, &name)).key();
     // Asks the RELAY to drop the registration's connections. It used to cancel a
     // broker session that owned the tunnel; with clients registering directly the
     // backend no longer holds anything to cancel, so the authority it does have —
@@ -375,12 +478,15 @@ async fn deregister_service(
     // can only ever name a service of their own. Naming the namespace is not
     // optional: the relay reads an absent one as the administrator's, where an
     // account's services never live, so omitting it would retire nothing.
-    let Some(namespace) = state
-        .credentials
-        .namespace_of(&claims.sub)
-        .await
-        .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?
-    else {
+    let namespace = match &caller {
+        Caller::GitHub(claims) => state
+            .credentials
+            .namespace_of(&claims.sub)
+            .await
+            .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?,
+        Caller::Device(_, caller) => stored_namespace(caller)?,
+    };
+    let Some(namespace) = namespace else {
         // No credential, so nothing of this account's is registered. The
         // post-condition the caller wants already holds.
         return Ok(StatusCode::NO_CONTENT);
@@ -400,9 +506,19 @@ async fn deregister_service(
 /// itself, so possession of it grants nothing outside that account.
 async fn relay_credential(
     State(state): State<AppState>,
+    PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
 ) -> ApiResult<Json<RelayCredentialResponse>> {
-    let claims = authed(&state, &headers)?;
+    let claims = match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => claims,
+        Caller::Device(service, caller) => {
+            // An old client can present a device JWT for up to its hour, and a key from
+            // a namespace fails every direct session on an older SDK.
+            pairing::check_protocol(&headers)?;
+            let bucket = service.client_bucket(peer, &headers);
+            return Ok(Json(service.relay_credential(&caller, bucket, now()).await?));
+        },
+    };
     let (credential, expires_at) = state
         .credentials
         .for_account(&claims.sub)
