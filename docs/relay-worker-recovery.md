@@ -3,7 +3,7 @@
 ## Direct connections
 
 POCOX follows pb-mapper's `master`, currently locked to
-`0439242abd3098428bb9ee6c7f269822e33e8318` (SDK 0.10.0), with its default
+`badcad714d06ef0d153d50607b5a7b40a7c61fa2` (SDK 0.10.2 and later work), with its default
 `p2p`, `relay-quic` and `port-mapping` features.
 The SDK requires Rust 1.99.1 or later; local builds and CI/release formatting use
 the root's `nightly-2026-08-21` pin, while CI compiles with current stable Rust.

@@ -1,8 +1,9 @@
 # Pairing-code login
 
-**Status: planned, nothing here is implemented yet.** This page specifies the
-design for [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage
-ships, its section becomes the rules a change must keep.
+**Status: relay support (stage 1) has shipped; pairing itself is planned and not
+usable yet.** This page specifies the design for
+[issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
+section becomes the rules a change must keep.
 
 Pairing makes a device usable without GitHub or another third-party account.
 The backend gives each device its own code, and devices linked by those codes
@@ -309,12 +310,12 @@ implementation must persist the following ownership and state boundaries:
 
 | Table | Required state and constraints |
 | --- | --- |
-| `device_users` | Unique id, fixed relay namespace, membership revision and creation time. Namespace is allocated once even under concurrent first-key requests. |
+| `device_users` | Unique id, fixed relay namespace that is UNIQUE per relay, membership revision and creation time. A conflict on that index means the relay repeated a number: allocate again and alert. Namespace is allocated once even under concurrent first-key requests. |
 | `devices` | Id; user FK/index; label/platform; unique nullable hardware lookup, set at activation with the latest device winning; current session generation; code generation/unique lookup/issue time; pause flag; joined time; activation time and last-active day; last membership transition (kind, time); nullable pending transition id. |
 | `device_sessions` | Device FK + generation as primary key; indexed secret hash; original user; state (`current`, `grace`, `revoked`); fixed nullable grace deadline. Partial unique indexes permit one current session per device and one current owner per secret hash. Membership moves preserve the hash in historical generations; a restore takes the inactive requester's hash and deletes that row in the same commit. Keep old hashes briefly to answer `device_superseded`. |
 | `pair_restore_requests` | Request id; requesting device, unique while pending; target device/group/session generation/membership revision; state; expiry. Multiple requests never overwrite each other. |
 | `pair_operations` | Operation id; actor and subject; expected revisions; confirmed destination; kind; prepared/relay-applied/committed state; result and retry metadata. Never store plaintext secrets or codes. |
-| `device_relay_keys` | Device/session generation, relay instance, unique full key id, namespace, grant operation id, expiry and hard cutoff/revocation state. Include every key that may still authenticate. |
+| `device_relay_keys` | Device/session generation, relay instance, full key id unique per relay instance, namespace, grant operation id, expiry and hard cutoff/revocation state. Include every key that may still authenticate. |
 | `retired_codes` | Unique code lookup and retirement time; retain seven days for `code_retired`. |
 | `pairing_metadata` | Non-secret key verification value/version, to detect an accidental pairing-secret change at startup. |
 
@@ -423,8 +424,9 @@ During that overlap:
   relay key, if it still exists. Never mint another old-generation key or hand
   out a current-generation key. The backend's credential cache includes backend,
   user, device and generation; an account-only cache would leak the new key.
-- The relay enforces the shortened expiry persistently and refuses new setups at
-  that deadline. Renewal takes a relative TTL, so this needs no clock agreement;
+- The relay enforces the shortened expiry persistently: at that deadline it refuses
+  new setups and closes the key's relayed connections. Renewal takes a relative TTL,
+  so this needs no clock agreement;
   below the relay's 10-second minimum, revoke instead. Only the backend holds the
   administrator key and it never extends a retiring key: recovering a lost
   credential string renews with the remaining time. Reconciliation reads each key's
@@ -446,21 +448,47 @@ Today one GitHub account shares a key whose id is its namespace
 (`crates/pocox-backend/src/credentials.rs`). Pairing needs per-device-generation
 keys in one stable user namespace. GitHub retains its current shared model.
 
-**Required pb-mapper changes, on `master`, before enabling pairing:**
+**What pb-mapper provides on `master`, through `pocox_pb::admin`:**
 
-- Persist a namespace on each key; default legacy keys to their existing key id.
-  Only the administrator may allocate namespaces or issue keys into them.
-- Add namespace-scoped issuance. Existing operations cover the rest: `renew`
-  already moves an active key's expiry in either direction, persists it and returns
-  the same credential text, and a key's label plus a listing identify it after a
-  lost response.
-- Expose a capability check for namespace issuance and persistence. Pairing returns
-  503 `relay_too_old` before side effects on an older relay.
-- Preserve generation-tagged key ids (already present in the pinned SDK);
-  namespace allocation must not collide with legacy key-id namespaces.
-- Keep per-key revocation enforced at new register/subscribe/direct-setup
-  authorization boundaries over both TCP and QUIC. Existing data paths have the
-  documented boundary below.
+- `allocate_namespace` and `issue_credential_in_namespace`, administrator-only. Each
+  key persists its namespace; a key issued the old way, and state from an older
+  relay, stay in the namespace their key id names. Issuing into a number the
+  allocator did not hand out fails, including another key's own namespace.
+- Allocated namespaces are `1` to `2^32 - 1`, the generation no key id uses, so they
+  cannot collide with key-id namespaces. The relay hands a number out once, across
+  restart, root rotation and auth-state reset, including a reset out of a damaged
+  snapshot. A lost allocation response wastes a number; ask again. Only losing the
+  relay's state directory, where both copies of its allocator live, can repeat one.
+- `relay_instance_id` reads the relay's instance id. A reset out of a damaged snapshot
+  changes it and starts key ids over, so a stored key id can come to name another
+  tenant's key.
+- `renew_credential` moves an active key's expiry in either direction, persists it
+  and returns the same credential text, label and namespace. A shortened key ends at
+  the new deadline, open relayed connections included, and the deadline survives a
+  restart. `live_credentials` reports each key's label, namespace and expiry, which
+  identifies a key after a lost issue response.
+- `relay_supports_key_namespaces` reads the relay's capability. Pairing returns 503
+  `relay_too_old` before side effects on an older relay.
+- Per-key revocation is enforced at new register, subscribe and direct setups over
+  both TCP and QUIC. Existing data paths have the documented boundary below.
+
+**What the backend must not assume about those answers:**
+
+- **Lost relay state.** `namespace_not_allocated` for a stored namespace means the
+  relay lost its state. Keep the operation pending and return 503. Never silently
+  allocate a replacement: the user's namespace is fixed, and moving it would split
+  the group.
+- **Instance change.** Before any call naming a stored key id, compare
+  `relay_instance_id` with the instance stored for that key, and treat a change as the
+  old key being dead. Renew, reveal and revoke act on whichever key holds an id now.
+- **Credential identity.** Before exposing a credential, check that the returned
+  namespace and label are the expected ones. Otherwise a recovery by stored id can
+  return another tenant's credential.
+- **Namespace drift.** Renewal and reconciliation compare the namespace returned by
+  renew and listing with the stored one. On a mismatch, revoke and reissue.
+- **Absence.** `live_credentials` pages by position, so a removal between pages can
+  skip a row. A walk spanning more than one page is not proof that a key is absent:
+  repeat it before minting another.
 
 Issuance is serialized against session/membership transitions. Persist the grant
 operation before calling the relay, label it with device/generation/operation,
@@ -509,13 +537,14 @@ loss and credential revocation; see
 This design accepts that behavior. The 10-minute overlap bounds **old JWT use
 and new connection authorization**, not the lifetime of an established stream.
 
-Removal prevents new relay/direct setups once its relay action completes.
-A setup that raced revocation must have a defined authorization/commit boundary;
-an uncommitted direct ticket must not authorize a later new session after that
-boundary. Previously committed connections may remain, and a session inside one
-can still send commands, read files or open application-level channels.
-Relayed connections may close with the SDK key lease; uninterrupted survival is
-not promised either.
+Removal prevents new relay/direct setups once its relay action completes. A
+revoked key's relayed connections close, and a relayed stream closes when either
+end's key dies. For a setup that raced revocation, the relay stops offering and
+attaching setups for that key and cancels those its consumer had in flight. Direct
+commit happens between the endpoints, so a grant they already hold stays good for
+that one session until its setup deadline, at most 8 seconds, and authorizes nothing
+after it. Previously committed direct connections may remain, and a session inside
+one can still send commands, read files or open application-level channels.
 
 UI says access for new connections was removed, rather than claiming every
 session has been disconnected. To cut an established connection, stop its owning
@@ -573,7 +602,7 @@ containing a code; use no-store responses and keep codes out of status/errors.
 | Pending requests and terminal results | Seven-day expiry/diagnostic window; never delete an unresolved relay transition |
 | Completed operation retry results and retired-code indexes | Seven days |
 | Relay grant/revocation records | Reconciled inactive at the relay and no longer needed by a transition |
-| User id and namespace | Last device and outstanding operation/grant gone; allocator never reassigns its namespace |
+| User id and namespace | Last device and outstanding operation/grant gone. The relay does not hand the number out again unless it loses its state directory, and the `device_users` unique index catches that |
 | Failure counters | 24 hours or process restart |
 
 Purge follows the same revocation/transition boundary, not a blind cascade that
@@ -668,7 +697,10 @@ pairing secret, because it stays out of `config.toml`; one reading a pairing
 `[account]` sees a session it cannot refresh and asks for sign-in. New clients keep
 GitHub response compatibility; pairing requests carry an explicit pairing protocol
 version, and an unsupported one gets 426 `pairing_client_upgrade_required` before
-side effects. Keep new pairing lifecycle state in its own store rather than adding
+side effects. Apply the same check to `GET /v1/relay` for a device JWT, not only to
+`/v1/pair` routes: an old client can present the device JWT from `[account]` for up
+to its hour, and a key from a namespace fails every direct session on an older SDK.
+Keep new pairing lifecycle state in its own store rather than adding
 unknown fields to old `deny_unknown_fields` config schemas.
 
 ## Security boundaries
@@ -693,8 +725,8 @@ feature, alter configuration, or warrant a release-note claim that pairing works
 | Stage | Scope | Acceptance |
 | --- | --- | --- |
 | 0 | Reviewed design and identity wording | Cross-check with current auth/relay/client code; document chosen 600-second overlap and surviving connections. |
-| 1 | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
-| 2 | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule. |
+| 1 (shipped in [pb-mapper#52](https://github.com/acking-you/pb-mapper/pull/52)) | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
+| 2 | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
 | 3 | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
 | 4 | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
 | 5 | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. |
@@ -727,6 +759,13 @@ The central acceptance scenarios are:
 - Preview A, move A elsewhere, then confirm: require a new preview. Repeated leave
   is a no-op result; opposite-direction singleton links converge without merging
   existing multi-device groups.
+- A repeated namespace from the relay allocates again and alerts; two users never
+  share a namespace. `namespace_not_allocated` for a stored namespace leaves the
+  operation pending with 503 and allocates no replacement.
+- After the relay's instance id changes, a stored key id is treated as dead and is
+  never renewed, revealed or revoked. A recovered credential whose namespace or label
+  is unexpected is never exposed. A renewal or listing reporting a namespace other than
+  the stored one revokes and reissues.
 - Android backup/transfer cannot restore credentials through the store, and
   `config.toml` holds no secret. Missing retained secrets require authorization. No
   retained secret/code after the retention window means explicit new identity, not a
