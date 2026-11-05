@@ -38,7 +38,9 @@ impl TrustedProxies {
         })
     }
 
-    fn contains(&self, ip: IpAddr) -> bool {
+    /// Whether `ip` is one of the configured proxies.
+    pub fn contains(&self, ip: IpAddr) -> bool {
+        let ip = canonical(ip);
         self.nets.iter().any(|net| net.contains(&ip))
     }
 

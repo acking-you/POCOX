@@ -200,6 +200,109 @@ async fn a_destination_that_changes_during_relay_work_leaves_the_source_intact()
     let new_key = mover.relay_key().await;
     assert_eq!(new_key.namespace, old_key.namespace);
     assert!(harness.credential_works(&new_key.credential).await);
+    // The old key does not get to run on to its full life just because the move
+    // failed.
+    assert!(!harness.credential_works(&old_key.credential).await);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_retake_that_fails_still_ends_the_suspect_devices_old_key() {
+    let harness = Harness::start().await;
+    let suspect = Device::activated(&harness, "suspect").await;
+    let old_key = suspect.relay_key().await;
+    let code = suspect.code().await;
+    let retaker = Device::new(&harness, "retaker").await;
+    let preview: pocox_account_proto::pairing::PreviewResponse =
+        retaker.preview(&code).await.expect(StatusCode::OK).parse();
+
+    // The relay is down, so the retake waits having touched the relay. Meanwhile
+    // its code stops being valid, so it can never commit.
+    harness.link.cut();
+    let id = op();
+    retaker
+        .post(
+            "/v1/pair/restore",
+            serde_json::json!({
+                "ticket": preview.ticket,
+                "target_device_id": suspect.id(),
+                "operation_id": id,
+                "intent": "retake",
+            }),
+        )
+        .await
+        .expect(StatusCode::ACCEPTED);
+    sqlx::query("UPDATE devices SET code_paused = 1 WHERE id = ?1")
+        .bind(suspect.id())
+        .execute(harness.store.pool())
+        .await
+        .expect("pause");
+    harness.link.point_at(harness.relay.addr());
+    harness.restart().await;
+
+    let failed: OperationView = retaker.operation(&id).await.expect(StatusCode::OK).parse();
+    assert_eq!(failed.status, OperationStatus::Failed);
+    assert!(
+        !harness.credential_works(&old_key.credential).await,
+        "a suspect device keeps no relay access through a failed retake"
+    );
+    // It keeps its secret, and that is all: nothing moved.
+    let mut suspect = suspect;
+    suspect.refresh().await.expect(StatusCode::OK);
+    retaker.refresh_raw().await.expect(StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_restore_that_fails_still_shortens_the_old_key() {
+    let harness = Harness::start().await;
+    let target = Device::activated(&harness, "target").await;
+    let old_key = target.relay_key().await;
+    let code = target.code().await;
+    let requester = Device::new(&harness, "requester").await;
+    let preview: pocox_account_proto::pairing::PreviewResponse = requester
+        .preview(&code)
+        .await
+        .expect(StatusCode::OK)
+        .parse();
+
+    harness.link.cut();
+    let id = op();
+    requester
+        .post(
+            "/v1/pair/restore",
+            serde_json::json!({
+                "ticket": preview.ticket,
+                "target_device_id": target.id(),
+                "operation_id": id,
+            }),
+        )
+        .await
+        .expect(StatusCode::ACCEPTED);
+    sqlx::query("UPDATE devices SET code_paused = 1 WHERE id = ?1")
+        .bind(target.id())
+        .execute(harness.store.pool())
+        .await
+        .expect("pause");
+    harness.link.point_at(harness.relay.addr());
+    harness.restart().await;
+
+    let failed: OperationView = requester
+        .operation(&id)
+        .await
+        .expect(StatusCode::OK)
+        .parse();
+    assert_eq!(failed.status, OperationStatus::Failed);
+    let key = harness
+        .live_keys()
+        .await
+        .into_iter()
+        .next()
+        .expect("still live, within its overlap");
+    let overlap = harness.settings.lock().expect("settings").overlap_secs as u64;
+    assert!(
+        key.expires_at <= time::OffsetDateTime::now_utc().unix_timestamp() as u64 + overlap,
+        "the old key was held to the deadline fixed at preparation"
+    );
+    assert!(key.expires_at < old_key.expires_at);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -348,7 +451,7 @@ async fn a_link_during_an_outage_exposes_no_destination_credential() {
     assert!(pending.session.is_none());
     let opened = harness
         .store
-        .device_open_keys(joiner.id())
+        .device_open_keys(joiner.id(), joiner.session.generation)
         .await
         .expect("keys");
     assert_eq!(opened.len(), 1, "only the old generation's key exists");

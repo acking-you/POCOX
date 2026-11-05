@@ -5,7 +5,9 @@ use sqlx::SqliteConnection;
 
 use super::devices::device_in;
 use super::models::{Device, OperationKind};
-use super::prepare::{existing_operation, insert_terminal_operation, OperationMeta};
+use super::prepare::{
+    existing_operation, insert_terminal_operation, refuse_if_transitioning, OperationMeta,
+};
 use super::refusal::Refusal;
 use crate::{Result, Store};
 
@@ -132,12 +134,7 @@ impl Store {
         if device.session_generation != input.generation {
             return Err(Refusal::SessionStale.into());
         }
-        if let Some(operation) = &device.pending_transition_id {
-            return Err(Refusal::TransitionPending {
-                operation_id: Some(operation.clone()),
-            }
-            .into());
-        }
+        refuse_if_transitioning(&mut tx, &device, meta.actor_secret_hash).await?;
         let ready_at = device.code_issued_at + CODE_ROTATION_WAIT_SECS;
         if meta.now < ready_at {
             return Err(Refusal::TooSoon {
@@ -146,18 +143,22 @@ impl Store {
             .into());
         }
         rotate_code_in(&mut tx, &device, meta.now, derive_lookup).await?;
-        insert_terminal_operation(&mut tx, meta, OperationKind::Rotate, &device).await?;
+        insert_terminal_operation(&mut tx, meta, OperationKind::Rotate, &device, false).await?;
         tx.commit().await?;
         Ok(())
     }
 
-    /// Set a code's pause state explicitly.
+    /// Set a code's pause state explicitly. A pause also moves its epoch, so
+    /// tickets from before it stay dead after a resume.
     pub async fn set_code_paused(&self, device_id: &str, paused: bool) -> Result<()> {
-        sqlx::query("UPDATE devices SET code_paused = ?2 WHERE id = ?1")
-            .bind(device_id)
-            .bind(paused)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE devices SET code_pause_epoch = code_pause_epoch + (?2 AND NOT code_paused), \
+             code_paused = ?2 WHERE id = ?1",
+        )
+        .bind(device_id)
+        .bind(paused)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 }

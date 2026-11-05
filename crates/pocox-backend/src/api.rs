@@ -55,7 +55,8 @@ pub fn router(state: AppState) -> Router {
         .route("/auth/web/start", post(web_start))
         .route("/auth/web/callback", get(web_callback))
         .route("/auth/web/exchange", post(web_exchange))
-        .route("/auth/refresh", post(refresh))
+        // Carries a device secret too. Like every pairing body, it is small.
+        .route("/auth/refresh", post(refresh).layer(RequestBodyLimitLayer::new(8 * 1024)))
         .route("/auth/logout", post(logout))
         .route("/v1/me", get(me))
         .route("/v1/services", get(services))
@@ -319,17 +320,24 @@ async fn logout(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn me(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Json<MeResponse>> {
-    Ok(Json(match authed(&state, &headers).await? {
-        Caller::GitHub(claims) => MeResponse {
+/// A device's answer on a shared route. These are per-device and can carry a
+/// relay credential, so nothing may cache them.
+fn no_store(body: impl IntoResponse) -> Response {
+    ([(CACHE_CONTROL, "no-store")], body).into_response()
+}
+
+async fn me(State(state): State<AppState>, headers: HeaderMap) -> ApiResult<Response> {
+    Ok(match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => Json(MeResponse {
             account_id: claims.gh_id.map(|id| id.to_string()),
             login: claims.login,
-        },
-        Caller::Device(_, caller) => MeResponse {
+        })
+        .into_response(),
+        Caller::Device(_, caller) => no_store(Json(MeResponse {
             login: caller.access.device.label,
             account_id: Some(caller.access.user.id),
-        },
-    }))
+        })),
+    })
 }
 
 /// The relay namespace a device's user holds, if it has ever needed one.
@@ -377,34 +385,41 @@ async fn services(
     State(state): State<AppState>,
     headers: HeaderMap,
     Query(query): Query<ServicesQuery>,
-) -> ApiResult<Json<ServicesResponse>> {
-    let (namespace, user_id) = match authed(&state, &headers).await? {
-        Caller::GitHub(claims) => (
-            state
-                .credentials
-                .namespace_of(&claims.sub)
-                .await
-                .map_err(|e| {
-                    ApiError::Internal(format!("resolving the account namespace: {e:#}"))
-                })?,
-            claims.sub,
-        ),
-        // A retiring session may look too, within its overlap: the same user's view.
-        Caller::Device(_, caller) => (stored_namespace(&caller)?, caller.access.user.id),
+) -> ApiResult<Response> {
+    let opt_in = OptInKinds {
+        acp: query.include_acp,
+        opencode: query.include_opencode,
     };
-    let Some(namespace) = namespace else {
+    let claims = match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => claims,
+        // A retiring session may look too, within its overlap: the same user's view.
+        Caller::Device(service, caller) => {
+            let _slot = service.enter()?;
+            let Some(namespace) = stored_namespace(&caller)? else {
+                return Ok(no_store(Json(ServicesResponse::default())));
+            };
+            let all = service.service_snapshot().await?;
+            return Ok(no_store(Json(ServicesResponse {
+                services: own_services(&all, namespace, &caller.access.user.id, opt_in),
+            })));
+        },
+    };
+    let Some(namespace) = state
+        .credentials
+        .namespace_of(&claims.sub)
+        .await
+        .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?
+    else {
         // No credential ever issued, so nothing can have been registered.
-        return Ok(Json(ServicesResponse::default()));
+        return Ok(Json(ServicesResponse::default()).into_response());
     };
     let all = pocox_pb::all_services(&state.relay)
         .await
         .map_err(|e| ApiError::Internal(format!("relay status: {e}")))?;
     Ok(Json(ServicesResponse {
-        services: own_services(&all, namespace, &user_id, OptInKinds {
-            acp: query.include_acp,
-            opencode: query.include_opencode,
-        }),
-    }))
+        services: own_services(&all, namespace, &claims.sub, opt_in),
+    })
+    .into_response())
 }
 
 /// The subset of `all` that belongs to `user_id` in relay `namespace`.
@@ -451,24 +466,41 @@ fn own_services(
 /// still hosting the service will reconnect and re-register shortly after.
 async fn deregister_service(
     State(state): State<AppState>,
+    PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
     Path((device, kind, name)): Path<(String, String, String)>,
-) -> ApiResult<StatusCode> {
-    let caller = authed(&state, &headers).await?;
-    let user_id = match &caller {
-        Caller::GitHub(claims) => claims.sub.clone(),
-        Caller::Device(_, caller) => {
+) -> ApiResult<Response> {
+    let claims = match authed(&state, &headers).await? {
+        Caller::GitHub(claims) => claims,
+        Caller::Device(service, caller) => {
+            pairing::check_protocol(&headers)?;
+            let _slot = service.enter()?;
             // A retiring session reads but never deregisters.
             if matches!(caller.mode, SessionMode::Retiring { .. }) {
                 return Err(PairingError::code(PairingErrorCode::GraceRestricted).into());
             }
-            caller.access.user.id.clone()
+            let kind: ServiceKind = kind
+                .parse()
+                .map_err(|_| PairingError::code(PairingErrorCode::InvalidRequest))?;
+            let relay_key = NamespacedServiceId::new(
+                &caller.access.user.id,
+                ServiceId::new(&device, kind, &name),
+            )
+            .key();
+            if let Some(namespace) = stored_namespace(&caller)? {
+                let bucket = service.client_bucket(peer, &headers);
+                service
+                    .retire_device_service(&caller.access.device.id, namespace, &relay_key, bucket)
+                    .await?;
+            }
+            return Ok(no_store(StatusCode::NO_CONTENT));
         },
     };
     let kind: ServiceKind = kind
         .parse()
         .map_err(|_| ApiError::BadRequest("invalid service kind"))?;
-    let relay_key = NamespacedServiceId::new(&user_id, ServiceId::new(&device, kind, &name)).key();
+    let relay_key =
+        NamespacedServiceId::new(&claims.sub, ServiceId::new(&device, kind, &name)).key();
     // Asks the RELAY to drop the registration's connections. It used to cancel a
     // broker session that owned the tunnel; with clients registering directly the
     // backend no longer holds anything to cancel, so the authority it does have —
@@ -478,23 +510,20 @@ async fn deregister_service(
     // can only ever name a service of their own. Naming the namespace is not
     // optional: the relay reads an absent one as the administrator's, where an
     // account's services never live, so omitting it would retire nothing.
-    let namespace = match &caller {
-        Caller::GitHub(claims) => state
-            .credentials
-            .namespace_of(&claims.sub)
-            .await
-            .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?,
-        Caller::Device(_, caller) => stored_namespace(caller)?,
-    };
-    let Some(namespace) = namespace else {
+    let Some(namespace) = state
+        .credentials
+        .namespace_of(&claims.sub)
+        .await
+        .map_err(|e| ApiError::Internal(format!("resolving the account namespace: {e:#}")))?
+    else {
         // No credential, so nothing of this account's is registered. The
         // post-condition the caller wants already holds.
-        return Ok(StatusCode::NO_CONTENT);
+        return Ok(StatusCode::NO_CONTENT.into_response());
     };
     pocox_pb::retire_service(&state.relay, namespace, &relay_key)
         .await
         .map_err(|e| ApiError::Internal(format!("retiring {relay_key}: {e:#}")))?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(StatusCode::NO_CONTENT.into_response())
 }
 
 /// Hand this account the relay address and a short-lived credential, so the
@@ -508,15 +537,16 @@ async fn relay_credential(
     State(state): State<AppState>,
     PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
-) -> ApiResult<Json<RelayCredentialResponse>> {
+) -> ApiResult<Response> {
     let claims = match authed(&state, &headers).await? {
         Caller::GitHub(claims) => claims,
         Caller::Device(service, caller) => {
             // An old client can present a device JWT for up to its hour, and a key from
             // a namespace fails every direct session on an older SDK.
             pairing::check_protocol(&headers)?;
+            let _slot = service.enter()?;
             let bucket = service.client_bucket(peer, &headers);
-            return Ok(Json(service.relay_credential(&caller, bucket, now()).await?));
+            return Ok(no_store(Json(service.relay_credential(&caller, bucket).await?)));
         },
     };
     let (credential, expires_at) = state
@@ -532,7 +562,8 @@ async fn relay_credential(
         // an account's namespace is decided, and a client that asked for another
         // one would still be confined by the credential it gets back.
         namespace: NamespacedServiceId::namespace_of(&claims.sub),
-    }))
+    })
+    .into_response())
 }
 
 #[cfg(test)]

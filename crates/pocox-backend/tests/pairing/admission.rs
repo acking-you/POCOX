@@ -86,7 +86,7 @@ async fn pairing_keys_stop_at_their_share_of_capacity() {
     );
     assert!(harness
         .store
-        .device_open_keys(devices[3].id())
+        .device_open_keys(devices[3].id(), devices[3].session.generation)
         .await
         .expect("keys")
         .is_empty());

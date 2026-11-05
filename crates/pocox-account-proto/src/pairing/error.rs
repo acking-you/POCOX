@@ -66,6 +66,9 @@ pub enum PairingErrorCode {
     RestoreSlotsFull,
     /// Too many attempts. Honor `retry_after`.
     RateLimited,
+    /// A code this client does not know, from a newer backend.
+    #[serde(other)]
+    Unknown,
 }
 
 impl PairingErrorCode {
@@ -100,6 +103,7 @@ impl PairingErrorCode {
             Self::NotFound => "not_found",
             Self::RestoreSlotsFull => "restore_slots_full",
             Self::RateLimited => "rate_limited",
+            Self::Unknown => "unknown",
         }
     }
 
@@ -123,4 +127,20 @@ pub struct PairingErrorBody {
     /// For a superseded secret, when its overlap ends (unix seconds).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub grace_deadline: Option<i64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_code_from_a_newer_backend_still_parses() {
+        let body: PairingErrorBody =
+            serde_json::from_str(r#"{"error":"invented_later"}"#).expect("parse");
+        assert_eq!(body.error, PairingErrorCode::Unknown);
+        assert_eq!(
+            PairingErrorCode::from_stored("preview_stale"),
+            Some(PairingErrorCode::PreviewStale)
+        );
+    }
 }

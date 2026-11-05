@@ -6,7 +6,9 @@
 mod support;
 
 mod admission;
+mod hardening;
 mod links;
+mod metering;
 mod principals;
 mod recovery;
 mod relay_answers;

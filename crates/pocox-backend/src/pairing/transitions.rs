@@ -10,28 +10,26 @@
 //!
 //! No destination credential exists until step 3, and step 3 only happens once
 //! the relay has confirmed step 2. A relay outage therefore leaves an operation
-//! pending, and whichever process runs next resumes it from the persisted
-//! state.
+//! pending, and the worker resumes it from the persisted state.
+//!
+//! This relies on one process per database: per-operation and per-device locks
+//! live in the process, and `crate::run` enforces that with a file lock beside
+//! the database.
 
 use std::sync::Arc;
 use std::time::Duration;
 
-use pocox_pb::CredentialRecord;
 use pocox_store::pairing::{
-    CommitContext, KeyState, OperationKind, OperationState, PairOperation, RelayKeyRow,
+    CommitContext, KeyAnswer, KeyState, OperationState, PairOperation, RelayKeyRow,
 };
 
 use super::error::{PairingError, PairingResult};
-use super::relay::RelayFailure;
+use super::relay::{KeyCheck, RelayFailure};
 use super::relay_keys::{expires_as_i64, parse_relay_number, MIN_KEY_TTL_SECS};
-use super::service::Pairing;
+use super::service::{unix_now, Pairing};
 
 /// Longest wait between attempts at a stuck operation.
 const MAX_RETRY_DELAY_SECS: i64 = 300;
-
-fn now() -> i64 {
-    time::OffsetDateTime::now_utc().unix_timestamp()
-}
 
 impl Pairing {
     fn commit_context(&self, now: i64) -> CommitContext<'_> {
@@ -44,8 +42,8 @@ impl Pairing {
     }
 
     /// Take an open operation as far as it can go right now. Safe to call from
-    /// any number of places: per-operation locking and compare-and-set
-    /// steps mean its effects happen once.
+    /// any number of places in this process: the operation's lock and
+    /// compare-and-set steps mean its effects happen once.
     pub(super) async fn drive(&self, id: &str) -> PairingResult<PairOperation> {
         let _operation_guard = self.operation_locks.acquire(id).await;
         let mut operation = self
@@ -59,48 +57,62 @@ impl Pairing {
         if operation.state == OperationState::Prepared {
             operation = self
                 .store
-                .revalidate_operation(id, self.commit_context(now()))
+                .revalidate_operation(id, self.commit_context(unix_now()))
                 .await?;
             if operation.state.is_terminal() {
-                self.forget_after(&operation);
+                self.after_terminal(&operation).await;
                 return Ok(operation);
             }
-            self.store.mark_relay_started(id, now()).await?;
-            let applied = {
-                let _device_guard = self
-                    .device_locks
-                    .acquire(&operation.subject_device_id)
-                    .await;
-                self.forget_credentials(&operation.subject_device_id);
-                self.apply_relay_action(&operation).await
-            };
-            if let Err(failure) = applied {
-                let delay = (5i64 << operation.attempts.clamp(0, 6)).min(MAX_RETRY_DELAY_SECS);
-                tracing::warn!(
-                    operation = %id,
-                    failure = ?failure,
-                    "relay work incomplete; the operation stays pending"
-                );
-                self.store.defer_operation(id, now() + delay, now()).await?;
-                return self
-                    .store
-                    .operation(id)
-                    .await?
-                    .ok_or_else(|| PairingError::internal("operation vanished"));
+            if self.store.mark_relay_started(id, unix_now()).await? {
+                let applied = {
+                    let _device_guard = self
+                        .device_locks
+                        .acquire(&operation.subject_device_id)
+                        .await;
+                    self.forget_credentials(&operation.subject_device_id);
+                    self.apply_relay_action(&operation).await
+                };
+                if let Err(failure) = applied {
+                    let delay = (5i64 << operation.attempts.clamp(0, 6)).min(MAX_RETRY_DELAY_SECS);
+                    tracing::warn!(
+                        operation = %id,
+                        ?failure,
+                        "relay work incomplete; the operation stays pending"
+                    );
+                    self.store
+                        .defer_operation(id, unix_now() + delay, unix_now())
+                        .await?;
+                    return self
+                        .store
+                        .operation(id)
+                        .await?
+                        .ok_or_else(|| PairingError::internal("operation vanished"));
+                }
+                self.store.mark_relay_applied(id, unix_now()).await?;
             }
-            self.store.mark_relay_applied(id, now()).await?;
         }
         let finished = self
             .store
-            .commit_operation(id, self.commit_context(now()))
+            .commit_operation(id, self.commit_context(unix_now()))
             .await?;
-        self.forget_after(&finished);
+        self.after_terminal(&finished).await;
         Ok(finished)
     }
 
-    fn forget_after(&self, operation: &PairOperation) {
+    /// Clear what a finished operation made stale. A failure after relay work
+    /// also owes the relay whatever the operation had started: old keys do
+    /// not get to run on.
+    async fn after_terminal(&self, operation: &PairOperation) {
         self.forget_credentials(&operation.subject_device_id);
         self.forget_credentials(&operation.actor_device_id);
+        if operation.state == OperationState::Failed && operation.relay_started {
+            if let Err(failure) = self.enforce_owed_cutoffs().await {
+                tracing::warn!(
+                    ?failure,
+                    "enforcing a failed operation's cutoffs; the worker retries"
+                );
+            }
+        }
     }
 
     /// Drive an operation with the request waiting a bounded time. The work is
@@ -123,11 +135,12 @@ impl Pairing {
     }
 
     /// Step 2. Returns only once the relay confirmed it for every key that may
-    /// still authenticate.
+    /// still authenticate, of the generations this operation covers. A key
+    /// newer than that is not its business, whichever order things ran in.
     async fn apply_relay_action(&self, operation: &PairOperation) -> Result<(), RelayFailure> {
         let rows = self
             .store
-            .device_open_keys(&operation.subject_device_id)
+            .device_open_keys(&operation.subject_device_id, operation.subject_generation)
             .await
             .map_err(store_failure)?;
         if rows.is_empty() {
@@ -139,32 +152,20 @@ impl Pairing {
                 // The old instance's keys died with it, and its ids may now name
                 // another tenant's keys. Dead is authoritative; touching it is not safe.
                 self.store
-                    .end_key(&row.grant_id, KeyState::Dead, now())
+                    .end_key(&row.grant_id, KeyState::Dead, unix_now())
                     .await
                     .map_err(store_failure)?;
                 continue;
             }
-            let Some(key_id) = self.resolve_key_id(&row).await? else {
-                self.store
-                    .end_key(&row.grant_id, KeyState::Dead, now())
-                    .await
-                    .map_err(store_failure)?;
-                continue;
-            };
-            match (operation.kind.revokes_all(), operation.grace_deadline) {
+            let cutoff = match (operation.kind.revokes_all(), operation.grace_deadline) {
+                (true, _) | (false, None) => unix_now(),
                 (false, Some(deadline)) if row.generation == operation.subject_generation => {
-                    self.shorten_key(&row, key_id, deadline).await?;
+                    deadline
                 },
                 // An older retiring generation keeps its own earlier deadline.
-                (false, _) => {},
-                (true, _) => {
-                    self.revoke_key(key_id).await?;
-                    self.store
-                        .end_key(&row.grant_id, KeyState::Revoked, now())
-                        .await
-                        .map_err(store_failure)?;
-                },
-            }
+                (false, Some(_)) => continue,
+            };
+            self.enforce_cutoff(&row, cutoff).await?;
         }
         Ok(())
     }
@@ -178,68 +179,92 @@ impl Pairing {
                 .map(Some)
                 .map_err(|error| RelayFailure::Unavailable(format!("{error:?}")));
         }
-        let found: Option<CredentialRecord> = self.find_key_by_label(&row.label).await?;
+        let found = self.find_key_by_label(&row.label).await?;
         Ok(found.map(|record| record.key_id))
     }
 
-    /// Set a retiring key to end at its generation's deadline. The relay takes
-    /// a relative lifetime, so no clock agreement is needed. Below its
-    /// minimum, revoke.
-    pub(super) async fn shorten_key(
+    /// Make a key end by `cutoff`, after reading that it is the key the row
+    /// says it is: the relay acts on whichever key holds an id now, so
+    /// another tenant's answer ends the row with no change at the relay.
+    ///
+    /// Revokes when too little time is left for a renewal, which is every
+    /// no-overlap change. Otherwise renews to the time left, which the
+    /// relay enforces by itself and which needs no clock agreement. Never
+    /// lengthens: a key already ending sooner keeps its own end.
+    pub(super) async fn enforce_cutoff(
         &self,
         row: &RelayKeyRow,
-        key_id: u64,
-        deadline: i64,
+        cutoff: i64,
     ) -> Result<(), RelayFailure> {
-        let remaining = deadline - now();
+        let Some(key_id) = self.resolve_key_id(row).await? else {
+            return self.end_row(row, KeyState::Dead).await;
+        };
+        let record = match self.inspect_key(row, key_id).await? {
+            KeyCheck::Ours(record) => record,
+            KeyCheck::Gone => return self.end_row(row, KeyState::Expired).await,
+            KeyCheck::Foreign => return self.end_row(row, KeyState::Dead).await,
+            KeyCheck::Drifted => {
+                self.revoke_key(key_id).await?;
+                return self.end_row(row, KeyState::Revoked).await;
+            },
+        };
+        let end = row.local_end.map_or(cutoff, |end| end.min(cutoff));
+        let started = unix_now();
+        let remaining = end - started;
         if remaining < MIN_KEY_TTL_SECS {
             self.revoke_key(key_id).await?;
+            return self.end_row(row, KeyState::Revoked).await;
+        }
+        let unmoved = row
+            .expires_at
+            .is_some_and(|known| expires_as_i64(record.expires_at) <= known);
+        if unmoved && row.local_end.is_some_and(|local_end| local_end <= cutoff) {
+            // It already ends by then, so nothing is owed and nothing needs writing.
             return self
                 .store
-                .end_key(&row.grant_id, KeyState::Revoked, now())
+                .record_cutoff_applied(&row.grant_id, KeyAnswer {
+                    key_id: &record.key_id.to_string(),
+                    expires_at: expires_as_i64(record.expires_at),
+                    local_end: end,
+                    now: started,
+                })
                 .await
                 .map_err(store_failure);
         }
         let ttl = Duration::from_secs(remaining as u64);
         match pocox_pb::renew_credential(&self.relay, key_id, ttl).await {
             Ok(renewed) => {
-                let foreign = renewed.label.as_deref() != Some(row.label.as_str());
-                if foreign {
+                if renewed.label.as_deref() != Some(row.label.as_str()) {
                     tracing::error!(grant = %row.grant_id, "a retiring key id answered with another label");
-                    return self
-                        .store
-                        .end_key(&row.grant_id, KeyState::Dead, now())
-                        .await
-                        .map_err(store_failure);
+                    return self.end_row(row, KeyState::Dead).await;
                 }
                 if renewed.namespace.to_string() != row.namespace {
                     tracing::error!(grant = %row.grant_id, "a retiring key is in another namespace; revoking");
                     self.revoke_key(key_id).await?;
-                    return self
-                        .store
-                        .end_key(&row.grant_id, KeyState::Revoked, now())
-                        .await
-                        .map_err(store_failure);
+                    return self.end_row(row, KeyState::Revoked).await;
                 }
                 self.store
-                    .record_key_expiry(&row.grant_id, expires_as_i64(renewed.expires_at), now())
+                    .record_cutoff_applied(&row.grant_id, KeyAnswer {
+                        key_id: &renewed.key_id.to_string(),
+                        expires_at: expires_as_i64(renewed.expires_at),
+                        local_end: end,
+                        now: unix_now(),
+                    })
                     .await
                     .map_err(store_failure)
             },
             Err(error) => match RelayFailure::classify(&error) {
-                RelayFailure::KeyDead => self
-                    .store
-                    .end_key(&row.grant_id, KeyState::Expired, now())
-                    .await
-                    .map_err(store_failure),
+                RelayFailure::KeyDead => self.end_row(row, KeyState::Expired).await,
                 other => Err(other),
             },
         }
     }
 
-    /// Whether a kind of operation needs the relay at all.
-    pub(super) fn has_relay_work(kind: OperationKind) -> bool {
-        !matches!(kind, OperationKind::Rotate | OperationKind::Decide)
+    async fn end_row(&self, row: &RelayKeyRow, state: KeyState) -> Result<(), RelayFailure> {
+        self.store
+            .end_key(&row.grant_id, state, unix_now())
+            .await
+            .map_err(store_failure)
     }
 }
 

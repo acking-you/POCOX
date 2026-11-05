@@ -77,9 +77,13 @@ pub(super) async fn create_request(
         .code_checks
         .charge(bucket.0, at)
         .map_err(|wait| PairingError::retry_later(PairingErrorCode::RateLimited, wait))?;
-    pairing
+    let backend = pairing
         .charge_backend("restore_requests", pairing.settings.limits.restore_requests_backend, at)
-        .await?;
+        .await;
+    if let Err(error) = backend {
+        pairing.limiters.code_checks.refund(bucket.0);
+        return Err(error);
+    }
     let created = pairing
         .store
         .create_restore_request(
@@ -173,7 +177,7 @@ pub(super) async fn confirm(
             .map_or(&b""[..], |hint| hint.key.as_bytes()),
     ]);
     if let Some(operation) = pairing.replay(&request.operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation).await;
+        return pairing.respond_to_operation(&operation, false).await;
     }
     pairing.require_capable_relay().await?;
     let at = now();
@@ -183,13 +187,13 @@ pub(super) async fn confirm(
         .as_ref()
         .map(|hint| pairing.hint_lookup(hint))
         .transpose()?;
+    let bucket = pairing.client_bucket(peer, &headers);
     let verified_ticket;
     let approved_request;
     let (proof, target_id): (RestoreProof<'_>, &str) =
         match (request.ticket.as_deref(), request.request_id.as_deref()) {
             (Some(ticket), None) => {
                 let target = request.target_device_id.as_deref().ok_or_else(invalid)?;
-                let bucket = pairing.client_bucket(peer, &headers);
                 pairing.charge_code_check(bucket, at).await?;
                 verified_ticket = pairing
                     .keys
@@ -199,12 +203,13 @@ pub(super) async fn confirm(
                             && ticket.caller_generation == caller.access.session.generation
                     })
                     .ok_or(PairingError::code(PairingErrorCode::PreviewStale))?;
-                pairing.limiters.code_checks.refund(bucket.0);
+                pairing.credit_valid_code(bucket, at)?;
                 (
                     RestoreProof::Ticket {
                         source_revision: verified_ticket.source_revision,
                         code_device_id: &verified_ticket.target_device_id,
                         code_generation: verified_ticket.code_generation,
+                        code_pause_epoch: verified_ticket.code_pause_epoch,
                         destination_user_id: &verified_ticket.user_id,
                         destination_revision: verified_ticket.revision,
                     },
@@ -226,26 +231,26 @@ pub(super) async fn confirm(
             },
             _ => return Err(invalid()),
         };
-    let operation = pairing
-        .store
-        .prepare_restore(RestoreInput {
-            meta: OperationMeta {
-                id: &request.operation_id,
-                fingerprint: &print,
-                actor_device_id: &caller.access.device.id,
-                actor_secret_hash: &hash,
-                now: at,
-            },
-            generation: caller.access.session.generation,
-            target_device_id: target_id,
-            proof,
-            retake,
-            hardware: binding(lookup.as_deref(), request.hint.as_ref()),
-            overlap_secs: pairing.settings.overlap_secs,
-            retake_limit: pairing.settings.retake_limit,
-            retake_window_secs: pairing.settings.retake_window_secs,
+    let prepared = pairing
+        .metered_prepare(&caller.access.device.id, bucket, at, || {
+            pairing.store.prepare_restore(RestoreInput {
+                meta: OperationMeta {
+                    id: &request.operation_id,
+                    fingerprint: &print,
+                    actor_device_id: &caller.access.device.id,
+                    actor_secret_hash: &hash,
+                    now: at,
+                },
+                generation: caller.access.session.generation,
+                target_device_id: target_id,
+                proof,
+                retake,
+                hardware: binding(lookup.as_deref(), request.hint.as_ref()),
+                overlap_secs: pairing.settings.overlap_secs,
+                retake_limit: pairing.settings.retake_limit,
+                retake_window_secs: pairing.settings.retake_window_secs,
+            })
         })
         .await?;
-    let driven = pairing.drive_in_foreground(operation).await?;
-    pairing.respond_to_operation(&driven).await
+    pairing.finish_mutation(prepared).await
 }

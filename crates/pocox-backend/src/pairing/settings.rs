@@ -42,6 +42,14 @@ pub struct PairingSettings {
     /// How long a cached relay status is believed where a stale one cannot
     /// harm.
     pub relay_status_ttl: Duration,
+    /// How long a request may wait for the relay's status before going on
+    /// without it.
+    pub relay_probe_wait: Duration,
+    /// How long the relay's service listing is shared between device callers.
+    pub services_snapshot_ttl: Duration,
+    /// How long a pairing request may take to send its body, before it counts
+    /// toward the concurrent request limit.
+    pub body_read_timeout: Duration,
 }
 
 impl Default for PairingSettings {
@@ -61,6 +69,9 @@ impl Default for PairingSettings {
             reconcile_interval: Duration::from_secs(15),
             sweep_interval: Duration::from_secs(300),
             relay_status_ttl: Duration::from_secs(30),
+            relay_probe_wait: Duration::from_secs(1),
+            services_snapshot_ttl: Duration::from_secs(3),
+            body_read_timeout: Duration::from_secs(5),
         }
     }
 }

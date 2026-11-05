@@ -80,6 +80,7 @@ fn status_of(code: PairingErrorCode) -> StatusCode {
         | Code::AlreadyLinked
         | Code::GroupFull => StatusCode::CONFLICT,
         Code::RestoreSlotsFull | Code::RateLimited => StatusCode::TOO_MANY_REQUESTS,
+        Code::Unknown => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
 
@@ -130,6 +131,7 @@ impl From<Refusal> for PairingError {
             Refusal::NotFound => Self::code(Code::NotFound),
             Refusal::SlotsFull => Self::code(Code::RestoreSlotsFull),
             Refusal::NotActivated => Self::code(Code::DeviceNotActivated),
+            Refusal::CapacityFull => Self::retry_later(Code::RelayCapacity, 300),
             Refusal::TooSoon {
                 retry_after,
             } => Self::retry_later(Code::RateLimited, retry_after),

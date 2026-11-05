@@ -253,6 +253,32 @@ pub struct CredentialRecord {
     pub expires_at: u64,
 }
 
+/// One credential, if the relay still accepts it. Reads without changing
+/// anything, so it costs no slot in the relay's replay window and is safe to
+/// ask before a renew or a revoke: those act on whichever key holds an id now.
+pub async fn live_credential(
+    session: &RelaySession,
+    key_id: u64,
+) -> Result<Option<CredentialRecord>> {
+    let shown = session.admin()?.show_key(key_id).await;
+    let key = match shown {
+        Ok(key) => key,
+        Err(pb_mapper::Error::Remote {
+            code, ..
+        }) if code == "temporary_key_not_found" => return Ok(None),
+        Err(error) => {
+            return Err(anyhow::Error::new(error)
+                .context(format!("showing credential {key_id} on {}", session.relay_addr)));
+        },
+    };
+    Ok((key.state == "active").then_some(CredentialRecord {
+        key_id: key.key_id,
+        namespace: key.namespace,
+        label: key.label,
+        expires_at: key.expires_at,
+    }))
+}
+
 /// Every credential the relay currently accepts.
 ///
 /// Filtered to live keys: the table retains expired and revoked ones until a

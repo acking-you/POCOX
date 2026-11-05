@@ -19,10 +19,15 @@ mod routes_group;
 mod routes_link;
 mod routes_restore;
 mod service;
+mod services;
 mod settings;
 mod transitions;
 
-pub(crate) use address::{validate_trusted_proxies, PeerAddr};
+#[cfg(test)]
+mod tests;
+
+pub use address::TrustedProxies;
+pub(crate) use address::{address_bucket, validate_trusted_proxies, PeerAddr};
 pub use error::PairingError;
 pub use limits::{PairingLimits, Rate};
 pub(crate) use routes::{check_protocol, is_device_token, router};

@@ -11,6 +11,7 @@ use pocox_account_proto::pairing::{
 use pocox_store::pairing::{OperationKind, OperationMeta, RemoveInput};
 use serde::Deserialize;
 
+use super::address::PeerAddr;
 use super::error::{PairingError, PairingResult};
 use super::routes::{gate, now, require_current, require_operation_id, PairJson};
 use super::service::fingerprint;
@@ -97,9 +98,9 @@ pub(super) async fn rename(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub(super) struct RemoveQuery {
-    operation_id: String,
+    operation_id: Option<String>,
 }
 
 /// `DELETE /v1/devices/{id}?operation_id=…`: remove a peer from the caller's
@@ -107,33 +108,39 @@ pub(super) struct RemoveQuery {
 /// completion.
 pub(super) async fn remove(
     State(state): State<AppState>,
+    PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
     Path(id): Path<String>,
     Query(query): Query<RemoveQuery>,
 ) -> PairingResult<Response> {
     let (pairing, caller) = gate(&state, &headers).await?;
     require_current(&caller)?;
-    require_operation_id(&query.operation_id)?;
+    let operation_id = query
+        .operation_id
+        .ok_or(PairingError::code(PairingErrorCode::InvalidRequest))?;
+    require_operation_id(&operation_id)?;
     let hash = caller.access.session.secret_hash.clone();
     let print = fingerprint(OperationKind::Remove.as_str(), &hash, &[id.as_bytes()]);
-    if let Some(operation) = pairing.replay(&query.operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation).await;
+    if let Some(operation) = pairing.replay(&operation_id, &print).await? {
+        return pairing.respond_to_operation(&operation, false).await;
     }
     pairing.require_capable_relay().await?;
-    let operation = pairing
-        .store
-        .prepare_remove(RemoveInput {
-            meta: OperationMeta {
-                id: &query.operation_id,
-                fingerprint: &print,
-                actor_device_id: &caller.access.device.id,
-                actor_secret_hash: &hash,
-                now: now(),
-            },
-            generation: caller.access.session.generation,
-            subject_device_id: &id,
+    let at = now();
+    let bucket = pairing.client_bucket(peer, &headers);
+    let prepared = pairing
+        .metered_prepare(&caller.access.device.id, bucket, at, || {
+            pairing.store.prepare_remove(RemoveInput {
+                meta: OperationMeta {
+                    id: &operation_id,
+                    fingerprint: &print,
+                    actor_device_id: &caller.access.device.id,
+                    actor_secret_hash: &hash,
+                    now: at,
+                },
+                generation: caller.access.session.generation,
+                subject_device_id: &id,
+            })
         })
         .await?;
-    let driven = pairing.drive_in_foreground(operation).await?;
-    pairing.respond_to_operation(&driven).await
+    pairing.finish_mutation(prepared).await
 }

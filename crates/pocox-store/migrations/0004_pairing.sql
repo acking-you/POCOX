@@ -29,9 +29,14 @@ CREATE TABLE devices (
     code_lookup           BLOB    NOT NULL UNIQUE,
     code_issued_at        INTEGER NOT NULL,
     code_paused           INTEGER NOT NULL DEFAULT 0 CHECK (code_paused IN (0, 1)),
+    -- Bumped on every pause, so resuming cannot revive a ticket from before it.
+    code_pause_epoch      INTEGER NOT NULL DEFAULT 0,
     created_at            INTEGER NOT NULL,
     joined_at             INTEGER NOT NULL,
     activated_at          INTEGER,
+    -- Never cleared, unlike activated_at, which a removal clears: retention tells a
+    -- device that was once in use from a first screen nobody continued.
+    first_activated_at    INTEGER,
     first_key_at          INTEGER,
     -- Days since the unix epoch.
     last_active_day       INTEGER NOT NULL,
@@ -111,6 +116,7 @@ CREATE TABLE pair_operations (
     -- The device whose code authorized this, and that code's generation.
     code_device_id         TEXT,
     code_generation        INTEGER,
+    code_pause_epoch       INTEGER,
     request_id             TEXT,
     -- The single-device user a leave or removal creates.
     new_user_id            TEXT,
@@ -121,6 +127,8 @@ CREATE TABLE pair_operations (
                                ('prepared', 'relay_applied', 'committed', 'failed')),
     -- Set before the first relay call: a failure after it can no longer undo.
     relay_started          INTEGER NOT NULL DEFAULT 0 CHECK (relay_started IN (0, 1)),
+    -- It committed without moving anyone. One such row per device and kind is kept.
+    no_op                  INTEGER NOT NULL DEFAULT 0 CHECK (no_op IN (0, 1)),
     result_code            TEXT,
     result_device_id       TEXT,
     attempts               INTEGER NOT NULL DEFAULT 0,
@@ -152,8 +160,14 @@ CREATE TABLE device_relay_keys (
     -- In the relay's clock, as its last answer stated. Only ever compared with
     -- another of the relay's answers, so no clock agreement is needed.
     expires_at     INTEGER,
+    -- The same moment in the backend's clock, from the lifetime it asked for. Good
+    -- enough to never lengthen a key; a deadline is enforced by the relay's own timer.
+    local_end      INTEGER,
     -- The backend-clock moment this key must never outlive.
     hard_cutoff    INTEGER,
+    -- The relay has not yet confirmed that cutoff. It stays owed through a failed
+    -- operation, so an old key cannot run on to its full life.
+    cutoff_pending INTEGER NOT NULL DEFAULT 0 CHECK (cutoff_pending IN (0, 1)),
     state          TEXT    NOT NULL CHECK (state IN
                        ('granting', 'active', 'revoked', 'expired', 'dead')),
     created_at     INTEGER NOT NULL,

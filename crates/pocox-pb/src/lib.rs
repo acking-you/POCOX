@@ -59,7 +59,7 @@ pub mod transport;
 
 pub use admin::{
     all_services, allocate_namespace, issue_credential, issue_credential_in_namespace,
-    live_credentials, relay_error_code, relay_instance_id, relay_status,
+    live_credential, live_credentials, relay_error_code, relay_instance_id, relay_status,
     relay_supports_key_namespaces, renew_credential, retire_service, revoke_credential,
     CredentialRecord, IssuedCredential, RelayStatus, ServiceRecord,
 };

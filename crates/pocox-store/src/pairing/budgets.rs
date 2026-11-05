@@ -47,4 +47,19 @@ impl Store {
         }
         Ok(BudgetVerdict::Admitted)
     }
+
+    /// Give one unit back to the current window, for a charge whose work was
+    /// refused before it cost anything.
+    pub async fn refund_budget(&self, name: &str, window_secs: i64, now: i64) -> Result<()> {
+        let window_start = now - now.rem_euclid(window_secs);
+        sqlx::query(
+            "UPDATE pairing_budgets SET used = MAX(used - 1, 0) WHERE name = ?1 AND window_start \
+             = ?2",
+        )
+        .bind(name)
+        .bind(window_start)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }

@@ -33,6 +33,9 @@ pub enum Refusal {
     /// The target's approval slots are full.
     #[error("the recovery slots are full")]
     SlotsFull,
+    /// Pairing keys are at their share of relay capacity.
+    #[error("pairing keys are at their share of relay capacity")]
+    CapacityFull,
     /// The device is not activated.
     #[error("the device is not activated")]
     NotActivated,

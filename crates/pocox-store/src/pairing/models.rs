@@ -161,12 +161,16 @@ pub struct Device {
     pub code_issued_at: i64,
     /// Whether linking through the code is paused.
     pub code_paused: bool,
+    /// Bumped on every pause. Bound into tickets, so resuming revives none.
+    pub code_pause_epoch: i64,
     /// Creation time.
     pub created_at: i64,
     /// When it entered its current user.
     pub joined_at: i64,
     /// When it was explicitly activated. A removal clears this.
     pub activated_at: Option<i64>,
+    /// When it was first activated. Never cleared.
+    pub first_activated_at: Option<i64>,
     /// When it first received a relay key.
     pub first_key_at: Option<i64>,
     /// The day it was last active, in days since the unix epoch.
@@ -260,6 +264,8 @@ pub struct PairOperation {
     pub code_device_id: Option<String>,
     /// That code's generation.
     pub code_generation: Option<i64>,
+    /// That code's pause epoch.
+    pub code_pause_epoch: Option<i64>,
     /// The approved recovery request that authorized this.
     pub request_id: Option<String>,
     /// The single-device user a leave or removal creates.
@@ -274,6 +280,8 @@ pub struct PairOperation {
     pub state: OperationState,
     /// Whether any relay call may have been made.
     pub relay_started: bool,
+    /// It committed without moving anyone.
+    pub no_op: bool,
     /// Stable error code of a failed operation.
     pub result_code: Option<String>,
     /// The device the actor's secret belongs to afterwards.
@@ -311,8 +319,12 @@ pub struct RelayKeyRow {
     pub key_id: Option<String>,
     /// Expiry in the relay's clock, as its last answer stated.
     pub expires_at: Option<i64>,
+    /// The same moment in the backend's clock.
+    pub local_end: Option<i64>,
     /// The backend-clock moment it must never outlive.
     pub hard_cutoff: Option<i64>,
+    /// The relay has not yet confirmed that cutoff.
+    pub cutoff_pending: bool,
     /// Its lifecycle.
     pub state: KeyState,
     /// Creation time.

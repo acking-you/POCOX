@@ -10,12 +10,17 @@ use super::refusal::Refusal;
 use crate::{Result, Store, StoreError};
 
 const KEY_COLUMNS: &str = "grant_id, device_id, generation, user_id, namespace, relay_instance, \
-                           label, key_id, expires_at, hard_cutoff, state, created_at, updated_at, \
-                           ended_at";
+                           label, key_id, expires_at, local_end, hard_cutoff, cutoff_pending, \
+                           state, created_at, updated_at, ended_at";
 
 /// How long a dead key still occupies a relay slot, plus a margin: the relay
 /// reclaims a tombstone after 60 seconds.
 const TOMBSTONE_MARGIN_SECS: i64 = 120;
+
+/// Counts the relay slots pairing keys occupy: live ones, plus dead ones the
+/// relay has not reclaimed yet.
+const COUNT_KEY_SLOTS: &str = "SELECT COUNT(*) FROM device_relay_keys
+     WHERE state IN ('granting', 'active') OR ended_at > ?1";
 
 /// The result of recording a relay namespace for a user.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +48,21 @@ pub struct NewGrant<'a> {
     pub relay_instance: &'a str,
     /// The exact label to issue with.
     pub label: &'a str,
+    /// Relay slots pairing keys may occupy.
+    pub slot_limit: i64,
+    /// The current time.
+    pub now: i64,
+}
+
+/// The relay's answer about one key.
+#[derive(Debug, Clone, Copy)]
+pub struct KeyAnswer<'a> {
+    /// The relay's key id, in canonical decimal.
+    pub key_id: &'a str,
+    /// Expiry in the relay's clock.
+    pub expires_at: i64,
+    /// The same moment in the backend's clock.
+    pub local_end: i64,
     /// The current time.
     pub now: i64,
 }
@@ -93,6 +113,8 @@ impl Store {
     ///
     /// Refuses unless the generation is current, the device is activated and no
     /// transition is under way, which serializes issuance against transitions.
+    /// The slot is counted and taken in this one transaction, so a burst
+    /// cannot pass the share.
     pub async fn open_grant(&self, grant: NewGrant<'_>) -> Result<RelayKeyRow> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let device = device_in(&mut tx, grant.device_id)
@@ -101,14 +123,21 @@ impl Store {
         if device.session_generation != grant.generation || device.user_id != grant.user_id {
             return Err(Refusal::SessionStale.into());
         }
-        if let Some(operation) = &device.pending_transition_id {
+        if device.pending_transition_id.is_some() {
             return Err(Refusal::TransitionPending {
-                operation_id: Some(operation.clone()),
+                operation_id: None,
             }
             .into());
         }
         if device.activated_at.is_none() {
             return Err(Refusal::NotActivated.into());
+        }
+        let (slots,): (i64,) = sqlx::query_as(COUNT_KEY_SLOTS)
+            .bind(grant.now - TOMBSTONE_MARGIN_SECS)
+            .fetch_one(&mut *tx)
+            .await?;
+        if slots >= grant.slot_limit {
+            return Err(Refusal::CapacityFull.into());
         }
         let inserted = sqlx::query(
             "INSERT INTO device_relay_keys (grant_id, device_id, generation, user_id, namespace, \
@@ -127,7 +156,7 @@ impl Store {
         .await;
         match inserted {
             Ok(_) => {},
-            // Another process holds this generation's one open grant.
+            // Another request already holds this generation's one open grant.
             Err(error) if is_unique_violation(&error) => {
                 return Err(Refusal::TransitionPending {
                     operation_id: None,
@@ -148,13 +177,7 @@ impl Store {
 
     /// Record the relay's answer to a grant or renewal, then decide whether the
     /// credential may be exposed. The key id is on record either way.
-    pub async fn record_key(
-        &self,
-        grant_id: &str,
-        key_id: &str,
-        expires_at: i64,
-        now: i64,
-    ) -> Result<GrantFate> {
+    pub async fn record_key(&self, grant_id: &str, answer: KeyAnswer<'_>) -> Result<GrantFate> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         let row = sqlx::query_as::<_, RelayKeyRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {KEY_COLUMNS} FROM device_relay_keys WHERE grant_id = ?1"
@@ -164,13 +187,14 @@ impl Store {
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
         sqlx::query(
-            "UPDATE device_relay_keys SET key_id = ?2, expires_at = ?3, state = 'active', \
-             updated_at = ?4 WHERE grant_id = ?1",
+            "UPDATE device_relay_keys SET key_id = ?2, expires_at = ?3, local_end = ?4, state = \
+             'active', updated_at = ?5 WHERE grant_id = ?1",
         )
         .bind(grant_id)
-        .bind(key_id)
-        .bind(expires_at)
-        .bind(now)
+        .bind(answer.key_id)
+        .bind(answer.expires_at)
+        .bind(answer.local_end)
+        .bind(answer.now)
         .execute(&mut *tx)
         .await?;
         let fate = match device_in(&mut tx, &row.device_id).await? {
@@ -183,7 +207,7 @@ impl Store {
                     "UPDATE devices SET first_key_at = COALESCE(first_key_at, ?2) WHERE id = ?1",
                 )
                 .bind(&row.device_id)
-                .bind(now)
+                .bind(answer.now)
                 .execute(&mut *tx)
                 .await?;
                 GrantFate::Expose
@@ -194,14 +218,18 @@ impl Store {
         Ok(fate)
     }
 
-    /// Note the expiry a retiring key's latest shortening reported.
-    pub async fn record_key_expiry(&self, grant_id: &str, expires_at: i64, now: i64) -> Result<()> {
+    /// Record the relay's confirmation that a retiring key ends by its cutoff.
+    /// Nothing is owed on it any more.
+    pub async fn record_cutoff_applied(&self, grant_id: &str, answer: KeyAnswer<'_>) -> Result<()> {
         sqlx::query(
-            "UPDATE device_relay_keys SET expires_at = ?2, updated_at = ?3 WHERE grant_id = ?1",
+            "UPDATE device_relay_keys SET key_id = ?2, expires_at = ?3, local_end = ?4, state = \
+             'active', cutoff_pending = 0, updated_at = ?5 WHERE grant_id = ?1",
         )
         .bind(grant_id)
-        .bind(expires_at)
-        .bind(now)
+        .bind(answer.key_id)
+        .bind(answer.expires_at)
+        .bind(answer.local_end)
+        .bind(answer.now)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -210,8 +238,8 @@ impl Store {
     /// Record that a key can no longer authenticate.
     pub async fn end_key(&self, grant_id: &str, state: KeyState, now: i64) -> Result<()> {
         sqlx::query(
-            "UPDATE device_relay_keys SET state = ?2, updated_at = ?3, ended_at = ?3
-             WHERE grant_id = ?1 AND state IN ('granting', 'active')",
+            "UPDATE device_relay_keys SET state = ?2, cutoff_pending = 0, updated_at = ?3, \
+             ended_at = ?3 WHERE grant_id = ?1 AND state IN ('granting', 'active')",
         )
         .bind(grant_id)
         .bind(state)
@@ -247,13 +275,20 @@ impl Store {
         Ok(row)
     }
 
-    /// Every key of a device that may still authenticate, across generations.
-    pub async fn device_open_keys(&self, device_id: &str) -> Result<Vec<RelayKeyRow>> {
+    /// Every key of a device that may still authenticate, up to and including
+    /// `generation`. An operation covers no key newer than the generation it
+    /// prepared.
+    pub async fn device_open_keys(
+        &self,
+        device_id: &str,
+        generation: i64,
+    ) -> Result<Vec<RelayKeyRow>> {
         let rows = sqlx::query_as::<_, RelayKeyRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {KEY_COLUMNS} FROM device_relay_keys
-             WHERE device_id = ?1 AND state IN ('granting', 'active')"
+             WHERE device_id = ?1 AND generation <= ?2 AND state IN ('granting', 'active')"
         )))
         .bind(device_id)
+        .bind(generation)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -263,6 +298,21 @@ impl Store {
     pub async fn open_keys(&self) -> Result<Vec<RelayKeyRow>> {
         let rows = sqlx::query_as::<_, RelayKeyRow>(sqlx::AssertSqlSafe(format!(
             "SELECT {KEY_COLUMNS} FROM device_relay_keys WHERE state IN ('granting', 'active')"
+        )))
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Keys whose cutoff the relay has not confirmed and that no open operation
+    /// is about to deal with: what a failed operation left behind.
+    pub async fn keys_owing_cutoff(&self) -> Result<Vec<RelayKeyRow>> {
+        let rows = sqlx::query_as::<_, RelayKeyRow>(sqlx::AssertSqlSafe(format!(
+            "SELECT {KEY_COLUMNS} FROM device_relay_keys k
+             WHERE cutoff_pending AND state IN ('granting', 'active')
+             AND NOT EXISTS (SELECT 1 FROM pair_operations o
+                 WHERE o.subject_device_id = k.device_id
+                 AND o.state IN ('prepared', 'relay_applied'))"
         )))
         .fetch_all(&self.pool)
         .await?;
@@ -283,13 +333,10 @@ impl Store {
     /// Relay slots pairing keys occupy: live ones, plus dead ones the relay has
     /// not reclaimed yet.
     pub async fn pairing_key_slots(&self, now: i64) -> Result<i64> {
-        let (count,): (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM device_relay_keys
-             WHERE state IN ('granting', 'active') OR ended_at > ?1",
-        )
-        .bind(now - TOMBSTONE_MARGIN_SECS)
-        .fetch_one(&self.pool)
-        .await?;
+        let (count,): (i64,) = sqlx::query_as(COUNT_KEY_SLOTS)
+            .bind(now - TOMBSTONE_MARGIN_SECS)
+            .fetch_one(&self.pool)
+            .await?;
         Ok(count)
     }
 

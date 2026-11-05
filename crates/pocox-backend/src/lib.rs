@@ -39,12 +39,18 @@ pub use config::{ServerConfig, TlsMode};
 pub use credentials::Credentials;
 use pocox_auth::Auth;
 use pocox_store::Store;
+pub use serve::ConnectionLimits;
 use tokio::net::TcpListener;
 
 /// Serve `router` over plain TCP through the real accept loop, forever. For
 /// local testing; a deployment goes through [`run`].
-pub async fn serve_plain(listener: TcpListener, router: axum::Router) {
-    serve::serve_http(listener, router, tls::TlsKind::Plain).await;
+pub async fn serve_plain(
+    listener: TcpListener,
+    router: axum::Router,
+    limits: ConnectionLimits,
+    trusted_proxies: pairing::TrustedProxies,
+) {
+    serve::serve_http(listener, router, tls::TlsKind::Plain, limits, trusted_proxies).await;
 }
 
 /// Run the backend (the HTTP API over the configured TLS layer) until a fatal
@@ -53,6 +59,11 @@ pub async fn run(cfg: ServerConfig) -> anyhow::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
 
     let store = Store::connect(&cfg.database_url).await?;
+
+    // Relay work is serialized by locks in this process, so a second process on
+    // this database could undo a removal. Held until this function returns,
+    // which is never.
+    let _database_owner = if cfg.pairing_secret.is_some() { store.lock_database()? } else { None };
 
     // Periodically purge expired device flows + refresh tokens so the tables
     // don't grow unbounded under device-flow churn / abandoned logins.
@@ -143,6 +154,7 @@ pub async fn run(cfg: ServerConfig) -> anyhow::Result<()> {
         "pocox backend up"
     );
 
-    serve::serve_http(http_listener, app, tls).await;
+    let trusted_proxies = pairing::TrustedProxies::parse(&cfg.trusted_proxies)?;
+    serve::serve_http(http_listener, app, tls, ConnectionLimits::default(), trusted_proxies).await;
     Ok(())
 }

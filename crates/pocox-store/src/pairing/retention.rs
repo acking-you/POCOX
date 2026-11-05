@@ -3,11 +3,16 @@
 //! Purging follows the revocation and transition boundary. A device, user or
 //! operation with an unresolved transition or a key that may still authenticate
 //! stays, whatever its age.
+//!
+//! This database also serves GitHub login, so a purge works in small batches,
+//! each its own short transaction, and never holds the writer for a whole
+//! sweep.
 
 use crate::{Result, Store};
 
 const DAY: i64 = 24 * 3600;
-/// An activated device lives this long without authenticated use or renewal.
+/// A device once activated lives this long without authenticated use or
+/// renewal.
 const ACTIVATED_RETENTION_SECS: i64 = 180 * DAY;
 /// A never-activated device lives this long after creation.
 const UNACTIVATED_RETENTION_SECS: i64 = 30 * DAY;
@@ -16,6 +21,8 @@ const UNACTIVATED_RETENTION_SECS: i64 = 30 * DAY;
 const DIAGNOSTIC_RETENTION_SECS: i64 = 7 * DAY;
 /// A dead key's row, past the relay reclaiming its slot.
 const DEAD_KEY_RETENTION_SECS: i64 = 3600;
+/// Rows removed in one transaction.
+const BATCH: i64 = 500;
 
 /// How many rows one purge removed.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -29,103 +36,145 @@ pub struct PurgeCounts {
 }
 
 impl Store {
-    /// Remove what retention no longer requires.
-    pub async fn purge_pairing(&self, now: i64) -> Result<PurgeCounts> {
+    /// Run one single-table delete, a batch at a time, until none is left.
+    /// `sql` takes `?1` as its cutoff and `?2` as the batch size.
+    async fn delete_in_batches(&self, sql: &'static str, cutoff: i64) -> Result<u64> {
+        let mut total = 0;
+        loop {
+            let removed = sqlx::query(sql)
+                .bind(cutoff)
+                .bind(BATCH)
+                .execute(&self.pool)
+                .await?
+                .rows_affected();
+            total += removed;
+            if removed < u64::try_from(BATCH).unwrap_or(u64::MAX) {
+                return Ok(total);
+            }
+        }
+    }
+
+    /// One batch of devices past their retention. Returns how many went.
+    async fn purge_device_batch(&self, now: i64) -> Result<u64> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
-        sqlx::query(
-            "UPDATE pair_restore_requests SET state = 'expired', updated_at = ?1
-             WHERE (state = 'pending' AND expires_at <= ?1)
-                OR (state = 'approved' AND approval_expires_at <= ?1)",
-        )
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
-        sqlx::query(
-            "DELETE FROM pair_restore_requests
-             WHERE state NOT IN ('pending', 'approved') AND updated_at <= ?1",
-        )
-        .bind(now - DIAGNOSTIC_RETENTION_SECS)
-        .execute(&mut *tx)
-        .await?;
-        // A device's age for retention: last use once activated, otherwise the
-        // moment it entered its current user, which a peer linking in never moves.
+        // A device's age for retention: last use once it has ever been activated,
+        // including one a removal has since deactivated; otherwise the moment it
+        // entered its current user, which a peer linking in never moves. A
+        // group with an open operation holds still: a purge moving its revision
+        // would fail that operation.
         let doomed: Vec<(String, String)> = sqlx::query_as(
             "SELECT id, user_id FROM devices d
              WHERE pending_transition_id IS NULL
-             AND ((activated_at IS NOT NULL AND last_active_day * 86400 <= ?1)
-               OR (activated_at IS NULL AND joined_at <= ?2))
+             AND ((first_activated_at IS NOT NULL AND last_active_day * 86400 <= ?1)
+               OR (first_activated_at IS NULL AND joined_at <= ?2))
              AND NOT EXISTS (SELECT 1 FROM device_relay_keys k
                  WHERE k.device_id = d.id AND k.state IN ('granting', 'active'))
              AND NOT EXISTS (SELECT 1 FROM pair_operations o
                  WHERE o.state IN ('prepared', 'relay_applied')
                  AND (o.subject_device_id = d.id OR o.actor_device_id = d.id
-                      OR o.code_device_id = d.id))",
+                      OR o.code_device_id = d.id OR o.source_user_id = d.user_id
+                      OR o.destination_user_id = d.user_id))
+             LIMIT ?3",
         )
         .bind(now - ACTIVATED_RETENTION_SECS)
         .bind(now - UNACTIVATED_RETENTION_SECS)
+        .bind(BATCH)
         .fetch_all(&mut *tx)
         .await?;
-        let mut counts = PurgeCounts::default();
-        for (device_id, user_id) in doomed {
+        for (device_id, user_id) in &doomed {
             sqlx::query("DELETE FROM devices WHERE id = ?1")
-                .bind(&device_id)
+                .bind(device_id)
                 .execute(&mut *tx)
                 .await?;
             sqlx::query(
                 "UPDATE device_users SET membership_revision = membership_revision + 1 WHERE id = \
                  ?1",
             )
-            .bind(&user_id)
+            .bind(user_id)
             .execute(&mut *tx)
             .await?;
-            counts.devices += 1;
         }
+        tx.commit().await?;
+        Ok(doomed.len() as u64)
+    }
+
+    /// Remove what retention no longer requires.
+    pub async fn purge_pairing(&self, now: i64) -> Result<PurgeCounts> {
+        let diagnostic = now - DIAGNOSTIC_RETENTION_SECS;
         sqlx::query(
-            "DELETE FROM device_sessions WHERE state != 'current' AND retired_at <= ?1
-             AND (grace_deadline IS NULL OR grace_deadline <= ?1)",
+            "UPDATE pair_restore_requests SET state = 'expired', updated_at = ?1
+             WHERE (state = 'pending' AND expires_at <= ?1)
+                OR (state = 'approved' AND approval_expires_at <= ?1)",
         )
-        .bind(now - DIAGNOSTIC_RETENTION_SECS)
-        .execute(&mut *tx)
+        .bind(now)
+        .execute(&self.pool)
         .await?;
-        counts.operations = sqlx::query(
-            "DELETE FROM pair_operations
-             WHERE state IN ('committed', 'failed') AND completed_at <= ?1",
+        self.delete_in_batches(
+            "DELETE FROM pair_restore_requests WHERE rowid IN (
+                 SELECT rowid FROM pair_restore_requests
+                 WHERE state NOT IN ('pending', 'approved') AND updated_at <= ?1 LIMIT ?2)",
+            diagnostic,
         )
-        .bind(now - DIAGNOSTIC_RETENTION_SECS)
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        sqlx::query("DELETE FROM retired_codes WHERE retired_at <= ?1")
-            .bind(now - DIAGNOSTIC_RETENTION_SECS)
-            .execute(&mut *tx)
+        .await?;
+        let mut counts = PurgeCounts::default();
+        loop {
+            let removed = self.purge_device_batch(now).await?;
+            counts.devices += removed;
+            if removed < u64::try_from(BATCH).unwrap_or(u64::MAX) {
+                break;
+            }
+        }
+        self.delete_in_batches(
+            "DELETE FROM device_sessions WHERE rowid IN (
+                 SELECT rowid FROM device_sessions WHERE state != 'current' AND retired_at <= ?1
+                 AND (grace_deadline IS NULL OR grace_deadline <= ?1) LIMIT ?2)",
+            diagnostic,
+        )
+        .await?;
+        counts.operations = self
+            .delete_in_batches(
+                "DELETE FROM pair_operations WHERE rowid IN (
+                     SELECT rowid FROM pair_operations
+                     WHERE state IN ('committed', 'failed') AND completed_at <= ?1 LIMIT ?2)",
+                diagnostic,
+            )
             .await?;
-        sqlx::query(
-            "DELETE FROM device_relay_keys WHERE state NOT IN ('granting', 'active')
-             AND ended_at <= ?1
-             AND NOT EXISTS (SELECT 1 FROM pair_operations o
-                 WHERE o.state IN ('prepared', 'relay_applied')
-                 AND o.subject_device_id = device_relay_keys.device_id)",
+        self.delete_in_batches(
+            "DELETE FROM retired_codes WHERE rowid IN (
+                 SELECT rowid FROM retired_codes WHERE retired_at <= ?1 LIMIT ?2)",
+            diagnostic,
         )
-        .bind(now - DEAD_KEY_RETENTION_SECS)
-        .execute(&mut *tx)
+        .await?;
+        self.delete_in_batches(
+            "DELETE FROM device_relay_keys WHERE rowid IN (
+                 SELECT rowid FROM device_relay_keys WHERE state NOT IN ('granting', 'active')
+                 AND ended_at <= ?1
+                 AND NOT EXISTS (SELECT 1 FROM pair_operations o
+                     WHERE o.state IN ('prepared', 'relay_applied')
+                     AND o.subject_device_id = device_relay_keys.device_id)
+                 LIMIT ?2)",
+            now - DEAD_KEY_RETENTION_SECS,
+        )
         .await?;
         // A user goes last, once no device, open operation or live key refers to it.
         // The relay does not hand its number out again, and the unique index catches
         // a relay that lost its state and does.
-        counts.users = sqlx::query(
-            "DELETE FROM device_users WHERE id NOT IN (SELECT user_id FROM devices)
-             AND id NOT IN (SELECT user_id FROM device_relay_keys
-                 WHERE state IN ('granting', 'active'))
-             AND id NOT IN (SELECT source_user_id FROM pair_operations
-                 WHERE state IN ('prepared', 'relay_applied'))
-             AND id NOT IN (SELECT destination_user_id FROM pair_operations
-                 WHERE state IN ('prepared', 'relay_applied')
-                 AND destination_user_id IS NOT NULL)",
-        )
-        .execute(&mut *tx)
-        .await?
-        .rows_affected();
-        tx.commit().await?;
+        counts.users = self
+            .delete_in_batches(
+                "DELETE FROM device_users WHERE rowid IN (
+                     SELECT rowid FROM device_users WHERE created_at <= ?1
+                     AND id NOT IN (SELECT user_id FROM devices)
+                     AND id NOT IN (SELECT user_id FROM device_relay_keys
+                         WHERE state IN ('granting', 'active'))
+                     AND id NOT IN (SELECT source_user_id FROM pair_operations
+                         WHERE state IN ('prepared', 'relay_applied'))
+                     AND id NOT IN (SELECT destination_user_id FROM pair_operations
+                         WHERE state IN ('prepared', 'relay_applied')
+                         AND destination_user_id IS NOT NULL)
+                     LIMIT ?2)",
+                now,
+            )
+            .await?;
         Ok(counts)
     }
 }

@@ -92,6 +92,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pocox-backend
 ```
 
+With `POCOX_PAIRING_SECRET` set, run **one backend process per database**. Relay work is serialized
+by locks in that process, so the backend takes a file lock beside the database at startup
+(`<database>.owner.lock`) and a second process refuses to start.
+
 ## Relay configuration (REQUIRED)
 
 ```bash

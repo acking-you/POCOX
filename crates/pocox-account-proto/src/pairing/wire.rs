@@ -49,6 +49,9 @@ pub enum MembershipChangeKind {
     /// Another device removed this one. Host nothing until an explicit
     /// Continue.
     Removed,
+    /// A kind this client does not know, from a newer backend.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Request body for `POST /v1/pair/device`.
@@ -200,6 +203,9 @@ pub enum RestoreRequestStatus {
     Expired,
     /// The target's group or generation changed, or the requester moved on.
     Stale,
+    /// A status this client does not know, from a newer backend.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Response to `POST /v1/pair/restore/requests` and
@@ -346,6 +352,9 @@ pub enum OperationKind {
     Rotate,
     /// Answer a recovery request.
     Decide,
+    /// A kind this client does not know, from a newer backend.
+    #[serde(other)]
+    Unknown,
 }
 
 /// Where an operation stands.
@@ -358,6 +367,9 @@ pub enum OperationStatus {
     Completed,
     /// It ended without changing membership. See [`OperationView::error`].
     Failed,
+    /// A status this client does not know, from a newer backend.
+    #[serde(other)]
+    Unknown,
 }
 
 /// The result of a durable operation, returned with 202 while pending and from
@@ -373,8 +385,11 @@ pub struct OperationView {
     /// Why it failed.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<PairingErrorCode>,
-    /// For a completed operation: a session freshly issued only because the
-    /// presented secret is still current. Results store no bearer material.
+    /// A session freshly issued for this response, never stored. Present on
+    /// `GET /v1/pair/operations/{id}` when the presented secret is current and
+    /// idle, and on the response of the request that really moved this
+    /// device. A no-op, a replay or a removal of a peer carries none:
+    /// refresh with the secret.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session: Option<DeviceSession>,
 }

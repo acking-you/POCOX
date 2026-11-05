@@ -63,11 +63,11 @@ pub(super) async fn preview(
     if target.code_paused {
         return Err(PairingError::code(PairingErrorCode::LinkingPaused));
     }
-    // A valid code refunds its charge: only guesses stay on the meter.
-    pairing.limiters.code_checks.refund(bucket.0);
     if target.id == caller.access.device.id {
         return Err(PairingError::code(PairingErrorCode::OwnCode));
     }
+    // A valid code refunds its charge: only guesses stay on the meter.
+    pairing.credit_valid_code(bucket, at)?;
     let group = pairing
         .store
         .device_access(&target.id, target.session_generation)
@@ -81,6 +81,7 @@ pub(super) async fn preview(
         source_revision: caller.access.user.membership_revision,
         target_device_id: target.id.clone(),
         code_generation: target.code_generation,
+        code_pause_epoch: target.code_pause_epoch,
         user_id: group.id.clone(),
         revision: group.membership_revision,
         exp,
@@ -115,7 +116,7 @@ pub(super) async fn link(
             .map_or(&b""[..], |hint| hint.key.as_bytes()),
     ]);
     if let Some(operation) = pairing.replay(&request.operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation).await;
+        return pairing.respond_to_operation(&operation, false).await;
     }
     pairing.require_capable_relay().await?;
     let at = now();
@@ -126,41 +127,43 @@ pub(super) async fn link(
         .verify_ticket(&request.ticket, at)
         .filter(|ticket| ticket.caller_device_id == caller.access.device.id)
         .ok_or(PairingError::code(PairingErrorCode::PreviewStale))?;
-    pairing.limiters.code_checks.refund(bucket.0);
+    pairing.credit_valid_code(bucket, at)?;
     let lookup = request
         .hint
         .as_ref()
         .map(|hint| pairing.hint_lookup(hint))
         .transpose()?;
-    let operation = pairing
-        .store
-        .prepare_link(LinkInput {
-            meta: OperationMeta {
-                id: &request.operation_id,
-                fingerprint: &print,
-                actor_device_id: &caller.access.device.id,
-                actor_secret_hash: &hash,
-                now: at,
-            },
-            generation: ticket.caller_generation,
-            source_revision: ticket.source_revision,
-            target_device_id: &ticket.target_device_id,
-            code_generation: ticket.code_generation,
-            destination_user_id: &ticket.user_id,
-            destination_revision: ticket.revision,
-            leave_current: request.leave_current,
-            hardware: binding(lookup.as_deref(), request.hint.as_ref()),
-            max_group_size: pairing.settings.max_group_size,
+    let prepared = pairing
+        .metered_prepare(&caller.access.device.id, bucket, at, || {
+            pairing.store.prepare_link(LinkInput {
+                meta: OperationMeta {
+                    id: &request.operation_id,
+                    fingerprint: &print,
+                    actor_device_id: &caller.access.device.id,
+                    actor_secret_hash: &hash,
+                    now: at,
+                },
+                generation: ticket.caller_generation,
+                source_revision: ticket.source_revision,
+                target_device_id: &ticket.target_device_id,
+                code_generation: ticket.code_generation,
+                code_pause_epoch: ticket.code_pause_epoch,
+                destination_user_id: &ticket.user_id,
+                destination_revision: ticket.revision,
+                leave_current: request.leave_current,
+                hardware: binding(lookup.as_deref(), request.hint.as_ref()),
+                max_group_size: pairing.settings.max_group_size,
+            })
         })
         .await?;
-    let driven = pairing.drive_in_foreground(operation).await?;
-    pairing.respond_to_operation(&driven).await
+    pairing.finish_mutation(prepared).await
 }
 
 /// `POST /v1/pair/leave`: move this device into a single-device user. A repeat
 /// is a no-op, never another new group.
 pub(super) async fn leave(
     State(state): State<AppState>,
+    PeerAddr(peer): PeerAddr,
     headers: HeaderMap,
     PairJson(request): PairJson<LeaveRequest>,
 ) -> PairingResult<Response> {
@@ -170,22 +173,24 @@ pub(super) async fn leave(
     let hash = caller.access.session.secret_hash.clone();
     let print = fingerprint(OperationKind::Leave.as_str(), &hash, &[]);
     if let Some(operation) = pairing.replay(&request.operation_id, &print).await? {
-        return pairing.respond_to_operation(&operation).await;
+        return pairing.respond_to_operation(&operation, false).await;
     }
     pairing.require_capable_relay().await?;
-    let operation = pairing
-        .store
-        .prepare_leave(
-            OperationMeta {
-                id: &request.operation_id,
-                fingerprint: &print,
-                actor_device_id: &caller.access.device.id,
-                actor_secret_hash: &hash,
-                now: now(),
-            },
-            caller.access.session.generation,
-        )
+    let at = now();
+    let bucket = pairing.client_bucket(peer, &headers);
+    let prepared = pairing
+        .metered_prepare(&caller.access.device.id, bucket, at, || {
+            pairing.store.prepare_leave(
+                OperationMeta {
+                    id: &request.operation_id,
+                    fingerprint: &print,
+                    actor_device_id: &caller.access.device.id,
+                    actor_secret_hash: &hash,
+                    now: at,
+                },
+                caller.access.session.generation,
+            )
+        })
         .await?;
-    let driven = pairing.drive_in_foreground(operation).await?;
-    pairing.respond_to_operation(&driven).await
+    pairing.finish_mutation(prepared).await
 }

@@ -24,6 +24,9 @@ pub struct PreviewTicket {
     pub target_device_id: String,
     /// That code's generation. A rotation invalidates the ticket.
     pub code_generation: i64,
+    /// That code's pause epoch. A pause invalidates the ticket, even after a
+    /// resume.
+    pub code_pause_epoch: i64,
     /// The group the user saw.
     pub user_id: String,
     /// That group's membership revision.
@@ -64,6 +67,7 @@ mod tests {
             source_revision: 0,
             target_device_id: "target".into(),
             code_generation: 1,
+            code_pause_epoch: 0,
             user_id: "user".into(),
             revision: 3,
             exp,

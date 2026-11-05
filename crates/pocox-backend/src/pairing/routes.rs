@@ -18,9 +18,9 @@ use pocox_account_proto::pairing::{
 use pocox_auth::pairing::hash_device_secret;
 use pocox_auth::{DeviceCaller, Principal, SessionMode};
 use pocox_store::pairing::{
-    NewDevice, NewDeviceOutcome, OperationKind, OperationState, PairOperation,
+    DeviceAccess, NewDevice, NewDeviceOutcome, OperationKind, OperationState, PairOperation,
+    Prepared,
 };
-use tower_http::limit::RequestBodyLimitLayer;
 
 use super::address::PeerAddr;
 use super::error::{PairingError, PairingResult};
@@ -55,24 +55,44 @@ pub(crate) fn router(state: AppState) -> Router<AppState> {
         )
         .route("/v1/devices/{id}/restore", post(super::routes_restore::decide))
         .route("/v1/pair/operations/{id}", get(operation))
-        .layer(RequestBodyLimitLayer::new(MAX_BODY_BYTES))
         .layer(middleware::from_fn_with_state(state, shared_limits))
 }
 
 /// Codes and tokens pass through these responses, so nothing may cache them;
 /// and only so many pairing requests run at once.
+///
+/// The body is read before a slot is taken, under its own short bound.
+/// Otherwise one client stalling its uploads could hold every slot while
+/// sending nothing.
 async fn shared_limits(State(state): State<AppState>, request: Request, next: Next) -> Response {
-    let permit = match &state.pairing {
-        Some(pairing) => match pairing.request_slots.try_acquire() {
-            Ok(permit) => Some(permit),
-            Err(_) => {
-                return PairingError::retry_later(PairingErrorCode::RateLimited, 1).into_response();
-            },
-        },
-        None => None,
+    let Some(pairing) = state.pairing.clone() else {
+        return no_store(next.run(request).await);
     };
-    let mut response = next.run(request).await;
+    let (parts, body) = request.into_parts();
+    let body = axum::body::to_bytes(body, MAX_BODY_BYTES);
+    let bytes = match tokio::time::timeout(pairing.settings.body_read_timeout, body).await {
+        Ok(Ok(bytes)) => bytes,
+        Ok(Err(_)) => {
+            let error = PairingError::code(PairingErrorCode::InvalidRequest).into_response();
+            return no_store((StatusCode::PAYLOAD_TOO_LARGE, error).into_response());
+        },
+        Err(_) => {
+            let error = PairingError::code(PairingErrorCode::InvalidRequest).into_response();
+            return no_store((StatusCode::REQUEST_TIMEOUT, error).into_response());
+        },
+    };
+    let permit = match pairing.enter() {
+        Ok(permit) => permit,
+        Err(error) => return no_store(error.into_response()),
+    };
+    let response = next
+        .run(Request::from_parts(parts, axum::body::Body::from(bytes)))
+        .await;
     drop(permit);
+    no_store(response)
+}
+
+fn no_store(mut response: Response) -> Response {
     response
         .headers_mut()
         .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
@@ -207,10 +227,12 @@ impl Pairing {
         Ok(Some(self.auth.issue_device_session(&access, at)?))
     }
 
-    /// An operation as the client sees it.
+    /// An operation as the client sees it. `with_session` says whether this
+    /// response may carry a fresh session: see [`Self::finish_mutation`].
     pub(super) async fn operation_view(
         &self,
         operation: &PairOperation,
+        with_session: bool,
         at: i64,
     ) -> PairingResult<OperationView> {
         let (status, error, session) = match operation.state {
@@ -228,8 +250,12 @@ impl Pairing {
             OperationState::Committed => (
                 OperationStatus::Completed,
                 None,
-                self.session_for_secret(&operation.actor_secret_hash, at)
-                    .await?,
+                if with_session {
+                    self.session_for_secret(&operation.actor_secret_hash, at)
+                        .await?
+                } else {
+                    None
+                },
             ),
         };
         Ok(OperationView {
@@ -247,15 +273,57 @@ impl Pairing {
     pub(super) async fn respond_to_operation(
         &self,
         operation: &PairOperation,
+        with_session: bool,
     ) -> PairingResult<Response> {
-        let view = self.operation_view(operation, now()).await?;
+        let view = self.operation_view(operation, with_session, now()).await?;
         match view.status {
-            OperationStatus::Pending => Ok((StatusCode::ACCEPTED, Json(view)).into_response()),
-            OperationStatus::Completed => Ok((StatusCode::OK, Json(view)).into_response()),
             OperationStatus::Failed => {
                 Err(PairingError::code(view.error.unwrap_or(PairingErrorCode::PreviewStale)))
             },
+            OperationStatus::Completed => Ok((StatusCode::OK, Json(view)).into_response()),
+            OperationStatus::Pending | OperationStatus::Unknown => {
+                Ok((StatusCode::ACCEPTED, Json(view)).into_response())
+            },
         }
+    }
+
+    /// Drive what a mutation prepared and answer it.
+    ///
+    /// The answer carries a session only if this very request moved this
+    /// device, whose old token it just killed. A no-op, a replay or a
+    /// removal of a peer moved nobody, and a token that could renew itself
+    /// by asking for one would never need the secret again: a restored
+    /// `config.toml` would stay signed in forever.
+    pub(super) async fn finish_mutation(
+        self: &Arc<Self>,
+        prepared: Prepared,
+    ) -> PairingResult<Response> {
+        let moved_caller = prepared.is_new
+            && !prepared.operation.no_op
+            && matches!(
+                prepared.operation.kind,
+                OperationKind::Link
+                    | OperationKind::Leave
+                    | OperationKind::Restore
+                    | OperationKind::Retake
+            );
+        let driven = self.drive_in_foreground(prepared.operation).await?;
+        self.respond_to_operation(&driven, moved_caller).await
+    }
+
+    /// `transition_pending` for a device reached by its secret. The operation's
+    /// id goes only to the device that asked for it.
+    async fn pending_refusal(&self, access: &DeviceAccess, secret_hash: &[u8]) -> PairingError {
+        let own = match &access.device.pending_transition_id {
+            Some(id) => self.store.operation(id).await.ok().flatten(),
+            None => None,
+        }
+        .filter(|operation| operation.actor_secret_hash == secret_hash)
+        .map(|operation| operation.id);
+        pocox_store::Refusal::TransitionPending {
+            operation_id: own,
+        }
+        .into()
     }
 
     /// If `id` was already used, this request is a retry: its result, or a
@@ -343,10 +411,7 @@ async fn create_device(
     // A pending device still answers with its status; only a current, idle one gets
     // a session here.
     if access.device.pending_transition_id.is_some() || access.session.grace_deadline.is_some() {
-        return Err(pocox_store::Refusal::TransitionPending {
-            operation_id: access.device.pending_transition_id.clone(),
-        }
-        .into());
+        return Err(pairing.pending_refusal(&access, &hash).await);
     }
     let session = state.auth.issue_device_session(&access, at)?;
     Ok(Json(session).into_response())
@@ -382,9 +447,9 @@ async fn operation(
         .await?
         .filter(|operation| operation.actor_secret_hash == hash)
         .ok_or(PairingError::code(PairingErrorCode::OperationUnknown))?;
-    let view = pairing.operation_view(&found, now()).await?;
+    let view = pairing.operation_view(&found, true, now()).await?;
     let status = match view.status {
-        OperationStatus::Pending => StatusCode::ACCEPTED,
+        OperationStatus::Pending | OperationStatus::Unknown => StatusCode::ACCEPTED,
         OperationStatus::Completed | OperationStatus::Failed => StatusCode::OK,
     };
     Ok((status, Json(view)).into_response())

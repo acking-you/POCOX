@@ -37,6 +37,10 @@ pub struct PairingLimits {
     pub code_checks_per_address: Rate,
     /// Code checks across the backend.
     pub code_checks_backend: Rate,
+    /// Checks that proved a valid code, per address. These refund the limit
+    /// above, so they need their own or one address could spend the
+    /// backend's budget for free.
+    pub valid_codes_per_address: Rate,
     /// New devices per address.
     pub new_devices_per_address: Rate,
     /// New devices across the backend.
@@ -45,6 +49,24 @@ pub struct PairingLimits {
     pub first_keys_per_address: Rate,
     /// First relay keys across the backend.
     pub first_keys_backend: Rate,
+    /// Later relay keys across the backend. Renewing an existing key is free.
+    pub key_regrants_backend: Rate,
+    /// Relay issues per device, whatever kept the last one from sticking.
+    pub key_grants_per_device: Rate,
+    /// Namespaces allocated across the backend.
+    pub namespace_allocations_backend: Rate,
+    /// Links, leaves, removals and restores per device.
+    pub moves_per_device: Rate,
+    /// Links, leaves, removals and restores per address.
+    pub moves_per_address: Rate,
+    /// Links, leaves, removals and restores across the backend.
+    pub moves_backend: Rate,
+    /// Service deregistrations per device.
+    pub deregistrations_per_device: Rate,
+    /// Service deregistrations per address.
+    pub deregistrations_per_address: Rate,
+    /// Service retirements reaching the relay, across the backend.
+    pub deregistrations_backend: Rate,
     /// Recovery requests across the backend.
     pub restore_requests_backend: Rate,
     /// Pairing requests handled at once.
@@ -60,10 +82,20 @@ impl Default for PairingLimits {
         Self {
             code_checks_per_address: Rate::new(5, 600),
             code_checks_backend: Rate::new(100, 1),
+            valid_codes_per_address: Rate::new(60, 600),
             new_devices_per_address: Rate::new(20, 3600),
             new_devices_backend: Rate::new(1000, 3600),
             first_keys_per_address: Rate::new(10, 3600),
             first_keys_backend: Rate::new(1000, 3600),
+            key_regrants_backend: Rate::new(3600, 3600),
+            key_grants_per_device: Rate::new(30, 3600),
+            namespace_allocations_backend: Rate::new(1000, 3600),
+            moves_per_device: Rate::new(20, 3600),
+            moves_per_address: Rate::new(60, 3600),
+            moves_backend: Rate::new(1000, 3600),
+            deregistrations_per_device: Rate::new(30, 600),
+            deregistrations_per_address: Rate::new(60, 600),
+            deregistrations_backend: Rate::new(600, 600),
             restore_requests_backend: Rate::new(1000, 3600),
             concurrent_requests: 256,
             concurrent_grants: 16,

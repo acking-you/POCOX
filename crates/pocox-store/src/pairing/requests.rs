@@ -9,7 +9,9 @@ use uuid::Uuid;
 
 use super::devices::{device_in, group_size_in, user_in};
 use super::models::{Device, DeviceUser, OperationKind, RestoreRequest, RestoreRequestState};
-use super::prepare::{existing_operation, insert_terminal_operation, OperationMeta};
+use super::prepare::{
+    existing_operation, insert_terminal_operation, refuse_if_transitioning, OperationMeta,
+};
 use super::refusal::Refusal;
 use crate::{Result, Store};
 
@@ -132,10 +134,15 @@ pub(super) async fn require_approved_in(
         && request.target_user_id == group.id
         && request.target_revision == group.membership_revision;
     if live {
-        Ok(())
-    } else {
-        Err(Refusal::Stale.into())
+        return Ok(());
     }
+    // Stale means the target or its group changed, so what the user saw is out of
+    // date: a stale preview like any other. Anything else simply no longer
+    // applies.
+    if request.state == RestoreRequestState::Stale {
+        return Err(Refusal::PreviewStale.into());
+    }
+    Err(Refusal::Stale.into())
 }
 
 impl Store {
@@ -161,9 +168,9 @@ impl Store {
         if requester.session_generation != generation {
             return Err(Refusal::SessionStale.into());
         }
-        if let Some(operation) = &requester.pending_transition_id {
+        if requester.pending_transition_id.is_some() {
             return Err(Refusal::TransitionPending {
-                operation_id: Some(operation.clone()),
+                operation_id: None,
             }
             .into());
         }
@@ -280,12 +287,7 @@ impl Store {
         if actor.session_generation != input.generation {
             return Err(Refusal::SessionStale.into());
         }
-        if let Some(operation) = &actor.pending_transition_id {
-            return Err(Refusal::TransitionPending {
-                operation_id: Some(operation.clone()),
-            }
-            .into());
-        }
+        refuse_if_transitioning(&mut tx, &actor, meta.actor_secret_hash).await?;
         let target = device_in(&mut tx, input.target_device_id)
             .await?
             .filter(|target| target.user_id == actor.user_id)
@@ -314,24 +316,33 @@ impl Store {
         .bind(meta.now)
         .execute(&mut *tx)
         .await?;
-        insert_terminal_operation(&mut tx, meta, OperationKind::Decide, &target).await?;
+        insert_terminal_operation(&mut tx, meta, OperationKind::Decide, &target, false).await?;
         tx.commit().await?;
         Ok(())
     }
 
-    /// Open requests about a group's devices, with each requester's name,
-    /// newest first and bounded.
+    /// Open requests about a group's devices that a member can still answer,
+    /// with each requester's name, newest first and bounded. A request
+    /// whose target or group has changed since it was made is undecidable,
+    /// so it is not offered.
     pub async fn pending_restore_requests(
         &self,
         user_id: &str,
         limit: i64,
         now: i64,
     ) -> Result<Vec<(RestoreRequest, String)>> {
-        let rows = sqlx::query_as::<_, RestoreRequest>(sqlx::AssertSqlSafe(format!(
-            "SELECT {REQUEST_COLUMNS} FROM pair_restore_requests
-             WHERE target_user_id = ?1 AND state = 'pending' AND expires_at > ?2
-             ORDER BY created_at DESC LIMIT ?3"
-        )))
+        let rows = sqlx::query_as::<_, RestoreRequest>(
+            "SELECT r.id, r.requester_device_id, r.target_device_id, r.target_user_id, \
+             r.target_generation, r.target_revision, r.state, r.created_at, r.expires_at, \
+             r.approval_expires_at, r.updated_at
+             FROM pair_restore_requests r
+             JOIN devices d ON d.id = r.target_device_id
+             JOIN device_users u ON u.id = d.user_id
+             WHERE r.target_user_id = ?1 AND r.state = 'pending' AND r.expires_at > ?2
+             AND d.user_id = r.target_user_id AND d.session_generation = r.target_generation
+             AND u.membership_revision = r.target_revision
+             ORDER BY r.created_at DESC LIMIT ?3",
+        )
         .bind(user_id)
         .bind(now)
         .bind(limit)

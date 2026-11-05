@@ -25,9 +25,10 @@ use crate::{Result, Store};
 pub(super) const OPERATION_COLUMNS: &str =
     "id, kind, fingerprint, actor_device_id, actor_secret_hash, subject_device_id, \
      subject_generation, source_user_id, source_revision, destination_user_id, \
-     destination_revision, code_device_id, code_generation, request_id, new_user_id, \
-     hardware_lookup, hardware_source, grace_deadline, state, relay_started, result_code, \
-     result_device_id, attempts, next_attempt_at, created_at, updated_at, completed_at";
+     destination_revision, code_device_id, code_generation, code_pause_epoch, request_id, \
+     new_user_id, hardware_lookup, hardware_source, grace_deadline, state, relay_started, no_op, \
+     result_code, result_device_id, attempts, next_attempt_at, created_at, updated_at, \
+     completed_at";
 
 const PREVIEW_STALE: &str = "preview_stale";
 const STALE: &str = "stale";
@@ -167,6 +168,7 @@ async fn commit_blocker(
         let holds_code = device_in(conn, code_device).await?.is_some_and(|holder| {
             holder.user_id == destination_id
                 && holder.code_generation == code_generation
+                && Some(holder.code_pause_epoch) == operation.code_pause_epoch
                 && !holder.code_paused
         });
         if !holds_code {
@@ -258,7 +260,8 @@ async fn fail_in(
                     .execute(&mut *conn)
                     .await?;
                     sqlx::query(
-                        "UPDATE device_relay_keys SET hard_cutoff = NULL, updated_at = ?3
+                        "UPDATE device_relay_keys SET hard_cutoff = NULL, cutoff_pending = 0, \
+                         updated_at = ?3
                          WHERE device_id = ?1 AND generation = ?2 AND hard_cutoff IS NOT NULL",
                     )
                     .bind(&subject.id)
@@ -320,7 +323,8 @@ async fn apply_link(
     .await?;
     sqlx::query(
         "UPDATE devices SET user_id = ?2, joined_at = ?3, activated_at = COALESCE(activated_at, \
-         ?3), last_transition_kind = ?4, last_transition_at = ?3, pending_transition_id = NULL
+         ?3), first_activated_at = COALESCE(first_activated_at, ?3), last_transition_kind = ?4, \
+         last_transition_at = ?3, pending_transition_id = NULL
          WHERE id = ?1",
     )
     .bind(&subject.id)
@@ -418,8 +422,9 @@ async fn apply_restore(
         .await?;
     let kind = if retake { TransitionKind::Retaken } else { TransitionKind::Restored };
     sqlx::query(
-        "UPDATE devices SET activated_at = COALESCE(activated_at, ?2), last_transition_kind = ?3, \
-         last_transition_at = ?2, pending_transition_id = NULL WHERE id = ?1",
+        "UPDATE devices SET activated_at = COALESCE(activated_at, ?2), first_activated_at = \
+         COALESCE(first_activated_at, ?2), last_transition_kind = ?3, last_transition_at = ?2, \
+         pending_transition_id = NULL WHERE id = ?1",
     )
     .bind(&target.id)
     .bind(now)
@@ -487,9 +492,11 @@ impl Store {
         Ok(operations)
     }
 
-    /// Note that relay calls may now have been made, before making them.
-    pub async fn mark_relay_started(&self, id: &str, now: i64) -> Result<()> {
-        sqlx::query(
+    /// Note that relay calls may now have been made, before making them. False
+    /// when the operation is no longer prepared, so its relay work is not
+    /// this caller's to do.
+    pub async fn mark_relay_started(&self, id: &str, now: i64) -> Result<bool> {
+        let marked = sqlx::query(
             "UPDATE pair_operations SET relay_started = 1, attempts = attempts + 1, updated_at = \
              ?2 WHERE id = ?1 AND state = 'prepared'",
         )
@@ -497,7 +504,7 @@ impl Store {
         .bind(now)
         .execute(&self.pool)
         .await?;
-        Ok(())
+        Ok(marked.rows_affected() == 1)
     }
 
     /// Record that the relay confirmed its part.

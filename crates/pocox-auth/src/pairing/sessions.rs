@@ -139,8 +139,19 @@ impl Auth {
         };
         if access.device.pending_transition_id.is_some() || access.session.grace_deadline.is_some()
         {
+            // A device being removed or restored by someone else learns the outcome
+            // from a later refresh: that operation is not its own to read.
+            let operation_id = match &access.device.pending_transition_id {
+                Some(id) => self
+                    .store
+                    .operation(id)
+                    .await?
+                    .filter(|operation| operation.actor_secret_hash == hash)
+                    .map(|operation| operation.id),
+                None => None,
+            };
             return Err(AuthError::TransitionPending {
-                operation_id: access.device.pending_transition_id.clone(),
+                operation_id,
             });
         }
         self.store.touch_device(&access.device.id, now).await?;
@@ -155,6 +166,11 @@ impl Auth {
     pub async fn authenticate_device(&self, claims: &Claims, now: i64) -> Result<DeviceCaller> {
         if self.pairing.is_none() {
             return Err(AuthError::PairingDisabled);
+        }
+        // The token library allows a minute's leeway. A device session gets none: its
+        // secret refreshes it at no cost, and an expired token is an expired token.
+        if now >= claims.exp {
+            return Err(AuthError::SessionStale);
         }
         let Some(Principal::Device {
             device_id,

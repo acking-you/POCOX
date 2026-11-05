@@ -7,7 +7,9 @@
 
 use sqlx::SqliteConnection;
 
-use super::devices::{device_in, group_size_in, new_user_id, user_in, HardwareBinding};
+use super::devices::{
+    activate_in, device_in, group_size_in, new_user_id, user_in, HardwareBinding,
+};
 use super::models::{Device, OperationKind, OperationState, PairOperation};
 use super::operations::OPERATION_COLUMNS;
 use super::refusal::Refusal;
@@ -28,6 +30,31 @@ pub struct OperationMeta<'a> {
     pub now: i64,
 }
 
+/// What preparing an operation came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prepared {
+    /// The operation as it stands.
+    pub operation: PairOperation,
+    /// False when the id had already been used: this request is a replay.
+    pub is_new: bool,
+}
+
+impl Prepared {
+    fn new(operation: PairOperation) -> Self {
+        Self {
+            operation,
+            is_new: true,
+        }
+    }
+
+    fn replay(operation: PairOperation) -> Self {
+        Self {
+            operation,
+            is_new: false,
+        }
+    }
+}
+
 /// What a confirmed link names.
 #[derive(Debug, Clone, Copy)]
 pub struct LinkInput<'a> {
@@ -41,6 +68,8 @@ pub struct LinkInput<'a> {
     pub target_device_id: &'a str,
     /// That code's generation in the ticket.
     pub code_generation: i64,
+    /// That code's pause epoch in the ticket.
+    pub code_pause_epoch: i64,
     /// The group the user confirmed.
     pub destination_user_id: &'a str,
     /// That group's revision in the ticket.
@@ -75,6 +104,8 @@ pub enum RestoreProof<'a> {
         code_device_id: &'a str,
         /// That code's generation in the ticket.
         code_generation: i64,
+        /// That code's pause epoch in the ticket.
+        code_pause_epoch: i64,
         /// The group the ticket confirmed.
         destination_user_id: &'a str,
         /// That group's revision in the ticket.
@@ -122,11 +153,13 @@ pub(super) struct NewOperation<'a> {
     pub destination_revision: Option<i64>,
     pub code_device_id: Option<&'a str>,
     pub code_generation: Option<i64>,
+    pub code_pause_epoch: Option<i64>,
     pub request_id: Option<&'a str>,
     pub new_user_id: Option<&'a str>,
     pub hardware: Option<HardwareBinding<'a>>,
     pub grace_deadline: Option<i64>,
     pub state: OperationState,
+    pub no_op: bool,
 }
 
 /// The operation a retry names, or `None` for a new id. Reusing an id with
@@ -167,8 +200,9 @@ pub(super) async fn insert_operation(
          subject_device_id, subject_generation, source_user_id, source_revision, \
          destination_user_id, destination_revision, code_device_id, code_generation, request_id, \
          new_user_id, hardware_lookup, hardware_source, grace_deadline, state, result_device_id, \
-         created_at, updated_at, completed_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, \
-         ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?21, ?22)",
+         created_at, updated_at, completed_at, code_pause_epoch, no_op) VALUES (?1, ?2, ?3, ?4, \
+         ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?21, \
+         ?22, ?23, ?24)",
     )
     .bind(new.meta.id)
     .bind(new.kind)
@@ -192,6 +226,8 @@ pub(super) async fn insert_operation(
     .bind(terminal.then_some(new.meta.actor_device_id))
     .bind(new.meta.now)
     .bind(terminal.then_some(new.meta.now))
+    .bind(new.code_pause_epoch)
+    .bind(new.no_op)
     .execute(&mut *conn)
     .await?;
     let inserted = operation_in(conn, new.meta.id)
@@ -207,7 +243,19 @@ pub(super) async fn insert_terminal_operation(
     meta: OperationMeta<'_>,
     kind: OperationKind,
     subject: &Device,
+    no_op: bool,
 ) -> Result<PairOperation> {
+    if no_op {
+        // A no-op changes nothing worth keeping two records of, and each one is free
+        // to repeat. One row per device and kind bounds what that costs the database.
+        sqlx::query(
+            "DELETE FROM pair_operations WHERE actor_device_id = ?1 AND kind = ?2 AND no_op",
+        )
+        .bind(meta.actor_device_id)
+        .bind(kind)
+        .execute(&mut *conn)
+        .await?;
+    }
     let user = user_in(conn, &subject.user_id)
         .await?
         .ok_or(sqlx::Error::RowNotFound)?;
@@ -222,23 +270,34 @@ pub(super) async fn insert_terminal_operation(
         destination_revision: None,
         code_device_id: None,
         code_generation: None,
+        code_pause_epoch: None,
         request_id: None,
         new_user_id: None,
         hardware: None,
         grace_deadline: None,
         state: OperationState::Committed,
+        no_op,
     })
     .await
 }
 
-fn refuse_if_transitioning(device: &Device) -> Result<()> {
-    match &device.pending_transition_id {
-        Some(operation) => Err(Refusal::TransitionPending {
-            operation_id: Some(operation.clone()),
-        }
-        .into()),
-        None => Ok(()),
+pub(super) async fn refuse_if_transitioning(
+    conn: &mut SqliteConnection,
+    device: &Device,
+    secret_hash: &[u8],
+) -> Result<()> {
+    let Some(pending) = &device.pending_transition_id else {
+        return Ok(());
+    };
+    // Its id is only for whoever asked for it: a device being removed by a peer
+    // learns the outcome from its refresh.
+    let own = operation_in(conn, pending)
+        .await?
+        .is_some_and(|operation| operation.actor_secret_hash == secret_hash);
+    Err(Refusal::TransitionPending {
+        operation_id: own.then(|| pending.clone()),
     }
+    .into())
 }
 
 /// Refuse while another device is transitioning. Its operation is not the
@@ -312,30 +371,64 @@ async fn revoke_grace_sessions(
     Ok(())
 }
 
+/// Owe the relay a cutoff on a device's open keys, in `generation` or in all of
+/// them.
+///
+/// The debt outlives the operation. If the operation fails after touching the
+/// relay, the worker still enforces it, so an old key cannot run on to its full
+/// life. A key already ending by then owes nothing.
+async fn owe_key_cutoffs(
+    conn: &mut SqliteConnection,
+    device_id: &str,
+    generation: Option<i64>,
+    cutoff: i64,
+    now: i64,
+) -> Result<()> {
+    sqlx::query(
+        "UPDATE device_relay_keys SET
+             cutoff_pending = CASE WHEN local_end IS NOT NULL AND local_end <= ?3 THEN 0 ELSE 1 \
+         END,
+             hard_cutoff = MIN(COALESCE(hard_cutoff, ?3), ?3),
+             updated_at = ?4
+         WHERE device_id = ?1 AND (?2 IS NULL OR generation = ?2)
+         AND state IN ('granting', 'active')",
+    )
+    .bind(device_id)
+    .bind(generation)
+    .bind(cutoff)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
+
 impl Store {
     /// Persist a confirmed link, or read a retry's result.
     ///
     /// A link to a device already in the caller's user is a no-op success,
-    /// which is how opposite-direction links converge. Anything else that
-    /// changed since the preview is `PreviewStale`.
-    pub async fn prepare_link(&self, input: LinkInput<'_>) -> Result<PairOperation> {
+    /// which is how opposite-direction links converge. The user still confirmed
+    /// this group, so it activates the device like any other link. Anything
+    /// else that changed since the preview is `PreviewStale`.
+    pub async fn prepare_link(&self, input: LinkInput<'_>) -> Result<Prepared> {
         let meta = input.meta;
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         if let Some(operation) = existing_operation(&mut tx, meta.id, meta.fingerprint).await? {
-            return Ok(operation);
+            return Ok(Prepared::replay(operation));
         }
         let subject = device_in(&mut tx, meta.actor_device_id)
             .await?
             .ok_or(Refusal::SessionStale)?;
-        refuse_if_transitioning(&subject)?;
+        refuse_if_transitioning(&mut tx, &subject, meta.actor_secret_hash).await?;
         let target = device_in(&mut tx, input.target_device_id)
             .await?
             .ok_or(Refusal::PreviewStale)?;
         if target.user_id == subject.user_id {
+            activate_in(&mut tx, &subject, input.hardware, meta.now).await?;
             let done =
-                insert_terminal_operation(&mut tx, meta, OperationKind::Link, &subject).await?;
+                insert_terminal_operation(&mut tx, meta, OperationKind::Link, &subject, true)
+                    .await?;
             tx.commit().await?;
-            return Ok(done);
+            return Ok(Prepared::new(done));
         }
         refuse_if_other_transitioning(&target)?;
         let source = user_in(&mut tx, &subject.user_id)
@@ -352,6 +445,7 @@ impl Store {
         if target.user_id != input.destination_user_id
             || destination.membership_revision != input.destination_revision
             || target.code_generation != input.code_generation
+            || target.code_pause_epoch != input.code_pause_epoch
             || target.code_paused
         {
             return Err(Refusal::PreviewStale.into());
@@ -375,17 +469,20 @@ impl Store {
             destination_revision: Some(destination.membership_revision),
             code_device_id: Some(&target.id),
             code_generation: Some(target.code_generation),
+            code_pause_epoch: Some(target.code_pause_epoch),
             request_id: None,
             new_user_id: None,
             hardware: input.hardware,
             grace_deadline: None,
             state: OperationState::Prepared,
+            no_op: false,
         })
         .await?;
         begin_transition(&mut tx, &subject.id, meta.id, meta.now).await?;
         revoke_grace_sessions(&mut tx, &subject.id, meta.now).await?;
+        owe_key_cutoffs(&mut tx, &subject.id, None, meta.now, meta.now).await?;
         tx.commit().await?;
-        Ok(operation)
+        Ok(Prepared::new(operation))
     }
 
     /// Persist moving the caller out of its group, or read a retry's result. A
@@ -395,10 +492,10 @@ impl Store {
         &self,
         meta: OperationMeta<'_>,
         generation: i64,
-    ) -> Result<PairOperation> {
+    ) -> Result<Prepared> {
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         if let Some(operation) = existing_operation(&mut tx, meta.id, meta.fingerprint).await? {
-            return Ok(operation);
+            return Ok(Prepared::replay(operation));
         }
         let subject = device_in(&mut tx, meta.actor_device_id)
             .await?
@@ -406,27 +503,28 @@ impl Store {
         if subject.session_generation != generation {
             return Err(Refusal::SessionStale.into());
         }
-        refuse_if_transitioning(&subject)?;
+        refuse_if_transitioning(&mut tx, &subject, meta.actor_secret_hash).await?;
         if group_size_in(&mut tx, &subject.user_id).await? <= 1 {
             let done =
-                insert_terminal_operation(&mut tx, meta, OperationKind::Leave, &subject).await?;
+                insert_terminal_operation(&mut tx, meta, OperationKind::Leave, &subject, true)
+                    .await?;
             tx.commit().await?;
-            return Ok(done);
+            return Ok(Prepared::new(done));
         }
         let operation = prepare_departure(&mut tx, meta, OperationKind::Leave, &subject).await?;
         tx.commit().await?;
-        Ok(operation)
+        Ok(Prepared::new(operation))
     }
 
     /// Persist removing a peer from the actor's current user, or read a retry's
     /// result. The actor's own membership is rechecked here, so a concurrent
     /// removal of the actor cannot authorize a later action on its former
     /// peers.
-    pub async fn prepare_remove(&self, input: RemoveInput<'_>) -> Result<PairOperation> {
+    pub async fn prepare_remove(&self, input: RemoveInput<'_>) -> Result<Prepared> {
         let meta = input.meta;
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         if let Some(operation) = existing_operation(&mut tx, meta.id, meta.fingerprint).await? {
-            return Ok(operation);
+            return Ok(Prepared::replay(operation));
         }
         let actor = device_in(&mut tx, meta.actor_device_id)
             .await?
@@ -434,7 +532,7 @@ impl Store {
         if actor.session_generation != input.generation {
             return Err(Refusal::SessionStale.into());
         }
-        refuse_if_transitioning(&actor)?;
+        refuse_if_transitioning(&mut tx, &actor, meta.actor_secret_hash).await?;
         let subject = device_in(&mut tx, input.subject_device_id)
             .await?
             .filter(|subject| subject.user_id == actor.user_id && subject.id != actor.id)
@@ -442,7 +540,7 @@ impl Store {
         refuse_if_other_transitioning(&subject)?;
         let operation = prepare_departure(&mut tx, meta, OperationKind::Remove, &subject).await?;
         tx.commit().await?;
-        Ok(operation)
+        Ok(Prepared::new(operation))
     }
 
     /// Persist a confirmed recovery, or read a retry's result.
@@ -450,11 +548,11 @@ impl Store {
     /// Fixes the retiring generation's deadline at this moment, before its keys
     /// are shortened and before any replacement exists, so nothing later
     /// can extend it.
-    pub async fn prepare_restore(&self, input: RestoreInput<'_>) -> Result<PairOperation> {
+    pub async fn prepare_restore(&self, input: RestoreInput<'_>) -> Result<Prepared> {
         let meta = input.meta;
         let mut tx = self.pool.begin_with("BEGIN IMMEDIATE").await?;
         if let Some(operation) = existing_operation(&mut tx, meta.id, meta.fingerprint).await? {
-            return Ok(operation);
+            return Ok(Prepared::replay(operation));
         }
         let requester = device_in(&mut tx, meta.actor_device_id)
             .await?
@@ -462,7 +560,7 @@ impl Store {
         if requester.session_generation != input.generation {
             return Err(Refusal::SessionStale.into());
         }
-        refuse_if_transitioning(&requester)?;
+        refuse_if_transitioning(&mut tx, &requester, meta.actor_secret_hash).await?;
         if requester.activated_at.is_some() || group_size_in(&mut tx, &requester.user_id).await? > 1
         {
             return Err(Refusal::Stale.into());
@@ -481,6 +579,7 @@ impl Store {
                 source_revision,
                 code_device_id,
                 code_generation,
+                code_pause_epoch,
                 destination_user_id,
                 destination_revision,
             } => {
@@ -491,6 +590,7 @@ impl Store {
                 let holds_code = code_holder.as_ref().is_some_and(|holder| {
                     holder.user_id == destination_user_id
                         && holder.code_generation == code_generation
+                        && holder.code_pause_epoch == code_pause_epoch
                         && !holder.code_paused
                 });
                 if !holds_code
@@ -500,7 +600,7 @@ impl Store {
                 {
                     return Err(Refusal::PreviewStale.into());
                 }
-                code_device = Some((code_device_id, code_generation));
+                code_device = Some((code_device_id, code_generation, code_pause_epoch));
             },
             RestoreProof::Request {
                 request_id: id,
@@ -514,6 +614,7 @@ impl Store {
         }
         refuse_if_other_transitioning(&target)?;
         refuse_if_group_busy(&mut tx, &target.user_id).await?;
+        refuse_if_group_busy(&mut tx, &requester.user_id).await?;
         if input.retake {
             refuse_if_retake_spent(&target, &input)?;
         }
@@ -527,13 +628,15 @@ impl Store {
             source_revision: group.membership_revision,
             destination_user_id: Some(&target.user_id),
             destination_revision: Some(group.membership_revision),
-            code_device_id: code_device.map(|(id, _)| id),
-            code_generation: code_device.map(|(_, generation)| generation),
+            code_device_id: code_device.map(|(id, _, _)| id),
+            code_generation: code_device.map(|(_, generation, _)| generation),
+            code_pause_epoch: code_device.map(|(_, _, epoch)| epoch),
             request_id,
             new_user_id: None,
             hardware: input.hardware,
             grace_deadline: Some(deadline),
             state: OperationState::Prepared,
+            no_op: false,
         })
         .await?;
         begin_transition(&mut tx, &target.id, meta.id, deadline).await?;
@@ -542,24 +645,23 @@ impl Store {
             .bind(meta.id)
             .execute(&mut *tx)
             .await?;
+        // The retiring generation's keys never outlive its deadline from here on,
+        // whatever a retry or a delayed earlier request does. A retake ends them all.
         if input.retake {
             revoke_grace_sessions(&mut tx, &target.id, meta.now).await?;
+            owe_key_cutoffs(&mut tx, &target.id, None, deadline, meta.now).await?;
+        } else {
+            owe_key_cutoffs(
+                &mut tx,
+                &target.id,
+                Some(target.session_generation),
+                deadline,
+                meta.now,
+            )
+            .await?;
         }
-        // The retiring generation's keys never outlive its deadline from here on,
-        // whatever a retry or a delayed earlier request does.
-        sqlx::query(
-            "UPDATE device_relay_keys SET hard_cutoff = MIN(COALESCE(hard_cutoff, ?3), ?3),
-             updated_at = ?4 WHERE device_id = ?1 AND generation = ?2
-             AND state IN ('granting', 'active')",
-        )
-        .bind(&target.id)
-        .bind(target.session_generation)
-        .bind(deadline)
-        .bind(meta.now)
-        .execute(&mut *tx)
-        .await?;
         tx.commit().await?;
-        Ok(operation)
+        Ok(Prepared::new(operation))
     }
 }
 
@@ -601,14 +703,17 @@ async fn prepare_departure(
         destination_revision: None,
         code_device_id: None,
         code_generation: None,
+        code_pause_epoch: None,
         request_id: None,
         new_user_id: Some(&reserved_user),
         hardware: None,
         grace_deadline: None,
         state: OperationState::Prepared,
+        no_op: false,
     })
     .await?;
     begin_transition(conn, &subject.id, meta.id, meta.now).await?;
     revoke_grace_sessions(conn, &subject.id, meta.now).await?;
+    owe_key_cutoffs(conn, &subject.id, None, meta.now, meta.now).await?;
     Ok(operation)
 }

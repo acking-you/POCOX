@@ -6,13 +6,14 @@ use uuid::Uuid;
 use super::codes::next_free_code;
 use super::models::{Device, DeviceSessionRow, DeviceUser};
 use super::refusal::Refusal;
-use crate::{Result, Store};
+use crate::{Result, Store, StoreError};
 
 pub(super) const DEVICE_COLUMNS: &str =
     "id, user_id, label, platform, hardware_lookup, hardware_source, session_generation, \
-     code_generation, code_lookup, code_issued_at, code_paused, created_at, joined_at, \
-     activated_at, first_key_at, last_active_day, last_transition_kind, last_transition_at, \
-     pending_transition_id, retake_window_start, retake_count";
+     code_generation, code_lookup, code_issued_at, code_paused, code_pause_epoch, created_at, \
+     joined_at, activated_at, first_activated_at, first_key_at, last_active_day, \
+     last_transition_kind, last_transition_at, pending_transition_id, retake_window_start, \
+     retake_count";
 
 pub(super) const SESSION_COLUMNS: &str = "device_id, generation, secret_hash, original_user_id, \
                                           state, grace_deadline, retired_at, created_at";
@@ -125,6 +126,37 @@ pub(super) async fn bind_hardware_in(
         .execute(&mut *conn)
         .await?;
     Ok(())
+}
+
+/// Mark a device activated, binding an optional hint and cancelling its own
+/// recovery requests. Returns when it was activated.
+pub(super) async fn activate_in(
+    conn: &mut SqliteConnection,
+    device: &Device,
+    hardware: Option<HardwareBinding<'_>>,
+    now: i64,
+) -> Result<i64> {
+    let activated_at = device.activated_at.unwrap_or(now);
+    sqlx::query(
+        "UPDATE devices SET activated_at = ?2, first_activated_at = COALESCE(first_activated_at, \
+         ?2) WHERE id = ?1",
+    )
+    .bind(&device.id)
+    .bind(activated_at)
+    .execute(&mut *conn)
+    .await?;
+    if let Some(binding) = hardware {
+        bind_hardware_in(conn, &device.id, binding).await?;
+    }
+    sqlx::query(
+        "UPDATE pair_restore_requests SET state = 'stale', updated_at = ?2
+         WHERE requester_device_id = ?1 AND state IN ('pending', 'approved')",
+    )
+    .bind(&device.id)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?;
+    Ok(activated_at)
 }
 
 async fn access_by_secret_in(
@@ -305,29 +337,13 @@ impl Store {
         if device.session_generation != generation {
             return Err(Refusal::SessionStale.into());
         }
-        if let Some(operation) = &device.pending_transition_id {
+        if device.pending_transition_id.is_some() {
             return Err(Refusal::TransitionPending {
-                operation_id: Some(operation.clone()),
+                operation_id: None,
             }
             .into());
         }
-        let activated_at = device.activated_at.unwrap_or(now);
-        sqlx::query("UPDATE devices SET activated_at = ?2 WHERE id = ?1")
-            .bind(device_id)
-            .bind(activated_at)
-            .execute(&mut *tx)
-            .await?;
-        if let Some(binding) = hardware {
-            bind_hardware_in(&mut tx, device_id, binding).await?;
-        }
-        sqlx::query(
-            "UPDATE pair_restore_requests SET state = 'stale', updated_at = ?2
-             WHERE requester_device_id = ?1 AND state IN ('pending', 'approved')",
-        )
-        .bind(device_id)
-        .bind(now)
-        .execute(&mut *tx)
-        .await?;
+        let activated_at = activate_in(&mut tx, &device, hardware, now).await?;
         tx.commit().await?;
         Ok(activated_at)
     }
@@ -389,6 +405,39 @@ impl Store {
         Ok(user_in(&mut conn, user_id)
             .await?
             .and_then(|user| user.namespace))
+    }
+
+    /// Hold the database for this process, until the returned file is dropped.
+    ///
+    /// Relay work is serialized by locks in this process, so two processes on
+    /// one database could undo each other's revocations. `Ok(None)` for an
+    /// in-memory database, which no other process can open.
+    pub fn lock_database(&self) -> Result<Option<std::fs::File>> {
+        let path = self.pool.connect_options().get_filename().to_path_buf();
+        let name = path.to_string_lossy();
+        if name.is_empty() || name.starts_with("file:") || name == ":memory:" {
+            return Ok(None);
+        }
+        let lock_path = format!("{name}.owner.lock");
+        let file = std::fs::File::options()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&lock_path)
+            .map_err(|source| StoreError::DatabaseLock {
+                path: lock_path.clone(),
+                source,
+            })?;
+        match file.try_lock() {
+            Ok(()) => Ok(Some(file)),
+            Err(std::fs::TryLockError::WouldBlock) => Err(StoreError::DatabaseInUse {
+                path: lock_path,
+            }),
+            Err(std::fs::TryLockError::Error(source)) => Err(StoreError::DatabaseLock {
+                path: lock_path,
+                source,
+            }),
+        }
     }
 
     /// Whether any pairing state exists, which makes a pairing key change

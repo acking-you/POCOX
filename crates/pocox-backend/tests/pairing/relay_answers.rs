@@ -384,6 +384,7 @@ async fn crashed_grant(
             namespace: &namespace_text,
             relay_instance: &instance,
             label: &label,
+            slot_limit: 1000,
             now: unix_now(),
         })
         .await

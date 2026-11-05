@@ -4,14 +4,15 @@ use std::time::Instant;
 
 use pocox_account_proto::pairing::PairingErrorCode;
 use pocox_pb::{relay_error_code, CredentialRecord, RelayStatus};
+use pocox_store::pairing::RelayKeyRow;
 
 use super::error::PairingError;
 use super::service::{CachedStatus, Pairing};
 
 /// A dead key answering a revoke or renew: `not_active` while its row lingers,
 /// `not_found` once reaped. Authoritative, so not a transport failure.
-pub(super) const KEY_NOT_ACTIVE: &str = "temporary_key_not_active";
-pub(super) const KEY_NOT_FOUND: &str = "temporary_key_not_found";
+const KEY_NOT_ACTIVE: &str = "temporary_key_not_active";
+const KEY_NOT_FOUND: &str = "temporary_key_not_found";
 const KEY_NOT_RENEWABLE: &str = "temporary_key_not_renewable";
 const NAMESPACE_NOT_ALLOCATED: &str = "namespace_not_allocated";
 const KEY_CAPACITY_EXHAUSTED: &str = "temporary_key_capacity_exhausted";
@@ -56,8 +57,32 @@ impl From<RelayFailure> for PairingError {
     }
 }
 
+/// What the relay says about a stored key id, asked before any renew or revoke,
+/// which act on whichever key holds an id now.
+pub(super) enum KeyCheck {
+    /// The expected key, with what the relay reports about it.
+    Ours(CredentialRecord),
+    /// Another tenant's key holds this id. Never exposed and never touched.
+    Foreign,
+    /// Ours by label, in another namespace: revoke and reissue.
+    Drifted,
+    /// No such key can authenticate.
+    Gone,
+}
+
+/// Clears the probe flag however the probing request ends, including when it is
+/// dropped.
+struct ProbeGuard<'a>(&'a Pairing);
+
+impl Drop for ProbeGuard<'_> {
+    fn drop(&mut self) {
+        self.0.probe.lock().expect("probe lock").in_flight = false;
+    }
+}
+
 impl Pairing {
-    /// Read the relay's status now, refreshing the cache.
+    /// Read the relay's status now, refreshing the cache. Waits as long as the
+    /// relay does, so a request-serving caller bounds it.
     pub(super) async fn fresh_status(&self) -> Result<RelayStatus, RelayFailure> {
         let status = pocox_pb::relay_status(&self.relay)
             .await
@@ -69,33 +94,89 @@ impl Pairing {
         Ok(status)
     }
 
-    /// The relay's status, cached where a slightly old answer cannot do harm.
-    /// Every call that names a stored key id uses [`Self::fresh_status`]
-    /// instead.
-    pub(super) async fn cached_status(&self) -> Result<RelayStatus, RelayFailure> {
-        let cached = self
-            .status
-            .lock()
-            .expect("status lock")
-            .as_ref()
-            .filter(|cached| cached.fetched.elapsed() < self.settings.relay_status_ttl)
-            .map(|cached| cached.status.clone());
-        match cached {
-            Some(status) => Ok(status),
-            None => self.fresh_status().await,
+    /// What is known about the relay right now, without waiting on it for long.
+    ///
+    /// A relay that accepts connections and then says nothing must not hold
+    /// requests, so a stale answer is refreshed by one caller at a time
+    /// under a short bound, and for a while after that fails nobody waits
+    /// at all. `None` means nothing is known: the answer to "may this go
+    /// ahead" is then yes, and durable work waits for the relay.
+    pub(super) async fn known_status(&self) -> Option<RelayStatus> {
+        let (fresh, last_known) = {
+            let status = self.status.lock().expect("status lock");
+            let last_known = status.as_ref().map(|cached| cached.status.clone());
+            let fresh = status
+                .as_ref()
+                .is_some_and(|cached| cached.fetched.elapsed() < self.settings.relay_status_ttl);
+            (fresh, last_known)
+        };
+        if fresh {
+            return last_known;
+        }
+        {
+            let mut probe = self.probe.lock().expect("probe lock");
+            let failed_recently = probe
+                .failed_at
+                .is_some_and(|at| at.elapsed() < self.settings.relay_status_ttl);
+            if probe.in_flight || failed_recently {
+                return last_known;
+            }
+            probe.in_flight = true;
+        }
+        let _guard = ProbeGuard(self);
+        let answer =
+            tokio::time::timeout(self.settings.relay_probe_wait, self.fresh_status()).await;
+        match answer {
+            Ok(Ok(status)) => {
+                self.probe.lock().expect("probe lock").failed_at = None;
+                Some(status)
+            },
+            _ => {
+                self.probe.lock().expect("probe lock").failed_at = Some(Instant::now());
+                last_known
+            },
         }
     }
 
     /// Refuse before side effects on a relay known to be too old. An
-    /// unreachable relay is not known to be anything: durable work proceeds
-    /// and waits for it.
+    /// unreachable or silent relay is not known to be anything: durable
+    /// work proceeds and waits for it.
     pub(super) async fn require_capable_relay(&self) -> Result<(), PairingError> {
-        match self.cached_status().await {
-            Ok(status) if !status.supports_key_namespaces => {
+        match self.known_status().await {
+            Some(status) if !status.supports_key_namespaces => {
                 Err(PairingError::code(PairingErrorCode::RelayTooOld))
             },
             _ => Ok(()),
         }
+    }
+
+    /// Ask the relay about a stored key id before acting on it. Costs no replay
+    /// slot.
+    pub(super) async fn inspect_key(
+        &self,
+        row: &RelayKeyRow,
+        key_id: u64,
+    ) -> Result<KeyCheck, RelayFailure> {
+        let shown = pocox_pb::live_credential(&self.relay, key_id)
+            .await
+            .map_err(|error| RelayFailure::classify(&error));
+        let record = match shown {
+            Ok(Some(record)) => record,
+            Ok(None) | Err(RelayFailure::KeyDead) => return Ok(KeyCheck::Gone),
+            Err(other) => return Err(other),
+        };
+        if record.label.as_deref() != Some(row.label.as_str()) {
+            tracing::error!(
+                grant = %row.grant_id,
+                "a stored key id answers with another label; not exposing or touching it"
+            );
+            return Ok(KeyCheck::Foreign);
+        }
+        if record.namespace.to_string() != row.namespace {
+            tracing::error!(grant = %row.grant_id, "relay reports another namespace for a key");
+            return Ok(KeyCheck::Drifted);
+        }
+        Ok(KeyCheck::Ours(record))
     }
 
     /// Find a key by its exact label.
@@ -133,82 +214,5 @@ impl Pairing {
                 other => Err(other),
             },
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::sync::Arc;
-
-    use pocox_auth::Auth;
-    use pocox_pb::{RelaySession, RelayStatus};
-    use pocox_store::Store;
-
-    use super::*;
-    use crate::pairing::PairingSettings;
-
-    #[tokio::test]
-    async fn an_old_relay_is_refused_before_side_effects_and_an_unreachable_one_is_not() {
-        let dir = std::env::temp_dir().join(format!("pocox-relay-facts-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).expect("directory");
-        let store = Store::connect(&format!("sqlite://{}", dir.join("backend.db").display()))
-            .await
-            .expect("store");
-        let auth = Arc::new(
-            Auth::new(store.clone(), pocox_auth::Config {
-                github_client_id: "client".to_string(),
-                github_client_secret: None,
-                github_scope: "read:user".to_string(),
-                jwt_secret: "j".repeat(32),
-                jwt_ttl_secs: 3600,
-                refresh_ttl_secs: 1000,
-                web_callback_url: None,
-                pairing_secret: Some("p".repeat(32)),
-            })
-            .expect("auth"),
-        );
-        let pairing = Pairing::new(
-            auth,
-            store,
-            RelaySession::for_test("127.0.0.1:1"),
-            PairingSettings::default(),
-        )
-        .expect("pairing");
-
-        // Nothing is known about a relay that cannot be reached: durable work waits.
-        pairing
-            .require_capable_relay()
-            .await
-            .expect("unknown is not too old");
-
-        let known = |supports_key_namespaces| CachedStatus {
-            status: RelayStatus {
-                instance_id: "instance".to_string(),
-                supports_key_namespaces,
-                key_capacity: 16,
-            },
-            fetched: Instant::now(),
-        };
-        *pairing.status.lock().expect("status") = Some(known(false));
-        let refused = pairing.require_capable_relay().await.expect_err("too old");
-        assert_eq!(refused.refusal_code(), Some(PairingErrorCode::RelayTooOld));
-
-        *pairing.status.lock().expect("status") = Some(known(true));
-        pairing.require_capable_relay().await.expect("capable");
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn the_relays_word_that_a_key_is_dead_is_not_a_transport_failure() {
-        for code in [KEY_NOT_ACTIVE, KEY_NOT_FOUND, KEY_NOT_RENEWABLE] {
-            let error: anyhow::Error = anyhow::Error::new(pb_mapper::Error::Remote {
-                code: code.to_string(),
-                message: String::new(),
-                retryable: false,
-            });
-            assert!(matches!(RelayFailure::classify(&error), RelayFailure::KeyDead));
-        }
-        let timeout = anyhow::anyhow!("administrator request timed out");
-        assert!(matches!(RelayFailure::classify(&timeout), RelayFailure::Unavailable(_)));
     }
 }

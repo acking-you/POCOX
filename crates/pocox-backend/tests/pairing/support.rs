@@ -16,7 +16,7 @@ use pocox_account_proto::pairing::{
     PAIRING_PROTOCOL_VERSION,
 };
 use pocox_auth::Auth;
-use pocox_backend::pairing::{Pairing, PairingSettings};
+use pocox_backend::pairing::{Pairing, PairingSettings, TrustedProxies};
 use pocox_backend::{router, AppState, Credentials};
 use pocox_pb::RelaySession;
 use pocox_store::Store;
@@ -93,6 +93,11 @@ impl RelayLink {
             .next
             .extend_from_slice(targets);
     }
+
+    /// How many connections the backend has opened toward the relay.
+    pub fn connections(&self) -> u64 {
+        self.plan.lock().expect("plan").connections
+    }
 }
 
 /// The running backend process, which a restart replaces.
@@ -122,6 +127,7 @@ pub fn test_settings() -> PairingSettings {
     PairingSettings {
         linked_key_ttl: std::time::Duration::from_secs(1800),
         single_key_ttl: std::time::Duration::from_secs(900),
+        services_snapshot_ttl: std::time::Duration::ZERO,
         ..PairingSettings::default()
     }
 }
@@ -146,6 +152,7 @@ async fn serve(
     auth: Arc<Auth>,
     relay: RelaySession,
     pairing: Option<Arc<Pairing>>,
+    trusted: TrustedProxies,
 ) -> (String, JoinHandle<()>) {
     let app = router(AppState {
         auth,
@@ -155,7 +162,12 @@ async fn serve(
     });
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("http bind");
     let addr = listener.local_addr().expect("http addr");
-    let server = tokio::spawn(pocox_backend::serve_plain(listener, app));
+    let server = tokio::spawn(pocox_backend::serve_plain(
+        listener,
+        app,
+        pocox_backend::ConnectionLimits::default(),
+        trusted,
+    ));
     (format!("http://{addr}"), server)
 }
 
@@ -178,7 +190,9 @@ impl Harness {
         let pairing =
             Pairing::new(Arc::clone(&auth), store.clone(), session.clone(), settings.clone())
                 .expect("pairing");
-        let (base, server) = serve(Arc::clone(&auth), session, Some(Arc::clone(&pairing))).await;
+        let trusted = TrustedProxies::parse(&settings.trusted_proxies).expect("proxies");
+        let (base, server) =
+            serve(Arc::clone(&auth), session, Some(Arc::clone(&pairing)), trusted).await;
         Self {
             relay,
             link,
@@ -210,6 +224,13 @@ impl Harness {
         pairing.reconcile_once().await.expect("reconcile");
     }
 
+    /// Resume open operations with the running process, without its comparison
+    /// of the relay's table: only the operation's own relay work runs.
+    pub async fn pairing_resume(&self) {
+        let pairing = self.process.lock().expect("process").pairing.clone();
+        pairing.resume_open_operations().await.expect("resume");
+    }
+
     /// The backend's base URL right now.
     pub fn base(&self) -> String {
         self.process.lock().expect("process").base.clone()
@@ -220,11 +241,12 @@ impl Harness {
     pub async fn relaunch(&self) {
         let settings = self.settings.lock().expect("settings").clone();
         let session = RelaySession::new(self.link_addr.to_string(), TEST_ADMIN_KEY);
+        let trusted = TrustedProxies::parse(&settings.trusted_proxies).expect("proxies");
         let pairing =
             Pairing::new(Arc::clone(&self.auth), self.store.clone(), session.clone(), settings)
                 .expect("pairing");
         let (base, server) =
-            serve(Arc::clone(&self.auth), session, Some(Arc::clone(&pairing))).await;
+            serve(Arc::clone(&self.auth), session, Some(Arc::clone(&pairing)), trusted).await;
         let mut process = self.process.lock().expect("process");
         process.server.abort();
         *process = Process {
@@ -555,7 +577,7 @@ pub async fn disabled_backend() -> DisabledBackend {
     let auth = build_auth(store, None).await;
     auth.verify_pairing_key().await.expect("nothing to verify");
     let session = RelaySession::for_test("127.0.0.1:7666");
-    let (base, server) = serve(Arc::clone(&auth), session, None).await;
+    let (base, server) = serve(Arc::clone(&auth), session, None, TrustedProxies::default()).await;
     DisabledBackend {
         base,
         auth,
