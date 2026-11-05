@@ -17,8 +17,8 @@ use pocox_core::pairing::{
 };
 use reqwest::Method;
 
-use super::error::{code_of, PairingError};
-use super::identity::Identity;
+use super::error::{code_of, is_definite_refusal, no_device_error, PairingError};
+use super::identity::{digest, Identity};
 use super::session::{self, Apply};
 use crate::engine::config::load_config;
 
@@ -75,11 +75,14 @@ pub async fn hardware_hint(
 /// A session for this identity right now, keeping `[account]` current if it is
 /// the active account here and leaving it alone if not.
 async fn current_session(identity: &Identity, label: Option<&str>) -> Result<DeviceSession> {
-    let record = identity.store.ensure_secret()?;
-    let fresh = identity.mint(&record, label).await?;
+    let record = identity.ensure_record().await?;
     let config = load_config(&identity.support)?;
+    let account = session::active_account(&config);
+    let fresh = identity.mint(&record, label).await?;
     if identity.is_active(&config) {
-        session::apply(identity, fresh.clone(), Apply::Refresh).await?;
+        // Left unapplied if the account moved on meanwhile; it still serves as a
+        // staged session.
+        session::apply(identity, fresh.clone(), Apply::Refresh, &account).await?;
     }
     Ok(fresh)
 }
@@ -98,7 +101,8 @@ pub async fn prepare(identity: &Identity, label: Option<&str>) -> Result<Prepare
 /// Get started, or Continue: mark this device activated, bind its hint and make
 /// this identity the active account here.
 pub async fn activate(identity: &Identity, native: Option<NativeHint>) -> Result<DeviceSession> {
-    identity.store.ensure_secret()?;
+    identity.ensure_record().await?;
+    let account = session::active_account(&load_config(&identity.support)?);
     let hint = hardware_hint(identity, native).await;
     let _: ActivationStatus = identity
         .call("/v1/pair/activate", |client, token| {
@@ -110,14 +114,23 @@ pub async fn activate(identity: &Identity, native: Option<NativeHint>) -> Result
                 })
         })
         .await?;
-    let record = identity.store.ensure_secret()?;
+    let record = identity.read()?.ok_or_else(no_device_error)?;
     let fresh = identity.mint(&record, None).await?;
-    session::apply(identity, fresh.clone(), Apply::Adopt).await?;
+    if session::apply(identity, fresh.clone(), Apply::Adopt, &account)
+        .await?
+        .is_none()
+    {
+        bail!(
+            "this installation's account changed while this was under way, and stays as it is; \
+             this device is set up and can be continued later"
+        );
+    }
     Ok(fresh)
 }
 
 /// This device's current code.
 pub async fn code(identity: &Identity) -> Result<CodeStatus> {
+    identity.require_record().await?;
     identity
         .call("/v1/pair/code", |client, token| {
             client
@@ -129,6 +142,7 @@ pub async fn code(identity: &Identity) -> Result<CodeStatus> {
 
 /// Pause or resume linking through this device's code.
 pub async fn set_paused(identity: &Identity, paused: bool) -> Result<CodeStatus> {
+    identity.require_record().await?;
     identity
         .call("PATCH /v1/pair/code", |client, token| {
             client
@@ -141,11 +155,13 @@ pub async fn set_paused(identity: &Identity, paused: bool) -> Result<CodeStatus>
         .await
 }
 
-/// Replace this device's code, allowed once per day. A lost response needs no
-/// saved identity: the code route shows the result.
+/// Replace this device's code, allowed once per day. After a lost response the
+/// code route shows whether it happened; asking again could only hear that a
+/// day has not passed.
 pub async fn rotate(identity: &Identity) -> Result<CodeStatus> {
+    let before = code(identity).await?;
     let operation_id = uuid::Uuid::new_v4().simple().to_string();
-    identity
+    let answer = identity
         .call("/v1/pair/code/rotate", |client, token| {
             client
                 .request(Method::POST, "/v1/pair/code/rotate")
@@ -154,7 +170,14 @@ pub async fn rotate(identity: &Identity) -> Result<CodeStatus> {
                     operation_id: operation_id.clone(),
                 })
         })
-        .await
+        .await;
+    match answer {
+        Err(error) if !is_definite_refusal(&error) => match code(identity).await {
+            Ok(current) if current.code != before.code => Ok(current),
+            _ => Err(error),
+        },
+        other => other,
+    }
 }
 
 /// The code in a scanned invitation. Only `pocox://pair?c=<code>` qualifies:
@@ -178,6 +201,7 @@ pub async fn preview(identity: &Identity, code: &str) -> Result<PreviewResponse>
         }
         .into());
     };
+    identity.ensure_record().await?;
     identity
         .call("/v1/pair/preview", |client, token| {
             client
@@ -192,6 +216,7 @@ pub async fn preview(identity: &Identity, code: &str) -> Result<PreviewResponse>
 
 /// One page of this device's group, with recovery requests a member can answer.
 pub async fn devices(identity: &Identity, cursor: Option<&str>) -> Result<DeviceListResponse> {
+    identity.require_record().await?;
     identity
         .call("/v1/devices", |client, token| {
             let mut request = client
@@ -207,6 +232,7 @@ pub async fn devices(identity: &Identity, cursor: Option<&str>) -> Result<Device
 
 /// Rename a device in this group.
 pub async fn rename(identity: &Identity, device_id: &str, name: &str) -> Result<()> {
+    identity.require_record().await?;
     identity
         .call_empty("PATCH /v1/devices", |client, token| {
             client
@@ -220,26 +246,36 @@ pub async fn rename(identity: &Identity, device_id: &str, name: &str) -> Result<
 }
 
 /// Answer the exact recovery request a member sees. Allowing changes nothing
-/// until the requester confirms.
+/// until the requester confirms. This device's same answer to the same request
+/// always has the same identity, so sending it again after a lost response
+/// reads as what already happened rather than as a request that is no longer
+/// open.
 pub async fn decide(
     identity: &Identity,
     device_id: &str,
     request_id: &str,
     allow: bool,
 ) -> Result<()> {
-    let operation_id = uuid::Uuid::new_v4().simple().to_string();
-    identity
-        .call_empty("POST /v1/devices/restore", |client, token| {
+    let record = identity.require_record().await?;
+    let operation_id =
+        digest(&format!("pocox.decide.v1:{}:{device_id}:{request_id}:{allow}", record.secret()));
+    let operation_id = &operation_id[..32];
+    let send = || {
+        identity.call_empty("POST /v1/devices/restore", |client, token| {
             client
                 .request(Method::POST, &format!("/v1/devices/{device_id}/restore"))
                 .bearer_auth(token)
                 .json(&DecideRestoreRequest {
                     request_id: request_id.to_string(),
-                    operation_id: operation_id.clone(),
+                    operation_id: operation_id.to_string(),
                     allow,
                 })
         })
-        .await
+    };
+    match send().await {
+        Err(error) if !is_definite_refusal(&error) => send().await,
+        other => other,
+    }
 }
 
 /// Ask this device's former group to let it back. Reveals nothing about that
@@ -249,6 +285,7 @@ pub async fn request_restore(
     identity: &Identity,
     native: Option<NativeHint>,
 ) -> Result<RestoreRequestView> {
+    identity.ensure_record().await?;
     let Some(hint) = hardware_hint(identity, native).await else {
         return Err(PairingError {
             code: PairingErrorCode::NotFound,
@@ -273,6 +310,7 @@ pub async fn request_restore(
 
 /// Where this device's recovery request stands.
 pub async fn poll_restore(identity: &Identity, request_id: &str) -> Result<RestoreRequestView> {
+    identity.ensure_record().await?;
     identity
         .call("/v1/pair/restore", |client, token| {
             client
@@ -288,10 +326,9 @@ pub async fn poll_restore(identity: &Identity, request_id: &str) -> Result<Resto
 /// secret still works, so nothing reclaims a device in a loop or throws away a
 /// live identity.
 pub async fn start_over(identity: &Identity, label: Option<&str>) -> Result<Prepared> {
-    let record = identity.store.ensure_secret()?;
-    if !record.registered {
+    let Some(record) = identity.read()?.filter(|record| record.registered) else {
         bail!("this device has not been set up yet; there is nothing to start over from");
-    }
+    };
     match identity.client.refresh(record.secret()).await {
         Ok(_) => bail!("this device's identity still works; nothing was discarded"),
         Err(error)

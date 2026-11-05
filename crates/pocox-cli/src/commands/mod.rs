@@ -35,10 +35,15 @@ mod version;
 mod worker;
 mod worker_health;
 
+pub(crate) use pair::{StillPending, EXIT_STILL_PENDING};
+
 /// Dispatch a parsed [`Cli`] invocation to the matching subcommand.
 pub async fn dispatch(cli: Cli) -> Result<()> {
+    pocox_bridge::account::honor_backend_env();
     match cli.command {
-        Command::Login(args) if args.resume => account::resume_github(),
+        Command::Login(args) if args.resume => {
+            account::resume_github(args.backend.as_deref()).await
+        },
         Command::Login(args) => account::login(args.backend.as_deref(), args.web).await,
         Command::Logout => account::logout().await,
         Command::Account => account::status().await,

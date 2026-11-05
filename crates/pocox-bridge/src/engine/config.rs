@@ -78,8 +78,7 @@ fn load_unlocked(support_dir: &Path) -> Result<Config> {
     }
 }
 
-/// Persist the config. On unix the file is created 0o600 (it holds the
-/// relay MSG_HEADER_KEY); permissions are set before the bytes are written.
+/// Persist the config.
 #[cfg(test)]
 pub fn save_config(support_dir: &Path, config: &Config) -> Result<()> {
     let _guard = CONFIG_WRITE
@@ -105,24 +104,11 @@ pub fn update_config<T>(
 
 fn save_unlocked(support_dir: &Path, config: &Config) -> Result<()> {
     std::fs::create_dir_all(support_dir).context("creating support dir")?;
-    let path = config_path(support_dir);
-    let raw = toml::to_string_pretty(config)?;
-    #[cfg(unix)]
-    {
-        use std::io::Write as _;
-        use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&path)?;
-        f.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        f.write_all(raw.as_bytes())?;
-    }
-    #[cfg(not(unix))]
-    std::fs::write(&path, raw)?;
-    Ok(())
+    pocox_core::config::write_config_file(
+        &config_path(support_dir),
+        &toml::to_string_pretty(config)?,
+    )
+    .context("saving config.toml")
 }
 
 #[cfg(test)]

@@ -997,16 +997,18 @@ abstract class RustLibApi extends BaseApi {
     String? backend,
   });
 
-  Future<PairingCodeDto> crateApiBridgePairingPairingCode();
+  Future<PairingCodeDto> crateApiBridgePairingPairingCode({String? backend});
 
   Future<void> crateApiBridgePairingPairingDecideRestore({
     required String deviceId,
     required String requestId,
     required bool allow,
+    String? backend,
   });
 
   Future<PairingDevicesDto> crateApiBridgePairingPairingDevices({
     String? cursor,
+    String? backend,
   });
 
   Future<void> crateApiBridgePairingPairingInstallNativeStore({
@@ -1015,7 +1017,9 @@ abstract class RustLibApi extends BaseApi {
     required FutureOr<String?> Function(String, String) write,
   });
 
-  Future<PairingOperationDto> crateApiBridgePairingPairingLeave();
+  Future<PairingOperationDto> crateApiBridgePairingPairingLeave({
+    String? backend,
+  });
 
   Future<PairingOperationDto> crateApiBridgePairingPairingLink({
     required String ticket,
@@ -1038,11 +1042,13 @@ abstract class RustLibApi extends BaseApi {
 
   Future<PairingOperationDto> crateApiBridgePairingPairingRemoveDevice({
     required String deviceId,
+    String? backend,
   });
 
   Future<void> crateApiBridgePairingPairingRenameDevice({
     required String deviceId,
     required String name,
+    String? backend,
   });
 
   Future<PairingOperationDto> crateApiBridgePairingPairingRestoreConfirm({
@@ -1064,12 +1070,13 @@ abstract class RustLibApi extends BaseApi {
     String? backend,
   });
 
-  Future<String?> crateApiBridgePairingPairingResumeGithub();
+  Future<String?> crateApiBridgePairingPairingResumeGithub({String? backend});
 
-  Future<PairingCodeDto> crateApiBridgePairingPairingRotate();
+  Future<PairingCodeDto> crateApiBridgePairingPairingRotate({String? backend});
 
   Future<PairingCodeDto> crateApiBridgePairingPairingSetPaused({
     required bool paused,
+    String? backend,
   });
 
   Future<List<PairingOperationDto>> crateApiBridgePairingPairingSettle({
@@ -7930,11 +7937,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<PairingCodeDto> crateApiBridgePairingPairingCode() {
+  Future<PairingCodeDto> crateApiBridgePairingPairingCode({String? backend}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -7947,20 +7955,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingCodeConstMeta,
-        argValues: [],
+        argValues: [backend],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiBridgePairingPairingCodeConstMeta =>
-      const TaskConstMeta(debugName: "pairing_code", argNames: []);
+      const TaskConstMeta(debugName: "pairing_code", argNames: ["backend"]);
 
   @override
   Future<void> crateApiBridgePairingPairingDecideRestore({
     required String deviceId,
     required String requestId,
     required bool allow,
+    String? backend,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -7969,6 +7978,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(deviceId, serializer);
           sse_encode_String(requestId, serializer);
           sse_encode_bool(allow, serializer);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -7981,7 +7991,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingDecideRestoreConstMeta,
-        argValues: [deviceId, requestId, allow],
+        argValues: [deviceId, requestId, allow, backend],
         apiImpl: this,
       ),
     );
@@ -7990,18 +8000,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgePairingPairingDecideRestoreConstMeta =>
       const TaskConstMeta(
         debugName: "pairing_decide_restore",
-        argNames: ["deviceId", "requestId", "allow"],
+        argNames: ["deviceId", "requestId", "allow", "backend"],
       );
 
   @override
   Future<PairingDevicesDto> crateApiBridgePairingPairingDevices({
     String? cursor,
+    String? backend,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_opt_String(cursor, serializer);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8014,14 +8026,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingDevicesConstMeta,
-        argValues: [cursor],
+        argValues: [cursor, backend],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiBridgePairingPairingDevicesConstMeta =>
-      const TaskConstMeta(debugName: "pairing_devices", argNames: ["cursor"]);
+      const TaskConstMeta(
+        debugName: "pairing_devices",
+        argNames: ["cursor", "backend"],
+      );
 
   @override
   Future<void> crateApiBridgePairingPairingInstallNativeStore({
@@ -8067,11 +8082,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<PairingOperationDto> crateApiBridgePairingPairingLeave() {
+  Future<PairingOperationDto> crateApiBridgePairingPairingLeave({
+    String? backend,
+  }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8084,14 +8102,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingLeaveConstMeta,
-        argValues: [],
+        argValues: [backend],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiBridgePairingPairingLeaveConstMeta =>
-      const TaskConstMeta(debugName: "pairing_leave", argNames: []);
+      const TaskConstMeta(debugName: "pairing_leave", argNames: ["backend"]);
 
   @override
   Future<PairingOperationDto> crateApiBridgePairingPairingLink({
@@ -8235,12 +8253,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<PairingOperationDto> crateApiBridgePairingPairingRemoveDevice({
     required String deviceId,
+    String? backend,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(deviceId, serializer);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8253,7 +8273,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingRemoveDeviceConstMeta,
-        argValues: [deviceId],
+        argValues: [deviceId, backend],
         apiImpl: this,
       ),
     );
@@ -8262,13 +8282,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgePairingPairingRemoveDeviceConstMeta =>
       const TaskConstMeta(
         debugName: "pairing_remove_device",
-        argNames: ["deviceId"],
+        argNames: ["deviceId", "backend"],
       );
 
   @override
   Future<void> crateApiBridgePairingPairingRenameDevice({
     required String deviceId,
     required String name,
+    String? backend,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -8276,6 +8297,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(deviceId, serializer);
           sse_encode_String(name, serializer);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8288,7 +8310,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingRenameDeviceConstMeta,
-        argValues: [deviceId, name],
+        argValues: [deviceId, name, backend],
         apiImpl: this,
       ),
     );
@@ -8297,7 +8319,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgePairingPairingRenameDeviceConstMeta =>
       const TaskConstMeta(
         debugName: "pairing_rename_device",
-        argNames: ["deviceId", "name"],
+        argNames: ["deviceId", "name", "backend"],
       );
 
   @override
@@ -8428,11 +8450,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
-  Future<String?> crateApiBridgePairingPairingResumeGithub() {
+  Future<String?> crateApiBridgePairingPairingResumeGithub({String? backend}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8445,21 +8468,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingResumeGithubConstMeta,
-        argValues: [],
+        argValues: [backend],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiBridgePairingPairingResumeGithubConstMeta =>
-      const TaskConstMeta(debugName: "pairing_resume_github", argNames: []);
+      const TaskConstMeta(
+        debugName: "pairing_resume_github",
+        argNames: ["backend"],
+      );
 
   @override
-  Future<PairingCodeDto> crateApiBridgePairingPairingRotate() {
+  Future<PairingCodeDto> crateApiBridgePairingPairingRotate({String? backend}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8472,24 +8499,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingRotateConstMeta,
-        argValues: [],
+        argValues: [backend],
         apiImpl: this,
       ),
     );
   }
 
   TaskConstMeta get kCrateApiBridgePairingPairingRotateConstMeta =>
-      const TaskConstMeta(debugName: "pairing_rotate", argNames: []);
+      const TaskConstMeta(debugName: "pairing_rotate", argNames: ["backend"]);
 
   @override
   Future<PairingCodeDto> crateApiBridgePairingPairingSetPaused({
     required bool paused,
+    String? backend,
   }) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_bool(paused, serializer);
+          sse_encode_opt_String(backend, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
@@ -8502,7 +8531,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: sse_decode_pairing_error_dto,
         ),
         constMeta: kCrateApiBridgePairingPairingSetPausedConstMeta,
-        argValues: [paused],
+        argValues: [paused, backend],
         apiImpl: this,
       ),
     );
@@ -8511,7 +8540,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   TaskConstMeta get kCrateApiBridgePairingPairingSetPausedConstMeta =>
       const TaskConstMeta(
         debugName: "pairing_set_paused",
-        argNames: ["paused"],
+        argNames: ["paused", "backend"],
       );
 
   @override
@@ -12189,13 +12218,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PairingOperationDto dco_decode_pairing_operation_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return PairingOperationDto(
       id: dco_decode_String(arr[0]),
       kind: dco_decode_String(arr[1]),
       status: dco_decode_String(arr[2]),
       error: dco_decode_opt_String(arr[3]),
+      caughtUp: dco_decode_bool(arr[4]),
     );
   }
 
@@ -12290,8 +12320,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   PairingStatusDto dco_decode_pairing_status_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 7)
-      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
     return PairingStatusDto(
       state: dco_decode_String(arr[0]),
       backend: dco_decode_String(arr[1]),
@@ -12299,7 +12329,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       activeHere: dco_decode_bool(arr[3]),
       graceDeadline: dco_decode_opt_box_autoadd_i_64(arr[4]),
       pending: dco_decode_list_pairing_operation_dto(arr[5]),
-      parkedGithub: dco_decode_opt_String(arr[6]),
+      failed: dco_decode_list_pairing_operation_dto(arr[6]),
+      parkedGithub: dco_decode_opt_String(arr[7]),
     );
   }
 
@@ -16338,11 +16369,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_kind = sse_decode_String(deserializer);
     var var_status = sse_decode_String(deserializer);
     var var_error = sse_decode_opt_String(deserializer);
+    var var_caughtUp = sse_decode_bool(deserializer);
     return PairingOperationDto(
       id: var_id,
       kind: var_kind,
       status: var_status,
       error: var_error,
+      caughtUp: var_caughtUp,
     );
   }
 
@@ -16462,6 +16495,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_activeHere = sse_decode_bool(deserializer);
     var var_graceDeadline = sse_decode_opt_box_autoadd_i_64(deserializer);
     var var_pending = sse_decode_list_pairing_operation_dto(deserializer);
+    var var_failed = sse_decode_list_pairing_operation_dto(deserializer);
     var var_parkedGithub = sse_decode_opt_String(deserializer);
     return PairingStatusDto(
       state: var_state,
@@ -16470,6 +16504,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       activeHere: var_activeHere,
       graceDeadline: var_graceDeadline,
       pending: var_pending,
+      failed: var_failed,
       parkedGithub: var_parkedGithub,
     );
   }
@@ -20247,6 +20282,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.kind, serializer);
     sse_encode_String(self.status, serializer);
     sse_encode_opt_String(self.error, serializer);
+    sse_encode_bool(self.caughtUp, serializer);
   }
 
   @protected
@@ -20336,6 +20372,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.activeHere, serializer);
     sse_encode_opt_box_autoadd_i_64(self.graceDeadline, serializer);
     sse_encode_list_pairing_operation_dto(self.pending, serializer);
+    sse_encode_list_pairing_operation_dto(self.failed, serializer);
     sse_encode_opt_String(self.parkedGithub, serializer);
   }
 

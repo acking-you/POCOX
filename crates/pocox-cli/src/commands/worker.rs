@@ -15,6 +15,10 @@ use crate::cli::WorkerCmd;
 use crate::commands::worker_health::Reporter;
 use crate::commands::{account, api_proxy};
 
+/// How many times a worker asks for a new key before giving up: about three
+/// minutes.
+const REPLACEMENT_TRIES: usize = 8;
+
 /// Run an internal worker command.
 pub async fn run(cmd: WorkerCmd) -> Result<()> {
     match cmd {
@@ -28,20 +32,27 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 crate::commands::relay::resolve_session(args.relay.relay.as_deref(), &config)?;
             let reporter =
                 reporter(PbRole::Register, &args.key, &args.local_addr, &session, args.codec)?;
-            let registration = pb_register(&session, RegisterOptions {
-                key: args.key,
+            let options = RegisterOptions {
+                key: args.key.clone(),
                 local_addr: args.local_addr,
                 codec: args.codec,
+            };
+            until_credential_gone(session, &args.key, &config, |session| {
+                let (options, reporter, config) = (options.clone(), &reporter, &config);
+                async move {
+                    let registration = pb_register(&session, options).await?;
+                    let _refresh = keep_account_credential_alive(&session, config);
+                    let outcome = until_identity_lost(
+                        config,
+                        &session,
+                        monitor(reporter, registration.subscribe(), || registration.diagnostics()),
+                    )
+                    .await;
+                    registration.stop().await?;
+                    outcome
+                }
             })
             .await?;
-            let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome = until_identity_lost(
-                &config,
-                monitor(&reporter, registration.subscribe(), || registration.diagnostics()),
-            )
-            .await;
-            registration.stop().await?;
-            outcome?;
         },
         WorkerCmd::PbSubscribe(args) => {
             let config = Config::load().unwrap_or_default();
@@ -49,19 +60,26 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 crate::commands::relay::resolve_session(args.relay.relay.as_deref(), &config)?;
             let reporter =
                 reporter(PbRole::Subscribe, &args.key, &args.local_addr, &session, false)?;
-            let connection = pb_subscribe(&session, SubscribeOptions {
-                key: args.key,
+            let options = SubscribeOptions {
+                key: args.key.clone(),
                 local_addr: args.local_addr,
+            };
+            until_credential_gone(session, &args.key, &config, |session| {
+                let (options, reporter, config) = (options.clone(), &reporter, &config);
+                async move {
+                    let connection = pb_subscribe(&session, options).await?;
+                    let _refresh = keep_account_credential_alive(&session, config);
+                    let outcome = until_identity_lost(
+                        config,
+                        &session,
+                        monitor(reporter, connection.subscribe(), || connection.diagnostics()),
+                    )
+                    .await;
+                    connection.stop().await?;
+                    outcome
+                }
             })
             .await?;
-            let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome = until_identity_lost(
-                &config,
-                monitor(&reporter, connection.subscribe(), || connection.diagnostics()),
-            )
-            .await;
-            connection.stop().await?;
-            outcome?;
         },
         WorkerCmd::ApiProxy(args) => {
             super::host_identity::initialize_for_metadata();
@@ -71,14 +89,103 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
     Ok(())
 }
 
-/// Run `work` while this installation's pairing identity stands. A worker
-/// outlives the command that spawned it, and a removed device must not keep
-/// trying to republish on a key that is gone. Never ends early on GitHub or
-/// self-hosted setups.
+/// Whether this worker runs on an account's own credential, rather than on a
+/// relay the caller named with its key. Only then does anything about the
+/// account concern it.
+fn on_account_credential(session: &RelaySession, config: &Config) -> bool {
+    session.credential.starts_with("pbmt1_") && config.account_mode() == Mode::Account
+}
+
+/// Run `work` while the account's credential can be had. A computer that slept
+/// past its key's end wakes to a relay that refuses it for good, and nothing
+/// else would start this worker again, so it fetches the replacement and
+/// carries on. A refusal with no replacement for this same user is how a
+/// removed or moved device stops.
+async fn until_credential_gone<F, Fut>(
+    mut session: RelaySession,
+    key: &str,
+    config: &Config,
+    mut work: F,
+) -> Result<()>
+where
+    F: FnMut(RelaySession) -> Fut,
+    Fut: std::future::Future<Output = Result<()>>,
+{
+    loop {
+        let error = match work(session.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(error) => error,
+        };
+        if !on_account_credential(&session, config) || !credential_refused(&error) {
+            return Err(error);
+        }
+        match replacement_credential(&session, key, config).await {
+            Some(next) => {
+                tracing::info!("the relay ended this worker's key; continuing on its replacement");
+                session = next;
+            },
+            None => return Err(error),
+        }
+    }
+}
+
+/// Whether the relay said this credential is over, rather than anything
+/// passing.
+fn credential_refused(error: &anyhow::Error) -> bool {
+    let said = format!("{error:#}");
+    said.contains("temporary_key_expired") || said.contains("temporary_key_revoked")
+}
+
+/// A new credential for `key`, if the backend gives this same user one. Retried
+/// for a while: a computer waking from sleep often has no network yet. The
+/// backend refusing is the answer, and so is its naming another user.
+async fn replacement_credential(
+    session: &RelaySession,
+    key: &str,
+    config: &Config,
+) -> Option<RelaySession> {
+    let backend = account::backend_base(None, config);
+    let mut delay = Duration::from_secs(2);
+    for _ in 0..REPLACEMENT_TRIES {
+        let mut latest = Config::load().unwrap_or_else(|_| config.clone());
+        match account::fetch_relay_credential(&mut latest, &backend).await {
+            Ok(relay) => {
+                let same_user = key.starts_with(&format!("pcxu:{}:", relay.namespace));
+                let new = relay.credential != session.credential;
+                return (same_user && new).then(|| {
+                    RelaySession::new(relay.relay_addr, relay.credential)
+                        .with_preferences(&latest.pb_mapper)
+                });
+            },
+            Err(error) if pocox_bridge::pairing::code_of(&error).is_some() => {
+                tracing::warn!("this worker's key was not replaced: {error:#}");
+                return None;
+            },
+            Err(error) => {
+                tracing::warn!(
+                    retry_secs = delay.as_secs(),
+                    "fetching a replacement key: {error:#}"
+                );
+                tokio::time::sleep(delay).await;
+                delay = (delay * 2).min(Duration::from_secs(30));
+            },
+        }
+    }
+    None
+}
+
+/// Run `work` while this installation's account stands. A worker outlives the
+/// command that spawned it, and a removed device must not keep trying to
+/// republish on a key that is gone, nor a GitHub one to renew a key this
+/// installation moved away from. One given a relay of its own never ends early.
 async fn until_identity_lost(
     config: &Config,
+    session: &RelaySession,
     work: impl std::future::Future<Output = Result<()>>,
 ) -> Result<()> {
+    if !on_account_credential(session, config) {
+        return work.await;
+    }
     let backend = account::backend_base(None, config);
     tokio::select! {
         outcome = work => outcome,
@@ -107,7 +214,7 @@ async fn until_identity_lost(
 /// Returns a guard whose drop stops refreshing. `None` in self-host mode, where
 /// the operator's own key does not expire.
 fn keep_account_credential_alive(session: &RelaySession, config: &Config) -> Option<OwnedTask> {
-    if !session.credential.starts_with("pbmt1_") || config.account_mode() != Mode::Account {
+    if !on_account_credential(session, config) {
         return None;
     }
     let backend = account::backend_base(None, config);

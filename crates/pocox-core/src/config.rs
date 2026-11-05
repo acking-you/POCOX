@@ -28,6 +28,8 @@
 //! target consulted by `choose_target` before falling back to
 //! `state.selected_service` or relay discovery.
 
+use std::path::Path;
+
 use serde::{Deserialize, Serialize};
 
 use crate::error::Result;
@@ -189,7 +191,8 @@ pub enum AccountProvider {
 
 impl AccountProvider {
     const GITHUB: &'static str = "github";
-    const DEVICE_CODE: &'static str = "device_code";
+    /// `[account].provider` for a pairing device.
+    pub const DEVICE_CODE: &'static str = "device_code";
 }
 
 /// Hosted-account configuration. The session [`AccountConfig::token`] is a
@@ -354,6 +357,17 @@ pub struct ServiceTargetConfig {
     pub name: String,
 }
 
+/// Replace the config file at `path` with `raw` in one step: another process
+/// reading it sees the old file or the new one, never half of either, and it
+/// is private to its owner from the moment it exists, because it may hold the
+/// relay `MSG_HEADER_KEY` or account tokens. A symlink to the file stays a
+/// symlink.
+pub fn write_config_file(path: &Path, raw: &str) -> Result<()> {
+    let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    crate::fs::write_private_atomic(&target, raw.as_bytes())?;
+    Ok(())
+}
+
 impl Config {
     /// Load configuration from the default location.
     ///
@@ -367,39 +381,14 @@ impl Config {
         }
     }
 
-    /// Persist configuration to the default location. On unix the file is
-    /// created with `0o600` and any pre-existing file is tightened to
-    /// `0o600` *before* the bytes are written, because it may hold the
-    /// relay `MSG_HEADER_KEY` or the account session/refresh tokens.
+    /// Persist configuration to the default location, through
+    /// [`write_config_file`].
     pub fn save(&self) -> Result<()> {
         let path = paths::config_file()?;
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let raw = toml::to_string_pretty(self)?;
-
-        #[cfg(unix)]
-        {
-            use std::io::Write as _;
-            use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
-            // `mode(0o600)` covers the create case. For a pre-existing file
-            // `open` keeps its old (possibly world-readable) mode, so tighten
-            // the open handle to 0o600 *before* writing — the secret is never
-            // on disk while the file is group/world-readable.
-            let mut file = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&path)?;
-            file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-            file.write_all(raw.as_bytes())?;
-        }
-        #[cfg(not(unix))]
-        {
-            std::fs::write(&path, raw)?;
-        }
-        Ok(())
+        write_config_file(&path, &toml::to_string_pretty(self)?)
     }
 
     /// Return the configured default target for a service kind.
@@ -601,9 +590,10 @@ impl Config {
         self.account.mode = None;
     }
 
-    /// Record a pairing device's session and switch to account mode. Holds only
-    /// the short-lived JWT and display fields: the device secret stays in the
-    /// device store.
+    /// Record a pairing device's session. Holds only the short-lived JWT and
+    /// display fields: the device secret stays in the device store. A chosen
+    /// self-host mode stays chosen; making this the active account is
+    /// [`Self::set_mode`]'s to say.
     pub fn set_device_session(
         &mut self,
         token: impl AsRef<str>,
@@ -615,7 +605,6 @@ impl Config {
         self.account.login = Some(label.as_ref().to_string());
         self.account.account_id = Some(account_id.as_ref().to_string());
         self.account.provider = Some(AccountProvider::DEVICE_CODE.to_string());
-        self.account.mode = None;
     }
 
     /// Clear the account session (logout): drops the tokens, identity and any
@@ -700,6 +689,32 @@ mod tests {
     }
 
     #[test]
+    fn saving_replaces_the_file_in_one_step_and_keeps_a_symlink() {
+        let dir = tempfile::tempdir().expect("dir");
+        let real = dir.path().join("dotfiles.toml");
+        std::fs::write(&real, "old").expect("write");
+        let link = dir.path().join("config.toml");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&real, &link).expect("symlink");
+        #[cfg(not(unix))]
+        std::fs::copy(&real, &link).expect("copy");
+        let reader = std::fs::File::open(&real).expect("open");
+        write_config_file(&link, "new").expect("save");
+        assert_eq!(std::fs::read_to_string(&link).expect("read"), "new");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+            assert!(std::fs::symlink_metadata(&link).expect("meta").is_symlink());
+            assert_eq!(std::fs::read_to_string(&real).expect("read"), "new");
+            let meta = std::fs::metadata(&real).expect("meta");
+            assert_eq!(meta.permissions().mode() & 0o777, 0o600);
+            // Someone reading while it is saved still has the whole old file.
+            assert_ne!(reader.metadata().expect("meta").ino(), meta.ino());
+        }
+        drop(reader);
+    }
+
+    #[test]
     fn a_pairing_session_holds_no_refresh_credential_and_old_clients_can_read_it() {
         let mut config = Config::default();
         // Moving from GitHub drops its refresh token from `[account]`.
@@ -711,6 +726,11 @@ mod tests {
         assert_eq!(config.account_mode(), Mode::Account);
         let raw = toml::to_string(&config).expect("serialize");
         assert!(!raw.contains("refresh_token"), "no field for a secret to go stale in");
+        // A chosen self-host mode outlives a session refreshed behind it.
+        let mut chosen = config.clone();
+        chosen.set_mode(Mode::SelfHost);
+        chosen.set_device_session("newer-jwt", "laptop", "user-1");
+        assert_eq!(chosen.account_mode(), Mode::SelfHost);
         // A value edited in by hand is not a credential either.
         let mut edited = config.clone();
         edited.account.refresh_token = Some("stale".into());

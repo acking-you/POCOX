@@ -96,6 +96,16 @@ pub fn install_platform_store(lock_root: PathBuf, backend: Arc<dyn StoreBackend>
     });
 }
 
+/// Whether this platform's device store can hold anything yet, without creating
+/// it: what a process checks before it has any reason to make one.
+pub fn device_store_exists() -> bool {
+    let installed = PLATFORM
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .is_some();
+    installed || crate::paths::device_store_dir().is_ok_and(|root| root.is_dir())
+}
+
 /// Which record a process uses.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StoreKey {
@@ -207,6 +217,9 @@ pub enum OperationState {
     Pending,
     /// The backend committed it; local configuration has yet to catch up.
     Completed,
+    /// It did not happen. Kept a while, so whoever started it can still hear
+    /// why after another process read the result.
+    Failed,
 }
 
 /// A membership change whose identity outlives a lost response or a restart.
@@ -224,6 +237,9 @@ pub struct StoredOperation {
     pub started_at: i64,
     /// How far it has reached.
     pub state: OperationState,
+    /// Why it failed: the backend's code.
+    #[serde(default)]
+    pub error: Option<String>,
 }
 
 /// A device's record: its secret and the work it has outstanding.
@@ -476,7 +492,7 @@ fn exclude_from_backup(root: &Path) {
     #[cfg(target_os = "macos")]
     {
         let root = root.to_string_lossy();
-        if super::hint::tools::run("/usr/bin/tmutil", &["addexclusion", &root]).is_none() {
+        if super::hint::tools::run("/usr/bin/tmutil", &["addexclusion", &root]).is_err() {
             tracing::debug!("the device store could not be excluded from Time Machine");
         }
     }
@@ -499,7 +515,7 @@ fn prune(record: &mut DeviceRecord) {
         let oldest = record
             .operations
             .iter()
-            .position(|operation| operation.state == OperationState::Completed)
+            .position(|operation| operation.state != OperationState::Pending)
             .unwrap_or(0);
         record.operations.remove(oldest);
     }
@@ -656,6 +672,7 @@ mod tests {
         assert_eq!(store.update(|_| 1).expect("update"), None, "no record to change");
         store.ensure_secret().expect("ensure");
         let operation = |id: String, state| StoredOperation {
+            error: None,
             id,
             kind: OperationKind::Link,
             initiator: "here".into(),

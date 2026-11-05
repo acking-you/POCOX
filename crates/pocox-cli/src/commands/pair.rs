@@ -11,27 +11,54 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use pocox_account_proto::pairing::{
-    display_code, normalize_code, CodeStatus, OperationStatus, PairingErrorCode, PreviewDevice,
-    RestoreRequestStatus, PAIR_URI_PREFIX,
+    display_code, normalize_code, CodeStatus, DeviceEntry, DeviceSession, MembershipChangeKind,
+    OperationStatus, PairingErrorCode, PendingRestoreSummary, PreviewDevice, RestoreRequestStatus,
+    PAIR_URI_PREFIX,
 };
 use pocox_bridge::pairing::identity::Identity;
 use pocox_bridge::pairing::operations::{self, RestoreTarget};
-use pocox_bridge::pairing::{code_of, flows, status, OperationOutcome, PairingState};
+use pocox_bridge::pairing::{
+    code_of, flows, status, NoDevice, OperationOutcome, PairingError, PairingState,
+};
 use pocox_core::config::Config;
+use pocox_core::pairing::OperationKind;
 use pocox_core::paths;
 use pocox_core::redact::scrub_pairing;
 
 use crate::cli::{DevicesCmd, PairArgs, PairCmd};
 use crate::commands::{account, ui};
 
-const LINK_POLL: Duration = Duration::from_secs(5);
-const RESTORE_POLL: Duration = Duration::from_secs(5);
+/// How often a waiting command lists its group, as any foreground page does.
+const LINK_POLL: Duration = Duration::from_secs(60);
+/// A wait starts here and backs off to [`MAX_POLL`].
+const FIRST_POLL: Duration = Duration::from_secs(5);
+const MAX_POLL: Duration = Duration::from_secs(60);
 const OPERATION_POLL: Duration = Duration::from_secs(2);
+const MAX_OPERATION_POLL: Duration = Duration::from_secs(15);
 /// How long a command waits on a pending change before leaving it to the next
 /// run.
 const OPERATION_WAIT: Duration = Duration::from_secs(60);
 /// A device active within this many days counts as active today for a warning.
 const SECONDS_PER_DAY: i64 = 86_400;
+/// The conventional exit code of a process stopped by Ctrl-C.
+const EXIT_INTERRUPTED: i32 = 130;
+
+/// The exit code of a command whose change the backend has yet to finish:
+/// neither done nor failed, and never to be repeated.
+pub(crate) const EXIT_STILL_PENDING: i32 = 75;
+
+/// A change is under way and this command stopped waiting for it. Already told
+/// to the user; the process exits with [`EXIT_STILL_PENDING`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct StillPending;
+
+impl std::fmt::Display for StillPending {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("still pending")
+    }
+}
+
+impl std::error::Error for StillPending {}
 
 fn identity(backend: Option<&str>) -> Result<Identity> {
     let config = Config::load()?;
@@ -45,9 +72,23 @@ fn support() -> Result<PathBuf> {
 
 /// Dispatch `pocox pair`.
 pub(crate) async fn run(args: PairArgs) -> Result<()> {
-    let result = dispatch(args).await;
-    // Whatever an error quotes, it never reaches a terminal or a log with a code.
-    result.map_err(|error| anyhow::anyhow!("{}", scrub_pairing(&format!("{error:#}"))))
+    dispatch(args).await.map_err(scrubbed)
+}
+
+/// Whatever an error quotes, it never reaches a terminal or a log with a code.
+fn scrubbed(error: anyhow::Error) -> anyhow::Error {
+    if error.is::<StillPending>() {
+        return error;
+    }
+    let error = explain_no_device(error);
+    anyhow::anyhow!("{}", scrub_pairing(&format!("{error:#}")))
+}
+
+fn explain_no_device(error: anyhow::Error) -> anyhow::Error {
+    if error.chain().any(|cause| cause.is::<NoDevice>()) {
+        return error.context("nothing was changed; `pocox pair` sets this device up");
+    }
+    error
 }
 
 async fn dispatch(args: PairArgs) -> Result<()> {
@@ -99,7 +140,7 @@ pub(crate) async fn devices(command: Option<DevicesCmd>, backend: Option<&str>) 
             request,
         }) => decide(backend, &id, &request, false).await,
     };
-    result.map_err(|error| anyhow::anyhow!("{}", scrub_pairing(&format!("{error:#}"))))
+    result.map_err(scrubbed)
 }
 
 fn print_code(code: &CodeStatus) {
@@ -115,13 +156,14 @@ fn print_code(code: &CodeStatus) {
 /// link.
 async fn show(backend: Option<&str>, yes: bool, no_wait: bool) -> Result<()> {
     let identity = identity(backend)?;
-    operations::settle(&identity).await?;
+    print_changes(&operations::settle(&identity).await?);
     let prepared = match flows::prepare(&identity, None).await {
         Ok(prepared) => prepared,
         Err(error) => return Err(explain_dead_identity(error)),
     };
     ui::headline(ui::Tone::Action, "this device's pairing code");
     print_code(&prepared.code);
+    print_membership(&prepared.session);
     // A retained identity after a logout or a GitHub sign-in is as much the user's
     // choice to resume as a new one is to set up.
     if !prepared.session.activated || !identity.is_active_here()? {
@@ -130,7 +172,7 @@ async fn show(backend: Option<&str>, yes: bool, no_wait: bool) -> Result<()> {
         } else {
             ui::muted("  this device is not set up yet: it has no relay access until you continue");
         }
-        if confirm("use this device's pairing identity now?", yes)? {
+        if confirm("use this device's pairing identity now?", yes).await? {
             let session = flows::activate(&identity, None).await?;
             ui::headline(ui::Tone::Ok, "this device is set up");
             ui::field("device", &session.login);
@@ -146,18 +188,54 @@ async fn show(backend: Option<&str>, yes: bool, no_wait: bool) -> Result<()> {
     wait_for_link(&identity).await
 }
 
+/// Every device in this group, and the requests a member can answer, which
+/// every page repeats.
+async fn whole_group(
+    identity: &Identity,
+) -> Result<(Vec<DeviceEntry>, Vec<PendingRestoreSummary>)> {
+    let first = flows::devices(identity, None).await?;
+    let requests = first.pending_requests;
+    let mut devices = first.devices;
+    let mut cursor = first.next_cursor;
+    while let Some(next) = cursor {
+        let page = flows::devices(identity, Some(&next)).await?;
+        devices.extend(page.devices);
+        cursor = page.next_cursor;
+    }
+    Ok((devices, requests))
+}
+
 async fn wait_for_link(identity: &Identity) -> Result<()> {
     ui::muted("  enter this code on another device; Ctrl-C to stop waiting");
-    let known = flows::devices(identity, None).await?.devices.len();
+    let known: Vec<String> = whole_group(identity)
+        .await?
+        .0
+        .into_iter()
+        .map(|device| device.id)
+        .collect();
+    let mut errors = Backoff::new(LINK_POLL);
+    let mut wait = LINK_POLL;
     loop {
         tokio::select! {
             _ = tokio::signal::ctrl_c() => return Ok(()),
-            () = tokio::time::sleep(LINK_POLL) => {},
+            () = tokio::time::sleep(wait) => {},
         }
-        let current = flows::devices(identity, None).await?;
-        if current.devices.len() > known {
+        let group = match whole_group(identity).await {
+            Ok((group, _)) => group,
+            Err(error) => {
+                wait = errors.after_failure(error)?;
+                continue;
+            },
+        };
+        wait = LINK_POLL;
+        errors = Backoff::new(LINK_POLL);
+        let joined: Vec<&DeviceEntry> = group
+            .iter()
+            .filter(|device| !known.contains(&device.id))
+            .collect();
+        if !joined.is_empty() {
             ui::headline(ui::Tone::Ok, "a device linked");
-            for device in current.devices.iter().filter(|device| !device.is_self) {
+            for device in joined {
                 ui::field("device", &device.name);
             }
             return Ok(());
@@ -165,31 +243,60 @@ async fn wait_for_link(identity: &Identity) -> Result<()> {
     }
 }
 
+/// How a wait treats its polls failing. A refusal ends it. Anything else may
+/// only be a network coming back, so it asks less often rather than giving up.
+struct Backoff {
+    next: Duration,
+}
+
+impl Backoff {
+    fn new(first: Duration) -> Self {
+        Self {
+            next: first,
+        }
+    }
+
+    fn after_failure(&mut self, error: anyhow::Error) -> Result<Duration> {
+        let refused = error
+            .chain()
+            .find_map(|cause| cause.downcast_ref::<PairingError>())
+            .is_some_and(PairingError::is_definite);
+        if refused || error.chain().any(|cause| cause.is::<NoDevice>()) {
+            return Err(error);
+        }
+        tracing::debug!("still waiting after: {error:#}");
+        let wait = self.next;
+        self.next = (self.next * 2).min(MAX_POLL);
+        Ok(wait)
+    }
+}
+
+const MOVES_EVERY_INSTALLATION: &str = "every POCOX installation on this device moves with it";
+
 /// `pocox pair join`: read a code, show its group, confirm, move this device
 /// there.
 async fn join(backend: Option<&str>, yes: bool) -> Result<()> {
     let identity = identity(backend)?;
-    let code = read_code()?;
+    let code = read_code().await?;
     let preview = flows::preview(&identity, &code).await?;
     ui::headline(ui::Tone::Action, "this code's group");
     print_group(&preview.devices);
-    let group = flows::devices(&identity, None).await?;
-    let peers = group
-        .devices
+    let (group, _) = whole_group(&identity).await?;
+    let peers = group.iter().filter(|device| !device.is_self).count();
+    let activated = group
         .iter()
-        .filter(|device| !device.is_self)
-        .count();
+        .any(|device| device.is_self && device.activated);
     if preview.already_member {
         ui::muted("  this device is already in this group");
     }
     let leave_current = peers > 0 && !preview.already_member;
     if leave_current {
-        ui::warn(&format!(
-            "this device leaves its {peers} current peer(s), and every POCOX installation on it \
-             moves too"
-        ));
+        ui::warn(&format!("this device leaves its {peers} current peer(s)"));
     }
-    if !confirm("join this group?", yes)? {
+    if (leave_current || activated) && !preview.already_member {
+        ui::warn(MOVES_EVERY_INSTALLATION);
+    }
+    if !confirm("join this group?", yes).await? {
         bail!("nothing changed");
     }
     let hint = flows::hardware_hint(&identity, None).await;
@@ -207,9 +314,19 @@ async fn restore(
     device: Option<String>,
 ) -> Result<()> {
     let identity = identity(backend)?;
-    flows::prepare(&identity, None)
+    let prepared = flows::prepare(&identity, None)
         .await
         .map_err(explain_dead_identity)?;
+    if prepared.session.activated {
+        // The backend would refuse it: only a device not yet set up can take over
+        // another's identity.
+        bail!(
+            "this device is set up, so it has nothing to recover. A restore runs on a replacement \
+             device, with a code from the group. If someone may have this device's code, run \
+             `pocox pair pause`, and remove anything you do not recognise from a linked device \
+             with `pocox devices remove <id>`"
+        );
+    }
     let (target, devices) = if ask {
         let approved = wait_for_approval(&identity).await?;
         let RestoreRequestStatus::Approved = approved.status else {
@@ -222,13 +339,13 @@ async fn restore(
             approved.devices,
         )
     } else {
-        let code = read_code()?;
+        let code = read_code().await?;
         let preview = flows::preview(&identity, &code).await?;
         ui::headline(ui::Tone::Action, "this code's group");
         print_group(&preview.devices);
         let device_id = match device {
             Some(device) => device,
-            None => pick_device(&preview.devices)?,
+            None => pick_device(&preview.devices).await?,
         };
         let chosen = preview
             .devices
@@ -245,10 +362,11 @@ async fn restore(
         )
     };
     print_group(&devices);
+    ui::warn(MOVES_EVERY_INSTALLATION);
     if retake {
         ui::warn("old access ends at once and this device's code changes");
     }
-    if !confirm("these are my devices: restore?", yes)? {
+    if !confirm("these are my devices: restore?", yes).await? {
         bail!("nothing changed; this device carries on as new");
     }
     let hint = flows::hardware_hint(&identity, None).await;
@@ -271,24 +389,37 @@ async fn wait_for_approval(
         ui::field("matching id", matching);
     }
     ui::muted("  allow it on a linked device if the matching id is the same there");
+    let stopped = || anyhow::anyhow!("nothing changed; the request stays until it expires");
+    let mut errors = Backoff::new(FIRST_POLL);
+    let mut wait = FIRST_POLL;
     while view.status == RestoreRequestStatus::Pending {
         tokio::select! {
-            _ = tokio::signal::ctrl_c() => bail!("nothing changed; the request stays until it expires"),
-            () = tokio::time::sleep(RESTORE_POLL) => {},
+            _ = tokio::signal::ctrl_c() => return Err(stopped()),
+            () = tokio::time::sleep(wait) => {},
         }
-        view = flows::poll_restore(identity, &view.request_id).await?;
+        let polled = tokio::select! {
+            _ = tokio::signal::ctrl_c() => return Err(stopped()),
+            polled = flows::poll_restore(identity, &view.request_id) => polled,
+        };
+        match polled {
+            Ok(latest) => {
+                view = latest;
+                wait = (wait * 2).min(MAX_POLL);
+            },
+            Err(error) => wait = errors.after_failure(error)?,
+        }
     }
     Ok(view)
 }
 
-fn pick_device(devices: &[PreviewDevice]) -> Result<String> {
+async fn pick_device(devices: &[PreviewDevice]) -> Result<String> {
     if !std::io::stdin().is_terminal() {
-        bail!("name the device to restore with --device <id>");
+        bail!("name the device to restore with --device <id>, from the ids shown above");
     }
     for (index, device) in devices.iter().enumerate() {
         println!("  {}. {} ({})", index + 1, device.name, device.id);
     }
-    let answer = prompt("which device is this? number: ")?;
+    let answer = prompt("which device is this? number: ").await?;
     let index: usize = answer.trim().parse().context("not a number")?;
     devices
         .get(index.wrapping_sub(1))
@@ -306,7 +437,7 @@ fn warn_if_active_today(device: &PreviewDevice) {
 /// `pocox pair start-over`: leave a superseded or unknown identity behind.
 async fn start_over(backend: Option<&str>, yes: bool) -> Result<()> {
     let identity = identity(backend)?;
-    if !confirm("discard this device's dead identity and start as a new device?", yes)? {
+    if !confirm("discard this device's dead identity and start as a new device?", yes).await? {
         bail!("nothing changed");
     }
     let prepared = flows::start_over(&identity, None).await?;
@@ -319,8 +450,9 @@ async fn start_over(backend: Option<&str>, yes: bool) -> Result<()> {
 /// `pocox pair leave`.
 async fn leave(backend: Option<&str>, yes: bool) -> Result<()> {
     let identity = identity(backend)?;
-    ui::warn("this device leaves its group, and every POCOX installation on it moves too");
-    if !confirm("leave?", yes)? {
+    ui::warn("this device leaves its group");
+    ui::warn(MOVES_EVERY_INSTALLATION);
+    if !confirm("leave?", yes).await? {
         bail!("nothing changed");
     }
     let outcome = operations::leave(&identity).await?;
@@ -330,34 +462,36 @@ async fn leave(backend: Option<&str>, yes: bool) -> Result<()> {
 async fn list(backend: Option<&str>) -> Result<()> {
     let identity = identity(backend)?;
     let reading = status::status(&identity).await?;
-    if reading.state == PairingState::NoDevice {
-        ui::headline(ui::Tone::Muted, "this device has no pairing identity yet");
-        ui::code("pocox pair");
-        return Ok(());
+    print_changes(&operations::settle(&identity).await?);
+    match reading.state {
+        PairingState::NoDevice => {
+            ui::headline(ui::Tone::Muted, "this device has no pairing identity yet");
+            ui::code("pocox pair");
+            return Ok(());
+        },
+        PairingState::Superseded | PairingState::Unknown => {
+            print_dead_identity(reading.state, reading.grace_deadline);
+            return Ok(());
+        },
+        _ => {},
     }
-    let mut cursor = None;
+    if let Some(session) = &reading.session {
+        print_membership(session);
+    }
+    let (devices, requests) = whole_group(&identity).await?;
     let mut table = ui::new_table(&["device", "name", "platform", "state", "last active"]);
-    let mut requests = Vec::new();
-    loop {
-        let page = flows::devices(&identity, cursor.as_deref()).await?;
-        for device in page.devices {
-            let mut name = device.name;
-            if device.is_self {
-                name.push_str(" (this device)");
-            }
-            table.add_row(vec![
-                device.id,
-                name,
-                device.platform.unwrap_or_default(),
-                if device.activated { "set up" } else { "not set up" }.to_string(),
-                format_day(device.last_active_day),
-            ]);
+    for device in devices {
+        let mut name = device.name;
+        if device.is_self {
+            name.push_str(" (this device)");
         }
-        requests.extend(page.pending_requests);
-        cursor = page.next_cursor;
-        if cursor.is_none() {
-            break;
-        }
+        table.add_row(vec![
+            device.id,
+            name,
+            device.platform.unwrap_or_default(),
+            if device.activated { "set up" } else { "not set up" }.to_string(),
+            format_day(device.last_active_day),
+        ]);
     }
     println!("{table}");
     for request in requests {
@@ -376,13 +510,85 @@ async fn list(backend: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+fn kind_name(kind: OperationKind) -> &'static str {
+    match kind {
+        OperationKind::Link => "joining a group",
+        OperationKind::Leave => "leaving a group",
+        OperationKind::Remove => "removing a device",
+        OperationKind::Restore => "restoring a device",
+        OperationKind::Retake => "taking a device back",
+    }
+}
+
+/// Changes still open and those that turned out not to happen, which a command
+/// that lost its answer could not say.
+fn print_changes(outcomes: &[OperationOutcome]) {
+    for outcome in outcomes {
+        match outcome.status {
+            OperationStatus::Pending | OperationStatus::Unknown => ui::headline(
+                ui::Tone::Change,
+                &format!("{} is still under way; do not repeat it", kind_name(outcome.kind)),
+            ),
+            OperationStatus::Failed => ui::warn(&format!(
+                "{} did not happen: {}",
+                kind_name(outcome.kind),
+                outcome.error.as_deref().unwrap_or("unknown")
+            )),
+            OperationStatus::Completed => {
+                if !outcome.caught_up {
+                    print_not_caught_up(outcome.kind);
+                }
+            },
+        }
+    }
+}
+
+fn print_not_caught_up(kind: OperationKind) {
+    ui::warn(&format!(
+        "{} went through, but this installation has yet to catch up; `pocox pair` tries again",
+        kind_name(kind)
+    ));
+}
+
+/// Say what happened to this device's membership, when a peer did it.
+fn print_membership(session: &DeviceSession) {
+    let Some(change) = session.membership_change else {
+        return;
+    };
+    if change.kind == MembershipChangeKind::Removed && !session.activated {
+        ui::warn(&format!(
+            "another device removed this one on {}: its new connections stopped",
+            format_time(change.at)
+        ));
+    }
+}
+
+fn print_dead_identity(state: PairingState, grace_deadline: Option<i64>) {
+    if state == PairingState::Superseded {
+        ui::warn("another device took over this one's identity");
+    } else {
+        ui::warn("the backend does not know this device");
+    }
+    if let Some(deadline) = grace_deadline {
+        ui::field("old access ends", &format_time(deadline));
+    }
+    ui::code("pocox pair start-over");
+}
+
+fn format_time(unix_seconds: i64) -> String {
+    chrono::DateTime::from_timestamp(unix_seconds, 0).map_or_else(
+        || unix_seconds.to_string(),
+        |time| time.format("%Y-%m-%d %H:%M UTC").to_string(),
+    )
+}
+
 async fn remove(backend: Option<&str>, id: &str, yes: bool) -> Result<()> {
     let identity = identity(backend)?;
     ui::warn(
         "its access for new connections ends; a connection already open may last until an end \
          closes it",
     );
-    if !confirm("remove this device?", yes)? {
+    if !confirm("remove this device?", yes).await? {
         bail!("nothing changed");
     }
     let outcome = operations::remove(&identity, id).await?;
@@ -400,44 +606,61 @@ async fn decide(backend: Option<&str>, id: &str, request: &str, allow: bool) -> 
 }
 
 /// Report a change's result, reading a pending one for a while. Never repeats
-/// it.
+/// it, and never takes its absence from the store for success: another process
+/// may have forgotten it for any reason, so the backend is asked.
 async fn finish(identity: &Identity, mut outcome: OperationOutcome, done: &str) -> Result<()> {
     let deadline = std::time::Instant::now() + OPERATION_WAIT;
+    let mut wait = OPERATION_POLL;
     while outcome.status == OperationStatus::Pending && std::time::Instant::now() < deadline {
-        tokio::time::sleep(OPERATION_POLL).await;
-        if let Some(latest) = operations::settle(identity)
+        tokio::select! {
+            _ = tokio::signal::ctrl_c() => break,
+            () = tokio::time::sleep(wait) => {},
+        }
+        wait = (wait * 2).min(MAX_OPERATION_POLL);
+        let saved = operations::settle(identity)
             .await?
             .into_iter()
-            .find(|candidate| candidate.id == outcome.id)
-        {
-            outcome = latest;
-        } else {
-            outcome.status = OperationStatus::Completed;
+            .find(|candidate| candidate.id == outcome.id);
+        let latest = match saved {
+            Some(saved) => Some(saved),
+            None => operations::read_outcome(identity, &outcome).await,
+        };
+        match latest {
+            Some(latest) => outcome = latest,
+            None => break,
         }
     }
     match outcome.status {
         OperationStatus::Completed => {
             ui::headline(ui::Tone::Ok, done);
+            if !outcome.caught_up {
+                print_not_caught_up(outcome.kind);
+            }
             Ok(())
         },
-        OperationStatus::Pending => {
-            ui::headline(ui::Tone::Change, "still waiting for the relay to confirm this");
-            ui::muted("  it continues without this command; run `pocox devices` to see the result");
-            Ok(())
+        OperationStatus::Pending | OperationStatus::Unknown => {
+            ui::headline(ui::Tone::Change, "the backend has yet to confirm this; do not repeat it");
+            ui::muted("  `pocox devices` shows how it ended");
+            Err(StillPending.into())
         },
-        OperationStatus::Failed | OperationStatus::Unknown => {
-            let reason = outcome.error.map_or("unknown", |code| code.as_str());
-            bail!("that did not happen: {reason}");
+        OperationStatus::Failed => {
+            bail!("that did not happen: {}", outcome.error.as_deref().unwrap_or("unknown"));
         },
     }
 }
 
 fn explain_dead_identity(error: anyhow::Error) -> anyhow::Error {
+    let deadline = error
+        .chain()
+        .find_map(|cause| cause.downcast_ref::<PairingError>())
+        .and_then(|refusal| refusal.grace_deadline)
+        .map(|deadline| format!(" Its old access ends at {}.", format_time(deadline)))
+        .unwrap_or_default();
     match code_of(&error) {
-        Some(PairingErrorCode::DeviceSuperseded) => error.context(
-            "another device took over this one's identity; run `pocox pair start-over`, then \
-             `pocox pair restore` if this should be a device you had",
-        ),
+        Some(PairingErrorCode::DeviceSuperseded) => error.context(format!(
+            "another device took over this one's identity.{deadline} Run `pocox pair start-over`, \
+             then `pocox pair restore` if this should be a device you had"
+        )),
         Some(PairingErrorCode::DeviceUnknown) => {
             error.context("the backend does not know this device; run `pocox pair start-over`")
         },
@@ -449,7 +672,12 @@ fn print_group(devices: &[PreviewDevice]) {
     for device in devices {
         ui::field(
             "device",
-            &format!("{} (last active {})", device.name, format_day(device.last_active_day)),
+            &format!(
+                "{} ({}, last active {})",
+                device.name,
+                device.id,
+                format_day(device.last_active_day)
+            ),
         );
     }
 }
@@ -464,9 +692,9 @@ fn format_day(day: i64) -> String {
 }
 
 /// A code from the terminal or the first line of stdin.
-fn read_code() -> Result<String> {
+async fn read_code() -> Result<String> {
     let raw = if std::io::stdin().is_terminal() {
-        prompt("pairing code: ")?
+        prompt("pairing code: ").await?
     } else {
         let mut line = String::new();
         std::io::stdin()
@@ -480,18 +708,32 @@ fn read_code() -> Result<String> {
     normalize_code(raw).context("that is not a pairing code")
 }
 
-fn prompt(question: &str) -> Result<String> {
-    let mut out = std::io::stderr();
-    write!(out, "{question}")?;
-    out.flush()?;
-    let mut line = String::new();
-    std::io::stdin().lock().read_line(&mut line)?;
-    Ok(line)
+/// Ask at the terminal. Once a wait has listened for Ctrl-C the terminal no
+/// longer stops this process on its own, so a prompt listens too. A blocked
+/// read of stdin cannot be cancelled, and the runtime would wait on it, so this
+/// leaves the process outright; nothing has changed at any prompt.
+async fn prompt(question: &str) -> Result<String> {
+    let question = question.to_string();
+    let answer = tokio::task::spawn_blocking(move || -> Result<String> {
+        let mut out = std::io::stderr();
+        write!(out, "{question}")?;
+        out.flush()?;
+        let mut line = String::new();
+        std::io::stdin().lock().read_line(&mut line)?;
+        Ok(line)
+    });
+    tokio::select! {
+        answer = answer => answer.context("reading the answer")?,
+        _ = tokio::signal::ctrl_c() => {
+            eprintln!("\nnothing changed");
+            std::process::exit(EXIT_INTERRUPTED);
+        },
+    }
 }
 
 /// `yes`, or the answer of someone at a terminal. Off a terminal, a change
 /// nobody confirmed does not happen.
-fn confirm(question: &str, yes: bool) -> Result<bool> {
+async fn confirm(question: &str, yes: bool) -> Result<bool> {
     if yes {
         return Ok(true);
     }
@@ -499,6 +741,6 @@ fn confirm(question: &str, yes: bool) -> Result<bool> {
         ui::muted(&format!("  {question} (pass --yes to confirm without a terminal)"));
         return Ok(false);
     }
-    let answer = prompt(&format!("{question} [y/N] "))?;
+    let answer = prompt(&format!("{question} [y/N] ")).await?;
     Ok(matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes"))
 }

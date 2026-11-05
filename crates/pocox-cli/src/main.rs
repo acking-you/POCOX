@@ -45,5 +45,10 @@ async fn main() -> Result<()> {
         .init();
 
     let cli = cli::Cli::parse();
-    commands::dispatch(cli).await
+    match commands::dispatch(cli).await {
+        Err(error) if error.is::<commands::StillPending>() => {
+            std::process::exit(commands::EXIT_STILL_PENDING)
+        },
+        other => other,
+    }
 }

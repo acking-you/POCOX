@@ -12,6 +12,7 @@
 //! engine runtime.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -82,11 +83,29 @@ pub fn default_backend() -> String {
     format!("https://{host}:8443")
 }
 
-/// The persisted backend base URL, or the built-in default.
+/// Whether `$POCOX_BACKEND` names the default backend in this process.
+static BACKEND_FROM_ENV: AtomicBool = AtomicBool::new(false);
+
+/// Let `$POCOX_BACKEND` name the default backend, as it does for the CLI, whose
+/// sessions on that backend this engine then sees for what they are. The app
+/// has no such variable.
+pub fn honor_backend_env() {
+    BACKEND_FROM_ENV.store(true, Ordering::SeqCst);
+}
+
+/// The persisted backend base URL, or the default.
 pub fn backend_base(config: &Config) -> String {
     config
         .account_backend()
         .map(ToString::to_string)
+        .or_else(|| {
+            BACKEND_FROM_ENV
+                .load(Ordering::SeqCst)
+                .then(|| std::env::var("POCOX_BACKEND").ok())
+                .flatten()
+                .map(|backend| backend.trim().to_string())
+                .filter(|backend| !backend.is_empty())
+        })
         .unwrap_or_else(default_backend)
 }
 
@@ -317,7 +336,7 @@ fn persist_login(support_dir: &Path, config: &Config) -> Result<()> {
     if let Err(error) = pairing::forget_parked_github(support_dir, &backend_base(config)) {
         tracing::warn!("a replaced GitHub session stays set aside: {error:#}");
     }
-    pairing::lifecycle::release_hold();
+    pairing::watch::wake();
     let owner = CacheOwner::of(config);
     if refresh
         .current
@@ -394,7 +413,7 @@ pub async fn logout(support_dir: &Path) -> Result<()> {
     // The next sign-in must not inherit this account's namespace — a cached
     // credential would have it registering into someone else's.
     forget_relay_credential().await;
-    pairing::lifecycle::release_hold();
+    pairing::watch::wake();
     Ok(())
 }
 

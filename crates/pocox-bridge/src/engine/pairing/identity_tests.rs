@@ -2,10 +2,18 @@
 
 use pocox_account_proto::pairing::PairingErrorCode;
 
-use super::error::{code_of, SignedOut};
-use super::test_lab::{hint, Lab};
-use super::{flows, session, status, PairingState};
+use super::error::{code_of, NoDevice, SignedOut};
+use super::test_lab::{hint, Install, Lab};
+use super::{flows, operations, session, status, PairingState};
 use crate::engine::config::save_config;
+
+/// `install`'s `config.toml`, with its still-living JWT, restored onto a
+/// computer that has no store.
+fn restored_from(lab: &Lab, install: &Install) -> Install {
+    let restored = lab.device();
+    save_config(&restored.support, &install.config()).expect("restore");
+    restored
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn the_secret_stays_in_the_store_and_the_configuration_holds_only_a_session() {
@@ -49,6 +57,92 @@ async fn a_configuration_restored_without_its_store_is_signed_out() {
     assert_eq!(restored.identity().read().expect("store").map(|_| ()), None, "and no new device");
     let reading = status::status(&restored.identity()).await.expect("status");
     assert_eq!(reading.state, PairingState::NoDevice);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_restored_configuration_cannot_act_for_the_device_it_came_from() {
+    let lab = Lab::start().await;
+    let (peer, _, code) = lab.activated().await;
+    let (original, session, _) = lab.activated().await;
+    let preview = flows::preview(&original.identity(), &code.code)
+        .await
+        .expect("preview");
+    operations::link(&original.identity(), &preview.ticket, false, None)
+        .await
+        .expect("link");
+    let members = |group: &pocox_account_proto::pairing::DeviceListResponse| group.devices.len();
+
+    // A mutation first: refused as signed out, and nothing is made to stand behind
+    // that JWT.
+    let restored = restored_from(&lab, &original);
+    let error = operations::leave(&restored.identity())
+        .await
+        .expect_err("not this device's to do");
+    assert!(error.chain().any(|cause| cause.is::<SignedOut>()), "{error:#}");
+    assert_eq!(restored.config().account_token(), None);
+    assert_eq!(restored.identity().read().expect("store").map(|_| ()), None);
+    let group = flows::devices(&peer.identity(), None)
+        .await
+        .expect("devices");
+    assert_eq!(members(&group), 2, "the original stays in its group");
+
+    // Preparing first: a device of its own, not written into `[account]` over the
+    // restored session's name.
+    let restored = restored_from(&lab, &original);
+    let prepared = flows::prepare(&restored.identity(), None)
+        .await
+        .expect("prepare");
+    assert_ne!(prepared.session.device_id, session.device_id);
+    assert!(!prepared.session.activated);
+    let config = restored.config();
+    assert_eq!(config.account_token(), None, "signed out, and nothing was confirmed");
+    assert_eq!(config.account_id(), None);
+    let group = flows::devices(&peer.identity(), None)
+        .await
+        .expect("devices");
+    assert_eq!(members(&group), 2);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn managing_a_device_that_does_not_exist_fails_and_creates_nothing() {
+    let lab = Lab::start().await;
+    let install = lab.device();
+    let identity = install.identity();
+    let no_device = |error: anyhow::Error| error.chain().any(|cause| cause.is::<NoDevice>());
+    assert!(no_device(
+        flows::set_paused(&identity, true)
+            .await
+            .expect_err("nothing to pause")
+    ));
+    assert!(no_device(flows::code(&identity).await.expect_err("no code")));
+    assert!(no_device(flows::rotate(&identity).await.expect_err("no code")));
+    assert!(no_device(flows::devices(&identity, None).await.expect_err("no group")));
+    assert!(no_device(
+        flows::rename(&identity, "d", "n")
+            .await
+            .expect_err("no group")
+    ));
+    assert!(no_device(
+        flows::decide(&identity, "d", "r", true)
+            .await
+            .expect_err("no group")
+    ));
+    assert!(no_device(operations::leave(&identity).await.expect_err("no group")));
+    assert!(no_device(
+        operations::remove(&identity, "d")
+            .await
+            .expect_err("no group")
+    ));
+    let relay = session::relay_credential(&install.support, &install.backend);
+    assert!(no_device(relay.await.expect_err("no key")));
+    assert_eq!(identity.read().expect("store").map(|_| ()), None, "no secret was saved");
+    assert_eq!(lab.front.total(), 0, "and the backend heard nothing");
+    // Status creates nothing either; these do.
+    assert_eq!(status::status(&identity).await.expect("status").state, PairingState::NoDevice);
+    flows::prepare(&identity, None).await.expect("prepare");
+    flows::set_paused(&identity, true)
+        .await
+        .expect("now it can");
 }
 
 #[tokio::test(flavor = "multi_thread")]

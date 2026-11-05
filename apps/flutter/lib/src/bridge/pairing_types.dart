@@ -12,7 +12,8 @@ class PairingFailure implements Exception {
   });
 
   /// The backend's stable reason (`device_superseded`, `preview_stale`, ...),
-  /// `signed_out` for a session with no saved identity, or `failed` for anything
+  /// `signed_out` for a session with no saved identity, `no_device` when this
+  /// backend has no identity here for the call to act on, or `failed` for anything
   /// else. Match on this, never on [message].
   final String code;
 
@@ -139,6 +140,7 @@ class PairingOperation {
     required this.kind,
     required this.status,
     this.error,
+    this.caughtUp = true,
   });
 
   /// Its id.
@@ -153,6 +155,10 @@ class PairingOperation {
 
   /// Why it failed.
   final String? error;
+
+  /// For a completed one, whether this installation has caught up with it. If
+  /// not the change still stands: [PairingBridgeApi.pairingSettle] tries again.
+  final bool caughtUp;
 }
 
 /// One reading of this device's identity.
@@ -166,6 +172,7 @@ class PairingStatus {
     this.session,
     this.graceDeadline,
     this.pending = const [],
+    this.failed = const [],
     this.parkedGithub,
   });
 
@@ -187,6 +194,9 @@ class PairingStatus {
 
   /// Changes whose result is not in yet, which survive a restart.
   final List<PairingOperation> pending;
+
+  /// Changes that recently turned out not to have happened, with why.
+  final List<PairingOperation> failed;
 
   /// The login of a GitHub session set aside here, if any.
   final String? parkedGithub;
@@ -365,7 +375,8 @@ abstract interface class PairingBridgeApi {
   /// at startup on mobile, before any other pairing call; desktops never do.
   /// [lockDir] is an app-private directory. [read] and [write] take an opaque slot
   /// name. [write] returns only once the record is durable, and answers a failure
-  /// as text: neither may throw.
+  /// as text: neither may throw. A call that never answers fails after a while,
+  /// and a new engine calling this again replaces an adapter that stopped answering.
   Future<void> pairingInstallNativeStore({
     required String lockDir,
     required Future<NativeStoreAnswer> Function(String slot) read,
@@ -387,13 +398,13 @@ abstract interface class PairingBridgeApi {
   });
 
   /// This device's current code.
-  Future<PairingCode> pairingCode();
+  Future<PairingCode> pairingCode({String? backend});
 
   /// Pause or resume linking through this device's code.
-  Future<PairingCode> pairingSetPaused({required bool paused});
+  Future<PairingCode> pairingSetPaused({required bool paused, String? backend});
 
   /// Replace this device's code. `rate_limited` with a wait before a day passes.
-  Future<PairingCode> pairingRotate();
+  Future<PairingCode> pairingRotate({String? backend});
 
   /// The code in a scanned invitation, or null when it is not one. Scanning
   /// executes nothing: pass the code to [pairingPreview].
@@ -412,23 +423,27 @@ abstract interface class PairingBridgeApi {
   });
 
   /// Move this device out of its group, after the user confirmed.
-  Future<PairingOperation> pairingLeave();
+  Future<PairingOperation> pairingLeave({String? backend});
 
   /// Reconcile every change saved on this device, without repeating any. Call at
   /// start and from a pending screen.
   Future<List<PairingOperation>> pairingSettle({String? backend});
 
   /// One page of this device's group.
-  Future<PairingDevices> pairingDevices({String? cursor});
+  Future<PairingDevices> pairingDevices({String? cursor, String? backend});
 
   /// Rename a device in this group.
   Future<void> pairingRenameDevice({
     required String deviceId,
     required String name,
+    String? backend,
   });
 
   /// Remove a device from this group, after the user confirmed.
-  Future<PairingOperation> pairingRemoveDevice(String deviceId);
+  Future<PairingOperation> pairingRemoveDevice(
+    String deviceId, {
+    String? backend,
+  });
 
   /// Allow or deny the exact recovery request a member sees. Allowing changes
   /// nothing until the requester confirms.
@@ -436,6 +451,7 @@ abstract interface class PairingBridgeApi {
     required String deviceId,
     required String requestId,
     required bool allow,
+    String? backend,
   });
 
   /// Ask this device's former group to let it back. `not_found` when there is
@@ -467,7 +483,9 @@ abstract interface class PairingBridgeApi {
   /// as a new inactive device. Refused while the identity still works.
   Future<PairingPrepared> pairingStartOver({String? label, String? backend});
 
-  /// Make the GitHub session set aside here the active account again. Returns its
-  /// login, or null when none was set aside.
-  Future<String?> pairingResumeGithub();
+  /// Make the GitHub session set aside here the active account again, for
+  /// [backend] when named, else this installation's or the only one. Hosts stop
+  /// first and start again under GitHub. Returns its login, or null when none was
+  /// set aside. Refused while a GitHub session is already active here.
+  Future<String?> pairingResumeGithub({String? backend});
 }

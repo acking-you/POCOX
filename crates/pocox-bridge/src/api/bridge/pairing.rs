@@ -10,28 +10,30 @@
 
 use std::sync::Arc;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use flutter_rust_bridge::DartFnFuture;
 use pocox_account_proto::pairing::{
     display_code, normalize_code, CodeStatus, DeviceListResponse, DeviceSession,
     MembershipChangeKind, OperationStatus, PreviewResponse, RestoreRequestStatus,
     RestoreRequestView, PAIR_URI_PREFIX,
 };
-use pocox_core::pairing::{install_platform_store, OperationKind, StoreBackend, StoredOperation};
+use pocox_core::pairing::{install_platform_store, OperationKind, StoredOperation};
 use pocox_core::redact::scrub_pairing;
 
 use crate::engine::config::load_config;
 use crate::engine::execution::{self, Lane};
 use crate::engine::pairing::identity::Identity;
+use crate::engine::pairing::native_store::NativeStore;
 use crate::engine::pairing::operations::{self, RestoreTarget};
 use crate::engine::pairing::{self, flows, status, NativeHint, OperationOutcome, PairingError};
-use crate::engine::{account, runtime, transport};
+use crate::engine::{account, runtime};
 
 /// Why a pairing call failed. Match on `code`, never on `message`.
 #[derive(Debug, Clone)]
 pub struct PairingErrorDto {
     /// The backend's stable reason (`device_superseded`, `preview_stale`, …),
-    /// `signed_out` for a session with no saved identity, or `failed` for
+    /// `signed_out` for a session with no saved identity, `no_device` when this
+    /// backend has no identity here for this call to act on, or `failed` for
     /// anything else: an unreachable backend or an unreadable store, say.
     pub code: String,
     /// For the log. Holds no secret, code or pairing link.
@@ -54,6 +56,9 @@ impl From<anyhow::Error> for PairingErrorDto {
             Some(refusal) => refusal.code.as_str().to_string(),
             None if error.chain().any(|cause| cause.is::<pairing::SignedOut>()) => {
                 "signed_out".to_string()
+            },
+            None if error.chain().any(|cause| cause.is::<pairing::NoDevice>()) => {
+                "no_device".to_string()
             },
             None => "failed".to_string(),
         };
@@ -136,6 +141,9 @@ pub struct PairingOperationDto {
     pub status: String,
     /// Why it failed.
     pub error: Option<String>,
+    /// For a completed one, whether this installation has caught up with it. If
+    /// not the change still stands: call [`pairing_settle`] to try again.
+    pub caught_up: bool,
 }
 
 /// One reading of this device's identity.
@@ -153,6 +161,8 @@ pub struct PairingStatusDto {
     pub grace_deadline: Option<i64>,
     /// Changes whose result is not in yet, which survive a restart.
     pub pending: Vec<PairingOperationDto>,
+    /// Changes that recently turned out not to have happened, with why.
+    pub failed: Vec<PairingOperationDto>,
     /// The login of a GitHub session set aside here, which
     /// [`pairing_resume_github`] brings back.
     pub parked_github: Option<String>,
@@ -240,39 +250,14 @@ pub struct PairingRestoreRequestDto {
     pub devices: Vec<PairingPreviewDeviceDto>,
 }
 
-/// A store whose bytes a platform adapter holds.
-struct NativeStore {
-    read: Box<dyn Fn(String) -> DartFnFuture<NativeStoreRead> + Send + Sync>,
-    write: Box<dyn Fn(String, String) -> DartFnFuture<Option<String>> + Send + Sync>,
-}
-
-impl StoreBackend for NativeStore {
-    fn read(&self, slot: &str) -> Result<Option<Vec<u8>>> {
-        // Waits for Dart's event loop, which runs elsewhere and never waits on
-        // this thread.
-        let answer = futures::executor::block_on((self.read)(slot.to_string()));
-        match answer.error {
-            Some(error) => anyhow::bail!("the device store cannot be read: {error}"),
-            None => Ok(answer.value.map(String::into_bytes)),
-        }
-    }
-
-    fn write(&self, slot: &str, bytes: &[u8]) -> Result<()> {
-        let value = String::from_utf8(bytes.to_vec()).context("encoding the device store")?;
-        match futures::executor::block_on((self.write)(slot.to_string(), value)) {
-            Some(error) => anyhow::bail!("the device store cannot be saved: {error}"),
-            None => Ok(()),
-        }
-    }
-}
-
 /// Keep the device store in a platform's secure storage for the rest of this
 /// run: the iOS Keychain, or on Android `no_backup` plus Block Store. Call once
 /// at startup, before any other pairing call. `lock_dir` is an app-private
 /// directory for its lock files. `read` and `write` receive an opaque slot name
 /// and the record as text; `write` answers only after the record is durable,
-/// and either reports a failure by value rather than by throwing. Desktops
-/// never call this.
+/// and either reports a failure by value rather than by throwing. A call that
+/// never answers fails after a while, and calling this again from a new engine
+/// replaces an adapter that stopped answering. Desktops never call this.
 pub fn pairing_install_native_store(
     lock_dir: String,
     read: impl Fn(String) -> DartFnFuture<NativeStoreRead> + Send + Sync + 'static,
@@ -280,10 +265,19 @@ pub fn pairing_install_native_store(
 ) {
     install_platform_store(
         lock_dir.into(),
-        Arc::new(NativeStore {
-            read: Box::new(read),
-            write: Box::new(write),
-        }),
+        Arc::new(NativeStore::new(
+            Box::new(move |slot| {
+                let call = read(slot);
+                Box::pin(async move {
+                    let answer = call.await;
+                    match answer.error {
+                        Some(error) => Err(error),
+                        None => Ok(answer.value),
+                    }
+                })
+            }),
+            Box::new(write),
+        )),
     );
 }
 
@@ -326,23 +320,25 @@ pub async fn pairing_activate(
 }
 
 /// This device's current code.
-pub async fn pairing_code() -> Result<PairingCodeDto, PairingErrorDto> {
-    run(None, move |identity| async move { Ok(code_dto(flows::code(&identity).await?)) }).await
+pub async fn pairing_code(backend: Option<String>) -> Result<PairingCodeDto, PairingErrorDto> {
+    run(backend, move |identity| async move { Ok(code_dto(flows::code(&identity).await?)) }).await
 }
 
 /// Pause or resume linking through this device's code.
-pub async fn pairing_set_paused(paused: bool) -> Result<PairingCodeDto, PairingErrorDto> {
-    run(
-        None,
-        move |identity| async move { Ok(code_dto(flows::set_paused(&identity, paused).await?)) },
-    )
+pub async fn pairing_set_paused(
+    paused: bool,
+    backend: Option<String>,
+) -> Result<PairingCodeDto, PairingErrorDto> {
+    run(backend, move |identity| async move {
+        Ok(code_dto(flows::set_paused(&identity, paused).await?))
+    })
     .await
 }
 
 /// Replace this device's code. `rate_limited` with `retry_after_secs` before a
 /// day has passed since the last one.
-pub async fn pairing_rotate() -> Result<PairingCodeDto, PairingErrorDto> {
-    run(None, move |identity| async move { Ok(code_dto(flows::rotate(&identity).await?)) }).await
+pub async fn pairing_rotate(backend: Option<String>) -> Result<PairingCodeDto, PairingErrorDto> {
+    run(backend, move |identity| async move { Ok(code_dto(flows::rotate(&identity).await?)) }).await
 }
 
 /// The code in a scanned `pocox://pair` invitation, or `None` when it is not
@@ -382,9 +378,14 @@ pub async fn pairing_link(
 }
 
 /// Move this device out of its group, after the user confirmed.
-pub async fn pairing_leave() -> Result<PairingOperationDto, PairingErrorDto> {
-    run(None, move |identity| async move { Ok(outcome_dto(operations::leave(&identity).await?)) })
-        .await
+pub async fn pairing_leave(
+    backend: Option<String>,
+) -> Result<PairingOperationDto, PairingErrorDto> {
+    run(
+        backend,
+        move |identity| async move { Ok(outcome_dto(operations::leave(&identity).await?)) },
+    )
+    .await
 }
 
 /// Reconcile every change saved on this device, without repeating any. Call at
@@ -403,24 +404,32 @@ pub async fn pairing_settle(
 }
 
 /// One page of this device's group.
-pub async fn pairing_devices(cursor: Option<String>) -> Result<PairingDevicesDto, PairingErrorDto> {
-    run(None, move |identity| async move {
+pub async fn pairing_devices(
+    cursor: Option<String>,
+    backend: Option<String>,
+) -> Result<PairingDevicesDto, PairingErrorDto> {
+    run(backend, move |identity| async move {
         Ok(devices_dto(flows::devices(&identity, cursor.as_deref()).await?))
     })
     .await
 }
 
 /// Rename a device in this group.
-pub async fn pairing_rename_device(device_id: String, name: String) -> Result<(), PairingErrorDto> {
-    run(None, move |identity| async move { flows::rename(&identity, &device_id, &name).await })
+pub async fn pairing_rename_device(
+    device_id: String,
+    name: String,
+    backend: Option<String>,
+) -> Result<(), PairingErrorDto> {
+    run(backend, move |identity| async move { flows::rename(&identity, &device_id, &name).await })
         .await
 }
 
 /// Remove a device from this group, after the user confirmed.
 pub async fn pairing_remove_device(
     device_id: String,
+    backend: Option<String>,
 ) -> Result<PairingOperationDto, PairingErrorDto> {
-    run(None, move |identity| async move {
+    run(backend, move |identity| async move {
         Ok(outcome_dto(operations::remove(&identity, &device_id).await?))
     })
     .await
@@ -432,8 +441,9 @@ pub async fn pairing_decide_restore(
     device_id: String,
     request_id: String,
     allow: bool,
+    backend: Option<String>,
 ) -> Result<(), PairingErrorDto> {
-    run(None, move |identity| async move {
+    run(backend, move |identity| async move {
         flows::decide(&identity, &device_id, &request_id, allow).await
     })
     .await
@@ -510,16 +520,19 @@ pub async fn pairing_start_over(
     .await
 }
 
-/// Make the GitHub session set aside here the active account again. Returns its
-/// login, or `None` when none was set aside. The pairing identity stays in its
-/// store, ready to resume.
-pub async fn pairing_resume_github() -> Result<Option<String>, PairingErrorDto> {
-    let resumed =
-        execution::run(Lane::Control, move || pairing::resume_github(&runtime::support_dir()?))
-            .await?;
-    if resumed.is_some() {
-        transport::context_changed();
-    }
+/// Make the GitHub session set aside here the active account again, for
+/// `backend` when one is named, else this installation's or the only one. Hosts
+/// stop first and start again under GitHub. Returns its login, or `None` when
+/// none was set aside. Refused while a GitHub session is already active here.
+/// The pairing identity stays in its store, ready to resume.
+pub async fn pairing_resume_github(
+    backend: Option<String>,
+) -> Result<Option<String>, PairingErrorDto> {
+    let resumed = execution::run(Lane::Control, move || {
+        let support = runtime::support_dir()?;
+        runtime::runtime().block_on(pairing::resume_github(&support, backend.as_deref()))
+    })
+    .await?;
     Ok(resumed)
 }
 
@@ -604,16 +617,18 @@ fn outcome_dto(outcome: OperationOutcome) -> PairingOperationDto {
             OperationStatus::Unknown => "unknown",
         }
         .to_string(),
-        error: outcome.error.map(|code| code.as_str().to_string()),
+        error: outcome.error,
+        caught_up: outcome.caught_up,
     }
 }
 
-fn pending_dto(operation: StoredOperation) -> PairingOperationDto {
+fn stored_dto(operation: StoredOperation, status: &str) -> PairingOperationDto {
     PairingOperationDto {
         id: operation.id,
         kind: kind_label(operation.kind).to_string(),
-        status: "pending".to_string(),
-        error: None,
+        status: status.to_string(),
+        error: operation.error,
+        caught_up: true,
     }
 }
 
@@ -633,7 +648,16 @@ fn status_dto(status: status::PairingStatus) -> PairingStatusDto {
         session: status.session.map(session_dto),
         active_here: status.active_here,
         grace_deadline: status.grace_deadline,
-        pending: status.pending.into_iter().map(pending_dto).collect(),
+        pending: status
+            .pending
+            .into_iter()
+            .map(|operation| stored_dto(operation, "pending"))
+            .collect(),
+        failed: status
+            .failed
+            .into_iter()
+            .map(|operation| stored_dto(operation, "failed"))
+            .collect(),
         parked_github: status.parked_github,
     }
 }

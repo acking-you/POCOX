@@ -119,7 +119,9 @@ no copy can go stale. A copy in `config.toml` would defeat the Keychain's
 `ThisDeviceOnly` and Android's exclusions, because that file lives in a backed-up
 directory on both platforms, and excluding the whole file would change what GitHub
 users get back from a restore. A restored `config.toml` without its store means
-signed out: its JWT expires within the hour and cannot be refreshed. On
+signed out: its JWT expires within the hour and cannot be refreshed, and it is cleared
+before anything is created or sent, so no new secret ever stands behind it. A record no
+session ever came from counts the same. On
 `device_superseded` show recovery; never automatically reclaim a device in a loop.
 The store retains pending and completed operation identity until local
 configuration catches up with a successful server transition.
@@ -787,48 +789,95 @@ Shared-store changes are observed before issuing new authenticated work and by
 long-running hosting owners, not only when a foreground page happens to poll.
 Only the hosting-state lock owner may restart hosts.
 
+**What may start a device.** Preparing, activating, previewing a code and asking to
+recover may create the secret. Everything else (a code's pause or rotation, the group,
+a removal, a leave) reads the store and fails with `no_device` if there is none: pausing
+a leaked code on a machine that never paired, or with the wrong `--backend`, must not
+report success on a new device while the real code stays live.
+
+**A late answer.** The account is read before a request and compared again before and
+during the write, so an answer that arrives after the user signed in elsewhere or out
+changes nothing they did and stops nothing of theirs. A refresh requires the identity to
+still be the active one, and an adoption requires the account it started from. The same
+holds for a refusal saying the identity died. The account's explicit self-host mode means
+the identity is not active; only an adoption ends that mode.
+
 **Operations.** A link, leave, removal or restore is saved in the store, with the
 installation that started it and that installation's active account, before it is sent.
 It is sent once. After a lost answer its result is only ever read, and a device with one
-open starts no other. A completed link or restore moves the installation that started
+pending starts no other. A clear refusal (a 4xx with a known code) means it did not
+happen. Anything else, a server failure included, may still commit, so it stays pending
+and its result is read. A completed link or restore moves the installation that started
 it only if that installation is still on the account it started from; otherwise the
-commit stands and that account is left alone. A result the backend still does not know
-two minutes on was never received, and is forgotten. Another installation's operation is
-left to it for a day.
+commit stands and that account is left alone. Any other installation may read the result
+at once, and a result it has read blocks nothing, but adopting it stays with the
+installation that started it for a day. A result the backend still does not know two
+minutes on was never received. An operation that did not happen stays a day, so whoever
+started it can still learn why after another process read it. A completed one's absence
+from the store never reads as success: the backend is asked. A commit whose local
+catch-up failed says so and is tried again, including by the watcher of an installation
+on GitHub. A decision on a recovery request has one identity per device, request and
+answer, and after a lost answer a rotation reads the code route, since sending either
+again could only be refused.
 
 **A change of user.** A process running the engine stops what the old user owned before
 the new one reaches `config.toml`: cached credentials and the renewer, every tunnel and
 session through the transport's epoch, then its hosts without touching their restore
-choices. Token work fails fast meanwhile, so a start holding a host's lease cannot leave
-the stop waiting on it. Then the hosts it stopped start again if the session is activated,
-and otherwise it holds: nothing starts until Continue. A hold is memory, and the backend
-is what survives a restart: every start asks whether `/v1/relay` refuses this device.
-A superseded or unknown identity holds the same way, and only the user's choice moves it on.
-GitHub and self-hosted setups skip all of this at the first check of the configuration.
+choices. What can fail locally is done first, and if the write still fails what was stopped
+starts again. Token work fails fast meanwhile, before waiting as well as after, so a start
+holding a host's lease cannot leave the stop waiting on it; a host still busy after ten
+seconds is owed a stop and a start, retried on the next check. Then the hosts it stopped start
+again if the session is activated, and otherwise it holds: nothing starts until Continue.
+A hold is memory, and the backend is what survives a restart: every start asks whether
+`/v1/relay` refuses this device, and being refused holds too, so when a hold ends
+everything the restore ledger says should run starts. A superseded or unknown identity
+holds the same way, only the user's choice moves it on, and this process stops asking the
+backend about that secret and stops dropping connections over it. GitHub and self-hosted
+setups skip all of this at the first check of the configuration, and a process given an
+explicit relay does not depend on the account at all.
 
-**Long-running processes.** A process that may host asks `GET /v1/me` every minute,
-which refreshes a session whose generation moved on. While holding it refreshes instead,
-since a Continue from another installation does not change this JWT. A plain `pocox serve`
-and detached relay workers ask the same question and exit when the identity changes.
+**Long-running processes.** A process that may host compares `config.toml` with the
+account it hosts under on every check, once a minute, and on a move to or from pairing it
+runs the same stop, then starts or holds: a `pocox pair join` in another terminal is the
+only way to confirm a move on a headless host, and it writes first. The first check after
+a start also learns whether this device may host. After that it asks `GET /v1/me`, which
+refreshes a session whose generation moved on. While holding it refreshes instead, since
+a Continue from another installation does not change this JWT. A plain `pocox serve` and
+detached relay workers on an account's credential make the same comparison and ask the
+same question, and exit when the account changes; one running under GitHub only ever
+reads its configuration here. A worker the relay refuses as expired, after a sleep past its
+key's end, fetches the replacement for the same user and registers again.
 
 **Switching.** `[account]` holds one session, so moving to pairing sets a GitHub session
-aside in `parked-accounts.json` in the support directory, per backend, for an explicit
-resume. A new GitHub sign-in on that backend replaces it. A file of its own, for the
-reason `[account]` gains no fields. A self-hosted relay and key stay where they are in
-`config.toml`, and an explicit self-host mode wins while chosen, with pairing asleep.
+aside in `parked-accounts.json` in the support directory, under the canonical backend it
+really used, carrying that backend so a resume can put it back. A new GitHub sign-in on
+that backend replaces it, and a resume never replaces a GitHub session already there, whose
+token would be lost unrevoked. Going back to GitHub is a change of user like any other:
+hosts stop first and start again under GitHub, whether it happens here or another process
+wrote it, because left alone they would stay published to the group this installation left.
+A file of its own, for the reason `[account]` gains no fields. A self-hosted relay and key
+stay where they are in `config.toml`, and an explicit self-host mode wins while chosen, with
+pairing asleep. `POCOX_DEVICE_SCOPE` names a separate identity and hardware key; since
+`config.toml` holds one session, each scope in use also needs its own `XDG_CONFIG_HOME`.
 
 ```bash
 pocox pair                  # show this device's code, ask before activating, wait for a link
 pocox pair join             # read code interactively or from stdin, never argv
 pocox pair restore          # recover a previous device: a code from stdin, or ask a linked device
-pocox pair start-over       # a superseded or unknown identity: start as a new device
+pocox pair start-over       # a superseded or unknown identity: sign out of it, start as a new device
 pocox pair rotate           # error while the 24-hour wait runs
 pocox pair pause            # resume explicitly with: pocox pair resume
 pocox pair leave            # confirm; move this device out of its group
-pocox devices               # list; devices remove <id>
+pocox devices               # list, with changes under way or failed; devices remove <id>
 pocox devices allow <id> --request <request-id>
 pocox devices deny <id> --request <request-id>
 ```
+
+A change still under way when a command stops waiting exits 75: neither done nor failed,
+never to be repeated, and `pocox devices` shows how it ended. A restore or retake runs on a
+device not yet set up (the backend refuses any other), so a live device is told to pause its
+code and remove what it does not recognise from a peer instead. Waits poll at the 60 seconds
+foreground screens use and back off through transient failures; only a refusal ends one.
 
 `pocox login` stays the GitHub flow, and `pocox login --resume` returns to a session set
 aside for pairing. Off a terminal `--yes` is the only confirmation; without it a command

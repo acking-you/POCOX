@@ -5,17 +5,23 @@
 //! stays until local configuration has caught up. After that first send a
 //! mutation is never sent again: its result is read with the secret, and
 //! applied only if this installation still has the account it started from.
+//!
+//! Any installation sharing the store may read a result. Only the one that
+//! started a move may adopt it, which is what the day it is left to that
+//! installation is for; it blocks nothing else meanwhile.
+
+use std::time::Duration;
 
 use anyhow::Result;
 use pocox_account_proto::pairing::{
-    ConfirmRestoreRequest, HardwareHint, LeaveRequest, LinkRequest, OperationStatus, OperationView,
-    PairingErrorCode, RestoreIntent,
+    ConfirmRestoreRequest, DeviceSession, HardwareHint, LeaveRequest, LinkRequest, OperationStatus,
+    OperationView, PairingErrorCode, RestoreIntent,
 };
 use pocox_core::pairing::{OperationKind, OperationState, StoredOperation};
 use reqwest::{Method, RequestBuilder};
 
 use super::client::Client;
-use super::error::PairingError;
+use super::error::{code_of, refusal_of, PairingError};
 use super::identity::Identity;
 use super::session::{self, Apply};
 use crate::engine::config::load_config;
@@ -23,8 +29,14 @@ use crate::engine::config::load_config;
 /// How long an operation the backend does not know can still be in flight: past
 /// the client's own request timeout, it was never received.
 const UNKNOWN_GRACE_SECS: i64 = 120;
-/// Another installation's unfinished operation is left to it this long.
-const OTHER_INSTALLATION_GRACE_SECS: i64 = 24 * 60 * 60;
+/// How long a completed move waits for the installation that started it to
+/// adopt it.
+const ADOPTION_WINDOW_SECS: i64 = 24 * 60 * 60;
+/// How long an operation that did not happen stays to be heard about.
+const FAILED_RETENTION_SECS: i64 = 24 * 60 * 60;
+/// How many times local configuration tries to catch up before leaving it to
+/// the next pass.
+const CATCH_UP_TRIES: u64 = 3;
 
 /// Where an operation stands for the caller.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,8 +47,11 @@ pub struct OperationOutcome {
     pub kind: OperationKind,
     /// Where it stands. Never repeat a pending action: read it again.
     pub status: OperationStatus,
-    /// Why it failed.
-    pub error: Option<PairingErrorCode>,
+    /// Why it failed: the backend's code.
+    pub error: Option<String>,
+    /// For a completed one, whether this installation has caught up with it. If
+    /// not the commit still stands, and the next reading tries again.
+    pub caught_up: bool,
 }
 
 impl OperationOutcome {
@@ -46,6 +61,14 @@ impl OperationOutcome {
             kind: operation.kind,
             status,
             error: None,
+            caught_up: true,
+        }
+    }
+
+    fn failed(operation: &StoredOperation, error: Option<String>) -> Self {
+        Self {
+            error,
+            ..Self::of(operation, OperationStatus::Failed)
         }
     }
 }
@@ -88,10 +111,16 @@ fn forget(identity: &Identity, id: &str) -> Result<()> {
     Ok(())
 }
 
-fn refusal_of(error: &anyhow::Error) -> Option<&PairingError> {
-    error
-        .chain()
-        .find_map(|cause| cause.downcast_ref::<PairingError>())
+fn mark(identity: &Identity, id: &str, state: OperationState, error: Option<String>) -> Result<()> {
+    identity.store.update(|record| {
+        for stored in &mut record.operations {
+            if stored.id == id {
+                stored.state = state;
+                stored.error.clone_from(&error);
+            }
+        }
+    })?;
+    Ok(())
 }
 
 /// Save `kind`'s identity, send it once, and report where it stands.
@@ -101,8 +130,9 @@ async fn run(
     what: &str,
     build: impl Fn(&Client, &str, &str) -> RequestBuilder,
 ) -> Result<OperationOutcome> {
+    identity.require_record().await?;
     settle(identity).await?;
-    let record = identity.store.ensure_secret()?;
+    let record = identity.require_record().await?;
     if let Some(open) = record
         .operations
         .iter()
@@ -125,6 +155,7 @@ async fn run(
         active_before: session::active_account(&config),
         started_at: now(),
         state: OperationState::Pending,
+        error: None,
     };
     identity
         .store
@@ -133,7 +164,7 @@ async fn run(
         .call(what, |client, token| build(client, token, &operation.id))
         .await;
     match answer {
-        Ok(view) => conclude(identity, &operation, view).await,
+        Ok(view) => conclude(identity, &operation, view, false).await,
         Err(error) => match refusal_of(&error) {
             Some(refusal)
                 if refusal.code == PairingErrorCode::TransitionPending
@@ -141,16 +172,16 @@ async fn run(
             {
                 Ok(OperationOutcome::of(&operation, OperationStatus::Pending))
             },
-            Some(_) => {
-                // The backend answered, and what it refused did not happen.
+            Some(refusal) if refusal.is_definite() => {
+                // The backend refused it, so it did not happen.
                 forget(identity, &operation.id)?;
                 Err(error)
             },
-            None => {
-                // No answer: it may or may not have reached the backend. Only its
+            _ => {
+                // No answer, or a server failure the commit may still follow. Only its
                 // result can say, and this send is never repeated.
-                tracing::warn!("no answer to {what}; reading its result instead: {error:#}");
-                settle_one(identity, &operation).await
+                tracing::warn!("no clear answer to {what}; reading its result: {error:#}");
+                settle_one(identity, &operation, false).await
             },
         },
     }
@@ -161,49 +192,82 @@ async fn conclude(
     identity: &Identity,
     operation: &StoredOperation,
     view: OperationView,
+    adoption_open: bool,
 ) -> Result<OperationOutcome> {
     match view.status {
         OperationStatus::Completed => {
-            if let Err(error) = catch_up(identity, operation, view).await {
-                // Committed, whatever this says: the store keeps it for the next
-                // pass, and no status here claims it did not happen.
-                tracing::warn!("local state has yet to catch up: {error:#}");
-            }
-            Ok(OperationOutcome::of(operation, OperationStatus::Completed))
+            Ok(completed(identity, operation, view.session, adoption_open).await)
         },
-        OperationStatus::Pending => Ok(OperationOutcome::of(operation, OperationStatus::Pending)),
-        status @ (OperationStatus::Failed | OperationStatus::Unknown) => {
-            forget(identity, &operation.id)?;
-            Ok(OperationOutcome {
-                error: view.error,
-                ..OperationOutcome::of(operation, status)
-            })
+        // A status this client does not know is no reason to call it over.
+        OperationStatus::Pending | OperationStatus::Unknown => {
+            Ok(OperationOutcome::of(operation, OperationStatus::Pending))
+        },
+        OperationStatus::Failed => {
+            let error = view.error.map(|code| code.as_str().to_string());
+            mark(identity, &operation.id, OperationState::Failed, error.clone())?;
+            Ok(OperationOutcome::failed(operation, error))
         },
     }
 }
 
-/// The operation committed: refresh, bring this installation along if it is
-/// still on the account it started from, and only then let go of the identity.
+/// The commit stands whatever happens here. Local configuration gets a few
+/// tries and the store keeps the operation for the next pass.
+async fn completed(
+    identity: &Identity,
+    operation: &StoredOperation,
+    session: Option<DeviceSession>,
+    adoption_open: bool,
+) -> OperationOutcome {
+    let mut caught_up = false;
+    for attempt in 0..CATCH_UP_TRIES {
+        if attempt > 0 {
+            tokio::time::sleep(Duration::from_secs(attempt)).await;
+        }
+        match catch_up(identity, operation, session.clone(), adoption_open).await {
+            Ok(()) => {
+                caught_up = true;
+                break;
+            },
+            Err(error) => {
+                tracing::warn!("local state has yet to catch up: {error:#}");
+                if matches!(
+                    code_of(&error),
+                    Some(PairingErrorCode::DeviceSuperseded | PairingErrorCode::DeviceUnknown)
+                ) {
+                    // This secret is over, so nothing here ever will catch up.
+                    if let Err(error) = forget(identity, &operation.id) {
+                        tracing::warn!("forgetting a finished operation: {error:#}");
+                    }
+                    break;
+                }
+            },
+        }
+    }
+    OperationOutcome {
+        caught_up,
+        ..OperationOutcome::of(operation, OperationStatus::Completed)
+    }
+}
+
+/// The operation committed: refresh, bring this installation along if it is the
+/// one that started it and still on the account it started from, and then let
+/// go of the identity, unless it is still waiting for that installation.
 async fn catch_up(
     identity: &Identity,
     operation: &StoredOperation,
-    view: OperationView,
+    session: Option<DeviceSession>,
+    adoption_open: bool,
 ) -> Result<()> {
-    identity.store.update(|record| {
-        for stored in &mut record.operations {
-            if stored.id == operation.id {
-                stored.state = OperationState::Completed;
-            }
-        }
-    })?;
-    let fresh = match view.session {
+    mark(identity, &operation.id, OperationState::Completed, None)?;
+    let config = load_config(&identity.support)?;
+    let account = session::active_account(&config);
+    let fresh = match session {
         Some(fresh) => fresh,
         None => {
-            let record = identity.store.ensure_secret()?;
+            let record = identity.read()?.ok_or_else(super::error::no_device_error)?;
             identity.mint(&record, None).await?
         },
     };
-    let config = load_config(&identity.support)?;
     let started_here = operation.initiator == installation(identity)
         && session::same_account(&operation.active_before, &config);
     let moves_here = matches!(
@@ -211,24 +275,24 @@ async fn catch_up(
         OperationKind::Link | OperationKind::Restore | OperationKind::Retake
     );
     if started_here && moves_here {
-        session::apply(identity, fresh, Apply::Adopt).await?;
+        session::apply(identity, fresh, Apply::Adopt, &operation.active_before).await?;
     } else if identity.is_active(&config) {
-        session::apply(identity, fresh, Apply::Refresh).await?;
+        session::apply(identity, fresh, Apply::Refresh, &account).await?;
+    }
+    if adoption_open {
+        return Ok(());
     }
     forget(identity, &operation.id)
 }
 
 /// Read one operation's result with the secret.
-async fn settle_one(identity: &Identity, operation: &StoredOperation) -> Result<OperationOutcome> {
+async fn settle_one(
+    identity: &Identity,
+    operation: &StoredOperation,
+    adoption_open: bool,
+) -> Result<OperationOutcome> {
     if operation.state == OperationState::Completed {
-        return conclude(identity, operation, OperationView {
-            operation_id: operation.id.clone(),
-            kind: pocox_account_proto::pairing::OperationKind::Unknown,
-            status: OperationStatus::Completed,
-            error: None,
-            session: None,
-        })
-        .await;
+        return Ok(completed(identity, operation, None, adoption_open).await);
     }
     let Some(record) = identity.read()? else {
         return Ok(OperationOutcome::of(operation, OperationStatus::Pending));
@@ -238,8 +302,8 @@ async fn settle_one(identity: &Identity, operation: &StoredOperation) -> Result<
         .read_operation(record.secret(), &operation.id)
         .await
     {
-        Ok(view) => conclude(identity, operation, view).await,
-        Err(error) => match refusal_of(&error).map(|refusal| refusal.code) {
+        Ok(view) => conclude(identity, operation, view, adoption_open).await,
+        Err(error) => match code_of(&error) {
             Some(PairingErrorCode::OperationUnknown)
                 if now() - operation.started_at < UNKNOWN_GRACE_SECS =>
             {
@@ -252,11 +316,9 @@ async fn settle_one(identity: &Identity, operation: &StoredOperation) -> Result<
             ) => {
                 // It never arrived, or this secret can no longer ask. Refreshing
                 // says what this device is now.
-                forget(identity, &operation.id)?;
-                Ok(OperationOutcome {
-                    error: Some(code),
-                    ..OperationOutcome::of(operation, OperationStatus::Failed)
-                })
+                let error = Some(code.as_str().to_string());
+                mark(identity, &operation.id, OperationState::Failed, error.clone())?;
+                Ok(OperationOutcome::failed(operation, error))
             },
             _ => {
                 tracing::debug!("operation result not available yet: {error:#}");
@@ -267,7 +329,8 @@ async fn settle_one(identity: &Identity, operation: &StoredOperation) -> Result<
 }
 
 /// Reconcile every saved operation: at start, before a new one and whenever a
-/// pending screen asks. Reads results only.
+/// pending screen asks. Reads results only, and never adopts another
+/// installation's move while it can still adopt that itself.
 pub async fn settle(identity: &Identity) -> Result<Vec<OperationOutcome>> {
     let Some(record) = identity.read()? else {
         return Ok(Vec::new());
@@ -275,15 +338,54 @@ pub async fn settle(identity: &Identity) -> Result<Vec<OperationOutcome>> {
     let here = installation(identity);
     let mut outcomes = Vec::with_capacity(record.operations.len());
     for operation in &record.operations {
-        if operation.initiator != here
-            && now() - operation.started_at < OTHER_INSTALLATION_GRACE_SECS
-        {
-            outcomes.push(OperationOutcome::of(operation, OperationStatus::Pending));
-            continue;
-        }
-        outcomes.push(settle_one(identity, operation).await?);
+        let adoption_open =
+            operation.initiator != here && now() - operation.started_at < ADOPTION_WINDOW_SECS;
+        let outcome = match operation.state {
+            OperationState::Failed => OperationOutcome::failed(operation, operation.error.clone()),
+            OperationState::Completed if adoption_open => {
+                OperationOutcome::of(operation, OperationStatus::Completed)
+            },
+            _ => settle_one(identity, operation, adoption_open).await?,
+        };
+        outcomes.push(outcome);
+    }
+    let old_failure = |operation: &StoredOperation| {
+        operation.state == OperationState::Failed
+            && now() - operation.started_at >= FAILED_RETENTION_SECS
+    };
+    if record.operations.iter().any(old_failure) {
+        identity.store.update(|record| {
+            record
+                .operations
+                .retain(|operation| !old_failure(operation));
+        })?;
     }
     Ok(outcomes)
+}
+
+/// The backend's word on `outcome`'s operation, for one no longer in the store:
+/// its absence alone says nothing about how it ended. `None` when that cannot
+/// be learned.
+pub async fn read_outcome(
+    identity: &Identity,
+    outcome: &OperationOutcome,
+) -> Option<OperationOutcome> {
+    let record = identity.read().ok()??;
+    let view = identity
+        .client
+        .read_operation(record.secret(), &outcome.id)
+        .await
+        .ok()?;
+    let status = match view.status {
+        OperationStatus::Unknown => OperationStatus::Pending,
+        status => status,
+    };
+    Some(OperationOutcome {
+        status,
+        error: view.error.map(|code| code.as_str().to_string()),
+        caught_up: true,
+        ..outcome.clone()
+    })
 }
 
 /// Move this device into the group a preview showed.

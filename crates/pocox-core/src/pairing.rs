@@ -25,8 +25,8 @@ pub use hint::{
     derive_hint, os_account, read_local_hardware_id, DerivedHint, HintSource, RawHardwareId,
 };
 pub use store::{
-    generate_secret, install_platform_store, secret_is_well_formed, ActiveAccount, DeviceRecord,
-    DeviceStore, OperationKind, OperationState, SessionMark, StoreBackend, StoreKey,
-    StoredOperation, DEVICE_SCOPE_ENV,
+    device_store_exists, generate_secret, install_platform_store, secret_is_well_formed,
+    ActiveAccount, DeviceRecord, DeviceStore, OperationKind, OperationState, SessionMark,
+    StoreBackend, StoreKey, StoredOperation, DEVICE_SCOPE_ENV,
 };
 pub use tuple::{encode_tuple, encode_tuple_with_tag, DEVICE_SECRET_PREFIX};

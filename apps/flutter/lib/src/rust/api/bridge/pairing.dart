@@ -6,16 +6,17 @@
 import '../../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `code_dto`, `devices_dto`, `kind_label`, `native`, `outcome_dto`, `pending_dto`, `preview_devices`, `preview_dto`, `restore_request_dto`, `run`, `session_dto`, `status_dto`
-// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `NativeStore`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `from`, `read`, `write`
+// These functions are ignored because they are not marked as `pub`: `code_dto`, `devices_dto`, `kind_label`, `native`, `outcome_dto`, `preview_devices`, `preview_dto`, `restore_request_dto`, `run`, `session_dto`, `status_dto`, `stored_dto`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`, `from`
 
-/// Keep the device store in a platform's secure storage for the rest of this run:
-/// the iOS Keychain, or on Android `no_backup` plus Block Store. Call once at
-/// startup, before any other pairing call. `lock_dir` is an app-private directory
-/// for its lock files. `read` and `write` receive an opaque slot name and the
-/// record as text; `write` answers only after the record is durable, and either
-/// reports a failure by value rather than by throwing. Desktops never call this.
+/// Keep the device store in a platform's secure storage for the rest of this
+/// run: the iOS Keychain, or on Android `no_backup` plus Block Store. Call once
+/// at startup, before any other pairing call. `lock_dir` is an app-private
+/// directory for its lock files. `read` and `write` receive an opaque slot name
+/// and the record as text; `write` answers only after the record is durable,
+/// and either reports a failure by value rather than by throwing. A call that
+/// never answers fails after a while, and calling this again from a new engine
+/// replaces an adapter that stopped answering. Desktops never call this.
 Future<void> pairingInstallNativeStore({
   required String lockDir,
   required FutureOr<NativeStoreRead> Function(String) read,
@@ -50,20 +51,25 @@ Future<PairingSessionDto> pairingActivate({
 );
 
 /// This device's current code.
-Future<PairingCodeDto> pairingCode() =>
-    RustLib.instance.api.crateApiBridgePairingPairingCode();
+Future<PairingCodeDto> pairingCode({String? backend}) =>
+    RustLib.instance.api.crateApiBridgePairingPairingCode(backend: backend);
 
 /// Pause or resume linking through this device's code.
-Future<PairingCodeDto> pairingSetPaused({required bool paused}) =>
-    RustLib.instance.api.crateApiBridgePairingPairingSetPaused(paused: paused);
+Future<PairingCodeDto> pairingSetPaused({
+  required bool paused,
+  String? backend,
+}) => RustLib.instance.api.crateApiBridgePairingPairingSetPaused(
+  paused: paused,
+  backend: backend,
+);
 
-/// Replace this device's code. `rate_limited` with `retry_after_secs` before a day
-/// has passed since the last one.
-Future<PairingCodeDto> pairingRotate() =>
-    RustLib.instance.api.crateApiBridgePairingPairingRotate();
+/// Replace this device's code. `rate_limited` with `retry_after_secs` before a
+/// day has passed since the last one.
+Future<PairingCodeDto> pairingRotate({String? backend}) =>
+    RustLib.instance.api.crateApiBridgePairingPairingRotate(backend: backend);
 
-/// The code in a scanned `pocox://pair` invitation, or `None` when it is not one.
-/// Scanning executes nothing: pass the code to [`pairing_preview`].
+/// The code in a scanned `pocox://pair` invitation, or `None` when it is not
+/// one. Scanning executes nothing: pass the code to [`pairing_preview`].
 String? pairingParseInvitation({required String uri}) =>
     RustLib.instance.api.crateApiBridgePairingPairingParseInvitation(uri: uri);
 
@@ -92,8 +98,8 @@ Future<PairingOperationDto> pairingLink({
 );
 
 /// Move this device out of its group, after the user confirmed.
-Future<PairingOperationDto> pairingLeave() =>
-    RustLib.instance.api.crateApiBridgePairingPairingLeave();
+Future<PairingOperationDto> pairingLeave({String? backend}) =>
+    RustLib.instance.api.crateApiBridgePairingPairingLeave(backend: backend);
 
 /// Reconcile every change saved on this device, without repeating any. Call at
 /// start and from a pending screen.
@@ -101,34 +107,44 @@ Future<List<PairingOperationDto>> pairingSettle({String? backend}) =>
     RustLib.instance.api.crateApiBridgePairingPairingSettle(backend: backend);
 
 /// One page of this device's group.
-Future<PairingDevicesDto> pairingDevices({String? cursor}) =>
-    RustLib.instance.api.crateApiBridgePairingPairingDevices(cursor: cursor);
+Future<PairingDevicesDto> pairingDevices({String? cursor, String? backend}) =>
+    RustLib.instance.api.crateApiBridgePairingPairingDevices(
+      cursor: cursor,
+      backend: backend,
+    );
 
 /// Rename a device in this group.
 Future<void> pairingRenameDevice({
   required String deviceId,
   required String name,
+  String? backend,
 }) => RustLib.instance.api.crateApiBridgePairingPairingRenameDevice(
   deviceId: deviceId,
   name: name,
+  backend: backend,
 );
 
 /// Remove a device from this group, after the user confirmed.
-Future<PairingOperationDto> pairingRemoveDevice({required String deviceId}) =>
-    RustLib.instance.api.crateApiBridgePairingPairingRemoveDevice(
-      deviceId: deviceId,
-    );
+Future<PairingOperationDto> pairingRemoveDevice({
+  required String deviceId,
+  String? backend,
+}) => RustLib.instance.api.crateApiBridgePairingPairingRemoveDevice(
+  deviceId: deviceId,
+  backend: backend,
+);
 
-/// Allow or deny the exact recovery request a member sees. Allowing changes nothing
-/// until the requester confirms.
+/// Allow or deny the exact recovery request a member sees. Allowing changes
+/// nothing until the requester confirms.
 Future<void> pairingDecideRestore({
   required String deviceId,
   required String requestId,
   required bool allow,
+  String? backend,
 }) => RustLib.instance.api.crateApiBridgePairingPairingDecideRestore(
   deviceId: deviceId,
   requestId: requestId,
   allow: allow,
+  backend: backend,
 );
 
 /// Ask this device's former group to let it back. `not_found` when there is
@@ -151,10 +167,10 @@ Future<PairingRestoreRequestDto> pairingRestorePoll({
   backend: backend,
 );
 
-/// Confirm a restore, once the user has seen the group's devices: a `ticket` and
-/// `target_device_id` from a code's preview, or an approved `request_id`. `retake`
-/// is for a suspected compromise: old authorization ends at once and the code
-/// rotates.
+/// Confirm a restore, once the user has seen the group's devices: a `ticket`
+/// and `target_device_id` from a code's preview, or an approved `request_id`.
+/// `retake` is for a suspected compromise: old authorization ends at once and
+/// the code rotates.
 Future<PairingOperationDto> pairingRestoreConfirm({
   String? ticket,
   String? targetDeviceId,
@@ -171,23 +187,26 @@ Future<PairingOperationDto> pairingRestoreConfirm({
   backend: backend,
 );
 
-/// A superseded or unknown identity's way forward, on the user's choice: discard
-/// the dead secret and start as a new inactive device, which can then recover or
-/// carry on. Refused while the identity still works.
+/// A superseded or unknown identity's way forward, on the user's choice:
+/// discard the dead secret and start as a new inactive device, which can then
+/// recover or carry on. Refused while the identity still works.
 Future<PairingPreparedDto> pairingStartOver({String? label, String? backend}) =>
     RustLib.instance.api.crateApiBridgePairingPairingStartOver(
       label: label,
       backend: backend,
     );
 
-/// Make the GitHub session set aside here the active account again. Returns its
-/// login, or `None` when none was set aside. The pairing identity stays in its
-/// store, ready to resume.
-Future<String?> pairingResumeGithub() =>
-    RustLib.instance.api.crateApiBridgePairingPairingResumeGithub();
+/// Make the GitHub session set aside here the active account again, for
+/// `backend` when one is named, else this installation's or the only one. Hosts
+/// stop first and start again under GitHub. Returns its login, or `None` when
+/// none was set aside. Refused while a GitHub session is already active here. The
+/// pairing identity stays in its store, ready to resume.
+Future<String?> pairingResumeGithub({String? backend}) => RustLib.instance.api
+    .crateApiBridgePairingPairingResumeGithub(backend: backend);
 
-/// A raw hardware identifier a platform adapter read, for the one call that asked
-/// for it. Rust derives a key from it and drops it; it is never stored or sent.
+/// A raw hardware identifier a platform adapter read, for the one call that
+/// asked for it. Rust derives a key from it and drops it; it is never stored or
+/// sent.
 class NativeHintDto {
   /// The adapter's source: `android_id`.
   final String source;
@@ -209,8 +228,8 @@ class NativeHintDto {
           rawId == other.rawId;
 }
 
-/// A native store's answer to a read. `error` means the store exists and cannot be
-/// read, which never becomes a new device.
+/// A native store's answer to a read. `error` means the store exists and cannot
+/// be read, which never becomes a new device.
 class NativeStoreRead {
   /// The record, absent when there is none.
   final String? value;
@@ -368,7 +387,8 @@ class PairingDevicesDto {
 /// Why a pairing call failed. Match on `code`, never on `message`.
 class PairingErrorDto implements FrbException {
   /// The backend's stable reason (`device_superseded`, `preview_stale`, …),
-  /// `signed_out` for a session with no saved identity, or `failed` for
+  /// `signed_out` for a session with no saved identity, `no_device` when this
+  /// backend has no identity here for this call to act on, or `failed` for
   /// anything else: an unreachable backend or an unreadable store, say.
   final String code;
 
@@ -427,16 +447,25 @@ class PairingOperationDto {
   /// Why it failed.
   final String? error;
 
+  /// For a completed one, whether this installation has caught up with it. If
+  /// not the change still stands: call [`pairing_settle`] to try again.
+  final bool caughtUp;
+
   const PairingOperationDto({
     required this.id,
     required this.kind,
     required this.status,
     this.error,
+    required this.caughtUp,
   });
 
   @override
   int get hashCode =>
-      id.hashCode ^ kind.hashCode ^ status.hashCode ^ error.hashCode;
+      id.hashCode ^
+      kind.hashCode ^
+      status.hashCode ^
+      error.hashCode ^
+      caughtUp.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -446,7 +475,8 @@ class PairingOperationDto {
           id == other.id &&
           kind == other.kind &&
           status == other.status &&
-          error == other.error;
+          error == other.error &&
+          caughtUp == other.caughtUp;
 }
 
 /// A recovery request waiting on a member.
@@ -656,7 +686,8 @@ class PairingSessionDto {
   /// Whether the user has set it up.
   final bool activated;
 
-  /// Its last membership transition: `linked`, `left`, `removed` or `unknown`.
+  /// Its last membership transition: `linked`, `left`, `removed` or
+  /// `unknown`.
   final String? membershipChange;
 
   /// When that was (unix seconds).
@@ -714,6 +745,9 @@ class PairingStatusDto {
   /// Changes whose result is not in yet, which survive a restart.
   final List<PairingOperationDto> pending;
 
+  /// Changes that recently turned out not to have happened, with why.
+  final List<PairingOperationDto> failed;
+
   /// The login of a GitHub session set aside here, which
   /// [`pairing_resume_github`] brings back.
   final String? parkedGithub;
@@ -725,6 +759,7 @@ class PairingStatusDto {
     required this.activeHere,
     this.graceDeadline,
     required this.pending,
+    required this.failed,
     this.parkedGithub,
   });
 
@@ -736,6 +771,7 @@ class PairingStatusDto {
       activeHere.hashCode ^
       graceDeadline.hashCode ^
       pending.hashCode ^
+      failed.hashCode ^
       parkedGithub.hashCode;
 
   @override
@@ -749,5 +785,6 @@ class PairingStatusDto {
           activeHere == other.activeHere &&
           graceDeadline == other.graceDeadline &&
           pending == other.pending &&
+          failed == other.failed &&
           parkedGithub == other.parkedGithub;
 }

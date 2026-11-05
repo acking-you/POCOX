@@ -113,7 +113,9 @@ from another device, is never applied unseen: Restart then opens the editor,
 and a save made after the card was read is refused. The host editor's **Apply and
 restart** runs for it without a configuration change. Nothing restarts such a
 host on its own: devices still using it under the earlier account or relay
-keep it until the user restarts it here.
+keep it until the user restarts it here. A move to or from
+[pairing](pairing-code-login.md#client) is the exception: those hosts stop first and start
+again, because keeping them would leave them published to a group this installation left.
 
 Local subscriptions report `Local` / **Local direct** / **本机直连** and the
 actual endpoint (or the chosen port of a forwarded API), with no fabricated SDK

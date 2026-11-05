@@ -20,6 +20,7 @@ use pocox_pb::RelaySession;
 use pocox_store::Store;
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
 use super::identity::{Identity, TEST_STORES};
@@ -38,7 +39,17 @@ pub(super) struct Front {
 #[derive(Default)]
 struct FrontPlan {
     lose: Vec<String>,
+    fail: Vec<String>,
+    hold: Vec<(String, Arc<Notify>)>,
     seen: Vec<String>,
+}
+
+/// What becomes of the answer to the request on a connection.
+#[derive(Default)]
+struct Fate {
+    lose: AtomicBool,
+    fail: AtomicBool,
+    hold: Mutex<Option<Arc<Notify>>>,
 }
 
 impl Front {
@@ -60,6 +71,24 @@ impl Front {
         self.plan.lock().expect("plan").lose.push(route.to_string());
     }
 
+    /// The next answer to a request whose line holds `route` reads as a server
+    /// failure, though the backend did whatever it did.
+    pub(super) fn fail_answer_to(&self, route: &str) {
+        self.plan.lock().expect("plan").fail.push(route.to_string());
+    }
+
+    /// The next answer to a request whose line holds `route` waits until the
+    /// returned gate is opened: a request in flight.
+    pub(super) fn hold_answer_to(&self, route: &str) -> Arc<Notify> {
+        let gate = Arc::new(Notify::new());
+        self.plan
+            .lock()
+            .expect("plan")
+            .hold
+            .push((route.to_string(), gate.clone()));
+        gate
+    }
+
     /// How many requests held `route` in their request line.
     pub(super) fn count(&self, route: &str) -> usize {
         let plan = self.plan.lock().expect("plan");
@@ -78,7 +107,7 @@ async fn forward(mut client: TcpStream, target: SocketAddr, plan: Arc<Mutex<Fron
     let Ok(mut server) = TcpStream::connect(target).await else {
         return;
     };
-    let lose = AtomicBool::new(false);
+    let fate = Fate::default();
     let (mut client_read, mut client_write) = client.split();
     let (mut server_read, mut server_write) = server.split();
     let requests = async {
@@ -100,7 +129,15 @@ async fn forward(mut client: TcpStream, target: SocketAddr, plan: Arc<Mutex<Fron
                 plan.seen.push(line.to_string());
                 if let Some(index) = plan.lose.iter().position(|route| line.contains(route)) {
                     plan.lose.remove(index);
-                    lose.store(true, Ordering::SeqCst);
+                    fate.lose.store(true, Ordering::SeqCst);
+                }
+                if let Some(index) = plan.fail.iter().position(|route| line.contains(route)) {
+                    plan.fail.remove(index);
+                    fate.fail.store(true, Ordering::SeqCst);
+                }
+                if let Some(index) = plan.hold.iter().position(|(route, _)| line.contains(route)) {
+                    let (_, gate) = plan.hold.remove(index);
+                    *fate.hold.lock().expect("hold") = Some(gate);
                 }
             }
             if server_write.write_all(&buffer[..count]).await.is_err() {
@@ -114,7 +151,21 @@ async fn forward(mut client: TcpStream, target: SocketAddr, plan: Arc<Mutex<Fron
             let Ok(count) = server_read.read(&mut buffer).await else {
                 return;
             };
-            if count == 0 || lose.load(Ordering::SeqCst) {
+            if count == 0 || fate.lose.load(Ordering::SeqCst) {
+                return;
+            }
+            let gate = fate.hold.lock().expect("hold").take();
+            if let Some(gate) = gate {
+                gate.notified().await;
+            }
+            if fate.fail.load(Ordering::SeqCst) {
+                let body = r#"{"error":"internal error"}"#;
+                let answer = format!(
+                    "HTTP/1.1 500 Internal Server Error\r\nContent-Type: \
+                     application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                let _ = client_write.write_all(answer.as_bytes()).await;
                 return;
             }
             if client_write.write_all(&buffer[..count]).await.is_err() {
@@ -175,6 +226,7 @@ pub(super) struct Lab {
     pub(super) front: Front,
     pub(super) base: String,
     pub(super) pairing: Arc<Pairing>,
+    pub(super) store: Store,
     _tasks: Vec<JoinHandle<()>>,
     _dir: tempfile::TempDir,
 }
@@ -211,8 +263,8 @@ impl Lab {
             ..PairingSettings::default()
         };
         let trusted = TrustedProxies::parse(&settings.trusted_proxies).expect("proxies");
-        let pairing =
-            Pairing::new(Arc::clone(&auth), store, session.clone(), settings).expect("pairing");
+        let pairing = Pairing::new(Arc::clone(&auth), store.clone(), session.clone(), settings)
+            .expect("pairing");
         let app = router(AppState {
             auth,
             credentials: Credentials::new(session.clone()),
@@ -234,6 +286,7 @@ impl Lab {
             front,
             base,
             pairing,
+            store,
             _tasks: vec![link_task, server, front_task],
             _dir: dir,
         }

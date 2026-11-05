@@ -94,20 +94,23 @@ mixin _FakePairing on _FakeBridgeState {
   }
 
   @override
-  Future<PairingCode> pairingCode() async {
+  Future<PairingCode> pairingCode({String? backend}) async {
     _pairingRefuse();
     return _pairingCode;
   }
 
   @override
-  Future<PairingCode> pairingSetPaused({required bool paused}) async {
+  Future<PairingCode> pairingSetPaused({
+    required bool paused,
+    String? backend,
+  }) async {
     _pairingRefuse();
     pairingPaused = paused;
     return _pairingCode;
   }
 
   @override
-  Future<PairingCode> pairingRotate() async {
+  Future<PairingCode> pairingRotate({String? backend}) async {
     _pairingRefuse();
     pairingCalls.add('rotate');
     return _pairingCode;
@@ -147,7 +150,7 @@ mixin _FakePairing on _FakeBridgeState {
   }
 
   @override
-  Future<PairingOperation> pairingLeave() async {
+  Future<PairingOperation> pairingLeave({String? backend}) async {
     _pairingRefuse();
     return _pairingDone('leave');
   }
@@ -159,7 +162,10 @@ mixin _FakePairing on _FakeBridgeState {
   }
 
   @override
-  Future<PairingDevices> pairingDevices({String? cursor}) async {
+  Future<PairingDevices> pairingDevices({
+    String? cursor,
+    String? backend,
+  }) async {
     _pairingRefuse();
     return PairingDevices(devices: pairingGroup, pendingRequests: const []);
   }
@@ -168,13 +174,17 @@ mixin _FakePairing on _FakeBridgeState {
   Future<void> pairingRenameDevice({
     required String deviceId,
     required String name,
+    String? backend,
   }) async {
     _pairingRefuse();
     pairingCalls.add('rename');
   }
 
   @override
-  Future<PairingOperation> pairingRemoveDevice(String deviceId) async {
+  Future<PairingOperation> pairingRemoveDevice(
+    String deviceId, {
+    String? backend,
+  }) async {
     _pairingRefuse();
     pairingGroup = [
       for (final device in pairingGroup)
@@ -188,6 +198,7 @@ mixin _FakePairing on _FakeBridgeState {
     required String deviceId,
     required String requestId,
     required bool allow,
+    String? backend,
   }) async {
     _pairingRefuse();
     pairingCalls.add(allow ? 'allow' : 'deny');
@@ -241,7 +252,7 @@ mixin _FakePairing on _FakeBridgeState {
   }
 
   @override
-  Future<String?> pairingResumeGithub() async {
+  Future<String?> pairingResumeGithub({String? backend}) async {
     _pairingRefuse();
     final login = pairingParkedGithub;
     pairingParkedGithub = null;

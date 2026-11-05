@@ -6,9 +6,9 @@ use pocox_account_proto::pairing::{OperationStatus, PairingErrorCode};
 use pocox_core::pairing::{ActiveAccount, OperationKind, OperationState, StoredOperation};
 
 use super::error::code_of;
-use super::flows;
 use super::operations::{self, OperationOutcome, RestoreTarget};
 use super::test_lab::{Install, Lab};
+use super::{flows, status, watch};
 use crate::engine::config::update_config;
 
 /// Read results until the operation stops pending, never repeating it.
@@ -28,6 +28,7 @@ async fn until_settled(install: &Install, id: &str) -> OperationOutcome {
                     kind: OperationKind::Link,
                     status: OperationStatus::Completed,
                     error: None,
+                    caught_up: true,
                 }
             },
         }
@@ -198,6 +199,7 @@ async fn link_sent_and_crashed(install: &Install, ticket: &str, active: ActiveAc
                 active_before: active,
                 started_at: chrono::Utc::now().timestamp(),
                 state: OperationState::Pending,
+                error: None,
             });
         })
         .expect("save the operation");
@@ -271,6 +273,213 @@ async fn a_result_arriving_later_moves_an_installation_still_on_its_account() {
     assert_eq!(outcome.status, OperationStatus::Completed);
     let config = joiner.config();
     assert_eq!(config.account_id(), Some(inviter_session.account_id.as_str()));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_server_failure_is_not_a_refusal_and_the_commit_behind_it_stands() {
+    let lab = Lab::start().await;
+    let (_, inviter_session, code) = lab.activated().await;
+    let joiner = lab.device();
+    flows::prepare(&joiner.identity(), None)
+        .await
+        .expect("prepare");
+    let preview = flows::preview(&joiner.identity(), &code.code)
+        .await
+        .expect("preview");
+
+    lab.front.fail_answer_to("POST /v1/pair/link");
+    let outcome = operations::link(&joiner.identity(), &preview.ticket, false, None)
+        .await
+        .expect("a server failure is not a refusal");
+    let outcome = until_settled(&joiner, &outcome.id).await;
+    assert_eq!(outcome.status, OperationStatus::Completed);
+    assert_eq!(lab.front.count("POST /v1/pair/link"), 1, "read, not replayed");
+    assert_eq!(joiner.config().account_id(), Some(inviter_session.account_id.as_str()));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn another_installations_operation_is_read_and_left_for_it_to_adopt() {
+    let lab = Lab::start().await;
+    let (_, inviter_session, code) = lab.activated().await;
+    let joiner = lab.device();
+    flows::prepare(&joiner.identity(), None)
+        .await
+        .expect("prepare");
+    let sibling = joiner.sibling();
+    let preview = flows::preview(&joiner.identity(), &code.code)
+        .await
+        .expect("preview");
+    let id = link_sent_and_crashed(&joiner, &preview.ticket, ActiveAccount::default()).await;
+
+    // The other installation hears how it ended, moves nothing and is not held up.
+    let outcomes = operations::settle(&sibling.identity())
+        .await
+        .expect("settle");
+    assert_eq!(outcomes[0].status, OperationStatus::Completed);
+    assert_eq!(sibling.config().account_token(), None, "not its move to adopt");
+    let requests = lab.front.total();
+    operations::settle(&sibling.identity())
+        .await
+        .expect("settle");
+    assert_eq!(lab.front.total(), requests, "and once read it asks no more");
+    let record = sibling.identity().read().expect("store").expect("record");
+    assert!(
+        !record
+            .operations
+            .iter()
+            .any(|operation| operation.state == OperationState::Pending),
+        "nothing blocks a removal now"
+    );
+
+    // The installation that started it still adopts it.
+    until_settled(&joiner, &id).await;
+    assert_eq!(joiner.config().account_id(), Some(inviter_session.account_id.as_str()));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_change_that_did_not_happen_stays_to_be_heard_about_and_blocks_nothing() {
+    let lab = Lab::start().await;
+    let (install, _, _) = lab.activated().await;
+    let identity = install.identity();
+    // Never received, long enough ago to say so, by another installation.
+    identity
+        .store
+        .update(|record| {
+            record.operations.push(StoredOperation {
+                id: uuid::Uuid::new_v4().simple().to_string(),
+                kind: OperationKind::Link,
+                initiator: "elsewhere".to_string(),
+                active_before: ActiveAccount::default(),
+                started_at: chrono::Utc::now().timestamp() - 600,
+                state: OperationState::Pending,
+                error: None,
+            });
+        })
+        .expect("saved");
+    let outcomes = operations::settle(&identity).await.expect("settle");
+    assert_eq!(outcomes[0].status, OperationStatus::Failed);
+    assert_eq!(outcomes[0].error.as_deref(), Some("operation_unknown"));
+    let reading = status::status(&identity).await.expect("status");
+    assert_eq!(reading.failed.len(), 1, "whoever started it can still learn why");
+    assert!(reading.pending.is_empty());
+    operations::leave(&identity)
+        .await
+        .expect("it blocks nothing");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_watcher_finishes_a_move_started_from_a_github_session() {
+    let lab = Lab::start().await;
+    let (_, inviter_session, code) = lab.activated().await;
+    let joiner = lab.device();
+    update_config(&joiner.support, |config| {
+        config.set_account_session("github-jwt", "github-refresh", "bob", Some("7".into()));
+        Ok(())
+    })
+    .expect("sign in");
+    flows::prepare(&joiner.identity(), None)
+        .await
+        .expect("prepare");
+    let preview = flows::preview(&joiner.identity(), &code.code)
+        .await
+        .expect("preview");
+    let active = crate::engine::pairing::session::active_account(&joiner.config());
+    let id = link_sent_and_crashed(&joiner, &preview.ticket, active).await;
+
+    watch::tick(&joiner.support).await.expect("tick");
+    assert_eq!(joiner.config().account_id(), Some(inviter_session.account_id.as_str()));
+    assert!(until_settled(&joiner, &id).await.caught_up);
+
+    // With nothing saved it costs a GitHub setup no request at all.
+    let github = lab.device();
+    update_config(&github.support, |config| {
+        config.set_account_session("github-jwt", "github-refresh", "bob", Some("7".into()));
+        Ok(())
+    })
+    .expect("sign in");
+    let requests = lab.front.total();
+    watch::tick(&github.support).await.expect("tick");
+    assert_eq!(lab.front.total(), requests);
+    assert_eq!(github.identity().read().expect("store").map(|_| ()), None);
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+async fn a_commit_says_when_this_installation_has_yet_to_catch_up() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let lab = Lab::start().await;
+    let (_, inviter_session, code) = lab.activated().await;
+    let joiner = lab.device();
+    flows::prepare(&joiner.identity(), None)
+        .await
+        .expect("prepare");
+    let preview = flows::preview(&joiner.identity(), &code.code)
+        .await
+        .expect("preview");
+    let permissions = |mode| std::fs::Permissions::from_mode(mode);
+    std::fs::set_permissions(&joiner.support, permissions(0o500)).expect("read-only");
+    let outcome = operations::link(&joiner.identity(), &preview.ticket, false, None).await;
+    std::fs::set_permissions(&joiner.support, permissions(0o700)).expect("writable");
+    let outcome = outcome.expect("the backend committed it");
+    assert_eq!(outcome.status, OperationStatus::Completed);
+    assert!(!outcome.caught_up, "and says so rather than claiming all is done");
+    assert_eq!(joiner.config().account_token(), None);
+
+    // The saved operation brings it along on the next pass.
+    let later = operations::settle(&joiner.identity())
+        .await
+        .expect("settle");
+    assert!(later[0].caught_up);
+    assert_eq!(joiner.config().account_id(), Some(inviter_session.account_id.as_str()));
+    assert_eq!(open_operations(&joiner), 0);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_lost_answer_to_a_decision_or_a_rotation_reads_as_what_happened() {
+    let lab = Lab::start().await;
+    let hardware = "564d1234-aaaa-bbbb-cccc-0123456789ab";
+    let member = lab.device();
+    flows::prepare(&member.identity(), None)
+        .await
+        .expect("prepare");
+    let session = flows::activate(&member.identity(), super::test_lab::hint(hardware))
+        .await
+        .expect("activate");
+    let asking = lab.device();
+    flows::prepare(&asking.identity(), None)
+        .await
+        .expect("prepare");
+    let request = flows::request_restore(&asking.identity(), super::test_lab::hint(hardware))
+        .await
+        .expect("ask");
+
+    lab.front.lose_answer_to("/restore HTTP");
+    flows::decide(&member.identity(), &session.device_id, &request.request_id, true)
+        .await
+        .expect("asking again replays it instead of hearing it is stale");
+    // A later run, having heard nothing, gets the same.
+    flows::decide(&member.identity(), &session.device_id, &request.request_id, true)
+        .await
+        .expect("still the same answer");
+    let approved = flows::poll_restore(&asking.identity(), &request.request_id)
+        .await
+        .expect("poll");
+    assert_eq!(approved.status, pocox_account_proto::pairing::RestoreRequestStatus::Approved);
+
+    // A day on from its last code, a rotation whose answer never arrives still
+    // shows the new code.
+    let before = flows::code(&member.identity()).await.expect("code");
+    sqlx::query("UPDATE devices SET code_issued_at = 0")
+        .execute(lab.store.pool())
+        .await
+        .expect("a day passes");
+    lab.front.lose_answer_to("/v1/pair/code/rotate");
+    let rotated = flows::rotate(&member.identity())
+        .await
+        .expect("the code route says");
+    assert_ne!(rotated.code, before.code);
+    assert_eq!(lab.front.count("/v1/pair/code/rotate"), 1, "and it was sent once");
 }
 
 #[tokio::test(flavor = "multi_thread")]

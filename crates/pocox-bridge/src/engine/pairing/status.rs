@@ -4,7 +4,7 @@ use anyhow::Result;
 use pocox_account_proto::pairing::{DeviceSession, MembershipChangeKind, PairingErrorCode};
 use pocox_core::pairing::{OperationState, StoredOperation};
 
-use super::error::PairingError;
+use super::error::{no_device_error, refusal_of};
 use super::identity::Identity;
 use super::operations;
 use super::session::{self, Apply};
@@ -44,6 +44,8 @@ pub struct PairingStatus {
     pub grace_deadline: Option<i64>,
     /// Membership changes whose result is not in yet.
     pub pending: Vec<StoredOperation>,
+    /// Membership changes that recently turned out not to have happened.
+    pub failed: Vec<StoredOperation>,
     /// The login of a GitHub session set aside here, if any.
     pub parked_github: Option<String>,
 }
@@ -52,7 +54,9 @@ pub struct PairingStatus {
 /// device with none stays that way until something prepares one. A saved secret
 /// the backend has yet to acknowledge is retried, which is idempotent.
 pub async fn status(identity: &Identity) -> Result<PairingStatus> {
-    let Some(_) = identity.read()? else {
+    session::sign_out_if_orphaned(identity).await?;
+    let parked_github = parked(identity);
+    if identity.read()?.is_none() {
         return Ok(PairingStatus {
             state: PairingState::NoDevice,
             backend: identity.backend().to_string(),
@@ -60,27 +64,26 @@ pub async fn status(identity: &Identity) -> Result<PairingStatus> {
             active_here: identity.is_active(&load_config(&identity.support)?),
             grace_deadline: None,
             pending: Vec::new(),
-            parked_github: super::parked::parked_github(&identity.support)?,
+            failed: Vec::new(),
+            parked_github,
         });
-    };
+    }
     operations::settle(identity).await?;
-    let record = identity.store.ensure_secret()?;
-    let minted = identity.mint(&record, None).await;
     let config = load_config(&identity.support)?;
     let active_here = identity.is_active(&config);
+    let account = session::active_account(&config);
+    let record = identity.read()?.ok_or_else(no_device_error)?;
+    let minted = identity.mint(&record, None).await;
     let mut grace_deadline = None;
     let (state, session) = match minted {
         Ok(fresh) => {
             if active_here {
-                session::apply(identity, fresh.clone(), Apply::Refresh).await?;
+                session::apply(identity, fresh.clone(), Apply::Refresh, &account).await?;
             }
             (state_of(&fresh), Some(fresh))
         },
         Err(error) => {
-            let Some(refusal) = error
-                .chain()
-                .find_map(|cause| cause.downcast_ref::<PairingError>())
-            else {
+            let Some(refusal) = refusal_of(&error) else {
                 return Err(error);
             };
             grace_deadline = refusal.grace_deadline;
@@ -93,21 +96,35 @@ pub async fn status(identity: &Identity) -> Result<PairingStatus> {
             (state, None)
         },
     };
-    let pending = identity
+    let operations = identity
         .read()?
         .map(|record| record.operations)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|operation| operation.state == OperationState::Pending)
-        .collect();
+        .unwrap_or_default();
+    let of_state = |state: OperationState| {
+        operations
+            .iter()
+            .filter(|operation| operation.state == state)
+            .cloned()
+            .collect()
+    };
     Ok(PairingStatus {
         state,
         backend: identity.backend().to_string(),
         session,
         active_here,
         grace_deadline,
-        pending,
-        parked_github: super::parked::parked_github(&identity.support)?,
+        pending: of_state(OperationState::Pending),
+        failed: of_state(OperationState::Failed),
+        parked_github,
+    })
+}
+
+/// The GitHub session set aside here. Damage to that file is not a reason to
+/// fail a reading of this device.
+fn parked(identity: &Identity) -> Option<String> {
+    super::parked::parked_github(&identity.support).unwrap_or_else(|error| {
+        tracing::warn!("reading the set-aside GitHub session: {error:#}");
+        None
     })
 }
 

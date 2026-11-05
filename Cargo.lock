@@ -3472,6 +3472,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "sqlx",
  "syntect",
  "system-configuration",
  "tempfile",

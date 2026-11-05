@@ -12,7 +12,7 @@ use std::time::Duration;
 use anyhow::{anyhow, bail, Result};
 use pocox_account_proto::http::{session_token_device, session_token_exp, RelayCredentialResponse};
 use pocox_account_proto::pairing::{DeviceSession, PairingErrorCode};
-use pocox_core::config::{AccountProvider, Config};
+use pocox_core::config::{AccountProvider, Config, Mode};
 use pocox_core::pairing::{ActiveAccount, DeviceRecord};
 use reqwest::Method;
 
@@ -70,6 +70,42 @@ pub(super) fn same_account(before: &ActiveAccount, config: &Config) -> bool {
         && (now.account_id.is_some() || now.login == before.login)
 }
 
+/// Who a long-running process works for: the account and the backend it is on.
+#[derive(Debug, Clone)]
+pub struct Principal {
+    account: ActiveAccount,
+    backend: Option<String>,
+}
+
+impl Principal {
+    /// Who `config` names.
+    pub fn of(config: &Config) -> Self {
+        Self {
+            account: active_account(config),
+            backend: config
+                .account_backend()
+                .map(|backend| backend.trim_end_matches('/').to_string()),
+        }
+    }
+
+    /// Whether this is a pairing session.
+    pub fn is_device(&self) -> bool {
+        self.account.provider.as_deref() == Some(AccountProvider::DEVICE_CODE)
+    }
+
+    /// Whether what runs under this must stop now that `latest` is what
+    /// `config.toml` names. Moves that never touch pairing keep the rules they
+    /// have always had.
+    pub fn moved_to(&self, latest: &Self) -> bool {
+        (self.is_device() || latest.is_device())
+            && (self.backend != latest.backend
+                || self.account.provider != latest.account.provider
+                || self.account.account_id != latest.account.account_id
+                || (self.account.account_id.is_none()
+                    && self.account.login != latest.account.login))
+    }
+}
+
 /// `config`'s token, while it is comfortably alive and the session another
 /// installation last saw in the shared store is this token's own. A mismatch
 /// means the identity moved under this installation: learn that before issuing
@@ -81,20 +117,42 @@ fn still_good(config: &Config, record: &DeviceRecord) -> Option<String> {
     if !alive {
         return None;
     }
-    let current = match &record.session {
-        Some(mark) => session_token_device(token).is_some_and(|(device_id, generation)| {
-            device_id == mark.device_id && generation == mark.generation
-        }),
-        None => true,
-    };
+    let mark = record.session.as_ref()?;
+    let current = session_token_device(token).is_some_and(|(device_id, generation)| {
+        device_id == mark.device_id && generation == mark.generation
+    });
     current.then(|| token.to_string())
+}
+
+/// Whether a `[account]` naming `identity` has nothing behind it: no record, or
+/// one no session ever came from. It was restored from elsewhere, or its store
+/// was lost, and that JWT speaks for a device this store knows nothing about.
+fn is_orphaned(record: Option<&DeviceRecord>) -> bool {
+    record.is_none_or(|record| record.session.is_none())
+}
+
+/// Sign out a `[account]` naming `identity` with nothing behind it, before
+/// anything is created or sent on its behalf. Returns whether it did.
+pub(super) async fn sign_out_if_orphaned(identity: &Identity) -> Result<bool> {
+    let mut config = load_config(&identity.support)?;
+    if !identity.is_active(&config) || !is_orphaned(identity.read()?.as_ref()) {
+        return Ok(false);
+    }
+    let error = sign_out_installation(&identity.support, &mut config).await;
+    if error.is::<super::SignedOut>() {
+        Ok(true)
+    } else {
+        Err(error)
+    }
 }
 
 /// A usable JWT for the active device session, refreshing when needed.
 pub async fn valid_token(support: &Path, config: &mut Config, backend: &str) -> Result<String> {
     let identity = Identity::open(support, backend)?;
-    let Some(record) = identity.read()? else {
-        return Err(sign_out_installation(support, config).await);
+    let record = identity.read()?;
+    let record = match record {
+        Some(record) if !is_orphaned(Some(&record)) => record,
+        _ => return Err(sign_out_installation(support, config).await),
     };
     if let Some(token) = still_good(config, &record) {
         return Ok(token);
@@ -108,29 +166,42 @@ pub async fn refresh_now(support: &Path, config: &mut Config, backend: &str) -> 
 }
 
 async fn refresh(identity: Identity, config: &mut Config, force: bool) -> Result<String> {
+    // Before waiting too: a change holds the lock below for as long as it takes to
+    // stop what the old user owned, which may include the start asking for this.
+    lifecycle::refuse_while_changing(&identity.support)?;
     let before = active_account(config);
     // The credential refresher can be what got here, and a change of user stops
     // it: this work finishes in its own task, or a half-applied change would be
     // left behind.
     let (token, latest) = tokio::spawn(async move {
         let _guard = account::refresh_lock().lock().await;
-        lifecycle::refuse_while_changing()?;
+        lifecycle::refuse_while_changing(&identity.support)?;
         let latest = load_config(&identity.support)?;
         if !same_account(&before, &latest) || !identity.is_active(&latest) {
             bail!("the account changed while waiting for its token");
         }
-        let Some(record) = identity.read()? else {
-            let mut latest = latest;
-            return Err(sign_out_installation(&identity.support, &mut latest).await);
+        let record = identity.read()?;
+        let record = match record {
+            Some(record) if !is_orphaned(Some(&record)) => record,
+            _ => {
+                let mut latest = latest;
+                return Err(sign_out_installation(&identity.support, &mut latest).await);
+            },
         };
         if !force {
             if let Some(token) = still_good(&latest, &record) {
                 return Ok((token, latest));
             }
         }
+        if let Some(refusal) = lifecycle::known_dead(record.secret()) {
+            return Err(refusal.into());
+        }
         match identity.mint(&record, None).await {
             Ok(session) => {
-                let token = apply_locked(&identity, session, Apply::Refresh).await?;
+                let Some(token) = apply_locked(&identity, session, Apply::Refresh, &before).await?
+                else {
+                    bail!("the account changed during a token refresh");
+                };
                 Ok((token, load_config(&identity.support)?))
             },
             Err(error) => {
@@ -138,7 +209,12 @@ async fn refresh(identity: Identity, config: &mut Config, force: bool) -> Result
                     code_of(&error),
                     Some(PairingErrorCode::DeviceSuperseded | PairingErrorCode::DeviceUnknown)
                 ) {
-                    lifecycle::identity_dead(&identity.support).await;
+                    // Only while this is still what this installation runs: a user who
+                    // moved on meanwhile has hosts this answer says nothing about.
+                    let latest = load_config(&identity.support)?;
+                    if same_account(&before, &latest) && identity.is_active(&latest) {
+                        lifecycle::identity_dead(&identity.support, record.secret(), &error).await;
+                    }
                 }
                 Err(error)
             },
@@ -150,42 +226,81 @@ async fn refresh(identity: Identity, config: &mut Config, force: bool) -> Result
     Ok(token)
 }
 
+/// Whether a session asked for while `expected` was active may still reach
+/// `config`. The user may have signed in elsewhere or out while the request
+/// ran, and what they did last stands.
+fn still_applies(
+    identity: &Identity,
+    how: Apply,
+    expected: &ActiveAccount,
+    config: &Config,
+) -> bool {
+    same_account(expected, config) && (how == Apply::Adopt || identity.is_active(config))
+}
+
 /// Bring `session` into `[account]`, comparing its user with this
-/// installation's own first. Returns its token. One at a time within a process,
-/// like a refresh, so what a change stops and what it writes cannot interleave
-/// with another's.
+/// installation's own first. Returns its token, or `None` when the account is
+/// no longer `expected`, which was read before the request that got `session`:
+/// then nothing here changed. One at a time within a process, like a refresh,
+/// so what a change stops and what it writes cannot interleave with another's.
 pub(super) async fn apply(
     identity: &Identity,
     session: DeviceSession,
     how: Apply,
-) -> Result<String> {
+    expected: &ActiveAccount,
+) -> Result<Option<String>> {
     let _guard = account::refresh_lock().lock().await;
-    apply_locked(identity, session, how).await
+    apply_locked(identity, session, how, expected).await
 }
 
-async fn apply_locked(identity: &Identity, session: DeviceSession, how: Apply) -> Result<String> {
+async fn apply_locked(
+    identity: &Identity,
+    session: DeviceSession,
+    how: Apply,
+    expected: &ActiveAccount,
+) -> Result<Option<String>> {
     let support = identity.support.as_path();
     let before = load_config(support)?;
+    if !still_applies(identity, how, expected, &before) {
+        return Ok(None);
+    }
+    // What can fail locally goes first, while nothing has stopped.
+    if how == Apply::Adopt {
+        parked::park_github(support, &before)?;
+    }
     let same_user = identity.is_active(&before) && before.account_id() == Some(&session.account_id);
     if !same_user {
         lifecycle::before_user_change(support).await;
     }
-    update_config(support, |latest| {
-        match how {
-            Apply::Refresh if !same_account(&active_account(&before), latest) => {
-                bail!("the account changed during a token refresh");
-            },
-            Apply::Refresh => {},
-            Apply::Adopt => {
+    let written = update_config(support, |latest| {
+        if !still_applies(identity, how, expected, latest) {
+            return Ok(false);
+        }
+        if how == Apply::Adopt {
+            // Another process may have rotated this token since it was set aside.
+            if latest.account_refresh_token() != before.account_refresh_token() {
                 parked::park_github(support, latest)?;
-                latest.set_account_backend(identity.backend());
-            },
+            }
+            latest.set_account_backend(identity.backend());
+            latest.set_mode(Mode::Account);
         }
         latest.set_device_session(&session.token, &session.login, &session.account_id);
-        Ok(())
-    })?;
-    lifecycle::after_persist(support, &session);
-    Ok(session.token)
+        Ok(true)
+    });
+    match written {
+        Ok(true) => {
+            lifecycle::after_persist(support, &session);
+            Ok(Some(session.token))
+        },
+        Ok(false) => {
+            lifecycle::after_failed_persist(support);
+            Ok(None)
+        },
+        Err(error) => {
+            lifecycle::after_failed_persist(support);
+            Err(error)
+        },
+    }
 }
 
 /// A `[account]` naming a pairing session whose store has no record: restored
@@ -204,9 +319,9 @@ async fn sign_out_installation(support: &Path, config: &mut Config) -> anyhow::E
     });
     match cleared {
         Ok(latest) => {
-            *config = latest;
             lifecycle::before_user_change(support).await;
-            lifecycle::release_hold();
+            lifecycle::left_pairing(support, &latest);
+            *config = latest;
             signed_out_error()
         },
         Err(error) => error,

@@ -1011,6 +1011,12 @@ pub(in crate::engine) fn insert_test_host(name: &str, published: Option<Publishe
     hosts_locked().insert(name.into(), host);
 }
 
+/// Forget a host [`insert_test_host`] recorded.
+#[cfg(test)]
+pub(in crate::engine) fn remove_test_host(name: &str) {
+    hosts_locked().remove(name);
+}
+
 #[cfg(test)]
 #[path = "serve_tests.rs"]
 mod tests;

@@ -16,6 +16,7 @@ use pocox_account_proto::http::{
     RelayCredentialResponse, WebExchangeRequest, WebExchangeResponse, WebStartRequest,
     WebStartResponse,
 };
+use pocox_account_proto::pairing::PairingErrorCode;
 use pocox_account_proto::pkce;
 use pocox_bridge::pairing;
 use pocox_core::config::{AccountProvider, Config, Mode};
@@ -152,6 +153,7 @@ async fn login_device(backend_flag: Option<&str>) -> Result<()> {
                     cred.account_id.clone(),
                 );
                 config.save()?;
+                forget_set_aside(&base);
                 ui::headline(ui::Tone::Ok, "signed in");
                 ui::field("login", &cred.login);
                 return Ok(());
@@ -283,9 +285,20 @@ async fn login_web(backend_flag: Option<&str>) -> Result<()> {
         cred.account_id.clone(),
     );
     config.save()?;
+    forget_set_aside(&base);
     ui::headline(ui::Tone::Ok, "signed in");
     ui::field("login", &cred.login);
     Ok(())
+}
+
+/// A new GitHub sign-in on `base` replaces any session set aside for it.
+fn forget_set_aside(base: &str) {
+    let forgotten = paths::config_dir()
+        .map_err(anyhow::Error::from)
+        .and_then(|support| pairing::forget_parked_github(&support, base));
+    if let Err(error) = forgotten {
+        tracing::warn!("a replaced GitHub session stays set aside: {error:#}");
+    }
 }
 
 /// Accept loopback connections until the browser delivers the OAuth redirect
@@ -383,8 +396,8 @@ async fn read_request_target(stream: &mut tokio::net::TcpStream) -> Result<Optio
 
 /// `pocox login --resume`: back to the GitHub session set aside when this
 /// installation moved to pairing.
-pub(crate) fn resume_github() -> Result<()> {
-    match pairing::resume_github(&paths::config_dir()?)? {
+pub(crate) async fn resume_github(backend: Option<&str>) -> Result<()> {
+    match pairing::resume_github(&paths::config_dir()?, backend).await? {
         Some(login) => {
             ui::headline(ui::Tone::Ok, "signed in");
             ui::field("login", &login);
@@ -479,38 +492,43 @@ async fn device_status(base: &str) -> Result<()> {
     }
 }
 
-/// What a long-running command does when its pairing identity is no longer the
-/// one it started under: another device removed this one, this device moved, or
-/// its secret was replaced. Resolves then; never on GitHub or self-hosted
-/// setups.
+/// What a long-running command does when it no longer works for the account it
+/// started under: another device removed this one, this device moved, its
+/// secret was replaced, or this installation moved to or from pairing. Resolves
+/// then. A setup that never touches pairing only ever reads its own
+/// configuration here, and does not resolve.
 pub(crate) async fn identity_lost(config: &Config, base: &str) -> String {
-    if config.account_provider() != AccountProvider::DeviceCode {
-        return std::future::pending().await;
-    }
-    let started = config.account_id().map(str::to_string);
+    let started = pairing::session::Principal::of(config);
     let Ok(support) = paths::config_dir() else {
         return std::future::pending().await;
     };
+    let moved = |started: &pairing::session::Principal| {
+        // A file that cannot be read right now says nothing about a move.
+        Config::load()
+            .is_ok_and(|latest| started.moved_to(&pairing::session::Principal::of(&latest)))
+    };
     loop {
         tokio::time::sleep(IDENTITY_CHECK).await;
-        let answer = pairing::session::me(&support, base).await;
-        if let Err(error) = &answer {
+        if moved(&started) {
+            return "this installation's account changed".to_string();
+        }
+        if !started.is_device() {
+            continue;
+        }
+        if let Err(error) = pairing::session::me(&support, base).await {
             if error.chain().any(|cause| cause.is::<pairing::SignedOut>()) {
                 return "this device is no longer signed in".to_string();
             }
-            match pairing::code_of(error) {
-                Some(
-                    code @ (pocox_account_proto::pairing::PairingErrorCode::DeviceSuperseded
-                    | pocox_account_proto::pairing::PairingErrorCode::DeviceUnknown),
-                ) => return format!("this device's identity ended: {}", code.as_str()),
-                _ => continue,
+            if let Some(
+                code @ (PairingErrorCode::DeviceSuperseded | PairingErrorCode::DeviceUnknown),
+            ) = pairing::code_of(&error)
+            {
+                return format!("this device's identity ended: {}", code.as_str());
             }
+            continue;
         }
-        let latest = Config::load().ok();
-        if latest.is_none_or(|latest| {
-            latest.account_provider() != AccountProvider::DeviceCode
-                || latest.account_id().map(str::to_string) != started
-        }) {
+        // That answer may have brought a new user into `config.toml`.
+        if moved(&started) {
             return "this device moved to another user, or was removed from its group".to_string();
         }
     }
@@ -608,15 +626,12 @@ pub(crate) async fn fetch_relay_credential(
     if config.account_provider() == AccountProvider::DeviceCode {
         let relay = pairing::session::relay_credential(&paths::config_dir()?, base)
             .await
-            .map_err(|error| {
-                match pairing::code_of(&error) {
-                    Some(pocox_account_proto::pairing::PairingErrorCode::DeviceNotActivated) => {
-                        error.context(
-                            "this device is not set up, or was removed from its group; run                              `pocox pair` to continue",
-                        )
-                    },
-                    _ => error,
-                }
+            .map_err(|error| match pairing::code_of(&error) {
+                Some(PairingErrorCode::DeviceNotActivated) => error.context(
+                    "this device is not set up, or was removed from its group; run `pocox pair` \
+                     to continue",
+                ),
+                _ => error,
             })?;
         *config = Config::load()?;
         return Ok(relay);

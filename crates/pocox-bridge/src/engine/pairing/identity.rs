@@ -12,14 +12,14 @@ use std::sync::{LazyLock, Mutex};
 use anyhow::{Context, Result};
 use pocox_account_proto::http::session_token_exp;
 use pocox_account_proto::pairing::{parse_label, DeviceSession, PairingErrorCode};
-use pocox_core::config::{AccountProvider, Config};
+use pocox_core::config::{AccountProvider, Config, Mode};
 use pocox_core::device::DeviceMetadata;
 use pocox_core::pairing::{CanonicalBackend, DeviceRecord, DeviceStore, SessionMark, StoreKey};
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
 
 use super::client::Client;
-use super::error::code_of;
+use super::error::{code_of, no_device_error, signed_out_error};
 use super::session;
 use crate::engine::account;
 use crate::engine::config::load_config;
@@ -80,10 +80,31 @@ impl Identity {
         self.store.read()
     }
 
-    /// Whether `[account]` here is this very identity.
+    /// The record of a device that exists, for work on it. A `[account]` with
+    /// nothing behind it is signed out on the way; a device with no identity is
+    /// told so, because only [`Self::ensure_record`]'s callers may start one.
+    pub(super) async fn require_record(&self) -> Result<DeviceRecord> {
+        if session::sign_out_if_orphaned(self).await? {
+            return Err(signed_out_error());
+        }
+        self.read()?
+            .filter(|record| record.registered)
+            .ok_or_else(no_device_error)
+    }
+
+    /// The record, starting one when there is none: preparing, activating,
+    /// previewing a code and asking to recover. A restored `[account]` is
+    /// signed out first, or the new secret would stand behind its JWT.
+    pub(super) async fn ensure_record(&self) -> Result<DeviceRecord> {
+        session::sign_out_if_orphaned(self).await?;
+        self.store.ensure_secret()
+    }
+
+    /// Whether `[account]` here is this very identity. A chosen self-host mode
+    /// means it is not: pairing sleeps while that stands.
     pub(super) fn is_active(&self, config: &Config) -> bool {
         config.account_provider() == AccountProvider::DeviceCode
-            && config.account_token().is_some()
+            && config.account_mode() == Mode::Account
             && CanonicalBackend::parse(&account::backend_base(config))
                 .is_ok_and(|backend| backend == self.backend)
     }
@@ -139,12 +160,13 @@ impl Identity {
     }
 
     /// A JWT for this identity whether or not it is the active account here.
+    /// Starts nothing: with no secret saved there is nothing to prove.
     pub(super) async fn token(&self) -> Result<String> {
         let mut config = load_config(&self.support)?;
         if self.is_active(&config) {
             return session::valid_token(&self.support, &mut config, self.backend()).await;
         }
-        let record = self.store.ensure_secret()?;
+        let record = self.read()?.ok_or_else(no_device_error)?;
         let cached = staged()
             .get(&self.store.key().slot())
             .filter(|cached| {
@@ -165,7 +187,7 @@ impl Identity {
         if self.is_active(&config) {
             return session::refresh_now(&self.support, &mut config, self.backend()).await;
         }
-        let record = self.store.ensure_secret()?;
+        let record = self.read()?.ok_or_else(no_device_error)?;
         Ok(self.mint(&record, None).await?.token)
     }
 
@@ -230,6 +252,21 @@ fn default_label() -> String {
     parse_label(&DeviceMetadata::current().hostname).unwrap_or_else(|| "device".to_string())
 }
 
-fn digest(secret: &str) -> String {
+pub(super) fn digest(secret: &str) -> String {
     pocox_core::history_sync::digest_bytes(secret.as_bytes())
+}
+
+/// Whether this process has any device store to look in, without making one.
+pub(super) fn store_exists(support: &Path) -> bool {
+    #[cfg(test)]
+    if TEST_STORES
+        .lock()
+        .unwrap_or_else(|p| p.into_inner())
+        .as_ref()
+        .is_some_and(|stores| stores.contains_key(support))
+    {
+        return true;
+    }
+    let _ = support;
+    pocox_core::pairing::device_store_exists()
 }

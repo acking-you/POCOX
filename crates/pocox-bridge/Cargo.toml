@@ -89,6 +89,7 @@ pb-mapper-testkit = { workspace = true }
 pocox-auth = { workspace = true }
 pocox-backend = { workspace = true }
 pocox-store = { workspace = true }
+sqlx = { workspace = true }
 tempfile = "3"
 tokio-tungstenite = { workspace = true }
 

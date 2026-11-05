@@ -45,6 +45,7 @@ mixin _RustPairing implements BridgeApi {
     kind: o.kind,
     status: o.status,
     error: o.error,
+    caughtUp: o.caughtUp,
   );
 
   List<PairingPreviewDevice> _previewDevices(
@@ -93,6 +94,7 @@ mixin _RustPairing implements BridgeApi {
       session: session == null ? null : _session(session),
       graceDeadline: s.graceDeadline?.toInt(),
       pending: s.pending.map(_operation).toList(),
+      failed: s.failed.map(_operation).toList(),
       parkedGithub: s.parkedGithub,
     );
   });
@@ -116,16 +118,21 @@ mixin _RustPairing implements BridgeApi {
   });
 
   @override
-  Future<PairingCode> pairingCode() =>
-      _pairing(() async => _code(await frb.pairingCode()));
+  Future<PairingCode> pairingCode({String? backend}) =>
+      _pairing(() async => _code(await frb.pairingCode(backend: backend)));
 
   @override
-  Future<PairingCode> pairingSetPaused({required bool paused}) =>
-      _pairing(() async => _code(await frb.pairingSetPaused(paused: paused)));
+  Future<PairingCode> pairingSetPaused({
+    required bool paused,
+    String? backend,
+  }) => _pairing(
+    () async =>
+        _code(await frb.pairingSetPaused(paused: paused, backend: backend)),
+  );
 
   @override
-  Future<PairingCode> pairingRotate() =>
-      _pairing(() async => _code(await frb.pairingRotate()));
+  Future<PairingCode> pairingRotate({String? backend}) =>
+      _pairing(() async => _code(await frb.pairingRotate(backend: backend)));
 
   @override
   String? pairingParseInvitation(String uri) =>
@@ -162,8 +169,9 @@ mixin _RustPairing implements BridgeApi {
   });
 
   @override
-  Future<PairingOperation> pairingLeave() =>
-      _pairing(() async => _operation(await frb.pairingLeave()));
+  Future<PairingOperation> pairingLeave({String? backend}) => _pairing(
+    () async => _operation(await frb.pairingLeave(backend: backend)),
+  );
 
   @override
   Future<List<PairingOperation>> pairingSettle({String? backend}) =>
@@ -173,44 +181,57 @@ mixin _RustPairing implements BridgeApi {
       });
 
   @override
-  Future<PairingDevices> pairingDevices({String? cursor}) => _pairing(() async {
-    final page = await frb.pairingDevices(cursor: cursor);
-    return PairingDevices(
-      devices: [
-        for (final device in page.devices)
-          PairingDevice(
-            id: device.id,
-            name: device.name,
-            platform: device.platform,
-            joinedAt: device.joinedAt.toInt(),
-            lastActiveDay: device.lastActiveDay.toInt(),
-            activated: device.activated,
-            isSelf: device.isSelf,
-          ),
-      ],
-      pendingRequests: [
-        for (final request in page.pendingRequests)
-          PairingRecoveryAsk(
-            requestId: request.requestId,
-            targetDeviceId: request.targetDeviceId,
-            requesterName: request.requesterName,
-            matchingId: request.matchingId,
-            expiresAt: request.expiresAt.toInt(),
-          ),
-      ],
-      nextCursor: page.nextCursor,
-    );
-  });
+  Future<PairingDevices> pairingDevices({String? cursor, String? backend}) =>
+      _pairing(() async {
+        final page = await frb.pairingDevices(cursor: cursor, backend: backend);
+        return PairingDevices(
+          devices: [
+            for (final device in page.devices)
+              PairingDevice(
+                id: device.id,
+                name: device.name,
+                platform: device.platform,
+                joinedAt: device.joinedAt.toInt(),
+                lastActiveDay: device.lastActiveDay.toInt(),
+                activated: device.activated,
+                isSelf: device.isSelf,
+              ),
+          ],
+          pendingRequests: [
+            for (final request in page.pendingRequests)
+              PairingRecoveryAsk(
+                requestId: request.requestId,
+                targetDeviceId: request.targetDeviceId,
+                requesterName: request.requesterName,
+                matchingId: request.matchingId,
+                expiresAt: request.expiresAt.toInt(),
+              ),
+          ],
+          nextCursor: page.nextCursor,
+        );
+      });
 
   @override
   Future<void> pairingRenameDevice({
     required String deviceId,
     required String name,
-  }) => _pairing(() => frb.pairingRenameDevice(deviceId: deviceId, name: name));
+    String? backend,
+  }) => _pairing(
+    () => frb.pairingRenameDevice(
+      deviceId: deviceId,
+      name: name,
+      backend: backend,
+    ),
+  );
 
   @override
-  Future<PairingOperation> pairingRemoveDevice(String deviceId) => _pairing(
-    () async => _operation(await frb.pairingRemoveDevice(deviceId: deviceId)),
+  Future<PairingOperation> pairingRemoveDevice(
+    String deviceId, {
+    String? backend,
+  }) => _pairing(
+    () async => _operation(
+      await frb.pairingRemoveDevice(deviceId: deviceId, backend: backend),
+    ),
   );
 
   @override
@@ -218,11 +239,13 @@ mixin _RustPairing implements BridgeApi {
     required String deviceId,
     required String requestId,
     required bool allow,
+    String? backend,
   }) => _pairing(
     () => frb.pairingDecideRestore(
       deviceId: deviceId,
       requestId: requestId,
       allow: allow,
+      backend: backend,
     ),
   );
 
@@ -279,5 +302,6 @@ mixin _RustPairing implements BridgeApi {
       });
 
   @override
-  Future<String?> pairingResumeGithub() => _pairing(frb.pairingResumeGithub);
+  Future<String?> pairingResumeGithub({String? backend}) =>
+      _pairing(() => frb.pairingResumeGithub(backend: backend));
 }
