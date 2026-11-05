@@ -6,7 +6,6 @@ import 'package:pocox/src/composer_control.dart';
 export 'package:pocox/src/composer_control.dart';
 
 import 'package:pocox/src/git_diff.dart';
-
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show immutable;
@@ -28,9 +27,14 @@ part 'bridge/tools_types.dart';
 part 'bridge/grok_types.dart';
 part 'bridge/harness_types.dart';
 part 'bridge/controller_api.dart';
+part 'bridge/pairing_types.dart';
 
 abstract interface class BridgeApi
-    implements UpdateApi, ControllerBridgeApi, HarnessBridgeApi {
+    implements
+        UpdateApi,
+        ControllerBridgeApi,
+        HarnessBridgeApi,
+        PairingBridgeApi {
   /// Current persisted config.
   Future<ConfigInfo> getConfig();
 

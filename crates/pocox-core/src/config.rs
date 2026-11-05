@@ -177,6 +177,21 @@ pub enum Mode {
     Unconfigured,
 }
 
+/// Which identity an account session belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccountProvider {
+    /// GitHub sign-in, refreshed by the token in `config.toml`. Also what a
+    /// configuration from before providers mattered means.
+    Github,
+    /// A pairing device, refreshed by the secret in the device store.
+    DeviceCode,
+}
+
+impl AccountProvider {
+    const GITHUB: &'static str = "github";
+    const DEVICE_CODE: &'static str = "device_code";
+}
+
 /// Hosted-account configuration. The session [`AccountConfig::token`] is a
 /// backend-issued bearer credential (never the GitHub token) and is stored in
 /// the same `0o600` `config.toml` as the relay key.
@@ -188,7 +203,8 @@ pub struct AccountConfig {
     /// relay is present. `None` for normal account use.
     pub mode: Option<String>,
 
-    /// Identity provider. Currently only `"github"`.
+    /// Identity provider: `"github"`, or `"device_code"` for a pairing device
+    /// (see [`AccountProvider`]).
     pub provider: Option<String>,
 
     /// Backend base URL override (e.g. for self-hosting the backend or dev).
@@ -199,13 +215,15 @@ pub struct AccountConfig {
     pub token: Option<String>,
 
     /// Opaque refresh token used to renew [`Self::token`] when it expires.
-    /// Sensitive; persisted 0600.
+    /// Sensitive; persisted 0600. Always empty for a pairing device, whose
+    /// secret stays in the device store.
     pub refresh_token: Option<String>,
 
-    /// Signed-in GitHub login/handle (display only).
+    /// Signed-in GitHub login/handle, or a pairing device's label (display
+    /// only).
     pub login: Option<String>,
 
-    /// GitHub account id (opaque; display/debug only).
+    /// GitHub account id, or a pairing device's current user (opaque).
     pub account_id: Option<String>,
 }
 
@@ -510,8 +528,22 @@ impl Config {
             .filter(|s| !s.is_empty())
     }
 
-    /// Refresh token used to renew the session token, or `None` when unset.
+    /// Which identity the session belongs to.
+    pub fn account_provider(&self) -> AccountProvider {
+        match self.account.provider.as_deref().map(str::trim) {
+            Some(AccountProvider::DEVICE_CODE) => AccountProvider::DeviceCode,
+            _ => AccountProvider::Github,
+        }
+    }
+
+    /// GitHub refresh token used to renew the session token, or `None` when
+    /// unset. Always `None` for a pairing device: its secret stays in the
+    /// device store, so a copy here can neither go stale nor be restored
+    /// from a backup.
     pub fn account_refresh_token(&self) -> Option<&str> {
+        if self.account_provider() == AccountProvider::DeviceCode {
+            return None;
+        }
         self.account
             .refresh_token
             .as_deref()
@@ -565,7 +597,24 @@ impl Config {
         self.account.refresh_token = Some(refresh_token.as_ref().to_string());
         self.account.login = Some(login.as_ref().to_string());
         self.account.account_id = account_id.filter(|s| !s.trim().is_empty());
-        self.account.provider = Some("github".to_string());
+        self.account.provider = Some(AccountProvider::GITHUB.to_string());
+        self.account.mode = None;
+    }
+
+    /// Record a pairing device's session and switch to account mode. Holds only
+    /// the short-lived JWT and display fields: the device secret stays in the
+    /// device store.
+    pub fn set_device_session(
+        &mut self,
+        token: impl AsRef<str>,
+        label: impl AsRef<str>,
+        account_id: impl AsRef<str>,
+    ) {
+        self.account.token = Some(token.as_ref().to_string());
+        self.account.refresh_token = None;
+        self.account.login = Some(label.as_ref().to_string());
+        self.account.account_id = Some(account_id.as_ref().to_string());
+        self.account.provider = Some(AccountProvider::DEVICE_CODE.to_string());
         self.account.mode = None;
     }
 
@@ -648,6 +697,29 @@ mod tests {
         let reloaded: Config = toml::from_str(&raw).expect("deserialize");
         assert_eq!(reloaded.relay(), Some("lb7666.top:7666"));
         assert_eq!(reloaded.relay_key(), Some("0123456789abcdef0123456789abcdef"));
+    }
+
+    #[test]
+    fn a_pairing_session_holds_no_refresh_credential_and_old_clients_can_read_it() {
+        let mut config = Config::default();
+        // Moving from GitHub drops its refresh token from `[account]`.
+        config.set_account_session("jwt", "refresh", "octocat", Some("42".into()));
+        assert_eq!(config.account_provider(), AccountProvider::Github);
+        config.set_device_session("device-jwt", "laptop", "user-1");
+        assert_eq!(config.account_provider(), AccountProvider::DeviceCode);
+        assert_eq!(config.account_refresh_token(), None);
+        assert_eq!(config.account_mode(), Mode::Account);
+        let raw = toml::to_string(&config).expect("serialize");
+        assert!(!raw.contains("refresh_token"), "no field for a secret to go stale in");
+        // A value edited in by hand is not a credential either.
+        let mut edited = config.clone();
+        edited.account.refresh_token = Some("stale".into());
+        assert_eq!(edited.account_refresh_token(), None);
+        // A configuration from before providers mattered is GitHub's.
+        let legacy: Config =
+            toml::from_str("[account]\ntoken = 't'\nrefresh_token = 'r'\n").expect("legacy");
+        assert_eq!(legacy.account_provider(), AccountProvider::Github);
+        assert_eq!(legacy.account_refresh_token(), Some("r"));
     }
 
     #[test]

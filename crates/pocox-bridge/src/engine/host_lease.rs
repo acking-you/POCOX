@@ -95,6 +95,7 @@ impl Table {
         let name = host_names::canonical(name)?;
         if op != Op::Stop {
             super::host_owner::require()?;
+            super::pairing::lifecycle::require_may_host(&name)?;
         }
         let deadline = Instant::now() + wait;
         let mut state = self.state();

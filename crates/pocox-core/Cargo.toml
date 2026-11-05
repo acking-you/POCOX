@@ -26,8 +26,14 @@ directories = { workspace = true }
 sysinfo = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+base64 = { workspace = true }
+hmac = { workspace = true }
+rand = { workspace = true }
 
 # Unix-only: `send_sigterm` uses signal(7); Windows falls back to
 # sysinfo's TerminateProcess path.
 [target.'cfg(unix)'.dependencies]
-nix = { workspace = true }
+nix = { workspace = true, features = ["user"] }
+
+[dev-dependencies]
+tempfile = "3"

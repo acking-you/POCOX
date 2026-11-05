@@ -22,6 +22,7 @@ import 'api/bridge/hosted_account.dart';
 import 'api/bridge/hosting.dart';
 import 'api/bridge/native_sessions.dart';
 import 'api/bridge/network.dart';
+import 'api/bridge/pairing.dart';
 import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';
@@ -87,6 +88,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
     dynamic raw,
   );
+
+  @protected
+  FutureOr<NativeStoreRead> Function(String)
+  dco_decode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+    dynamic raw,
+  );
+
+  @protected
+  FutureOr<String?> Function(String, String)
+  dco_decode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+    dynamic raw,
+  );
+
+  @protected
+  Object dco_decode_DartOpaque(dynamic raw);
 
   @protected
   ComposerController
@@ -258,9 +274,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ManagedRuntimeDto dco_decode_box_autoadd_managed_runtime_dto(dynamic raw);
 
   @protected
+  NativeHintDto dco_decode_box_autoadd_native_hint_dto(dynamic raw);
+
+  @protected
   OpenCodeHostStatusDto dco_decode_box_autoadd_open_code_host_status_dto(
     dynamic raw,
   );
+
+  @protected
+  PairingSessionDto dco_decode_box_autoadd_pairing_session_dto(dynamic raw);
 
   @protected
   PortMappingStatusDto dco_decode_box_autoadd_port_mapping_status_dto(
@@ -450,6 +472,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_isize(dynamic raw);
+
+  @protected
   LinkEventDto dco_decode_link_event_dto(dynamic raw);
 
   @protected
@@ -533,6 +558,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ModelInfoDto> dco_decode_list_model_info_dto(dynamic raw);
+
+  @protected
+  List<PairingDeviceDto> dco_decode_list_pairing_device_dto(dynamic raw);
+
+  @protected
+  List<PairingOperationDto> dco_decode_list_pairing_operation_dto(dynamic raw);
+
+  @protected
+  List<PairingPendingRequestDto> dco_decode_list_pairing_pending_request_dto(
+    dynamic raw,
+  );
+
+  @protected
+  List<PairingPreviewDeviceDto> dco_decode_list_pairing_preview_device_dto(
+    dynamic raw,
+  );
 
   @protected
   List<int> dco_decode_list_prim_u_16_loose(dynamic raw);
@@ -652,6 +693,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelInfoDto dco_decode_model_info_dto(dynamic raw);
 
   @protected
+  NativeHintDto dco_decode_native_hint_dto(dynamic raw);
+
+  @protected
   NativeSessionListDto dco_decode_native_session_list_dto(dynamic raw);
 
   @protected
@@ -659,6 +703,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   NativeSessionRevisionDto dco_decode_native_session_revision_dto(dynamic raw);
+
+  @protected
+  NativeStoreRead dco_decode_native_store_read(dynamic raw);
 
   @protected
   NetworkProxyDto dco_decode_network_proxy_dto(dynamic raw);
@@ -737,7 +784,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  NativeHintDto? dco_decode_opt_box_autoadd_native_hint_dto(dynamic raw);
+
+  @protected
   OpenCodeHostStatusDto? dco_decode_opt_box_autoadd_open_code_host_status_dto(
+    dynamic raw,
+  );
+
+  @protected
+  PairingSessionDto? dco_decode_opt_box_autoadd_pairing_session_dto(
     dynamic raw,
   );
 
@@ -792,6 +847,42 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  PairingCodeDto dco_decode_pairing_code_dto(dynamic raw);
+
+  @protected
+  PairingDeviceDto dco_decode_pairing_device_dto(dynamic raw);
+
+  @protected
+  PairingDevicesDto dco_decode_pairing_devices_dto(dynamic raw);
+
+  @protected
+  PairingErrorDto dco_decode_pairing_error_dto(dynamic raw);
+
+  @protected
+  PairingOperationDto dco_decode_pairing_operation_dto(dynamic raw);
+
+  @protected
+  PairingPendingRequestDto dco_decode_pairing_pending_request_dto(dynamic raw);
+
+  @protected
+  PairingPreparedDto dco_decode_pairing_prepared_dto(dynamic raw);
+
+  @protected
+  PairingPreviewDeviceDto dco_decode_pairing_preview_device_dto(dynamic raw);
+
+  @protected
+  PairingPreviewDto dco_decode_pairing_preview_dto(dynamic raw);
+
+  @protected
+  PairingRestoreRequestDto dco_decode_pairing_restore_request_dto(dynamic raw);
+
+  @protected
+  PairingSessionDto dco_decode_pairing_session_dto(dynamic raw);
+
+  @protected
+  PairingStatusDto dco_decode_pairing_status_dto(dynamic raw);
 
   @protected
   PortMappingDto dco_decode_port_mapping_dto(dynamic raw);
@@ -993,6 +1084,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerEventFeed(
     SseDeserializer deserializer,
   );
+
+  @protected
+  Object sse_decode_DartOpaque(SseDeserializer deserializer);
 
   @protected
   ComposerController
@@ -1218,7 +1312,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  NativeHintDto sse_decode_box_autoadd_native_hint_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   OpenCodeHostStatusDto sse_decode_box_autoadd_open_code_host_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingSessionDto sse_decode_box_autoadd_pairing_session_dto(
     SseDeserializer deserializer,
   );
 
@@ -1464,6 +1568,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_isize(SseDeserializer deserializer);
+
+  @protected
   LinkEventDto sse_decode_link_event_dto(SseDeserializer deserializer);
 
   @protected
@@ -1573,6 +1680,26 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<ModelInfoDto> sse_decode_list_model_info_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PairingDeviceDto> sse_decode_list_pairing_device_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PairingOperationDto> sse_decode_list_pairing_operation_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PairingPendingRequestDto> sse_decode_list_pairing_pending_request_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  List<PairingPreviewDeviceDto> sse_decode_list_pairing_preview_device_dto(
     SseDeserializer deserializer,
   );
 
@@ -1738,6 +1865,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ModelInfoDto sse_decode_model_info_dto(SseDeserializer deserializer);
 
   @protected
+  NativeHintDto sse_decode_native_hint_dto(SseDeserializer deserializer);
+
+  @protected
   NativeSessionListDto sse_decode_native_session_list_dto(
     SseDeserializer deserializer,
   );
@@ -1751,6 +1881,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   NativeSessionRevisionDto sse_decode_native_session_revision_dto(
     SseDeserializer deserializer,
   );
+
+  @protected
+  NativeStoreRead sse_decode_native_store_read(SseDeserializer deserializer);
 
   @protected
   NetworkProxyDto sse_decode_network_proxy_dto(SseDeserializer deserializer);
@@ -1849,7 +1982,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  NativeHintDto? sse_decode_opt_box_autoadd_native_hint_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   OpenCodeHostStatusDto? sse_decode_opt_box_autoadd_open_code_host_status_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingSessionDto? sse_decode_opt_box_autoadd_pairing_session_dto(
     SseDeserializer deserializer,
   );
 
@@ -1910,6 +2053,58 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Uint8List? sse_decode_opt_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  PairingCodeDto sse_decode_pairing_code_dto(SseDeserializer deserializer);
+
+  @protected
+  PairingDeviceDto sse_decode_pairing_device_dto(SseDeserializer deserializer);
+
+  @protected
+  PairingDevicesDto sse_decode_pairing_devices_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingErrorDto sse_decode_pairing_error_dto(SseDeserializer deserializer);
+
+  @protected
+  PairingOperationDto sse_decode_pairing_operation_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingPendingRequestDto sse_decode_pairing_pending_request_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingPreparedDto sse_decode_pairing_prepared_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingPreviewDeviceDto sse_decode_pairing_preview_device_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingPreviewDto sse_decode_pairing_preview_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingRestoreRequestDto sse_decode_pairing_restore_request_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingSessionDto sse_decode_pairing_session_dto(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  PairingStatusDto sse_decode_pairing_status_dto(SseDeserializer deserializer);
 
   @protected
   PortMappingDto sse_decode_port_mapping_dto(SseDeserializer deserializer);
@@ -2149,6 +2344,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
     EventFeed self,
     SseSerializer serializer,
   );
+
+  @protected
+  void sse_encode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+    FutureOr<NativeStoreRead> Function(String) self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+    FutureOr<String?> Function(String, String) self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_DartOpaque(Object self, SseSerializer serializer);
 
   @protected
   void
@@ -2427,8 +2637,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_native_hint_dto(
+    NativeHintDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_open_code_host_status_dto(
     OpenCodeHostStatusDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_pairing_session_dto(
+    PairingSessionDto self,
     SseSerializer serializer,
   );
 
@@ -2733,6 +2955,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_isize(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
   void sse_encode_link_event_dto(LinkEventDto self, SseSerializer serializer);
 
   @protected
@@ -2879,6 +3104,30 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_model_info_dto(
     List<ModelInfoDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_pairing_device_dto(
+    List<PairingDeviceDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_pairing_operation_dto(
+    List<PairingOperationDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_pairing_pending_request_dto(
+    List<PairingPendingRequestDto> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_list_pairing_preview_device_dto(
+    List<PairingPreviewDeviceDto> self,
     SseSerializer serializer,
   );
 
@@ -3093,6 +3342,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_model_info_dto(ModelInfoDto self, SseSerializer serializer);
 
   @protected
+  void sse_encode_native_hint_dto(NativeHintDto self, SseSerializer serializer);
+
+  @protected
   void sse_encode_native_session_list_dto(
     NativeSessionListDto self,
     SseSerializer serializer,
@@ -3107,6 +3359,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_native_session_revision_dto(
     NativeSessionRevisionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_native_store_read(
+    NativeStoreRead self,
     SseSerializer serializer,
   );
 
@@ -3231,8 +3489,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_native_hint_dto(
+    NativeHintDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_open_code_host_status_dto(
     OpenCodeHostStatusDto? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_opt_box_autoadd_pairing_session_dto(
+    PairingSessionDto? self,
     SseSerializer serializer,
   );
 
@@ -3302,6 +3572,78 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_opt_list_prim_u_8_strict(
     Uint8List? self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_code_dto(
+    PairingCodeDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_device_dto(
+    PairingDeviceDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_devices_dto(
+    PairingDevicesDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_error_dto(
+    PairingErrorDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_operation_dto(
+    PairingOperationDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_pending_request_dto(
+    PairingPendingRequestDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_prepared_dto(
+    PairingPreparedDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_preview_device_dto(
+    PairingPreviewDeviceDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_preview_dto(
+    PairingPreviewDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_restore_request_dto(
+    PairingRestoreRequestDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_session_dto(
+    PairingSessionDto self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_pairing_status_dto(
+    PairingStatusDto self,
     SseSerializer serializer,
   );
 

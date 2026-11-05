@@ -25,7 +25,10 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 
 | Command | Does |
 | --- | --- |
-| `login [--web]`, `logout`, `account` | hosted-account sign-in with GitHub, sign-out, current account and transport |
+| `login [--web \| --resume]`, `logout`, `account` | hosted-account sign-in with GitHub or back to the session set aside for pairing, sign-out, current account and transport |
+| `pair`, `pair join`, `pair restore [--ask] [--retake]`, `pair start-over` | sign in without GitHub: show this device's code, join another device's group, recover a previous device, or leave a replaced identity behind ([details](#pairing-codes)) |
+| `pair rotate`, `pair pause`, `pair resume`, `pair leave` | replace or pause this device's code; move it out of its group |
+| `devices`, `devices remove <id>`, `devices allow <id> --request <id>`, `devices deny <id> --request <id>` | list the linked devices, remove one, answer a recovery request |
 | `init [--relay <host:port>] [--key <32B>]` | save a self-host relay and shared key to `~/.config/pocox/config.toml` (0600) |
 | `serve [--allow-remote-management]` | start or reuse `codex app-server` and register it as `…:app:<name>`; with the flag, run the managed host other devices can configure ([details](remote-device-management.md#cli-host)) |
 | `connect` | subscribe to a remote app-server and print the `codex --remote …` command |
@@ -59,6 +62,50 @@ pocox services list         # another device: list your services
 pocox connect               # attach to the default app-server
 codex --remote ws://127.0.0.1:28080
 ```
+
+## Pairing codes
+
+A device can sign in with no GitHub account. Each device has one long-lived code,
+and devices linked by those codes count as one user.
+
+```bash
+pocox pair                  # on the first device: show its code, ask to set it up, wait for a link
+pocox pair join             # on the next device: type the code, or pipe it to stdin
+pocox devices               # list the group
+```
+
+A code is read from a prompt or stdin, never the command line, where other accounts
+and shell history could read it. Everything that changes membership shows what it
+does and asks first; without a terminal, `--yes` is that answer and the command
+otherwise changes nothing. `--backend <url>` chooses a backend, which must be
+`https://` or on this computer. `--no-wait` makes `pocox pair` return after showing
+the code.
+
+| Situation | Do |
+| --- | --- |
+| Reinstalled, with the device store intact | `pocox pair`: same device, same code |
+| Reinstalled without it, holding a code from the group | `pocox pair restore`, then pick the device you were (`--device <id>` off a terminal) |
+| Reinstalled without it, holding no code | `pocox pair restore --ask`; a linked device runs `pocox devices`, compares the matching id and allows it |
+| Suspect someone has this device's identity or code | `pocox pair restore --retake`: old access ends at once and the code changes |
+| Told another device took this identity over | `pocox pair start-over` starts as a new device; `pocox pair restore` then recovers one you had |
+| This device was removed | `pocox pair` asks to continue, as a device of its own; returning to the group takes a new code |
+| A code leaked | `pocox pair pause` at once; `pocox pair rotate` once 24 hours have passed since it was issued |
+
+The identity lives in a private device store outside `config.toml`, shared by every
+POCOX installation of this OS account and backend, so moving one moves them all.
+`POCOX_DEVICE_SCOPE=<name>` keeps a separate identity, for testing several devices
+on one computer. `pocox logout` signs this installation out and leaves the identity
+and its group alone: `pocox pair` resumes it. To end a device's access, remove it from
+another device. Moving to pairing sets a GitHub session aside, and `pocox login
+--resume` brings it back.
+
+A running `pocox serve` or relay worker notices within a minute that its device was
+removed or moved, and stops. Removal ends new connections; one already open may last
+until an end closes it. `pocox serve --allow-remote-management` stops its hosts the
+same way and starts them again after a move you confirmed, or after you continue on a
+removed device.
+
+Details are in [the design](pairing-code-login.md).
 
 ## Self-host
 

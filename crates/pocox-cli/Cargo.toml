@@ -46,3 +46,11 @@ open = "5"
 comfy-table = { workspace = true }
 owo-colors = { workspace = true }
 crossterm = { workspace = true }
+
+[dev-dependencies]
+pb-mapper-testkit = { workspace = true }
+pocox-auth = { workspace = true }
+pocox-backend = { workspace = true }
+pocox-store = { workspace = true }
+tempfile = "3"
+toml = { workspace = true }

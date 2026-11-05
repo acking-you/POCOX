@@ -19,6 +19,7 @@ mod local_tools;
 mod managed_api;
 mod managed_host;
 mod managed_pb;
+mod pair;
 mod pb;
 mod relay;
 mod remote_hint;
@@ -37,9 +38,12 @@ mod worker_health;
 /// Dispatch a parsed [`Cli`] invocation to the matching subcommand.
 pub async fn dispatch(cli: Cli) -> Result<()> {
     match cli.command {
+        Command::Login(args) if args.resume => account::resume_github(),
         Command::Login(args) => account::login(args.backend.as_deref(), args.web).await,
         Command::Logout => account::logout().await,
         Command::Account => account::status().await,
+        Command::Pair(args) => pair::run(args).await,
+        Command::Devices(args) => pair::devices(args.command, args.backend.as_deref()).await,
         Command::Init(args) => init::run(args).await,
         Command::Serve(args) => serve::run(args).await,
         Command::Connect(args) => connect::run(args).await,

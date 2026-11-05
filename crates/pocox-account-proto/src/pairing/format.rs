@@ -1,6 +1,7 @@
 //! Pure formats shared by the backend and its pairing clients.
 
 use base64::Engine as _;
+pub use pocox_core::pairing::{encode_tuple, encode_tuple_with_tag, DEVICE_SECRET_PREFIX};
 
 /// Header every pairing request carries. A missing or unsupported value gets
 /// 426 `pairing_client_upgrade_required` before any side effect.
@@ -8,9 +9,6 @@ pub const PAIRING_PROTOCOL_HEADER: &str = "x-pocox-pairing-protocol";
 
 /// The pairing protocol this build speaks.
 pub const PAIRING_PROTOCOL_VERSION: u32 = 1;
-
-/// Prefix of a device secret: a client-generated random 256-bit bearer value.
-pub const DEVICE_SECRET_PREFIX: &str = "pcxd1_";
 
 /// The invitation URI a QR code carries, ahead of the compact code.
 pub const PAIR_URI_PREFIX: &str = "pocox://pair?c=";
@@ -57,32 +55,10 @@ pub fn display_code(code: &str) -> String {
     out
 }
 
-/// The unambiguous length-prefixed tuple encoding of the design's `encode(..)`.
-pub fn encode_tuple(fields: &[&[u8]]) -> Vec<u8> {
-    let size = fields.iter().map(|field| field.len() + 4).sum();
-    let mut out = Vec::with_capacity(size);
-    for field in fields {
-        let len = u32::try_from(field.len()).expect("a tuple field fits in four gigabytes");
-        out.extend_from_slice(&len.to_be_bytes());
-        out.extend_from_slice(field);
-    }
-    out
-}
-
-/// [`encode_tuple`] with a leading domain-separation tag.
-pub fn encode_tuple_with_tag(tag: &str, fields: &[&[u8]]) -> Vec<u8> {
-    let mut all: Vec<&[u8]> = Vec::with_capacity(fields.len() + 1);
-    all.push(tag.as_bytes());
-    all.extend_from_slice(fields);
-    encode_tuple(&all)
-}
-
 /// Whether `secret` has the shape of a device secret: the prefix plus 32 random
 /// bytes in unpadded base64url.
 pub fn secret_is_well_formed(secret: &str) -> bool {
-    secret
-        .strip_prefix(DEVICE_SECRET_PREFIX)
-        .is_some_and(|body| parse_hardware_key(body).is_some())
+    pocox_core::pairing::secret_is_well_formed(secret)
 }
 
 /// Decode a hardware key from the wire: 32 bytes in unpadded base64url.

@@ -17,7 +17,9 @@ use pocox_account_proto::http::{
     WebStartResponse,
 };
 use pocox_account_proto::pkce;
-use pocox_core::config::{Config, Mode};
+use pocox_bridge::pairing;
+use pocox_core::config::{AccountProvider, Config, Mode};
+use pocox_core::paths;
 use pocox_core::service::default_device_id;
 
 use crate::commands::ui;
@@ -38,6 +40,9 @@ const DEFAULT_BACKEND_HOST: Option<&str> = option_env!("POCOX_BACKEND_HOST");
 const MIN_DEVICE_POLL_INTERVAL_SECS: u64 = 6;
 const MAX_DEVICE_POLL_INTERVAL_SECS: u64 = 300;
 const DEFAULT_DEVICE_CODE_LIFETIME_SECS: u64 = 900;
+/// How often a long-running command asks whether its pairing identity still
+/// stands.
+const IDENTITY_CHECK: Duration = Duration::from_secs(60);
 const MAX_DEVICE_CODE_LIFETIME_SECS: u64 = 3600;
 
 /// The compile-time default backend API base URL — `https://<host>:8443`, where
@@ -376,8 +381,22 @@ async fn read_request_target(stream: &mut tokio::net::TcpStream) -> Result<Optio
     }
 }
 
-/// `pocox logout`: revoke the refresh token (best effort) and clear the
-/// local session.
+/// `pocox login --resume`: back to the GitHub session set aside when this
+/// installation moved to pairing.
+pub(crate) fn resume_github() -> Result<()> {
+    match pairing::resume_github(&paths::config_dir()?)? {
+        Some(login) => {
+            ui::headline(ui::Tone::Ok, "signed in");
+            ui::field("login", &login);
+            Ok(())
+        },
+        None => bail!("no GitHub session was set aside; run `pocox login`"),
+    }
+}
+
+/// `pocox logout`: revoke a GitHub refresh token (best effort) and clear the
+/// local session. A pairing device has none to revoke: logging out neither
+/// leaves its group nor touches the device store, and `pocox pair` resumes it.
 pub(crate) async fn logout() -> Result<()> {
     let mut config = Config::load()?;
     let base = backend_base(None, &config);
@@ -405,6 +424,9 @@ pub(crate) async fn status() -> Result<()> {
     match config.account_mode() {
         Mode::Account => {
             let base = backend_base(None, &config);
+            if config.account_provider() == AccountProvider::DeviceCode {
+                return device_status(&base).await;
+            }
             let token = valid_token(&mut config, &base).await?;
             let me: MeResponse = http_client()?
                 .get(format!("{base}/v1/me"))
@@ -438,9 +460,68 @@ pub(crate) async fn status() -> Result<()> {
     Ok(())
 }
 
+/// `pocox account` for a pairing device.
+async fn device_status(base: &str) -> Result<()> {
+    let support = paths::config_dir()?;
+    match pairing::session::me(&support, base).await {
+        Ok(me) => {
+            ui::headline(ui::Tone::Ok, "signed in with a pairing code");
+            ui::field("device", &me.login);
+            ui::field("backend", base);
+            Ok(())
+        },
+        Err(error) if error.chain().any(|cause| cause.is::<pairing::SignedOut>()) => {
+            ui::headline(ui::Tone::Muted, "not signed in");
+            ui::code("pocox pair");
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
+}
+
+/// What a long-running command does when its pairing identity is no longer the
+/// one it started under: another device removed this one, this device moved, or
+/// its secret was replaced. Resolves then; never on GitHub or self-hosted
+/// setups.
+pub(crate) async fn identity_lost(config: &Config, base: &str) -> String {
+    if config.account_provider() != AccountProvider::DeviceCode {
+        return std::future::pending().await;
+    }
+    let started = config.account_id().map(str::to_string);
+    let Ok(support) = paths::config_dir() else {
+        return std::future::pending().await;
+    };
+    loop {
+        tokio::time::sleep(IDENTITY_CHECK).await;
+        let answer = pairing::session::me(&support, base).await;
+        if let Err(error) = &answer {
+            if error.chain().any(|cause| cause.is::<pairing::SignedOut>()) {
+                return "this device is no longer signed in".to_string();
+            }
+            match pairing::code_of(error) {
+                Some(
+                    code @ (pocox_account_proto::pairing::PairingErrorCode::DeviceSuperseded
+                    | pocox_account_proto::pairing::PairingErrorCode::DeviceUnknown),
+                ) => return format!("this device's identity ended: {}", code.as_str()),
+                _ => continue,
+            }
+        }
+        let latest = Config::load().ok();
+        if latest.is_none_or(|latest| {
+            latest.account_provider() != AccountProvider::DeviceCode
+                || latest.account_id().map(str::to_string) != started
+        }) {
+            return "this device moved to another user, or was removed from its group".to_string();
+        }
+    }
+}
+
 /// Return a currently-valid session token, refreshing it when it is missing,
 /// unparsable, or within a minute of expiry.
 async fn valid_token(config: &mut Config, base: &str) -> Result<String> {
+    if config.account_provider() == AccountProvider::DeviceCode {
+        return pairing::session::valid_token(&paths::config_dir()?, config, base).await;
+    }
     if let Some(token) = config.account_token() {
         // Reuse the token only when we can confirm it is not within a minute of
         // expiry; an unparsable / exp-less token falls through to a refresh
@@ -524,6 +605,22 @@ pub(crate) async fn fetch_relay_credential(
     config: &mut Config,
     base: &str,
 ) -> Result<RelayCredentialResponse> {
+    if config.account_provider() == AccountProvider::DeviceCode {
+        let relay = pairing::session::relay_credential(&paths::config_dir()?, base)
+            .await
+            .map_err(|error| {
+                match pairing::code_of(&error) {
+                    Some(pocox_account_proto::pairing::PairingErrorCode::DeviceNotActivated) => {
+                        error.context(
+                            "this device is not set up, or was removed from its group; run                              `pocox pair` to continue",
+                        )
+                    },
+                    _ => error,
+                }
+            })?;
+        *config = Config::load()?;
+        return Ok(relay);
+    }
     let token = valid_token(config, base).await?;
     let resp = http_client()?
         .get(format!("{base}/v1/relay"))

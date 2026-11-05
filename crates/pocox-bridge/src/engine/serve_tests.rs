@@ -169,7 +169,7 @@ fn a_broken_saved_configuration_fails_the_start_before_any_spawn() {
 
 /// A recorded host with no process behind it: its tasks idle until aborted,
 /// and the closed discard port stands for its listener.
-fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
+pub(super) fn fake_host(name: &str, incarnation: &str, adopted: bool) -> LocalServe {
     runtime::init(std::env::temp_dir()).expect("init runtime");
     let idle = || runtime::runtime().spawn(std::future::pending::<()>());
     let local: SocketAddr = "127.0.0.1:9".parse().expect("addr");

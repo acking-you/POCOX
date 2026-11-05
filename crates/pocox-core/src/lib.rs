@@ -13,6 +13,9 @@
 /// Metadata identifying the environment that owns a registered service.
 pub mod device;
 
+/// The client's device identity for pairing-code login.
+pub mod pairing;
+
 /// Library-level error type re-exported from individual modules.
 pub mod error;
 

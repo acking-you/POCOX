@@ -23,6 +23,7 @@ import 'package:pocox/src/rust/api/bridge/hosted_account.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/hosting.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/native_sessions.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/network.dart' as frb;
+import 'package:pocox/src/rust/api/bridge/pairing.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/services.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/session_access.dart' as frb;
 import 'package:pocox/src/rust/api/bridge/session_config.dart' as frb;
@@ -40,6 +41,7 @@ part 'bridge/rust_harnesses.dart';
 part 'bridge/rust_updates.dart';
 part 'bridge/rust_composer.dart';
 part 'bridge/rust_events.dart';
+part 'bridge/rust_pairing.dart';
 
 /// Real [BridgeApi] backed by generated Rust bindings.
 class RustBridgeApi
@@ -51,7 +53,8 @@ class RustBridgeApi
         _RustTools,
         _RustGrok,
         _RustHarnesses,
-        _RustUpdates
+        _RustUpdates,
+        _RustPairing
     implements BridgeApi {
   /// Creates the real bridge.
   const RustBridgeApi();

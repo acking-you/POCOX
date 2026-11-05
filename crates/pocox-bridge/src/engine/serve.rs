@@ -876,6 +876,20 @@ pub fn serve_status() -> Vec<ServeStatus> {
     out
 }
 
+/// Every host this process runs, under any provider.
+pub(super) fn owned_host_names() -> Vec<String> {
+    let mut names: Vec<String> = hosts_locked().keys().cloned().collect();
+    names.extend(
+        super::serve_acp::status()
+            .into_iter()
+            .chain(super::serve_opencode::status())
+            .map(|host| host.name),
+    );
+    names.sort();
+    names.dedup();
+    names
+}
+
 /// The Codex rows of [`serve_status`], without its relay recovery.
 fn codex_status() -> Vec<ServeStatus> {
     // Read before the hosts lock: the context's lock never nests inside it.
@@ -986,6 +1000,15 @@ async fn meta_svc_supervisor(
         async move { pocox_host_svc::serve(listener, app_ws_addr, store, host).await }
     })
     .await
+}
+
+/// Record a host with no process behind it, whose app registration is
+/// `published`.
+#[cfg(test)]
+pub(in crate::engine) fn insert_test_host(name: &str, published: Option<Published>) {
+    let mut host = tests::fake_host(name, "pairing-test", true);
+    host.app_register = published;
+    hosts_locked().insert(name.into(), host);
 }
 
 #[cfg(test)]

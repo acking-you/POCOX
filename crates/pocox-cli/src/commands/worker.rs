@@ -35,8 +35,11 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
             })
             .await?;
             let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome =
-                monitor(&reporter, registration.subscribe(), || registration.diagnostics()).await;
+            let outcome = until_identity_lost(
+                &config,
+                monitor(&reporter, registration.subscribe(), || registration.diagnostics()),
+            )
+            .await;
             registration.stop().await?;
             outcome?;
         },
@@ -52,8 +55,11 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
             })
             .await?;
             let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome =
-                monitor(&reporter, connection.subscribe(), || connection.diagnostics()).await;
+            let outcome = until_identity_lost(
+                &config,
+                monitor(&reporter, connection.subscribe(), || connection.diagnostics()),
+            )
+            .await;
             connection.stop().await?;
             outcome?;
         },
@@ -63,6 +69,24 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
         },
     }
     Ok(())
+}
+
+/// Run `work` while this installation's pairing identity stands. A worker
+/// outlives the command that spawned it, and a removed device must not keep
+/// trying to republish on a key that is gone. Never ends early on GitHub or
+/// self-hosted setups.
+async fn until_identity_lost(
+    config: &Config,
+    work: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    let backend = account::backend_base(None, config);
+    tokio::select! {
+        outcome = work => outcome,
+        reason = account::identity_lost(config, &backend) => {
+            tracing::warn!("worker stopping: {reason}");
+            Ok(())
+        },
+    }
 }
 
 /// Keep this worker's relay credential from lapsing, for as long as it runs.

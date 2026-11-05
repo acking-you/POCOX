@@ -31,6 +31,7 @@ pub mod hosted_account;
 pub mod hosting;
 pub mod native_sessions;
 pub mod network;
+pub mod pairing;
 pub mod services;
 pub mod session_access;
 pub mod session_config;
@@ -182,6 +183,8 @@ pub fn init_bridge(support_dir: String) -> Result<()> {
     crate::engine::management::initialize();
     crate::engine::harnesses::initialize();
     crate::engine::agent_tools::initialize();
+    // A long-running app learns of a peer's removal without a page polling.
+    crate::engine::pairing::watch::start();
     Ok(())
 }
 

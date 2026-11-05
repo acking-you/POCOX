@@ -195,9 +195,13 @@ async fn serve_account_foreground(
     tokio::spawn(codex_health_watchdog(local_addr.clone(), spawn_opts));
 
     ui::headline(ui::Tone::Action, "exposing — keep this running, Ctrl-C to stop");
-    tokio::signal::ctrl_c()
-        .await
-        .context("waiting for Ctrl-C")?;
+    let config = Config::load().unwrap_or_default();
+    let backend = super::account::backend_base(None, &config);
+    tokio::select! {
+        signal = tokio::signal::ctrl_c() => signal.context("waiting for Ctrl-C")?,
+        // Its key is gone, so nothing would republish; this host must not linger.
+        reason = super::account::identity_lost(&config, &backend) => ui::warn(&reason),
+    }
 
     // Ctrl-C was advertised as stopping the host, so it has to stop ALL of it. The
     // meta service is in-process and dies with us, but the app register worker is

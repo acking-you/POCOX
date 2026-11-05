@@ -41,6 +41,7 @@ pub mod native_sessions;
 pub mod network;
 pub mod opencode;
 mod owned_child;
+pub mod pairing;
 pub mod runtime;
 pub mod serve;
 pub mod serve_acp;

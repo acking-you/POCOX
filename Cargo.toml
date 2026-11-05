@@ -151,6 +151,7 @@ time = { version = "0.3", features = ["formatting", "parsing"] }
 # Internal backend crates
 pocox-store = { path = "crates/pocox-store" }
 pocox-auth = { path = "crates/pocox-auth" }
+pocox-backend = { path = "crates/pocox-backend" }
 
 [workspace.lints.rust]
 # Doc coverage is part of the contract — every public item has a comment.
