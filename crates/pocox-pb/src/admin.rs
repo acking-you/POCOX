@@ -132,6 +132,52 @@ pub async fn relay_instance_id(session: &RelaySession) -> Result<String> {
     Ok(status.server_instance_id)
 }
 
+/// What a backend needs to know about a relay before relying on it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelayStatus {
+    /// See [`relay_instance_id`].
+    pub instance_id: String,
+    /// See [`relay_supports_key_namespaces`].
+    pub supports_key_namespaces: bool,
+    /// How many temporary credentials the relay's table holds, dead ones
+    /// included until it reclaims them.
+    pub key_capacity: usize,
+}
+
+/// Read a relay's instance, capability and capacity in one round trip.
+///
+/// The relay audits every status read, so a caller wanting more than one of
+/// these should ask once.
+pub async fn relay_status(session: &RelaySession) -> Result<RelayStatus> {
+    let status = session
+        .admin()?
+        .auth_status()
+        .await
+        .with_context(|| format!("reading the status of {}", session.relay_addr))?;
+    Ok(RelayStatus {
+        supports_key_namespaces: status
+            .capabilities
+            .iter()
+            .any(|capability| capability == "key_namespaces"),
+        key_capacity: status.capacity,
+        instance_id: status.server_instance_id,
+    })
+}
+
+/// The relay's stable error code behind `error`, if the relay refused the
+/// request.
+///
+/// `None` means no authoritative answer arrived (a transport failure, a
+/// timeout), so nothing is known about whether the request took effect.
+pub fn relay_error_code(error: &anyhow::Error) -> Option<&str> {
+    match error.downcast_ref::<pb_mapper::Error>() {
+        Some(pb_mapper::Error::Remote {
+            code, ..
+        }) => Some(code),
+        _ => None,
+    }
+}
+
 /// Reserve a namespace that no credential owns, for
 /// [`issue_credential_in_namespace`].
 ///
@@ -205,6 +251,32 @@ pub struct CredentialRecord {
     pub label: Option<String>,
     /// Unix seconds at which the relay stops accepting it.
     pub expires_at: u64,
+}
+
+/// One credential, if the relay still accepts it. Reads without changing
+/// anything, so it costs no slot in the relay's replay window and is safe to
+/// ask before a renew or a revoke: those act on whichever key holds an id now.
+pub async fn live_credential(
+    session: &RelaySession,
+    key_id: u64,
+) -> Result<Option<CredentialRecord>> {
+    let shown = session.admin()?.show_key(key_id).await;
+    let key = match shown {
+        Ok(key) => key,
+        Err(pb_mapper::Error::Remote {
+            code, ..
+        }) if code == "temporary_key_not_found" => return Ok(None),
+        Err(error) => {
+            return Err(anyhow::Error::new(error)
+                .context(format!("showing credential {key_id} on {}", session.relay_addr)));
+        },
+    };
+    Ok((key.state == "active").then_some(CredentialRecord {
+        key_id: key.key_id,
+        namespace: key.namespace,
+        label: key.label,
+        expires_at: key.expires_at,
+    }))
 }
 
 /// Every credential the relay currently accepts.
@@ -295,9 +367,10 @@ pub async fn retire_service(
 
 /// Withdraw a credential, cancelling whatever it currently holds open.
 ///
-/// Idempotent from the caller's point of view in the way that matters: revoking
-/// an already-dead key is not an error worth distinguishing, because the
-/// post-condition — that key cannot authenticate — holds either way.
+/// Revoking a dead key is an error at this layer: `temporary_key_not_active`
+/// while its row lingers, `temporary_key_not_found` once reaped. Both are
+/// authoritative answers that the key cannot authenticate; match them with
+/// [`relay_error_code`] when that post-condition is all a caller wants.
 pub async fn revoke_credential(session: &RelaySession, key_id: u64) -> Result<()> {
     session
         .admin()?

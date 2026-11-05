@@ -1,7 +1,7 @@
 # Pairing-code login
 
-**Status: relay support (stage 1) has shipped; pairing itself is planned and not
-usable yet.** This page specifies the design for
+**Status: relay support (stage 1) and the backend (stage 2) have shipped; no client
+speaks pairing yet, so it is not usable.** This page specifies the design for
 [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
 section becomes the rules a change must keep.
 
@@ -314,10 +314,17 @@ implementation must persist the following ownership and state boundaries:
 | `devices` | Id; user FK/index; label/platform; unique nullable hardware lookup, set at activation with the latest device winning; current session generation; code generation/unique lookup/issue time; pause flag; joined time; activation time and last-active day; last membership transition (kind, time); nullable pending transition id. |
 | `device_sessions` | Device FK + generation as primary key; indexed secret hash; original user; state (`current`, `grace`, `revoked`); fixed nullable grace deadline. Partial unique indexes permit one current session per device and one current owner per secret hash. Membership moves preserve the hash in historical generations; a restore takes the inactive requester's hash and deletes that row in the same commit. Keep old hashes briefly to answer `device_superseded`. |
 | `pair_restore_requests` | Request id; requesting device, unique while pending; target device/group/session generation/membership revision; state; expiry. Multiple requests never overwrite each other. |
-| `pair_operations` | Operation id; actor and subject; expected revisions; confirmed destination; kind; prepared/relay-applied/committed state; result and retry metadata. Never store plaintext secrets or codes. |
-| `device_relay_keys` | Device/session generation, relay instance, full key id unique per relay instance, namespace, grant operation id, expiry and hard cutoff/revocation state. Include every key that may still authenticate. |
+| `pair_operations` | Operation id; actor (with its secret hash, which authorizes reading the result and survives every move) and subject; expected revisions; confirmed destination; kind; prepared/relay-applied/committed/failed state; result and retry metadata. Never store plaintext secrets or codes. No foreign keys: a result outlives the requester a restore deletes. |
+| `device_relay_keys` | Grant id as key, named in the relay label `pcxd:<device>:<generation>:<grant>`; device/session generation, relay instance, full key id unique per relay instance, namespace, the relay's last stated expiry and the same moment in the backend's clock; a backend-clock hard cutoff and whether the relay has yet to confirm it; granting/active/revoked/expired/dead state. At most one open key per device generation. Include every key that may still authenticate, so no foreign key: a purge must not forget one. |
 | `retired_codes` | Unique code lookup and retirement time; retain seven days for `code_retired`. |
 | `pairing_metadata` | Non-secret key verification value/version, to detect an accidental pairing-secret change at startup. |
+| `pairing_budgets` | Backend-wide admission windows, in the database so they survive a restart. |
+
+**One process serves a pairing database**, enforced by an OS file lock beside it
+(`<database>.owner.lock`) that the backend takes at startup when pairing is enabled. Relay work
+is serialized by per-operation and per-device locks held in memory, and with two processes one
+could undo the other's revocation, so a second process refuses to start. Replicas need those
+locks moved first. With pairing disabled nothing is locked, as before.
 
 Use STRICT tables, foreign keys, indexes on ownership/lookups and transactional
 compare-and-set updates. Relay key ids/namespaces are `u64`: store canonical
@@ -342,7 +349,8 @@ Derivation lets a device retrieve its code without plaintext storage. A lookup
 collision with an active or retained retired code advances the generation in the
 same transaction. Rotation retires the old lookup, increments the generation and
 records server time atomically. Pause and rotation also invalidate preview tickets
-for that code. Server time determines the 24-hour wait.
+for that code: a ticket binds the code's pause count, so resuming revives none of them.
+Server time determines the 24-hour wait.
 
 `POCOX_PAIRING_SECRET` follows the entropy/configuration checks on `jwt_secret`.
 It is independent of the JWT key. With it unset, pairing routes are disabled and
@@ -384,6 +392,45 @@ Return 202 with an operation id while relay work is incomplete. Do not show
 every 60 seconds; pending operation screens can poll their own operation with
 bounded backoff. Background/headless correctness must not depend on those UI polls.
 
+**On the wire.** Every pairing request carries `X-Pocox-Pairing-Protocol: 1`. A refusal
+is `{ "error": <code> }`, plus `retry_after` (also sent as `Retry-After`),
+`operation_id` or `grace_deadline` where they apply. Pairing responses and a device's answers on
+routes it shares with GitHub are `no-store`, and pairing bodies, device refresh included, are
+limited to 8 KiB. Bodies and codes are in `crates/pocox-account-proto/src/pairing/`, whose
+response enums parse a value they do not know as `unknown`, so a newer backend can add one.
+Details a client depends on:
+
+- `POST /auth/refresh` takes `{ "device_secret": … }` and answers with a
+  `DeviceSession`; a body naming both a refresh token and a secret is a 400. GitHub's
+  request and response are unchanged.
+- `GET /v1/pair/operations/{id}` takes the device secret itself as the bearer value,
+  because the JWT may already be dead by then.
+- `DELETE /v1/devices/{id}` takes its operation id as `?operation_id=`.
+- **Only the secret gets a session**: `POST /auth/refresh`, `POST /v1/pair/device` and
+  `GET /v1/pair/operations/{id}`, because the presented secret is current right now. A response to a
+  JWT never carries one, even when that request really moved the device, or a JWT could live forever
+  by cycling link and leave and a restored `config.toml` would never expire. **After any completed
+  mutation the client refreshes.** Sessions are issued for that one response, never stored.
+- A link to a device already in this user is a no-op that still activates this device, binds
+  its hint and cancels its requests, because the user confirmed that group.
+- `GET /v1/relay` answers 429 `rate_limited` with `Retry-After: 1` while another request is working on
+  this device, rather than queueing.
+- Last-active days are days since the unix epoch. Operation ids are 16 to 64 URL-safe
+  characters chosen by the client.
+
+| Code | Status | Means |
+| --- | --- | --- |
+| `session_stale` | 401 | This JWT's generation no longer authorizes anything. Refresh with the secret. |
+| `device_superseded` | 401 | This secret was replaced. Offer recovery or starting as new. |
+| `device_unknown` | 401 | Nothing is known about this secret. |
+| `grace_restricted` | 403 | A retiring session on a route it may not use. |
+| `device_session_required` | 403 | A GitHub session on a device route. |
+| `device_not_activated` | 403 | No relay key until Continue. |
+| `transition_pending` | 409 | A membership change is under way on this device or group. Retry; an `operation_id` is included only when it is the caller's own. A refresh gets this too, so it does not mean the secret is dead. |
+| `retiring_key_gone` | 410 | A retiring session's key no longer exists, and none is minted for it. |
+| `relay_state_lost` | 503 | The relay does not know a stored namespace. Nothing moves until an operator restores it. |
+| `relay_unavailable` | 503 | No authoritative answer from the relay. |
+
 ### Sessions
 
 Add optional `did` and `dgen` claims and make `gh_id` optional, but validate
@@ -392,7 +439,8 @@ pairing has both `did` and `dgen` without `gh_id`. Reject mixed or incomplete
 forms. Legacy GitHub tokens keep their existing validation.
 
 Each device-authenticated route checks the database row, user, generation,
-session state and any pending transition. `sub`/`ns` refer to the device's
+session state and any pending transition, and refuses a token at its `exp`, without the minute of
+leeway a GitHub token gets. `sub`/`ns` refer to the device's
 current user; `account_id` is that user's opaque id; `login` is display only.
 Apply this to existing `/v1/me`, service listing and service deregistration as
 well as the new routes. Checking only `/v1/relay` leaves other old-user access.
@@ -410,10 +458,16 @@ owner restarts under the new user. After `removed` it shows that state and hosts
 nothing until an explicit Continue, so a removed device never quietly republishes
 into a new single-device namespace.
 
+A refresh does not issue a JWT while a transition is moving the device, whichever
+side it is on: it answers `transition_pending`, and the device learns the outcome once
+the operation commits.
+
 **Normal secret replacement allows a fixed 600-second overlap.** At preparation
 time `t`, persist the retiring generation's deadline `t + 600` and shorten all its
 relay keys to the remaining time before activating the replacement. If activation
-takes longer, the remaining overlap is shorter; retries never restart the clock.
+takes longer, the remaining overlap is shorter; retries never restart the clock. The
+deadline applies to the session from that moment, before the replacement exists: from
+then on it is limited to the routes below.
 
 During that overlap:
 
@@ -441,6 +495,11 @@ authorization: revoke all current and grace generations, invalidate old JWTs and
 cancel pending requests. A moved device's current secret may obtain a new-user
 JWT after completion; a superseded secret never revives. Returning later to the
 same user must not make any old JWT valid again.
+
+A removal also clears the device's activation in the same commit, so the backend itself
+refuses it a relay key until an explicit Continue, whatever its client does. A leave
+keeps it, because the user confirmed that move. A link's old authorization also ends at
+preparation, with no overlap.
 
 ### Relay credentials and durable transitions
 
@@ -514,10 +573,67 @@ transaction pretending to include a network call:
 If the relay is unavailable, retain the operation and report pending. A worker
 reconciles it on restart. No destination credential is exposed while old
 authorization is uncertain. Revalidate the confirmed destination before commit;
-if it changed, require a new preview and leave the source membership intact
-(after an already-applied revocation it can receive a fresh generation there).
-Keep empty source users until no operation or potentially live old key refers
-to them. Client cache clearing is not server-side revocation.
+if it changed, require a new preview and leave the source membership intact.
+Once any relay call may have been made, the subject gets a fresh generation there
+rather than its old one back: a shortened or revoked key is not restored, and the old
+generation keeps only the deadline it had. Whatever cutoff that operation put on a key stays
+owed: the worker enforces it on every pass until the relay confirms, so an old key never runs on to
+its full life. A failed retake therefore still ends the old key, and the secret stays current until
+a retake succeeds. Before any relay call, the transition mark is simply undone. Keep empty source users until no operation or
+potentially live old key refers to them. Client cache clearing is not server-side revocation.
+
+Membership changes are **serialized per group**: while an operation is open on a user,
+as source or destination, another link, leave, removal or restore touching it gets
+`transition_pending`. A change that would only lose at commit is thus refused before it
+revokes anything. Of several concurrent links into one group, one commits and the others
+then find a changed revision and need a new preview. A relay outage therefore holds the
+group still until the relay returns.
+
+A worker resumes open operations at startup, ignoring their retry schedule, then every
+15 seconds. Every 5 minutes it compares the relay's table with the database: it adopts
+an orphaned grant whose generation still stands and revokes one whose generation does
+not, revokes a labelled key with no grant on record, revokes a key reported in another
+namespace, and reapplies a deadline a delayed renewal moved. Expiries are compared only
+with the relay's own earlier answers, so this needs no clock agreement.
+
+**Identity comes before any change.** Renew and revoke act on whichever key holds an id now, so
+before either the backend reads the key's label and namespace with the relay's non-mutating
+`KeyShow`. A stored id naming another tenant's key ends the row as dead with no write at the relay.
+A key our label names in another namespace follows the namespace drift rule. A relay's answer to
+the write is checked again, since the read can be raced.
+
+**A key's life is never lengthened against its rule.** A retiring key's lifetime is computed from a
+clock read right before the renewal, as the time left to the earlier of its deadline and its own
+end, so no wait for a lock or the relay can push it past either. A current key is never shortened:
+renewal takes the longer of the group's key lifetime and what the key has left, since another
+installation may be asleep on the expiry it was given.
+
+**Answers may be slow; requests may not.** The relay can accept connections and then say nothing,
+and the SDK waits 30 seconds. Checking its capability reads a status refreshed under a 1-second
+bound and goes on without one, so a removal still persists and ends the old session at once, and
+answers 202. `GET /v1/relay` and a device's service routes are bounded by the 5-second foreground
+wait and answer `relay_unavailable`. A status known to be too old still refuses.
+
+`GET /v1/relay` does its work in a task of its own that the request waits on, so a client closing
+between the relay's answer and the backend remembering it cannot throw away a relay write for the
+next request to repeat. It never queues on its device's lock while holding a global slot.
+
+**What a device can make the relay do is metered**, because the relay's replay window holds 65,536
+administrator writes per 10 minutes for the whole backend, GitHub included, and every write takes a
+slot before it is checked. Renewing an existing key stays free: the credential is cached until its
+renewal margin, so a client cannot force it. A retiring session's credential is cached too, however
+often it asks. A device with no key on record pays per device before the relay is asked anything,
+status reads and label walks included, so once refused it costs the relay nothing per request.
+
+**A shared budget must not stop anyone defending themselves.** Only a link owing the relay work
+draws from the backend-wide move budget, inside the transaction that decides it is owed. A no-op,
+a device with no keys, a leave, a removal and a recovery never do, each of the last three needing a
+peer or a code some metered step already paid for. Replacing a key that merely ended, in the same
+generation, is outside the key budgets too: a laptop that slept past its one-hour key, or every
+device after a relay reset, cannot be starved by a fleet. `DELETE /v1/services/..` for a device reads a listing first, and a service that is not
+there costs no write. `GET /v1/services` for a device reads one listing shared across all devices for
+3 seconds, so a service can take that long to appear. The limits are in the
+[table](#limits-and-transport).
 
 A linked group's keys last 24 hours. A single-device group's last one hour, renewed
 while the device runs, so an abandoned device returns its slot quickly. Grace keys
@@ -558,12 +674,22 @@ or reconnection of unaffected peers is required.
 | Limit | Initial value |
 | --- | --- |
 | Code checks per address (`preview`, `link`, `restore`) | 5 per 10 minutes, with growing backoff; a valid code refunds its charge |
-| Code checks across the backend | 100 per second, charged only for attempts the per-address limit admits |
+| Code checks across the backend | 100 per second, charged only for attempts the per-address limit admits; an address whose charge this budget refused gets it back |
+| Valid code checks per address | 60 per 10 minutes, unrefunded, or one address could spend the budget above for free. A device's own code proves nothing and is not refunded at all |
 | `POST /v1/pair/device` per address | 20 new operations per hour; idempotent retries do not create rows |
 | First relay key per address | 10 per hour, activated devices only |
-| First relay keys across the backend | 1,000 per hour |
+| First relay keys across the backend | 1,000 per hour, charged once a namespace exists, so a failed allocation costs none |
+| Keys after a move | 120 per hour per address and 3,600 across the backend. Renewing a key, or replacing one that merely ended, is outside this |
+| Attempts at a key per device | 30 per hour, charged before the relay is asked anything; a failed allocation gets it back. Renewal is free |
+| Namespace allocations across the backend | 1,000 per hour |
+| Links, leaves, removals and restores | 20 per hour per device. Links and restores also 60 per address. Links owing the relay work also 1,000 across the backend. A refused or replayed one costs nothing; a no-op counts per device |
+| Service deregistrations | 30 per 10 minutes per device, 60 per address; those reaching the relay, 600 per 10 minutes across the backend |
 | Pairing keys' share of relay capacity | 50%; past it, 503 `relay_capacity` before side effects. Operators can raise `PB_MAPPER_AUTH_MAX_TEMP_KEYS`. |
-| Pending recovery requests | At most 3 per target, plus backend-wide admission limits |
+| Pending recovery requests | At most 3 per target, plus 1,000 new requests per hour across the backend |
+| New devices across the backend | 1,000 per hour |
+| Group size | 64 devices |
+| Concurrent device requests, pairing routes and a device's `/v1/relay` and `/v1/services*` | 256, past which 429. A body is read before taking a slot, under its own 5-second bound; relay grants in flight, 16 |
+| Connections, with pairing on | 8,192 in total and 128 per address, trusted proxies exempt, so every proxy must be listed. A client has 18 seconds to send a request's headers, which also ends an idle connection. Refusals are logged at warn, at most once a minute. With pairing off none of this applies |
 | Rotation | Once per 24 hours per device; an authorized retake may skip the wait, at most 3 times per device per 24 hours |
 
 An address is one IPv4 address or one IPv6 /64, since a single host commonly controls
@@ -595,18 +721,19 @@ containing a code; use no-store responses and keep codes out of status/errors.
 
 | Data | Kept until |
 | --- | --- |
-| Activated device, code and hardware index | 180 days without successful authenticated use/credential renewal |
+| Activated device, code and hardware index | 180 days without successful authenticated use/credential renewal. A removed device keeps this clock though its activation was cleared, so it can still say it was removed |
 | Unactivated first-screen device | 30 days after creation; opening or polling the code does not activate it, and a peer linking into it does not extend it |
 | Current session hash | Device deletion or authorized replacement |
 | Superseded/revoked session hashes | At least their authorization cutoff; seven-day diagnostic retention |
 | Pending requests and terminal results | Seven-day expiry/diagnostic window; never delete an unresolved relay transition |
-| Completed operation retry results and retired-code indexes | Seven days |
+| Completed operation retry results and retired-code indexes | Seven days. A no-op keeps one row per device and kind, replaced by the next |
 | Relay grant/revocation records | Reconciled inactive at the relay and no longer needed by a transition |
 | User id and namespace | Last device and outstanding operation/grant gone. The relay does not hand the number out again unless it loses its state directory, and the `device_users` unique index catches that |
 | Failure counters | 24 hours or process restart |
 
 Purge follows the same revocation/transition boundary, not a blind cascade that
-forgets still-valid keys. A host's successful credential renewal counts as
+forgets still-valid keys. It runs in small batches, each its own short transaction, since GitHub
+login shares this database, and leaves alone any group with an open operation. A host's successful credential renewal counts as
 activity even with no foreground UI. Pausing the last available code prevents
 code-based recovery; retiring it invalidates remembered copies. Once retention
 deletes the last device, its code cannot recover that group. Unknown/expired

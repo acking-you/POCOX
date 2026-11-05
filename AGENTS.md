@@ -196,7 +196,7 @@ planned until it ships:
 
 - **Pairing-code login**: backend-issued per-device codes, with linked devices
   counting as one user, authorized reinstall recovery and a bounded credential
-  overlap
+  overlap. The relay and backend have shipped; clients remain
   ([design](docs/pairing-code-login.md)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.

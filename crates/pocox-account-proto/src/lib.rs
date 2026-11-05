@@ -17,6 +17,8 @@
 //! - [`pkce`] — client-side PKCE + CSRF helpers for the web
 //!   (authorization-code) login flow.
 //! - [`params`] — shared retry/backoff bounds.
+//! - [`pairing`] — pairing-code login: device sessions, recovery and durable
+//!   membership operations.
 //!
 //! I/O-free by construction: it is serde types and pure helpers. It used to
 //! also carry a broker tunnel protocol (`HELLO`/`Ack` plus length-prefixed
@@ -28,6 +30,7 @@
 
 pub mod http;
 pub mod key;
+pub mod pairing;
 pub mod params;
 pub mod pkce;
 

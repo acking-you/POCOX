@@ -92,6 +92,17 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pocox-backend
 ```
 
+With `POCOX_PAIRING_SECRET` set, run **one backend process per database**. Relay work is serialized
+by locks in that process, so the backend takes a file lock beside the database at startup
+(`<database>.owner.lock`) and a second process refuses to start.
+
+Pairing also opens an anonymous surface, so with it enabled the listener caps connections at 8,192 in
+total and 128 per address, and closes a connection that sends no request headers within 18 seconds.
+**List every proxy in front of the backend in `trusted_proxies`**: the list decides whose
+`X-Forwarded-For` is believed, and it exempts that proxy from the per-address cap. An unlisted proxy
+shares one 128-connection cap among all its users. Refusals are logged at warn, at most once a minute.
+With pairing off, none of this applies.
+
 ## Relay configuration (REQUIRED)
 
 ```bash

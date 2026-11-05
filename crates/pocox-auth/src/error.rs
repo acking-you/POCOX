@@ -34,6 +34,35 @@ pub enum AuthError {
     /// its PKCE verifier did not match.
     #[error("invalid or expired exchange code")]
     BadExchange,
+    /// `POCOX_PAIRING_SECRET` is unset, so device sessions fail closed.
+    #[error("pairing is not configured")]
+    PairingDisabled,
+    /// `POCOX_PAIRING_SECRET` does not match the one this database was built
+    /// with. Derived codes and hardware indexes would all disagree with
+    /// what is stored.
+    #[error("POCOX_PAIRING_SECRET does not match this database; a change needs a rekey migration")]
+    PairingKeyMismatch,
+    /// A token's claims are neither the GitHub form nor the device form.
+    #[error("token has a mixed or incomplete principal")]
+    BadPrincipal,
+    /// Nothing is known about this device secret.
+    #[error("unknown device secret")]
+    DeviceUnknown,
+    /// This device secret was replaced and can never refresh again.
+    #[error("device secret was superseded")]
+    DeviceSuperseded {
+        /// The latest overlap deadline of its old generations.
+        grace_deadline: Option<i64>,
+    },
+    /// This session generation no longer authorizes anything.
+    #[error("device session is stale")]
+    SessionStale,
+    /// A membership change is in progress on this device.
+    #[error("a membership change is in progress")]
+    TransitionPending {
+        /// The operation moving this device.
+        operation_id: Option<String>,
+    },
 }
 
 /// Convenience result alias for the auth layer.

@@ -138,12 +138,14 @@ sqlx = { version = "0.9", default-features = false, features = ["runtime-tokio",
 uuid = { version = "1", features = ["v4"] }
 jsonwebtoken = { version = "9", default-features = false }
 sha2 = "0.10"
+hmac = "0.12"
 rand = "0.8"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 rustls-pemfile = "2"
 rustls-acme = { version = "0.13", default-features = false, features = ["ring", "tokio"] }
 tower-http = { version = "0.6", features = ["trace", "timeout", "limit"] }
 figment = { version = "0.10", features = ["env", "toml"] }
+ipnet = "2"
 time = { version = "0.3", features = ["formatting", "parsing"] }
 
 # Internal backend crates

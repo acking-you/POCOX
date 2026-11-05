@@ -15,12 +15,14 @@
 mod error;
 mod github;
 mod jwt;
+pub mod pairing;
 
 use base64::Engine as _;
 pub use error::{AuthError, Result};
 use github::{GitHub, PollResult};
-pub use jwt::Claims;
 use jwt::Jwt;
+pub use jwt::{Claims, Principal};
+pub use pairing::{DeviceCaller, PairingKeys, PreviewTicket, SessionMode};
 use pocox_account_proto::http::{
     DevicePollResponse, DevicePollStatus, DeviceStartResponse, SessionCredential, WebStartResponse,
 };
@@ -52,6 +54,10 @@ pub struct Config {
     /// (`https://<host>[:port]/auth/web/callback`). Required only for the web
     /// flow; must exactly match the GitHub OAuth app's registered callback URL.
     pub web_callback_url: Option<String>,
+    /// The pairing secret, independent of the JWT key. Leave `None` to keep
+    /// pairing disabled: device refresh then fails closed and GitHub stays
+    /// available.
+    pub pairing_secret: Option<String>,
 }
 
 /// The web-flow-only secrets, present iff both the client secret and the public
@@ -75,6 +81,8 @@ pub struct Auth {
     /// Web-flow secrets, or `None` when the authorization-code flow is
     /// disabled.
     web: Option<WebConfig>,
+    /// Pairing keys, or `None` when pairing is disabled.
+    pairing: Option<PairingKeys>,
 }
 
 impl Auth {
@@ -124,6 +132,10 @@ impl Auth {
             refresh_ttl_secs: config.refresh_ttl_secs,
             scope: config.github_scope,
             web,
+            pairing: config
+                .pairing_secret
+                .as_deref()
+                .map(|secret| PairingKeys::new(secret.as_bytes())),
             store,
         })
     }
@@ -456,9 +468,15 @@ impl Auth {
         Ok(())
     }
 
-    /// Statelessly verify a session token, returning its claims.
+    /// Statelessly verify a session token, returning its claims. A token whose
+    /// claims form neither closed principal is rejected here, whatever it was
+    /// signed with.
     pub fn verify(&self, token: &str) -> Result<Claims> {
-        Ok(self.jwt.verify(token)?)
+        let claims = self.jwt.verify(token)?;
+        if claims.principal().is_none() {
+            return Err(AuthError::BadPrincipal);
+        }
+        Ok(claims)
     }
 
     /// Issue a session and return it alongside the new refresh token's row id
@@ -473,7 +491,9 @@ impl Auth {
             sub: user.id.clone(),
             ns: format!("{SERVICE_NS_PREFIX}:{}", user.id),
             login: user.github_login.clone(),
-            gh_id: user.github_id,
+            gh_id: Some(user.github_id),
+            did: None,
+            dgen: None,
             iat: now,
             exp: now + self.jwt_ttl_secs,
             jti: Uuid::new_v4().simple().to_string(),

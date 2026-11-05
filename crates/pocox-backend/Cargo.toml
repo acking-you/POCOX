@@ -34,7 +34,7 @@ rustls-pemfile = { workspace = true }
 axum = { workspace = true, features = ["json", "query"] }
 tower-http = { workspace = true }
 hyper = { version = "1", features = ["server", "http1", "http2"] }
-hyper-util = { version = "0.1", features = ["server", "server-auto", "tokio", "service"] }
+hyper-util = { version = "0.1", features = ["server", "server-auto", "tokio", "service", "http1", "http2"] }
 figment = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -43,8 +43,18 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 time = { workspace = true }
+ipnet = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+tower = { version = "0.5", default-features = false, features = ["util"] }
 
 [dev-dependencies]
 async-trait = { workspace = true }
 jsonwebtoken = { workspace = true }
 reqwest = { workspace = true }
+pb-mapper = { workspace = true }
+pb-mapper-testkit = { workspace = true }
+tempfile = "3"
+sqlx = { workspace = true }
+base64 = { workspace = true }

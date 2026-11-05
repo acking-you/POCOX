@@ -45,7 +45,9 @@ fn mint(user: &str, login: &str, gh_id: i64) -> String {
         sub: user.to_string(),
         ns: format!("pcxu:{user}"),
         login: login.to_string(),
-        gh_id,
+        gh_id: Some(gh_id),
+        did: None,
+        dgen: None,
         iat: 0,
         exp: 9_999_999_999,
         jti: "test".to_string(),
@@ -70,6 +72,7 @@ async fn start_backend(relay: pocox_pb::RelaySession) -> String {
             jwt_ttl_secs: 3600,
             refresh_ttl_secs: 1000,
             web_callback_url: None,
+            pairing_secret: None,
         })
         .expect("auth"),
     );
@@ -77,6 +80,7 @@ async fn start_backend(relay: pocox_pb::RelaySession) -> String {
         auth,
         credentials: pocox_backend::Credentials::new(relay.clone()),
         relay,
+        pairing: None,
     });
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("http bind");
     let addr = listener.local_addr().expect("http addr");
@@ -131,7 +135,9 @@ async fn health_identity_and_auth_enforcement() {
             sub: "userB".to_string(),
             ns: "pcxu:userb".to_string(),
             login: "attacker".to_string(),
-            gh_id: 1,
+            gh_id: Some(1),
+            did: None,
+            dgen: None,
             iat: 0,
             exp: 9_999_999_999,
             jti: "forged".to_string(),
