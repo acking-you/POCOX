@@ -28,6 +28,21 @@
 //!   rotating the root or resetting the instance id — both inputs to the
 //!   derivation.
 //!
+//! # Namespaces
+//!
+//! A namespace decides which services a credential can see. Two shapes exist:
+//!
+//! ```text
+//!   issue_credential                   one key, its id is the namespace; every
+//!                                      device of an account holds the same key
+//!   allocate_namespace                 one namespace, a key per device; revoking
+//!   + issue_credential_in_namespace    one leaves the others where they are
+//! ```
+//!
+//! Check [`relay_supports_key_namespaces`] before starting anything that needs
+//! the second shape: an older relay refuses it, but only once a caller has
+//! already asked.
+//!
 //! # The one rule
 //!
 //! Only the administrator key may call anything here, and it must never leave
@@ -51,11 +66,27 @@ use crate::session::RelaySession;
 pub struct IssuedCredential {
     /// The `pbmt1_…` string the client presents to the relay.
     pub credential: String,
-    /// The relay's handle for this credential, for renew and revoke. Also the
-    /// namespace the credential is confined to.
+    /// The relay's handle for this credential, for renew and revoke.
     pub key_id: u64,
+    /// The namespace the credential is confined to: the one it was issued into,
+    /// or else the one its key id names.
+    pub namespace: u64,
     /// Unix seconds at which the relay stops accepting it.
     pub expires_at: u64,
+    /// The label it was issued with, if any.
+    pub label: Option<String>,
+}
+
+impl From<pb_mapper::IssuedKey> for IssuedCredential {
+    fn from(issued: pb_mapper::IssuedKey) -> Self {
+        Self {
+            credential: issued.credential,
+            key_id: issued.key_id,
+            namespace: issued.namespace,
+            expires_at: issued.expires_at,
+            label: issued.label,
+        }
+    }
 }
 
 /// Mint a temporary credential valid for `ttl`.
@@ -73,20 +104,82 @@ pub async fn issue_credential(
         .issue_key(ttl, label)
         .await
         .with_context(|| format!("issuing a temporary credential on {}", session.relay_addr))?;
-    Ok(IssuedCredential {
-        credential: issued.credential,
-        key_id: issued.key_id,
-        expires_at: issued.expires_at,
-    })
+    Ok(issued.into())
 }
 
-/// Extend an existing credential's life, keeping its key id.
+/// Whether this relay can allocate namespaces, issue credentials into them and
+/// keep each credential's namespace across a restart.
+pub async fn relay_supports_key_namespaces(session: &RelaySession) -> Result<bool> {
+    session
+        .admin()?
+        .supports_key_namespaces()
+        .await
+        .with_context(|| format!("reading the capabilities of {}", session.relay_addr))
+}
+
+/// The relay's instance id.
+///
+/// A reset out of a damaged snapshot changes it and starts key ids over, so a
+/// stored key id means nothing under a different instance: [`renew_credential`]
+/// and [`revoke_credential`] act on whichever key holds an id now. Compare this
+/// first.
+pub async fn relay_instance_id(session: &RelaySession) -> Result<String> {
+    let status = session
+        .admin()?
+        .auth_status()
+        .await
+        .with_context(|| format!("reading the instance id of {}", session.relay_addr))?;
+    Ok(status.server_instance_id)
+}
+
+/// Reserve a namespace that no credential owns, for
+/// [`issue_credential_in_namespace`].
+///
+/// The relay hands a number out once, ever, so it stays safe to store against a
+/// tenant after all of that tenant's credentials are gone. A caller that loses
+/// the response wastes the number and asks again.
+pub async fn allocate_namespace(session: &RelaySession) -> Result<u64> {
+    session
+        .admin()?
+        .allocate_namespace()
+        .await
+        .with_context(|| format!("allocating a namespace on {}", session.relay_addr))
+}
+
+/// Mint a temporary credential valid for `ttl` inside an allocated namespace.
+///
+/// Every credential in a namespace sees the same services, and each is renewed
+/// and revoked on its own. A number [`allocate_namespace`] did not return is
+/// refused, including another credential's own namespace. See
+/// [`issue_credential`] for `session` and `label`.
+pub async fn issue_credential_in_namespace(
+    session: &RelaySession,
+    namespace: u64,
+    ttl: Duration,
+    label: Option<String>,
+) -> Result<IssuedCredential> {
+    let issued = session
+        .admin()?
+        .issue_key_in_namespace(namespace, ttl, label)
+        .await
+        .with_context(|| {
+            format!("issuing a credential in namespace {namespace} on {}", session.relay_addr)
+        })?;
+    Ok(issued.into())
+}
+
+/// Set an existing credential's life to `ttl` from now, keeping its key id and
+/// its text.
+///
+/// `ttl` may be shorter than what remains: the credential then stops at the new
+/// deadline, restart included, and the relay's 10-second minimum applies.
+/// Renewing also recovers a credential text its holder lost.
 ///
 /// Preferred over issuing a replacement whenever the old credential is still
-/// alive: the key id IS the namespace, so a fresh credential would move the
-/// holder to a new namespace and orphan every service already registered under
-/// the old one. Fails once the credential is past renewal, at which point
-/// [`issue_credential`] is the only way back.
+/// alive: a credential issued by [`issue_credential`] has its key id as its
+/// namespace, so a fresh one would move the holder to a new namespace and
+/// orphan every service already registered under the old one. Fails once the
+/// credential is past renewal, at which point issuing is the only way back.
 pub async fn renew_credential(
     session: &RelaySession,
     key_id: u64,
@@ -97,18 +190,17 @@ pub async fn renew_credential(
         .renew_key(key_id, ttl)
         .await
         .with_context(|| format!("renewing credential {key_id} on {}", session.relay_addr))?;
-    Ok(IssuedCredential {
-        credential: renewed.credential,
-        key_id: renewed.key_id,
-        expires_at: renewed.expires_at,
-    })
+    Ok(renewed.into())
 }
 
 /// A credential the relay still holds, without its secret.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CredentialRecord {
-    /// The relay's handle for it — and the namespace it is confined to.
+    /// The relay's handle for it.
     pub key_id: u64,
+    /// The namespace it is confined to: the one it was issued into, or else the
+    /// one its key id names.
+    pub namespace: u64,
     /// The label it was issued with, if any.
     pub label: Option<String>,
     /// Unix seconds at which the relay stops accepting it.
@@ -131,6 +223,7 @@ pub async fn live_credentials(session: &RelaySession) -> Result<Vec<CredentialRe
         .filter(|key| key.state == "active")
         .map(|key| CredentialRecord {
             key_id: key.key_id,
+            namespace: key.namespace,
             label: key.label,
             expires_at: key.expires_at,
         })
