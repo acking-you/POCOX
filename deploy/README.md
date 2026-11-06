@@ -206,7 +206,7 @@ scratch device stays on the backend until it has gone 180 days unused.
 pb-mapper admin legacy-protocol set deny
 
 # Confirm:
-pb-mapper admin auth-status
+pb-mapper admin status    # legacy protocol: Deny; capabilities: key_namespaces
 ```
 
 Then open the API and relay ports:
