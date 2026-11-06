@@ -5,6 +5,9 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import android.util.Log
 import com.google.android.gms.auth.blockstore.Blockstore
 import com.google.android.gms.auth.blockstore.RetrieveBytesRequest
@@ -22,6 +25,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import org.json.JSONObject
 
@@ -43,6 +47,10 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
     private val context = context.applicationContext
     private val channel = MethodChannel(messenger, "pocox/device_store")
     private val io: ExecutorService = Executors.newSingleThreadExecutor()
+
+    // Block Store copies, in order and off the store's own queue: a slow Play
+    // services never holds up a read or write Rust waits on.
+    private val blockStore: ExecutorService = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
     init {
@@ -52,6 +60,7 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
     fun dispose() {
         channel.setMethodCallHandler(null)
         io.shutdown()
+        blockStore.shutdown()
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -82,7 +91,11 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
                     }
                     main.post { result.success(failure) }
                     if (failure == null) {
-                        saveToBlockStore(slot, value)
+                        try {
+                            blockStore.execute { saveToBlockStore(slot, value) }
+                        } catch (_: RejectedExecutionException) {
+                            // This engine is gone; the file is the record.
+                        }
                     }
                 }
             }
@@ -131,8 +144,22 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
             if (!pending.renameTo(recordFile(slot))) {
                 throw IOException("the device store could not be replaced")
             }
+            syncDirectory(dir)
         } finally {
             pending.delete()
+        }
+    }
+
+    /** Make the rename itself durable: the answer promises the record survives. */
+    private fun syncDirectory(dir: File) {
+        val fd = Os.open(dir.path, OsConstants.O_RDONLY, 0)
+        try {
+            Os.fsync(fd)
+        } catch (error: ErrnoException) {
+            // A filesystem that cannot sync a directory has nothing more to do.
+            if (error.errno != OsConstants.EINVAL) throw IOException(error)
+        } finally {
+            Os.close(fd)
         }
     }
 
@@ -156,7 +183,11 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
                 .setBytes(bytes)
                 .setShouldBackupToCloud(false)
                 .build()
-            Tasks.await(Blockstore.getClient(context).storeBytes(data), WAIT_SECONDS, TimeUnit.SECONDS)
+            Tasks.await(
+                Blockstore.getClient(context).storeBytes(data),
+                BLOCK_STORE_WAIT_SECONDS,
+                TimeUnit.SECONDS,
+            )
         } catch (error: Exception) {
             Log.w(TAG, "Block Store kept no copy: " + error.javaClass.simpleName)
         }
@@ -171,7 +202,7 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
             val request = RetrieveBytesRequest.Builder().setKeys(listOf(key)).build()
             val response = Tasks.await(
                 Blockstore.getClient(context).retrieveBytes(request),
-                WAIT_SECONDS,
+                BLOCK_STORE_WAIT_SECONDS,
                 TimeUnit.SECONDS,
             )
             val bytes = response.blockstoreDataMap[key]?.bytes ?: return null
@@ -206,7 +237,8 @@ class DeviceStoreChannel(context: Context, messenger: BinaryMessenger) :
     private companion object {
         const val TAG = "PocoxDeviceStore"
         const val KEY_PREFIX = "pocox-device-"
-        const val WAIT_SECONDS = 10L
+        // Well under the ten seconds Rust waits for any store answer.
+        const val BLOCK_STORE_WAIT_SECONDS = 3L
         // Block Store's limit per entry.
         const val BLOCK_STORE_LIMIT = 4096
         val SLOT = Regex("^[0-9a-f]{1,64}$")

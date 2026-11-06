@@ -59,6 +59,7 @@ String pairingErrorText(AppLocalizations l10n, Object error) {
     'device_unknown' => l10n.pairingUnknownTitle,
     'device_not_activated' => l10n.pairingErrNotActivated,
     'not_found' => l10n.pairingErrNotFound,
+    'operation_unknown' => l10n.pairingErrNotApplied,
     'restore_slots_full' => l10n.pairingErrSlotsFull,
     'signed_out' || 'no_device' => l10n.pairingErrNoDevice,
     _ => l10n.pairingErrUnreachable,

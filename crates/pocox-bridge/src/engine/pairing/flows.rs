@@ -230,9 +230,10 @@ pub async fn devices(identity: &Identity, cursor: Option<&str>) -> Result<Device
         .await
 }
 
-/// Rename a device in this group.
+/// Rename a device in this group. Renaming this device also refreshes its
+/// session, whose label is the name this installation shows for itself.
 pub async fn rename(identity: &Identity, device_id: &str, name: &str) -> Result<()> {
-    identity.require_record().await?;
+    let record = identity.require_record().await?;
     identity
         .call_empty("PATCH /v1/devices", |client, token| {
             client
@@ -242,7 +243,18 @@ pub async fn rename(identity: &Identity, device_id: &str, name: &str) -> Result<
                     name: name.to_string(),
                 })
         })
-        .await
+        .await?;
+    let is_self = record
+        .session
+        .as_ref()
+        .is_some_and(|mark| mark.device_id == device_id);
+    if is_self {
+        // The rename stands either way; the label follows at the next refresh.
+        if let Err(error) = identity.refresh_label().await {
+            tracing::debug!("this device's new name waits for the next refresh: {error:#}");
+        }
+    }
+    Ok(())
 }
 
 /// Answer the exact recovery request a member sees. Allowing changes nothing

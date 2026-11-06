@@ -17,7 +17,7 @@ breaking change goes.
   device, pauses or changes the code, answers recovery requests and switches back to
   GitHub. A `pocox://pair` link or QR code only ever opens a preview. iOS keeps the
   identity in the Keychain, so a reinstall resumes it, and Android in its no-backup
-  storage. "Use a device code instead" is now "GitHub device code".
+  storage; Android's side compiles in CI but has not yet been run on a device. "Use a device code instead" is now "GitHub device code".
 - **Sign in with a pairing code, from the CLI.** `pocox pair` shows this device's
   code and `pocox pair join` links another device with it, with no GitHub account.
   `pocox devices` lists and removes linked devices; `pocox pair restore` recovers a

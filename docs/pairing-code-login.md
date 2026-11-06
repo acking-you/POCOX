@@ -1,7 +1,8 @@
 # Pairing-code login
 
 **Status: relay support (stage 1), the backend (stage 2), the core, bridge and CLI
-(stage 3) and the app (stage 4) have shipped. Usage and deployment docs remain.** This
+(stage 3) and the app (stage 4) have shipped; the app's Android side is built in CI
+but has not yet been run on a device. Usage and deployment docs remain.** This
 page specifies the design for
 [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
 section becomes the rules a change must keep.
@@ -923,11 +924,16 @@ The existing `accountUseDeviceCode` label becomes "GitHub device code / GitHub
 under Other ways to sign in; Advanced's backend field applies to pairing too. The pages are `/pair/join`,
 `/pair/restore`, `/pair/scan` and `/pair/pending`, plus `/pair` for an installation on
 GitHub or a self-hosted relay, reached from Settings › Account. A code travels to them
-in memory, never in a route. While this installation is a pairing device, the app reads
-its group every minute it is in front: a device that joined or asks to be restored is
-offered for review, and a removal or a replaced identity returns to sign-in, where the
-banner says what happened. The config view names the account's provider, so a pairing
-device never shows a GitHub avatar for an id that is not GitHub's.
+in memory, never in a route; each page opened from sign-in carries its backend. While
+this installation is a pairing device, the app reads its group every minute it is in
+front: a device that joined or asks to be restored since the user was last told,
+whether or not the app was running, is offered for review once, and the record starts
+over silently under another account. A removal or a replaced identity returns to
+sign-in, where the banner says what happened; a change still under way is offered for
+review, and one that did not happen says why once. The config view names the account's
+provider, so a pairing device never shows a GitHub avatar or "@" for an id that is not
+GitHub's. A pairing route that a backend answers with 404 or 405 means that backend
+cannot pair, which shows as unavailable rather than offline.
 
 | Platform | Device store | Hint | Links and QR |
 | --- | --- | --- | --- |
@@ -992,7 +998,7 @@ feature, alter configuration, or warrant a release-note claim that pairing works
 | 1 (shipped in [pb-mapper#52](https://github.com/acking-you/pb-mapper/pull/52)) | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
 | 2 | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
 | 3 (shipped) | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
-| 4 (shipped) | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
+| 4 (shipped except Android acceptance) | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
 | 5 | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. |
 
 The central acceptance scenarios are:

@@ -1826,5 +1826,8 @@
   "pairingErrNotFound": "没有找到可以请求的已关联设备，请改用其中一台的匹配码。",
   "pairingErrSlotsFull": "那台设备已有待处理的请求，请改用匹配码。",
   "pairingErrNoDevice": "这台设备在这里还没有匹配身份。",
+  "pairingErrDeviceGone": "那台设备已不在这个组里。",
+  "pairingErrName": "名称太长，或含有不能用于名称的字符。",
+  "pairingErrNotApplied": "这项更改没有生效，什么都没变。",
   "pairingErrUnreachable": "连不上服务器，已输入的内容会保留。"
 }

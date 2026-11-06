@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/widgets.dart' show Widget;
 import 'package:go_router/go_router.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/pairing/pairing_host.dart';
@@ -69,7 +70,8 @@ void openSettingsFromTray() {
 
 /// Push [location] from outside a page's own context (the agent tools'
 /// app-wide prompts open shares this way). A no-op before the router exists.
-void pushRoute(String location) => _appRouter?.push(location);
+void pushRoute(String location, {Object? extra}) =>
+    _appRouter?.push(location, extra: extra);
 
 /// Go to [location] from outside a page's own context, replacing the stack: a
 /// removed pairing device returns to sign-in this way. A no-op before the
@@ -103,23 +105,15 @@ GoRouter buildRouter({
       path: '/pair',
       builder: (c, s) => const PairingStartPage(),
       routes: [
-        GoRoute(
-          path: 'join',
-          builder: (c, s) => PairingJoinScreen(code: s.extra as String?),
-        ),
+        GoRoute(path: 'join', builder: (c, s) => pairingJoinPage(s.extra)),
         GoRoute(
           path: 'restore',
-          builder: (c, s) =>
-              PairingRestoreScreen(retake: s.extra as bool? ?? false),
+          builder: (c, s) => pairingRestorePage(s.extra),
         ),
         GoRoute(path: 'scan', builder: (c, s) => const PairingScanScreen()),
         GoRoute(
           path: 'pending',
-          builder: (c, s) {
-            final (operation, backend) =
-                s.extra as (PairingOperation?, String?)? ?? (null, null);
-            return PairingPendingPage(operation: operation, backend: backend);
-          },
+          builder: (c, s) => pairingPendingPage(s.extra),
         ),
       ],
     ),
@@ -200,3 +194,33 @@ GoRouter buildRouter({
     ),
   ],
 );
+
+/// `/pair/join` from its extra: `(code, backend)`, or a bare code. The code
+/// rides in memory, never in the location.
+Widget pairingJoinPage(Object? extra) {
+  final (code, backend) = switch (extra) {
+    (String? code, String? backend) => (code, backend),
+    String code => (code, null),
+    _ => (null, null),
+  };
+  return PairingJoinScreen(code: code, backend: backend);
+}
+
+/// `/pair/restore` from its extra: `(retake, backend)`, or a bare retake.
+Widget pairingRestorePage(Object? extra) {
+  final (retake, backend) = switch (extra) {
+    (bool retake, String? backend) => (retake, backend),
+    bool retake => (retake, null),
+    _ => (false, null),
+  };
+  return PairingRestoreScreen(retake: retake, backend: backend);
+}
+
+/// `/pair/pending` from its extra: `(operation, backend)`.
+Widget pairingPendingPage(Object? extra) {
+  final (operation, backend) = switch (extra) {
+    (PairingOperation? operation, String? backend) => (operation, backend),
+    _ => (null, null),
+  };
+  return PairingPendingPage(operation: operation, backend: backend);
+}

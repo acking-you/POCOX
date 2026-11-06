@@ -12,6 +12,8 @@ and writes them to $GITHUB_OUTPUT:
   test_crates    space-separated: changed crates + their workspace dependents
   clippy_crates  space-separated: the directly-changed crates
   flutter        true | false
+  android        true | false: the app's Android build (native code, Gradle,
+                 plugin set, or the bridge compiled into the APK) is affected
 
 `run-clippy` / `run-test` consume MODE + CRATES and invoke cargo for the
 affected crates (or the whole workspace for `all`); `none` skips cargo.
@@ -51,6 +53,12 @@ CI_INFRA_PREFIX = (".github/", "scripts/")
 
 # The Flutter app lives outside the cargo workspace.
 FLUTTER_PREFIX = ("apps/flutter/",)
+
+# The app's Android build: its native code and Gradle files and its plugin set.
+# The bridge it compiles in is decided from the crate graph.
+ANDROID_PREFIX = ("apps/flutter/android/",)
+ANDROID_EXACT = {"apps/flutter/pubspec.yaml", "apps/flutter/pubspec.lock"}
+BRIDGE_CRATE = "pocox_bridge"
 
 
 def run(cmd, **kw):
@@ -130,14 +138,16 @@ def dependents_closure(seeds, deps):
     return affected
 
 
-def emit(rust_mode, test_crates, clippy_crates, flutter):
+def emit(rust_mode, test_crates, clippy_crates, flutter, android):
     test_s = " ".join(sorted(test_crates))
     clippy_s = " ".join(sorted(clippy_crates))
     flutter_s = "true" if flutter else "false"
+    android_s = "true" if android else "false"
     print(f"[detect] rust_mode={rust_mode}")
     print(f"[detect] test_crates=[{test_s}]")
     print(f"[detect] clippy_crates=[{clippy_s}]")
     print(f"[detect] flutter={flutter_s}")
+    print(f"[detect] android={android_s}")
     gh_out = os.environ.get("GITHUB_OUTPUT")
     if gh_out:
         with open(gh_out, "a") as fh:
@@ -146,6 +156,7 @@ def emit(rust_mode, test_crates, clippy_crates, flutter):
                 f"test_crates={test_s}\n"
                 f"clippy_crates={clippy_s}\n"
                 f"flutter={flutter_s}\n"
+                f"android={android_s}\n"
             )
 
 
@@ -155,20 +166,23 @@ def detect():
     files = changed_files(base, head)
     if files is None:
         print("[detect] base/head unresolved; running everything.")
-        return emit("all", [], [], True)
+        return emit("all", [], [], True, True)
     if not files:
-        return emit("none", [], [], False)
+        return emit("none", [], [], False, False)
 
     flutter = any(f.startswith(p) for f in files for p in FLUTTER_PREFIX)
+    android = any(
+        f in ANDROID_EXACT or f.startswith(ANDROID_PREFIX) for f in files
+    )
     ci_infra = [f for f in files if any(f.startswith(p) for p in CI_INFRA_PREFIX)]
     if ci_infra:
         print(f"[detect] CI infra change(s): {sorted(ci_infra)[:5]} -> run everything.")
-        return emit("all", [], [], True)
+        return emit("all", [], [], True, True)
 
     rust_cross = [f for f in files if is_rust_cross_cutting(f)]
     if rust_cross:
         print(f"[detect] rust cross-cutting: {sorted(rust_cross)[:5]} -> full workspace.")
-        return emit("all", [], [], flutter)
+        return emit("all", [], [], flutter, True)
 
     dir2name, deps = workspace_graph()
     seeds = {c for c in (owning_crate(f, dir2name) for f in files) if c}
@@ -179,7 +193,8 @@ def detect():
         rust_mode = "subset"
         test_crates = dependents_closure(seeds, deps)
         clippy_crates = seeds
-    return emit(rust_mode, test_crates, clippy_crates, flutter)
+        android = android or BRIDGE_CRATE in test_crates
+    return emit(rust_mode, test_crates, clippy_crates, flutter, android)
 
 
 def sh(cmd):

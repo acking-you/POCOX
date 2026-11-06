@@ -5906,6 +5906,17 @@ class AppLocalizationsEn extends AppLocalizations {
       'This device has no pairing identity here yet.';
 
   @override
+  String get pairingErrDeviceGone => 'That device is no longer in this group.';
+
+  @override
+  String get pairingErrName =>
+      'That name is too long or has characters a name cannot have.';
+
+  @override
+  String get pairingErrNotApplied =>
+      'That change did not go through. Nothing changed.';
+
+  @override
   String get pairingErrUnreachable =>
       'Cannot reach the server. Your entry is kept.';
 }

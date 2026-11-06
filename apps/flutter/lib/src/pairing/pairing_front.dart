@@ -32,7 +32,7 @@ class PairingFront extends ConsumerStatefulWidget {
     this.backend,
     this.otherWays = const [],
     this.advanced,
-    this.otherWaysEnabled = true,
+    this.enabled = true,
   });
 
   /// The backend the sign-in page's Advanced field names.
@@ -44,8 +44,9 @@ class PairingFront extends ConsumerStatefulWidget {
   /// The self-hosted settings under Advanced.
   final WidgetBuilder? advanced;
 
-  /// Whether Other ways can open: not while a sign-in is under way.
-  final bool otherWaysEnabled;
+  /// Whether its actions can act now: not while another sign-in on the page
+  /// is under way, which would otherwise race this one.
+  final bool enabled;
 
   @override
   ConsumerState<PairingFront> createState() => _PairingFrontState();
@@ -64,6 +65,9 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   bool _busy = false;
   Timer? _poll;
 
+  /// Which [_load] may still write: a backend change starts another.
+  int _generation = 0;
+
   @override
   void initState() {
     super.initState();
@@ -76,7 +80,18 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   @override
   void didUpdateWidget(PairingFront old) {
     super.didUpdateWidget(old);
-    if (old.backend != widget.backend) unawaited(_load());
+    if (old.backend == widget.backend) return;
+    // Another backend is another identity: nothing of this one may act.
+    setState(() {
+      _code = null;
+      _status = null;
+      _session = null;
+      _others = const [];
+      _offline = false;
+      _unavailable = null;
+      _loading = true;
+    });
+    unawaited(_load());
   }
 
   @override
@@ -94,36 +109,42 @@ class _PairingFrontState extends ConsumerState<PairingFront>
 
   BridgeApi get _api => ref.read(bridgeApiProvider);
 
-  /// Read where this device stands and prepare its code. Offline keeps the
-  /// page usable; the next poll asks again.
+  /// Read where this device stands and prepare its code, on every poll and
+  /// resume too, so a removal or a replaced identity shows here. Offline
+  /// keeps the page usable; the next poll asks again. Only the latest call
+  /// writes.
   Future<void> _load() async {
+    final generation = ++_generation;
+    bool stale() => !mounted || generation != _generation;
     final api = _api;
     final backend = widget.backend;
     await settleQuietly(api, backend: backend);
+    if (stale()) return;
     try {
       final status = await api.pairingStatus(backend: backend);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(() {
         _status = status;
         _session = status.session;
         _offline = false;
         _unavailable = null;
       });
+      explainFailedOperations(context, status.failed);
       if (const {'superseded', 'unknown', 'pending'}.contains(status.state)) {
         return;
       }
       final prepared = await api.pairingPrepare(backend: backend);
-      if (!mounted) return;
+      if (stale()) return;
       setState(() {
         _code = prepared.code;
         _session = prepared.session;
       });
-      await _refreshGroup();
+      await _refreshGroup(generation);
     } catch (error) {
-      if (!mounted) return;
+      if (stale()) return;
       setState(() => _noteFailure(error));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (!stale()) setState(() => _loading = false);
     }
   }
 
@@ -134,26 +155,23 @@ class _PairingFrontState extends ConsumerState<PairingFront>
           'relay_capacity',
           'pairing_disabled',
           'pairing_client_upgrade_required',
+          'rate_limited',
         }.contains(error.code)) {
+      // Each says what is wrong, or how long to wait, better than Offline.
       _unavailable = pairingErrorText(l10n, error);
+      _offline = false;
     } else {
       _offline = true;
     }
   }
 
-  void _refresh() {
-    if (_code == null || _offline || _unavailable != null) {
-      unawaited(_load());
-    } else {
-      unawaited(_refreshGroup());
-    }
-  }
+  void _refresh() => unawaited(_load());
 
   /// Who has linked into this device while its first screen was open.
-  Future<void> _refreshGroup() async {
+  Future<void> _refreshGroup(int generation) async {
     try {
       final page = await _api.pairingDevices(backend: widget.backend);
-      if (!mounted) return;
+      if (!mounted || generation != _generation) return;
       setState(
         () => _others = [
           for (final device in page.devices)
@@ -177,7 +195,22 @@ class _PairingFrontState extends ConsumerState<PairingFront>
       showToastOk(context, l10n.pairingReady);
       await landAfterSignIn(context, ref);
     } catch (error) {
-      if (mounted) showToastError(context, pairingErrorText(l10n, error));
+      if (!mounted) return;
+      if (followTransitionPending(context, error, backend: widget.backend)) {
+        return;
+      }
+      showToastError(context, pairingErrorText(l10n, error));
+      // A refusal about this identity changes what the page should offer.
+      if (error is PairingFailure &&
+          const {
+            'device_superseded',
+            'device_unknown',
+            'grace_restricted',
+            'transition_pending',
+            'signed_out',
+          }.contains(error.code)) {
+        await _load();
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -192,7 +225,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
       await _api.pairingStartOver(backend: widget.backend);
       if (!mounted) return;
       if (takeBack) {
-        context.push('/pair/restore', extra: true);
+        context.push('/pair/restore', extra: (true, widget.backend));
       }
       await _load();
     } catch (error) {
@@ -213,7 +246,26 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   }
 
   void _openJoin([String? code]) {
-    context.push('/pair/join', extra: code ?? _entry.text);
+    context.push('/pair/join', extra: (code ?? _entry.text, widget.backend));
+  }
+
+  /// Whether this device may recover another identity: only one read in full
+  /// that has nothing to lose, not set up, alone and not removed.
+  bool get _restorable {
+    final status = _status;
+    final session = _session;
+    return status != null &&
+        session != null &&
+        !const {
+          'superseded',
+          'unknown',
+          'pending',
+          'removed',
+        }.contains(status.state) &&
+        !session.activated &&
+        _others.isEmpty &&
+        !_offline &&
+        _unavailable == null;
   }
 
   @override
@@ -225,7 +277,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
     final activated = _session?.activated ?? false;
     final removed = state == 'removed';
     final joined = _others.isNotEmpty;
-    final restorable = !activated && !joined && !removed;
+    final idle = widget.enabled && !_busy;
     final children = <Widget>[];
 
     if (state == 'superseded' || state == 'unknown') {
@@ -251,7 +303,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
         if (state == 'superseded') ...[
           FilledButton(
             key: const Key('pairing-take-back'),
-            onPressed: _busy ? null : () => _startOver(takeBack: true),
+            onPressed: idle ? () => _startOver(takeBack: true) : null,
             style: pairingCta,
             child: Text(l10n.pairingTakeBack),
           ),
@@ -259,7 +311,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
         ],
         OutlinedButton(
           key: const Key('pairing-start-over'),
-          onPressed: _busy ? null : () => _startOver(takeBack: false),
+          onPressed: idle ? () => _startOver(takeBack: false) : null,
           style: pairingCta,
           child: Text(l10n.pairingStartOver),
         ),
@@ -313,7 +365,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
               tone: successColor(scheme),
             )
           : null;
-      final ready = _code != null && !_busy;
+      final ready = _code != null && idle;
       if (isDesktop) {
         children.addAll([
           PairingCodeCard(
@@ -332,7 +384,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
           const SizedBox(height: 10),
           OutlinedButton(
             key: const Key('pairing-enter-code'),
-            onPressed: _busy ? null : () => _openJoin(''),
+            onPressed: idle ? () => _openJoin('') : null,
             style: pairingCta,
             child: Text(l10n.pairingEnterOther),
           ),
@@ -351,15 +403,16 @@ class _PairingFrontState extends ConsumerState<PairingFront>
         children.addAll([
           PairingCodeField(
             controller: _entry,
+            enabled: idle,
             onScan: nativeDeviceStore ? _scan : null,
             onSubmitted: (_) {
-              if (pairingCodeComplete(_entry.text)) _openJoin();
+              if (idle && pairingCodeComplete(_entry.text)) _openJoin();
             },
           ),
           const SizedBox(height: 12),
           FilledButton(
             key: const Key('pairing-next'),
-            onPressed: pairingCodeComplete(_entry.text) && !_busy
+            onPressed: pairingCodeComplete(_entry.text) && idle
                 ? _openJoin
                 : null,
             style: pairingCta,
@@ -376,10 +429,10 @@ class _PairingFrontState extends ConsumerState<PairingFront>
                   : l10n.pairingFirstDevice,
             ),
           ),
-          if (!activated && !joined && _unavailable != null) ...[
+          if (!activated && !joined && placeholder != null) ...[
             const SizedBox(height: 8),
             Text(
-              _unavailable!,
+              placeholder,
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
@@ -393,16 +446,18 @@ class _PairingFrontState extends ConsumerState<PairingFront>
       children.addAll(const [SizedBox(height: 12), PairingSpinner()]);
     }
     final ways = [
-      // Only a device with nothing to lose recovers another identity.
-      if (state != 'superseded' &&
-          state != 'unknown' &&
-          state != 'pending' &&
-          restorable)
+      if (_restorable)
         PairingOtherWay(
           key: const Key('pairing-restore'),
           icon: AppIcons.history,
           label: l10n.pairingRestore,
-          onSelected: () => context.push('/pair/restore'),
+          // Read again on the tap: the panel may have stayed open while
+          // another device linked into this one.
+          onSelected: () {
+            if (_restorable) {
+              context.push('/pair/restore', extra: (false, widget.backend));
+            }
+          },
         ),
       ...widget.otherWays,
     ];
@@ -410,7 +465,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
       children.addAll([
         const SizedBox(height: 6),
         PairingOtherWaysButton(
-          enabled: widget.otherWaysEnabled && !_busy,
+          enabled: idle,
           advanced: widget.advanced,
           ways: ways,
         ),

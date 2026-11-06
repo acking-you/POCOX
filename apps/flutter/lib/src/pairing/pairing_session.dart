@@ -15,11 +15,6 @@ import 'package:pocox/src/widgets/app_toast.dart';
 /// navigation log.
 final pairingInvitationProvider = StateProvider<String?>((ref) => null);
 
-/// The backend the sign-in page's Advanced field names, so every pairing page
-/// opened from it works on that backend's identity. Null means the configured
-/// one.
-final pairingBackendProvider = StateProvider<String?>((ref) => null);
-
 /// Land a user who just signed in, by any route: re-read what the sign-in
 /// changed, then the welcome guide the first time and the app every later
 /// time. Waits briefly for the preferences file, degrading to "not seen".
@@ -84,5 +79,48 @@ Future<void> settleQuietly(BridgeApi api, {String? backend}) async {
     await api.pairingSettle(backend: backend);
   } catch (_) {
     // The reading that follows reports what matters.
+  }
+}
+
+/// A refusal because another change of this device is still under way: wait
+/// for that one on its own page instead of saying "try again". True when
+/// [error] was one and the page opened.
+bool followTransitionPending(
+  BuildContext context,
+  Object error, {
+  String? backend,
+}) {
+  if (error is! PairingFailure || error.code != 'transition_pending') {
+    return false;
+  }
+  final id = error.operationId;
+  if (id == null) return false;
+  context.go(
+    '/pair/pending',
+    extra: (PairingOperation(id: id, kind: '', status: 'pending'), backend),
+  );
+  return true;
+}
+
+/// The failed changes already explained in this run, so each is told once.
+final _explainedFailures = <String>{};
+
+/// Say why each of [failed] did not happen, once per change per run: a
+/// change whose answer came while no page waited for it would otherwise go
+/// unexplained.
+void explainFailedOperations(
+  BuildContext context,
+  List<PairingOperation> failed,
+) {
+  final l10n = AppLocalizations.of(context);
+  for (final operation in failed) {
+    if (!_explainedFailures.add(operation.id)) continue;
+    showToastError(
+      context,
+      pairingErrorText(
+        l10n,
+        PairingFailure(code: operation.error ?? 'failed', message: ''),
+      ),
+    );
   }
 }

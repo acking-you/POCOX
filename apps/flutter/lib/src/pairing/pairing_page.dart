@@ -23,6 +23,7 @@ class PairingPageFrame extends StatelessWidget {
     this.onBack,
     this.logo = false,
     this.footer,
+    this.busy = false,
   });
 
   /// The title bar's title.
@@ -40,6 +41,10 @@ class PairingPageFrame extends StatelessWidget {
   /// Actions kept at the bottom on a phone.
   final List<Widget>? footer;
 
+  /// A change is being sent: going back now would drop its outcome, so
+  /// neither the back button nor the system's back leaves.
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
     void back() {
@@ -53,12 +58,20 @@ class PairingPageFrame extends StatelessWidget {
     }
 
     final footer = this.footer;
+    return PopScope(canPop: !busy, child: _scaffold(context, back, footer));
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    VoidCallback back,
+    List<Widget>? footer,
+  ) {
     return Scaffold(
       appBar: WindowTitleBar(
         leading: IconButton(
           key: const Key('pairing-back'),
           tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-          onPressed: back,
+          onPressed: busy ? null : back,
           icon: const Icon(AppIcons.arrow_back),
         ),
         automaticallyImplyLeading: false,
@@ -255,7 +268,7 @@ class _PairingPendingState extends ConsumerState<PairingPendingPage> {
     };
     return PairingPageFrame(
       title: l10n.pairingPendingTitle,
-      onBack: () => context.go('/'),
+      onBack: _land,
       logo: true,
       children: [
         PairingHeading(title, center: true),

@@ -13,8 +13,12 @@ mixin _FakePairing on _FakeBridgeState {
   /// This device's group.
   List<PairingDevice> pairingGroup = const [];
 
-  /// What the next call throws, once.
+  /// What the next call throws, once: the next [pairingRefusalOn] call when
+  /// that names one (`status`, `devices`, `link`), else any call.
   PairingFailure? pairingRefusal;
+
+  /// The call [pairingRefusal] waits for; null refuses whichever comes next.
+  String? pairingRefusalOn;
 
   /// The login of a set-aside GitHub session.
   String? pairingParkedGithub;
@@ -54,10 +58,13 @@ mixin _FakePairing on _FakeBridgeState {
   /// Refusals for the next previews, one each.
   final List<PairingFailure> pairingPreviewRefusals = [];
 
-  void _pairingRefuse() {
+  void _pairingRefuse([String? call]) {
     final refusal = pairingRefusal;
+    if (refusal == null) return;
+    if (pairingRefusalOn != null && pairingRefusalOn != call) return;
     pairingRefusal = null;
-    if (refusal != null) throw refusal;
+    pairingRefusalOn = null;
+    throw refusal;
   }
 
   PairingSession get _pairingSession => PairingSession(
@@ -90,7 +97,7 @@ mixin _FakePairing on _FakeBridgeState {
 
   @override
   Future<PairingStatus> pairingStatus({String? backend}) async {
-    _pairingRefuse();
+    _pairingRefuse('status');
     return PairingStatus(
       state: pairingState,
       backend: backend ?? 'https://backend.example',
@@ -174,7 +181,7 @@ mixin _FakePairing on _FakeBridgeState {
     NativeHardwareHint? hint,
     String? backend,
   }) async {
-    _pairingRefuse();
+    _pairingRefuse('link');
     pairingLastLeaveCurrent = leaveCurrent;
     final done = _pairingDone('link');
     if (done.status == 'completed') {
@@ -201,7 +208,7 @@ mixin _FakePairing on _FakeBridgeState {
     String? cursor,
     String? backend,
   }) async {
-    _pairingRefuse();
+    _pairingRefuse('devices');
     return PairingDevices(devices: pairingGroup, pendingRequests: pairingAsks);
   }
 

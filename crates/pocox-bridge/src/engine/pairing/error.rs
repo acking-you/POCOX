@@ -26,6 +26,18 @@ impl PairingError {
         (400..500).contains(&self.status) && self.code != PairingErrorCode::Unknown
     }
 
+    /// A backend from before pairing, which has no pairing routes: it cannot
+    /// pair here, which is not the same as being unreachable.
+    pub(super) fn without_pairing(status: u16) -> Self {
+        Self {
+            code: PairingErrorCode::PairingDisabled,
+            status,
+            retry_after: None,
+            operation_id: None,
+            grace_deadline: None,
+        }
+    }
+
     /// The error a refusal's body describes.
     pub(super) fn from_body(
         status: u16,

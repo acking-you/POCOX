@@ -2155,5 +2155,8 @@
   "pairingErrNotFound": "No linked device was found to ask. Use a code from one of them instead.",
   "pairingErrSlotsFull": "That device already has requests waiting. Use a code instead.",
   "pairingErrNoDevice": "This device has no pairing identity here yet.",
+  "pairingErrDeviceGone": "That device is no longer in this group.",
+  "pairingErrName": "That name is too long or has characters a name cannot have.",
+  "pairingErrNotApplied": "That change did not go through. Nothing changed.",
   "pairingErrUnreachable": "Cannot reach the server. Your entry is kept."
 }

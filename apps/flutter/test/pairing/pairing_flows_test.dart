@@ -13,9 +13,6 @@ import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/pairing/pairing_account.dart';
 import 'package:pocox/src/pairing/pairing_front.dart';
 import 'package:pocox/src/pairing/pairing_host.dart';
-import 'package:pocox/src/pairing/pairing_join_screen.dart';
-import 'package:pocox/src/pairing/pairing_page.dart';
-import 'package:pocox/src/pairing/pairing_restore_screen.dart';
 import 'package:pocox/src/pairing/pairing_session.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/router.dart';
@@ -34,6 +31,37 @@ class _SeenPrefs extends UiPrefsStore {
   Future<void> save(UiPrefs prefs) async {}
 }
 
+/// Preferences kept in memory, readable after the app saved them.
+class _StoredPrefs extends UiPrefsStore {
+  _StoredPrefs(this.saved);
+
+  UiPrefs saved;
+
+  @override
+  Future<UiPrefs> load() async => saved;
+
+  @override
+  Future<void> save(UiPrefs prefs) async => saved = prefs;
+}
+
+ConfigInfo _pairingConfig(String account) => ConfigInfo(
+  relay: '',
+  hasKey: false,
+  mode: 'account',
+  accountProvider: 'device_code',
+  accountId: account,
+);
+
+PairingDevice _device(String id, String name, {bool self = false}) =>
+    PairingDevice(
+      id: id,
+      name: name,
+      joinedAt: 0,
+      lastActiveDay: 0,
+      activated: true,
+      isSelf: self,
+    );
+
 const _unconfigured = ConfigInfo(relay: '', hasKey: false);
 
 List<GoRoute> _routes() => [
@@ -41,21 +69,14 @@ List<GoRoute> _routes() => [
     path: '/onboarding',
     builder: (_, _) => const AccountOnboardingScreen(),
   ),
-  GoRoute(
-    path: '/pair/join',
-    builder: (_, s) => PairingJoinScreen(code: s.extra as String?),
-  ),
+  GoRoute(path: '/pair/join', builder: (_, s) => pairingJoinPage(s.extra)),
   GoRoute(
     path: '/pair/restore',
-    builder: (_, s) => PairingRestoreScreen(retake: s.extra as bool? ?? false),
+    builder: (_, s) => pairingRestorePage(s.extra),
   ),
   GoRoute(
     path: '/pair/pending',
-    builder: (_, s) {
-      final (operation, backend) =
-          s.extra as (PairingOperation?, String?)? ?? (null, null);
-      return PairingPendingPage(operation: operation, backend: backend);
-    },
+    builder: (_, s) => pairingPendingPage(s.extra),
   ),
   stub('/', 'HOME-ROUTE'),
   stub('/welcome', 'WELCOME-ROUTE'),
@@ -296,10 +317,12 @@ void main() {
     final api = FakeBridgeApi(config: _unconfigured);
     await _mount(t, api, initial: '/pair/join', extra: 'K7M2-F9QX-3RTB');
 
-    api.pairingRefusal = const PairingFailure(
-      code: 'preview_stale',
-      message: '',
-    );
+    api
+      ..pairingRefusal = const PairingFailure(
+        code: 'preview_stale',
+        message: '',
+      )
+      ..pairingRefusalOn = 'link';
     await _tapKey(t, 'pairing-link');
     expect(api.pairingCalls, ['preview', 'preview'], reason: 'never linked');
     expect(find.byKey(const Key('pairing-link')), findsOneWidget);
@@ -423,7 +446,8 @@ void main() {
           ..pairingRefusal = const PairingFailure(
             code: 'device_superseded',
             message: '',
-          );
+          )
+          ..pairingRefusalOn = 'devices';
     final router = GoRouter(
       initialLocation: '/',
       routes: [stub('/', 'HOME-ROUTE'), stub('/onboarding', 'SIGN-IN')],
@@ -449,15 +473,99 @@ void main() {
     // Signed in again, then replaced again.
     router.go('/');
     await t.pumpAndSettle();
-    api.pairingRefusal = const PairingFailure(
-      code: 'device_superseded',
-      message: '',
-    );
+    api
+      ..pairingRefusal = const PairingFailure(
+        code: 'device_superseded',
+        message: '',
+      )
+      ..pairingRefusalOn = 'devices';
     await t.pump(pairingPollInterval);
     await t.pumpAndSettle();
     expect(find.text('SIGN-IN'), findsOneWidget);
 
     await t.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('news of the group is told per account, including what came '
+      'while the app was closed', (t) async {
+    final prefs = _StoredPrefs(
+      const UiPrefs(
+        pairingSeen: PairingSeen(accountId: 'user-1', devices: ['d-pixel']),
+      ),
+    );
+    final api = FakeBridgeApi(config: _pairingConfig('user-1'))
+      ..pairingState = 'active'
+      ..pairingGroup = [
+        _device('device-self', 'This Mac', self: true),
+        _device('d-pixel', 'Pixel'),
+        _device('d-ipad', 'iPad'),
+      ];
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [
+        stub('/', 'HOME-ROUTE'),
+        stub('/onboarding', 'SIGN-IN'),
+        stub('/settings/account', 'ACCOUNT'),
+      ],
+    );
+    debugSetAppRouterForTesting(router);
+    addTearDown(debugSetAppRouterForTesting);
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [
+          bridgeApiProvider.overrideWithValue(api),
+          uiPrefsProvider.overrideWith(() => prefs),
+        ],
+        child: MaterialApp.router(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+          builder: (_, child) => PairingHost(child: child!),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    // Joined while the app was closed: told now. Already told: not again.
+    expect(find.textContaining('iPad'), findsOneWidget);
+    expect(find.textContaining('Pixel'), findsNothing);
+
+    // Linked into another group: its members are no intruders.
+    final container = ProviderScope.containerOf(
+      t.element(find.byType(Scaffold)),
+    );
+    ScaffoldMessenger.of(t.element(find.byType(Scaffold))).clearSnackBars();
+    api
+      ..config = _pairingConfig('user-2')
+      ..pairingGroup = [
+        _device('device-self', 'This Mac', self: true),
+        _device('d-laptop', 'Laptop'),
+      ];
+    container.invalidate(configProvider);
+    await t.pump(pairingPollInterval);
+    await t.pumpAndSettle();
+    expect(find.textContaining('Laptop'), findsNothing);
+    expect(prefs.saved.pairingSeen?.accountId, 'user-2');
+
+    await t.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('the first screen shows a replaced identity at its next read', (
+    t,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      final api = FakeBridgeApi(config: _unconfigured);
+      await _mount(t, api);
+      expect(find.byKey(const Key('pairing-get-started')), findsOneWidget);
+
+      api.pairingState = 'superseded';
+      await t.pump(pairingPollInterval);
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('pairing-superseded')), findsOneWidget);
+      expect(find.byKey(const Key('pairing-get-started')), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('a member answers the exact request and manages its group', (

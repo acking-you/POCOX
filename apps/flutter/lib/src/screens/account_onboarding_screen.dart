@@ -79,6 +79,9 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
         url: start.authorizeUrl,
         callbackUrlScheme: cb.callbackScheme,
       );
+      // A page gone meanwhile (the user signed in another way) must not let
+      // a late browser hand-off replace that account.
+      if (!mounted) return;
       final params = Uri.parse(result).queryParameters;
       final err = params['error'];
       final code = params['exchange_code'];
@@ -267,7 +270,6 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       final typed = _backend.text.trim();
       final backend = typed.isEmpty ? null : typed;
       if (backend == _pairingBackend) return;
-      ref.read(pairingBackendProvider.notifier).state = backend;
       setState(() => _pairingBackend = backend);
     });
   }
@@ -455,10 +457,12 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                   // Pairing leads: no account needed. GitHub's sign-ins and
                   // the self-hosted path wait under Other ways.
                   PairingFront(
+                    // Kept across an error line appearing above it.
+                    key: const ValueKey('pairing-front'),
                     backend: _pairingBackend,
                     otherWays: _gitHubWays(l10n),
                     advanced: _advancedSettings,
-                    otherWaysEnabled: !_busy,
+                    enabled: !_busy,
                   ),
                   if (_busy) ...const [SizedBox(height: 12), _Spinner()],
                 ] else ...[
@@ -503,7 +507,15 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  // Waiting on GitHub: only the self-hosted way out remains.
+                  // Back to the page, pairing included; a poll in flight
+                  // answers first, since it may already have signed in.
+                  TextButton(
+                    key: const Key('account-device-cancel'),
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() => _device = null),
+                    child: Text(l10n.cancel),
+                  ),
                   PairingOtherWaysButton(
                     ways: const [],
                     advanced: _advancedSettings,

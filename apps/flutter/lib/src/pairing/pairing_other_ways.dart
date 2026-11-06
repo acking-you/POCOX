@@ -32,8 +32,9 @@ class PairingOtherWay {
 }
 
 /// Sign-in's last, quiet action: opens [ways] in a sheet on a phone and a
-/// dialog on a computer, with [advanced] folded into its last row.
-class PairingOtherWaysButton extends StatelessWidget {
+/// dialog on a computer, with [advanced] folded into its last row. An open
+/// panel follows the page: rows the page stops offering leave it.
+class PairingOtherWaysButton extends StatefulWidget {
   /// Creates the button.
   const PairingOtherWaysButton({
     super.key,
@@ -53,13 +54,39 @@ class PairingOtherWaysButton extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<PairingOtherWaysButton> createState() => _PairingOtherWaysState();
+}
+
+class _PairingOtherWaysState extends State<PairingOtherWaysButton> {
+  late final _ways = ValueNotifier(widget.ways);
+
+  @override
+  void didUpdateWidget(PairingOtherWaysButton old) {
+    super.didUpdateWidget(old);
+    // The panel is another route: tell it after this frame's build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ways.value = widget.ways;
+    });
+  }
+
+  @override
+  void dispose() {
+    _ways.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return TextButton(
       key: const Key('pairing-other-ways'),
-      onPressed: enabled
+      onPressed: widget.enabled
           ? () => showAdaptivePanel<void>(
               context: context,
-              builder: (_) => _OtherWaysPanel(ways: ways, advanced: advanced),
+              builder: (_) => ValueListenableBuilder(
+                valueListenable: _ways,
+                builder: (_, ways, _) =>
+                    _OtherWaysPanel(ways: ways, advanced: widget.advanced),
+              ),
             )
           : null,
       child: Text(AppLocalizations.of(context).pairingOtherWays),
@@ -119,7 +146,13 @@ class _OtherWaysPanelState extends State<_OtherWaysPanel> {
     final l10n = AppLocalizations.of(context);
     final advanced = widget.advanced;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      // The backend field must stay above a phone's keyboard.
+      padding: EdgeInsets.fromLTRB(
+        20,
+        4,
+        20,
+        20 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

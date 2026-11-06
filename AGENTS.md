@@ -196,8 +196,8 @@ planned until it ships:
 
 - **Pairing-code login**: backend-issued per-device codes, with linked devices
   counting as one user, authorized reinstall recovery and a bounded credential
-  overlap. The relay, backend, core, bridge, CLI and the app have shipped; usage and
-  deployment docs remain ([design](docs/pairing-code-login.md)).
+  overlap. The relay, backend, core, bridge, CLI and the app have shipped (Android
+  built, not yet run on a device); usage and deployment docs remain ([design](docs/pairing-code-login.md)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.
 - **Session takeover for Claude and OpenCode**: an explicit, confirmed continue

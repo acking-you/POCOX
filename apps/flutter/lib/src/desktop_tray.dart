@@ -153,7 +153,7 @@ class DesktopTray with TrayListener, WindowListener {
     await trayManager.setContextMenu(
       Menu(
         items: [
-          MenuItem(key: 'show', label: labels.show, onClick: (_) => _show()),
+          MenuItem(key: 'show', label: labels.show, onClick: (_) => show()),
           MenuItem(
             key: 'settings',
             label: labels.settings,
@@ -166,7 +166,9 @@ class DesktopTray with TrayListener, WindowListener {
     );
   }
 
-  Future<void> _show() async {
+  /// Bring the window back and to the front, from the tray or from a link
+  /// the app was asked to open while hidden.
+  Future<void> show() async {
     if (await windowManager.isMinimized()) {
       await windowManager.restore();
     }
@@ -184,7 +186,7 @@ class DesktopTray with TrayListener, WindowListener {
   }
 
   Future<void> _openSettings() async {
-    await _show();
+    await show();
     _onOpenSettings?.call();
   }
 
@@ -209,7 +211,7 @@ class DesktopTray with TrayListener, WindowListener {
     // when an owned process may still run: then the app stays open, shows
     // why and offers to quit again, instead of exiting over the cleanup.
     if (!await stopHostingForQuit(_stopHosting, quitStatus)) {
-      await _show();
+      await show();
       return;
     }
     // Remove the tray icon, lift the close guard so destroy() isn't intercepted
@@ -245,7 +247,7 @@ class DesktopTray with TrayListener, WindowListener {
     // always receive the event). Linux/appindicator opens its menu natively
     // and sends no click events, so it needs nothing.
     if (_isWindows) {
-      _show();
+      show();
     } else if (_isMacOS) {
       _popUpMenu();
     }

@@ -5558,5 +5558,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get pairingErrNoDevice => '这台设备在这里还没有匹配身份。';
 
   @override
+  String get pairingErrDeviceGone => '那台设备已不在这个组里。';
+
+  @override
+  String get pairingErrName => '名称太长，或含有不能用于名称的字符。';
+
+  @override
+  String get pairingErrNotApplied => '这项更改没有生效，什么都没变。';
+
+  @override
   String get pairingErrUnreachable => '连不上服务器，已输入的内容会保留。';
 }

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pocox/l10n/gen/app_localizations.dart';
@@ -95,15 +97,29 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
     }
   }
 
-  Future<void> _act(Future<void> Function() work) async {
+  /// Run [work], then read the group again. A refusal says why, in
+  /// [instead]'s words for the codes it names; one waiting on another change
+  /// of this device opens that change's page.
+  Future<void> _act(
+    Future<void> Function() work, {
+    Map<String, String> instead = const {},
+  }) async {
     final l10n = AppLocalizations.of(context);
     try {
       await work();
     } catch (error) {
-      if (mounted) showToastError(context, pairingErrorText(l10n, error));
+      if (!mounted) return;
+      if (followTransitionPending(context, error)) return;
+      final custom = error is PairingFailure ? instead[error.code] : null;
+      showToastError(context, custom ?? pairingErrorText(l10n, error));
     }
     await _load();
   }
+
+  /// What a device-targeted action's refusal means when the device is gone.
+  Map<String, String> _gone(AppLocalizations l10n) => {
+    'not_found': l10n.pairingErrDeviceGone,
+  };
 
   Future<void> _showAdd() async {
     final code = _code;
@@ -147,7 +163,8 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
           key: const Key('pairing-rename-field'),
           controller: controller,
           autofocus: true,
-          maxLength: 64,
+          // The backend counts bytes, not characters.
+          inputFormatters: const [_Utf8Limit(pairingNameMaxBytes)],
           decoration: InputDecoration(labelText: l10n.pairingDeviceName),
           onSubmitted: (value) => Navigator.pop(dialog, value),
         ),
@@ -166,9 +183,11 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
     controller.dispose();
     final trimmed = name?.trim() ?? '';
     if (trimmed.isEmpty || trimmed == device.name) return;
-    await _act(
-      () => _api.pairingRenameDevice(deviceId: device.id, name: trimmed),
-    );
+    await _act(() async {
+      await _api.pairingRenameDevice(deviceId: device.id, name: trimmed);
+      // This device's own name is the one sign-in and the pocket show.
+      if (device.isSelf) ref.invalidate(configProvider);
+    }, instead: {..._gone(l10n), 'invalid_request': l10n.pairingErrName});
   }
 
   Future<void> _remove(PairingDevice device) async {
@@ -188,7 +207,8 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
         case 'completed':
           showToastOk(context, l10n.pairingRemoved(device.name));
         case 'pending':
-          showToast(context, l10n.pairingPendingRemove);
+          // Followed to its end on its own page, as every change is.
+          await followPairingOperation(context, ref, operation);
         default:
           showToastError(
             context,
@@ -198,22 +218,22 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
             ),
           );
       }
-    });
+    }, instead: _gone(l10n));
   }
 
-  Future<void> _decide(PairingRecoveryAsk ask, {required bool allow}) => _act(
-    () async {
+  Future<void> _decide(PairingRecoveryAsk ask, {required bool allow}) {
+    final l10n = AppLocalizations.of(context);
+    return _act(() async {
       await _api.pairingDecideRestore(
         deviceId: ask.targetDeviceId,
         requestId: ask.requestId,
         allow: allow,
       );
       if (mounted) {
-        final l10n = AppLocalizations.of(context);
         showToastOk(context, allow ? l10n.pairingAllowed : l10n.pairingDenied);
       }
-    },
-  );
+    }, instead: _gone(l10n));
+  }
 
   Future<void> _rotate() async {
     final l10n = AppLocalizations.of(context);
@@ -338,13 +358,11 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
         ],
       ),
     );
-    Widget deviceRow(PairingDevice device) {
-      final ask = _asks
-          .where((ask) => ask.targetDeviceId == device.id)
-          .firstOrNull;
-      if (ask != null) {
-        return PairingDeviceRow(
-          key: Key('pairing-device-${device.id}'),
+    // Every open request is its own row, keyed by the request, with its own
+    // check number: a second request never takes the first one's place.
+    Widget askRow(PairingDevice device, PairingRecoveryAsk ask) =>
+        PairingDeviceRow(
+          key: Key('pairing-ask-${ask.requestId}'),
           name: device.name,
           icon: pairingDeviceIcon(device.platform),
           line: l10n.pairingAsking(ask.matchingId),
@@ -367,7 +385,7 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
             ],
           ),
         );
-      }
+    Widget deviceRow(PairingDevice device) {
       return PairingDeviceRow(
         key: Key('pairing-device-${device.id}'),
         name: device.name,
@@ -417,8 +435,11 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
                 child: PairingSpinner(),
               )
             else ...[
-              if (self != null) deviceRow(self),
-              for (final device in peers) deviceRow(device),
+              for (final device in [?self, ...peers]) ...[
+                deviceRow(device),
+                for (final ask in _asks)
+                  if (ask.targetDeviceId == device.id) askRow(device, ask),
+              ],
             ],
           ],
         ),
@@ -495,4 +516,21 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
       ],
     );
   }
+}
+
+/// The longest device name the backend takes, in UTF-8 bytes.
+const pairingNameMaxBytes = 64;
+
+/// Keeps a field's text within [maxBytes] UTF-8 bytes, refusing the edit that
+/// would pass it.
+class _Utf8Limit extends TextInputFormatter {
+  const _Utf8Limit(this.maxBytes);
+
+  final int maxBytes;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) => utf8.encode(newValue.text).length > maxBytes ? oldValue : newValue;
 }

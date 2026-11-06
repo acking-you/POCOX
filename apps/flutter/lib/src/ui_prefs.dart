@@ -2,7 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart' show protected, visibleForTesting;
+import 'package:flutter/foundation.dart'
+    show immutable, protected, visibleForTesting;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pocox/src/bridge_api.dart' show AcpAgentSpec;
@@ -32,7 +33,12 @@ class UiPrefs {
     this.sidebarOpen,
     this.sidebarWidth,
     this.contextCardOpen,
+    this.pairingSeen,
   });
+
+  /// The pairing group this device last announced, so a device that joins or
+  /// asks while the app is closed is still told about.
+  final PairingSeen? pairingSeen;
 
   /// Custom ACP agents the user saved (program + arguments, in plain text).
   final List<AcpAgentSpec> acpAgents;
@@ -112,6 +118,7 @@ class UiPrefs {
     bool? sidebarOpen,
     double? sidebarWidth,
     bool? contextCardOpen,
+    PairingSeen? pairingSeen,
   }) => UiPrefs(
     preferredAppServiceKey:
         preferredAppServiceKey ?? this.preferredAppServiceKey,
@@ -129,6 +136,7 @@ class UiPrefs {
     sidebarOpen: sidebarOpen ?? this.sidebarOpen,
     sidebarWidth: sidebarWidth ?? this.sidebarWidth,
     contextCardOpen: contextCardOpen ?? this.contextCardOpen,
+    pairingSeen: pairingSeen ?? this.pairingSeen,
   );
 
   /// Parse from JSON; any shape surprise degrades to defaults.
@@ -190,6 +198,10 @@ class UiPrefs {
         num value when value.isFinite => value.toDouble().clamp(200, 520),
         _ => null,
       },
+      pairingSeen: switch (json['pairingSeen']) {
+        Map<String, dynamic> seen => PairingSeen.fromJson(seen),
+        _ => null,
+      },
     );
   }
 
@@ -217,6 +229,48 @@ class UiPrefs {
     if (sidebarOpen != null) 'sidebarOpen': sidebarOpen,
     if (contextCardOpen != null) 'contextCardOpen': contextCardOpen,
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
+    if (pairingSeen != null) 'pairingSeen': pairingSeen!.toJson(),
+  };
+}
+
+/// The devices and recovery requests of a pairing group this device has
+/// already told its user about.
+@immutable
+class PairingSeen {
+  /// Creates a record for [accountId].
+  const PairingSeen({
+    required this.accountId,
+    this.devices = const [],
+    this.requests = const [],
+  });
+
+  /// Parse from JSON; a malformed record reads as none seen.
+  factory PairingSeen.fromJson(Map<String, dynamic> json) => PairingSeen(
+    accountId: _as<String>(json['accountId']) ?? '',
+    devices: [
+      for (final id in _as<List<dynamic>>(json['devices']) ?? const [])
+        if (id is String) id,
+    ],
+    requests: [
+      for (final id in _as<List<dynamic>>(json['requests']) ?? const [])
+        if (id is String) id,
+    ],
+  );
+
+  /// The group's account: another one starts a fresh record silently.
+  final String accountId;
+
+  /// Device ids already announced.
+  final List<String> devices;
+
+  /// Recovery request ids already announced.
+  final List<String> requests;
+
+  /// JSON for persistence.
+  Map<String, dynamic> toJson() => {
+    'accountId': accountId,
+    'devices': devices,
+    'requests': requests,
   };
 }
 
@@ -542,6 +596,10 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
     }
     return p.copyWith(lastThreadByService: threads);
   });
+
+  /// Record the pairing group's devices and requests as announced.
+  void setPairingSeen(PairingSeen seen) =>
+      _mutate((p) => p.copyWith(pairingSeen: seen));
 
   /// Record that the first-run welcome guide has been shown on this device.
   void markGuideSeen() =>

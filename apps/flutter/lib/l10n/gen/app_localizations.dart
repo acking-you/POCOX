@@ -10091,6 +10091,24 @@ abstract class AppLocalizations {
   /// **'This device has no pairing identity here yet.'**
   String get pairingErrNoDevice;
 
+  /// No description provided for @pairingErrDeviceGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That device is no longer in this group.'**
+  String get pairingErrDeviceGone;
+
+  /// No description provided for @pairingErrName.
+  ///
+  /// In en, this message translates to:
+  /// **'That name is too long or has characters a name cannot have.'**
+  String get pairingErrName;
+
+  /// No description provided for @pairingErrNotApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'That change did not go through. Nothing changed.'**
+  String get pairingErrNotApplied;
+
   /// No description provided for @pairingErrUnreachable.
   ///
   /// In en, this message translates to:

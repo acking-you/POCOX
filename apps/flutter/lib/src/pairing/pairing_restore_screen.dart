@@ -25,10 +25,14 @@ enum _Step { start, pick, asking, approved }
 class PairingRestoreScreen extends ConsumerStatefulWidget {
   /// Creates the page. [retake] ends the old device's access at once and
   /// changes its code, for when someone else may have it.
-  const PairingRestoreScreen({super.key, this.retake = false});
+  const PairingRestoreScreen({super.key, this.retake = false, this.backend});
 
   /// Whether this takes a device back rather than continuing it.
   final bool retake;
+
+  /// The backend of the page that opened this one; null is the configured
+  /// one.
+  final String? backend;
 
   @override
   ConsumerState<PairingRestoreScreen> createState() => _PairingRestoreState();
@@ -47,7 +51,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
   Timer? _poll;
   var _wait = const Duration(seconds: 5);
 
-  String? get _backend => ref.read(pairingBackendProvider);
+  String? get _backend => widget.backend;
   BridgeApi get _api => ref.read(bridgeApiProvider);
 
   @override
@@ -84,6 +88,21 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  /// A ticket-carrying change refused: another change under way opens its
+  /// page; a group that changed since its preview is shown again, picking
+  /// anew. True when handled.
+  bool _followRefusal(Object error) {
+    if (followTransitionPending(context, error, backend: _backend)) return true;
+    if (error is PairingFailure && error.code == 'preview_stale') {
+      showToast(context, AppLocalizations.of(context).pairingErrStale);
+      setState(() => _picked = null);
+      // After the refused change's own busy state has cleared.
+      unawaited(Future(_lookUp));
+      return true;
+    }
+    return false;
   }
 
   Future<void> _lookUp() => _run(() async {
@@ -178,14 +197,20 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     }
     await _run(() async {
       final hint = await pairingHardwareHint();
-      final operation = await _api.pairingRestoreConfirm(
-        ticket: requestId == null ? preview?.ticket : null,
-        targetDeviceId: requestId == null ? picked : null,
-        requestId: requestId,
-        retake: widget.retake,
-        hint: hint,
-        backend: _backend,
-      );
+      final PairingOperation operation;
+      try {
+        operation = await _api.pairingRestoreConfirm(
+          ticket: requestId == null ? preview?.ticket : null,
+          targetDeviceId: requestId == null ? picked : null,
+          requestId: requestId,
+          retake: widget.retake,
+          hint: hint,
+          backend: _backend,
+        );
+      } catch (error) {
+        if (mounted && _followRefusal(error)) return;
+        rethrow;
+      }
       if (!mounted) return;
       if (operation.status == 'completed') {
         showToastOk(context, l10n.pairingRestored);
@@ -199,12 +224,18 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
   Future<void> _linkAsNew() => _run(() async {
     final preview = _preview!;
     final hint = await pairingHardwareHint();
-    final operation = await _api.pairingLink(
-      ticket: preview.ticket,
-      leaveCurrent: false,
-      hint: hint,
-      backend: _backend,
-    );
+    final PairingOperation operation;
+    try {
+      operation = await _api.pairingLink(
+        ticket: preview.ticket,
+        leaveCurrent: false,
+        hint: hint,
+        backend: _backend,
+      );
+    } catch (error) {
+      if (mounted && _followRefusal(error)) return;
+      rethrow;
+    }
     if (!mounted) return;
     await followPairingOperation(context, ref, operation, backend: _backend);
   });
@@ -227,7 +258,8 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
       PairingCodeField(
         controller: _entry,
         label: l10n.pairingGroupCode,
-        error: _step == _Step.start ? _error : null,
+        // A failed lookup says so wherever the code was typed.
+        error: _step == _Step.start || _step == _Step.asking ? _error : null,
         enabled: !_busy,
         onScan: nativeDeviceStore ? _scan : null,
         onSubmitted: (_) {
@@ -246,6 +278,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
 
   Widget _start(AppLocalizations l10n, String title) => PairingPageFrame(
     title: title,
+    busy: _busy,
     logo: true,
     children: [
       PairingHeading(l10n.pairingRestoreQuestion, center: true),
@@ -324,6 +357,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     ];
     return PairingPageFrame(
       title: title,
+      busy: _busy,
       onBack: () => setState(() => _step = _Step.start),
       footer: isDesktop ? null : actions,
       children: [
@@ -348,6 +382,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     final scheme = theme.colorScheme;
     return PairingPageFrame(
       title: title,
+      busy: _busy,
       logo: true,
       onBack: () {
         _poll?.cancel();
@@ -413,6 +448,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     ];
     return PairingPageFrame(
       title: l10n.pairingConfirmRestore,
+      busy: _busy,
       onBack: _asNew,
       footer: isDesktop ? null : actions,
       children: [

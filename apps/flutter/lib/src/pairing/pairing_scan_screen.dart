@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,8 +35,17 @@ class _PairingScanState extends ConsumerState<PairingScanScreen> {
     super.dispose();
   }
 
-  void _detected(BarcodeCapture capture) {
+  /// Leave without a code: nothing detected after this may pop the page
+  /// below in its place.
+  void _close() {
     if (_done) return;
+    _done = true;
+    unawaited(_controller.stop());
+    context.pop();
+  }
+
+  void _detected(BarcodeCapture capture) {
+    if (_done || ModalRoute.of(context)?.isCurrent != true) return;
     final api = ref.read(bridgeApiProvider);
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
@@ -42,6 +53,7 @@ class _PairingScanState extends ConsumerState<PairingScanScreen> {
       final code = api.pairingParseInvitation(raw);
       if (code != null) {
         _done = true;
+        unawaited(_controller.stop());
         context.pop(code);
         return;
       }
@@ -68,7 +80,7 @@ class _PairingScanState extends ConsumerState<PairingScanScreen> {
       appBar: WindowTitleBar(
         leading: IconButton(
           tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-          onPressed: () => context.pop(),
+          onPressed: _close,
           icon: const Icon(AppIcons.close),
         ),
         automaticallyImplyLeading: false,
@@ -133,7 +145,7 @@ class _PairingScanState extends ConsumerState<PairingScanScreen> {
                       ],
                       OutlinedButton(
                         key: const Key('pairing-scan-by-hand'),
-                        onPressed: () => context.pop(),
+                        onPressed: _close,
                         child: Text(l10n.pairingByHand),
                       ),
                     ],

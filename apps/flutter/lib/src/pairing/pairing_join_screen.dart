@@ -19,10 +19,14 @@ import 'package:pocox/src/widgets/app_toast.dart';
 /// sign-in or a self-hosted relay is asked about first.
 class PairingJoinScreen extends ConsumerStatefulWidget {
   /// Creates the page, previewing [code] at once when there is one.
-  const PairingJoinScreen({super.key, this.code});
+  const PairingJoinScreen({super.key, this.code, this.backend});
 
   /// A code from the first screen, a scan or a `pocox://pair` link.
   final String? code;
+
+  /// The backend of the page that opened this one; null is the configured
+  /// one.
+  final String? backend;
 
   @override
   ConsumerState<PairingJoinScreen> createState() => _PairingJoinState();
@@ -34,7 +38,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
   String? _error;
   bool _busy = false;
 
-  String? get _backend => ref.read(pairingBackendProvider);
+  String? get _backend => widget.backend;
 
   @override
   void initState() {
@@ -92,21 +96,22 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
             .firstOrNull ??
         preview.devices.first.name;
     final config = await ref.read(configProvider.future);
+    // This identity's peers, signed in or still on the first screen: a
+    // device that others linked into has a group to leave too.
+    var peers = const <PairingDevice>[];
+    try {
+      final page = await _api.pairingDevices(backend: _backend);
+      peers = [
+        for (final device in page.devices)
+          if (!device.isSelf) device,
+      ];
+    } catch (_) {
+      // No identity here (no_device) has no peers; with no group to read, the
+      // backend still refuses a link that would leave peers unconfirmed.
+    }
     if (!mounted) return null;
-    if (config.pairing) {
-      List<PairingDevice> peers = const [];
-      try {
-        final page = await _api.pairingDevices(backend: _backend);
-        peers = [
-          for (final device in page.devices)
-            if (!device.isSelf) device,
-        ];
-      } catch (_) {
-        // With no group to read, the backend still refuses a link that would
-        // leave peers unconfirmed.
-      }
-      if (!mounted) return null;
-      if (peers.isEmpty) return false;
+    var leave = false;
+    if (peers.isNotEmpty) {
       final yes = await confirmPairing(
         context,
         title: l10n.pairingLeaveTitle(peers.length),
@@ -116,8 +121,10 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
         ),
         yes: l10n.pairingLeaveAndLink,
       );
-      return yes ? true : null;
+      if (!yes || !mounted) return null;
+      leave = true;
     }
+    if (config.pairing) return leave;
     if (config.mode == 'account') {
       final yes = await confirmPairing(
         context,
@@ -125,7 +132,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
         body: l10n.pairingSignOutBody(target),
         yes: l10n.pairingSignOutAndLink,
       );
-      return yes ? false : null;
+      return yes ? leave : null;
     }
     if (config.mode == 'self_host') {
       final yes = await confirmPairing(
@@ -134,9 +141,9 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
         body: l10n.pairingRelayBody(target),
         yes: l10n.pairingRelayAndLink,
       );
-      return yes ? false : null;
+      return yes ? leave : null;
     }
-    return false;
+    return leave;
   }
 
   Future<void> _link() async {
@@ -161,6 +168,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
       await followPairingOperation(context, ref, operation, backend: _backend);
     } on PairingFailure catch (error) {
       if (!mounted) return;
+      if (followTransitionPending(context, error, backend: _backend)) return;
       if (error.code == 'preview_stale') {
         // The group changed since the preview: show it again, as new.
         showToast(context, l10n.pairingErrStale);
@@ -183,6 +191,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     if (preview != null) return _confirm(context, l10n, preview);
     return PairingPageFrame(
       title: l10n.pairingEnterOther,
+      busy: _busy,
       logo: true,
       children: [
         PairingHeading(l10n.pairingEnterTitle, center: true),
@@ -243,6 +252,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     ];
     return PairingPageFrame(
       title: l10n.pairingConfirmTitle,
+      busy: _busy,
       onBack: _busy ? () {} : () => setState(() => _preview = null),
       footer: isDesktop ? null : actions,
       children: [
