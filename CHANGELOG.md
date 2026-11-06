@@ -9,24 +9,42 @@ breaking change goes.
 
 ## Unreleased
 
-- **Sign in with a pairing code, in the app.** Sign-in now leads with this device's
-  code: a computer shows it with a QR code and gets started in one step, a phone types
-  or scans another device's code. Restore a previous device, GitHub's sign-ins and
-  self-hosting sit under Other ways to sign in; restoring recovers a device by its
-  group's code or a linked device's approval. Settings › Account lists the group, adds a
-  device, pauses or changes the code, answers recovery requests and switches back to
-  GitHub. A `pocox://pair` link or QR code only ever opens a preview. iOS keeps the
-  identity in the Keychain, so a reinstall resumes it, and Android in its no-backup
-  storage; Android's side compiles in CI but has not yet been run on a device. "Use a
-  device code instead" is now "GitHub device code".
-- **Sign in with a pairing code, from the CLI.** `pocox pair` shows this device's
-  code and `pocox pair join` links another device with it, with no GitHub account.
-  `pocox devices` lists and removes linked devices; `pocox pair restore` recovers a
-  previous device; `pocox pair rotate`, `pause`, `resume` and `leave` manage the code
-  and the group. A code is only ever read from a prompt or stdin. `pocox login`,
-  `pocox logout` and self-hosted relays work as before, and `pocox login --resume`
-  returns to a GitHub session set aside for pairing. A change the backend has yet to
-  finish exits with code 75. A backend needs `POCOX_PAIRING_SECRET` set. See [the CLI guide](docs/cli.md#pairing-codes).
+- **Sign in with a pairing code.** No GitHub account needed: every device has one
+  long-lived code, and devices linked by their codes count as one user.
+  ([usage](docs/usage.md#1-sign-in-with-a-pairing-code), [CLI](docs/cli.md#pairing-codes),
+  [design](docs/pairing-code-login.md))
+  - **In the app**, sign-in leads with this device's code: a computer shows it with a
+    QR code and gets started in one step, a phone types or scans another device's
+    code. Restore a previous device, GitHub's sign-ins and self-hosting sit under
+    Other ways to sign in. A `pocox://pair` link or QR code only ever opens a preview.
+  - **Settings › Account** lists the group, adds and removes devices, pauses or
+    changes the code, answers recovery requests with a check number, and switches
+    back to GitHub. "Use a device code instead" is now "GitHub device code".
+  - **From the CLI**, `pocox pair` shows this device's code and `pocox pair join`
+    links another device with it; `pocox devices` lists, removes and answers
+    recovery requests; `pocox pair restore`, `rotate`, `pause`, `resume`, `leave` and
+    `start-over` cover the rest. A code is only ever read from a prompt or stdin. A
+    change the backend has yet to finish exits with code 75.
+  - **Recovery**: a reinstalled device restores itself by its group's code or a
+    member's approval. iOS keeps the identity in the Keychain, so a reinstall usually
+    resumes it (Apple does not promise this); Android keeps it out of backups, and a
+    computer keeps it outside the app's folder, so reinstalling the app keeps it.
+  - **Removing a device** ends its new connections; a direct connection already
+    set up may last until either end closes it. A device whose identity is restored
+    elsewhere keeps its access for 600 seconds.
+  - **GitHub sign-in and self-hosted relays work as before.** `pocox login --resume`
+    returns to a GitHub session set aside for pairing.
+  - **For backend operators** pairing is optional: it needs `POCOX_PAIRING_SECRET`
+    and a relay with key namespaces (a pb-mapper `master` build at `badcad7` or
+    later; no release has it yet). Upgrade the relay, then the backend, then clients;
+    a client speaking another pairing protocol is told to update
+    (`pairing_client_upgrade_required`). See
+    [deploy](deploy/README.md#pairing-code-login-optional).
+  - **Not yet verified**: the app on an Android device (it compiles in CI), iOS
+    backup exclusion on a real device, camera scanning, `pocox://pair` routing on
+    macOS, anything on Windows (the device store's access control, the hardware hint,
+    the app build), the Linux app build, a live GitHub sign-in and switching to GitHub
+    and back, and a direct connection after removal.
 - Forked Codex conversations recover inherited image attachments from their
   stored history after the original temporary image files disappear.
 - Fork confirmations expire when their conversation view or host connection

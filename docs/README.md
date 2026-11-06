@@ -8,7 +8,7 @@ must keep. Start with [architecture](architecture.md); contributor rules are in
 
 | Page | Covers |
 | --- | --- |
-| [Usage guide](usage.md) · [中文](usage.zh-CN.md) | sign in with GitHub, host Codex, drive it from another device |
+| [Usage guide](usage.md) · [中文](usage.zh-CN.md) | sign in with a pairing code or GitHub, host Codex, drive it from another device |
 | [CLI](cli.md) | every `pocox` command, hosted-account and self-host flows |
 | [Deploy the backend](../deploy/README.md) | run `pocox-backend` and the relay for hosted accounts |
 | [Architecture](architecture.md) | hosts, relay, controllers, service keys, connection modes |
@@ -23,7 +23,7 @@ must keep. Start with [architecture](architecture.md); contributor rules are in
 | [Grok Build](grok-build.md) | the Grok preset, its account, extensions and leader following |
 | [Hosting configuration](hosting-configuration.md) | the hosting editor, model services, keys, apply and restore |
 | [Remote device management](remote-device-management.md) | managing another computer, the CLI managed host, device identity |
-| [Pairing-code login](pairing-code-login.md) | the relay, backend, CLI and app have shipped (Android not yet run on a device): account-free device codes, linking, reinstalling |
+| [Pairing-code login](pairing-code-login.md) | account-free device codes, linking, recovery and reinstalling; what is not yet verified (Android, Windows, Linux app, live GitHub, and more) |
 | [Harness updates](harness-updates.md) | each computer's agent versions, updating them and restarting their services |
 | [macOS shell PATH](macos-shell-path.md) | how GUI hosts find Codex and Node on macOS |
 

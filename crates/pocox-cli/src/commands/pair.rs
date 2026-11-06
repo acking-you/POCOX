@@ -599,6 +599,12 @@ pub(crate) fn print_dead_identity(state: PairingState, grace_deadline: Option<i6
         ui::field("old access ends", &format_time(deadline));
     }
     ui::code("pocox pair start-over");
+    if state == PairingState::Superseded {
+        // Taking it back is a retake from a fresh identity: a plain restore would
+        // leave the other copy its overlap and keep the code it may have.
+        ui::muted("  not moved by you? after starting over, take it back:");
+        ui::code("pocox pair restore --retake");
+    }
 }
 
 fn format_time(unix_seconds: i64) -> String {
@@ -691,7 +697,8 @@ fn explain_dead_identity(error: anyhow::Error) -> anyhow::Error {
         Some(PairingErrorCode::DeviceSuperseded | PairingErrorCode::GraceRestricted) => error
             .context(format!(
                 "another device took over this one's identity.{deadline} Run `pocox pair \
-                 start-over`, then `pocox pair restore` if this should be a device you had"
+                 start-over`; if you did not move it, then take it back with `pocox pair restore \
+                 --retake`"
             )),
         Some(PairingErrorCode::DeviceUnknown) => {
             error.context("the backend does not know this device; run `pocox pair start-over`")
