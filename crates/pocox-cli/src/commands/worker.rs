@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use pocox_core::config::{Config, Mode};
+use pocox_core::config::Config;
 use pocox_core::paths;
 use pocox_core::state::{PbRole, PbSessionInfo};
 use pocox_pb::{
@@ -12,15 +12,15 @@ use pocox_pb::{
 };
 
 use crate::cli::WorkerCmd;
+use crate::commands::account_key::{
+    credential_refused, on_account_credential, replacement_credential, Shutdown,
+};
 use crate::commands::worker_health::Reporter;
 use crate::commands::{account, api_proxy};
 
-/// How many times a worker asks for a new key before giving up: about three
-/// minutes.
-const REPLACEMENT_TRIES: usize = 8;
-
 /// Run an internal worker command.
 pub async fn run(cmd: WorkerCmd) -> Result<()> {
+    let shutdown = Shutdown::listen();
     match cmd {
         WorkerCmd::PbRegister(args) => {
             // The parent always passes `--relay` and exports the credential, so
@@ -37,15 +37,21 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 local_addr: args.local_addr,
                 codec: args.codec,
             };
-            until_credential_gone(session, &args.key, &config, |session| {
+            until_credential_gone(session, &args.key, &config, shutdown.clone(), |session| {
                 let (options, reporter, config) = (options.clone(), &reporter, &config);
+                let shutdown = shutdown.clone();
                 async move {
                     let registration = pb_register(&session, options).await?;
                     let _refresh = keep_account_credential_alive(&session, config);
                     let outcome = until_identity_lost(
                         config,
                         &session,
-                        monitor(reporter, registration.subscribe(), || registration.diagnostics()),
+                        monitor(
+                            reporter,
+                            registration.subscribe(),
+                            || registration.diagnostics(),
+                            shutdown,
+                        ),
                     )
                     .await;
                     registration.stop().await?;
@@ -64,15 +70,21 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 key: args.key.clone(),
                 local_addr: args.local_addr,
             };
-            until_credential_gone(session, &args.key, &config, |session| {
+            until_credential_gone(session, &args.key, &config, shutdown.clone(), |session| {
                 let (options, reporter, config) = (options.clone(), &reporter, &config);
+                let shutdown = shutdown.clone();
                 async move {
                     let connection = pb_subscribe(&session, options).await?;
                     let _refresh = keep_account_credential_alive(&session, config);
                     let outcome = until_identity_lost(
                         config,
                         &session,
-                        monitor(reporter, connection.subscribe(), || connection.diagnostics()),
+                        monitor(
+                            reporter,
+                            connection.subscribe(),
+                            || connection.diagnostics(),
+                            shutdown,
+                        ),
                     )
                     .await;
                     connection.stop().await?;
@@ -89,13 +101,6 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
     Ok(())
 }
 
-/// Whether this worker runs on an account's own credential, rather than on a
-/// relay the caller named with its key. Only then does anything about the
-/// account concern it.
-fn on_account_credential(session: &RelaySession, config: &Config) -> bool {
-    session.credential.starts_with("pbmt1_") && config.account_mode() == Mode::Account
-}
-
 /// Run `work` while the account's credential can be had. A computer that slept
 /// past its key's end wakes to a relay that refuses it for good, and nothing
 /// else would start this worker again, so it fetches the replacement and
@@ -105,6 +110,7 @@ async fn until_credential_gone<F, Fut>(
     mut session: RelaySession,
     key: &str,
     config: &Config,
+    mut shutdown: Shutdown,
     mut work: F,
 ) -> Result<()>
 where
@@ -116,10 +122,14 @@ where
             Ok(()) => return Ok(()),
             Err(error) => error,
         };
-        if !on_account_credential(&session, config) || !credential_refused(&error) {
+        if !on_account_credential(&session, config) || !credential_refused(&format!("{error:#}")) {
             return Err(error);
         }
-        match replacement_credential(&session, key, config).await {
+        let next = tokio::select! {
+            next = replacement_credential(&session, key, config) => next,
+            () = shutdown.requested() => return Ok(()),
+        };
+        match next {
             Some(next) => {
                 tracing::info!("the relay ended this worker's key; continuing on its replacement");
                 session = next;
@@ -127,51 +137,6 @@ where
             None => return Err(error),
         }
     }
-}
-
-/// Whether the relay said this credential is over, rather than anything
-/// passing.
-fn credential_refused(error: &anyhow::Error) -> bool {
-    let said = format!("{error:#}");
-    said.contains("temporary_key_expired") || said.contains("temporary_key_revoked")
-}
-
-/// A new credential for `key`, if the backend gives this same user one. Retried
-/// for a while: a computer waking from sleep often has no network yet. The
-/// backend refusing is the answer, and so is its naming another user.
-async fn replacement_credential(
-    session: &RelaySession,
-    key: &str,
-    config: &Config,
-) -> Option<RelaySession> {
-    let backend = account::backend_base(None, config);
-    let mut delay = Duration::from_secs(2);
-    for _ in 0..REPLACEMENT_TRIES {
-        let mut latest = Config::load().unwrap_or_else(|_| config.clone());
-        match account::fetch_relay_credential(&mut latest, &backend).await {
-            Ok(relay) => {
-                let same_user = key.starts_with(&format!("pcxu:{}:", relay.namespace));
-                let new = relay.credential != session.credential;
-                return (same_user && new).then(|| {
-                    RelaySession::new(relay.relay_addr, relay.credential)
-                        .with_preferences(&latest.pb_mapper)
-                });
-            },
-            Err(error) if pocox_bridge::pairing::code_of(&error).is_some() => {
-                tracing::warn!("this worker's key was not replaced: {error:#}");
-                return None;
-            },
-            Err(error) => {
-                tracing::warn!(
-                    retry_secs = delay.as_secs(),
-                    "fetching a replacement key: {error:#}"
-                );
-                tokio::time::sleep(delay).await;
-                delay = (delay * 2).min(Duration::from_secs(30));
-            },
-        }
-    }
-    None
 }
 
 /// Run `work` while this installation's account stands. A worker outlives the
@@ -275,9 +240,8 @@ async fn monitor(
     reporter: &Reporter,
     mut status: tokio::sync::watch::Receiver<TunnelStatus>,
     diagnostics: impl Fn() -> pocox_pb::TunnelDiagnostics,
+    mut shutdown: Shutdown,
 ) -> Result<()> {
-    let shutdown = shutdown_signal();
-    tokio::pin!(shutdown);
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut snapshot_failed = false;
@@ -297,7 +261,7 @@ async fn monitor(
             _ => {},
         }
         tokio::select! {
-            result = &mut shutdown => return result,
+            () = shutdown.requested() => return Ok(()),
             _ = interval.tick() => {},
             result = status.changed() => { if result.is_err() { bail!("network worker stopped reporting status"); } },
         }

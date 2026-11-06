@@ -153,7 +153,7 @@ tracking identifier.
 | --- | --- | --- |
 | Android 8+ | [`ANDROID_ID`](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID) | Scoped to signing key, user and device; reset/signing changes and the documented Android 8 OTA case can change it. Not remote attestation. |
 | macOS | `IOPlatformUUID` | Machine-wide, readable by other local accounts, may survive resale; not an authorization secret. |
-| Windows | SMBIOS UUID, with `MachineGuid` fallback | Firmware duplicates/placeholders exist; fallback and OS-account identity may change on reinstall. |
+| Windows | SMBIOS UUID, with `MachineGuid` fallback only when the firmware answered with a placeholder; a failed or slow read sends no hint | Firmware duplicates/placeholders exist; fallback and OS-account identity may change on reinstall. |
 | iOS, Android 7 and older | None | Recover with a retained secret or a code from its group. A member's approval needs a hint to find the device. |
 | Linux, WSL, containers | None | The store preserves identity across binary reinstalls; losing it requires a code from its group. |
 
@@ -812,7 +812,9 @@ it only if that installation is still on the account it started from; otherwise 
 commit stands and that account is left alone. Any other installation may read the result
 at once, and a result it has read blocks nothing, but adopting it stays with the
 installation that started it for a day. A result the backend still does not know two
-minutes on was never received. An operation that did not happen stays a day, so whoever
+minutes on was never received; past the week the backend keeps finished ones, or once the
+secret can no longer ask, how it ended is unknown, and the device's own state says where it
+stands. An operation that did not happen stays a day, so whoever
 started it can still learn why after another process read it. A completed one's absence
 from the store never reads as success: the backend is asked. A commit whose local
 catch-up failed says so and is tried again, including by the watcher of an installation
@@ -830,7 +832,8 @@ seconds is owed a stop and a start, retried on the next check. Then the hosts it
 again if the session is activated, and otherwise it holds: nothing starts until Continue.
 A hold is memory, and the backend is what survives a restart: every start asks whether
 `/v1/relay` refuses this device, and being refused holds too, so when a hold ends
-everything the restore ledger says should run starts. A superseded or unknown identity
+everything the restore ledger says should run starts. Signing out keeps that owed: the
+hosts start under the next account that can publish them, in this process or any other. A superseded or unknown identity
 holds the same way, only the user's choice moves it on, and this process stops asking the
 backend about that secret and stops dropping connections over it. GitHub and self-hosted
 setups skip all of this at the first check of the configuration, and a process given an
@@ -845,8 +848,10 @@ refreshes a session whose generation moved on. While holding it refreshes instea
 a Continue from another installation does not change this JWT. A plain `pocox serve` and
 detached relay workers on an account's credential make the same comparison and ask the
 same question, and exit when the account changes; one running under GitHub only ever
-reads its configuration here. A worker the relay refuses as expired, after a sleep past its
-key's end, fetches the replacement for the same user and registers again.
+reads its configuration here. A worker, or `pocox serve`'s own meta registration, that the
+relay refuses as expired after a sleep past its key's end fetches the replacement for the
+same user and registers again. Only the backend refusing this device ends that; a busy or
+unreachable relay is asked again for a while. A stop request reaches every phase of it.
 
 **Switching.** `[account]` holds one session, so moving to pairing sets a GitHub session
 aside in `parked-accounts.json` in the support directory, under the canonical backend it
@@ -858,7 +863,9 @@ wrote it, because left alone they would stay published to the group this install
 A file of its own, for the reason `[account]` gains no fields. A self-hosted relay and key
 stay where they are in `config.toml`, and an explicit self-host mode wins while chosen, with
 pairing asleep. `POCOX_DEVICE_SCOPE` names a separate identity and hardware key; since
-`config.toml` holds one session, each scope in use also needs its own `XDG_CONFIG_HOME`.
+`config.toml` holds one session, each scope in use also needs its own configuration
+directory: a separate `HOME` on macOS and Linux, and a separate account on Windows, whose
+configuration directory follows the account rather than any variable.
 
 ```bash
 pocox pair                  # show this device's code, ask before activating, wait for a link

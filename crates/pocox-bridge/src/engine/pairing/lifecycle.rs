@@ -53,6 +53,10 @@ const STOP_WAIT: Duration = Duration::from_millis(1500);
 static CHANGING: AtomicBool = AtomicBool::new(false);
 /// Nothing hosts until an explicit Continue.
 static HOLDING: AtomicBool = AtomicBool::new(false);
+/// What a change stopped still owes a start, but the account here can publish
+/// nothing: signed out, say. The next account that can is when it comes back,
+/// in this process as in any other.
+static UNSERVED: AtomicBool = AtomicBool::new(false);
 /// Hosts a change stopped, which start again once this device may host.
 static STOPPED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Hosts a change could not stop, still owed a stop and a start.
@@ -166,8 +170,14 @@ pub(super) fn after_persist(support: &Path, session: &DeviceSession) {
         HOLDING.store(true, Ordering::SeqCst);
         return;
     }
+    restart_stopped(end_hold());
+}
+
+/// Whether a hold ended, or an obligation left over from a sign-out, now that
+/// something can publish again.
+fn end_hold() -> bool {
     let held = HOLDING.swap(false, Ordering::SeqCst);
-    restart_stopped(held);
+    UNSERVED.swap(false, Ordering::SeqCst) || held
 }
 
 /// The new session never reached `config.toml`: nothing changed, so what was
@@ -179,20 +189,22 @@ pub(super) fn after_failed_persist(support: &Path) {
 }
 
 /// `config.toml` no longer names a pairing session, so no Continue will come.
-/// What the change stopped starts again if anything else here can publish it.
+/// What the change stopped starts again if anything else here can publish it,
+/// and otherwise waits for the next account that can.
 pub(super) fn left_pairing(support: &Path, config: &Config) {
     if !owns(support) {
         return;
     }
     *guarded(&HOSTED_UNDER) = Some(Principal::of(config));
     *guarded(&DEAD) = None;
-    let held = HOLDING.swap(false, Ordering::SeqCst);
     if config.account_mode() == Mode::Unconfigured {
-        guarded(&STOPPED).clear();
-        guarded(&OWED).clear();
+        let held = HOLDING.swap(false, Ordering::SeqCst);
+        if held || !guarded(&STOPPED).is_empty() {
+            UNSERVED.store(true, Ordering::SeqCst);
+        }
         return;
     }
-    restart_stopped(held);
+    restart_stopped(end_hold());
 }
 
 /// Follow a change another process wrote: `pocox pair join` in another terminal
@@ -214,6 +226,11 @@ pub(super) async fn follow(support: &Path) -> Result<()> {
         return Ok(());
     };
     if !previous.moved_to(&now) {
+        // Signed out with hosts owed a start, and now signed in to something that
+        // never touched pairing: they start under it.
+        if UNSERVED.load(Ordering::SeqCst) && config.account_mode() != Mode::Unconfigured {
+            restart_stopped(end_hold());
+        }
         return Ok(());
     }
     tracing::info!("another process changed this installation's account");
@@ -333,9 +350,11 @@ pub(in crate::engine) fn require_may_host(name: &str) -> Result<()> {
     }
 }
 
+/// Add `names` to `list` once each. The host table and the restore ledger spell
+/// a host differently, so they are compared as the one instance they name.
 fn remember(list: &mut Vec<String>, names: impl IntoIterator<Item = String>) {
     for name in names {
-        if !list.contains(&name) {
+        if !list.iter().any(|known| host_names::same(known, &name)) {
             list.push(name);
         }
     }
@@ -415,7 +434,7 @@ fn restorable_hosts() -> Vec<String> {
     };
     saved
         .into_iter()
-        .filter(|name| !running.contains(name))
+        .filter(|name| !running.iter().any(|host| host_names::same(host, name)))
         .collect()
 }
 
@@ -482,6 +501,7 @@ fn restart(names: &[String]) {
 #[cfg(test)]
 pub(super) fn forget_everything() {
     HOLDING.store(false, Ordering::SeqCst);
+    UNSERVED.store(false, Ordering::SeqCst);
     CHANGING.store(false, Ordering::SeqCst);
     guarded(&STOPPED).clear();
     guarded(&OWED).clear();
@@ -510,5 +530,9 @@ mod tests {
         })]);
         assert_eq!(plan_restart(&entries, "My Host"), RestartPlan::Restore(7));
         assert_eq!(plan_restart(&entries, "Another"), RestartPlan::Lost);
+        // A stopped host and its ledger entry are one host to start, not two.
+        let mut names = vec!["My Host".to_string()];
+        remember(&mut names, ["my-host".to_string(), "Another".to_string()]);
+        assert_eq!(names, ["My Host", "Another"]);
     }
 }

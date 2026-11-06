@@ -164,8 +164,7 @@ pub fn os_account() -> String {
 pub fn read_local_hardware_id() -> Option<RawHardwareId> {
     #[cfg(target_os = "macos")]
     {
-        let output =
-            tools::run("/usr/sbin/ioreg", &["-rd1", "-c", "IOPlatformExpertDevice"]).ok()?;
+        let output = tools::run("/usr/sbin/ioreg", &["-rd1", "-c", "IOPlatformExpertDevice"])?;
         RawHardwareId::new(HintSource::MacosPlatformUuid, &parse_ioreg(&output)?)
     }
     #[cfg(windows)]
@@ -195,28 +194,17 @@ fn parse_reg_query(output: &str) -> Option<String> {
     line.split_whitespace().last().map(str::to_string)
 }
 
-/// Why a system tool gave no output.
-#[cfg(any(target_os = "macos", windows, test))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ToolFailure {
-    /// It could not run or reported failure: its answer is simply not there.
-    Unusable,
-    /// It outlasted the wait, which says nothing about what it would have said.
-    TimedOut,
-}
-
 #[cfg(any(target_os = "macos", windows))]
 pub(super) mod tools {
     use std::process::{Command, Stdio};
     use std::time::{Duration, Instant};
 
-    use super::ToolFailure;
-
     const WAIT: Duration = Duration::from_secs(5);
 
     /// Stdout of a system tool named by absolute path, so `PATH` cannot choose
-    /// what runs.
-    pub(in crate::pairing) fn run(program: &str, args: &[&str]) -> Result<String, ToolFailure> {
+    /// what runs. A tool that cannot run, fails or outlasts the wait yields
+    /// nothing: the hint is optional.
+    pub(in crate::pairing) fn run(program: &str, args: &[&str]) -> Option<String> {
         let mut command = Command::new(program);
         command
             .args(args)
@@ -229,44 +217,38 @@ pub(super) mod tools {
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             command.creation_flags(CREATE_NO_WINDOW);
         }
-        let mut child = command.spawn().map_err(|_| ToolFailure::Unusable)?;
+        let mut child = command.spawn().ok()?;
         let deadline = Instant::now() + WAIT;
         loop {
-            match child.try_wait().map_err(|_| ToolFailure::Unusable)? {
+            match child.try_wait().ok()? {
                 Some(status) if status.success() => break,
-                Some(_) => return Err(ToolFailure::Unusable),
+                Some(_) => return None,
                 None if Instant::now() >= deadline => {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(ToolFailure::TimedOut);
+                    return None;
                 },
                 None => std::thread::sleep(Duration::from_millis(20)),
             }
         }
         let mut output = String::new();
-        let mut stdout = child.stdout.take().ok_or(ToolFailure::Unusable)?;
-        std::io::Read::read_to_string(&mut stdout, &mut output)
-            .map_err(|_| ToolFailure::Unusable)?;
-        Ok(output)
+        let mut stdout = child.stdout.take()?;
+        std::io::Read::read_to_string(&mut stdout, &mut output).ok()?;
+        Some(output)
     }
 }
 
-/// The firmware's UUID when it is real, else the installation's GUID. A
-/// firmware answer that merely took too long stays unknown: falling back then
-/// would send a different key from the one this device bound.
+/// The firmware's UUID when it is real, else the installation's GUID. Only a
+/// firmware that answered, with a placeholder, falls back: a read that failed
+/// or took too long says nothing about which this device bound, and a different
+/// key would find nothing, so it sends none.
 #[cfg(any(windows, test))]
 fn windows_identifier(
-    smbios: Result<String, ToolFailure>,
-    machine_guid: impl FnOnce() -> Result<String, ToolFailure>,
+    smbios: Option<String>,
+    machine_guid: impl FnOnce() -> Option<String>,
 ) -> Option<RawHardwareId> {
-    let firmware = match smbios {
-        Err(ToolFailure::TimedOut) => return None,
-        Err(ToolFailure::Unusable) => None,
-        Ok(output) => RawHardwareId::new(HintSource::WindowsSmbiosUuid, &output),
-    };
-    firmware.or_else(|| {
-        let output = machine_guid().ok()?;
-        RawHardwareId::new(HintSource::WindowsMachineGuid, &parse_reg_query(&output)?)
+    RawHardwareId::new(HintSource::WindowsSmbiosUuid, &smbios?).or_else(|| {
+        RawHardwareId::new(HintSource::WindowsMachineGuid, &parse_reg_query(&machine_guid()?)?)
     })
 }
 
@@ -313,13 +295,11 @@ mod tests {
     #[test]
     fn a_slow_firmware_answer_never_becomes_another_hardware_key() {
         let guid = "HKEY\n    MachineGuid    REG_SZ    11111111-2222-3333-4444-555555555555\n";
-        let timed_out = windows_identifier(Err(ToolFailure::TimedOut), || panic!("not asked"));
-        assert!(timed_out.is_none());
-        let unusable = windows_identifier(Err(ToolFailure::Unusable), || Ok(guid.to_string()));
-        assert_eq!(unusable.expect("the guid").source(), HintSource::WindowsMachineGuid);
+        let no_answer = windows_identifier(None, || panic!("not asked"));
+        assert!(no_answer.is_none(), "a failed or slow read sends no hint");
         let placeholder =
-            windows_identifier(Ok("00000000-0000-0000-0000-000000000000".into()), || {
-                Ok(guid.to_string())
+            windows_identifier(Some("00000000-0000-0000-0000-000000000000".into()), || {
+                Some(guid.to_string())
             });
         assert_eq!(placeholder.expect("the guid").source(), HintSource::WindowsMachineGuid);
     }

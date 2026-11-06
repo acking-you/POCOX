@@ -492,7 +492,7 @@ fn exclude_from_backup(root: &Path) {
     #[cfg(target_os = "macos")]
     {
         let root = root.to_string_lossy();
-        if super::hint::tools::run("/usr/bin/tmutil", &["addexclusion", &root]).is_err() {
+        if super::hint::tools::run("/usr/bin/tmutil", &["addexclusion", &root]).is_none() {
             tracing::debug!("the device store could not be excluded from Time Machine");
         }
     }

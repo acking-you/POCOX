@@ -473,23 +473,41 @@ pub(crate) async fn status() -> Result<()> {
     Ok(())
 }
 
-/// `pocox account` for a pairing device.
+/// `pocox account` for a pairing device: who it is, and what a peer or a
+/// replacement did to it.
 async fn device_status(base: &str) -> Result<()> {
-    let support = paths::config_dir()?;
-    match pairing::session::me(&support, base).await {
-        Ok(me) => {
-            ui::headline(ui::Tone::Ok, "signed in with a pairing code");
-            ui::field("device", &me.login);
-            ui::field("backend", base);
-            Ok(())
+    use pairing::{status, PairingState};
+
+    let identity = pairing::identity::Identity::open(&paths::config_dir()?, base)?;
+    let reading = status::status(&identity).await?;
+    super::pair::print_changes(&pairing::operations::settle(&identity).await?);
+    match reading.state {
+        PairingState::Superseded | PairingState::Unknown => {
+            super::pair::print_dead_identity(reading.state, reading.grace_deadline);
+            return Ok(());
         },
-        Err(error) if error.chain().any(|cause| cause.is::<pairing::SignedOut>()) => {
+        _ if !reading.active_here => {
             ui::headline(ui::Tone::Muted, "not signed in");
             ui::code("pocox pair");
-            Ok(())
+            return Ok(());
         },
-        Err(error) => Err(error),
+        _ => {},
     }
+    let Some(session) = reading.session else {
+        ui::headline(ui::Tone::Change, "a change to this device is under way");
+        ui::code("pocox devices");
+        return Ok(());
+    };
+    if session.activated {
+        ui::headline(ui::Tone::Ok, "signed in with a pairing code");
+    } else {
+        ui::headline(ui::Tone::Change, "signed in with a pairing code, not set up");
+        ui::code("pocox pair");
+    }
+    ui::field("device", &session.login);
+    ui::field("backend", &reading.backend);
+    super::pair::print_membership(&session);
+    Ok(())
 }
 
 /// What a long-running command does when it no longer works for the account it

@@ -394,6 +394,8 @@ async fn a_removed_device_is_told_and_comes_back_only_by_continuing() {
     assert!(again.status.success(), "{}", shown(&again));
     assert!(shown(&again).contains("not set up"), "{}", shown(&again));
     assert!(shown(&again).contains("removed this one"), "it says what happened: {}", shown(&again));
+    let account = second.ok(&["account"]);
+    assert!(account.contains("removed this one") || account.contains("not set up"), "{account}");
     second.ok(&["pair", "--yes", "--no-wait"]);
     assert!(second.run(&["services", "list"]).status.success(), "Continue restored access");
     assert_eq!(first.ok(&["devices"]).matches("set up").count(), 1, "but not its old group");
@@ -425,6 +427,10 @@ async fn a_restored_device_takes_the_code_and_the_old_copy_is_told_to_start_over
     assert!(!refused.status.success());
     assert!(shown(&refused).contains("start-over"), "{}", shown(&refused));
     assert!(shown(&refused).contains("old access ends"), "and until when: {}", shown(&refused));
+    for args in [&["pair", "pause"][..], &["account"]] {
+        let said = old.run(args);
+        assert!(shown(&said).contains("start-over"), "{args:?}: {}", shown(&said));
+    }
     assert_eq!(old.secret(), dead, "nothing reclaims a device on its own");
     let fresh = old.ok(&["pair", "start-over", "--yes"]);
     assert_ne!(old.secret(), dead);
@@ -495,6 +501,7 @@ async fn a_change_still_under_way_has_its_own_exit_code_and_shows_up_later() {
     assert_eq!(output.0.code(), Some(75), "neither success nor failure");
 
     let listed = second.run(&["devices"]);
+    assert!(listed.status.success(), "{}", shown(&listed));
     assert!(shown(&listed).contains("under way"), "{}", shown(&listed));
     let again = second.run(&["pair", "leave", "--yes"]);
     assert!(!again.status.success(), "and it is not started twice");
@@ -654,6 +661,9 @@ async fn a_code_can_be_paused_and_a_rotation_waits_a_day() {
     let rotate = first.run(&["pair", "rotate"]);
     assert!(!rotate.status.success());
     assert!(shown(&rotate).contains("rate_limited"), "{}", shown(&rotate));
+    // What the code is, and since when, says whether an earlier rotation happened.
+    assert_eq!(code_in(&shown(&rotate)), code, "{}", shown(&rotate));
+    assert!(shown(&rotate).contains("issued"), "{}", shown(&rotate));
 }
 
 #[test]

@@ -100,8 +100,10 @@ and `pocox pair` show changes still under way and any that turned out not to hap
 The identity lives in a private device store outside `config.toml`, shared by every
 POCOX installation of this OS account and backend, so moving one moves them all.
 `POCOX_DEVICE_SCOPE=<name>` keeps a separate identity, for testing several devices
-on one computer; `config.toml` holds one session, so give each scope its own
-`XDG_CONFIG_HOME` too, or they sign each other out. `pocox logout` signs this
+on one computer. `config.toml` holds one session, so give each scope its own home too,
+or they sign each other out: `HOME=<dir> POCOX_DEVICE_SCOPE=<name> pocox …` on macOS and
+Linux. On Windows the configuration directory follows the account, so use a separate
+Windows account. `pocox logout` signs this
 installation out and leaves the identity and its group alone: `pocox pair` resumes it. To
 end a device's access, remove it from another device. Moving to pairing sets a GitHub
 session aside, and `pocox login --resume` brings it back, with the backend it was on;

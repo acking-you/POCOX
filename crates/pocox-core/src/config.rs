@@ -361,11 +361,30 @@ pub struct ServiceTargetConfig {
 /// reading it sees the old file or the new one, never half of either, and it
 /// is private to its owner from the moment it exists, because it may hold the
 /// relay `MSG_HEADER_KEY` or account tokens. A symlink to the file stays a
-/// symlink.
+/// symlink, even one whose target does not exist yet.
 pub fn write_config_file(path: &Path, raw: &str) -> Result<()> {
-    let target = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
-    crate::fs::write_private_atomic(&target, raw.as_bytes())?;
+    crate::fs::write_private_atomic(&link_target(path), raw.as_bytes())?;
     Ok(())
+}
+
+/// Where a write to `path` should land: through every symlink, whether or not
+/// the file at the end exists.
+fn link_target(path: &Path) -> std::path::PathBuf {
+    if let Ok(existing) = std::fs::canonicalize(path) {
+        return existing;
+    }
+    let mut current = path.to_path_buf();
+    // A cycle cannot be written through; the bound only stops the walk.
+    for _ in 0..40 {
+        let Ok(next) = std::fs::read_link(&current) else {
+            return current;
+        };
+        current = match current.parent() {
+            Some(parent) if next.is_relative() => parent.join(next),
+            _ => next,
+        };
+    }
+    current
 }
 
 impl Config {
@@ -712,6 +731,20 @@ mod tests {
             assert_ne!(reader.metadata().expect("meta").ino(), meta.ino());
         }
         drop(reader);
+
+        // One whose target is yet to be written is written at that target.
+        #[cfg(unix)]
+        {
+            let dangling = dir.path().join("dangling.toml");
+            std::os::unix::fs::symlink("nested/missing.toml", &dangling).expect("symlink");
+            std::fs::create_dir(dir.path().join("nested")).expect("dir");
+            write_config_file(&dangling, "first").expect("save");
+            assert!(std::fs::symlink_metadata(&dangling)
+                .expect("meta")
+                .is_symlink());
+            let target = dir.path().join("nested/missing.toml");
+            assert_eq!(std::fs::read_to_string(target).expect("read"), "first");
+        }
     }
 
     #[test]

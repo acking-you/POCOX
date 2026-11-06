@@ -308,16 +308,48 @@ async fn a_dead_identity_stops_hosting_and_renewing_and_stays_held() {
     assert_eq!(old.secret(), dead, "and only the user's choice replaces its secret");
 
     // A new secret is a new question: signed out of the old session, nothing held,
-    // and a Continue of its own works.
+    // and a Continue of its own works and brings back what the hold stopped.
     flows::start_over(&old.identity(), None)
         .await
         .expect("the user's choice");
     assert_eq!(old.config().account_token(), None);
     assert!(!lifecycle::holding());
+    assert!(restarted().is_empty(), "nothing can publish while signed out");
     flows::activate(&old.identity(), None)
         .await
         .expect("Continue");
     assert_ne!(old.config().account_id(), Some(old_session.account_id.as_str()));
+    assert!(until_restarted().await.contains(&name.to_string()), "what the hold stopped starts");
+    engine_off();
+}
+
+#[allow(
+    clippy::await_holding_lock,
+    reason = "it only serializes whole tests, each on its own runtime"
+)]
+#[tokio::test(flavor = "multi_thread")]
+async fn hosts_stopped_by_a_sign_out_start_under_the_next_account() {
+    let _serial = transport::test_serial();
+    let lab = Lab::start().await;
+    let name = "pairing-test-signed-out";
+    let (install, _, _) = lab.activated().await;
+    engine_on(&install).await;
+    host_on_relay(&install, name).await;
+
+    // Signing out wakes the watcher, which stops what the group's key published.
+    account::logout(&install.support).await.expect("logout");
+    watch::tick(&install.support).await.expect("tick");
+    assert!(!serve::owned_host_names().contains(&name.to_string()), "it stopped");
+    assert!(restarted().is_empty(), "and nothing can publish it now");
+
+    // A GitHub sign-in in this same process is somewhere it can go again.
+    update_config(&install.support, |config| {
+        config.set_account_session("github-jwt", "github-refresh", "bob", Some("7".into()));
+        Ok(())
+    })
+    .expect("sign in");
+    watch::tick(&install.support).await.expect("tick");
+    assert_eq!(until_restarted().await, vec![name.to_string()]);
     engine_off();
 }
 

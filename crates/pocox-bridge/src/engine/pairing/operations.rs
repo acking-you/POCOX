@@ -29,6 +29,8 @@ use crate::engine::config::load_config;
 /// How long an operation the backend does not know can still be in flight: past
 /// the client's own request timeout, it was never received.
 const UNKNOWN_GRACE_SECS: i64 = 120;
+/// How long the backend keeps a finished operation to be read.
+const BACKEND_RETENTION_SECS: i64 = 7 * 24 * 60 * 60;
 /// How long a completed move waits for the installation that started it to
 /// adopt it.
 const ADOPTION_WINDOW_SECS: i64 = 24 * 60 * 60;
@@ -46,6 +48,8 @@ pub struct OperationOutcome {
     /// What it does.
     pub kind: OperationKind,
     /// Where it stands. Never repeat a pending action: read it again.
+    /// `Unknown` means its result can no longer be learned: the device's own
+    /// state says where it stands.
     pub status: OperationStatus,
     /// Why it failed: the backend's code.
     pub error: Option<String>,
@@ -309,16 +313,23 @@ async fn settle_one(
             {
                 Ok(OperationOutcome::of(operation, OperationStatus::Pending))
             },
-            Some(
-                code @ (PairingErrorCode::OperationUnknown
-                | PairingErrorCode::DeviceSuperseded
-                | PairingErrorCode::DeviceUnknown),
-            ) => {
-                // It never arrived, or this secret can no longer ask. Refreshing
-                // says what this device is now.
-                let error = Some(code.as_str().to_string());
+            Some(PairingErrorCode::OperationUnknown)
+                if now() - operation.started_at < BACKEND_RETENTION_SECS =>
+            {
+                // The backend keeps a finished one this long, so it never arrived.
+                let error = Some(PairingErrorCode::OperationUnknown.as_str().to_string());
                 mark(identity, &operation.id, OperationState::Failed, error.clone())?;
                 Ok(OperationOutcome::failed(operation, error))
+            },
+            Some(
+                PairingErrorCode::OperationUnknown
+                | PairingErrorCode::DeviceSuperseded
+                | PairingErrorCode::DeviceUnknown,
+            ) => {
+                // Purged since, or this secret can no longer ask: how it ended
+                // cannot be learned. The next refresh says where this device stands.
+                forget(identity, &operation.id)?;
+                Ok(OperationOutcome::of(operation, OperationStatus::Unknown))
             },
             _ => {
                 tracing::debug!("operation result not available yet: {error:#}");

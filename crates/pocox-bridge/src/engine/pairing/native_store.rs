@@ -89,8 +89,11 @@ impl NativeStore {
         // Not a task: the threads that would run one may all be here, waiting on the
         // store's lock or on this very answer.
         runtime::runtime().spawn_blocking(move || {
-            let _answered = answered;
-            let _ = answer.send(futures::executor::block_on(call));
+            let reply = futures::executor::block_on(call);
+            // Cleared before the answer is out, so a call right after this one never
+            // takes it for one still owed.
+            drop(answered);
+            let _ = answer.send(reply);
         });
         answers
             .recv_timeout(self.wait)
@@ -216,6 +219,19 @@ mod tests {
         while store.read().is_err() {
             assert!(Instant::now() < deadline, "its answer clears the way");
             std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn calls_in_quick_succession_never_wait_on_each_other() {
+        engine_runtime();
+        let root = tempfile::tempdir().expect("root");
+        let store = store(root.path(), working());
+        store.ensure_secret().expect("created");
+        for _ in 0..200 {
+            store
+                .update(|record| record.registered = !record.registered)
+                .expect("a read and a write, back to back");
         }
     }
 

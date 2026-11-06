@@ -9,6 +9,7 @@ use anyhow::Result;
 use crate::cli::{Cli, Command};
 
 mod account;
+mod account_key;
 mod api;
 mod api_proxy;
 mod codex;

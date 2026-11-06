@@ -80,7 +80,7 @@ fn scrubbed(error: anyhow::Error) -> anyhow::Error {
     if error.is::<StillPending>() {
         return error;
     }
-    let error = explain_no_device(error);
+    let error = explain_dead_identity(explain_no_device(error));
     anyhow::anyhow!("{}", scrub_pairing(&format!("{error:#}")))
 }
 
@@ -102,10 +102,7 @@ async fn dispatch(args: PairArgs) -> Result<()> {
             device,
         }) => restore(backend, args.yes, ask, retake, device).await,
         Some(PairCmd::StartOver) => start_over(backend, args.yes).await,
-        Some(PairCmd::Rotate) => {
-            print_code(&flows::rotate(&identity(backend)?).await?);
-            Ok(())
-        },
+        Some(PairCmd::Rotate) => rotate(backend).await,
         Some(PairCmd::Pause) => {
             let code = flows::set_paused(&identity(backend)?, true).await?;
             ui::headline(ui::Tone::Change, "linking through this code is paused");
@@ -159,7 +156,7 @@ async fn show(backend: Option<&str>, yes: bool, no_wait: bool) -> Result<()> {
     print_changes(&operations::settle(&identity).await?);
     let prepared = match flows::prepare(&identity, None).await {
         Ok(prepared) => prepared,
-        Err(error) => return Err(explain_dead_identity(error)),
+        Err(error) => return Err(error),
     };
     ui::headline(ui::Tone::Action, "this device's pairing code");
     print_code(&prepared.code);
@@ -314,9 +311,7 @@ async fn restore(
     device: Option<String>,
 ) -> Result<()> {
     let identity = identity(backend)?;
-    let prepared = flows::prepare(&identity, None)
-        .await
-        .map_err(explain_dead_identity)?;
+    let prepared = flows::prepare(&identity, None).await?;
     if prepared.session.activated {
         // The backend would refuse it: only a device not yet set up can take over
         // another's identity.
@@ -434,6 +429,30 @@ fn warn_if_active_today(device: &PreviewDevice) {
     }
 }
 
+/// `pocox pair rotate`. Refused within a day of the code's issue, which is also
+/// what an earlier rotation whose answer never arrived looks like: the current
+/// code and when it was issued say which.
+async fn rotate(backend: Option<&str>) -> Result<()> {
+    let identity = identity(backend)?;
+    match flows::rotate(&identity).await {
+        Ok(code) => {
+            ui::headline(ui::Tone::Ok, "this device has a new code");
+            print_code(&code);
+            Ok(())
+        },
+        Err(error) if code_of(&error) == Some(PairingErrorCode::RateLimited) => {
+            if let Ok(current) = flows::code(&identity).await {
+                ui::headline(ui::Tone::Muted, "this device's code");
+                print_code(&current);
+                ui::field("issued", &format_time(current.issued_at));
+                ui::field("rotates", &format!("after {}", format_time(current.next_rotation_at)));
+            }
+            Err(error.context("a code changes at most once a day"))
+        },
+        Err(error) => Err(error),
+    }
+}
+
 /// `pocox pair start-over`: leave a superseded or unknown identity behind.
 async fn start_over(backend: Option<&str>, yes: bool) -> Result<()> {
     let identity = identity(backend)?;
@@ -473,6 +492,8 @@ async fn list(backend: Option<&str>) -> Result<()> {
             print_dead_identity(reading.state, reading.grace_deadline);
             return Ok(());
         },
+        // The backend lists nothing until it finishes; what is under way was said.
+        PairingState::Pending => return Ok(()),
         _ => {},
     }
     if let Some(session) = &reading.session {
@@ -522,13 +543,18 @@ fn kind_name(kind: OperationKind) -> &'static str {
 
 /// Changes still open and those that turned out not to happen, which a command
 /// that lost its answer could not say.
-fn print_changes(outcomes: &[OperationOutcome]) {
+pub(crate) fn print_changes(outcomes: &[OperationOutcome]) {
     for outcome in outcomes {
         match outcome.status {
-            OperationStatus::Pending | OperationStatus::Unknown => ui::headline(
+            OperationStatus::Pending => ui::headline(
                 ui::Tone::Change,
                 &format!("{} is still under way; do not repeat it", kind_name(outcome.kind)),
             ),
+            OperationStatus::Unknown => ui::muted(&format!(
+                "  how {} ended can no longer be learned; this device's state shows where it \
+                 stands",
+                kind_name(outcome.kind)
+            )),
             OperationStatus::Failed => ui::warn(&format!(
                 "{} did not happen: {}",
                 kind_name(outcome.kind),
@@ -551,7 +577,7 @@ fn print_not_caught_up(kind: OperationKind) {
 }
 
 /// Say what happened to this device's membership, when a peer did it.
-fn print_membership(session: &DeviceSession) {
+pub(crate) fn print_membership(session: &DeviceSession) {
     let Some(change) = session.membership_change else {
         return;
     };
@@ -563,7 +589,7 @@ fn print_membership(session: &DeviceSession) {
     }
 }
 
-fn print_dead_identity(state: PairingState, grace_deadline: Option<i64>) {
+pub(crate) fn print_dead_identity(state: PairingState, grace_deadline: Option<i64>) {
     if state == PairingState::Superseded {
         ui::warn("another device took over this one's identity");
     } else {
@@ -638,10 +664,13 @@ async fn finish(identity: &Identity, mut outcome: OperationOutcome, done: &str) 
             }
             Ok(())
         },
-        OperationStatus::Pending | OperationStatus::Unknown => {
+        OperationStatus::Pending => {
             ui::headline(ui::Tone::Change, "the backend has yet to confirm this; do not repeat it");
             ui::muted("  `pocox devices` shows how it ended");
             Err(StillPending.into())
+        },
+        OperationStatus::Unknown => {
+            bail!("how that ended can no longer be learned; `pocox devices` shows where this is");
         },
         OperationStatus::Failed => {
             bail!("that did not happen: {}", outcome.error.as_deref().unwrap_or("unknown"));
@@ -657,10 +686,13 @@ fn explain_dead_identity(error: anyhow::Error) -> anyhow::Error {
         .map(|deadline| format!(" Its old access ends at {}.", format_time(deadline)))
         .unwrap_or_default();
     match code_of(&error) {
-        Some(PairingErrorCode::DeviceSuperseded) => error.context(format!(
-            "another device took over this one's identity.{deadline} Run `pocox pair start-over`, \
-             then `pocox pair restore` if this should be a device you had"
-        )),
+        // A replaced identity's last session may still finish what it had open,
+        // and is refused the rest with this.
+        Some(PairingErrorCode::DeviceSuperseded | PairingErrorCode::GraceRestricted) => error
+            .context(format!(
+                "another device took over this one's identity.{deadline} Run `pocox pair \
+                 start-over`, then `pocox pair restore` if this should be a device you had"
+            )),
         Some(PairingErrorCode::DeviceUnknown) => {
             error.context("the backend does not know this device; run `pocox pair start-over`")
         },
