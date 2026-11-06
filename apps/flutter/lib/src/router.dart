@@ -76,6 +76,10 @@ void pushRoute(String location) => _appRouter?.push(location);
 /// router exists.
 void goRoute(String location) => _appRouter?.go(location);
 
+/// The app's current location's path, or null before the router exists.
+String? currentRoutePath() =>
+    _appRouter?.routerDelegate.currentConfiguration.uri.path;
+
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
 GoRouter buildRouter({

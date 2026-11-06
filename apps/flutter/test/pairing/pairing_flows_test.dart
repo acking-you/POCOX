@@ -8,12 +8,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/pairing/pairing_account.dart';
+import 'package:pocox/src/pairing/pairing_front.dart';
+import 'package:pocox/src/pairing/pairing_host.dart';
 import 'package:pocox/src/pairing/pairing_join_screen.dart';
 import 'package:pocox/src/pairing/pairing_page.dart';
 import 'package:pocox/src/pairing/pairing_restore_screen.dart';
 import 'package:pocox/src/pairing/pairing_session.dart';
+import 'package:pocox/src/providers.dart';
+import 'package:pocox/src/router.dart';
 import 'package:pocox/src/screens/account_onboarding_screen.dart';
 import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/widgets/setting_row.dart';
@@ -403,6 +408,57 @@ void main() {
       expect(api.pairingLastRestoreTarget, 'request');
     },
   );
+
+  testWidgets('a device back from sign-in is sent there again when it loses '
+      'its identity', (t) async {
+    final api =
+        FakeBridgeApi(
+            config: const ConfigInfo(
+              relay: '',
+              hasKey: false,
+              mode: 'account',
+              accountProvider: 'device_code',
+            ),
+          )
+          ..pairingRefusal = const PairingFailure(
+            code: 'device_superseded',
+            message: '',
+          );
+    final router = GoRouter(
+      initialLocation: '/',
+      routes: [stub('/', 'HOME-ROUTE'), stub('/onboarding', 'SIGN-IN')],
+    );
+    debugSetAppRouterForTesting(router);
+    addTearDown(debugSetAppRouterForTesting);
+    await t.pumpWidget(
+      ProviderScope(
+        overrides: [bridgeApiProvider.overrideWithValue(api)],
+        child: MaterialApp.router(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          routerConfig: router,
+          builder: (_, child) => PairingHost(child: child!),
+        ),
+      ),
+    );
+    // The first check finds config still loading; the next one acts.
+    await t.pump(pairingPollInterval);
+    await t.pumpAndSettle();
+    expect(find.text('SIGN-IN'), findsOneWidget);
+
+    // Signed in again, then replaced again.
+    router.go('/');
+    await t.pumpAndSettle();
+    api.pairingRefusal = const PairingFailure(
+      code: 'device_superseded',
+      message: '',
+    );
+    await t.pump(pairingPollInterval);
+    await t.pumpAndSettle();
+    expect(find.text('SIGN-IN'), findsOneWidget);
+
+    await t.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('a member answers the exact request and manages its group', (
     t,

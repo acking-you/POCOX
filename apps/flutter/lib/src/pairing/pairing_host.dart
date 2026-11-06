@@ -33,7 +33,6 @@ class _PairingHostState extends ConsumerState<PairingHost>
   Timer? _poll;
   Set<String>? _devices;
   Set<String>? _asks;
-  bool _sentToSignIn = false;
 
   @override
   void initState() {
@@ -64,7 +63,6 @@ class _PairingHostState extends ConsumerState<PairingHost>
     if (config == null || !config.pairing) {
       _devices = null;
       _asks = null;
-      _sentToSignIn = false;
       return;
     }
     final lifecycle = WidgetsBinding.instance.lifecycleState;
@@ -93,7 +91,6 @@ class _PairingHostState extends ConsumerState<PairingHost>
       _toSignIn();
       return;
     }
-    _sentToSignIn = false;
     final l10n = AppLocalizations.of(context);
     final toast = ToastMessenger.of(context);
     final devices = {
@@ -129,8 +126,10 @@ class _PairingHostState extends ConsumerState<PairingHost>
   }
 
   void _toSignIn() {
-    if (_sentToSignIn) return;
-    _sentToSignIn = true;
+    // Sign-in and its pairing pages already say what happened; anywhere else,
+    // including after signing in again, the device goes back to sign-in.
+    final path = currentRoutePath() ?? '';
+    if (path.startsWith('/onboarding') || path.startsWith('/pair')) return;
     ref.invalidate(configProvider);
     goRoute('/onboarding');
   }
