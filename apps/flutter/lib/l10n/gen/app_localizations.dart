@@ -878,12 +878,6 @@ abstract class AppLocalizations {
   /// **'Welcome to POCOX'**
   String get accountWelcomeHeadline;
 
-  /// No description provided for @accountWelcomeSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in to pick up your conversations on any device.'**
-  String get accountWelcomeSubtitle;
-
   /// No description provided for @accountSignInTitle.
   ///
   /// In en, this message translates to:
@@ -899,7 +893,7 @@ abstract class AppLocalizations {
   /// No description provided for @accountUseDeviceCode.
   ///
   /// In en, this message translates to:
-  /// **'Use a device code instead'**
+  /// **'GitHub device code'**
   String get accountUseDeviceCode;
 
   /// No description provided for @accountSessionExpiredTitle.
@@ -3685,6 +3679,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in with the same GitHub account'**
   String get welcomeMobileStep2;
+
+  /// No description provided for @welcomeMobileStep2Pairing.
+  ///
+  /// In en, this message translates to:
+  /// **'Link it to this device with a pairing code'**
+  String get welcomeMobileStep2Pairing;
 
   /// No description provided for @welcomeMobileStep3.
   ///
@@ -9190,6 +9190,948 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{used} / {limit} MB'**
   String historyCacheValue(String used, int limit);
+
+  /// No description provided for @pairingThisCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This device\'s pairing code'**
+  String get pairingThisCode;
+
+  /// No description provided for @pairingCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get pairingCopied;
+
+  /// No description provided for @pairingQrLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'QR code of this device\'s pairing code'**
+  String get pairingQrLabel;
+
+  /// No description provided for @pairingOr.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get pairingOr;
+
+  /// No description provided for @pairingOtherCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device\'s code'**
+  String get pairingOtherCode;
+
+  /// No description provided for @pairingGroupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'A code from any linked device'**
+  String get pairingGroupCode;
+
+  /// No description provided for @pairingScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan QR code'**
+  String get pairingScan;
+
+  /// No description provided for @pairingNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get pairingNext;
+
+  /// No description provided for @pairingGetStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get pairingGetStarted;
+
+  /// No description provided for @pairingContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get pairingContinue;
+
+  /// No description provided for @pairingContinueAlone.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue on its own'**
+  String get pairingContinueAlone;
+
+  /// No description provided for @pairingFirstDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This is my first device'**
+  String get pairingFirstDevice;
+
+  /// No description provided for @pairingEnterOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter another device\'s code'**
+  String get pairingEnterOther;
+
+  /// No description provided for @pairingEnterTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Which device\'s group?'**
+  String get pairingEnterTitle;
+
+  /// No description provided for @pairingRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore a previous device'**
+  String get pairingRestore;
+
+  /// No description provided for @pairingUseCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a pairing code'**
+  String get pairingUseCode;
+
+  /// No description provided for @pairingUseInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a pairing code instead'**
+  String get pairingUseInstead;
+
+  /// No description provided for @pairingOtherWays.
+  ///
+  /// In en, this message translates to:
+  /// **'Other ways to sign in'**
+  String get pairingOtherWays;
+
+  /// No description provided for @pairingReady.
+  ///
+  /// In en, this message translates to:
+  /// **'This device is set up'**
+  String get pairingReady;
+
+  /// No description provided for @pairingSignedInWithCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Signed in with a pairing code'**
+  String get pairingSignedInWithCode;
+
+  /// No description provided for @pairingOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get pairingOffline;
+
+  /// No description provided for @pairingOfflineBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Requested once you\'re online.'**
+  String get pairingOfflineBody;
+
+  /// No description provided for @pairingUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get pairingUnavailable;
+
+  /// No description provided for @pairingNoRoom.
+  ///
+  /// In en, this message translates to:
+  /// **'The server is not taking new devices right now. Existing devices are fine. Try later, or sign in with GitHub.'**
+  String get pairingNoRoom;
+
+  /// No description provided for @pairingTooOld.
+  ///
+  /// In en, this message translates to:
+  /// **'This server has no pairing codes yet. Update the backend, or sign in with GitHub.'**
+  String get pairingTooOld;
+
+  /// No description provided for @pairingJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} joined'**
+  String pairingJoined(String name);
+
+  /// No description provided for @pairingJoinedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} linked. Not yours?'**
+  String pairingJoinedNotice(String name);
+
+  /// No description provided for @pairingJoinedManyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices linked. Not yours?'**
+  String pairingJoinedManyNotice(int count);
+
+  /// No description provided for @pairingAskManyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices ask to be restored'**
+  String pairingAskManyNotice(int count);
+
+  /// No description provided for @pairingNewsNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changes to your devices'**
+  String pairingNewsNotice(int count);
+
+  /// No description provided for @pairingAskNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'A device asks to restore {name}'**
+  String pairingAskNotice(String name);
+
+  /// No description provided for @pairingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Review'**
+  String get pairingReview;
+
+  /// No description provided for @pairingRemovedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This device was removed'**
+  String get pairingRemovedTitle;
+
+  /// No description provided for @pairingRemovedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Another device removed it and new connections stopped. Sessions and settings here are intact.'**
+  String get pairingRemovedBody;
+
+  /// No description provided for @pairingSupersededTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'This device was restored elsewhere'**
+  String get pairingSupersededTitle;
+
+  /// No description provided for @pairingSupersededBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This one stops working at {time}. If that wasn\'t you, take it back with a code or a linked device; the old code then stops at once.'**
+  String pairingSupersededBody(String time);
+
+  /// No description provided for @pairingSupersededBodyNow.
+  ///
+  /// In en, this message translates to:
+  /// **'This one no longer works. If that wasn\'t you, take it back with a code or a linked device; the old code then stops at once.'**
+  String get pairingSupersededBodyNow;
+
+  /// No description provided for @pairingUnknownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The server no longer knows this device'**
+  String get pairingUnknownTitle;
+
+  /// No description provided for @pairingUnknownBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Start as a new device. You can then restore one you had.'**
+  String get pairingUnknownBody;
+
+  /// No description provided for @pairingTakeBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Take back and change code'**
+  String get pairingTakeBack;
+
+  /// No description provided for @pairingTakeBackBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The old device\'s access ends at once and its code changes.'**
+  String get pairingTakeBackBody;
+
+  /// No description provided for @pairingStartOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Start as a new device'**
+  String get pairingStartOver;
+
+  /// No description provided for @pairingPendingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the server'**
+  String get pairingPendingTitle;
+
+  /// No description provided for @pairingPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The server has yet to confirm this change. It finishes on its own; nothing needs repeating.'**
+  String get pairingPendingBody;
+
+  /// No description provided for @pairingPendingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Linking'**
+  String get pairingPendingLink;
+
+  /// No description provided for @pairingPendingLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leaving these devices'**
+  String get pairingPendingLeave;
+
+  /// No description provided for @pairingPendingRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Removing a device'**
+  String get pairingPendingRemove;
+
+  /// No description provided for @pairingPendingRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring this device'**
+  String get pairingPendingRestore;
+
+  /// No description provided for @pairingCheckStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Check status'**
+  String get pairingCheckStatus;
+
+  /// No description provided for @pairingNotCaughtUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Done. This app is still catching up and will try again.'**
+  String get pairingNotCaughtUp;
+
+  /// No description provided for @pairingConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get pairingConfirmTitle;
+
+  /// No description provided for @pairingLinkQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to these devices?'**
+  String get pairingLinkQuestion;
+
+  /// No description provided for @pairingAlreadyMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Already linked to these devices'**
+  String get pairingAlreadyMember;
+
+  /// No description provided for @pairingLinkBody.
+  ///
+  /// In en, this message translates to:
+  /// **'They can use services hosted here, and this device can use theirs.'**
+  String get pairingLinkBody;
+
+  /// No description provided for @pairingLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Link'**
+  String get pairingLink;
+
+  /// No description provided for @pairingLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked'**
+  String get pairingLinked;
+
+  /// No description provided for @pairingOwnsCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Owns this code'**
+  String get pairingOwnsCode;
+
+  /// No description provided for @pairingListSeparator.
+  ///
+  /// In en, this message translates to:
+  /// **', '**
+  String get pairingListSeparator;
+
+  /// No description provided for @pairingLeaveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave your {count} current devices?'**
+  String pairingLeaveTitle(int count);
+
+  /// No description provided for @pairingLeaveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This device leaves {names} and links to {target}. Sessions and settings here stay, and the two groups do not merge. Every POCOX installation on this device moves with it.'**
+  String pairingLeaveBody(String names, String target);
+
+  /// No description provided for @pairingLeaveAndLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave and link'**
+  String get pairingLeaveAndLink;
+
+  /// No description provided for @pairingSignOutTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out of @{login}?'**
+  String pairingSignOutTitle(String login);
+
+  /// No description provided for @pairingSignOutBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This device links to {target}. That account\'s devices stop seeing what it hosts. The session is set aside, so you can switch back in Settings.'**
+  String pairingSignOutBody(String target);
+
+  /// No description provided for @pairingSignOutAndLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out and link'**
+  String get pairingSignOutAndLink;
+
+  /// No description provided for @pairingRelayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop using this relay?'**
+  String get pairingRelayTitle;
+
+  /// No description provided for @pairingRelayBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This device links to {target}. The relay address and key are kept, so you can switch back in Settings.'**
+  String pairingRelayBody(String target);
+
+  /// No description provided for @pairingRelayAndLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop and link'**
+  String get pairingRelayAndLink;
+
+  /// No description provided for @pairingRestoreQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Used POCOX on this device before?'**
+  String get pairingRestoreQuestion;
+
+  /// No description provided for @pairingAsk.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask a linked device'**
+  String get pairingAsk;
+
+  /// No description provided for @pairingAsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue as a new device'**
+  String get pairingAsNew;
+
+  /// No description provided for @pairingWhichDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Which one is this device?'**
+  String get pairingWhichDevice;
+
+  /// No description provided for @pairingAddAsNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Add as a new device'**
+  String get pairingAddAsNew;
+
+  /// No description provided for @pairingRestoreThis.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore this device'**
+  String get pairingRestoreThis;
+
+  /// No description provided for @pairingActiveTodayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was active today'**
+  String pairingActiveTodayTitle(String name);
+
+  /// No description provided for @pairingActiveTodayBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring it here stops it there. Restore anyway?'**
+  String get pairingActiveTodayBody;
+
+  /// No description provided for @pairingRestoreYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get pairingRestoreYes;
+
+  /// No description provided for @pairingRestored.
+  ///
+  /// In en, this message translates to:
+  /// **'This device was restored'**
+  String get pairingRestored;
+
+  /// No description provided for @pairingWaitingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for a linked device'**
+  String get pairingWaitingTitle;
+
+  /// No description provided for @pairingWaitingInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'On a linked device, open Settings › Account and allow the request showing this same check number. Nothing changes until you confirm here.'**
+  String get pairingWaitingInfo;
+
+  /// No description provided for @pairingCheckNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Check number'**
+  String get pairingCheckNumber;
+
+  /// No description provided for @pairingRestoreDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'The request was denied. This device continues as new.'**
+  String get pairingRestoreDenied;
+
+  /// No description provided for @pairingRestoreExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'The request expired. Ask again, or use a code.'**
+  String get pairingRestoreExpired;
+
+  /// No description provided for @pairingConfirmRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm restore'**
+  String get pairingConfirmRestore;
+
+  /// No description provided for @pairingYourDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Are these your devices?'**
+  String get pairingYourDevices;
+
+  /// No description provided for @pairingNotMine.
+  ///
+  /// In en, this message translates to:
+  /// **'Not mine, continue as new'**
+  String get pairingNotMine;
+
+  /// No description provided for @pairingSameDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Same device'**
+  String get pairingSameDevice;
+
+  /// No description provided for @pairingScanTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan pairing code'**
+  String get pairingScanTitle;
+
+  /// No description provided for @pairingScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Point at the QR code on the other device'**
+  String get pairingScanHint;
+
+  /// No description provided for @pairingScanNotOurs.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a pairing code'**
+  String get pairingScanNotOurs;
+
+  /// No description provided for @pairingByHand.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter it by hand'**
+  String get pairingByHand;
+
+  /// No description provided for @pairingCameraDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera access is off. Allow it in Settings, or enter the code by hand.'**
+  String get pairingCameraDenied;
+
+  /// No description provided for @pairingCameraFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The camera is not available. Enter the code by hand.'**
+  String get pairingCameraFailed;
+
+  /// No description provided for @pairingMyDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'My devices'**
+  String get pairingMyDevices;
+
+  /// No description provided for @pairingAddDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get pairingAddDevice;
+
+  /// No description provided for @pairingThisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device'**
+  String get pairingThisDevice;
+
+  /// No description provided for @pairingNotSetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Not set up'**
+  String get pairingNotSetUp;
+
+  /// No description provided for @pairingToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get pairingToday;
+
+  /// No description provided for @pairingYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get pairingYesterday;
+
+  /// No description provided for @pairingDaysAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days ago'**
+  String pairingDaysAgo(int days);
+
+  /// No description provided for @pairingNoPeers.
+  ///
+  /// In en, this message translates to:
+  /// **'No other devices linked'**
+  String get pairingNoPeers;
+
+  /// No description provided for @pairingLinkedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices linked'**
+  String pairingLinkedCount(int count);
+
+  /// No description provided for @pairingAsking.
+  ///
+  /// In en, this message translates to:
+  /// **'Asking to restore · check number {number}'**
+  String pairingAsking(String number);
+
+  /// No description provided for @pairingDeny.
+  ///
+  /// In en, this message translates to:
+  /// **'Deny'**
+  String get pairingDeny;
+
+  /// No description provided for @pairingAllow.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow'**
+  String get pairingAllow;
+
+  /// No description provided for @pairingAllowed.
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed. Nothing changes until that device confirms.'**
+  String get pairingAllowed;
+
+  /// No description provided for @pairingDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Denied'**
+  String get pairingDenied;
+
+  /// No description provided for @pairingMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get pairingMore;
+
+  /// No description provided for @pairingRename.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get pairingRename;
+
+  /// No description provided for @pairingDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get pairingDeviceName;
+
+  /// No description provided for @pairingRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove {name}?'**
+  String pairingRemoveTitle(String name);
+
+  /// No description provided for @pairingRemoveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It can\'t make new connections, and other devices are not affected. A direct connection already open lasts until either end closes it. Its sessions and settings stay on it.'**
+  String get pairingRemoveBody;
+
+  /// No description provided for @pairingRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was removed'**
+  String pairingRemoved(String name);
+
+  /// No description provided for @pairingCodeSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing code'**
+  String get pairingCodeSection;
+
+  /// No description provided for @pairingPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get pairingPaused;
+
+  /// No description provided for @pairingAllowLinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow linking with this code'**
+  String get pairingAllowLinking;
+
+  /// No description provided for @pairingAllowLinkingInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'Takes effect at once. Linked devices are not affected.'**
+  String get pairingAllowLinkingInfo;
+
+  /// No description provided for @pairingChangeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Change code'**
+  String get pairingChangeCode;
+
+  /// No description provided for @pairingChangeCodeInfo.
+  ///
+  /// In en, this message translates to:
+  /// **'The old code stops working at once. Linked devices are not affected. You can change it again after 24 hours.'**
+  String get pairingChangeCodeInfo;
+
+  /// No description provided for @pairingAvailableIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Available in {hours} h'**
+  String pairingAvailableIn(int hours);
+
+  /// No description provided for @pairingChange.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get pairingChange;
+
+  /// No description provided for @pairingRotateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Change this device\'s code?'**
+  String get pairingRotateTitle;
+
+  /// No description provided for @pairingRotateBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The old code stops working at once. Linked devices are not affected. You can change it again after 24 hours.'**
+  String get pairingRotateBody;
+
+  /// No description provided for @pairingRotateYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get pairingRotateYes;
+
+  /// No description provided for @pairingRotated.
+  ///
+  /// In en, this message translates to:
+  /// **'The code was changed'**
+  String get pairingRotated;
+
+  /// No description provided for @pairingLinking.
+  ///
+  /// In en, this message translates to:
+  /// **'Linking'**
+  String get pairingLinking;
+
+  /// No description provided for @pairingLinkAnother.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to another device'**
+  String get pairingLinkAnother;
+
+  /// No description provided for @pairingLinkInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Link to other devices instead'**
+  String get pairingLinkInstead;
+
+  /// No description provided for @pairingToGitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to GitHub'**
+  String get pairingToGitHub;
+
+  /// No description provided for @pairingBackToGitHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to GitHub (@{login})'**
+  String pairingBackToGitHub(String login);
+
+  /// No description provided for @pairingToGitHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch to GitHub?'**
+  String get pairingToGitHubTitle;
+
+  /// No description provided for @pairingBackToGitHubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to @{login}?'**
+  String pairingBackToGitHubTitle(String login);
+
+  /// No description provided for @pairingToGitHubBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This installation stops using this device\'s pairing identity. Its devices stay linked, and you can come back with Use a pairing code.'**
+  String get pairingToGitHubBody;
+
+  /// No description provided for @pairingToGitHubYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with GitHub'**
+  String get pairingToGitHubYes;
+
+  /// No description provided for @pairingBackToGitHubYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch back'**
+  String get pairingBackToGitHubYes;
+
+  /// No description provided for @pairingLeaveGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave these devices'**
+  String get pairingLeaveGroup;
+
+  /// No description provided for @pairingLeaveGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave your {count} linked devices?'**
+  String pairingLeaveGroupTitle(int count);
+
+  /// No description provided for @pairingLeaveGroupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This device continues on its own with its own code. Every POCOX installation on it moves with it. Sessions and settings here stay.'**
+  String get pairingLeaveGroupBody;
+
+  /// No description provided for @pairingLeaveYes.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get pairingLeaveYes;
+
+  /// No description provided for @pairingErrUnknownCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That code is not right. Check it and try again.'**
+  String get pairingErrUnknownCode;
+
+  /// No description provided for @pairingErrRetired.
+  ///
+  /// In en, this message translates to:
+  /// **'This code no longer works. Check the latest one on that device.'**
+  String get pairingErrRetired;
+
+  /// No description provided for @pairingErrPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'That device has paused linking. Turn it on there first.'**
+  String get pairingErrPaused;
+
+  /// No description provided for @pairingErrOwnCode.
+  ///
+  /// In en, this message translates to:
+  /// **'This is this device\'s own code. Enter another device\'s.'**
+  String get pairingErrOwnCode;
+
+  /// No description provided for @pairingErrTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Try again in {minutes} minutes.'**
+  String pairingErrTooMany(int minutes);
+
+  /// No description provided for @pairingErrStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Those devices just changed. Review them again.'**
+  String get pairingErrStale;
+
+  /// No description provided for @pairingErrAlreadyLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'This device is already linked to those devices.'**
+  String get pairingErrAlreadyLinked;
+
+  /// No description provided for @pairingErrGroupFull.
+  ///
+  /// In en, this message translates to:
+  /// **'That group has no room for another device.'**
+  String get pairingErrGroupFull;
+
+  /// No description provided for @pairingErrPending.
+  ///
+  /// In en, this message translates to:
+  /// **'A change to this device is still under way.'**
+  String get pairingErrPending;
+
+  /// No description provided for @pairingErrUpgrade.
+  ///
+  /// In en, this message translates to:
+  /// **'Update POCOX to use pairing codes with this server.'**
+  String get pairingErrUpgrade;
+
+  /// No description provided for @pairingErrRelay.
+  ///
+  /// In en, this message translates to:
+  /// **'The server\'s relay is not reachable right now. Try again shortly.'**
+  String get pairingErrRelay;
+
+  /// No description provided for @pairingErrNotActivated.
+  ///
+  /// In en, this message translates to:
+  /// **'This device is not set up yet. Continue on it first.'**
+  String get pairingErrNotActivated;
+
+  /// No description provided for @pairingErrNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No linked device was found to ask. Use a code from one of them instead.'**
+  String get pairingErrNotFound;
+
+  /// No description provided for @pairingErrSlotsFull.
+  ///
+  /// In en, this message translates to:
+  /// **'That device already has requests waiting. Use a code instead.'**
+  String get pairingErrSlotsFull;
+
+  /// No description provided for @pairingErrNoDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has no pairing identity here yet.'**
+  String get pairingErrNoDevice;
+
+  /// No description provided for @pairingErrDeviceGone.
+  ///
+  /// In en, this message translates to:
+  /// **'That device is no longer in this group.'**
+  String get pairingErrDeviceGone;
+
+  /// No description provided for @pairingErrName.
+  ///
+  /// In en, this message translates to:
+  /// **'That name is too long or has characters a name cannot have.'**
+  String get pairingErrName;
+
+  /// No description provided for @pairingErrNotApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'That change did not go through. Nothing changed.'**
+  String get pairingErrNotApplied;
+
+  /// No description provided for @pairingErrUnreachable.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot reach the server. Your entry is kept.'**
+  String get pairingErrUnreachable;
 }
 
 class _AppLocalizationsDelegate

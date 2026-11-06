@@ -43,6 +43,11 @@ Future<T?> showAdaptivePanel<T>({
   /// The control to hang from, when the caller knows it; otherwise the
   /// pressed control is used (see [PopoverAnchor]).
   Rect? anchorRect,
+
+  /// On a phone, keep the body above the keyboard: the sheet's scrolling body
+  /// shrinks by the keyboard's height, so a focused field scrolls into view.
+  /// Off for bodies that pad for the keyboard themselves.
+  bool avoidKeyboard = false,
 }) {
   final size = MediaQuery.sizeOf(context);
   final scheme = Theme.of(context).colorScheme;
@@ -66,7 +71,10 @@ Future<T?> showAdaptivePanel<T>({
       // The drag handle occupies the top edge, so the body starts right under it.
       builder: (c) => SafeArea(
         child: Padding(
-          padding: EdgeInsets.only(top: insetTop ? 4 : 0),
+          padding: EdgeInsets.only(
+            top: insetTop ? 4 : 0,
+            bottom: avoidKeyboard ? MediaQuery.viewInsetsOf(c).bottom : 0,
+          ),
           child: body(c),
         ),
       ),

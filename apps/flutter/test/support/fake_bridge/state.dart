@@ -15,6 +15,9 @@ abstract class _FakeBridgeState implements BridgeApi {
       _services = List.of(services ?? const []);
 
   ConfigInfo _config;
+
+  /// What [getConfig] answers from now on, as if another page had signed in.
+  set config(ConfigInfo value) => _config = value;
   final List<ServiceEntry> _services;
   final Map<String, SubInfo> _subs = {};
 

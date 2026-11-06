@@ -13,6 +13,7 @@ import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/network/network_settings.dart';
 import 'package:pocox/src/network/connection_paths.dart';
 import 'package:pocox/src/network/connection_window.dart';
+import 'package:pocox/src/pairing/pairing_account.dart';
 import 'package:pocox/src/tools/tools_providers.dart';
 import 'package:pocox/src/tools/tools_settings.dart';
 import 'package:pocox/src/theme.dart';

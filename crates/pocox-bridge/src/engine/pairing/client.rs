@@ -15,7 +15,7 @@ use pocox_account_proto::pairing::{
 };
 use pocox_core::pairing::CanonicalBackend;
 use reqwest::redirect::Policy;
-use reqwest::{Method, RequestBuilder, Response};
+use reqwest::{Method, RequestBuilder, Response, StatusCode};
 use serde::de::DeserializeOwned;
 
 use super::error::PairingError;
@@ -137,6 +137,9 @@ pub(crate) async fn accepted(response: Response, what: &str) -> Result<Response>
         .and_then(|value| value.parse().ok());
     match response.json::<PairingErrorBody>().await {
         Ok(body) => Err(PairingError::from_body(status.as_u16(), body, retry_header).into()),
+        Err(_) if matches!(status, StatusCode::NOT_FOUND | StatusCode::METHOD_NOT_ALLOWED) => {
+            Err(PairingError::without_pairing(status.as_u16()).into())
+        },
         Err(_) => bail!("{what} failed: HTTP {status}"),
     }
 }

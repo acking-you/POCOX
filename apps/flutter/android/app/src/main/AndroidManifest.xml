@@ -9,11 +9,16 @@
     <!-- Hands a user-requested, verified update to the system installer,
          which asks the user before anything installs. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <!-- Scans another device's pairing code. Asked for only when the user
+         opens the scanner. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="POCOX"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:networkSecurityConfig="@xml/network_security_config">
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -31,9 +36,10 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <!-- No route opens from an intent's data: nothing here is a deep
-                 link (the login callback has its own activity below), and
-                 pages such as /preview must not open on another app's say. -->
+            <!-- No route opens from an intent's data: pages such as /preview
+                 must not open on another app's say. The one link this activity
+                 takes, a pairing invitation, is read by the app itself and only
+                 ever opens a preview. -->
             <meta-data
               android:name="flutter_deeplinking_enabled"
               android:value="false" />
@@ -41,11 +47,18 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pocox" android:host="pair" />
+            </intent-filter>
         </activity>
         <!-- flutter_web_auth_2 callback: the browser-redirect login sends the
-             user back to `pocox://…` after GitHub authorization; this
+             user back to `pocox://auth` after GitHub authorization; this
              activity (provided by the plugin) catches that deep link and hands
-             the result back to the awaiting authenticate() call. -->
+             the result back to the awaiting authenticate() call. Only that
+             host: a pairing invitation must never be taken for it. -->
         <activity
             android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
             android:exported="true">
@@ -53,7 +66,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="pocox" />
+                <data android:scheme="pocox" android:host="auth" />
             </intent-filter>
         </activity>
         <!-- Hears the package installer's status and shows its

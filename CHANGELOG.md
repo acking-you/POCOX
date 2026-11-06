@@ -9,6 +9,16 @@ breaking change goes.
 
 ## Unreleased
 
+- **Sign in with a pairing code, in the app.** Sign-in now leads with this device's
+  code: a computer shows it with a QR code and gets started in one step, a phone types
+  or scans another device's code. Restore a previous device, GitHub's sign-ins and
+  self-hosting sit under Other ways to sign in; restoring recovers a device by its
+  group's code or a linked device's approval. Settings › Account lists the group, adds a
+  device, pauses or changes the code, answers recovery requests and switches back to
+  GitHub. A `pocox://pair` link or QR code only ever opens a preview. iOS keeps the
+  identity in the Keychain, so a reinstall resumes it, and Android in its no-backup
+  storage; Android's side compiles in CI but has not yet been run on a device. "Use a
+  device code instead" is now "GitHub device code".
 - **Sign in with a pairing code, from the CLI.** `pocox pair` shows this device's
   code and `pocox pair join` links another device with it, with no GitHub account.
   `pocox devices` lists and removes linked devices; `pocox pair restore` recovers a
@@ -16,8 +26,7 @@ breaking change goes.
   and the group. A code is only ever read from a prompt or stdin. `pocox login`,
   `pocox logout` and self-hosted relays work as before, and `pocox login --resume`
   returns to a GitHub session set aside for pairing. A change the backend has yet to
-  finish exits with code 75. The app's screens come later; a backend needs
-  `POCOX_PAIRING_SECRET` set. See [the CLI guide](docs/cli.md#pairing-codes).
+  finish exits with code 75. A backend needs `POCOX_PAIRING_SECRET` set. See [the CLI guide](docs/cli.md#pairing-codes).
 - Forked Codex conversations recover inherited image attachments from their
   stored history after the original temporary image files disappear.
 - Fork confirmations expire when their conversation view or host connection

@@ -31,6 +31,11 @@ dependencies:
   flutter_webrtc: 1.6.2+hotfix.3
   go_router: ^14.6.2
   path_provider: ^2.1.5
+  # Pairing-code login: a device's code as a QR, a phone's camera to read one,
+  # and `pocox://pair` invitations opened from outside the app.
+  qr_flutter: ^4.1.0
+  mobile_scanner: 7.4.2
+  app_links: ^7.2.2
   # Native buffers for the galaxy's per-frame call into the Rust bridge.
   ffi: ^2.2.0
   # Renders agent replies as Markdown documents (headings, code, lists,

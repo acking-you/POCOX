@@ -3,7 +3,7 @@ part of '../services_screen.dart';
 class _DeviceColumn extends StatelessWidget {
   const _DeviceColumn({
     required this.relay,
-    required this.accountLogin,
+    required this.accountName,
     required this.accountId,
     required this.devices,
     required this.activeDevice,
@@ -16,7 +16,7 @@ class _DeviceColumn extends StatelessWidget {
   });
 
   final String relay;
-  final String? accountLogin;
+  final String? accountName;
   final String? accountId;
   final List<String> devices;
   final String? activeDevice;
@@ -60,9 +60,9 @@ class _DeviceColumn extends StatelessWidget {
     // the devices below it are rows on the sheet itself, the chosen one
     // lifted into a card of its own — one level of plates, not a slab.
     final identity = _RelayCard(
-      name: accountLogin == null ? relay : '@$accountLogin',
+      name: accountName ?? relay,
       relay: relay,
-      account: accountLogin != null,
+      account: accountName != null,
       accountId: accountId,
       state: relayState,
     );

@@ -250,7 +250,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountRedirectRejected =>
-      '该服务器的账号后端版本早于应用，不接受应用的登录回调地址。请更新后端，或使用下方的设备码登录。';
+      '该服务器的账号后端版本早于应用，不接受应用的登录回调地址。请更新后端，或改用 GitHub 设备码。';
 
   @override
   String get linkSheetTitle => '连接';
@@ -442,16 +442,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountWelcomeHeadline => '欢迎使用 POCOX';
 
   @override
-  String get accountWelcomeSubtitle => '登录后，在任意设备上继续你的对话。';
-
-  @override
   String get accountSignInTitle => '登录';
 
   @override
   String get accountSignInButton => '使用 GitHub 登录';
 
   @override
-  String get accountUseDeviceCode => '设备码登录';
+  String get accountUseDeviceCode => 'GitHub 设备码';
 
   @override
   String get accountSessionExpiredTitle => '登录已过期';
@@ -467,7 +464,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get accountWebTrouble =>
-      '浏览器登录未完成 —— 可能是 GitHub 页面打不开，也可能是浏览器无法把结果交回给应用。下方的设备码登录不需要这一步交接。';
+      '浏览器登录未完成 —— 可能是 GitHub 页面打不开，也可能是浏览器无法把结果交回给应用。GitHub 设备码不需要这一步交接。';
 
   @override
   String get accountSignedIn => '已登录';
@@ -1975,6 +1972,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get welcomeMobileStep2 => '登录同一个 GitHub 账号';
+
+  @override
+  String get welcomeMobileStep2Pairing => '用匹配码把它关联到这台设备';
 
   @override
   String get welcomeMobileStep3 => '点击「开始托管」，一键完成配置';
@@ -5061,4 +5061,526 @@ class AppLocalizationsZh extends AppLocalizations {
   String historyCacheValue(String used, int limit) {
     return '$used / $limit MB';
   }
+
+  @override
+  String get pairingThisCode => '这台设备的匹配码';
+
+  @override
+  String get pairingCopied => '匹配码已复制';
+
+  @override
+  String get pairingQrLabel => '这台设备匹配码的二维码';
+
+  @override
+  String get pairingOr => '或';
+
+  @override
+  String get pairingOtherCode => '另一台设备的匹配码';
+
+  @override
+  String get pairingGroupCode => '任一台已关联设备的匹配码';
+
+  @override
+  String get pairingScan => '扫描二维码';
+
+  @override
+  String get pairingNext => '下一步';
+
+  @override
+  String get pairingGetStarted => '开始使用';
+
+  @override
+  String get pairingContinue => '继续使用';
+
+  @override
+  String get pairingContinueAlone => '继续单独使用';
+
+  @override
+  String get pairingFirstDevice => '这是我的第一台设备';
+
+  @override
+  String get pairingEnterOther => '输入其他设备的匹配码';
+
+  @override
+  String get pairingEnterTitle => '关联到哪台设备？';
+
+  @override
+  String get pairingRestore => '恢复以前的设备';
+
+  @override
+  String get pairingUseCode => '使用匹配码';
+
+  @override
+  String get pairingUseInstead => '改用匹配码';
+
+  @override
+  String get pairingOtherWays => '其他登录方式';
+
+  @override
+  String get pairingReady => '这台设备已设置好';
+
+  @override
+  String get pairingSignedInWithCode => '已用匹配码登录';
+
+  @override
+  String get pairingOffline => '离线';
+
+  @override
+  String get pairingOfflineBody => '联网后自动申请。';
+
+  @override
+  String get pairingUnavailable => '不可用';
+
+  @override
+  String get pairingNoRoom => '服务器暂时不接收新设备，已有设备不受影响。稍后再试，或用 GitHub 登录。';
+
+  @override
+  String get pairingTooOld => '这个服务器还不支持匹配码。升级后端，或用 GitHub 登录。';
+
+  @override
+  String pairingJoined(String name) {
+    return '$name 已加入';
+  }
+
+  @override
+  String pairingJoinedNotice(String name) {
+    return '$name 已关联。不是你的设备？';
+  }
+
+  @override
+  String pairingJoinedManyNotice(int count) {
+    return '$count 台设备已关联，不是你的？';
+  }
+
+  @override
+  String pairingAskManyNotice(int count) {
+    return '$count 台设备请求恢复';
+  }
+
+  @override
+  String pairingNewsNotice(int count) {
+    return '你的设备有 $count 项变化';
+  }
+
+  @override
+  String pairingAskNotice(String name) {
+    return '有设备请求恢复 $name';
+  }
+
+  @override
+  String get pairingReview => '查看';
+
+  @override
+  String get pairingRemovedTitle => '这台设备已被移除';
+
+  @override
+  String get pairingRemovedBody => '另一台设备移除了它，新的连接已停止。这里的会话和设置都还在。';
+
+  @override
+  String get pairingSupersededTitle => '这台设备已在别处恢复';
+
+  @override
+  String pairingSupersededBody(String time) {
+    return '这台会在 $time 停止工作。如果不是你做的，用匹配码或已关联的设备重新接管；旧码随即失效。';
+  }
+
+  @override
+  String get pairingSupersededBodyNow =>
+      '这台已经停止工作。如果不是你做的，用匹配码或已关联的设备重新接管；旧码随即失效。';
+
+  @override
+  String get pairingUnknownTitle => '服务器已不认识这台设备';
+
+  @override
+  String get pairingUnknownBody => '作为新设备开始，之后可以恢复以前的设备。';
+
+  @override
+  String get pairingTakeBack => '重新接管并更换匹配码';
+
+  @override
+  String get pairingTakeBackBody => '旧设备的访问立刻失效，匹配码随之更换。';
+
+  @override
+  String get pairingStartOver => '作为新设备开始';
+
+  @override
+  String get pairingPendingTitle => '等待服务器确认';
+
+  @override
+  String get pairingPendingBody => '服务器还没确认这项变更。它会自行完成，不需要重复操作。';
+
+  @override
+  String get pairingPendingLink => '正在关联';
+
+  @override
+  String get pairingPendingLeave => '正在离开这些设备';
+
+  @override
+  String get pairingPendingRemove => '正在移除设备';
+
+  @override
+  String get pairingPendingRestore => '正在恢复这台设备';
+
+  @override
+  String get pairingCheckStatus => '查看状态';
+
+  @override
+  String get pairingNotCaughtUp => '已完成，应用还在同步，会自动重试。';
+
+  @override
+  String get pairingConfirmTitle => '确认关联';
+
+  @override
+  String get pairingLinkQuestion => '关联到这些设备？';
+
+  @override
+  String get pairingAlreadyMember => '已经和这些设备关联';
+
+  @override
+  String get pairingLinkBody => '它们可以使用这里托管的服务，这台设备也能使用它们的。';
+
+  @override
+  String get pairingLink => '关联';
+
+  @override
+  String get pairingLinked => '已关联';
+
+  @override
+  String get pairingOwnsCode => '发码设备';
+
+  @override
+  String get pairingListSeparator => '、';
+
+  @override
+  String pairingLeaveTitle(int count) {
+    return '离开现在的 $count 台设备？';
+  }
+
+  @override
+  String pairingLeaveBody(String names, String target) {
+    return '这台设备离开 $names，关联到 $target。这里的会话和设置保留，两组设备不会合并。这台设备上的所有 POCOX 安装一同移动。';
+  }
+
+  @override
+  String get pairingLeaveAndLink => '离开并关联';
+
+  @override
+  String pairingSignOutTitle(String login) {
+    return '退出 GitHub 账号 @$login？';
+  }
+
+  @override
+  String pairingSignOutBody(String target) {
+    return '这台设备关联到 $target，该账号的设备将看不到它托管的服务。登录会被保留，可在设置中切换回来。';
+  }
+
+  @override
+  String get pairingSignOutAndLink => '退出并关联';
+
+  @override
+  String get pairingRelayTitle => '停用自建 relay？';
+
+  @override
+  String pairingRelayBody(String target) {
+    return '这台设备关联到 $target。relay 地址和密钥会保留，可在设置中切换回来。';
+  }
+
+  @override
+  String get pairingRelayAndLink => '停用并关联';
+
+  @override
+  String get pairingRestoreQuestion => '这台设备以前用过 POCOX？';
+
+  @override
+  String get pairingAsk => '让已关联的设备允许';
+
+  @override
+  String get pairingAsNew => '作为新设备继续';
+
+  @override
+  String get pairingWhichDevice => '哪一台是这台设备？';
+
+  @override
+  String get pairingAddAsNew => '添加为新设备';
+
+  @override
+  String get pairingRestoreThis => '恢复这台设备';
+
+  @override
+  String pairingActiveTodayTitle(String name) {
+    return '$name 今天还在使用';
+  }
+
+  @override
+  String get pairingActiveTodayBody => '在这里恢复会让那台停止工作。仍要恢复吗？';
+
+  @override
+  String get pairingRestoreYes => '确定恢复';
+
+  @override
+  String get pairingRestored => '这台设备已恢复';
+
+  @override
+  String get pairingWaitingTitle => '等待已关联的设备允许';
+
+  @override
+  String get pairingWaitingInfo =>
+      '在已关联的设备上打开 设置 › 账号，允许核对数字相同的请求。在这里确认之前什么都不会改变。';
+
+  @override
+  String get pairingCheckNumber => '核对数字';
+
+  @override
+  String get pairingRestoreDenied => '请求被拒绝，这台设备作为新设备继续。';
+
+  @override
+  String get pairingRestoreExpired => '请求已过期。重新请求，或使用匹配码。';
+
+  @override
+  String get pairingConfirmRestore => '确认恢复';
+
+  @override
+  String get pairingYourDevices => '这些是你的设备吗？';
+
+  @override
+  String get pairingNotMine => '不是我的，作为新设备继续';
+
+  @override
+  String get pairingSameDevice => '同一台设备';
+
+  @override
+  String get pairingScanTitle => '扫描匹配码';
+
+  @override
+  String get pairingScanHint => '对准另一台设备上的二维码';
+
+  @override
+  String get pairingScanNotOurs => '这不是匹配码';
+
+  @override
+  String get pairingByHand => '手动输入';
+
+  @override
+  String get pairingCameraDenied => '相机权限已关闭。在系统设置中允许，或手动输入匹配码。';
+
+  @override
+  String get pairingCameraFailed => '相机不可用，请手动输入匹配码。';
+
+  @override
+  String get pairingMyDevices => '我的设备';
+
+  @override
+  String get pairingAddDevice => '添加设备';
+
+  @override
+  String get pairingThisDevice => '本机';
+
+  @override
+  String get pairingNotSetUp => '未设置';
+
+  @override
+  String get pairingToday => '今天';
+
+  @override
+  String get pairingYesterday => '昨天';
+
+  @override
+  String pairingDaysAgo(int days) {
+    return '$days 天前';
+  }
+
+  @override
+  String get pairingNoPeers => '未关联其他设备';
+
+  @override
+  String pairingLinkedCount(int count) {
+    return '$count 台设备已关联';
+  }
+
+  @override
+  String pairingAsking(String number) {
+    return '请求恢复 · 核对数字 $number';
+  }
+
+  @override
+  String get pairingDeny => '拒绝';
+
+  @override
+  String get pairingAllow => '允许';
+
+  @override
+  String get pairingAllowed => '已允许。那台设备确认之前什么都不会改变。';
+
+  @override
+  String get pairingDenied => '已拒绝';
+
+  @override
+  String get pairingMore => '更多';
+
+  @override
+  String get pairingRename => '重命名';
+
+  @override
+  String get pairingDeviceName => '名称';
+
+  @override
+  String pairingRemoveTitle(String name) {
+    return '移除 $name？';
+  }
+
+  @override
+  String get pairingRemoveBody =>
+      '它不能再建立新连接，其他设备不受影响。已建立的直连要等任一端关闭才会断开。它本机的会话和设置不会被删除。';
+
+  @override
+  String pairingRemoved(String name) {
+    return '已移除 $name';
+  }
+
+  @override
+  String get pairingCodeSection => '匹配码';
+
+  @override
+  String get pairingPaused => '已暂停';
+
+  @override
+  String get pairingAllowLinking => '允许通过匹配码关联';
+
+  @override
+  String get pairingAllowLinkingInfo => '立刻生效，已关联的设备不受影响。';
+
+  @override
+  String get pairingChangeCode => '更换匹配码';
+
+  @override
+  String get pairingChangeCodeInfo => '旧码立刻失效，已关联的设备不受影响。更换后至少要等 24 小时才能再次更换。';
+
+  @override
+  String pairingAvailableIn(int hours) {
+    return '$hours 小时后可更换';
+  }
+
+  @override
+  String get pairingChange => '更换';
+
+  @override
+  String get pairingRotateTitle => '更换这台设备的匹配码？';
+
+  @override
+  String get pairingRotateBody => '旧码立刻失效，已关联的设备不受影响。更换后至少要等 24 小时才能再次更换。';
+
+  @override
+  String get pairingRotateYes => '更换';
+
+  @override
+  String get pairingRotated => '匹配码已更换';
+
+  @override
+  String get pairingLinking => '关联';
+
+  @override
+  String get pairingLinkAnother => '关联其他设备';
+
+  @override
+  String get pairingLinkInstead => '改为关联其他设备';
+
+  @override
+  String get pairingToGitHub => '改用 GitHub 登录';
+
+  @override
+  String pairingBackToGitHub(String login) {
+    return '切回 GitHub（@$login）';
+  }
+
+  @override
+  String get pairingToGitHubTitle => '改用 GitHub 登录？';
+
+  @override
+  String pairingBackToGitHubTitle(String login) {
+    return '切回 @$login？';
+  }
+
+  @override
+  String get pairingToGitHubBody =>
+      '这个安装不再使用这台设备的匹配身份。已关联的设备保持关联，之后可通过“使用匹配码”回来。';
+
+  @override
+  String get pairingToGitHubYes => '用 GitHub 登录';
+
+  @override
+  String get pairingBackToGitHubYes => '切回';
+
+  @override
+  String get pairingLeaveGroup => '离开这些设备';
+
+  @override
+  String pairingLeaveGroupTitle(int count) {
+    return '离开已关联的 $count 台设备？';
+  }
+
+  @override
+  String get pairingLeaveGroupBody =>
+      '这台设备以自己的匹配码单独继续，设备上的所有 POCOX 安装一同移动。这里的会话和设置保留。';
+
+  @override
+  String get pairingLeaveYes => '离开';
+
+  @override
+  String get pairingErrUnknownCode => '匹配码不对，检查后再试。';
+
+  @override
+  String get pairingErrRetired => '这个匹配码已失效，请查看那台设备上最新的码。';
+
+  @override
+  String get pairingErrPaused => '对方暂停了关联，请先在那台设备上打开。';
+
+  @override
+  String get pairingErrOwnCode => '这是这台设备自己的码，请输入另一台设备的。';
+
+  @override
+  String pairingErrTooMany(int minutes) {
+    return '尝试次数过多，$minutes 分钟后再试。';
+  }
+
+  @override
+  String get pairingErrStale => '那些设备刚刚有变化，请重新确认。';
+
+  @override
+  String get pairingErrAlreadyLinked => '这台设备已经和那些设备关联。';
+
+  @override
+  String get pairingErrGroupFull => '那组设备已满，不能再添加。';
+
+  @override
+  String get pairingErrPending => '这台设备还有一项变更在进行中。';
+
+  @override
+  String get pairingErrUpgrade => '请升级 POCOX 后再使用匹配码。';
+
+  @override
+  String get pairingErrRelay => '服务器的 relay 暂时不可用，稍后再试。';
+
+  @override
+  String get pairingErrNotActivated => '这台设备还没设置好，请先在它上面继续使用。';
+
+  @override
+  String get pairingErrNotFound => '没有找到可以请求的已关联设备，请改用其中一台的匹配码。';
+
+  @override
+  String get pairingErrSlotsFull => '那台设备已有待处理的请求，请改用匹配码。';
+
+  @override
+  String get pairingErrNoDevice => '这台设备在这里还没有匹配身份。';
+
+  @override
+  String get pairingErrDeviceGone => '那台设备已不在这个组里。';
+
+  @override
+  String get pairingErrName => '名称太长，或含有不能用于名称的字符。';
+
+  @override
+  String get pairingErrNotApplied => '这项更改没有生效，什么都没变。';
+
+  @override
+  String get pairingErrUnreachable => '连不上服务器，已输入的内容会保留。';
 }

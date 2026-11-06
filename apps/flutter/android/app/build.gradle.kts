@@ -56,3 +56,9 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // Pairing's device store keeps a local-only copy here, where Play services exists
+    // (DeviceStoreChannel.kt). Without it the no_backup file is all there is.
+    implementation("com.google.android.gms:play-services-auth-blockstore:16.4.0")
+}

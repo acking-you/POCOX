@@ -272,6 +272,7 @@ class RustBridgeApi
       accountLogin: c.accountLogin,
       accountId: c.accountId,
       hasAccountToken: c.hasAccountToken,
+      accountProvider: c.accountProvider,
     );
   }
 

@@ -61,6 +61,11 @@ class ConfigView {
   /// Whether an account session token is stored (value withheld).
   final bool hasAccountToken;
 
+  /// Who the account session belongs to: `github` or `device_code`, a
+  /// device signed in with its pairing code, whose login is its name and
+  /// whose id is no GitHub id. Empty with no session.
+  final String accountProvider;
+
   const ConfigView({
     this.relay,
     required this.hasKey,
@@ -69,6 +74,7 @@ class ConfigView {
     this.accountLogin,
     this.accountId,
     required this.hasAccountToken,
+    required this.accountProvider,
   });
 
   @override
@@ -79,7 +85,8 @@ class ConfigView {
       mode.hashCode ^
       accountLogin.hashCode ^
       accountId.hashCode ^
-      hasAccountToken.hashCode;
+      hasAccountToken.hashCode ^
+      accountProvider.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -92,5 +99,6 @@ class ConfigView {
           mode == other.mode &&
           accountLogin == other.accountLogin &&
           accountId == other.accountId &&
-          hasAccountToken == other.hasAccountToken;
+          hasAccountToken == other.hasAccountToken &&
+          accountProvider == other.accountProvider;
 }

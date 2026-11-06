@@ -1,4 +1,6 @@
 PODS:
+  - app_links (6.4.1):
+    - FlutterMacOS
   - desktop_drop (0.0.1):
     - FlutterMacOS
   - desktop_webview_window (0.0.1):
@@ -13,6 +15,9 @@ PODS:
     - FlutterMacOS
     - WebRTC-SDK (= 150.7871.01)
   - FlutterMacOS (1.0.0)
+  - mobile_scanner (7.0.0):
+    - Flutter
+    - FlutterMacOS
   - pasteboard (0.0.1):
     - FlutterMacOS
   - pocox_bridge (0.0.1):
@@ -35,6 +40,7 @@ PODS:
     - FlutterMacOS
 
 DEPENDENCIES:
+  - app_links (from `Flutter/ephemeral/.symlinks/plugins/app_links/macos`)
   - desktop_drop (from `Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos`)
   - desktop_webview_window (from `Flutter/ephemeral/.symlinks/plugins/desktop_webview_window/macos`)
   - file_saver (from `Flutter/ephemeral/.symlinks/plugins/file_saver/macos`)
@@ -42,6 +48,7 @@ DEPENDENCIES:
   - flutter_web_auth_2 (from `Flutter/ephemeral/.symlinks/plugins/flutter_web_auth_2/macos`)
   - flutter_webrtc (from `Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos`)
   - FlutterMacOS (from `Flutter/ephemeral`)
+  - mobile_scanner (from `Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin`)
   - pasteboard (from `Flutter/ephemeral/.symlinks/plugins/pasteboard/macos`)
   - pocox_bridge (from `Flutter/ephemeral/.symlinks/plugins/pocox_bridge/macos`)
   - screen_retriever_macos (from `Flutter/ephemeral/.symlinks/plugins/screen_retriever_macos/macos`)
@@ -57,6 +64,8 @@ SPEC REPOS:
     - WebRTC-SDK
 
 EXTERNAL SOURCES:
+  app_links:
+    :path: Flutter/ephemeral/.symlinks/plugins/app_links/macos
   desktop_drop:
     :path: Flutter/ephemeral/.symlinks/plugins/desktop_drop/macos
   desktop_webview_window:
@@ -71,6 +80,8 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/flutter_webrtc/macos
   FlutterMacOS:
     :path: Flutter/ephemeral
+  mobile_scanner:
+    :path: Flutter/ephemeral/.symlinks/plugins/mobile_scanner/darwin
   pasteboard:
     :path: Flutter/ephemeral/.symlinks/plugins/pasteboard/macos
   pocox_bridge:
@@ -91,6 +102,7 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/window_to_front/macos
 
 SPEC CHECKSUMS:
+  app_links: 05a6ec2341985eb05e9f97dc63f5837c39895c3f
   desktop_drop: 10a3e6a7fa9dbe350541f2574092fecfa345a07b
   desktop_webview_window: 7e37af677d6d19294cb433d9b1d878ef78dffa4d
   file_saver: 0b49fcd0f67d6e24737b757ee1eb1d3d8ca392fb
@@ -98,6 +110,7 @@ SPEC CHECKSUMS:
   flutter_web_auth_2: 62b08da29f15a20fa63f144234622a1488d45b65
   flutter_webrtc: af708ba091a5d71e101f9f631a9f96c107581a3d
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  mobile_scanner: 9157936403f5a0644ca3779a38ff8404c5434a93
   pasteboard: b594eaf838d930b276d7a35a44a32b4f489170cb
   pocox_bridge: 367e6e18fd32cadd6d37b747822236f1fd2a9609
   screen_retriever_macos: c5508cc3c66ff0d4db650480cf0ab691e220d933

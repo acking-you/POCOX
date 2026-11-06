@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  app_links_linux
   desktop_drop
   desktop_webview_window
   file_saver

@@ -42,6 +42,24 @@ extension _SettingsSections on _SettingsState {
       uiPrefsProvider.select((prefs) => prefs.valueOrNull?.themeMode),
     );
     final account = config?.mode == 'account';
+    final pairing = config?.pairing ?? false;
+    // The relay a pairing or GitHub account falls back to, and signing out.
+    List<Widget> accountRows() => [
+      SettingValueRow(
+        key: const Key('settings-relay'),
+        label: account ? l10n.settingsSelfHostedRelay : l10n.relayRow,
+        value: Text(_relayLabel(l10n, config)),
+        onTap: () => _editRelay(api),
+      ),
+      SettingValueRow(
+        key: const Key('settings-key'),
+        label: account ? l10n.settingsSelfHostedKey : l10n.keyRow,
+        value: Text(_keyLabel(l10n, config)),
+        onTap: () => _editKey(api),
+      ),
+      if (account)
+        _DangerRow(onPressed: () => _signOut(api), title: l10n.accountSignOut),
+    ];
     final toolsSupported = ref.watch(
       toolsStatusProvider.select((status) => status.supported),
     );
@@ -195,7 +213,7 @@ extension _SettingsSections on _SettingsState {
         id: SettingsSection.account,
         icon: AppIcons.account_circle_outlined,
         label: account ? l10n.accountSection : l10n.settingsRelay,
-        leading: account
+        leading: account && !pairing
             ? GitHubAvatar(
                 accountId: config?.accountId,
                 fallbackIcon: AppIcons.person_outline,
@@ -204,35 +222,26 @@ extension _SettingsSections on _SettingsState {
             : null,
         // A compact root heads the page with this section instead.
         rows: const [],
-        page: [
-          GroupCard(
-            title: account ? l10n.accountSection : l10n.settingsRelay,
-            children: [
-              if (account)
-                const Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(14, 12, 12, 12),
-                  child: PocketIdentity(),
+        page: pairing
+            ? [PairingAccountGroups(trailing: accountRows())]
+            : [
+                GroupCard(
+                  title: account ? l10n.accountSection : l10n.settingsRelay,
+                  children: [
+                    if (account)
+                      const Padding(
+                        padding: EdgeInsetsDirectional.fromSTEB(14, 12, 12, 12),
+                        child: PocketIdentity(),
+                      ),
+                    ...accountRows(),
+                    SettingValueRow(
+                      key: const Key('settings-use-pairing'),
+                      label: l10n.pairingUseCode,
+                      onTap: () => context.push('/pair'),
+                    ),
+                  ],
                 ),
-              SettingValueRow(
-                key: const Key('settings-relay'),
-                label: account ? l10n.settingsSelfHostedRelay : l10n.relayRow,
-                value: Text(_relayLabel(l10n, config)),
-                onTap: () => _editRelay(api),
-              ),
-              SettingValueRow(
-                key: const Key('settings-key'),
-                label: account ? l10n.settingsSelfHostedKey : l10n.keyRow,
-                value: Text(_keyLabel(l10n, config)),
-                onTap: () => _editKey(api),
-              ),
-              if (account)
-                _DangerRow(
-                  onPressed: () => _signOut(api),
-                  title: l10n.accountSignOut,
-                ),
-            ],
-          ),
-        ],
+              ],
       ),
       _Section(
         id: SettingsSection.about,

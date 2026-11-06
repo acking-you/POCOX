@@ -29,6 +29,7 @@ jobs:
       test_crates: ${{ steps.detect.outputs.test_crates }}
       clippy_crates: ${{ steps.detect.outputs.clippy_crates }}
       flutter: ${{ steps.detect.outputs.flutter }}
+      android: ${{ steps.detect.outputs.android }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -252,15 +253,59 @@ jobs:
   # Single required status that reflects the whole run. Always runs, so a
   # skipped Rust/Flutter job (path-filtered out) keeps the gate green, while
   # any real failure or cancellation fails it.
+  # Build-only: compiles the Kotlin device store, the Android plugins and the
+  # bridge for Android, as release.yml's app-android does, with no signing and
+  # nothing uploaded. Nothing else builds them before a release.
+  android-build:
+    name: Android build (debug, arm64)
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # As release.yml builds the app: warnings in dependencies' Android code
+      # are not this job's to fail on.
+      RUSTFLAGS: ""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # Match rust-toolchain.toml, as release.yml does.
+          toolchain: nightly-2026-08-21
+      - uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r26d
+          link-to-sdk: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android-build
+      - name: Build a debug APK
+        working-directory: apps/flutter
+        run: |
+          flutter pub get
+          flutter build apk --debug --target-platform android-arm64
+
   ci-result:
     name: CI result
-    needs: [changes, fmt, clippy, test, flutter, macos-host, macos-packaging-tests, windows-updater]
+    needs: [changes, fmt, clippy, test, flutter, android-build, macos-host, macos-packaging-tests, windows-updater]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Verify no required job failed
         run: |
-          results="${{ needs.changes.result }} ${{ needs.fmt.result }} ${{ needs.clippy.result }} ${{ needs.test.result }} ${{ needs.flutter.result }} ${{ needs.macos-host.result }} ${{ needs.macos-packaging-tests.result }} ${{ needs.windows-updater.result }}"
+          results="${{ needs.changes.result }} ${{ needs.fmt.result }} ${{ needs.clippy.result }} ${{ needs.test.result }} ${{ needs.flutter.result }} ${{ needs.android-build.result }} ${{ needs.macos-host.result }} ${{ needs.macos-packaging-tests.result }} ${{ needs.windows-updater.result }}"
           echo "job results: $results"
           for r in $results; do
             if [ "$r" = "failure" ] || [ "$r" = "cancelled" ]; then

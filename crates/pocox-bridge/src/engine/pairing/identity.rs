@@ -181,6 +181,16 @@ impl Identity {
         }
     }
 
+    /// Mint a fresh session for the active installation now, so its stored
+    /// label follows a rename of this device. Nothing for an inactive one.
+    pub(super) async fn refresh_label(&self) -> Result<()> {
+        let mut config = load_config(&self.support)?;
+        if self.is_active(&config) {
+            session::refresh_now(&self.support, &mut config, self.backend()).await?;
+        }
+        Ok(())
+    }
+
     async fn fresh_token(&self) -> Result<String> {
         self.forget_staged();
         let mut config = load_config(&self.support)?;

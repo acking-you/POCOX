@@ -18,9 +18,10 @@
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
-		<!-- flutter_web_auth_2 deep-link callback for the browser-redirect login:
-		     ASWebAuthenticationSession returns to the app when GitHub's backend
-		     callback redirects to pocox://… -->
+		<!-- The pocox scheme: pocox://auth is the browser-redirect login's
+		     callback, which ASWebAuthenticationSession receives itself, and
+		     pocox://pair?c=… is a pairing invitation, which the app reads and
+		     only ever opens as a preview. -->
 		<key>CFBundleURLTypes</key>
 		<array>
 			<dict>
@@ -44,6 +45,8 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<key>NSCameraUsageDescription</key>
+		<string>The camera reads another device's pairing code.</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<!-- The in-app browser opens pages the user's other devices share at
@@ -53,9 +56,8 @@
 			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
-		<!-- No route opens from a URL: the pocox scheme is only the
-		     login callback, which ASWebAuthenticationSession receives itself,
-		     and pages such as /preview must not open on a link's say. -->
+		<!-- No route opens from a URL: pages such as /preview must not open
+		     on a link's say. A pairing invitation is read by the app itself. -->
 		<key>FlutterDeepLinkingEnabled</key>
 		<false/>
 		<key>UIApplicationSceneManifest</key>

@@ -148,6 +148,7 @@ async fn run(
             retry_after: None,
             operation_id: Some(open.id.clone()),
             grace_deadline: None,
+            bare_status: false,
         }
         .into());
     }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier. The pairing device store is in no_backup, which
+     backup never copies; this keeps any copy outside it out as well, so a
+     restored phone signs in again and pairs explicitly. -->
+<full-backup-content>
+    <exclude domain="file" path="device-store/" />
+</full-backup-content>

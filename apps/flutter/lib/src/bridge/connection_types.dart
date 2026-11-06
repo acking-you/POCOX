@@ -471,6 +471,7 @@ class ConfigInfo {
     this.accountLogin,
     this.accountId,
     this.hasAccountToken = false,
+    this.accountProvider = '',
   });
 
   /// Configured relay `host:port`, if any.
@@ -495,6 +496,13 @@ class ConfigInfo {
 
   /// Whether an account session token is stored.
   final bool hasAccountToken;
+
+  /// Who the session belongs to: `github`, `device_code` or empty.
+  final String accountProvider;
+
+  /// Whether this installation is signed in with a pairing code. Its login is
+  /// the device's name and its account id no GitHub id.
+  bool get pairing => mode == 'account' && accountProvider == 'device_code';
 }
 
 /// A started GitHub device flow: show the code + URL, then poll.

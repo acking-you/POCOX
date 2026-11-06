@@ -1,5 +1,12 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/widgets.dart' show Widget;
 import 'package:go_router/go_router.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/pairing/pairing_host.dart';
+import 'package:pocox/src/pairing/pairing_join_screen.dart';
+import 'package:pocox/src/pairing/pairing_page.dart';
+import 'package:pocox/src/pairing/pairing_restore_screen.dart';
+import 'package:pocox/src/pairing/pairing_scan_screen.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/codex_setup_screen.dart';
 import 'package:pocox/src/screens/home_screen.dart';
@@ -63,7 +70,18 @@ void openSettingsFromTray() {
 
 /// Push [location] from outside a page's own context (the agent tools'
 /// app-wide prompts open shares this way). A no-op before the router exists.
-void pushRoute(String location) => _appRouter?.push(location);
+void pushRoute(String location, {Object? extra}) =>
+    _appRouter?.push(location, extra: extra);
+
+/// Go to [location] from outside a page's own context, replacing the stack: a
+/// removed pairing device returns to sign-in this way. A no-op before the
+/// router exists.
+void goRoute(String location) => _appRouter?.go(location);
+
+/// The path of the page in front, a pushed one included, or null before the
+/// router exists.
+String? currentRoutePath() =>
+    _appRouter?.routerDelegate.currentConfiguration.lastOrNull?.matchedLocation;
 
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
@@ -80,6 +98,26 @@ GoRouter buildRouter({
       ),
       routes: [
         GoRoute(path: 'self-host', builder: (c, s) => const OnboardingScreen()),
+      ],
+    ),
+    // Pairing-code login. A code reaches these pages in memory (`extra`, or
+    // pairingInvitationProvider), never in a location. The waiting page is on
+    // its own, not under /pair: going there must not build the start page
+    // (and its first screen) below it.
+    GoRoute(
+      path: '/pair/pending',
+      builder: (c, s) => pairingPendingPage(s.extra),
+    ),
+    GoRoute(
+      path: '/pair',
+      builder: (c, s) => const PairingStartPage(),
+      routes: [
+        GoRoute(path: 'join', builder: (c, s) => pairingJoinPage(s.extra)),
+        GoRoute(
+          path: 'restore',
+          builder: (c, s) => pairingRestorePage(s.extra),
+        ),
+        GoRoute(path: 'scan', builder: (c, s) => const PairingScanScreen()),
       ],
     ),
     // Chat-first home: resolves an app service + the latest conversation and
@@ -159,3 +197,33 @@ GoRouter buildRouter({
     ),
   ],
 );
+
+/// `/pair/join` from its extra: `(code, backend)`, or a bare code. The code
+/// rides in memory, never in the location.
+Widget pairingJoinPage(Object? extra) {
+  final (code, backend) = switch (extra) {
+    (String? code, String? backend) => (code, backend),
+    String code => (code, null),
+    _ => (null, null),
+  };
+  return PairingJoinScreen(code: code, backend: backend);
+}
+
+/// `/pair/restore` from its extra: `(retake, backend)`, or a bare retake.
+Widget pairingRestorePage(Object? extra) {
+  final (retake, backend) = switch (extra) {
+    (bool retake, String? backend) => (retake, backend),
+    bool retake => (retake, null),
+    _ => (false, null),
+  };
+  return PairingRestoreScreen(retake: retake, backend: backend);
+}
+
+/// `/pair/pending` from its extra: `(operation, backend)`.
+Widget pairingPendingPage(Object? extra) {
+  final (operation, backend) = switch (extra) {
+    (PairingOperation? operation, String? backend) => (operation, backend),
+    _ => (null, null),
+  };
+  return PairingPendingPage(operation: operation, backend: backend);
+}

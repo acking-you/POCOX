@@ -219,6 +219,8 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
     final services =
         ref.watch(servicesProvider).valueOrNull ?? const <ServiceEntry>[];
     final found = services.where((s) => isSessionKind(s.kind)).toList();
+    // A pairing device has no GitHub account for the computer to share.
+    final pairing = ref.watch(configProvider).valueOrNull?.pairing ?? false;
     return [
       _stepCard(
         scheme: scheme,
@@ -243,7 +245,9 @@ class _WelcomeGuideScreenState extends ConsumerState<WelcomeGuideScreen> {
         scheme: scheme,
         number: 2,
         done: false,
-        title: l10n.welcomeMobileStep2,
+        title: pairing
+            ? l10n.welcomeMobileStep2Pairing
+            : l10n.welcomeMobileStep2,
       ),
       const SizedBox(height: 12),
       _stepCard(

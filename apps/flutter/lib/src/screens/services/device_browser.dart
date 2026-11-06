@@ -69,7 +69,7 @@ class _DeviceFirstServices extends ConsumerWidget {
   const _DeviceFirstServices({
     required this.services,
     required this.relay,
-    required this.accountLogin,
+    required this.accountName,
     required this.accountId,
     required this.selectedDevice,
     required this.onSelectDevice,
@@ -79,7 +79,7 @@ class _DeviceFirstServices extends ConsumerWidget {
 
   final List<ServiceEntry> services;
   final String? relay;
-  final String? accountLogin;
+  final String? accountName;
   final String? accountId;
 
   /// The device whose detail is shown. On narrow this doubles as the level:
@@ -108,7 +108,7 @@ class _DeviceFirstServices extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final account = accountLogin != null;
+    final account = accountName != null;
     final pending = ref.watch(pendingRemovalProvider);
     final dismissed =
         ref.watch(dismissedServicesProvider).valueOrNull ?? const <String>{};
@@ -630,7 +630,7 @@ class _DeviceFirstServices extends ConsumerWidget {
     };
     final deviceColumn = _DeviceColumn(
       relay: relay ?? l10n.relayNotConfigured,
-      accountLogin: accountLogin,
+      accountName: accountName,
       accountId: accountId,
       devices: devices,
       activeDevice: activeDevice,

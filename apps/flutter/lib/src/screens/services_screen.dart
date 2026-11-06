@@ -142,6 +142,10 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
     });
     final config = ref.watch(configProvider).valueOrNull;
     final account = config?.mode == 'account';
+    // A pairing account's login is this device's name and its id is no
+    // GitHub user's: no "@" and no avatar for it.
+    final pairing = config?.pairing ?? false;
+    final login = config?.accountLogin;
     Widget devices(
       List<ServiceEntry> services, {
       _RelayState relayState = const _RelayOnline(),
@@ -149,8 +153,12 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen>
       services: services,
       relayState: relayState,
       relay: config?.relay,
-      accountLogin: account ? config?.accountLogin : null,
-      accountId: account ? config?.accountId : null,
+      accountName: !account || login == null
+          ? null
+          : pairing
+          ? login
+          : '@$login',
+      accountId: account && !pairing ? config?.accountId : null,
       selectedDevice: _selectedDevice,
       onSelectDevice: (device) {
         if (_selectedDevice != device) {
