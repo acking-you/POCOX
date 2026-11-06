@@ -34,7 +34,15 @@ class UiPrefs {
     this.sidebarWidth,
     this.contextCardOpen,
     this.pairingSeen,
+    this.pairingToldFailures = const [],
   });
+
+  /// Failed pairing changes whose reason the user was already told, so each
+  /// is told once even across restarts. The newest [maxToldFailures] are kept.
+  final List<String> pairingToldFailures;
+
+  /// How many told failures [pairingToldFailures] keeps.
+  static const maxToldFailures = 32;
 
   /// The pairing group this device last announced, so a device that joins or
   /// asks while the app is closed is still told about.
@@ -119,6 +127,7 @@ class UiPrefs {
     double? sidebarWidth,
     bool? contextCardOpen,
     PairingSeen? pairingSeen,
+    List<String>? pairingToldFailures,
   }) => UiPrefs(
     preferredAppServiceKey:
         preferredAppServiceKey ?? this.preferredAppServiceKey,
@@ -137,6 +146,7 @@ class UiPrefs {
     sidebarWidth: sidebarWidth ?? this.sidebarWidth,
     contextCardOpen: contextCardOpen ?? this.contextCardOpen,
     pairingSeen: pairingSeen ?? this.pairingSeen,
+    pairingToldFailures: pairingToldFailures ?? this.pairingToldFailures,
   );
 
   /// Parse from JSON; any shape surprise degrades to defaults.
@@ -202,6 +212,11 @@ class UiPrefs {
         Map<String, dynamic> seen => PairingSeen.fromJson(seen),
         _ => null,
       },
+      pairingToldFailures: [
+        for (final id
+            in _as<List<dynamic>>(json['pairingToldFailures']) ?? const [])
+          if (id is String) id,
+      ],
     );
   }
 
@@ -230,6 +245,8 @@ class UiPrefs {
     if (contextCardOpen != null) 'contextCardOpen': contextCardOpen,
     if (sidebarWidth != null) 'sidebarWidth': sidebarWidth,
     if (pairingSeen != null) 'pairingSeen': pairingSeen!.toJson(),
+    if (pairingToldFailures.isNotEmpty)
+      'pairingToldFailures': pairingToldFailures,
   };
 }
 
@@ -600,6 +617,17 @@ class UiPrefsStore extends AsyncNotifier<UiPrefs> {
   /// Record the pairing group's devices and requests as announced.
   void setPairingSeen(PairingSeen seen) =>
       _mutate((p) => p.copyWith(pairingSeen: seen));
+
+  /// Record a failed pairing change as told, keeping the newest few.
+  void addPairingToldFailure(String id) => _mutate((p) {
+    if (p.pairingToldFailures.contains(id)) return null;
+    final told = [...p.pairingToldFailures, id];
+    return p.copyWith(
+      pairingToldFailures: told.length > UiPrefs.maxToldFailures
+          ? told.sublist(told.length - UiPrefs.maxToldFailures)
+          : told,
+    );
+  });
 
   /// Record that the first-run welcome guide has been shown on this device.
   void markGuideSeen() =>

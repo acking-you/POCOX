@@ -48,6 +48,10 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
   String? _picked;
   String? _error;
   bool _busy = false;
+
+  /// A change is being sent (not a read-only lookup): back would drop its
+  /// outcome.
+  bool _sending = false;
   Timer? _poll;
   var _wait = const Duration(seconds: 5);
 
@@ -75,10 +79,11 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     }
   }
 
-  Future<void> _run(Future<void> Function() work) async {
+  Future<void> _run(Future<void> Function() work, {bool sends = false}) async {
     final l10n = AppLocalizations.of(context);
     setState(() {
       _busy = true;
+      _sending = sends;
       _error = null;
     });
     try {
@@ -86,15 +91,32 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     } catch (error) {
       if (mounted) setState(() => _error = pairingErrorText(l10n, error));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _sending = false;
+        });
+      }
     }
   }
 
   /// A ticket-carrying change refused: another change under way opens its
   /// page; a group that changed since its preview is shown again, picking
   /// anew. True when handled.
-  bool _followRefusal(Object error) {
+  bool _followRefusal(Object error, {bool viaRequest = false}) {
     if (followTransitionPending(context, error, backend: _backend)) return true;
+    if (error is PairingFailure &&
+        error.code == 'preview_stale' &&
+        viaRequest) {
+      // The approved request's group changed: ask again from the start.
+      _poll?.cancel();
+      showToast(context, AppLocalizations.of(context).pairingErrStale);
+      setState(() {
+        _request = null;
+        _step = _Step.start;
+      });
+      return true;
+    }
     if (error is PairingFailure && error.code == 'preview_stale') {
       showToast(context, AppLocalizations.of(context).pairingErrStale);
       setState(() => _picked = null);
@@ -135,7 +157,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
       _step = _Step.asking;
     });
     _schedulePoll();
-  });
+  }, sends: true);
 
   void _schedulePoll() {
     _poll?.cancel();
@@ -208,7 +230,9 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
           backend: _backend,
         );
       } catch (error) {
-        if (mounted && _followRefusal(error)) return;
+        if (mounted && _followRefusal(error, viaRequest: requestId != null)) {
+          return;
+        }
         rethrow;
       }
       if (!mounted) return;
@@ -216,7 +240,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
         showToastOk(context, l10n.pairingRestored);
       }
       await followPairingOperation(context, ref, operation, backend: _backend);
-    });
+    }, sends: true);
   }
 
   /// Not one of the group's devices: join the group as a new one with the
@@ -238,7 +262,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     }
     if (!mounted) return;
     await followPairingOperation(context, ref, operation, backend: _backend);
-  });
+  }, sends: true);
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +302,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
 
   Widget _start(AppLocalizations l10n, String title) => PairingPageFrame(
     title: title,
-    busy: _busy,
+    busy: _sending,
     logo: true,
     children: [
       PairingHeading(l10n.pairingRestoreQuestion, center: true),
@@ -357,7 +381,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     ];
     return PairingPageFrame(
       title: title,
-      busy: _busy,
+      busy: _sending,
       onBack: () => setState(() => _step = _Step.start),
       footer: isDesktop ? null : actions,
       children: [
@@ -382,7 +406,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     final scheme = theme.colorScheme;
     return PairingPageFrame(
       title: title,
-      busy: _busy,
+      busy: _sending,
       logo: true,
       onBack: () {
         _poll?.cancel();
@@ -448,7 +472,7 @@ class _PairingRestoreState extends ConsumerState<PairingRestoreScreen> {
     ];
     return PairingPageFrame(
       title: l10n.pairingConfirmRestore,
-      busy: _busy,
+      busy: _sending,
       onBack: _asNew,
       footer: isDesktop ? null : actions,
       children: [

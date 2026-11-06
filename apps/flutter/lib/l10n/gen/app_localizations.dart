@@ -9353,6 +9353,24 @@ abstract class AppLocalizations {
   /// **'{name} linked. Not yours?'**
   String pairingJoinedNotice(String name);
 
+  /// No description provided for @pairingJoinedManyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices linked. Not yours?'**
+  String pairingJoinedManyNotice(int count);
+
+  /// No description provided for @pairingAskManyNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} devices ask to be restored'**
+  String pairingAskManyNotice(int count);
+
+  /// No description provided for @pairingNewsNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} changes to your devices'**
+  String pairingNewsNotice(int count);
+
   /// No description provided for @pairingAskNotice.
   ///
   /// In en, this message translates to:

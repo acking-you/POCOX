@@ -1978,6 +1978,18 @@
   "@pairingJoinedNotice": {
     "placeholders": { "name": { "type": "String" } }
   },
+  "pairingJoinedManyNotice": "{count} devices linked. Not yours?",
+  "@pairingJoinedManyNotice": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "pairingAskManyNotice": "{count} devices ask to be restored",
+  "@pairingAskManyNotice": {
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "pairingNewsNotice": "{count} changes to your devices",
+  "@pairingNewsNotice": {
+    "placeholders": { "count": { "type": "int" } }
+  },
   "pairingAskNotice": "A device asks to restore {name}",
   "@pairingAskNotice": {
     "placeholders": { "name": { "type": "String" } }

@@ -499,6 +499,7 @@ void main() {
         _device('device-self', 'This Mac', self: true),
         _device('d-pixel', 'Pixel'),
         _device('d-ipad', 'iPad'),
+        _device('d-mini', 'Mac mini'),
       ];
     final router = GoRouter(
       initialLocation: '/',
@@ -525,8 +526,9 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
-    // Joined while the app was closed: told now. Already told: not again.
-    expect(find.textContaining('iPad'), findsOneWidget);
+    // Joined while the app was closed: told now, in one notice that a second
+    // cannot hide. Already told: not again.
+    expect(find.textContaining('2 devices linked'), findsOneWidget);
     expect(find.textContaining('Pixel'), findsNothing);
 
     // Linked into another group: its members are no intruders.

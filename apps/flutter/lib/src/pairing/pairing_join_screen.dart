@@ -38,6 +38,10 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
   String? _error;
   bool _busy = false;
 
+  /// The link is being sent (not a read-only preview): back would drop its
+  /// outcome.
+  bool _sending = false;
+
   String? get _backend => widget.backend;
 
   @override
@@ -105,9 +109,16 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
         for (final device in page.devices)
           if (!device.isSelf) device,
       ];
-    } catch (_) {
-      // No identity here (no_device) has no peers; with no group to read, the
-      // backend still refuses a link that would leave peers unconfirmed.
+    } on PairingFailure catch (error) {
+      // No identity here has no peers. Anything else leaves the question
+      // unanswerable, and a link must not go ahead without it.
+      if (!const {'no_device', 'signed_out'}.contains(error.code)) {
+        if (mounted) showToastError(context, pairingErrorText(l10n, error));
+        return null;
+      }
+    } catch (error) {
+      if (mounted) showToastError(context, pairingErrorText(l10n, error));
+      return null;
     }
     if (!mounted) return null;
     var leave = false;
@@ -152,7 +163,10 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     final l10n = AppLocalizations.of(context);
     final leaveCurrent = await _confirmLeaving(preview);
     if (leaveCurrent == null || !mounted) return;
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+      _sending = true;
+    });
     try {
       final hint = await pairingHardwareHint();
       final operation = await _api.pairingLink(
@@ -180,7 +194,12 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     } catch (error) {
       if (mounted) showToastError(context, pairingErrorText(l10n, error));
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _sending = false;
+        });
+      }
     }
   }
 
@@ -191,7 +210,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     if (preview != null) return _confirm(context, l10n, preview);
     return PairingPageFrame(
       title: l10n.pairingEnterOther,
-      busy: _busy,
+      busy: _sending,
       logo: true,
       children: [
         PairingHeading(l10n.pairingEnterTitle, center: true),
@@ -252,7 +271,7 @@ class _PairingJoinState extends ConsumerState<PairingJoinScreen> {
     ];
     return PairingPageFrame(
       title: l10n.pairingConfirmTitle,
-      busy: _busy,
+      busy: _sending,
       onBack: _busy ? () {} : () => setState(() => _preview = null),
       footer: isDesktop ? null : actions,
       children: [

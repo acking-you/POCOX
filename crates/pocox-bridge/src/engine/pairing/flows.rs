@@ -198,6 +198,7 @@ pub async fn preview(identity: &Identity, code: &str) -> Result<PreviewResponse>
             retry_after: None,
             operation_id: None,
             grace_deadline: None,
+            bare_status: false,
         }
         .into());
     };
@@ -305,6 +306,7 @@ pub async fn request_restore(
             retry_after: None,
             operation_id: None,
             grace_deadline: None,
+            bare_status: false,
         }
         .into());
     };

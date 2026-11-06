@@ -83,22 +83,26 @@ class _PairingHostState extends ConsumerState<PairingHost>
   }
 
   Future<void> _checkOnce() async {
+    final api = ref.read(bridgeApiProvider);
     final ConfigInfo config;
     try {
-      // A cold start reads config once; waiting for it beats waiting a minute.
-      config = await ref.read(configProvider.future);
+      // Read fresh, not the cached provider: the engine changes the account
+      // (a link finishing in the background) without telling it.
+      config = await api.getConfig();
     } catch (_) {
       return;
     }
     if (!mounted || !config.pairing) return;
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
-    final api = ref.read(bridgeApiProvider);
     final PairingDevices page;
     try {
       page = await api.pairingDevices();
     } on PairingFailure catch (error) {
-      if (const {
+      if (error.code == 'transition_pending') {
+        // This device's own link or leave is under way: offer its page.
+        await _followOperations(api, quiet: false);
+      } else if (const {
         'device_superseded',
         'device_unknown',
         'grace_restricted',
@@ -117,22 +121,35 @@ class _PairingHostState extends ConsumerState<PairingHost>
       _toSignIn();
       return;
     }
-    await _announce(config.accountId ?? '', page);
-    if (mounted) await _followOperations(api);
+    final ConfigInfo after;
+    try {
+      after = await api.getConfig();
+    } catch (_) {
+      return;
+    }
+    if (!mounted) return;
+    if (after.accountId != config.accountId) {
+      // The group read may be either account's: the next check reads one.
+      ref.invalidate(configProvider);
+      return;
+    }
+    final told = await _announce(config.accountId ?? '', page);
+    if (mounted) await _followOperations(api, quiet: told);
   }
 
-  /// Tell the user about each device that joined and each recovery request
-  /// since this device last told them, while the app ran or not. Another
-  /// account (a link, restore or start over) starts a fresh record silently.
-  Future<void> _announce(String account, PairingDevices page) async {
+  /// Tell the user, in one notice, about every device that joined and every
+  /// recovery request since they were last told, while the app ran or not.
+  /// Another account (a link, restore or start over) starts a fresh record
+  /// silently. True when a notice went up.
+  Future<bool> _announce(String account, PairingDevices page) async {
     final prefs = ref.read(uiPrefsProvider.notifier);
     final UiPrefs saved;
     try {
       saved = await prefs.ready.timeout(const Duration(seconds: 2));
     } catch (_) {
-      return;
+      return false;
     }
-    if (!mounted) return;
+    if (!mounted) return false;
     final seen = saved.pairingSeen;
     prefs.setPairingSeen(
       PairingSeen(
@@ -144,34 +161,45 @@ class _PairingHostState extends ConsumerState<PairingHost>
         requests: [for (final ask in page.pendingRequests) ask.requestId],
       ),
     );
-    if (seen == null || seen.accountId != account) return;
+    if (seen == null || seen.accountId != account) return false;
+    final joined = [
+      for (final device in page.devices)
+        if (!device.isSelf && !seen.devices.contains(device.id)) device,
+    ];
+    final asks = [
+      for (final ask in page.pendingRequests)
+        if (!seen.requests.contains(ask.requestId)) ask,
+    ];
     final l10n = AppLocalizations.of(context);
-    final toast = ToastMessenger.of(context);
-    for (final device in page.devices) {
-      if (device.isSelf || seen.devices.contains(device.id)) continue;
-      toast.offer(
-        l10n.pairingJoinedNotice(device.name),
-        action: l10n.pairingReview,
-        onAction: () => pushRoute('/settings/account'),
-      );
-    }
-    for (final ask in page.pendingRequests) {
-      if (seen.requests.contains(ask.requestId)) continue;
-      final target = page.devices
-          .where((device) => device.id == ask.targetDeviceId)
-          .map((device) => device.name)
-          .firstOrNull;
-      toast.offer(
-        l10n.pairingAskNotice(target ?? ask.requesterName),
-        action: l10n.pairingReview,
-        onAction: () => pushRoute('/settings/account'),
-      );
-    }
+    String target(PairingRecoveryAsk ask) =>
+        page.devices
+            .where((device) => device.id == ask.targetDeviceId)
+            .map((device) => device.name)
+            .firstOrNull ??
+        ask.requesterName;
+    // One notice for all of it: a second would hide the first.
+    final message = switch ((joined.length, asks.length)) {
+      (0, 0) => null,
+      (1, 0) => l10n.pairingJoinedNotice(joined.single.name),
+      (_, 0) => l10n.pairingJoinedManyNotice(joined.length),
+      (0, 1) => l10n.pairingAskNotice(target(asks.single)),
+      (0, _) => l10n.pairingAskManyNotice(asks.length),
+      _ => l10n.pairingNewsNotice(joined.length + asks.length),
+    };
+    if (message == null) return false;
+    ToastMessenger.of(context).offer(
+      message,
+      action: l10n.pairingReview,
+      onAction: () => pushRoute('/settings/account'),
+    );
+    return true;
   }
 
-  /// A change no page waits for any more: one under way is offered for
-  /// review, one that did not happen says why, once.
-  Future<void> _followOperations(BridgeApi api) async {
+  /// A change no page waits for any more: one that did not happen says why,
+  /// once, and one under way is offered for review. One notice per check;
+  /// when [quiet], another already went up and these wait for the next.
+  Future<void> _followOperations(BridgeApi api, {required bool quiet}) async {
+    if (quiet) return;
     final PairingStatus status;
     try {
       status = await api.pairingStatus();
@@ -179,24 +207,25 @@ class _PairingHostState extends ConsumerState<PairingHost>
       return;
     }
     if (!mounted) return;
-    explainFailedOperations(context, status.failed);
+    if (explainFailedOperations(context, ref, status.failed)) return;
     if ((currentRoutePath() ?? '').startsWith('/pair/pending')) return;
+    final operation = status.pending
+        .where((operation) => !_offeredPending.contains(operation.id))
+        .firstOrNull;
+    if (operation == null) return;
+    _offeredPending.add(operation.id);
     final l10n = AppLocalizations.of(context);
-    final toast = ToastMessenger.of(context);
-    for (final operation in status.pending) {
-      if (!_offeredPending.add(operation.id)) continue;
-      toast.offer(
-        switch (operation.kind) {
-          'link' => l10n.pairingPendingLink,
-          'leave' => l10n.pairingPendingLeave,
-          'remove' => l10n.pairingPendingRemove,
-          'restore' || 'retake' => l10n.pairingPendingRestore,
-          _ => l10n.pairingPendingTitle,
-        },
-        action: l10n.pairingReview,
-        onAction: () => pushRoute('/pair/pending', extra: (operation, null)),
-      );
-    }
+    ToastMessenger.of(context).offer(
+      switch (operation.kind) {
+        'link' => l10n.pairingPendingLink,
+        'leave' => l10n.pairingPendingLeave,
+        'remove' => l10n.pairingPendingRemove,
+        'restore' || 'retake' => l10n.pairingPendingRestore,
+        _ => l10n.pairingPendingTitle,
+      },
+      action: l10n.pairingReview,
+      onAction: () => pushRoute('/pair/pending', extra: (operation, null)),
+    );
   }
 
   void _toSignIn() {

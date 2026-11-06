@@ -154,6 +154,8 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
 
   Future<void> _rename(PairingDevice device) async {
     final l10n = AppLocalizations.of(context);
+    // Captured first: leaving Settings before the answer must not skip it.
+    final container = ProviderScope.containerOf(context);
     final controller = TextEditingController(text: device.name);
     final name = await showAppDialog<String>(
       context: context,
@@ -182,11 +184,11 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
     );
     controller.dispose();
     final trimmed = name?.trim() ?? '';
-    if (trimmed.isEmpty || trimmed == device.name) return;
+    if (trimmed.isEmpty || trimmed == device.name || !mounted) return;
     await _act(() async {
       await _api.pairingRenameDevice(deviceId: device.id, name: trimmed);
       // This device's own name is the one sign-in and the pocket show.
-      if (device.isSelf) ref.invalidate(configProvider);
+      if (device.isSelf) container.invalidate(configProvider);
     }, instead: {..._gone(l10n), 'invalid_request': l10n.pairingErrName});
   }
 
@@ -521,8 +523,9 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
 /// The longest device name the backend takes, in UTF-8 bytes.
 const pairingNameMaxBytes = 64;
 
-/// Keeps a field's text within [maxBytes] UTF-8 bytes, refusing the edit that
-/// would pass it.
+/// Keeps a field's text within [maxBytes] UTF-8 bytes. An input method's
+/// composition runs freely; once it is committed, the text is cut back to the
+/// longest whole-character prefix that fits.
 class _Utf8Limit extends TextInputFormatter {
   const _Utf8Limit(this.maxBytes);
 
@@ -532,5 +535,23 @@ class _Utf8Limit extends TextInputFormatter {
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
-  ) => utf8.encode(newValue.text).length > maxBytes ? oldValue : newValue;
+  ) {
+    final composing = newValue.composing;
+    if (composing.isValid && !composing.isCollapsed) return newValue;
+    if (utf8.encode(newValue.text).length <= maxBytes) return newValue;
+    final kept = StringBuffer();
+    var bytes = 0;
+    for (final rune in newValue.text.runes) {
+      final char = String.fromCharCode(rune);
+      final size = utf8.encode(char).length;
+      if (bytes + size > maxBytes) break;
+      kept.write(char);
+      bytes += size;
+    }
+    final text = kept.toString();
+    return TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
 }

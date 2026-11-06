@@ -82,6 +82,7 @@ class _PairingOtherWaysState extends State<PairingOtherWaysButton> {
       onPressed: widget.enabled
           ? () => showAdaptivePanel<void>(
               context: context,
+              avoidKeyboard: true,
               builder: (_) => ValueListenableBuilder(
                 valueListenable: _ways,
                 builder: (_, ways, _) =>
@@ -145,14 +146,14 @@ class _OtherWaysPanelState extends State<_OtherWaysPanel> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final advanced = widget.advanced;
+    if (widget.ways.isEmpty && advanced == null) {
+      // Nothing left to offer (the page stopped offering Restore): close.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+    }
     return Padding(
-      // The backend field must stay above a phone's keyboard.
-      padding: EdgeInsets.fromLTRB(
-        20,
-        4,
-        20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

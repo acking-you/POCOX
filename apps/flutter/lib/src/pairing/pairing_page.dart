@@ -24,6 +24,7 @@ class PairingPageFrame extends StatelessWidget {
     this.logo = false,
     this.footer,
     this.busy = false,
+    this.backTakesOver = false,
   });
 
   /// The title bar's title.
@@ -45,6 +46,10 @@ class PairingPageFrame extends StatelessWidget {
   /// neither the back button nor the system's back leaves.
   final bool busy;
 
+  /// Whether the system's back goes through [onBack] too, for a page whose
+  /// way back depends on where the device now stands.
+  final bool backTakesOver;
+
   @override
   Widget build(BuildContext context) {
     void back() {
@@ -58,7 +63,13 @@ class PairingPageFrame extends StatelessWidget {
     }
 
     final footer = this.footer;
-    return PopScope(canPop: !busy, child: _scaffold(context, back, footer));
+    return PopScope(
+      canPop: !busy && !backTakesOver,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !busy && backTakesOver) back();
+      },
+      child: _scaffold(context, back, footer),
+    );
   }
 
   Widget _scaffold(
@@ -269,6 +280,7 @@ class _PairingPendingState extends ConsumerState<PairingPendingPage> {
     return PairingPageFrame(
       title: l10n.pairingPendingTitle,
       onBack: _land,
+      backTakesOver: true,
       logo: true,
       children: [
         PairingHeading(title, center: true),

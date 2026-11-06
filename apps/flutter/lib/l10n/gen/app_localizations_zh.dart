@@ -5148,6 +5148,21 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String pairingJoinedManyNotice(int count) {
+    return '$count 台设备已关联，不是你的？';
+  }
+
+  @override
+  String pairingAskManyNotice(int count) {
+    return '$count 台设备请求恢复';
+  }
+
+  @override
+  String pairingNewsNotice(int count) {
+    return '你的设备有 $count 项变化';
+  }
+
+  @override
   String pairingAskNotice(String name) {
     return '有设备请求恢复 $name';
   }

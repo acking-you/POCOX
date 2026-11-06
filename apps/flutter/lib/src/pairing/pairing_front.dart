@@ -68,6 +68,9 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   /// Which [_load] may still write: a backend change starts another.
   int _generation = 0;
 
+  /// The [_load] in flight, which a poll or resume leaves to finish.
+  int? _loadInFlight;
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +118,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   /// writes.
   Future<void> _load() async {
     final generation = ++_generation;
+    _loadInFlight = generation;
     bool stale() => !mounted || generation != _generation;
     final api = _api;
     final backend = widget.backend;
@@ -129,7 +133,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
         _offline = false;
         _unavailable = null;
       });
-      explainFailedOperations(context, status.failed);
+      explainFailedOperations(context, ref, status.failed);
       if (const {'superseded', 'unknown', 'pending'}.contains(status.state)) {
         return;
       }
@@ -144,6 +148,7 @@ class _PairingFrontState extends ConsumerState<PairingFront>
       if (stale()) return;
       setState(() => _noteFailure(error));
     } finally {
+      if (_loadInFlight == generation) _loadInFlight = null;
       if (!stale()) setState(() => _loading = false);
     }
   }
@@ -165,7 +170,11 @@ class _PairingFrontState extends ConsumerState<PairingFront>
     }
   }
 
-  void _refresh() => unawaited(_load());
+  void _refresh() {
+    // A slow load is still the latest; only a backend change replaces it.
+    if (_loadInFlight != null) return;
+    unawaited(_load());
+  }
 
   /// Who has linked into this device while its first screen was open.
   Future<void> _refreshGroup(int generation) async {
@@ -187,10 +196,14 @@ class _PairingFrontState extends ConsumerState<PairingFront>
   /// identity here, the moment its hint is read.
   Future<void> _activate() async {
     final l10n = AppLocalizations.of(context);
+    // Captured first: the account changes even if this page is left before
+    // the answer comes.
+    final container = ProviderScope.containerOf(context);
     setState(() => _busy = true);
     try {
       final hint = await pairingHardwareHint();
       await _api.pairingActivate(hint: hint, backend: widget.backend);
+      container.invalidate(configProvider);
       if (!mounted) return;
       showToastOk(context, l10n.pairingReady);
       await landAfterSignIn(context, ref);
@@ -461,16 +474,23 @@ class _PairingFrontState extends ConsumerState<PairingFront>
         ),
       ...widget.otherWays,
     ];
-    if (ways.isNotEmpty || widget.advanced != null) {
-      children.addAll([
-        const SizedBox(height: 6),
-        PairingOtherWaysButton(
-          enabled: idle,
-          advanced: widget.advanced,
-          ways: ways,
+    // Kept in the tree when it has nothing to offer, so an open panel
+    // learns that and closes instead of losing its rows.
+    final offers = ways.isNotEmpty || widget.advanced != null;
+    children.add(
+      Visibility(
+        visible: offers,
+        maintainState: true,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: PairingOtherWaysButton(
+            enabled: idle && offers,
+            advanced: widget.advanced,
+            ways: ways,
+          ),
         ),
-      ]);
-    }
+      ),
+    );
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,

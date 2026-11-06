@@ -16,6 +16,10 @@ pub struct PairingError {
     pub operation_id: Option<String>,
     /// For a superseded secret, when its overlap ends (unix seconds).
     pub grace_deadline: Option<i64>,
+    /// The answer was a bare status with no refusal body: an old backend, or a
+    /// proxy in front of one that might have taken the request. Shown by its
+    /// code, but never a definite refusal, so waits keep asking.
+    pub bare_status: bool,
 }
 
 impl PairingError {
@@ -23,7 +27,9 @@ impl PairingError {
     /// server failure or a code this client does not know says nothing either
     /// way: only reading the result can.
     pub fn is_definite(&self) -> bool {
-        (400..500).contains(&self.status) && self.code != PairingErrorCode::Unknown
+        !self.bare_status
+            && (400..500).contains(&self.status)
+            && self.code != PairingErrorCode::Unknown
     }
 
     /// A backend from before pairing, which has no pairing routes: it cannot
@@ -35,6 +41,7 @@ impl PairingError {
             retry_after: None,
             operation_id: None,
             grace_deadline: None,
+            bare_status: true,
         }
     }
 
@@ -50,6 +57,7 @@ impl PairingError {
             retry_after: body.retry_after.or(retry_header),
             operation_id: body.operation_id,
             grace_deadline: body.grace_deadline,
+            bare_status: false,
         }
     }
 }

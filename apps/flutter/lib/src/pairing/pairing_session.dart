@@ -60,6 +60,7 @@ Future<void> followPairingOperation(
     case 'pending':
       context.go('/pair/pending', extra: (operation, backend));
     default:
+      markFailureTold(ref, operation.id);
       showToastError(
         context,
         operation.error == null
@@ -102,25 +103,40 @@ bool followTransitionPending(
   return true;
 }
 
-/// The failed changes already explained in this run, so each is told once.
+/// The failed changes already explained in this run; the saved list covers
+/// earlier runs.
 final _explainedFailures = <String>{};
 
-/// Say why each of [failed] did not happen, once per change per run: a
+/// Record that the user was told why change [id] did not happen.
+void markFailureTold(WidgetRef ref, String id) {
+  _explainedFailures.add(id);
+  ref.read(uiPrefsProvider.notifier).addPairingToldFailure(id);
+}
+
+/// Say why the first of [failed] not yet told did not happen, once ever: a
 /// change whose answer came while no page waited for it would otherwise go
-/// unexplained.
-void explainFailedOperations(
+/// unexplained. One notice at a time; the rest wait for the next read. True
+/// when a notice went up.
+bool explainFailedOperations(
   BuildContext context,
+  WidgetRef ref,
   List<PairingOperation> failed,
 ) {
-  final l10n = AppLocalizations.of(context);
-  for (final operation in failed) {
-    if (!_explainedFailures.add(operation.id)) continue;
-    showToastError(
-      context,
-      pairingErrorText(
-        l10n,
-        PairingFailure(code: operation.error ?? 'failed', message: ''),
-      ),
-    );
-  }
+  final told = {
+    ..._explainedFailures,
+    ...?ref.read(uiPrefsProvider).valueOrNull?.pairingToldFailures,
+  };
+  final operation = failed
+      .where((operation) => !told.contains(operation.id))
+      .firstOrNull;
+  if (operation == null) return false;
+  markFailureTold(ref, operation.id);
+  showToastError(
+    context,
+    pairingErrorText(
+      AppLocalizations.of(context),
+      PairingFailure(code: operation.error ?? 'failed', message: ''),
+    ),
+  );
+  return true;
 }

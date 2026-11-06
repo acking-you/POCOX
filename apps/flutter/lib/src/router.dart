@@ -78,9 +78,10 @@ void pushRoute(String location, {Object? extra}) =>
 /// router exists.
 void goRoute(String location) => _appRouter?.go(location);
 
-/// The app's current location's path, or null before the router exists.
+/// The path of the page in front, a pushed one included, or null before the
+/// router exists.
 String? currentRoutePath() =>
-    _appRouter?.routerDelegate.currentConfiguration.uri.path;
+    _appRouter?.routerDelegate.currentConfiguration.lastOrNull?.matchedLocation;
 
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
@@ -100,7 +101,13 @@ GoRouter buildRouter({
       ],
     ),
     // Pairing-code login. A code reaches these pages in memory (`extra`, or
-    // pairingInvitationProvider), never in a location.
+    // pairingInvitationProvider), never in a location. The waiting page is on
+    // its own, not under /pair: going there must not build the start page
+    // (and its first screen) below it.
+    GoRoute(
+      path: '/pair/pending',
+      builder: (c, s) => pairingPendingPage(s.extra),
+    ),
     GoRoute(
       path: '/pair',
       builder: (c, s) => const PairingStartPage(),
@@ -111,10 +118,6 @@ GoRouter buildRouter({
           builder: (c, s) => pairingRestorePage(s.extra),
         ),
         GoRoute(path: 'scan', builder: (c, s) => const PairingScanScreen()),
-        GoRoute(
-          path: 'pending',
-          builder: (c, s) => pairingPendingPage(s.extra),
-        ),
       ],
     ),
     // Chat-first home: resolves an app service + the latest conversation and

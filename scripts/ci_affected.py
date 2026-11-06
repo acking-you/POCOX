@@ -54,9 +54,10 @@ CI_INFRA_PREFIX = (".github/", "scripts/")
 # The Flutter app lives outside the cargo workspace.
 FLUTTER_PREFIX = ("apps/flutter/",)
 
-# The app's Android build: its native code and Gradle files and its plugin set.
-# The bridge it compiles in is decided from the crate graph.
-ANDROID_PREFIX = ("apps/flutter/android/",)
+# The app's Android build: its native code and Gradle files, its plugin set,
+# and the bridge's own Gradle plugin and cargokit build. The bridge's Rust is
+# decided from the crate graph.
+ANDROID_PREFIX = ("apps/flutter/android/", "apps/flutter/rust_builder/")
 ANDROID_EXACT = {"apps/flutter/pubspec.yaml", "apps/flutter/pubspec.lock"}
 BRIDGE_CRATE = "pocox_bridge"
 
@@ -68,7 +69,9 @@ def run(cmd, **kw):
 def workspace_graph():
     """Return (dir2name, deps) parsed from the workspace manifests.
 
-    deps[crate] = set of intra-workspace crates it depends on (any dep kind).
+    deps[crate] = set of intra-workspace crates it depends on (any dep kind);
+    runtime_deps[crate] the same without dev-dependencies, which never reach
+    a built artifact such as the app.
     POCOX crates reference each other as `dep = { workspace = true }`
     (the path lives in the root `[workspace.dependencies]`), not as a local
     `{ path = .. }`, so an edge is recognised whenever a dependency *key*
@@ -83,6 +86,7 @@ def workspace_graph():
         dir2name[m] = ct["package"]["name"]
     names = set(dir2name.values())
     deps = defaultdict(set)
+    runtime_deps = defaultdict(set)
     for m in members:
         ct = tomllib.load(open(REPO / m / "Cargo.toml", "rb"))
         me = dir2name[m]
@@ -90,7 +94,9 @@ def workspace_graph():
             for key in ct.get(sect, {}):
                 if key in names and key != me:
                     deps[me].add(key)
-    return dir2name, deps
+                    if sect != "dev-dependencies":
+                        runtime_deps[me].add(key)
+    return dir2name, deps, runtime_deps
 
 
 def changed_files(base, head):
@@ -184,7 +190,7 @@ def detect():
         print(f"[detect] rust cross-cutting: {sorted(rust_cross)[:5]} -> full workspace.")
         return emit("all", [], [], flutter, True)
 
-    dir2name, deps = workspace_graph()
+    dir2name, deps, runtime_deps = workspace_graph()
     seeds = {c for c in (owning_crate(f, dir2name) for f in files) if c}
     if not seeds:
         rust_mode, test_crates, clippy_crates = "none", [], []
@@ -193,7 +199,8 @@ def detect():
         rust_mode = "subset"
         test_crates = dependents_closure(seeds, deps)
         clippy_crates = seeds
-        android = android or BRIDGE_CRATE in test_crates
+        # Only what the bridge links (not test-only links) reaches the APK.
+        android = android or BRIDGE_CRATE in dependents_closure(seeds, runtime_deps)
     return emit(rust_mode, test_crates, clippy_crates, flutter, android)
 
 

@@ -5468,6 +5468,21 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String pairingJoinedManyNotice(int count) {
+    return '$count devices linked. Not yours?';
+  }
+
+  @override
+  String pairingAskManyNotice(int count) {
+    return '$count devices ask to be restored';
+  }
+
+  @override
+  String pairingNewsNotice(int count) {
+    return '$count changes to your devices';
+  }
+
+  @override
   String pairingAskNotice(String name) {
     return 'A device asks to restore $name';
   }
