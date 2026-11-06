@@ -92,16 +92,94 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now pocox-backend
 ```
 
-With `POCOX_PAIRING_SECRET` set, run **one backend process per database**. Relay work is serialized
-by locks in that process, so the backend takes a file lock beside the database at startup
-(`<database>.owner.lock`) and a second process refuses to start.
+Pairing-code login is optional and off until you set its secret; see
+[Pairing-code login](#pairing-code-login-optional) below.
 
-Pairing also opens an anonymous surface, so with it enabled the listener caps connections at 8,192 in
-total and 128 per address, and closes a connection that sends no request headers within 18 seconds.
-**List every proxy in front of the backend in `trusted_proxies`**: the list decides whose
-`X-Forwarded-For` is believed, and it exempts that proxy from the per-address cap. An unlisted proxy
-shares one 128-connection cap among all its users. Refusals are logged at warn, at most once a minute.
-With pairing off, none of this applies.
+## Pairing-code login (optional)
+
+Pairing lets devices sign in with no GitHub account: each device gets one long-lived
+code from the backend, and devices linked by those codes count as one user. The rules
+are in [the design](../docs/pairing-code-login.md); people use it as the
+[usage guide](../docs/usage.md#1-sign-in-with-a-pairing-code) describes.
+
+### What it needs
+
+- **`POCOX_PAIRING_SECRET`** in `backend.env` (the `0600` file systemd reads), at least
+  32 bytes of random material, independent of `POCOX_JWT_SECRET`
+  (`openssl rand -hex 32`). Unset keeps pairing off: its routes answer 503 and GitHub
+  sign-in is unaffected. **Never change it once devices exist**: codes and hardware
+  indexes derive from it, and the backend refuses to start on a secret that does not
+  match its database.
+- **A relay with key namespaces**: pb-mapper built from `master` at `badcad7` or later
+  (the first release after 0.10.2). The backend asks the relay for its
+  `key_namespaces` capability and answers pairing calls with `relay_too_old` until it
+  has one. `--legacy-protocol deny` stays required, as for GitHub accounts.
+- **One backend process per database.** Relay work is serialized by locks in that
+  process, so the backend takes a file lock beside the database
+  (`<database>.owner.lock`) and a second process refuses to start.
+- **Every proxy listed in `trusted_proxies`.** Pairing is reachable without an
+  account, so with it on the listener caps connections at 8,192 in total and 128 per
+  address, and closes one that sends no request headers within 18 seconds. The list
+  decides whose `X-Forwarded-For` is believed and exempts that proxy from the
+  per-address cap; an unlisted proxy shares one 128-connection cap among all its users.
+  Refusals are logged at warn, at most once a minute. With pairing off none of this
+  applies.
+
+### Limits and their defaults
+
+The limits are built in, not configuration; the design lists every one
+([limits](../docs/pairing-code-login.md#limits-and-transport),
+[retention](../docs/pairing-code-login.md#retention-and-recovery-limits)). The ones an
+operator meets first:
+
+| Limit | Default |
+| --- | --- |
+| Code checks per address | 5 per 10 minutes, with growing backoff; a valid code refunds its charge |
+| New devices | 20 per hour per address, 1,000 per hour across the backend |
+| Group size | 64 devices |
+| Links, leaves, removals and restores | 20 per hour per device |
+| Pending recovery requests | 3 per device asked about |
+| Code changes | once per 24 hours per device |
+| Pairing keys' share of the relay's temporary keys | 50%; past it, new keys fail with 503 `relay_capacity`. Raise the relay's `PB_MAPPER_AUTH_MAX_TEMP_KEYS` for more |
+| Inactive devices | an activated device unused for 180 days, and a first-screen device never set up after 30 days, are deleted with their codes |
+| Operation results and recovery requests | 7 days |
+
+A refused call answers 429 with `Retry-After`; clients wait and say so.
+
+### Upgrade order
+
+1. **The relay**, to a pb-mapper with key namespaces. Existing GitHub accounts keep
+   working on it: keys issued the old way stay where they were.
+2. **The backend**, with `POCOX_PAIRING_SECRET` set.
+3. **The clients.** The CLI and app from this release on speak pairing protocol 1
+   (the `x-pocox-pairing-protocol` header). An older client has no pairing at all and
+   keeps signing in with GitHub; a client whose pairing protocol this backend does
+   not speak gets 426 `pairing_client_upgrade_required` before anything changes; the
+   app asks the user to update POCOX.
+
+### Existing connections
+
+- **Removing a device** stops new connections at once: its relay key is revoked, and
+  its relayed connections close. A direct (P2P) connection already set up may last
+  until either end closes it, so the app says new connections stopped rather than
+  that everything was cut. Stop a service or the device's host to end one.
+- **Replacing a device's secret** by restoring onto it gives the old secret's
+  sessions a fixed 600-second overlap. Leaving, removal and taking a device back
+  (`pocox pair restore --retake`) give none.
+
+### Smoke test
+
+On a spare machine, or with a scratch home and device scope so your own identity is
+untouched:
+
+```bash
+HOME=$(mktemp -d) POCOX_DEVICE_SCOPE=smoke pocox pair --backend https://lb7666.top:8443
+```
+
+It shows a code, then asks to set this device up. Saying yes takes a relay key, so a
+relay without key namespaces fails here with `relay_too_old`, and a backend without
+`POCOX_PAIRING_SECRET` fails at once with `pairing_disabled`. The scratch device
+stays on the backend until it has gone 180 days unused.
 
 ## Relay configuration (REQUIRED)
 

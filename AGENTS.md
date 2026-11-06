@@ -194,10 +194,10 @@ upload route and respect draft admission; see
 Shipped work lives in the changelog and git history. Open, described only as
 planned until it ships:
 
-- **Pairing-code login**: backend-issued per-device codes, with linked devices
-  counting as one user, authorized reinstall recovery and a bounded credential
-  overlap. The relay, backend, core, bridge, CLI and the app have shipped (Android
-  built, not yet run on a device); usage and deployment docs remain ([design](docs/pairing-code-login.md)).
+- **Pairing-code login**: every stage has shipped, docs included; acceptance on
+  hardware remains: the app on an Android device, iOS backup exclusion on a real
+  device, camera scanning and `pocox://pair` routing on macOS
+  ([design](docs/pairing-code-login.md)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.
 - **Session takeover for Claude and OpenCode**: an explicit, confirmed continue

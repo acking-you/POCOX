@@ -29,7 +29,7 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 | `pair`, `pair join`, `pair restore [--ask] [--retake]`, `pair start-over` | sign in without GitHub: show this device's code, join another device's group, recover a previous device, or leave a replaced identity behind ([details](#pairing-codes)) |
 | `pair rotate`, `pair pause`, `pair resume`, `pair leave` | replace or pause this device's code; move it out of its group |
 | `devices`, `devices remove <id>`, `devices allow <id> --request <id>`, `devices deny <id> --request <id>` | list the linked devices, remove one, answer a recovery request |
-| `init [--relay <host:port>] [--key <32B>]` | save a self-host relay and shared key to `~/.config/pocox/config.toml` (0600) |
+| `init [--relay <host:port>] [--key <32B>]` | save a self-host relay and shared key to `config.toml` (0600) in POCOX's config directory (`~/.config/pocox` on Linux, `~/Library/Application Support/io.github.acking-you.pocox` on macOS) |
 | `serve [--allow-remote-management]` | start or reuse `codex app-server` and register it as `…:app:<name>`; with the flag, run the managed host other devices can configure ([details](remote-device-management.md#cli-host)) |
 | `connect` | subscribe to a remote app-server and print the `codex --remote …` command |
 | `api serve`, `api connect` | publish this machine's Codex login as a Responses API proxy, or subscribe to one and print a `model_providers` snippet |
