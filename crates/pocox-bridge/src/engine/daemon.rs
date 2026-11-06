@@ -121,6 +121,9 @@ impl Manager {
         runtime::init(options.config_dir)?;
         // Before any host starts, so restored harnesses get the tools.
         super::agent_tools::initialize();
+        // A supervisor runs for days on one credential; this is how it learns of
+        // a peer's removal.
+        super::pairing::watch::start();
         let mut manager = Self {
             state_dir: options.state_dir,
             stopped: false,

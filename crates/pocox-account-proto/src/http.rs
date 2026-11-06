@@ -156,6 +156,20 @@ pub fn session_token_exp(token: &str) -> Option<i64> {
     value.get("exp")?.as_i64()
 }
 
+/// The device id and session generation a device JWT names, read without
+/// verifying it, or `None` for a GitHub token or anything unreadable. Only for
+/// noticing that a token is out of date; the backend decides what it
+/// authorizes.
+pub fn session_token_device(token: &str) -> Option<(String, i64)> {
+    use base64::Engine as _;
+    let payload = token.split('.').nth(1)?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+    Some((value.get("did")?.as_str()?.to_string(), value.get("dgen")?.as_i64()?))
+}
+
 /// Request body for `POST /auth/refresh`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RefreshRequest {

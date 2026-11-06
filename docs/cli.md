@@ -25,7 +25,10 @@ irm https://raw.githubusercontent.com/acking-you/POCOX/main/scripts/install.ps1 
 
 | Command | Does |
 | --- | --- |
-| `login [--web]`, `logout`, `account` | hosted-account sign-in with GitHub, sign-out, current account and transport |
+| `login [--web \| --resume] [--backend <url>]`, `logout`, `account` | hosted-account sign-in with GitHub or back to the session set aside for pairing, sign-out, current account and transport |
+| `pair`, `pair join`, `pair restore [--ask] [--retake]`, `pair start-over` | sign in without GitHub: show this device's code, join another device's group, recover a previous device, or leave a replaced identity behind ([details](#pairing-codes)) |
+| `pair rotate`, `pair pause`, `pair resume`, `pair leave` | replace or pause this device's code; move it out of its group |
+| `devices`, `devices remove <id>`, `devices allow <id> --request <id>`, `devices deny <id> --request <id>` | list the linked devices, remove one, answer a recovery request |
 | `init [--relay <host:port>] [--key <32B>]` | save a self-host relay and shared key to `~/.config/pocox/config.toml` (0600) |
 | `serve [--allow-remote-management]` | start or reuse `codex app-server` and register it as `…:app:<name>`; with the flag, run the managed host other devices can configure ([details](remote-device-management.md#cli-host)) |
 | `connect` | subscribe to a remote app-server and print the `codex --remote …` command |
@@ -59,6 +62,63 @@ pocox services list         # another device: list your services
 pocox connect               # attach to the default app-server
 codex --remote ws://127.0.0.1:28080
 ```
+
+## Pairing codes
+
+A device can sign in with no GitHub account. Each device has one long-lived code,
+and devices linked by those codes count as one user.
+
+```bash
+pocox pair                  # on the first device: show its code, ask to set it up, wait for a link
+pocox pair join             # on the next device: type the code, or pipe it to stdin
+pocox devices               # list the group
+```
+
+A code is read from a prompt or stdin, never the command line, where other accounts
+and shell history could read it. Everything that changes membership shows what it
+does and asks first; without a terminal, `--yes` is that answer and the command
+otherwise changes nothing. `--backend <url>` chooses a backend, which must be
+`https://` or on this computer. `--no-wait` makes `pocox pair` return after showing
+the code. Only `pocox pair`, `pair join` and `pair restore` start an identity; anything
+else on a device with none says so and changes nothing, including `pair pause`.
+
+A change the backend has yet to finish when the command stops waiting, or when you press
+Ctrl-C, exits with code **75**: neither done nor failed. Do not repeat it. `pocox devices`
+and `pocox pair` show changes still under way and any that turned out not to happen.
+
+| Situation | Do |
+| --- | --- |
+| Reinstalled, with the device store intact | `pocox pair`: same device, same code |
+| Reinstalled without it, holding a code from the group | `pocox pair restore`, then pick the device you were (`--device <id>` off a terminal) |
+| Reinstalled without it, holding no code | `pocox pair restore --ask`; a linked device runs `pocox devices`, compares the matching id and allows it |
+| Suspect someone has this device's code, on this device | `pocox pair pause`, then `pocox devices remove <id>` for anything you do not recognise |
+| Suspect someone has a device's identity, and you have replaced that device | On the replacement, not yet set up, with a code from the group: `pocox pair restore --retake`. Old access ends at once and the code changes |
+| Told another device took this identity over | `pocox pair start-over` starts as a new device; `pocox pair restore` then recovers one you had |
+| This device was removed | `pocox pair` asks to continue, as a device of its own; returning to the group takes a new code |
+| A code leaked | `pocox pair pause` at once; `pocox pair rotate` once 24 hours have passed since it was issued |
+
+The identity lives in a private device store outside `config.toml`, shared by every
+POCOX installation of this OS account and backend, so moving one moves them all.
+`POCOX_DEVICE_SCOPE=<name>` keeps a separate identity, for testing several devices
+on one computer. `config.toml` holds one session, so give each scope its own home too,
+or they sign each other out: `HOME=<dir> POCOX_DEVICE_SCOPE=<name> pocox …` on macOS and
+Linux. On Windows the configuration directory follows the account, so use a separate
+Windows account. `pocox logout` signs this
+installation out and leaves the identity and its group alone: `pocox pair` resumes it. To
+end a device's access, remove it from another device. Moving to pairing sets a GitHub
+session aside, and `pocox login --resume` brings it back, with the backend it was on;
+`--backend <url>` names one when several are set aside. It refuses to replace a GitHub
+session already here.
+
+A running `pocox serve` or relay worker on your account notices within a minute that its
+device was removed or moved, or that this installation moved to or from pairing, and
+stops. Removal ends new connections; one already open may last until an end closes it.
+`pocox serve --allow-remote-management` stops its hosts the same way and starts them
+again after a move you confirmed, including one made by a command in another terminal, or
+after you continue on a removed device. A worker that slept past its key's end registers
+again with the next one. An explicit `--relay` depends on none of this.
+
+Details are in [the design](pairing-code-login.md).
 
 ## Self-host
 

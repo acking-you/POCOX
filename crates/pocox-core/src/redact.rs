@@ -227,6 +227,80 @@ impl Lines {
     }
 }
 
+/// Pairing's bearer values and invitations, wherever they might appear in text
+/// bound for a log or an error: device secrets (`pcxd1_…`), `pocox://pair`
+/// links and pairing codes, typed with or without their dashes.
+///
+/// A second line of defence. The engine never formats these into text; a code a
+/// user pasted into a field that ends up in an error is the case this catches.
+pub fn scrub_pairing(text: &str) -> std::borrow::Cow<'_, str> {
+    let is_token = |ch: char| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_';
+    let mut out = String::new();
+    let mut copied = 0;
+    let mut rest = 0;
+    while rest < text.len() {
+        // A link first: it holds characters a token does not, and its code would
+        // otherwise leave the rest of the link behind.
+        if text[rest..].starts_with(PAIR_LINK_START) {
+            let end = text[rest..]
+                .find(|ch: char| ch.is_whitespace() || matches!(ch, '"' | '\'' | '<' | '>' | ')'))
+                .map_or(text.len(), |len| rest + len);
+            out.push_str(&text[copied..rest]);
+            out.push_str("[pairing link]");
+            copied = end;
+            rest = end;
+            continue;
+        }
+        let Some(ch) = text[rest..].chars().next() else {
+            break;
+        };
+        if !is_token(ch) {
+            rest += ch.len_utf8();
+            continue;
+        }
+        let end = text[rest..]
+            .find(|ch: char| !is_token(ch))
+            .map_or(text.len(), |len| rest + len);
+        let replacement = match &text[rest..end] {
+            token if token.starts_with(crate::pairing::DEVICE_SECRET_PREFIX) => {
+                Some("[device secret]")
+            },
+            token if is_pairing_code(token) => Some("[pairing code]"),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            out.push_str(&text[copied..rest]);
+            out.push_str(replacement);
+            copied = end;
+        }
+        rest = end;
+    }
+    if copied == 0 {
+        return std::borrow::Cow::Borrowed(text);
+    }
+    out.push_str(&text[copied..]);
+    std::borrow::Cow::Owned(out)
+}
+
+const PAIR_LINK_START: &str = "pocox://pair";
+
+/// Whether `token` reads as a pairing code. Dashed in its groups of four it is
+/// unmistakable in any case. Bare, it must be uppercase and mix letters and
+/// digits, so an ordinary twelve-letter word stays readable in a log.
+fn is_pairing_code(token: &str) -> bool {
+    let in_alphabet = |ch: char| ch.is_ascii_alphanumeric() && !matches!(ch, 'U' | 'u');
+    let bytes = token.as_bytes();
+    let dashed = bytes.len() == 14 && bytes[4] == b'-' && bytes[9] == b'-';
+    if dashed {
+        return token.chars().filter(|ch| *ch != '-').all(in_alphabet);
+    }
+    bytes.len() == 12
+        && token.chars().all(in_alphabet)
+        && !token.chars().any(|ch| ch.is_ascii_lowercase())
+        && token.chars().any(|ch| ch.is_ascii_digit())
+        && token.chars().any(|ch| ch.is_ascii_uppercase())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,6 +411,22 @@ mod tests {
         let shown = format!("{:?}", Redactor::new(Some(&Secret::new("sk-a/b+c"))));
         assert!(!shown.contains("sk-a") && !shown.contains("%2F"), "{shown}");
         assert!(shown.contains("forms"), "{shown}");
+    }
+
+    #[test]
+    fn pairing_values_never_survive_in_text() {
+        let secret = format!("pcxd1_{}", "A1b2_-".repeat(7));
+        let text = format!("refresh with {secret}: refused");
+        assert_eq!(scrub_pairing(&text), "refresh with [device secret]: refused");
+        for code in ["K7M2-F9QX-3RTB", "k7m2-f9qx-3rtb", "K7M2F9QX3RTB"] {
+            let text = format!("code `{code}` is unknown");
+            assert_eq!(scrub_pairing(&text), "code `[pairing code]` is unknown");
+        }
+        let scrubbed = scrub_pairing("opened pocox://pair?c=K7M2F9QX3RTB&x=1 today");
+        assert_eq!(scrubbed, "opened [pairing link] today");
+        let ordinary = "the relay at relay.example:7666 answered 503 for pocox-backend-1234";
+        assert!(matches!(scrub_pairing(ordinary), std::borrow::Cow::Borrowed(_)));
+        assert_eq!(scrub_pairing("configuration"), "configuration", "lowercase word");
     }
 
     #[test]

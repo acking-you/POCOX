@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Result};
-use pocox_core::config::{Config, Mode};
+use pocox_core::config::Config;
 use pocox_core::paths;
 use pocox_core::state::{PbRole, PbSessionInfo};
 use pocox_pb::{
@@ -12,11 +12,15 @@ use pocox_pb::{
 };
 
 use crate::cli::WorkerCmd;
+use crate::commands::account_key::{
+    credential_refused, on_account_credential, replacement_credential, Shutdown,
+};
 use crate::commands::worker_health::Reporter;
 use crate::commands::{account, api_proxy};
 
 /// Run an internal worker command.
 pub async fn run(cmd: WorkerCmd) -> Result<()> {
+    let shutdown = Shutdown::listen();
     match cmd {
         WorkerCmd::PbRegister(args) => {
             // The parent always passes `--relay` and exports the credential, so
@@ -28,17 +32,33 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 crate::commands::relay::resolve_session(args.relay.relay.as_deref(), &config)?;
             let reporter =
                 reporter(PbRole::Register, &args.key, &args.local_addr, &session, args.codec)?;
-            let registration = pb_register(&session, RegisterOptions {
-                key: args.key,
+            let options = RegisterOptions {
+                key: args.key.clone(),
                 local_addr: args.local_addr,
                 codec: args.codec,
+            };
+            until_credential_gone(session, &args.key, &config, shutdown.clone(), |session| {
+                let (options, reporter, config) = (options.clone(), &reporter, &config);
+                let shutdown = shutdown.clone();
+                async move {
+                    let registration = pb_register(&session, options).await?;
+                    let _refresh = keep_account_credential_alive(&session, config);
+                    let outcome = until_identity_lost(
+                        config,
+                        &session,
+                        monitor(
+                            reporter,
+                            registration.subscribe(),
+                            || registration.diagnostics(),
+                            shutdown,
+                        ),
+                    )
+                    .await;
+                    registration.stop().await?;
+                    outcome
+                }
             })
             .await?;
-            let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome =
-                monitor(&reporter, registration.subscribe(), || registration.diagnostics()).await;
-            registration.stop().await?;
-            outcome?;
         },
         WorkerCmd::PbSubscribe(args) => {
             let config = Config::load().unwrap_or_default();
@@ -46,16 +66,32 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
                 crate::commands::relay::resolve_session(args.relay.relay.as_deref(), &config)?;
             let reporter =
                 reporter(PbRole::Subscribe, &args.key, &args.local_addr, &session, false)?;
-            let connection = pb_subscribe(&session, SubscribeOptions {
-                key: args.key,
+            let options = SubscribeOptions {
+                key: args.key.clone(),
                 local_addr: args.local_addr,
+            };
+            until_credential_gone(session, &args.key, &config, shutdown.clone(), |session| {
+                let (options, reporter, config) = (options.clone(), &reporter, &config);
+                let shutdown = shutdown.clone();
+                async move {
+                    let connection = pb_subscribe(&session, options).await?;
+                    let _refresh = keep_account_credential_alive(&session, config);
+                    let outcome = until_identity_lost(
+                        config,
+                        &session,
+                        monitor(
+                            reporter,
+                            connection.subscribe(),
+                            || connection.diagnostics(),
+                            shutdown,
+                        ),
+                    )
+                    .await;
+                    connection.stop().await?;
+                    outcome
+                }
             })
             .await?;
-            let _refresh = keep_account_credential_alive(&session, &config);
-            let outcome =
-                monitor(&reporter, connection.subscribe(), || connection.diagnostics()).await;
-            connection.stop().await?;
-            outcome?;
         },
         WorkerCmd::ApiProxy(args) => {
             super::host_identity::initialize_for_metadata();
@@ -63,6 +99,66 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
         },
     }
     Ok(())
+}
+
+/// Run `work` while the account's credential can be had. A computer that slept
+/// past its key's end wakes to a relay that refuses it for good, and nothing
+/// else would start this worker again, so it fetches the replacement and
+/// carries on. A refusal with no replacement for this same user is how a
+/// removed or moved device stops.
+async fn until_credential_gone<F, Fut>(
+    mut session: RelaySession,
+    key: &str,
+    config: &Config,
+    mut shutdown: Shutdown,
+    mut work: F,
+) -> Result<()>
+where
+    F: FnMut(RelaySession) -> Fut,
+    Fut: std::future::Future<Output = Result<()>>,
+{
+    loop {
+        let error = match work(session.clone()).await {
+            Ok(()) => return Ok(()),
+            Err(error) => error,
+        };
+        if !on_account_credential(&session, config) || !credential_refused(&format!("{error:#}")) {
+            return Err(error);
+        }
+        let next = tokio::select! {
+            next = replacement_credential(&session, key, config) => next,
+            () = shutdown.requested() => return Ok(()),
+        };
+        match next {
+            Some(next) => {
+                tracing::info!("the relay ended this worker's key; continuing on its replacement");
+                session = next;
+            },
+            None => return Err(error),
+        }
+    }
+}
+
+/// Run `work` while this installation's account stands. A worker outlives the
+/// command that spawned it, and a removed device must not keep trying to
+/// republish on a key that is gone, nor a GitHub one to renew a key this
+/// installation moved away from. One given a relay of its own never ends early.
+async fn until_identity_lost(
+    config: &Config,
+    session: &RelaySession,
+    work: impl std::future::Future<Output = Result<()>>,
+) -> Result<()> {
+    if !on_account_credential(session, config) {
+        return work.await;
+    }
+    let backend = account::backend_base(None, config);
+    tokio::select! {
+        outcome = work => outcome,
+        reason = account::identity_lost(config, &backend) => {
+            tracing::warn!("worker stopping: {reason}");
+            Ok(())
+        },
+    }
 }
 
 /// Keep this worker's relay credential from lapsing, for as long as it runs.
@@ -83,7 +179,7 @@ pub async fn run(cmd: WorkerCmd) -> Result<()> {
 /// Returns a guard whose drop stops refreshing. `None` in self-host mode, where
 /// the operator's own key does not expire.
 fn keep_account_credential_alive(session: &RelaySession, config: &Config) -> Option<OwnedTask> {
-    if !session.credential.starts_with("pbmt1_") || config.account_mode() != Mode::Account {
+    if !on_account_credential(session, config) {
         return None;
     }
     let backend = account::backend_base(None, config);
@@ -144,9 +240,8 @@ async fn monitor(
     reporter: &Reporter,
     mut status: tokio::sync::watch::Receiver<TunnelStatus>,
     diagnostics: impl Fn() -> pocox_pb::TunnelDiagnostics,
+    mut shutdown: Shutdown,
 ) -> Result<()> {
-    let shutdown = shutdown_signal();
-    tokio::pin!(shutdown);
     let mut interval = tokio::time::interval(Duration::from_secs(5));
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     let mut snapshot_failed = false;
@@ -166,7 +261,7 @@ async fn monitor(
             _ => {},
         }
         tokio::select! {
-            result = &mut shutdown => return result,
+            () = shutdown.requested() => return Ok(()),
             _ = interval.tick() => {},
             result = status.changed() => { if result.is_err() { bail!("network worker stopped reporting status"); } },
         }

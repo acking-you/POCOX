@@ -68,7 +68,8 @@ pub use keepalive::keep_credential_alive;
 pub use pb_mapper::{
     Connection, DirectAttempt, DirectStage, PathDiagnostics, PortMappingDiagnostics,
     PortMappingProtocol, PortMappingStage, PortMappingStatus, RecoveryFailure, RecoveryPhase,
-    RelayTransport, TunnelDiagnostics, TunnelEvent, TunnelEventKind, TunnelStatus, SDK_VERSION,
+    Registration, RelayTransport, TunnelDiagnostics, TunnelEvent, TunnelEventKind, TunnelStatus,
+    SDK_VERSION,
 };
 pub use publish::{publish, publish_pending, PublishError, Published};
 pub use session::{

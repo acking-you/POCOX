@@ -84,6 +84,12 @@ system-configuration = "0.7"
 
 [dev-dependencies]
 pb-mapper-testkit = { workspace = true }
+# The real backend, for the pairing engine's boundary tests. Never a normal
+# dependency: `scripts/check_mobile_dependencies.py` keeps its database off phones.
+pocox-auth = { workspace = true }
+pocox-backend = { workspace = true }
+pocox-store = { workspace = true }
+sqlx = { workspace = true }
 tempfile = "3"
 tokio-tungstenite = { workspace = true }
 

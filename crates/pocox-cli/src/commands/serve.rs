@@ -45,6 +45,9 @@ use pocox_core::service::{ServiceId, ServiceKind};
 use pocox_core::state::PbRole;
 
 use crate::cli::ServeArgs;
+use crate::commands::account_key::{
+    credential_refused, on_account_credential, replacement_credential, Shutdown,
+};
 use crate::commands::managed_pb::{self, EnsureOutcome, PbWorkerSpec};
 use crate::commands::transport::{self, Transport};
 use crate::commands::{api_proxy, codex, ui};
@@ -168,20 +171,23 @@ async fn serve_account_foreground(
     // must not stop the app-server from serving. Its own registration rather
     // than a share of the app's, because the relay maps one local address per key
     // and this is a second listener.
+    let meta_options = |meta_local: SocketAddr| pocox_pb::RegisterOptions {
+        key: transport.key(&ServiceId::new(device, ServiceKind::Meta, name)),
+        local_addr: meta_local.to_string(),
+        codec: false,
+    };
     let meta = match spawn_meta_service(local).await {
         Ok(meta_local) => {
-            pocox_pb::session::register_pending(&transport.session, pocox_pb::RegisterOptions {
-                key: transport.key(&ServiceId::new(device, ServiceKind::Meta, name)),
-                local_addr: meta_local.to_string(),
-                codec: false,
-            })
-            .await
+            let options = meta_options(meta_local);
+            pocox_pb::session::register_pending(&transport.session, options.clone())
+                .await
+                .map(|(registration, ready)| (registration, ready, options))
         },
         Err(e) => Err(e),
     };
     match &meta {
-        Ok((_, Ok(()))) => ui::field("meta", &format!("{device}/meta/{name}")),
-        Ok((_, Err(e))) => ui::warn(&format!("host meta service not ready: {e:#}")),
+        Ok((_, Ok(()), _)) => ui::field("meta", &format!("{device}/meta/{name}")),
+        Ok((_, Err(e), _)) => ui::warn(&format!("host meta service not ready: {e:#}")),
         Err(e) => ui::warn(&format!("host meta service unavailable: {e:#}")),
     }
 
@@ -194,10 +200,27 @@ async fn serve_account_foreground(
     };
     tokio::spawn(codex_health_watchdog(local_addr.clone(), spawn_opts));
 
+    let config = Config::load().unwrap_or_default();
+    // The app's own worker replaces its key after a sleep past its end; this
+    // in-process registration needs the same.
+    let (stop_meta, meta_stopped) = Shutdown::manual();
+    let meta = meta.ok().map(|(registration, _, options)| {
+        tokio::spawn(hold_meta(
+            registration,
+            transport.session.clone(),
+            options,
+            config.clone(),
+            meta_stopped,
+        ))
+    });
+
     ui::headline(ui::Tone::Action, "exposing — keep this running, Ctrl-C to stop");
-    tokio::signal::ctrl_c()
-        .await
-        .context("waiting for Ctrl-C")?;
+    let backend = super::account::backend_base(None, &config);
+    tokio::select! {
+        signal = tokio::signal::ctrl_c() => signal.context("waiting for Ctrl-C")?,
+        // Its key is gone, so nothing would republish; this host must not linger.
+        reason = super::account::identity_lost(&config, &backend) => ui::warn(&reason),
+    }
 
     // Ctrl-C was advertised as stopping the host, so it has to stop ALL of it. The
     // meta service is in-process and dies with us, but the app register worker is
@@ -207,8 +230,9 @@ async fn serve_account_foreground(
     ui::headline(ui::Tone::Change, "stopping");
     // Awaited rather than dropped, so the relay frees the meta key now instead of
     // at its next lease sweep.
-    if let Ok((registration, _)) = meta {
-        let _ = registration.stop().await;
+    let _ = stop_meta.send(true);
+    if let Some(meta) = meta {
+        let _ = meta.await;
     }
     let stopped = managed_pb::stop_matching(managed_pb::StopFilter {
         role: Some(PbRole::Register),
@@ -224,6 +248,57 @@ async fn serve_account_foreground(
         None => ui::muted("    codex was already gone"),
     }
     Ok(())
+}
+
+/// Keep the host meta service registered until `stopped`, then end its
+/// registration. A key the relay ended for good is replaced, for this same user
+/// only.
+async fn hold_meta(
+    mut registration: pocox_pb::Registration,
+    mut session: pocox_pb::RelaySession,
+    options: pocox_pb::RegisterOptions,
+    config: Config,
+    mut stopped: Shutdown,
+) {
+    loop {
+        let mut status = registration.subscribe();
+        let ended = loop {
+            if let pocox_pb::TunnelStatus::Failed(reason) = &*status.borrow_and_update() {
+                break credential_refused(reason);
+            }
+            tokio::select! {
+                () = stopped.requested() => {
+                    let _ = registration.stop().await;
+                    return;
+                },
+                changed = status.changed() => if changed.is_err() { break false },
+            }
+        };
+        let next = if ended && on_account_credential(&session, &config) {
+            tokio::select! {
+                next = replacement_credential(&session, &options.key, &config) => next,
+                () = stopped.requested() => None,
+            }
+        } else {
+            None
+        };
+        let _ = registration.stop().await;
+        let Some(next) = next else {
+            ui::warn("host meta service stopped: the relay refused it");
+            stopped.requested().await;
+            return;
+        };
+        tracing::info!("the relay ended the meta service's key; continuing on its replacement");
+        session = next;
+        registration = match pocox_pb::register_background(&session, options.clone()).await {
+            Ok(registration) => registration,
+            Err(error) => {
+                ui::warn(&format!("host meta service unavailable: {error:#}"));
+                stopped.requested().await;
+                return;
+            },
+        };
+    }
 }
 
 /// Stop the codex app-server listening on `listen_addr`, returning its pid.

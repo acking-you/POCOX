@@ -22,6 +22,7 @@ import 'api/bridge/hosted_account.dart';
 import 'api/bridge/hosting.dart';
 import 'api/bridge/native_sessions.dart';
 import 'api/bridge/network.dart';
+import 'api/bridge/pairing.dart';
 import 'api/bridge/services.dart';
 import 'api/bridge/session_access.dart';
 import 'api/bridge/session_config.dart';
@@ -91,7 +92,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -2052828330;
+  int get rustContentHash => -147872274;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -990,6 +991,106 @@ abstract class RustLibApi extends BaseApi {
   });
 
   Future<void> crateApiBridgeHostingOpencodeRefresh({required String name});
+
+  Future<PairingSessionDto> crateApiBridgePairingPairingActivate({
+    NativeHintDto? nativeHint,
+    String? backend,
+  });
+
+  Future<PairingCodeDto> crateApiBridgePairingPairingCode({String? backend});
+
+  Future<void> crateApiBridgePairingPairingDecideRestore({
+    required String deviceId,
+    required String requestId,
+    required bool allow,
+    String? backend,
+  });
+
+  Future<PairingDevicesDto> crateApiBridgePairingPairingDevices({
+    String? cursor,
+    String? backend,
+  });
+
+  Future<void> crateApiBridgePairingPairingInstallNativeStore({
+    required String lockDir,
+    required FutureOr<NativeStoreRead> Function(String) read,
+    required FutureOr<String?> Function(String, String) write,
+  });
+
+  Future<PairingOperationDto> crateApiBridgePairingPairingLeave({
+    String? backend,
+  });
+
+  Future<PairingOperationDto> crateApiBridgePairingPairingLink({
+    required String ticket,
+    required bool leaveCurrent,
+    NativeHintDto? nativeHint,
+    String? backend,
+  });
+
+  String? crateApiBridgePairingPairingParseInvitation({required String uri});
+
+  Future<PairingPreparedDto> crateApiBridgePairingPairingPrepare({
+    String? label,
+    String? backend,
+  });
+
+  Future<PairingPreviewDto> crateApiBridgePairingPairingPreview({
+    required String code,
+    String? backend,
+  });
+
+  Future<PairingOperationDto> crateApiBridgePairingPairingRemoveDevice({
+    required String deviceId,
+    String? backend,
+  });
+
+  Future<void> crateApiBridgePairingPairingRenameDevice({
+    required String deviceId,
+    required String name,
+    String? backend,
+  });
+
+  Future<PairingOperationDto> crateApiBridgePairingPairingRestoreConfirm({
+    String? ticket,
+    String? targetDeviceId,
+    String? requestId,
+    required bool retake,
+    NativeHintDto? nativeHint,
+    String? backend,
+  });
+
+  Future<PairingRestoreRequestDto> crateApiBridgePairingPairingRestorePoll({
+    required String requestId,
+    String? backend,
+  });
+
+  Future<PairingRestoreRequestDto> crateApiBridgePairingPairingRestoreRequest({
+    NativeHintDto? nativeHint,
+    String? backend,
+  });
+
+  Future<String?> crateApiBridgePairingPairingResumeGithub({String? backend});
+
+  Future<PairingCodeDto> crateApiBridgePairingPairingRotate({String? backend});
+
+  Future<PairingCodeDto> crateApiBridgePairingPairingSetPaused({
+    required bool paused,
+    String? backend,
+  });
+
+  Future<List<PairingOperationDto>> crateApiBridgePairingPairingSettle({
+    String? backend,
+  });
+
+  Future<PairingPreparedDto> crateApiBridgePairingPairingStartOver({
+    String? label,
+    String? backend,
+  });
+
+  Future<PairingStatusDto> crateApiBridgePairingPairingStatus({
+    String? backend,
+  });
 
   Future<QueuedCommandDto> crateApiBridgeComposerQueuedCommandDtoDefault();
 
@@ -7801,6 +7902,743 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "opencode_refresh", argNames: ["name"]);
 
   @override
+  Future<PairingSessionDto> crateApiBridgePairingPairingActivate({
+    NativeHintDto? nativeHint,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_box_autoadd_native_hint_dto(nativeHint, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 195,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_session_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingActivateConstMeta,
+        argValues: [nativeHint, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingActivateConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_activate",
+        argNames: ["nativeHint", "backend"],
+      );
+
+  @override
+  Future<PairingCodeDto> crateApiBridgePairingPairingCode({String? backend}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 196,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_code_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingCodeConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingCodeConstMeta =>
+      const TaskConstMeta(debugName: "pairing_code", argNames: ["backend"]);
+
+  @override
+  Future<void> crateApiBridgePairingPairingDecideRestore({
+    required String deviceId,
+    required String requestId,
+    required bool allow,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(deviceId, serializer);
+          sse_encode_String(requestId, serializer);
+          sse_encode_bool(allow, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 197,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingDecideRestoreConstMeta,
+        argValues: [deviceId, requestId, allow, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingDecideRestoreConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_decide_restore",
+        argNames: ["deviceId", "requestId", "allow", "backend"],
+      );
+
+  @override
+  Future<PairingDevicesDto> crateApiBridgePairingPairingDevices({
+    String? cursor,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(cursor, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 198,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_devices_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingDevicesConstMeta,
+        argValues: [cursor, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingDevicesConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_devices",
+        argNames: ["cursor", "backend"],
+      );
+
+  @override
+  Future<void> crateApiBridgePairingPairingInstallNativeStore({
+    required String lockDir,
+    required FutureOr<NativeStoreRead> Function(String) read,
+    required FutureOr<String?> Function(String, String) write,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(lockDir, serializer);
+          sse_encode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+            read,
+            serializer,
+          );
+          sse_encode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+            write,
+            serializer,
+          );
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 199,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgePairingPairingInstallNativeStoreConstMeta,
+        argValues: [lockDir, read, write],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingInstallNativeStoreConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_install_native_store",
+        argNames: ["lockDir", "read", "write"],
+      );
+
+  @override
+  Future<PairingOperationDto> crateApiBridgePairingPairingLeave({
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 200,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_operation_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingLeaveConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingLeaveConstMeta =>
+      const TaskConstMeta(debugName: "pairing_leave", argNames: ["backend"]);
+
+  @override
+  Future<PairingOperationDto> crateApiBridgePairingPairingLink({
+    required String ticket,
+    required bool leaveCurrent,
+    NativeHintDto? nativeHint,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(ticket, serializer);
+          sse_encode_bool(leaveCurrent, serializer);
+          sse_encode_opt_box_autoadd_native_hint_dto(nativeHint, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 201,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_operation_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingLinkConstMeta,
+        argValues: [ticket, leaveCurrent, nativeHint, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingLinkConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_link",
+        argNames: ["ticket", "leaveCurrent", "nativeHint", "backend"],
+      );
+
+  @override
+  String? crateApiBridgePairingPairingParseInvitation({required String uri}) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(uri, serializer);
+          return pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 202,
+          )!;
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiBridgePairingPairingParseInvitationConstMeta,
+        argValues: [uri],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingParseInvitationConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_parse_invitation",
+        argNames: ["uri"],
+      );
+
+  @override
+  Future<PairingPreparedDto> crateApiBridgePairingPairingPrepare({
+    String? label,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(label, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 203,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_prepared_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingPrepareConstMeta,
+        argValues: [label, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingPrepareConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_prepare",
+        argNames: ["label", "backend"],
+      );
+
+  @override
+  Future<PairingPreviewDto> crateApiBridgePairingPairingPreview({
+    required String code,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(code, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 204,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_preview_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingPreviewConstMeta,
+        argValues: [code, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingPreviewConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_preview",
+        argNames: ["code", "backend"],
+      );
+
+  @override
+  Future<PairingOperationDto> crateApiBridgePairingPairingRemoveDevice({
+    required String deviceId,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(deviceId, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 205,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_operation_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRemoveDeviceConstMeta,
+        argValues: [deviceId, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRemoveDeviceConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_remove_device",
+        argNames: ["deviceId", "backend"],
+      );
+
+  @override
+  Future<void> crateApiBridgePairingPairingRenameDevice({
+    required String deviceId,
+    required String name,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(deviceId, serializer);
+          sse_encode_String(name, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 206,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRenameDeviceConstMeta,
+        argValues: [deviceId, name, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRenameDeviceConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_rename_device",
+        argNames: ["deviceId", "name", "backend"],
+      );
+
+  @override
+  Future<PairingOperationDto> crateApiBridgePairingPairingRestoreConfirm({
+    String? ticket,
+    String? targetDeviceId,
+    String? requestId,
+    required bool retake,
+    NativeHintDto? nativeHint,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(ticket, serializer);
+          sse_encode_opt_String(targetDeviceId, serializer);
+          sse_encode_opt_String(requestId, serializer);
+          sse_encode_bool(retake, serializer);
+          sse_encode_opt_box_autoadd_native_hint_dto(nativeHint, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 207,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_operation_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRestoreConfirmConstMeta,
+        argValues: [
+          ticket,
+          targetDeviceId,
+          requestId,
+          retake,
+          nativeHint,
+          backend,
+        ],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRestoreConfirmConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_restore_confirm",
+        argNames: [
+          "ticket",
+          "targetDeviceId",
+          "requestId",
+          "retake",
+          "nativeHint",
+          "backend",
+        ],
+      );
+
+  @override
+  Future<PairingRestoreRequestDto> crateApiBridgePairingPairingRestorePoll({
+    required String requestId,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(requestId, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 208,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_restore_request_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRestorePollConstMeta,
+        argValues: [requestId, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRestorePollConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_restore_poll",
+        argNames: ["requestId", "backend"],
+      );
+
+  @override
+  Future<PairingRestoreRequestDto> crateApiBridgePairingPairingRestoreRequest({
+    NativeHintDto? nativeHint,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_box_autoadd_native_hint_dto(nativeHint, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 209,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_restore_request_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRestoreRequestConstMeta,
+        argValues: [nativeHint, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRestoreRequestConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_restore_request",
+        argNames: ["nativeHint", "backend"],
+      );
+
+  @override
+  Future<String?> crateApiBridgePairingPairingResumeGithub({String? backend}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 210,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_opt_String,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingResumeGithubConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingResumeGithubConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_resume_github",
+        argNames: ["backend"],
+      );
+
+  @override
+  Future<PairingCodeDto> crateApiBridgePairingPairingRotate({String? backend}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 211,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_code_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingRotateConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingRotateConstMeta =>
+      const TaskConstMeta(debugName: "pairing_rotate", argNames: ["backend"]);
+
+  @override
+  Future<PairingCodeDto> crateApiBridgePairingPairingSetPaused({
+    required bool paused,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_bool(paused, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 212,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_code_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingSetPausedConstMeta,
+        argValues: [paused, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingSetPausedConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_set_paused",
+        argNames: ["paused", "backend"],
+      );
+
+  @override
+  Future<List<PairingOperationDto>> crateApiBridgePairingPairingSettle({
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 213,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_pairing_operation_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingSettleConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingSettleConstMeta =>
+      const TaskConstMeta(debugName: "pairing_settle", argNames: ["backend"]);
+
+  @override
+  Future<PairingPreparedDto> crateApiBridgePairingPairingStartOver({
+    String? label,
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(label, serializer);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 214,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_prepared_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingStartOverConstMeta,
+        argValues: [label, backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingStartOverConstMeta =>
+      const TaskConstMeta(
+        debugName: "pairing_start_over",
+        argNames: ["label", "backend"],
+      );
+
+  @override
+  Future<PairingStatusDto> crateApiBridgePairingPairingStatus({
+    String? backend,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(backend, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 215,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_pairing_status_dto,
+          decodeErrorData: sse_decode_pairing_error_dto,
+        ),
+        constMeta: kCrateApiBridgePairingPairingStatusConstMeta,
+        argValues: [backend],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiBridgePairingPairingStatusConstMeta =>
+      const TaskConstMeta(debugName: "pairing_status", argNames: ["backend"]);
+
+  @override
   Future<QueuedCommandDto> crateApiBridgeComposerQueuedCommandDtoDefault() {
     return handler.executeNormal(
       NormalTask(
@@ -7809,7 +8647,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 195,
+            funcId: 216,
             port: port_,
           );
         },
@@ -7839,7 +8677,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 196,
+            funcId: 217,
             port: port_,
           );
         },
@@ -7866,7 +8704,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 197,
+            funcId: 218,
             port: port_,
           );
         },
@@ -7896,7 +8734,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 198,
+            funcId: 219,
             port: port_,
           );
         },
@@ -7929,7 +8767,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 199,
+            funcId: 220,
             port: port_,
           );
         },
@@ -7959,7 +8797,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 200,
+            funcId: 221,
             port: port_,
           );
         },
@@ -7991,7 +8829,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 201,
+            funcId: 222,
             port: port_,
           );
         },
@@ -8019,7 +8857,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 202,
+            funcId: 223,
             port: port_,
           );
         },
@@ -8047,7 +8885,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 203,
+            funcId: 224,
             port: port_,
           );
         },
@@ -8074,7 +8912,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 204,
+            funcId: 225,
             port: port_,
           );
         },
@@ -8108,7 +8946,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 205,
+            funcId: 226,
             port: port_,
           );
         },
@@ -8143,7 +8981,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 206,
+            funcId: 227,
             port: port_,
           );
         },
@@ -8176,7 +9014,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 207,
+            funcId: 228,
             port: port_,
           );
         },
@@ -8210,7 +9048,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 208,
+            funcId: 229,
             port: port_,
           );
         },
@@ -8243,7 +9081,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 209,
+            funcId: 230,
             port: port_,
           );
         },
@@ -8278,7 +9116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 210,
+            funcId: 231,
             port: port_,
           );
         },
@@ -8308,7 +9146,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 211,
+            funcId: 232,
             port: port_,
           );
         },
@@ -8336,7 +9174,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 212,
+            funcId: 233,
             port: port_,
           );
         },
@@ -8366,7 +9204,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 213,
+            funcId: 234,
             port: port_,
           );
         },
@@ -8400,7 +9238,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 214,
+            funcId: 235,
             port: port_,
           );
         },
@@ -8437,7 +9275,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 215,
+            funcId: 236,
             port: port_,
           );
         },
@@ -8478,7 +9316,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 216,
+            funcId: 237,
             port: port_,
           );
         },
@@ -8508,7 +9346,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 217,
+            funcId: 238,
           )!;
         },
         codec: SseCodec(
@@ -8539,7 +9377,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 218,
+            funcId: 239,
             port: port_,
           );
         },
@@ -8569,7 +9407,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 219,
+            funcId: 240,
           )!;
         },
         codec: SseCodec(
@@ -8598,7 +9436,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 220,
+              funcId: 241,
               port: port_,
             );
           },
@@ -8630,7 +9468,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 221,
+              funcId: 242,
               port: port_,
             );
           },
@@ -8660,7 +9498,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 222,
+            funcId: 243,
           )!;
         },
         codec: SseCodec(
@@ -8690,7 +9528,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 223,
+            funcId: 244,
             port: port_,
           );
         },
@@ -8717,7 +9555,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 224,
+            funcId: 245,
           )!;
         },
         codec: SseCodec(
@@ -8746,7 +9584,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 225,
+            funcId: 246,
             port: port_,
           );
         },
@@ -8773,7 +9611,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 226,
+            funcId: 247,
             port: port_,
           );
         },
@@ -8800,7 +9638,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 227,
+            funcId: 248,
             port: port_,
           );
         },
@@ -8832,7 +9670,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 228,
+            funcId: 249,
             port: port_,
           );
         },
@@ -8862,7 +9700,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 229,
+            funcId: 250,
           )!;
         },
         codec: SseCodec(
@@ -8888,7 +9726,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           return pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 230,
+            funcId: 251,
           )!;
         },
         codec: SseCodec(
@@ -8917,7 +9755,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             pdeCallFfi(
               generalizedFrbRustBinding,
               serializer,
-              funcId: 231,
+              funcId: 252,
               port: port_,
             );
           },
@@ -8936,6 +9774,77 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiBridgeUpdatesUpdateWatchConstMeta =>
       const TaskConstMeta(debugName: "update_watch", argNames: ["sink"]);
+
+  Future<void> Function(int, dynamic)
+  encode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+    FutureOr<NativeStoreRead> Function(String) raw,
+  ) {
+    return (callId, rawArg0) async {
+      final arg0 = dco_decode_String(rawArg0);
+
+      Box<NativeStoreRead>? rawOutput;
+      Box<AnyhowException>? rawError;
+      try {
+        rawOutput = Box(await raw(arg0));
+      } catch (e, s) {
+        rawError = Box(AnyhowException("$e\n\n$s"));
+      }
+
+      final serializer = SseSerializer(generalizedFrbRustBinding);
+      assert((rawOutput != null) ^ (rawError != null));
+      if (rawOutput != null) {
+        serializer.buffer.putUint8(0);
+        sse_encode_native_store_read(rawOutput.value, serializer);
+      } else {
+        serializer.buffer.putUint8(1);
+        sse_encode_AnyhowException(rawError!.value, serializer);
+      }
+      final output = serializer.intoRaw();
+
+      generalizedFrbRustBinding.dartFnDeliverOutput(
+        callId: callId,
+        ptr: output.ptr,
+        rustVecLen: output.rustVecLen,
+        dataLen: output.dataLen,
+      );
+    };
+  }
+
+  Future<void> Function(int, dynamic, dynamic)
+  encode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+    FutureOr<String?> Function(String, String) raw,
+  ) {
+    return (callId, rawArg0, rawArg1) async {
+      final arg0 = dco_decode_String(rawArg0);
+      final arg1 = dco_decode_String(rawArg1);
+
+      Box<String?>? rawOutput;
+      Box<AnyhowException>? rawError;
+      try {
+        rawOutput = Box(await raw(arg0, arg1));
+      } catch (e, s) {
+        rawError = Box(AnyhowException("$e\n\n$s"));
+      }
+
+      final serializer = SseSerializer(generalizedFrbRustBinding);
+      assert((rawOutput != null) ^ (rawError != null));
+      if (rawOutput != null) {
+        serializer.buffer.putUint8(0);
+        sse_encode_opt_String(rawOutput.value, serializer);
+      } else {
+        serializer.buffer.putUint8(1);
+        sse_encode_AnyhowException(rawError!.value, serializer);
+      }
+      final output = serializer.intoRaw();
+
+      generalizedFrbRustBinding.dartFnDeliverOutput(
+        callId: callId,
+        ptr: output.ptr,
+        rustVecLen: output.rustVecLen,
+        dataLen: output.dataLen,
+      );
+    };
+  }
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_ComposerController => wire
@@ -9010,6 +9919,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return EventFeedImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  FutureOr<NativeStoreRead> Function(String)
+  dco_decode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError('');
+  }
+
+  @protected
+  FutureOr<String?> Function(String, String)
+  dco_decode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError('');
+  }
+
+  @protected
+  Object dco_decode_DartOpaque(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return decodeDartOpaque(raw, generalizedFrbRustBinding);
   }
 
   @protected
@@ -9571,11 +10504,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto dco_decode_box_autoadd_native_hint_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_native_hint_dto(raw);
+  }
+
+  @protected
   OpenCodeHostStatusDto dco_decode_box_autoadd_open_code_host_status_dto(
     dynamic raw,
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_open_code_host_status_dto(raw);
+  }
+
+  @protected
+  PairingSessionDto dco_decode_box_autoadd_pairing_session_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_pairing_session_dto(raw);
   }
 
   @protected
@@ -10279,6 +11224,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 dco_decode_isize(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dcoDecodeI64(raw);
+  }
+
+  @protected
   LinkEventDto dco_decode_link_event_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -10458,6 +11409,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<ModelInfoDto> dco_decode_list_model_info_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_model_info_dto).toList();
+  }
+
+  @protected
+  List<PairingDeviceDto> dco_decode_list_pairing_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_pairing_device_dto).toList();
+  }
+
+  @protected
+  List<PairingOperationDto> dco_decode_list_pairing_operation_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_pairing_operation_dto)
+        .toList();
+  }
+
+  @protected
+  List<PairingPendingRequestDto> dco_decode_list_pairing_pending_request_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_pairing_pending_request_dto)
+        .toList();
+  }
+
+  @protected
+  List<PairingPreviewDeviceDto> dco_decode_list_pairing_preview_device_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>)
+        .map(dco_decode_pairing_preview_device_dto)
+        .toList();
   }
 
   @protected
@@ -10795,6 +11780,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto dco_decode_native_hint_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return NativeHintDto(
+      source: dco_decode_String(arr[0]),
+      rawId: dco_decode_String(arr[1]),
+    );
+  }
+
+  @protected
   NativeSessionListDto dco_decode_native_session_list_dto(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -10836,6 +11833,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       generation: dco_decode_String(arr[1]),
       revision: dco_decode_String(arr[2]),
       liveness: dco_decode_session_liveness_dto(arr[3]),
+    );
+  }
+
+  @protected
+  NativeStoreRead dco_decode_native_store_read(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return NativeStoreRead(
+      value: dco_decode_opt_String(arr[0]),
+      error: dco_decode_opt_String(arr[1]),
     );
   }
 
@@ -11022,6 +12031,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto? dco_decode_opt_box_autoadd_native_hint_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_native_hint_dto(raw);
+  }
+
+  @protected
   OpenCodeHostStatusDto? dco_decode_opt_box_autoadd_open_code_host_status_dto(
     dynamic raw,
   ) {
@@ -11029,6 +12044,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return raw == null
         ? null
         : dco_decode_box_autoadd_open_code_host_status_dto(raw);
+  }
+
+  @protected
+  PairingSessionDto? dco_decode_opt_box_autoadd_pairing_session_dto(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_pairing_session_dto(raw);
   }
 
   @protected
@@ -11129,6 +12152,186 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Uint8List? dco_decode_opt_list_prim_u_8_strict(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_prim_u_8_strict(raw);
+  }
+
+  @protected
+  PairingCodeDto dco_decode_pairing_code_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PairingCodeDto(
+      code: dco_decode_String(arr[0]),
+      uri: dco_decode_String(arr[1]),
+      issuedAt: dco_decode_i_64(arr[2]),
+      nextRotationAt: dco_decode_i_64(arr[3]),
+      paused: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
+  PairingDeviceDto dco_decode_pairing_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 7)
+      throw Exception('unexpected arr length: expect 7 but see ${arr.length}');
+    return PairingDeviceDto(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      platform: dco_decode_opt_String(arr[2]),
+      joinedAt: dco_decode_i_64(arr[3]),
+      lastActiveDay: dco_decode_i_64(arr[4]),
+      activated: dco_decode_bool(arr[5]),
+      isSelf: dco_decode_bool(arr[6]),
+    );
+  }
+
+  @protected
+  PairingDevicesDto dco_decode_pairing_devices_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return PairingDevicesDto(
+      devices: dco_decode_list_pairing_device_dto(arr[0]),
+      nextCursor: dco_decode_opt_String(arr[1]),
+      pendingRequests: dco_decode_list_pairing_pending_request_dto(arr[2]),
+    );
+  }
+
+  @protected
+  PairingErrorDto dco_decode_pairing_error_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PairingErrorDto(
+      code: dco_decode_String(arr[0]),
+      message: dco_decode_String(arr[1]),
+      retryAfterSecs: dco_decode_opt_box_autoadd_u_64(arr[2]),
+      operationId: dco_decode_opt_String(arr[3]),
+      graceDeadline: dco_decode_opt_box_autoadd_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  PairingOperationDto dco_decode_pairing_operation_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PairingOperationDto(
+      id: dco_decode_String(arr[0]),
+      kind: dco_decode_String(arr[1]),
+      status: dco_decode_String(arr[2]),
+      error: dco_decode_opt_String(arr[3]),
+      caughtUp: dco_decode_bool(arr[4]),
+    );
+  }
+
+  @protected
+  PairingPendingRequestDto dco_decode_pairing_pending_request_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PairingPendingRequestDto(
+      requestId: dco_decode_String(arr[0]),
+      targetDeviceId: dco_decode_String(arr[1]),
+      requesterName: dco_decode_String(arr[2]),
+      matchingId: dco_decode_String(arr[3]),
+      expiresAt: dco_decode_i_64(arr[4]),
+    );
+  }
+
+  @protected
+  PairingPreparedDto dco_decode_pairing_prepared_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return PairingPreparedDto(
+      session: dco_decode_pairing_session_dto(arr[0]),
+      code: dco_decode_pairing_code_dto(arr[1]),
+    );
+  }
+
+  @protected
+  PairingPreviewDeviceDto dco_decode_pairing_preview_device_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return PairingPreviewDeviceDto(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+      lastActiveDay: dco_decode_i_64(arr[2]),
+    );
+  }
+
+  @protected
+  PairingPreviewDto dco_decode_pairing_preview_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5)
+      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PairingPreviewDto(
+      ticket: dco_decode_String(arr[0]),
+      expiresAt: dco_decode_i_64(arr[1]),
+      targetDeviceId: dco_decode_String(arr[2]),
+      alreadyMember: dco_decode_bool(arr[3]),
+      devices: dco_decode_list_pairing_preview_device_dto(arr[4]),
+    );
+  }
+
+  @protected
+  PairingRestoreRequestDto dco_decode_pairing_restore_request_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return PairingRestoreRequestDto(
+      requestId: dco_decode_String(arr[0]),
+      status: dco_decode_String(arr[1]),
+      matchingId: dco_decode_opt_String(arr[2]),
+      expiresAt: dco_decode_opt_box_autoadd_i_64(arr[3]),
+      targetDeviceId: dco_decode_opt_String(arr[4]),
+      devices: dco_decode_list_pairing_preview_device_dto(arr[5]),
+    );
+  }
+
+  @protected
+  PairingSessionDto dco_decode_pairing_session_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return PairingSessionDto(
+      deviceId: dco_decode_String(arr[0]),
+      accountId: dco_decode_String(arr[1]),
+      label: dco_decode_String(arr[2]),
+      activated: dco_decode_bool(arr[3]),
+      membershipChange: dco_decode_opt_String(arr[4]),
+      membershipChangedAt: dco_decode_opt_box_autoadd_i_64(arr[5]),
+    );
+  }
+
+  @protected
+  PairingStatusDto dco_decode_pairing_status_dto(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8)
+      throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return PairingStatusDto(
+      state: dco_decode_String(arr[0]),
+      backend: dco_decode_String(arr[1]),
+      session: dco_decode_opt_box_autoadd_pairing_session_dto(arr[2]),
+      activeHere: dco_decode_bool(arr[3]),
+      graceDeadline: dco_decode_opt_box_autoadd_i_64(arr[4]),
+      pending: dco_decode_list_pairing_operation_dto(arr[5]),
+      failed: dco_decode_list_pairing_operation_dto(arr[6]),
+      parkedGithub: dco_decode_opt_String(arr[7]),
+    );
   }
 
   @protected
@@ -11974,6 +13177,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Object sse_decode_DartOpaque(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_isize(deserializer);
+    return decodeDartOpaque(inner, generalizedFrbRustBinding);
+  }
+
+  @protected
   ComposerController
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
     SseDeserializer deserializer,
@@ -12703,11 +13913,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto sse_decode_box_autoadd_native_hint_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_native_hint_dto(deserializer));
+  }
+
+  @protected
   OpenCodeHostStatusDto sse_decode_box_autoadd_open_code_host_status_dto(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_open_code_host_status_dto(deserializer));
+  }
+
+  @protected
+  PairingSessionDto sse_decode_box_autoadd_pairing_session_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_pairing_session_dto(deserializer));
   }
 
   @protected
@@ -13521,6 +14747,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  PlatformInt64 sse_decode_isize(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getPlatformInt64();
+  }
+
+  @protected
   LinkEventDto sse_decode_link_event_dto(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_seq = sse_decode_u_32(deserializer);
@@ -13877,6 +15109,62 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <ModelInfoDto>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_model_info_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PairingDeviceDto> sse_decode_list_pairing_device_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PairingDeviceDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pairing_device_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PairingOperationDto> sse_decode_list_pairing_operation_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PairingOperationDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pairing_operation_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PairingPendingRequestDto> sse_decode_list_pairing_pending_request_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PairingPendingRequestDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pairing_pending_request_dto(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PairingPreviewDeviceDto> sse_decode_list_pairing_preview_device_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PairingPreviewDeviceDto>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pairing_preview_device_dto(deserializer));
     }
     return ans_;
   }
@@ -14430,6 +15718,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto sse_decode_native_hint_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_source = sse_decode_String(deserializer);
+    var var_rawId = sse_decode_String(deserializer);
+    return NativeHintDto(source: var_source, rawId: var_rawId);
+  }
+
+  @protected
   NativeSessionListDto sse_decode_native_session_list_dto(
     SseDeserializer deserializer,
   ) {
@@ -14484,6 +15780,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       revision: var_revision,
       liveness: var_liveness,
     );
+  }
+
+  @protected
+  NativeStoreRead sse_decode_native_store_read(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_value = sse_decode_opt_String(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return NativeStoreRead(value: var_value, error: var_error);
   }
 
   @protected
@@ -14776,6 +16080,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  NativeHintDto? sse_decode_opt_box_autoadd_native_hint_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_native_hint_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   OpenCodeHostStatusDto? sse_decode_opt_box_autoadd_open_code_host_status_dto(
     SseDeserializer deserializer,
   ) {
@@ -14783,6 +16100,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
     if (sse_decode_bool(deserializer)) {
       return (sse_decode_box_autoadd_open_code_host_status_dto(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  PairingSessionDto? sse_decode_opt_box_autoadd_pairing_session_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_pairing_session_dto(deserializer));
     } else {
       return null;
     }
@@ -14956,6 +16286,227 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  PairingCodeDto sse_decode_pairing_code_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_String(deserializer);
+    var var_uri = sse_decode_String(deserializer);
+    var var_issuedAt = sse_decode_i_64(deserializer);
+    var var_nextRotationAt = sse_decode_i_64(deserializer);
+    var var_paused = sse_decode_bool(deserializer);
+    return PairingCodeDto(
+      code: var_code,
+      uri: var_uri,
+      issuedAt: var_issuedAt,
+      nextRotationAt: var_nextRotationAt,
+      paused: var_paused,
+    );
+  }
+
+  @protected
+  PairingDeviceDto sse_decode_pairing_device_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_platform = sse_decode_opt_String(deserializer);
+    var var_joinedAt = sse_decode_i_64(deserializer);
+    var var_lastActiveDay = sse_decode_i_64(deserializer);
+    var var_activated = sse_decode_bool(deserializer);
+    var var_isSelf = sse_decode_bool(deserializer);
+    return PairingDeviceDto(
+      id: var_id,
+      name: var_name,
+      platform: var_platform,
+      joinedAt: var_joinedAt,
+      lastActiveDay: var_lastActiveDay,
+      activated: var_activated,
+      isSelf: var_isSelf,
+    );
+  }
+
+  @protected
+  PairingDevicesDto sse_decode_pairing_devices_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_devices = sse_decode_list_pairing_device_dto(deserializer);
+    var var_nextCursor = sse_decode_opt_String(deserializer);
+    var var_pendingRequests = sse_decode_list_pairing_pending_request_dto(
+      deserializer,
+    );
+    return PairingDevicesDto(
+      devices: var_devices,
+      nextCursor: var_nextCursor,
+      pendingRequests: var_pendingRequests,
+    );
+  }
+
+  @protected
+  PairingErrorDto sse_decode_pairing_error_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_code = sse_decode_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_retryAfterSecs = sse_decode_opt_box_autoadd_u_64(deserializer);
+    var var_operationId = sse_decode_opt_String(deserializer);
+    var var_graceDeadline = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return PairingErrorDto(
+      code: var_code,
+      message: var_message,
+      retryAfterSecs: var_retryAfterSecs,
+      operationId: var_operationId,
+      graceDeadline: var_graceDeadline,
+    );
+  }
+
+  @protected
+  PairingOperationDto sse_decode_pairing_operation_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    var var_caughtUp = sse_decode_bool(deserializer);
+    return PairingOperationDto(
+      id: var_id,
+      kind: var_kind,
+      status: var_status,
+      error: var_error,
+      caughtUp: var_caughtUp,
+    );
+  }
+
+  @protected
+  PairingPendingRequestDto sse_decode_pairing_pending_request_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_requestId = sse_decode_String(deserializer);
+    var var_targetDeviceId = sse_decode_String(deserializer);
+    var var_requesterName = sse_decode_String(deserializer);
+    var var_matchingId = sse_decode_String(deserializer);
+    var var_expiresAt = sse_decode_i_64(deserializer);
+    return PairingPendingRequestDto(
+      requestId: var_requestId,
+      targetDeviceId: var_targetDeviceId,
+      requesterName: var_requesterName,
+      matchingId: var_matchingId,
+      expiresAt: var_expiresAt,
+    );
+  }
+
+  @protected
+  PairingPreparedDto sse_decode_pairing_prepared_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_session = sse_decode_pairing_session_dto(deserializer);
+    var var_code = sse_decode_pairing_code_dto(deserializer);
+    return PairingPreparedDto(session: var_session, code: var_code);
+  }
+
+  @protected
+  PairingPreviewDeviceDto sse_decode_pairing_preview_device_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_id = sse_decode_String(deserializer);
+    var var_name = sse_decode_String(deserializer);
+    var var_lastActiveDay = sse_decode_i_64(deserializer);
+    return PairingPreviewDeviceDto(
+      id: var_id,
+      name: var_name,
+      lastActiveDay: var_lastActiveDay,
+    );
+  }
+
+  @protected
+  PairingPreviewDto sse_decode_pairing_preview_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ticket = sse_decode_String(deserializer);
+    var var_expiresAt = sse_decode_i_64(deserializer);
+    var var_targetDeviceId = sse_decode_String(deserializer);
+    var var_alreadyMember = sse_decode_bool(deserializer);
+    var var_devices = sse_decode_list_pairing_preview_device_dto(deserializer);
+    return PairingPreviewDto(
+      ticket: var_ticket,
+      expiresAt: var_expiresAt,
+      targetDeviceId: var_targetDeviceId,
+      alreadyMember: var_alreadyMember,
+      devices: var_devices,
+    );
+  }
+
+  @protected
+  PairingRestoreRequestDto sse_decode_pairing_restore_request_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_requestId = sse_decode_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_matchingId = sse_decode_opt_String(deserializer);
+    var var_expiresAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_targetDeviceId = sse_decode_opt_String(deserializer);
+    var var_devices = sse_decode_list_pairing_preview_device_dto(deserializer);
+    return PairingRestoreRequestDto(
+      requestId: var_requestId,
+      status: var_status,
+      matchingId: var_matchingId,
+      expiresAt: var_expiresAt,
+      targetDeviceId: var_targetDeviceId,
+      devices: var_devices,
+    );
+  }
+
+  @protected
+  PairingSessionDto sse_decode_pairing_session_dto(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_deviceId = sse_decode_String(deserializer);
+    var var_accountId = sse_decode_String(deserializer);
+    var var_label = sse_decode_String(deserializer);
+    var var_activated = sse_decode_bool(deserializer);
+    var var_membershipChange = sse_decode_opt_String(deserializer);
+    var var_membershipChangedAt = sse_decode_opt_box_autoadd_i_64(deserializer);
+    return PairingSessionDto(
+      deviceId: var_deviceId,
+      accountId: var_accountId,
+      label: var_label,
+      activated: var_activated,
+      membershipChange: var_membershipChange,
+      membershipChangedAt: var_membershipChangedAt,
+    );
+  }
+
+  @protected
+  PairingStatusDto sse_decode_pairing_status_dto(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_state = sse_decode_String(deserializer);
+    var var_backend = sse_decode_String(deserializer);
+    var var_session = sse_decode_opt_box_autoadd_pairing_session_dto(
+      deserializer,
+    );
+    var var_activeHere = sse_decode_bool(deserializer);
+    var var_graceDeadline = sse_decode_opt_box_autoadd_i_64(deserializer);
+    var var_pending = sse_decode_list_pairing_operation_dto(deserializer);
+    var var_failed = sse_decode_list_pairing_operation_dto(deserializer);
+    var var_parkedGithub = sse_decode_opt_String(deserializer);
+    return PairingStatusDto(
+      state: var_state,
+      backend: var_backend,
+      session: var_session,
+      activeHere: var_activeHere,
+      graceDeadline: var_graceDeadline,
+      pending: var_pending,
+      failed: var_failed,
+      parkedGithub: var_parkedGithub,
+    );
   }
 
   @protected
@@ -15970,6 +17521,49 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+    FutureOr<NativeStoreRead> Function(String) self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_DartOpaque(
+      encode_DartFn_Inputs_String_Output_native_store_read_AnyhowException(
+        self,
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+    FutureOr<String?> Function(String, String) self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_DartOpaque(
+      encode_DartFn_Inputs_String_String_Output_opt_String_AnyhowException(
+        self,
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_DartOpaque(Object self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_isize(
+      PlatformPointerUtil.ptrToPlatformInt64(
+        encodeDartOpaque(
+          self,
+          portManager.dartHandlerPort,
+          generalizedFrbRustBinding,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
   void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerComposerController(
     ComposerController self,
@@ -16611,12 +18205,30 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_native_hint_dto(
+    NativeHintDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_native_hint_dto(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_open_code_host_status_dto(
     OpenCodeHostStatusDto self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_open_code_host_status_dto(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_pairing_session_dto(
+    PairingSessionDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_pairing_session_dto(self, serializer);
   }
 
   @protected
@@ -17255,6 +18867,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_isize(PlatformInt64 self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putPlatformInt64(self);
+  }
+
+  @protected
   void sse_encode_link_event_dto(LinkEventDto self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self.seq, serializer);
@@ -17557,6 +19175,54 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_model_info_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pairing_device_dto(
+    List<PairingDeviceDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pairing_device_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pairing_operation_dto(
+    List<PairingOperationDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pairing_operation_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pairing_pending_request_dto(
+    List<PairingPendingRequestDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pairing_pending_request_dto(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pairing_preview_device_dto(
+    List<PairingPreviewDeviceDto> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pairing_preview_device_dto(item, serializer);
     }
   }
 
@@ -18012,6 +19678,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_native_hint_dto(
+    NativeHintDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.source, serializer);
+    sse_encode_String(self.rawId, serializer);
+  }
+
+  @protected
   void sse_encode_native_session_list_dto(
     NativeSessionListDto self,
     SseSerializer serializer,
@@ -18048,6 +19724,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.generation, serializer);
     sse_encode_String(self.revision, serializer);
     sse_encode_session_liveness_dto(self.liveness, serializer);
+  }
+
+  @protected
+  void sse_encode_native_store_read(
+    NativeStoreRead self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_opt_String(self.value, serializer);
+    sse_encode_opt_String(self.error, serializer);
   }
 
   @protected
@@ -18323,6 +20009,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_native_hint_dto(
+    NativeHintDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_native_hint_dto(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_box_autoadd_open_code_host_status_dto(
     OpenCodeHostStatusDto? self,
     SseSerializer serializer,
@@ -18332,6 +20031,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_open_code_host_status_dto(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_pairing_session_dto(
+    PairingSessionDto? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_pairing_session_dto(self, serializer);
     }
   }
 
@@ -18503,6 +20215,165 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_list_prim_u_8_strict(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_pairing_code_dto(
+    PairingCodeDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.uri, serializer);
+    sse_encode_i_64(self.issuedAt, serializer);
+    sse_encode_i_64(self.nextRotationAt, serializer);
+    sse_encode_bool(self.paused, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_device_dto(
+    PairingDeviceDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_opt_String(self.platform, serializer);
+    sse_encode_i_64(self.joinedAt, serializer);
+    sse_encode_i_64(self.lastActiveDay, serializer);
+    sse_encode_bool(self.activated, serializer);
+    sse_encode_bool(self.isSelf, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_devices_dto(
+    PairingDevicesDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_list_pairing_device_dto(self.devices, serializer);
+    sse_encode_opt_String(self.nextCursor, serializer);
+    sse_encode_list_pairing_pending_request_dto(
+      self.pendingRequests,
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_pairing_error_dto(
+    PairingErrorDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.code, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_opt_box_autoadd_u_64(self.retryAfterSecs, serializer);
+    sse_encode_opt_String(self.operationId, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.graceDeadline, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_operation_dto(
+    PairingOperationDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_opt_String(self.error, serializer);
+    sse_encode_bool(self.caughtUp, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_pending_request_dto(
+    PairingPendingRequestDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.requestId, serializer);
+    sse_encode_String(self.targetDeviceId, serializer);
+    sse_encode_String(self.requesterName, serializer);
+    sse_encode_String(self.matchingId, serializer);
+    sse_encode_i_64(self.expiresAt, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_prepared_dto(
+    PairingPreparedDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_pairing_session_dto(self.session, serializer);
+    sse_encode_pairing_code_dto(self.code, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_preview_device_dto(
+    PairingPreviewDeviceDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
+    sse_encode_i_64(self.lastActiveDay, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_preview_dto(
+    PairingPreviewDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.ticket, serializer);
+    sse_encode_i_64(self.expiresAt, serializer);
+    sse_encode_String(self.targetDeviceId, serializer);
+    sse_encode_bool(self.alreadyMember, serializer);
+    sse_encode_list_pairing_preview_device_dto(self.devices, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_restore_request_dto(
+    PairingRestoreRequestDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.requestId, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_opt_String(self.matchingId, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.expiresAt, serializer);
+    sse_encode_opt_String(self.targetDeviceId, serializer);
+    sse_encode_list_pairing_preview_device_dto(self.devices, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_session_dto(
+    PairingSessionDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.deviceId, serializer);
+    sse_encode_String(self.accountId, serializer);
+    sse_encode_String(self.label, serializer);
+    sse_encode_bool(self.activated, serializer);
+    sse_encode_opt_String(self.membershipChange, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.membershipChangedAt, serializer);
+  }
+
+  @protected
+  void sse_encode_pairing_status_dto(
+    PairingStatusDto self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.state, serializer);
+    sse_encode_String(self.backend, serializer);
+    sse_encode_opt_box_autoadd_pairing_session_dto(self.session, serializer);
+    sse_encode_bool(self.activeHere, serializer);
+    sse_encode_opt_box_autoadd_i_64(self.graceDeadline, serializer);
+    sse_encode_list_pairing_operation_dto(self.pending, serializer);
+    sse_encode_list_pairing_operation_dto(self.failed, serializer);
+    sse_encode_opt_String(self.parkedGithub, serializer);
   }
 
   @protected

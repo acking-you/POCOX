@@ -1,7 +1,8 @@
 # Pairing-code login
 
-**Status: relay support (stage 1) and the backend (stage 2) have shipped; no client
-speaks pairing yet, so it is not usable.** This page specifies the design for
+**Status: relay support (stage 1), the backend (stage 2) and the core, bridge and CLI
+(stage 3) have shipped. `pocox pair` works; the app has no screens for it yet.** This
+page specifies the design for
 [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
 section becomes the rules a change must keep.
 
@@ -69,19 +70,38 @@ directory. Scope must affect both the store and hardware derivation, so test
 devices do not share a secret. Canonicalization must not equate different backend
 paths or send credentials across redirects to another origin.
 
+Canonical means the URL parser's lowercase host and elided default port, with only
+a trailing slash removed: path case and every other path stay distinct. A backend
+address must be `https://`, or `http://` to a loopback address, and carries no
+credentials, query or fragment. Pairing requests follow no redirect at all, since a
+307 would carry a JSON body holding the secret to wherever it points.
+
 | Platform | Device store | App reinstall |
 | --- | --- | --- |
 | iOS | Keychain, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, synchronization disabled | Usually retained; [Apple does not guarantee this](https://developer.apple.com/forums/thread/36442?page=2) |
 | Android | App-private `no_backup` directory, plus Block Store where available | `no_backup` is wiped with the app; Block Store can survive. Otherwise recovery requires a valid code or a member's approval |
-| macOS, Linux, WSL | Private user data directory outside the app's folder; directory `0700`, files `0600` | Retained if that directory survives |
-| Windows | User profile data directory outside the app's folder; owner-restricted ACL | Retained if that directory survives |
+| macOS, Linux, WSL | Private user data directory outside the app's folder; directory `0700`, files `0600`. On macOS, excluded from Time Machine when created | Retained if that directory survives |
+| Windows | Local (not roaming) user profile data directory outside the app's folder; owner-restricted ACL when created, keeping the profile's own ACL if that fails | Retained if that directory survives |
 
 Reuse the locking and atomic-write approach in
 `crates/pocox-core/src/device/identity.rs`, with Windows replacement semantics
 handled explicitly. Serialize create, recovery and replacement across processes,
-and re-read under the lock. An unreadable store is an error, never a new device.
-Sharing a home directory or copying a VM can copy this bearer identity; a
-hardware hint cannot detect or revoke such a clone.
+and re-read under the lock. No network call happens under it. An unreadable store is
+an error, never a new device, and it is left in place for a repair. Sharing a home
+directory or copying a VM can copy this bearer identity; a hardware hint cannot detect
+or revoke such a clone.
+
+The record also says whether the backend has acknowledged the secret, because that
+decides the first request. Until then `POST /v1/pair/device` is the idempotent retry
+after a lost response. Afterward only `POST /auth/refresh` applies, so a purged device
+answers `device_unknown` instead of being recreated silently. Each installation also
+writes the device and generation it last saw, so another installation can tell its own
+JWT is out of date before using it. Neither authorizes anything.
+
+A platform whose secure storage is not a file implements `StoreBackend` (read and
+durably write opaque bytes under an opaque slot name). A desktop never needs one. A
+mobile build with none installed refuses, rather than falling back to a directory the
+platform backs up.
 
 **Block Store on Android.** Also write the secret to
 [Block Store](https://developer.android.com/identity/block-store), local only
@@ -99,7 +119,9 @@ no copy can go stale. A copy in `config.toml` would defeat the Keychain's
 `ThisDeviceOnly` and Android's exclusions, because that file lives in a backed-up
 directory on both platforms, and excluding the whole file would change what GitHub
 users get back from a restore. A restored `config.toml` without its store means
-signed out: its JWT expires within the hour and cannot be refreshed. On
+signed out: its JWT expires within the hour and cannot be refreshed, and it is cleared
+before anything is created or sent, so no new secret ever stands behind it. A record no
+session ever came from counts the same. On
 `device_superseded` show recovery; never automatically reclaim a device in a loop.
 The store retains pending and completed operation identity until local
 configuration catches up with a successful server transition.
@@ -131,7 +153,7 @@ tracking identifier.
 | --- | --- | --- |
 | Android 8+ | [`ANDROID_ID`](https://developer.android.com/reference/android/provider/Settings.Secure#ANDROID_ID) | Scoped to signing key, user and device; reset/signing changes and the documented Android 8 OTA case can change it. Not remote attestation. |
 | macOS | `IOPlatformUUID` | Machine-wide, readable by other local accounts, may survive resale; not an authorization secret. |
-| Windows | SMBIOS UUID, with `MachineGuid` fallback | Firmware duplicates/placeholders exist; fallback and OS-account identity may change on reinstall. |
+| Windows | SMBIOS UUID, with `MachineGuid` fallback only when the firmware answered with a placeholder; a failed or slow read sends no hint | Firmware duplicates/placeholders exist; fallback and OS-account identity may change on reinstall. |
 | iOS, Android 7 and older | None | Recover with a retained secret or a code from its group. A member's approval needs a hint to find the device. |
 | Linux, WSL, containers | None | The store preserves identity across binary reinstalls; losing it requires a code from its group. |
 
@@ -140,8 +162,11 @@ Reject empty, all-zero, all-`F` values and known firmware placeholders such as
 reinstall: `os_account` can change even when a machine UUID survives. Renaming
 the host only changes its display name.
 
-Read the hint only at activation or for an explicit recovery request. Do not use
-it for locality, routing or automatic takeover. The stored source/scope is
+Read the hint only at activation or for an explicit recovery request. Desktops read
+it with the system's own tool, named by absolute path and bounded to a few seconds; a
+mobile platform passes its identifier into the one call that needs it, and Rust derives
+the key and drops the identifier. Do not use it for locality, routing or automatic
+takeover. The stored source/scope is
 informational; claiming `app` scope in a request must never bypass recovery
 authorization. Linux's machine-id provides little recovery benefit and is often
 copied in VM images, so this design omits it.
@@ -764,22 +789,109 @@ Shared-store changes are observed before issuing new authenticated work and by
 long-running hosting owners, not only when a foreground page happens to poll.
 Only the hosting-state lock owner may restart hosts.
 
+**What may start a device.** Preparing, activating, previewing a code and asking to
+recover may create the secret. Everything else (a code's pause or rotation, the group,
+a removal, a leave) reads the store and fails with `no_device` if there is none: pausing
+a leaked code on a machine that never paired, or with the wrong `--backend`, must not
+report success on a new device while the real code stays live.
+
+**A late answer.** The account is read before a request and compared again before and
+during the write, so an answer that arrives after the user signed in elsewhere or out
+changes nothing they did and stops nothing of theirs. A refresh requires the identity to
+still be the active one, and an adoption requires the account it started from. The same
+holds for a refusal saying the identity died. The account's explicit self-host mode means
+the identity is not active; only an adoption ends that mode.
+
+**Operations.** A link, leave, removal or restore is saved in the store, with the
+installation that started it and that installation's active account, before it is sent.
+It is sent once. After a lost answer its result is only ever read, and a device with one
+pending starts no other. A clear refusal (a 4xx with a known code) means it did not
+happen. Anything else, a server failure included, may still commit, so it stays pending
+and its result is read. A completed link or restore moves the installation that started
+it only if that installation is still on the account it started from; otherwise the
+commit stands and that account is left alone. Any other installation may read the result
+at once, and a result it has read blocks nothing, but adopting it stays with the
+installation that started it for a day. A result the backend still does not know two
+minutes on was never received; past the week the backend keeps finished ones, or once the
+secret can no longer ask, how it ended is unknown, and the device's own state says where it
+stands. An operation that did not happen stays a day, so whoever
+started it can still learn why after another process read it. A completed one's absence
+from the store never reads as success: the backend is asked. A commit whose local
+catch-up failed says so and is tried again, including by the watcher of an installation
+on GitHub. A decision on a recovery request has one identity per device, request and
+answer, and after a lost answer a rotation reads the code route, since sending either
+again could only be refused.
+
+**A change of user.** A process running the engine stops what the old user owned before
+the new one reaches `config.toml`: cached credentials and the renewer, every tunnel and
+session through the transport's epoch, then its hosts without touching their restore
+choices. What can fail locally is done first, and if the write still fails what was stopped
+starts again. Token work fails fast meanwhile, before waiting as well as after, so a start
+holding a host's lease cannot leave the stop waiting on it; a host still busy after ten
+seconds is owed a stop and a start, retried on the next check. Then the hosts it stopped start
+again if the session is activated, and otherwise it holds: nothing starts until Continue.
+A hold is memory, and the backend is what survives a restart: every start asks whether
+`/v1/relay` refuses this device, and being refused holds too, so when a hold ends
+everything the restore ledger says should run starts. Signing out keeps that owed: the
+hosts start under the next account that can publish them, in this process or any other. A superseded or unknown identity
+holds the same way, only the user's choice moves it on, and this process stops asking the
+backend about that secret and stops dropping connections over it. GitHub and self-hosted
+setups skip all of this at the first check of the configuration, and a process given an
+explicit relay does not depend on the account at all.
+
+**Long-running processes.** A process that may host compares `config.toml` with the
+account it hosts under on every check, once a minute, and on a move to or from pairing it
+runs the same stop, then starts or holds: a `pocox pair join` in another terminal is the
+only way to confirm a move on a headless host, and it writes first. The first check after
+a start also learns whether this device may host. After that it asks `GET /v1/me`, which
+refreshes a session whose generation moved on. While holding it refreshes instead, since
+a Continue from another installation does not change this JWT. A plain `pocox serve` and
+detached relay workers on an account's credential make the same comparison and ask the
+same question, and exit when the account changes; one running under GitHub only ever
+reads its configuration here. A worker, or `pocox serve`'s own meta registration, that the
+relay refuses as expired after a sleep past its key's end fetches the replacement for the
+same user and registers again. Only the backend refusing this device ends that; a busy or
+unreachable relay is asked again for a while. A stop request reaches every phase of it.
+
+**Switching.** `[account]` holds one session, so moving to pairing sets a GitHub session
+aside in `parked-accounts.json` in the support directory, under the canonical backend it
+really used, carrying that backend so a resume can put it back. A new GitHub sign-in on
+that backend replaces it, and a resume never replaces a GitHub session already there, whose
+token would be lost unrevoked. Going back to GitHub is a change of user like any other:
+hosts stop first and start again under GitHub, whether it happens here or another process
+wrote it, because left alone they would stay published to the group this installation left.
+A file of its own, for the reason `[account]` gains no fields. A self-hosted relay and key
+stay where they are in `config.toml`, and an explicit self-host mode wins while chosen, with
+pairing asleep. `POCOX_DEVICE_SCOPE` names a separate identity and hardware key; since
+`config.toml` holds one session, each scope in use also needs its own configuration
+directory: a separate `HOME` on macOS and Linux, and a separate account on Windows, whose
+configuration directory follows the account rather than any variable.
+
 ```bash
 pocox pair                  # show this device's code, ask before activating, wait for a link
 pocox pair join             # read code interactively or from stdin, never argv
 pocox pair restore          # recover a previous device: a code from stdin, or ask a linked device
+pocox pair start-over       # a superseded or unknown identity: sign out of it, start as a new device
 pocox pair rotate           # error while the 24-hour wait runs
 pocox pair pause            # resume explicitly with: pocox pair resume
 pocox pair leave            # confirm; move this device out of its group
-pocox devices               # list; devices remove <id>
+pocox devices               # list, with changes under way or failed; devices remove <id>
 pocox devices allow <id> --request <request-id>
 pocox devices deny <id> --request <request-id>
 ```
 
-`pocox login` stays the GitHub flow. `pocox logout` clears that installation's
+A change still under way when a command stops waiting exits 75: neither done nor failed,
+never to be repeated, and `pocox devices` shows how it ended. A restore or retake runs on a
+device not yet set up (the backend refuses any other), so a live device is told to pause its
+code and remove what it does not recognise from a peer instead. Waits poll at the 60 seconds
+foreground screens use and back off through transient failures; only a refusal ends one.
+
+`pocox login` stays the GitHub flow, and `pocox login --resume` returns to a session set
+aside for pairing. Off a terminal `--yes` is the only confirmation; without it a command
+that would change membership changes nothing. `pocox logout` clears that installation's
 active account and owned connections, just as before; it does not call
 `/auth/logout`, silently leave a group or delete the persistent device store.
-Resuming pairing from the retained store is an explicit choice. Server-side device
+Resuming pairing from the retained store is an explicit choice: `pocox pair` asks. Server-side device
 removal/retake is the action for revoking authorization, rather than assuming local
 logout erased every copy.
 
@@ -854,7 +966,7 @@ feature, alter configuration, or warrant a release-note claim that pairing works
 | 0 | Reviewed design and identity wording | Cross-check with current auth/relay/client code; document chosen 600-second overlap and surviving connections. |
 | 1 (shipped in [pb-mapper#52](https://github.com/acking-you/pb-mapper/pull/52)) | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
 | 2 | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
-| 3 | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
+| 3 (shipped) | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
 | 4 | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
 | 5 | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. |
 

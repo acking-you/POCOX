@@ -252,6 +252,11 @@ fn clock(timestamp_ms: i64) -> String {
 fn emit(mut line: LogLine) {
     truncate(&mut line.level, 16);
     truncate(&mut line.target, 256);
+    // Nothing in the engine formats these into a log. This is for what it cannot
+    // vouch for: a third party's error quoting what it was given, say.
+    if let std::borrow::Cow::Owned(scrubbed) = pocox_core::redact::scrub_pairing(&line.message) {
+        line.message = scrubbed;
+    }
     truncate(&mut line.message, MESSAGE_BYTES);
     if let Some(file) = FILE.get() {
         file.push(line.clone());

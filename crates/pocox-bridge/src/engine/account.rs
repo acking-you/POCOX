@@ -12,24 +12,26 @@
 //! engine runtime.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{anyhow, bail, Context, Result};
 use once_cell::sync::OnceCell;
 use pocox_account_proto::http::{
-    session_token_exp, DevicePollRequest, DevicePollResponse, DevicePollStatus, DeviceStartRequest,
-    DeviceStartResponse, LogoutRequest, MeResponse, RefreshRequest, RefreshResponse,
-    RelayCredentialResponse, ServiceEntry, WebExchangeRequest, WebExchangeResponse,
-    WebStartRequest, WebStartResponse,
+    session_token_device, session_token_exp, DevicePollRequest, DevicePollResponse,
+    DevicePollStatus, DeviceStartRequest, DeviceStartResponse, LogoutRequest, MeResponse,
+    RefreshRequest, RefreshResponse, RelayCredentialResponse, ServiceEntry, WebExchangeRequest,
+    WebExchangeResponse, WebStartRequest, WebStartResponse,
 };
 use pocox_account_proto::pkce;
-use pocox_core::config::Config;
+use pocox_core::config::{AccountProvider, Config};
 use pocox_core::service::sanitize_component;
 
 #[cfg(test)]
 use crate::engine::config::save_config;
 use crate::engine::config::{load_config, update_config};
+use crate::engine::pairing;
 
 fn http_client(support_dir: &Path) -> Result<reqwest::Client> {
     super::network::client(support_dir)?
@@ -81,11 +83,29 @@ pub fn default_backend() -> String {
     format!("https://{host}:8443")
 }
 
-/// The persisted backend base URL, or the built-in default.
+/// Whether `$POCOX_BACKEND` names the default backend in this process.
+static BACKEND_FROM_ENV: AtomicBool = AtomicBool::new(false);
+
+/// Let `$POCOX_BACKEND` name the default backend, as it does for the CLI, whose
+/// sessions on that backend this engine then sees for what they are. The app
+/// has no such variable.
+pub fn honor_backend_env() {
+    BACKEND_FROM_ENV.store(true, Ordering::SeqCst);
+}
+
+/// The persisted backend base URL, or the default.
 pub fn backend_base(config: &Config) -> String {
     config
         .account_backend()
         .map(ToString::to_string)
+        .or_else(|| {
+            BACKEND_FROM_ENV
+                .load(Ordering::SeqCst)
+                .then(|| std::env::var("POCOX_BACKEND").ok())
+                .flatten()
+                .map(|backend| backend.trim().to_string())
+                .filter(|backend| !backend.is_empty())
+        })
         .unwrap_or_else(default_backend)
 }
 
@@ -313,6 +333,10 @@ fn persist_login(support_dir: &Path, config: &Config) -> Result<()> {
         latest.account = config.account.clone();
         Ok(())
     })?;
+    if let Err(error) = pairing::forget_parked_github(support_dir, &backend_base(config)) {
+        tracing::warn!("a replaced GitHub session stays set aside: {error:#}");
+    }
+    pairing::watch::wake();
     let owner = CacheOwner::of(config);
     if refresh
         .current
@@ -340,6 +364,13 @@ pub async fn current_user(support_dir: &Path) -> Result<Option<AccountUser>> {
         return Ok(None);
     }
     let backend = backend_base(&config);
+    if is_device(&config) {
+        let me = pairing::session::me(support_dir, &backend).await?;
+        return Ok(Some(AccountUser {
+            login: me.login,
+            account_id: me.account_id,
+        }));
+    }
     let token = valid_token(support_dir, &mut config, &backend).await?;
     let me: MeResponse = call(
         http_client(support_dir)?
@@ -382,6 +413,7 @@ pub async fn logout(support_dir: &Path) -> Result<()> {
     // The next sign-in must not inherit this account's namespace — a cached
     // credential would have it registering into someone else's.
     forget_relay_credential().await;
+    pairing::watch::wake();
     Ok(())
 }
 
@@ -390,6 +422,9 @@ pub async fn logout(support_dir: &Path) -> Result<()> {
 pub async fn services(support_dir: &Path) -> Result<Vec<ServiceEntry>> {
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
+    if is_device(&config) {
+        return pairing::session::services(support_dir, &backend).await;
+    }
     let token = valid_token(support_dir, &mut config, &backend).await?;
     // Older backends ignore `include_acp` and simply omit ACP services:
     // discovery then falls back to services this app hosts itself.
@@ -418,12 +453,15 @@ pub async fn deregister_service(
 ) -> Result<()> {
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
-    let token = valid_token(support_dir, &mut config, &backend).await?;
     // Sanitize the user-chosen segments to the exact key the backend derives, so
     // a name with `/`, `#`, or `?` can't break the URL path / target a wrong key
     // (the relay key was registered through the same sanitizer).
     let device = sanitize_component(device);
     let name = sanitize_component(name);
+    if is_device(&config) {
+        return pairing::session::deregister(support_dir, &backend, &device, kind, &name).await;
+    }
+    let token = valid_token(support_dir, &mut config, &backend).await?;
     call(
         http_client(support_dir)?
             .delete(format!("{backend}/v1/services/{device}/{kind}/{name}"))
@@ -434,8 +472,16 @@ pub async fn deregister_service(
     Ok(())
 }
 
+/// Whether this session belongs to a pairing device rather than GitHub.
+fn is_device(config: &Config) -> bool {
+    config.account_provider() == AccountProvider::DeviceCode
+}
+
 /// Return a currently-valid token, refreshing when missing/near-expiry.
 async fn valid_token(support_dir: &Path, config: &mut Config, backend: &str) -> Result<String> {
+    if is_device(config) {
+        return pairing::session::valid_token(support_dir, config, backend).await;
+    }
     // Fast path: the in-hand token is comfortably valid. An unparsable / exp-less
     // token does NOT count as valid here — it falls through to a refresh.
     if let Some(token) = config.account_token() {
@@ -503,6 +549,7 @@ async fn valid_token(support_dir: &Path, config: &mut Config, backend: &str) -> 
 // for the same identity must not be overwritten by an older refresh response.
 fn same_session(left: &Config, right: &Config) -> bool {
     CacheOwner::of(left) == CacheOwner::of(right)
+        && left.account_provider() == right.account_provider()
         && left.account.mode == right.account.mode
         && left.account_token() == right.account_token()
         && left.account_refresh_token() == right.account_refresh_token()
@@ -511,7 +558,7 @@ fn same_session(left: &Config, right: &Config) -> bool {
 /// Process-global lock serializing token refreshes, so overlapping callers
 /// don't each spend the rotating refresh token (401-ing the losers) or
 /// lost-update each other's persisted credential.
-fn refresh_lock() -> &'static tokio::sync::Mutex<()> {
+pub(super) fn refresh_lock() -> &'static tokio::sync::Mutex<()> {
     static LOCK: once_cell::sync::OnceCell<tokio::sync::Mutex<()>> =
         once_cell::sync::OnceCell::new();
     LOCK.get_or_init(|| tokio::sync::Mutex::new(()))
@@ -564,13 +611,23 @@ struct CacheOwner {
 
 impl CacheOwner {
     fn of(config: &Config) -> Self {
-        Self {
-            backend: backend_base(config),
-            account_id: config.account_id().map(ToString::to_string),
+        // A device's key belongs to one session generation and its label is
+        // display only, so a generation is what tells its credentials apart.
+        let login = if is_device(config) {
+            config
+                .account_token()
+                .and_then(session_token_device)
+                .map(|(device, generation)| format!("{device}:{generation}"))
+        } else {
             // Carried alongside the id because `account_id` is optional in the
             // credential the backend issues; two accounts must never compare
             // equal just because neither reported one.
-            login: config.account_login().map(ToString::to_string),
+            config.account_login().map(ToString::to_string)
+        };
+        Self {
+            backend: backend_base(config),
+            account_id: config.account_id().map(ToString::to_string),
+            login,
         }
     }
 }
@@ -633,6 +690,9 @@ fn relay_cache() -> &'static RelayCache {
 async fn fetch_relay_credential(support_dir: &Path) -> Result<RelayCredentialResponse> {
     let mut config = load_config(support_dir)?;
     let backend = backend_base(&config);
+    if is_device(&config) {
+        return pairing::session::relay_credential(support_dir, &backend).await;
+    }
     let token = valid_token(support_dir, &mut config, &backend).await?;
     let resp = http_client(support_dir)?
         .get(format!("{backend}/v1/relay"))

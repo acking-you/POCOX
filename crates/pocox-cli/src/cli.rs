@@ -1,7 +1,7 @@
 //! Command-line argument schema for `pocox`.
 //!
 //! All subcommands are declared here so that argument parsing,
-//! `--help` text and shell completion stay in one file. The actual
+//! `--help` text and shell completion stay in one place. The actual
 //! work is delegated to `commands::*` so this module remains free of
 //! side effects.
 
@@ -10,6 +10,9 @@ use std::path::PathBuf;
 use clap::{Args, Parser, Subcommand};
 use pocox_core::service::ServiceKind;
 use pocox_core::state::PbRole;
+
+mod pairing;
+pub use pairing::{DevicesArgs, DevicesCmd, PairArgs, PairCmd};
 
 /// `pocox` orchestrates codex app-server + pb-mapper.
 #[derive(Debug, Parser)]
@@ -38,6 +41,13 @@ pub enum Command {
 
     /// Show the current account / transport status.
     Account,
+
+    /// Sign in without GitHub: show this device's pairing code, or link it to
+    /// another device's with `pair join`.
+    Pair(PairArgs),
+
+    /// List the devices linked to this one, or act on one.
+    Devices(DevicesArgs),
 
     /// Interactively configure the default relay URL and shared key.
     Init(InitArgs),
@@ -105,6 +115,11 @@ pub struct LoginArgs {
     /// Use the default device flow on headless / SSH sessions.
     #[arg(long)]
     pub web: bool,
+
+    /// Go back to the GitHub session set aside when this installation moved to
+    /// pairing, instead of signing in again.
+    #[arg(long, conflicts_with = "web")]
+    pub resume: bool,
 }
 
 /// Args for `pocox init`.

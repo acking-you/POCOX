@@ -88,6 +88,13 @@ pub fn api_proxy_log_file(key: &str) -> Result<PathBuf> {
         .join(format!("api-proxy-{}.log", safe_file_component(key))))
 }
 
+/// Parent of the pairing device store: this OS account's local data, outside
+/// any app folder and, on Windows, outside the profile that roams to other
+/// computers. The app and the CLI of one account resolve the same directory.
+pub fn device_store_dir() -> Result<PathBuf> {
+    Ok(project_dirs()?.data_local_dir().join("device-store"))
+}
+
 /// Default config file location (`config.toml` next to the state dir).
 pub fn config_file() -> Result<PathBuf> {
     Ok(config_dir()?.join("config.toml"))
