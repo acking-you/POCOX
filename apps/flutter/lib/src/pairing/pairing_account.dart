@@ -208,17 +208,10 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
       switch (operation.status) {
         case 'completed':
           showToastOk(context, l10n.pairingRemoved(device.name));
-        case 'pending':
-          // Followed to its end on its own page, as every change is.
-          await followPairingOperation(context, ref, operation);
         default:
-          showToastError(
-            context,
-            pairingErrorText(
-              l10n,
-              PairingFailure(code: operation.error ?? 'failed', message: ''),
-            ),
-          );
+          // Under way: followed to its end on its own page. Failed: said
+          // once, and recorded so the host does not say it again.
+          await followPairingOperation(context, ref, operation);
       }
     }, instead: _gone(l10n));
   }
@@ -523,13 +516,15 @@ class _PairingAccountState extends ConsumerState<PairingAccountGroups> {
 /// The longest device name the backend takes, in UTF-8 bytes.
 const pairingNameMaxBytes = 64;
 
-/// Keeps a field's text within [maxBytes] UTF-8 bytes. An input method's
-/// composition runs freely; once it is committed, the text is cut back to the
-/// longest whole-character prefix that fits.
+/// Keeps a field's text within [maxBytes] UTF-8 bytes. A plain edit that
+/// would pass it is refused. An input method's composition runs freely; once
+/// committed, only the committed text is cut to fit, never the text around it.
 class _Utf8Limit extends TextInputFormatter {
   const _Utf8Limit(this.maxBytes);
 
   final int maxBytes;
+
+  static int _bytes(String text) => utf8.encode(text).length;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -538,20 +533,37 @@ class _Utf8Limit extends TextInputFormatter {
   ) {
     final composing = newValue.composing;
     if (composing.isValid && !composing.isCollapsed) return newValue;
-    if (utf8.encode(newValue.text).length <= maxBytes) return newValue;
-    final kept = StringBuffer();
-    var bytes = 0;
-    for (final rune in newValue.text.runes) {
-      final char = String.fromCharCode(rune);
-      final size = utf8.encode(char).length;
-      if (bytes + size > maxBytes) break;
-      kept.write(char);
-      bytes += size;
+    if (_bytes(newValue.text) <= maxBytes) return newValue;
+    final composed = oldValue.composing;
+    if (!composed.isValid || composed.isCollapsed) return oldValue;
+    // A composition just ended: keep what was around it, and as much of the
+    // committed text as fits between.
+    final before = oldValue.text.substring(0, composed.start);
+    final after = oldValue.text.substring(composed.end);
+    final text = newValue.text;
+    if (!text.startsWith(before) ||
+        !text.endsWith(after) ||
+        text.length < before.length + after.length) {
+      return TextEditingValue(
+        text: before + after,
+        selection: TextSelection.collapsed(offset: before.length),
+      );
     }
-    final text = kept.toString();
+    final committed = text.substring(before.length, text.length - after.length);
+    final room = maxBytes - _bytes(before) - _bytes(after);
+    final kept = StringBuffer();
+    var used = 0;
+    for (final rune in committed.runes) {
+      final char = String.fromCharCode(rune);
+      final size = _bytes(char);
+      if (used + size > room) break;
+      kept.write(char);
+      used += size;
+    }
+    final fitted = kept.toString();
     return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
+      text: before + fitted + after,
+      selection: TextSelection.collapsed(offset: before.length + fitted.length),
     );
   }
 }

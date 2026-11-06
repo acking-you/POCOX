@@ -207,8 +207,9 @@ class _PairingHostState extends ConsumerState<PairingHost>
       return;
     }
     if (!mounted) return;
-    if (explainFailedOperations(context, ref, status.failed)) return;
+    // The waiting page in front tells its own change, whichever way it ends.
     if ((currentRoutePath() ?? '').startsWith('/pair/pending')) return;
+    if (explainFailedOperations(context, ref, status.failed)) return;
     final operation = status.pending
         .where((operation) => !_offeredPending.contains(operation.id))
         .firstOrNull;

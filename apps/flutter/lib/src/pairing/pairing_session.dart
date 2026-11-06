@@ -60,6 +60,8 @@ Future<void> followPairingOperation(
     case 'pending':
       context.go('/pair/pending', extra: (operation, backend));
     default:
+      // The host may have told it already, while this page waited.
+      if (failureTold(ref, operation.id)) return;
       markFailureTold(ref, operation.id);
       showToastError(
         context,
@@ -107,6 +109,12 @@ bool followTransitionPending(
 /// earlier runs.
 final _explainedFailures = <String>{};
 
+/// Whether the user was already told why change [id] did not happen.
+bool failureTold(WidgetRef ref, String id) =>
+    _explainedFailures.contains(id) ||
+    (ref.read(uiPrefsProvider).valueOrNull?.pairingToldFailures.contains(id) ??
+        false);
+
 /// Record that the user was told why change [id] did not happen.
 void markFailureTold(WidgetRef ref, String id) {
   _explainedFailures.add(id);
@@ -122,12 +130,8 @@ bool explainFailedOperations(
   WidgetRef ref,
   List<PairingOperation> failed,
 ) {
-  final told = {
-    ..._explainedFailures,
-    ...?ref.read(uiPrefsProvider).valueOrNull?.pairingToldFailures,
-  };
   final operation = failed
-      .where((operation) => !told.contains(operation.id))
+      .where((operation) => !failureTold(ref, operation.id))
       .firstOrNull;
   if (operation == null) return false;
   markFailureTold(ref, operation.id);

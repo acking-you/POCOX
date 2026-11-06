@@ -108,6 +108,10 @@ class _OtherWaysPanel extends StatefulWidget {
 class _OtherWaysPanelState extends State<_OtherWaysPanel> {
   bool _advancedOpen = false;
 
+  /// Closing was asked for once already; later builds (its exit animation,
+  /// a keyboard inset changing) must not pop again, or the page beneath goes.
+  bool _closing = false;
+
   Widget _row({
     required Key key,
     required IconData icon,
@@ -146,10 +150,14 @@ class _OtherWaysPanelState extends State<_OtherWaysPanel> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final advanced = widget.advanced;
-    if (widget.ways.isEmpty && advanced == null) {
-      // Nothing left to offer (the page stopped offering Restore): close.
+    if (widget.ways.isEmpty && advanced == null && !_closing) {
+      // Nothing left to offer (the page stopped offering Restore): close
+      // this panel, once, and only while it is the route in front.
+      _closing = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).maybePop();
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          Navigator.of(context).pop();
+        }
       });
     }
     return Padding(
