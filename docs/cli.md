@@ -90,10 +90,10 @@ and `pocox pair` show changes still under way and any that turned out not to hap
 | --- | --- |
 | Reinstalled, with the device store intact | `pocox pair`: same device, same code |
 | Reinstalled without it, holding a code from the group | `pocox pair restore`, then pick the device you were (`--device <id>` off a terminal) |
-| Reinstalled without it, holding no code | `pocox pair restore --ask`; a linked device runs `pocox devices`, compares the matching id and allows it |
+| Reinstalled without it, holding no code | `pocox pair restore --ask`; a linked device runs `pocox devices`, compares the matching id and allows it. It finds the device by its hardware, so not on Linux |
 | Suspect someone has this device's code, on this device | `pocox pair pause`, then `pocox devices remove <id>` for anything you do not recognise |
 | Suspect someone has a device's identity, and you have replaced that device | On the replacement, not yet set up, with a code from the group: `pocox pair restore --retake`. Old access ends at once and the code changes |
-| Told another device took this identity over | `pocox pair start-over` starts as a new device; `pocox pair restore` then recovers one you had |
+| Told another device took this identity over | `pocox pair start-over` starts as a new device. If you did not move it, `pocox pair restore --retake` then takes it back; plain `pocox pair restore` recovers another device you had |
 | This device was removed | `pocox pair` asks to continue, as a device of its own; returning to the group takes a new code |
 | A code leaked | `pocox pair pause` at once; `pocox pair rotate` once 24 hours have passed since it was issued |
 

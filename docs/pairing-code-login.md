@@ -3,8 +3,10 @@
 **Status: shipped, from relay support through the backend, core, bridge, CLI and app
 to the [usage](usage.md#1-sign-in-with-a-pairing-code) and
 [deployment](../deploy/README.md#pairing-code-login-optional) docs. Not yet verified:
-the app on an Android device, iOS backup exclusion on a real device, camera scanning
-and `pocox://pair` routing on macOS.** This page specifies the design for
+the app on an Android device, iOS backup exclusion on a real device, camera scanning,
+`pocox://pair` routing on macOS, anything on Windows, the Linux app build, a live GitHub
+sign-in and switching to GitHub and back, and a direct connection after removal; the
+rows below name each stage's gaps.** This page specifies the design for
 [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
 section becomes the rules a change must keep.
 
@@ -996,10 +998,10 @@ Each stage shipped as a separate PR. What a stage still lacks is named in its ro
 | --- | --- | --- |
 | 0 (shipped) | Reviewed design and identity wording | Cross-check with current auth/relay/client code; document chosen 600-second overlap and surviving connections. |
 | 1 (shipped in [pb-mapper#52](https://github.com/acking-you/pb-mapper/pull/52)) | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
-| 2 (shipped) | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
-| 3 (shipped) | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
+| 2 (shipped; not yet verified: TLS with real clients, `relay_too_old` against a real old relay, a real relay reset and a real crash) | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
+| 3 (shipped; not yet verified: Windows, the `serve --allow-remote-management` supervisor through a removal, a second app instance) | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
 | 4 (shipped; not yet verified: Android on a device, iOS backup exclusion on a real device, camera scanning, macOS `pocox://pair` routing) | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
-| 5 (shipped) | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. End to end on a local backend and relay: a computer hosting Codex, a device linked by code running a turn under `pcxu:`, refused once removed; GitHub and self-hosted setups unchanged. |
+| 5 (shipped) | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. End to end on a local backend and relay: a computer hosting Codex, a device linked by code running a turn under `pcxu:`, refused once removed; a self-hosted setup unchanged. GitHub sign-in is covered by `pocox-auth`'s fake-GitHub tests and a relay-credential test against a real relay; a live GitHub sign-in, switching to GitHub and back, and a direct connection after removal were not run. |
 
 The central acceptance scenarios are:
 

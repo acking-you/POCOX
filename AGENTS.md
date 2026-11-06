@@ -194,10 +194,11 @@ upload route and respect draft admission; see
 Shipped work lives in the changelog and git history. Open, described only as
 planned until it ships:
 
-- **Pairing-code login**: every stage has shipped, docs included; acceptance on
-  hardware remains: the app on an Android device, iOS backup exclusion on a real
-  device, camera scanning and `pocox://pair` routing on macOS
-  ([design](docs/pairing-code-login.md)).
+- **Pairing-code login**: every stage has shipped, docs included. Not yet verified:
+  the app on an Android device, iOS backup exclusion on a real device, camera
+  scanning, `pocox://pair` routing on macOS, anything on Windows, the Linux app build,
+  a live GitHub sign-in and switching to GitHub and back, and a direct connection
+  after removal ([design](docs/pairing-code-login.md#delivery-and-verification)).
 - **Typed JSON-RPC client**: local types for `pocox-codex::protocol`, checked
   against the upstream schema, instead of `serde_json::Value`.
 - **Session takeover for Claude and OpenCode**: an explicit, confirmed continue

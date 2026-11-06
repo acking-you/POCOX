@@ -47,32 +47,41 @@ phone, `pocox pair join` in a terminal. The next page shows the group's devices;
 nothing is linked until you choose **Link**. To show a code to the new device, open
 **Settings › Account › Add device** on one you already use.
 
-Whoever sees a code can ask to link with it, so share it only with your own devices.
-Each device you use is told when another links ("Pixel linked. Not yours?"), and
-**Settings › Account** can remove it at once.
+A code lets whoever has it link a device at once, with no approval, and use your
+hosted services; your devices are told only afterwards ("Pixel linked. Not yours?").
+Share it only with your own devices. If a code leaks, on the device whose code it is
+turn off **Allow linking with this code** (`pocox pair pause`) at once, remove any
+device you do not recognise in **Settings › Account** (`pocox devices remove`), then
+**Change code** (`pocox pair rotate`) once a day has passed since it was issued.
 
 ### A QR code or link only opens a preview
 
 Scanning a pairing QR code, or opening a `pocox://pair` link, fills in the code and
-shows the same preview as typing it. It never links by itself.
+shows the same preview as typing it. It never links by itself. Links open the app on
+iOS, Android and macOS; on Windows and Linux, type the code.
 
 ### Restoring a device
 
 On a reinstalled or reset device that lost its identity (see below), choose **Restore
-a previous device** under **Other ways to sign in**, or `pocox pair restore`:
+a previous device** under **Other ways to sign in**, or `pocox pair restore`. Do it
+before choosing **Get started**, **This is my first device**, **Continue** or **Link**:
+once a device is set up, it can only join its group again as a new device.
 
 - **With a code** from any device in the group: pick which device this one was. One
   that was active today asks again, since restoring it stops it there.
-- **By asking a linked device**, when you have no code at hand: this device shows a
-  check number. On a linked device, **Settings › Account** shows the request with the
-  same number; **Allow** it there (`pocox devices allow` in a terminal), then confirm
-  here.
+- **Ask a linked device**, when you have no code at hand: this device shows a check
+  number. On a linked device, **Settings › Account** shows the request with the same
+  number; **Allow** it there (`pocox devices allow` in a terminal), then confirm here.
+  The backend finds the device by its hardware, so this works only on macOS, Windows
+  and Android 8 or later, on the same hardware, and not after a phone's factory
+  reset. On iOS, Linux or a reset phone, use a code.
 - **Continue as a new device** is always open instead.
 
 When one of your devices is restored somewhere you did not intend, that device says
 so, with the time its access ends, and offers **Take back and change code**: the
-other copy's access ends at once and the code changes. In a terminal,
-`pocox pair restore --retake` does the same on a replacement device.
+other copy's access ends at once and the code changes. In a terminal on that device,
+run `pocox pair start-over`, then `pocox pair restore --retake`; on a replacement
+device not yet set up, `pocox pair restore --retake` alone.
 
 ### Settings › Account
 
@@ -92,17 +101,18 @@ pause`, `resume`, `rotate` and `leave` ([CLI](cli.md#pairing-codes)).
 
 ### Reinstalling
 
-A device keeps its identity in a private store, never in a backup that could restore
-it onto another device:
+A device keeps its identity in a private store. Phones keep it out of backups, so a
+backup cannot restore it onto another phone; on a computer it is a file in your user
+data:
 
 | Platform | After a reinstall |
 | --- | --- |
 | iOS | The identity is in the Keychain, on this device only, so deleting and reinstalling the app usually resumes it (Apple does not promise this): same device, same code. |
-| Android | The identity lives in app storage that no backup copies, so uninstalling deletes it. Where Google Play services is present, a local Block Store copy brings it back on the same device (not yet tested on a device). |
-| macOS, Windows, Linux | The identity sits in the account's application data, shared by every POCOX on that OS account, CLI included, and survives reinstalling the app. |
+| Android | The identity lives in app storage that no backup copies, so uninstalling deletes it. A local Block Store copy may bring it back on the same phone, best effort: it needs Android 8 or later, Google Play services and Google backup turned on, and has not yet been tested on a device. |
+| macOS, Windows, Linux | The identity sits in the account's application data, shared by every POCOX on that OS account, CLI included, and survives reinstalling the app. A backup or migration of your home folder copies it (only Time Machine on macOS skips it). A copy that reaches another computer acts as this device: remove that device from another of yours, or take it back with `pocox pair start-over`, then `pocox pair restore --retake`. |
 
-Without its identity a device starts on the first screen: restore it as above, or
-continue as a new device.
+Without its identity a device starts on the first screen: restore it as above (on
+iOS and Linux, with a code), or continue as a new device.
 
 ### What a removed device keeps
 
@@ -117,14 +127,16 @@ device says so and offers to take the identity back.
 
 ## 2. Sign in with GitHub
 
-In the app, **Sign in with GitHub** and **GitHub device code** are under **Other ways
-to sign in**.
-
 ### App
 
-Launch the app → **Sign in with GitHub**. It shows a short code and opens
-`github.com/login/device`; enter the code and authorize. You land on the home
-screen, which shows the account you signed in as.
+Both GitHub sign-ins are under **Other ways to sign in**:
+
+- **Sign in with GitHub** opens GitHub in the browser; authorize, and the browser
+  hands you back to the app.
+- **GitHub device code** shows a short code; enter it at `github.com/login/device`
+  and authorize.
+
+Either way you land on the home screen, which shows the account you signed in as.
 
 ### CLI
 

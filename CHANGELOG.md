@@ -26,21 +26,25 @@ breaking change goes.
     `start-over` cover the rest. A code is only ever read from a prompt or stdin. A
     change the backend has yet to finish exits with code 75.
   - **Recovery**: a reinstalled device restores itself by its group's code or a
-    member's approval. iOS keeps the identity in the Keychain, so a reinstall
-    resumes it; Android keeps it out of backups, and a computer keeps it outside the
-    app's folder, so reinstalling the app keeps it.
+    member's approval. iOS keeps the identity in the Keychain, so a reinstall usually
+    resumes it (Apple does not promise this); Android keeps it out of backups, and a
+    computer keeps it outside the app's folder, so reinstalling the app keeps it.
   - **Removing a device** ends its new connections; a direct connection already
     set up may last until either end closes it. A device whose identity is restored
     elsewhere keeps its access for 600 seconds.
   - **GitHub sign-in and self-hosted relays work as before.** `pocox login --resume`
     returns to a GitHub session set aside for pairing.
   - **For backend operators** pairing is optional: it needs `POCOX_PAIRING_SECRET`
-    and a relay with key namespaces (pb-mapper after 0.10.2). Upgrade the relay, then
-    the backend, then clients; a client speaking another pairing protocol is told
-    to update (`pairing_client_upgrade_required`). See
+    and a relay with key namespaces (a pb-mapper `master` build at `badcad7` or
+    later; no release has it yet). Upgrade the relay, then the backend, then clients;
+    a client speaking another pairing protocol is told to update
+    (`pairing_client_upgrade_required`). See
     [deploy](deploy/README.md#pairing-code-login-optional).
-  - **Not yet verified**: Android on a device (it compiles in CI), iOS backup
-    exclusion on a real device, camera scanning, and `pocox://pair` routing on macOS.
+  - **Not yet verified**: the app on an Android device (it compiles in CI), iOS
+    backup exclusion on a real device, camera scanning, `pocox://pair` routing on
+    macOS, anything on Windows (the device store's access control, the hardware hint,
+    the app build), the Linux app build, a live GitHub sign-in and switching to GitHub
+    and back, and a direct connection after removal.
 - Forked Codex conversations recover inherited image attachments from their
   stored history after the original temporary image files disappear.
 - Fork confirmations expire when their conversation view or host connection
