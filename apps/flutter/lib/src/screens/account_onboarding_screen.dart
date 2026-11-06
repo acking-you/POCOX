@@ -10,6 +10,7 @@ import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/fonts.dart';
 import 'package:pocox/src/pairing/pairing_front.dart';
+import 'package:pocox/src/pairing/pairing_other_ways.dart';
 import 'package:pocox/src/pairing/pairing_session.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/web_authenticator.dart';
@@ -19,10 +20,10 @@ import 'package:pocox/src/widgets/links.dart';
 import 'package:pocox/src/widgets/window_title_bar.dart';
 import 'package:pocox/src/app_icons.dart';
 
-/// Default first-run experience: sign in to a hosted account. The convenient
-/// browser-redirect login is the default ("Sign in with GitHub" opens a browser
-/// and returns automatically); a device-code fallback (enter a code on GitHub)
-/// stays one tap away. The self-host relay setup remains behind "Advanced".
+/// Default first-run experience. Pairing leads, with at most three actions on
+/// the page; GitHub's two sign-ins and the self-hosted path sit under "Other
+/// ways to sign in". A GitHub user whose session expired gets GitHub's
+/// sign-ins on the page instead, and pairing under Other ways.
 class AccountOnboardingScreen extends ConsumerStatefulWidget {
   /// Default constructor.
   const AccountOnboardingScreen({super.key, this.sessionExpired = false});
@@ -38,12 +39,20 @@ class AccountOnboardingScreen extends ConsumerStatefulWidget {
 class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
   DeviceCode? _device;
   String? _error;
-  bool _busy = false;
-  bool _advanced = false;
+
+  /// A sign-in under way, as a listenable too: Other ways' panel, a route of
+  /// its own, follows it while open.
+  final _busyNow = ValueNotifier(false);
+  bool get _busy => _busyNow.value;
+  set _busy(bool value) => _busyNow.value = value;
+
+  /// An expired GitHub session's user chose a pairing code instead.
+  bool _pairingInstead = false;
   final _backend = TextEditingController();
 
   @override
   void dispose() {
+    _busyNow.dispose();
     _backend.dispose();
     super.dispose();
   }
@@ -225,10 +234,7 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     // Welcome stays mounted under setup. Drop the pending device code so a
     // sleeping poll can't sign in from behind the setup page. Return to the
     // compact sign-in view while retaining any typed backend address.
-    setState(() {
-      _device = null;
-      _advanced = false;
-    });
+    setState(() => _device = null);
     final uri = GoRouterState.of(context).uri;
     context.go(uri.replace(path: '/onboarding/self-host').toString());
   }
@@ -255,41 +261,98 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
   String? _pairingBackend;
 
   void _applyPairingBackend() {
-    final typed = _backend.text.trim();
-    final backend = typed.isEmpty ? null : typed;
-    if (backend == _pairingBackend) return;
-    ref.read(pairingBackendProvider.notifier).state = backend;
-    setState(() => _pairingBackend = backend);
+    // Blur can arrive while the panel's route unmounts: change state after.
+    Future(() {
+      if (!mounted) return;
+      final typed = _backend.text.trim();
+      final backend = typed.isEmpty ? null : typed;
+      if (backend == _pairingBackend) return;
+      ref.read(pairingBackendProvider.notifier).state = backend;
+      setState(() => _pairingBackend = backend);
+    });
   }
 
-  /// GitHub's two sign-ins, side by side. Which leads depends on the platform:
-  /// a phone's browser hands back to the app in fewest steps, while a desktop's
-  /// redirect often lands in another browser profile, and the device code has
-  /// no redirect at all.
-  Widget _gitHubRow(AppLocalizations l10n) {
-    final device = OutlinedButton(
+  /// GitHub's two sign-ins, in the order the platform prefers: a phone's
+  /// browser hands back to the app in fewest steps, while a desktop's redirect
+  /// often lands in another browser profile, and the device code has no
+  /// redirect at all.
+  List<PairingOtherWay> _gitHubWays(AppLocalizations l10n) {
+    final device = PairingOtherWay(
       key: const Key('account-device-code'),
-      onPressed: _busy ? null : _startDevice,
-      style: _ctaStyle,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(l10n.accountUseDeviceCode),
-      ),
+      icon: AppIcons.pin_outlined,
+      label: l10n.accountUseDeviceCode,
+      onSelected: _startDevice,
     );
-    final web = OutlinedButton(
+    final web = PairingOtherWay(
       key: const Key('account-sign-in-web'),
-      onPressed: _busy ? null : _startWeb,
-      style: _ctaStyle,
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(l10n.accountSignInButton),
-      ),
+      icon: AppIcons.open_in_new,
+      label: l10n.accountSignInButton,
+      onSelected: _startWeb,
     );
-    return Row(
+    return prefersDeviceCodeLogin ? [device, web] : [web, device];
+  }
+
+  /// GitHub's sign-ins as the page's own actions, for a user whose GitHub
+  /// session expired: the preferred one filled, the other outlined.
+  List<Widget> _gitHubButtons(AppLocalizations l10n) {
+    final ways = _gitHubWays(l10n);
+    return [
+      FilledButton(
+        key: ways.first.key,
+        onPressed: _busy ? null : ways.first.onSelected,
+        style: _ctaStyle,
+        child: Text(ways.first.label),
+      ),
+      const SizedBox(height: 10),
+      OutlinedButton(
+        key: ways.last.key,
+        onPressed: _busy ? null : ways.last.onSelected,
+        style: _ctaStyle,
+        child: Text(ways.last.label),
+      ),
+    ];
+  }
+
+  /// Advanced, inside Other ways: a self-deployed backend, which pairing and
+  /// GitHub then both use, or the self-hosted relay instead.
+  Widget _advancedSettings(BuildContext panel) {
+    final l10n = AppLocalizations.of(panel);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Expanded(child: prefersDeviceCodeLogin ? device : web),
-        const SizedBox(width: 10),
-        Expanded(child: prefersDeviceCodeLogin ? web : device),
+        Focus(
+          onFocusChange: (focused) {
+            if (!focused) _applyPairingBackend();
+          },
+          child: TextField(
+            key: const Key('account-backend'),
+            controller: _backend,
+            enabled: _device == null,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            onSubmitted: (_) => _applyPairingBackend(),
+            decoration: InputDecoration(
+              labelText: l10n.accountBackendHint,
+              isDense: true,
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        // An authorized poll may still be writing the account: no relay
+        // setup until it has answered.
+        ValueListenableBuilder<bool>(
+          valueListenable: _busyNow,
+          builder: (_, busy, _) => TextButton(
+            key: const Key('account-self-host'),
+            onPressed: busy
+                ? null
+                : () {
+                    Navigator.of(panel).pop();
+                    _openSelfHost();
+                  },
+            child: Text(l10n.accountAdvancedSelfHost),
+          ),
+        ),
       ],
     );
   }
@@ -299,6 +362,8 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final device = _device;
+    // A GitHub user whose session expired comes back to GitHub first.
+    final gitHubFirst = widget.sessionExpired && !_pairingInstead;
     return Scaffold(
       appBar: WindowTitleBar(title: Text(l10n.accountSignInTitle)),
       body: Center(
@@ -316,16 +381,8 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                   l10n.accountWelcomeHeadline,
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  l10n.accountWelcomeSubtitle,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
                 const SizedBox(height: 32),
-                if (widget.sessionExpired) ...[
+                if (gitHubFirst) ...[
                   DecoratedBox(
                     key: const Key('account-session-expired'),
                     decoration: BoxDecoration(
@@ -377,28 +434,33 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                if (device == null) ...[
+                if (device == null && gitHubFirst) ...[
+                  ..._gitHubButtons(l10n),
+                  if (_busy) ...const [SizedBox(height: 12), _Spinner()],
+                  const SizedBox(height: 6),
+                  PairingOtherWaysButton(
+                    enabled: !_busy,
+                    advanced: _advancedSettings,
+                    ways: [
+                      PairingOtherWay(
+                        key: const Key('account-use-pairing'),
+                        icon: AppIcons.devices_outlined,
+                        label: l10n.pairingUseInstead,
+                        onSelected: () =>
+                            setState(() => _pairingInstead = true),
+                      ),
+                    ],
+                  ),
+                ] else if (device == null) ...[
                   // Pairing leads: no account needed. GitHub's sign-ins and
-                  // the self-hosted path follow under "or".
+                  // the self-hosted path wait under Other ways.
                   PairingFront(
                     backend: _pairingBackend,
-                    extra: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _gitHubRow(l10n),
-                        if (_busy) ...[
-                          const SizedBox(height: 12),
-                          const Center(
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                    otherWays: _gitHubWays(l10n),
+                    advanced: _advancedSettings,
+                    otherWaysEnabled: !_busy,
                   ),
+                  if (_busy) ...const [SizedBox(height: 12), _Spinner()],
                 ] else ...[
                   // Three ordered steps, because the code alone doesn't say what
                   // to do with it: take the code, enter it at GitHub, come back.
@@ -440,37 +502,11 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                       ],
                     ),
                   ),
-                ],
-                const SizedBox(height: 24),
-                // Unobtrusive escape hatch: a self-deployed backend URL or the
-                // legacy self-hosted relay. Hidden behind one quiet toggle so
-                // the default is simply "Sign in with GitHub".
-                if (!_advanced)
-                  TextButton(
-                    onPressed: () => setState(() => _advanced = true),
-                    child: Text(l10n.accountAdvanced),
-                  )
-                else ...[
-                  Focus(
-                    onFocusChange: (focused) {
-                      if (!focused) _applyPairingBackend();
-                    },
-                    child: TextField(
-                      key: const Key('account-backend'),
-                      controller: _backend,
-                      enabled: device == null,
-                      keyboardType: TextInputType.url,
-                      autocorrect: false,
-                      onSubmitted: (_) => _applyPairingBackend(),
-                      decoration: InputDecoration(
-                        labelText: l10n.accountBackendHint,
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _busy ? null : _openSelfHost,
-                    child: Text(l10n.accountAdvancedSelfHost),
+                  const SizedBox(height: 18),
+                  // Waiting on GitHub: only the self-hosted way out remains.
+                  PairingOtherWaysButton(
+                    ways: const [],
+                    advanced: _advancedSettings,
                   ),
                 ],
               ],
@@ -620,4 +656,18 @@ class _DeviceCodeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A sign-in under way.
+class _Spinner extends StatelessWidget {
+  const _Spinner();
+
+  @override
+  Widget build(BuildContext context) => const Center(
+    child: SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    ),
+  );
 }

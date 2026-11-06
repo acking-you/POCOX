@@ -442,9 +442,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get accountWelcomeHeadline => '欢迎使用 POCOX';
 
   @override
-  String get accountWelcomeSubtitle => '不用账号，在任意设备上继续你的对话。';
-
-  @override
   String get accountSignInTitle => '登录';
 
   @override
@@ -5112,6 +5109,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get pairingUseCode => '使用匹配码';
+
+  @override
+  String get pairingUseInstead => '改用匹配码';
+
+  @override
+  String get pairingOtherWays => '其他登录方式';
 
   @override
   String get pairingReady => '这台设备已设置好';

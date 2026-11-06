@@ -88,6 +88,13 @@ Future<void> _tapKey(WidgetTester t, String key) async {
   await t.pumpAndSettle();
 }
 
+Future<void> _otherWays(WidgetTester t) => _tapKey(t, 'pairing-other-ways');
+
+Future<void> _closePanel(WidgetTester t) async {
+  Navigator.of(t.element(find.byKey(const Key('account-device-code')))).pop();
+  await t.pumpAndSettle();
+}
+
 bool _enabled(WidgetTester t, String key) {
   final widget = t.widget(find.byKey(Key(key)));
   return switch (widget) {
@@ -110,7 +117,14 @@ void main() {
         expect(api.pairingState, 'inactive', reason: 'the code was prepared');
         expect(find.text('K7M2-F9QX-3RTB'), findsOneWidget);
         expect(api.pairingCalls, isNot(contains('activate')));
+        // The page keeps three actions; restoring and GitHub wait in Other
+        // ways.
+        expect(find.byKey(const Key('pairing-restore')), findsNothing);
+        expect(find.byKey(const Key('account-device-code')), findsNothing);
+        await _otherWays(t);
         expect(find.byKey(const Key('pairing-restore')), findsOneWidget);
+        expect(find.byKey(const Key('account-device-code')), findsOneWidget);
+        await _closePanel(t);
 
         await _tapKey(t, 'pairing-get-started');
         expect(api.pairingCalls, contains('activate'));
@@ -131,7 +145,9 @@ void main() {
       await _mount(t, api);
 
       expect(find.byKey(const Key('pairing-removed')), findsOneWidget);
+      await _otherWays(t);
       expect(find.byKey(const Key('pairing-restore')), findsNothing);
+      await _closePanel(t);
       expect(api.pairingCalls, isEmpty);
       await _tapKey(t, 'pairing-get-started');
       expect(api.pairingCalls, ['activate']);

@@ -36,11 +36,9 @@ void main() {
           '/onboarding',
           platform: platform,
         );
-        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.byKey(const Key('pairing-other-ways')), findsOneWidget);
         expect(find.byKey(const Key('account-backend')), findsNothing);
-        await tester.ensureVisible(find.text('Advanced / self-hosted'));
-        await tester.tap(find.text('Advanced / self-hosted'));
-        await tester.pumpAndSettle();
+        await _openAdvanced(tester);
         await tester.enterText(
           find.byKey(const Key('account-backend')),
           _backend,
@@ -58,11 +56,9 @@ void main() {
         }
         await tester.pumpAndSettle();
         expect(router.canPop(), isFalse);
-        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.byKey(const Key('pairing-other-ways')), findsOneWidget);
         expect(find.text(_backend), findsNothing);
-        await tester.ensureVisible(find.text('Advanced / self-hosted'));
-        await tester.tap(find.text('Advanced / self-hosted'));
-        await tester.pumpAndSettle();
+        await _openAdvanced(tester);
         expect(find.text(_backend), findsOneWidget);
       },
       variant: TargetPlatformVariant.only(platform),
@@ -103,14 +99,16 @@ void main() {
     (tester) async {
       final api = _HeldLoginPoll();
       final router = await _mount(tester, api, '/onboarding');
-      await tester.ensureVisible(find.text('Advanced / self-hosted'));
-      await tester.tap(find.text('Advanced / self-hosted'));
+      await tester.tap(find.byKey(const Key('pairing-other-ways')));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('GitHub device code'));
       await tester.tap(find.text('GitHub device code'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 5));
       expect(api.calls, 1);
+      await tester.tap(find.byKey(const Key('pairing-other-ways')));
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.byKey(const Key('account-advanced')));
+      await tester.pump(const Duration(milliseconds: 400));
       final setup = find.widgetWithText(
         TextButton,
         'Use a self-hosted relay instead',
@@ -128,7 +126,7 @@ void main() {
       await tester.tap(find.byKey(_back));
       await tester.pumpAndSettle();
       expect(router.canPop(), isFalse);
-      expect(find.text('GitHub device code'), findsOneWidget);
+      expect(find.byKey(const Key('pairing-other-ways')), findsOneWidget);
       expect(find.text('ABCD-1234'), findsNothing);
     },
   );
@@ -200,9 +198,7 @@ void selfHostNavigationTests() {
       final originalWelcome = tester.state(welcome);
       final setup = find.byType(OnboardingScreen);
       if (!direct) {
-        await tester.ensureVisible(find.text('Advanced / self-hosted'));
-        await tester.tap(find.text('Advanced / self-hosted'));
-        await tester.pumpAndSettle();
+        await _openAdvanced(tester);
         await tester.enterText(
           find.byKey(const Key('account-backend')),
           _backend,
@@ -243,11 +239,9 @@ void selfHostNavigationTests() {
         );
       }
       if (!direct) {
-        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.byKey(const Key('pairing-other-ways')), findsOneWidget);
         expect(find.text(_backend), findsNothing);
-        await tester.ensureVisible(find.text('Advanced / self-hosted'));
-        await tester.tap(find.text('Advanced / self-hosted'));
-        await tester.pumpAndSettle();
+        await _openAdvanced(tester);
         expect(find.text(_backend), findsOneWidget);
         await tester.ensureVisible(
           find.text('Use a self-hosted relay instead'),
@@ -256,15 +250,22 @@ void selfHostNavigationTests() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_back));
         await tester.pumpAndSettle();
-        expect(find.text('Advanced / self-hosted'), findsOneWidget);
+        expect(find.byKey(const Key('pairing-other-ways')), findsOneWidget);
         expect(find.text(_backend), findsNothing);
-        await tester.ensureVisible(find.text('Advanced / self-hosted'));
-        await tester.tap(find.text('Advanced / self-hosted'));
-        await tester.pumpAndSettle();
-        expect(find.text(_backend), findsOneWidget);
         expect(router.canPop(), isFalse);
+        await _openAdvanced(tester);
+        expect(find.text(_backend), findsOneWidget);
       }
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+}
+
+/// Open Other ways and its Advanced settings.
+Future<void> _openAdvanced(WidgetTester tester) async {
+  await tester.ensureVisible(find.byKey(const Key('pairing-other-ways')));
+  await tester.tap(find.byKey(const Key('pairing-other-ways')));
+  await tester.pumpAndSettle();
+  await tester.tap(find.byKey(const Key('account-advanced')));
+  await tester.pumpAndSettle();
 }

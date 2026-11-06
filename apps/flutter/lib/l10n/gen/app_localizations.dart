@@ -878,12 +878,6 @@ abstract class AppLocalizations {
   /// **'Welcome to POCOX'**
   String get accountWelcomeHeadline;
 
-  /// No description provided for @accountWelcomeSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'No account needed. Pick up your conversations on any device.'**
-  String get accountWelcomeSubtitle;
-
   /// No description provided for @accountSignInTitle.
   ///
   /// In en, this message translates to:
@@ -9292,6 +9286,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use a pairing code'**
   String get pairingUseCode;
+
+  /// No description provided for @pairingUseInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Use a pairing code instead'**
+  String get pairingUseInstead;
+
+  /// No description provided for @pairingOtherWays.
+  ///
+  /// In en, this message translates to:
+  /// **'Other ways to sign in'**
+  String get pairingOtherWays;
 
   /// No description provided for @pairingReady.
   ///

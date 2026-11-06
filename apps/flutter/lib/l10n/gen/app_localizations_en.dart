@@ -471,10 +471,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountWelcomeHeadline => 'Welcome to POCOX';
 
   @override
-  String get accountWelcomeSubtitle =>
-      'No account needed. Pick up your conversations on any device.';
-
-  @override
   String get accountSignInTitle => 'Sign in';
 
   @override
@@ -5431,6 +5427,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pairingUseCode => 'Use a pairing code';
+
+  @override
+  String get pairingUseInstead => 'Use a pairing code instead';
+
+  @override
+  String get pairingOtherWays => 'Other ways to sign in';
 
   @override
   String get pairingReady => 'This device is set up';

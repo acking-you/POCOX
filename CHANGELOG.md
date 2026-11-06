@@ -11,7 +11,8 @@ breaking change goes.
 
 - **Sign in with a pairing code, in the app.** Sign-in now leads with this device's
   code: a computer shows it with a QR code and gets started in one step, a phone types
-  or scans another device's code, and Restore a previous device recovers one by its
+  or scans another device's code. Restore a previous device, GitHub's sign-ins and
+  self-hosting sit under Other ways to sign in; restoring recovers a device by its
   group's code or a linked device's approval. Settings › Account lists the group, adds a
   device, pauses or changes the code, answers recovery requests and switches back to
   GitHub. A `pocox://pair` link or QR code only ever opens a preview. iOS keeps the

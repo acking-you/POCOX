@@ -902,8 +902,9 @@ implemented feature.
 
 | Screen | Behaviour |
 | --- | --- |
-| First open, computer | Logo/greeting, prepared code with QR/copy, Get started, Enter another device's code, Restore a previous device, then GitHub sign-ins and Advanced. If a device links meanwhile, show who joined; hosting still waits for Continue. |
-| First open, phone | Code entry/scan first; This is my first device and Restore a previous device remain available. |
+| First open, computer | Logo and headline, prepared code with QR/copy, Get started, Enter another device's code, then Other ways to sign in: at most three actions on the page. If a device links meanwhile, show who joined; hosting still waits for Continue. |
+| First open, phone | Logo and headline, code entry/scan, Next, This is my first device, then Other ways to sign in. |
+| Other ways to sign in | A sheet on a phone, a dialog on a computer: Restore a previous device (only when the device has nothing to lose), GitHub's two sign-ins in the platform's preferred order, and Advanced, which reveals the backend field and the self-hosted relay. A GitHub user whose session expired sees GitHub's sign-ins on the page instead, with "Use a pairing code instead" and Advanced here. |
 | Retained-secret reinstall | Same code and explicit Continue. |
 | Restore a previous device | Enter a code or ask a linked device; continuing as new stays available. Waiting shows the matching identifier and no device names. No hardware-only "Restored" state. |
 | Pick a device | After a code: the group's devices with last-active days. This is that device, or add as a new device; a device active today asks again. |
@@ -919,7 +920,7 @@ The existing `accountUseDeviceCode` label becomes "GitHub device code / GitHub
 设备码" to distinguish GitHub's flow from pairing.
 
 **In the app.** Sign-in leads with pairing and keeps GitHub's two sign-ins and Advanced
-under "or"; Advanced's backend field applies to pairing too. The pages are `/pair/join`,
+under Other ways to sign in; Advanced's backend field applies to pairing too. The pages are `/pair/join`,
 `/pair/restore`, `/pair/scan` and `/pair/pending`, plus `/pair` for an installation on
 GitHub or a self-hosted relay, reached from Settings › Account. A code travels to them
 in memory, never in a route. While this installation is a pairing device, the app reads

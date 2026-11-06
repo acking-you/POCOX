@@ -7,6 +7,7 @@ import 'package:pocox/l10n/gen/app_localizations.dart';
 import 'package:pocox/src/app_icons.dart';
 import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/pairing/pairing_other_ways.dart';
 import 'package:pocox/src/pairing/pairing_platform.dart';
 import 'package:pocox/src/pairing/pairing_session.dart';
 import 'package:pocox/src/pairing/pairing_widgets.dart';
@@ -18,20 +19,33 @@ import 'package:pocox/src/widgets/app_toast.dart';
 /// any foreground pairing page does.
 const pairingPollInterval = Duration(seconds: 60);
 
-/// The pairing paths at the top of sign-in: this device's code and getting
-/// started on a computer, another device's code first on a phone, and restoring
-/// a previous device. Preparing the code changes nothing but the device store:
-/// no account, hosting or GitHub sign-in in progress is touched until the user
-/// chooses Get started, Continue or a link.
+/// Sign-in's pairing page: this device's code and getting started on a
+/// computer, another device's code first on a phone, then "Other ways to sign
+/// in" for restoring a previous device and [otherWays]. Preparing the code
+/// changes nothing but the device store: no account, hosting or GitHub sign-in
+/// in progress is touched until the user chooses Get started, Continue or a
+/// link.
 class PairingFront extends ConsumerStatefulWidget {
   /// Creates the front, on [backend] or the configured one.
-  const PairingFront({super.key, this.backend, this.extra});
+  const PairingFront({
+    super.key,
+    this.backend,
+    this.otherWays = const [],
+    this.advanced,
+    this.otherWaysEnabled = true,
+  });
 
   /// The backend the sign-in page's Advanced field names.
   final String? backend;
 
-  /// What follows the pairing paths: GitHub's sign-ins and Advanced.
-  final Widget? extra;
+  /// The sign-in page's own other ways (GitHub's), after Restore.
+  final List<PairingOtherWay> otherWays;
+
+  /// The self-hosted settings under Advanced.
+  final WidgetBuilder? advanced;
+
+  /// Whether Other ways can open: not while a sign-in is under way.
+  final bool otherWaysEnabled;
 
   @override
   ConsumerState<PairingFront> createState() => _PairingFrontState();
@@ -374,27 +388,32 @@ class _PairingFrontState extends ConsumerState<PairingFront>
           ],
         ]);
       }
-      if (restorable) {
-        children.addAll([
-          const SizedBox(height: 4),
-          TextButton(
-            key: const Key('pairing-restore'),
-            onPressed: _busy ? null : () => context.push('/pair/restore'),
-            child: Text(l10n.pairingRestore),
-          ),
-        ]);
-      }
     }
     if (_busy || (_loading && _status == null)) {
       children.addAll(const [SizedBox(height: 12), PairingSpinner()]);
     }
-    final extra = widget.extra;
-    if (extra != null) {
+    final ways = [
+      // Only a device with nothing to lose recovers another identity.
+      if (state != 'superseded' &&
+          state != 'unknown' &&
+          state != 'pending' &&
+          restorable)
+        PairingOtherWay(
+          key: const Key('pairing-restore'),
+          icon: AppIcons.history,
+          label: l10n.pairingRestore,
+          onSelected: () => context.push('/pair/restore'),
+        ),
+      ...widget.otherWays,
+    ];
+    if (ways.isNotEmpty || widget.advanced != null) {
       children.addAll([
-        const SizedBox(height: 14),
-        const PairingOr(),
-        const SizedBox(height: 14),
-        extra,
+        const SizedBox(height: 6),
+        PairingOtherWaysButton(
+          enabled: widget.otherWaysEnabled && !_busy,
+          advanced: widget.advanced,
+          ways: ways,
+        ),
       ]);
     }
     return Column(
