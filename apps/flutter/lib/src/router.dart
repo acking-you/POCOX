@@ -1,5 +1,11 @@
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:go_router/go_router.dart';
+import 'package:pocox/src/bridge_api.dart';
+import 'package:pocox/src/pairing/pairing_host.dart';
+import 'package:pocox/src/pairing/pairing_join_screen.dart';
+import 'package:pocox/src/pairing/pairing_page.dart';
+import 'package:pocox/src/pairing/pairing_restore_screen.dart';
+import 'package:pocox/src/pairing/pairing_scan_screen.dart';
 import 'package:pocox/src/screens/app_session_screen.dart';
 import 'package:pocox/src/screens/codex_setup_screen.dart';
 import 'package:pocox/src/screens/home_screen.dart';
@@ -65,6 +71,11 @@ void openSettingsFromTray() {
 /// app-wide prompts open shares this way). A no-op before the router exists.
 void pushRoute(String location) => _appRouter?.push(location);
 
+/// Go to [location] from outside a page's own context, replacing the stack: a
+/// removed pairing device returns to sign-in this way. A no-op before the
+/// router exists.
+void goRoute(String location) => _appRouter?.go(location);
+
 /// Build the app router. [initialLocation] is `/onboarding` on first run
 /// (no relay configured) and `/` otherwise.
 GoRouter buildRouter({
@@ -80,6 +91,32 @@ GoRouter buildRouter({
       ),
       routes: [
         GoRoute(path: 'self-host', builder: (c, s) => const OnboardingScreen()),
+      ],
+    ),
+    // Pairing-code login. A code reaches these pages in memory (`extra`, or
+    // pairingInvitationProvider), never in a location.
+    GoRoute(
+      path: '/pair',
+      builder: (c, s) => const PairingStartPage(),
+      routes: [
+        GoRoute(
+          path: 'join',
+          builder: (c, s) => PairingJoinScreen(code: s.extra as String?),
+        ),
+        GoRoute(
+          path: 'restore',
+          builder: (c, s) =>
+              PairingRestoreScreen(retake: s.extra as bool? ?? false),
+        ),
+        GoRoute(path: 'scan', builder: (c, s) => const PairingScanScreen()),
+        GoRoute(
+          path: 'pending',
+          builder: (c, s) {
+            final (operation, backend) =
+                s.extra as (PairingOperation?, String?)? ?? (null, null);
+            return PairingPendingPage(operation: operation, backend: backend);
+          },
+        ),
       ],
     ),
     // Chat-first home: resolves an app service + the latest conversation and

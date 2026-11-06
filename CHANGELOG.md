@@ -9,6 +9,14 @@ breaking change goes.
 
 ## Unreleased
 
+- **Sign in with a pairing code, in the app.** Sign-in now leads with this device's
+  code: a computer shows it with a QR code and gets started in one step, a phone types
+  or scans another device's code, and Restore a previous device recovers one by its
+  group's code or a linked device's approval. Settings › Account lists the group, adds a
+  device, pauses or changes the code, answers recovery requests and switches back to
+  GitHub. A `pocox://pair` link or QR code only ever opens a preview. iOS keeps the
+  identity in the Keychain, so a reinstall resumes it, and Android in its no-backup
+  storage. "Use a device code instead" is now "GitHub device code".
 - **Sign in with a pairing code, from the CLI.** `pocox pair` shows this device's
   code and `pocox pair join` links another device with it, with no GitHub account.
   `pocox devices` lists and removes linked devices; `pocox pair restore` recovers a

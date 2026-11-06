@@ -81,15 +81,20 @@ class PocketIdentity extends ConsumerWidget {
     final theme = Theme.of(context);
     final config = ref.watch(configProvider).valueOrNull;
     final account = config?.mode == 'account';
+    final pairing = config?.pairing ?? false;
     final relay = config?.relay?.trim() ?? '';
-    final name = account
+    final name = pairing
+        ? config?.accountLogin ?? ''
+        : account
         ? '@${config?.accountLogin ?? ''}'
         : relay.isEmpty
         ? l10n.notConfigured
         : relay;
     return Row(
       children: [
-        if (account)
+        if (pairing)
+          IconBadge(icon: AppIcons.devices_outlined, size: size)
+        else if (account)
           GitHubAvatar(
             accountId: config?.accountId,
             fallbackIcon: AppIcons.person_outline,
@@ -113,7 +118,11 @@ class PocketIdentity extends ConsumerWidget {
               ),
               if (subtitle)
                 Text(
-                  account ? l10n.githubAccount : l10n.settingsRelay,
+                  pairing
+                      ? l10n.pairingSignedInWithCode
+                      : account
+                      ? l10n.githubAccount
+                      : l10n.settingsRelay,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.bodySmall?.copyWith(

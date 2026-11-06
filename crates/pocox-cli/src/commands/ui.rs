@@ -94,11 +94,20 @@ pub(crate) fn headline(tone: Tone, title: &str) {
 }
 
 /// Print an indented `label`/`value` pair beneath a [`headline`]. The
-/// label is padded to a fixed width *before* dimming so columns align.
+/// label is padded to a fixed width *before* dimming so columns align; one
+/// longer than the column still keeps a space before its value.
 pub(crate) fn field(label: &str, value: &str) {
-    let label = paint(&format!("{label:<10}"), Style::new().dimmed());
+    let padded = if label.chars().count() < FIELD_WIDTH {
+        format!("{label:<FIELD_WIDTH$}")
+    } else {
+        format!("{label} ")
+    };
+    let label = paint(&padded, Style::new().dimmed());
     println!("    {label}{value}");
 }
+
+/// The label column of [`field`].
+const FIELD_WIDTH: usize = 10;
 
 /// Print an indented, copy-pasteable command line in cyan.
 pub(crate) fn code(line: &str) {

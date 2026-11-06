@@ -9,8 +9,9 @@ import 'package:pocox/src/bridge_api.dart';
 import 'package:pocox/src/desktop_theme.dart';
 import 'package:pocox/src/error_format.dart';
 import 'package:pocox/src/fonts.dart';
+import 'package:pocox/src/pairing/pairing_front.dart';
+import 'package:pocox/src/pairing/pairing_session.dart';
 import 'package:pocox/src/providers.dart';
-import 'package:pocox/src/ui_prefs.dart';
 import 'package:pocox/src/web_authenticator.dart';
 import 'package:pocox/src/widgets/app_toast.dart';
 import 'package:pocox/src/widgets/brand_logo.dart';
@@ -232,44 +233,9 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
     context.go(uri.replace(path: '/onboarding/self-host').toString());
   }
 
-  /// Land the signed-in user: the first sign-in on this device gets the
-  /// focused welcome guide (one-click hosting setup on desktop / the
-  /// what-to-do-on-the-computer steps on a phone); every later sign-in goes
-  /// straight to the chat. Waits (bounded) for the prefs file when its load is
-  /// still in flight, degrading to "not seen" — showing the guide twice is a
-  /// far smaller cost than never showing it.
-  Future<void> _goAfterSignIn() async {
-    // The token was just written to config.toml by Rust, but `configProvider`
-    // is a FutureProvider that already resolved — without invalidating it every
-    // screen we navigate to keeps reading the pre-login snapshot, so the app
-    // still believes nobody is signed in (`mode` stays off `account`, the
-    // Settings account section stays hidden, and the guide has no account to
-    // show). Await the refreshed value so the next route builds from it.
-    ref.invalidate(configProvider);
-    try {
-      await ref.read(configProvider.future).timeout(const Duration(seconds: 2));
-    } catch (_) {
-      // A slow/failed re-read must not strand the user on the login screen;
-      // the destination re-reads config itself.
-    }
-    if (!mounted) return;
-    // Service discovery and reachability were resolved against the old
-    // (tokenless) config too, so they'd report nothing available.
-    ref.invalidate(servicesProvider);
-    bool seen;
-    try {
-      final prefs = await ref
-          .read(uiPrefsProvider.notifier)
-          .ready
-          .timeout(const Duration(seconds: 2));
-      seen = prefs.guideSeen;
-    } on TimeoutException {
-      // The screen (and its scope) may be gone by now; nothing to route.
-      if (!mounted) return;
-      seen = ref.read(uiPrefsProvider).valueOrNull?.guideSeen ?? false;
-    }
-    if (mounted) context.go(seen ? '/' : '/welcome');
-  }
+  /// Land the signed-in user: the welcome guide the first time on this device,
+  /// the chat every later time.
+  Future<void> _goAfterSignIn() => landAfterSignIn(context, ref);
 
   /// Confirm a successful sign-in. Raised on the app-level ScaffoldMessenger, so
   /// it survives the immediate `context.go('/')`.
@@ -281,6 +247,50 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
       (login != null && login.isNotEmpty)
           ? l10n.accountSignedInAs(login)
           : l10n.accountSignedIn,
+    );
+  }
+
+  /// The backend pairing works on: the Advanced field's, once the user is done
+  /// typing it, else the configured one.
+  String? _pairingBackend;
+
+  void _applyPairingBackend() {
+    final typed = _backend.text.trim();
+    final backend = typed.isEmpty ? null : typed;
+    if (backend == _pairingBackend) return;
+    ref.read(pairingBackendProvider.notifier).state = backend;
+    setState(() => _pairingBackend = backend);
+  }
+
+  /// GitHub's two sign-ins, side by side. Which leads depends on the platform:
+  /// a phone's browser hands back to the app in fewest steps, while a desktop's
+  /// redirect often lands in another browser profile, and the device code has
+  /// no redirect at all.
+  Widget _gitHubRow(AppLocalizations l10n) {
+    final device = OutlinedButton(
+      key: const Key('account-device-code'),
+      onPressed: _busy ? null : _startDevice,
+      style: _ctaStyle,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(l10n.accountUseDeviceCode),
+      ),
+    );
+    final web = OutlinedButton(
+      key: const Key('account-sign-in-web'),
+      onPressed: _busy ? null : _startWeb,
+      style: _ctaStyle,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(l10n.accountSignInButton),
+      ),
+    );
+    return Row(
+      children: [
+        Expanded(child: prefersDeviceCodeLogin ? device : web),
+        const SizedBox(width: 10),
+        Expanded(child: prefersDeviceCodeLogin ? web : device),
+      ],
     );
   }
 
@@ -367,52 +377,28 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                   ),
                   const SizedBox(height: 16),
                 ],
-                // Which sign-in leads depends on the platform, because the two
-                // idioms don't cost the same on each. A phone has one browser,
-                // shared cookies and a working app-redirect, so the tap-through
-                // is fewest steps. A desktop's redirect must round-trip through
-                // a loopback listener and often lands in a different browser
-                // profile than the one signed into GitHub; the device code has
-                // no redirect at all and reaches GitHub via the backend, which
-                // is why it stays reliable behind a proxy or VPN.
                 if (device == null) ...[
-                  if (prefersDeviceCodeLogin) ...[
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _startDevice,
-                      style: _ctaStyle,
-                      icon: const Icon(AppIcons.pin_outlined),
-                      label: Text(l10n.accountUseDeviceCode),
+                  // Pairing leads: no account needed. GitHub's sign-ins and
+                  // the self-hosted path follow under "or".
+                  PairingFront(
+                    backend: _pairingBackend,
+                    extra: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _gitHubRow(l10n),
+                        if (_busy) ...[
+                          const SizedBox(height: 12),
+                          const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: _busy ? null : _startWeb,
-                      style: _ctaStyle,
-                      child: Text(l10n.accountSignInButton),
-                    ),
-                  ] else ...[
-                    FilledButton.icon(
-                      onPressed: _busy ? null : _startWeb,
-                      style: _ctaStyle,
-                      icon: const Icon(AppIcons.login),
-                      label: Text(l10n.accountSignInButton),
-                    ),
-                    const SizedBox(height: 10),
-                    OutlinedButton(
-                      onPressed: _busy ? null : _startDevice,
-                      style: _ctaStyle,
-                      child: Text(l10n.accountUseDeviceCode),
-                    ),
-                  ],
-                  if (_busy) ...[
-                    const SizedBox(height: 12),
-                    const Center(
-                      child: SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
-                  ],
+                  ),
                 ] else ...[
                   // Three ordered steps, because the code alone doesn't say what
                   // to do with it: take the code, enter it at GitHub, come back.
@@ -465,14 +451,21 @@ class _AccountOnboardingState extends ConsumerState<AccountOnboardingScreen> {
                     child: Text(l10n.accountAdvanced),
                   )
                 else ...[
-                  TextField(
-                    controller: _backend,
-                    enabled: device == null,
-                    keyboardType: TextInputType.url,
-                    autocorrect: false,
-                    decoration: InputDecoration(
-                      labelText: l10n.accountBackendHint,
-                      isDense: true,
+                  Focus(
+                    onFocusChange: (focused) {
+                      if (!focused) _applyPairingBackend();
+                    },
+                    child: TextField(
+                      key: const Key('account-backend'),
+                      controller: _backend,
+                      enabled: device == null,
+                      keyboardType: TextInputType.url,
+                      autocorrect: false,
+                      onSubmitted: (_) => _applyPairingBackend(),
+                      decoration: InputDecoration(
+                        labelText: l10n.accountBackendHint,
+                        isDense: true,
+                      ),
                     ),
                   ),
                   TextButton(

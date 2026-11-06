@@ -8,7 +8,7 @@
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
-use pocox_core::config::Mode;
+use pocox_core::config::{AccountProvider, Mode};
 
 use crate::engine::{config, logging, runtime, transport};
 use crate::frb_generated::StreamSink;
@@ -162,6 +162,10 @@ pub struct ConfigView {
     pub account_id: Option<String>,
     /// Whether an account session token is stored (value withheld).
     pub has_account_token: bool,
+    /// Who the account session belongs to: `github` or `device_code`, a
+    /// device signed in with its pairing code, whose login is its name and
+    /// whose id is no GitHub id. Empty with no session.
+    pub account_provider: String,
 }
 
 /// Initialise the engine with the platform app-support dir (from Dart's
@@ -205,6 +209,11 @@ pub fn get_config() -> Result<ConfigView> {
         account_login: cfg.account_login().map(str::to_string),
         account_id: cfg.account_id().map(str::to_string),
         has_account_token: cfg.account_token().is_some(),
+        account_provider: match (cfg.account_token(), cfg.account_provider()) {
+            (None, _) => String::new(),
+            (Some(_), AccountProvider::Github) => "github".to_string(),
+            (Some(_), AccountProvider::DeviceCode) => "device_code".to_string(),
+        },
     })
 }
 

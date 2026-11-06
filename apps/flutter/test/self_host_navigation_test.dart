@@ -37,10 +37,17 @@ void main() {
           platform: platform,
         );
         expect(find.text('Advanced / self-hosted'), findsOneWidget);
-        expect(find.byType(TextField), findsNothing);
+        expect(find.byKey(const Key('account-backend')), findsNothing);
+        await tester.ensureVisible(find.text('Advanced / self-hosted'));
         await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
-        await tester.enterText(find.byType(TextField), _backend);
+        await tester.enterText(
+          find.byKey(const Key('account-backend')),
+          _backend,
+        );
+        await tester.ensureVisible(
+          find.text('Use a self-hosted relay instead'),
+        );
         await tester.tap(find.text('Use a self-hosted relay instead'));
         await tester.pumpAndSettle();
 
@@ -53,6 +60,7 @@ void main() {
         expect(router.canPop(), isFalse);
         expect(find.text('Advanced / self-hosted'), findsOneWidget);
         expect(find.text(_backend), findsNothing);
+        await tester.ensureVisible(find.text('Advanced / self-hosted'));
         await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
         expect(find.text(_backend), findsOneWidget);
@@ -95,9 +103,11 @@ void main() {
     (tester) async {
       final api = _HeldLoginPoll();
       final router = await _mount(tester, api, '/onboarding');
+      await tester.ensureVisible(find.text('Advanced / self-hosted'));
       await tester.tap(find.text('Advanced / self-hosted'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Use a device code instead'));
+      await tester.ensureVisible(find.text('GitHub device code'));
+      await tester.tap(find.text('GitHub device code'));
       await tester.pump();
       await tester.pump(const Duration(seconds: 5));
       expect(api.calls, 1);
@@ -118,7 +128,7 @@ void main() {
       await tester.tap(find.byKey(_back));
       await tester.pumpAndSettle();
       expect(router.canPop(), isFalse);
-      expect(find.text('Use a device code instead'), findsOneWidget);
+      expect(find.text('GitHub device code'), findsOneWidget);
       expect(find.text('ABCD-1234'), findsNothing);
     },
   );
@@ -190,11 +200,18 @@ void selfHostNavigationTests() {
       final originalWelcome = tester.state(welcome);
       final setup = find.byType(OnboardingScreen);
       if (!direct) {
+        await tester.ensureVisible(find.text('Advanced / self-hosted'));
         await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
-        await tester.enterText(find.byType(TextField), _backend);
+        await tester.enterText(
+          find.byKey(const Key('account-backend')),
+          _backend,
+        );
         FocusManager.instance.primaryFocus?.unfocus();
         await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.text('Use a self-hosted relay instead'),
+        );
         await tester.tap(find.text('Use a self-hosted relay instead'));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 80));
@@ -228,15 +245,20 @@ void selfHostNavigationTests() {
       if (!direct) {
         expect(find.text('Advanced / self-hosted'), findsOneWidget);
         expect(find.text(_backend), findsNothing);
+        await tester.ensureVisible(find.text('Advanced / self-hosted'));
         await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
         expect(find.text(_backend), findsOneWidget);
+        await tester.ensureVisible(
+          find.text('Use a self-hosted relay instead'),
+        );
         await tester.tap(find.text('Use a self-hosted relay instead'));
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(_back));
         await tester.pumpAndSettle();
         expect(find.text('Advanced / self-hosted'), findsOneWidget);
         expect(find.text(_backend), findsNothing);
+        await tester.ensureVisible(find.text('Advanced / self-hosted'));
         await tester.tap(find.text('Advanced / self-hosted'));
         await tester.pumpAndSettle();
         expect(find.text(_backend), findsOneWidget);

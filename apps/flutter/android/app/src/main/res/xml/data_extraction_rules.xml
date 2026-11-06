@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later: cloud backup and device-to-device transfer alike.
+     The pairing device store is in no_backup, which neither copies; this keeps
+     any copy outside it out as well. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="file" path="device-store/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="file" path="device-store/" />
+    </device-transfer>
+</data-extraction-rules>

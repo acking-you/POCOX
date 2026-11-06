@@ -10858,6 +10858,7 @@ impl SseDecode for crate::api::bridge::ConfigView {
         let mut var_accountLogin = <Option<String>>::sse_decode(deserializer);
         let mut var_accountId = <Option<String>>::sse_decode(deserializer);
         let mut var_hasAccountToken = <bool>::sse_decode(deserializer);
+        let mut var_accountProvider = <String>::sse_decode(deserializer);
         return crate::api::bridge::ConfigView {
             relay: var_relay,
             has_key: var_hasKey,
@@ -10866,6 +10867,7 @@ impl SseDecode for crate::api::bridge::ConfigView {
             account_login: var_accountLogin,
             account_id: var_accountId,
             has_account_token: var_hasAccountToken,
+            account_provider: var_accountProvider,
         };
     }
 }
@@ -16380,6 +16382,7 @@ impl flutter_rust_bridge::IntoDart for crate::api::bridge::ConfigView {
             self.account_login.into_into_dart().into_dart(),
             self.account_id.into_into_dart().into_dart(),
             self.has_account_token.into_into_dart().into_dart(),
+            self.account_provider.into_into_dart().into_dart(),
         ]
         .into_dart()
     }
@@ -19757,6 +19760,7 @@ impl SseEncode for crate::api::bridge::ConfigView {
         <Option<String>>::sse_encode(self.account_login, serializer);
         <Option<String>>::sse_encode(self.account_id, serializer);
         <bool>::sse_encode(self.has_account_token, serializer);
+        <String>::sse_encode(self.account_provider, serializer);
     }
 }
 

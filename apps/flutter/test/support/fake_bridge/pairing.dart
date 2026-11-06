@@ -25,6 +25,35 @@ mixin _FakePairing on _FakeBridgeState {
   /// Every mutation so far, in order.
   final List<String> pairingCalls = [];
 
+  /// The group a preview shows.
+  List<PairingPreviewDevice> pairingPreviewDevices = const [
+    PairingPreviewDevice(id: 'device-peer', name: 'Peer', lastActiveDay: 0),
+  ];
+
+  /// Requests a member can answer, in [pairingDevices].
+  List<PairingRecoveryAsk> pairingAsks = const [];
+
+  /// How a link, restore, leave or removal ends: `completed` or `pending`.
+  String pairingOutcome = 'completed';
+
+  /// What settling reports.
+  List<PairingOperation> pairingSettled = const [];
+
+  /// Where an asked-for restore stands when polled.
+  PairingRestoreRequest? pairingRestoreAnswer;
+
+  /// The last link's confirmation of leaving current peers.
+  bool? pairingLastLeaveCurrent;
+
+  /// The last restore's target: a device id or a request id.
+  String? pairingLastRestoreTarget;
+
+  /// When this device's code may change next (unix seconds).
+  int pairingNextRotationAt = 0;
+
+  /// Refusals for the next previews, one each.
+  final List<PairingFailure> pairingPreviewRefusals = [];
+
   void _pairingRefuse() {
     final refusal = pairingRefusal;
     pairingRefusal = null;
@@ -42,13 +71,13 @@ mixin _FakePairing on _FakeBridgeState {
     code: 'K7M2-F9QX-3RTB',
     uri: 'pocox://pair?c=K7M2F9QX3RTB',
     issuedAt: 0,
-    nextRotationAt: 86400,
+    nextRotationAt: pairingNextRotationAt,
     paused: pairingPaused,
   );
 
   PairingOperation _pairingDone(String kind) {
     pairingCalls.add(kind);
-    return PairingOperation(id: 'op-$kind', kind: kind, status: 'completed');
+    return PairingOperation(id: 'op-$kind', kind: kind, status: pairingOutcome);
   }
 
   // Native storage belongs to the platform; the fake keeps everything in memory.
@@ -125,14 +154,16 @@ mixin _FakePairing on _FakeBridgeState {
   @override
   Future<PairingPreview> pairingPreview(String code, {String? backend}) async {
     _pairingRefuse();
+    pairingCalls.add('preview');
+    if (pairingPreviewRefusals.isNotEmpty) {
+      throw pairingPreviewRefusals.removeAt(0);
+    }
     return PairingPreview(
       ticket: 'ticket',
       expiresAt: 300,
-      targetDeviceId: 'device-peer',
+      targetDeviceId: pairingPreviewDevices.first.id,
       alreadyMember: false,
-      devices: const [
-        PairingPreviewDevice(id: 'device-peer', name: 'Peer', lastActiveDay: 0),
-      ],
+      devices: pairingPreviewDevices,
     );
   }
 
@@ -144,9 +175,13 @@ mixin _FakePairing on _FakeBridgeState {
     String? backend,
   }) async {
     _pairingRefuse();
-    pairingState = 'active';
-    pairingActiveHere = true;
-    return _pairingDone('link');
+    pairingLastLeaveCurrent = leaveCurrent;
+    final done = _pairingDone('link');
+    if (done.status == 'completed') {
+      pairingState = 'active';
+      pairingActiveHere = true;
+    }
+    return done;
   }
 
   @override
@@ -158,7 +193,7 @@ mixin _FakePairing on _FakeBridgeState {
   @override
   Future<List<PairingOperation>> pairingSettle({String? backend}) async {
     _pairingRefuse();
-    return const [];
+    return pairingSettled;
   }
 
   @override
@@ -167,7 +202,7 @@ mixin _FakePairing on _FakeBridgeState {
     String? backend,
   }) async {
     _pairingRefuse();
-    return PairingDevices(devices: pairingGroup, pendingRequests: const []);
+    return PairingDevices(devices: pairingGroup, pendingRequests: pairingAsks);
   }
 
   @override
@@ -202,6 +237,10 @@ mixin _FakePairing on _FakeBridgeState {
   }) async {
     _pairingRefuse();
     pairingCalls.add(allow ? 'allow' : 'deny');
+    pairingAsks = [
+      for (final ask in pairingAsks)
+        if (ask.requestId != requestId) ask,
+    ];
   }
 
   @override
@@ -223,7 +262,8 @@ mixin _FakePairing on _FakeBridgeState {
     String? backend,
   }) async {
     _pairingRefuse();
-    return PairingRestoreRequest(requestId: requestId, status: 'pending');
+    return pairingRestoreAnswer ??
+        PairingRestoreRequest(requestId: requestId, status: 'pending');
   }
 
   @override
@@ -236,9 +276,13 @@ mixin _FakePairing on _FakeBridgeState {
     String? backend,
   }) async {
     _pairingRefuse();
-    pairingState = 'active';
-    pairingActiveHere = true;
-    return _pairingDone(retake ? 'retake' : 'restore');
+    pairingLastRestoreTarget = targetDeviceId ?? requestId;
+    final done = _pairingDone(retake ? 'retake' : 'restore');
+    if (done.status == 'completed') {
+      pairingState = 'active';
+      pairingActiveHere = true;
+    }
+    return done;
   }
 
   @override
@@ -247,6 +291,7 @@ mixin _FakePairing on _FakeBridgeState {
     String? backend,
   }) async {
     _pairingRefuse();
+    pairingCalls.add('start-over');
     pairingState = 'inactive';
     return PairingPrepared(session: _pairingSession, code: _pairingCode);
   }

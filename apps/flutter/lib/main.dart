@@ -10,6 +10,8 @@ import 'package:pocox/src/desktop_tray.dart';
 import 'package:pocox/src/log_manager.dart';
 import 'package:pocox/src/providers.dart';
 import 'package:pocox/src/quit_status.dart';
+import 'package:pocox/src/pairing/pairing_host.dart';
+import 'package:pocox/src/pairing/pairing_platform.dart';
 import 'package:pocox/src/router.dart';
 import 'package:pocox/src/theme.dart';
 import 'package:pocox/src/theme_transition.dart';
@@ -88,6 +90,9 @@ Future<void> main() async {
   // No-op on mobile (DesktopTray.init guards on the platform). The menu labels
   // are filled in once the app builds (see the MaterialApp.router builder).
   await DesktopTray.instance.init(onOpenSettings: openSettingsFromTray);
+
+  // Before any pairing call, and again on every engine this process starts.
+  await installPairingStore(const RustBridgeApi());
 
   final cfg = await frb.getConfig();
   // Three-way boot: an account session or a self-host relay → home; neither
@@ -229,7 +234,9 @@ class _PocoxAppState extends ConsumerState<PocoxApp>
         // Updates are checked quietly and offered once per release.
         final page = ThemeTransitionHost(
           child: UpdateHost(
-            child: ToolsHost(child: child ?? const SizedBox.shrink()),
+            child: PairingHost(
+              child: ToolsHost(child: child ?? const SizedBox.shrink()),
+            ),
           ),
         );
         if (!DesktopTray.supported) return page;

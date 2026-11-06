@@ -75,7 +75,8 @@ Future<void> _mountOnboarding(
 /// animation, so this advances by bounded pumps (pumpAndSettle would never
 /// settle while it spins).
 Future<void> _signInWithDeviceCode(WidgetTester t) async {
-  await t.tap(find.text('设备码登录')); // accountUseDeviceCode (zh)
+  await t.ensureVisible(find.text('GitHub 设备码'));
+  await t.tap(find.text('GitHub 设备码')); // accountUseDeviceCode (zh)
   await t.pump(); // accountLoginStart resolves
   await t.pump(); // the code and spinner show
   await t.pump(const Duration(seconds: 6)); // the 5 s poll: authorized
@@ -276,7 +277,7 @@ void main() {
     await t.pumpAndSettle();
 
     expect(find.byKey(const Key('account-session-expired')), findsOneWidget);
-    expect(find.text('设备码登录'), findsOneWidget);
+    expect(find.text('GitHub 设备码'), findsOneWidget);
   });
 
   testWidgets('Settings shows masked key and relay', (t) async {
@@ -368,7 +369,8 @@ void main() {
     )..accountPollStatus = 'expired';
     await t.pumpWidget(host(const AccountOnboardingScreen(), api));
     await t.pumpAndSettle();
-    await t.tap(find.text('设备码登录')); // accountUseDeviceCode (zh)
+    await t.ensureVisible(find.text('GitHub 设备码'));
+    await t.tap(find.text('GitHub 设备码')); // accountUseDeviceCode (zh)
     await t.pump(); // accountLoginStart resolves
     await t.pump(); // the code renders
     expect(find.byKey(const Key('account-open-github')), findsOneWidget);
@@ -407,7 +409,8 @@ void main() {
       ),
     );
     await t.pumpAndSettle(); // initial onboarding (no spinner yet)
-    await t.tap(find.text('设备码登录')); // device-code fallback
+    await t.ensureVisible(find.text('GitHub 设备码'));
+    await t.tap(find.text('GitHub 设备码')); // device-code fallback
     await t.pump(); // start resolves
     await t.pump(); // code + spinner show
     expect(find.text('ABCD-1234'), findsOneWidget);
@@ -452,6 +455,7 @@ void main() {
     );
     await t.pumpAndSettle();
     // The PRIMARY button is the browser flow (the convenient default).
+    await t.ensureVisible(find.text('使用 GitHub 登录'));
     await t.tap(find.text('使用 GitHub 登录'));
     // Flush the async chain (start → authenticate → exchange → toast + go) with
     // bounded pumps; pumpAndSettle would advance past the toast's 3s auto-dismiss.
@@ -551,6 +555,7 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
+      await t.ensureVisible(find.text('使用 GitHub 登录'));
       await t.tap(find.text('使用 GitHub 登录'));
       await t.pumpAndSettle();
 
@@ -558,7 +563,7 @@ void main() {
       // stay on screen — the device code and a browser retry.
       expect(find.text('HOME-ROUTE'), findsNothing);
       expect(find.textContaining(_zh.accountWebTrouble), findsOneWidget);
-      expect(find.text('设备码登录'), findsOneWidget);
+      expect(find.text('GitHub 设备码'), findsOneWidget);
       expect(find.text('使用 GitHub 登录'), findsOneWidget);
       // The cause is kept, so a real bug stays diagnosable from a screenshot.
       if (cause != null) {
@@ -589,12 +594,13 @@ void main() {
       ),
     );
     await t.pumpAndSettle();
+    await t.ensureVisible(find.text('使用 GitHub 登录'));
     await t.tap(find.text('使用 GitHub 登录'));
     await t.pumpAndSettle();
 
     expect(find.text(_zh.accountRedirectRejected), findsOneWidget);
     expect(find.textContaining(_zh.accountWebTrouble), findsNothing);
-    expect(find.text('设备码登录'), findsOneWidget);
+    expect(find.text('GitHub 设备码'), findsOneWidget);
   });
 
   testWidgets('settings: account sign-out clears the user and returns to '
@@ -688,32 +694,21 @@ void main() {
       await t.pumpAndSettle();
     }
 
-    // Primary action = the FilledButton; the other stays available as an
-    // OutlinedButton, so neither platform loses a way in.
-    String primaryLabel() => t
-        .widget<Text>(
-          find.descendant(
-            of: find.byType(FilledButton),
-            matching: find.byType(Text),
-          ),
-        )
-        .data!;
+    // Both stay available side by side; the one the platform prefers leads.
+    bool deviceCodeLeads() =>
+        t.getTopLeft(find.byKey(const Key('account-device-code'))).dx <
+        t.getTopLeft(find.byKey(const Key('account-sign-in-web'))).dx;
 
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
       await mount();
-      expect(primaryLabel(), '设备码登录'); // accountUseDeviceCode
-      expect(
-        find.widgetWithText(OutlinedButton, '使用 GitHub 登录'),
-        findsOneWidget,
-      );
+      expect(deviceCodeLeads(), isTrue);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }
 
     // The harness reports android, which is the mobile default.
     await mount();
-    expect(primaryLabel(), '使用 GitHub 登录'); // accountSignInButton
-    expect(find.widgetWithText(OutlinedButton, '设备码登录'), findsOneWidget);
+    expect(deviceCodeLeads(), isFalse);
   });
 }

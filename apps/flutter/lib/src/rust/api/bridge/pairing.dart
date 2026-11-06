@@ -199,8 +199,8 @@ Future<PairingPreparedDto> pairingStartOver({String? label, String? backend}) =>
 /// Make the GitHub session set aside here the active account again, for
 /// `backend` when one is named, else this installation's or the only one. Hosts
 /// stop first and start again under GitHub. Returns its login, or `None` when
-/// none was set aside. Refused while a GitHub session is already active here. The
-/// pairing identity stays in its store, ready to resume.
+/// none was set aside. Refused while a GitHub session is already active here.
+/// The pairing identity stays in its store, ready to resume.
 Future<String?> pairingResumeGithub({String? backend}) => RustLib.instance.api
     .crateApiBridgePairingPairingResumeGithub(backend: backend);
 

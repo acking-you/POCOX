@@ -1,7 +1,7 @@
 # Pairing-code login
 
-**Status: relay support (stage 1), the backend (stage 2) and the core, bridge and CLI
-(stage 3) have shipped. `pocox pair` works; the app has no screens for it yet.** This
+**Status: relay support (stage 1), the backend (stage 2), the core, bridge and CLI
+(stage 3) and the app (stage 4) have shipped. Usage and deployment docs remain.** This
 page specifies the design for
 [issue #174](https://github.com/acking-you/POCOX/issues/174). Once a stage ships, its
 section becomes the rules a change must keep.
@@ -918,6 +918,30 @@ implemented feature.
 The existing `accountUseDeviceCode` label becomes "GitHub device code / GitHub
 设备码" to distinguish GitHub's flow from pairing.
 
+**In the app.** Sign-in leads with pairing and keeps GitHub's two sign-ins and Advanced
+under "or"; Advanced's backend field applies to pairing too. The pages are `/pair/join`,
+`/pair/restore`, `/pair/scan` and `/pair/pending`, plus `/pair` for an installation on
+GitHub or a self-hosted relay, reached from Settings › Account. A code travels to them
+in memory, never in a route. While this installation is a pairing device, the app reads
+its group every minute it is in front: a device that joined or asks to be restored is
+offered for review, and a removal or a replaced identity returns to sign-in, where the
+banner says what happened. The config view names the account's provider, so a pairing
+device never shows a GitHub avatar for an id that is not GitHub's.
+
+| Platform | Device store | Hint | Links and QR |
+| --- | --- | --- | --- |
+| iOS | A Keychain item per slot, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, not synchronizable; lock files in Application Support, excluded from backup | None | `pocox://pair` through `app_links`; camera scanning with a usage string |
+| Android | `no_backup/device-store/<slot>.json`, replaced atomically; a local-only Block Store copy where Play services exists, tagged with a hash of `ANDROID_ID` and ignored on any other device | `ANDROID_ID` on Android 8+, read only for the action the user just confirmed | `pocox://pair` opens the main activity; the OAuth callback activity takes only `pocox://auth`; camera scanning |
+| Desktops | Rust's own files (above) | Rust reads its own | `pocox://pair` on macOS; QR shown, not scanned |
+
+The store is installed at every engine start, before any other pairing call. Block Store
+is best effort: it is written only after the file is durable, an entry over its 4 KB
+limit is skipped, and its absence or failure only leaves recovery to a code or a member.
+A platform keychain package was not used because its Linux plugin would add native
+build dependencies to every desktop build for storage only phones need; the two channels
+are small. Android's backup rules exclude any store copy outside `no_backup` from cloud
+backup and device transfer as well.
+
 Preparing a code on first open creates only an inactive device. It must not
 call active-account setters, reset self-host settings, restart services or discard
 an in-progress GitHub login. Cancel/Advanced/offline/backend errors leave those
@@ -967,7 +991,7 @@ feature, alter configuration, or warrant a release-note claim that pairing works
 | 1 (shipped in [pb-mapper#52](https://github.com/acking-you/pb-mapper/pull/52)) | pb-mapper namespace support; then update the lockfile | Per-key isolation, stable namespace, a shortened expiry holds across restart, crash/restart recovery, old keys unchanged; TCP and QUIC plus direct-setup boundaries. |
 | 2 | Backend model, auth, routes and reconciliation | Real relay: multi-device groups, invalid principals, concurrent confirmed links, idempotent retries, lost responses, activation gating, key limits and every recovery rule; a relay that repeats a namespace, lost its state, changed instance or reports another namespace. |
 | 3 (shipped) | Core, bridge and CLI | App/CLI shared-store races, two explicit device scopes, account switches and hosting owner rules; a peer's removal reaches every installation; copied/expired/superseded credentials cannot revive authority. |
-| 4 | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
+| 4 (shipped) | Flutter and native platforms | Real-app state/theme media, large text and phone/desktop layouts; real reinstall/backup/transfer checks, Block Store with and without Play services, and OAuth/pair URI routing. |
 | 5 | Usage, CLI, deployment docs and changelog | Upgrade order, supported client versions, recovery/retention limits and existing-connection behavior documented. |
 
 The central acceptance scenarios are:

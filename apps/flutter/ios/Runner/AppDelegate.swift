@@ -4,6 +4,8 @@ import flutter_webrtc
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private var deviceStore: DeviceStoreChannel?
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
@@ -15,5 +17,8 @@ import flutter_webrtc
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "PocoxDeviceStore") {
+      deviceStore = DeviceStoreChannel(messenger: registrar.messenger())
+    }
   }
 }

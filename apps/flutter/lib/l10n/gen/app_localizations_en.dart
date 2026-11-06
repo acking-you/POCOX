@@ -472,7 +472,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get accountWelcomeSubtitle =>
-      'Sign in to pick up your conversations on any device.';
+      'No account needed. Pick up your conversations on any device.';
 
   @override
   String get accountSignInTitle => 'Sign in';
@@ -481,7 +481,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get accountSignInButton => 'Sign in with GitHub';
 
   @override
-  String get accountUseDeviceCode => 'Use a device code instead';
+  String get accountUseDeviceCode => 'GitHub device code';
 
   @override
   String get accountSessionExpiredTitle => 'Your session expired';
@@ -2064,6 +2064,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeMobileStep2 => 'Sign in with the same GitHub account';
+
+  @override
+  String get welcomeMobileStep2Pairing =>
+      'Link it to this device with a pairing code';
 
   @override
   String get welcomeMobileStep3 =>
@@ -5379,4 +5383,527 @@ class AppLocalizationsEn extends AppLocalizations {
   String historyCacheValue(String used, int limit) {
     return '$used / $limit MB';
   }
+
+  @override
+  String get pairingThisCode => 'This device\'s pairing code';
+
+  @override
+  String get pairingCopied => 'Code copied';
+
+  @override
+  String get pairingQrLabel => 'QR code of this device\'s pairing code';
+
+  @override
+  String get pairingOr => 'or';
+
+  @override
+  String get pairingOtherCode => 'Another device\'s code';
+
+  @override
+  String get pairingGroupCode => 'A code from any linked device';
+
+  @override
+  String get pairingScan => 'Scan QR code';
+
+  @override
+  String get pairingNext => 'Next';
+
+  @override
+  String get pairingGetStarted => 'Get started';
+
+  @override
+  String get pairingContinue => 'Continue';
+
+  @override
+  String get pairingContinueAlone => 'Continue on its own';
+
+  @override
+  String get pairingFirstDevice => 'This is my first device';
+
+  @override
+  String get pairingEnterOther => 'Enter another device\'s code';
+
+  @override
+  String get pairingEnterTitle => 'Which device\'s group?';
+
+  @override
+  String get pairingRestore => 'Restore a previous device';
+
+  @override
+  String get pairingUseCode => 'Use a pairing code';
+
+  @override
+  String get pairingReady => 'This device is set up';
+
+  @override
+  String get pairingSignedInWithCode => 'Signed in with a pairing code';
+
+  @override
+  String get pairingOffline => 'Offline';
+
+  @override
+  String get pairingOfflineBody => 'Requested once you\'re online.';
+
+  @override
+  String get pairingUnavailable => 'Unavailable';
+
+  @override
+  String get pairingNoRoom =>
+      'The server is not taking new devices right now. Existing devices are fine. Try later, or sign in with GitHub.';
+
+  @override
+  String get pairingTooOld =>
+      'This server has no pairing codes yet. Update the backend, or sign in with GitHub.';
+
+  @override
+  String pairingJoined(String name) {
+    return '$name joined';
+  }
+
+  @override
+  String pairingJoinedNotice(String name) {
+    return '$name linked. Not yours?';
+  }
+
+  @override
+  String pairingAskNotice(String name) {
+    return 'A device asks to restore $name';
+  }
+
+  @override
+  String get pairingReview => 'Review';
+
+  @override
+  String get pairingRemovedTitle => 'This device was removed';
+
+  @override
+  String get pairingRemovedBody =>
+      'Another device removed it and new connections stopped. Sessions and settings here are intact.';
+
+  @override
+  String get pairingSupersededTitle => 'This device was restored elsewhere';
+
+  @override
+  String pairingSupersededBody(String time) {
+    return 'This one stops working at $time. If that wasn\'t you, take it back with a code or a linked device; the old code then stops at once.';
+  }
+
+  @override
+  String get pairingSupersededBodyNow =>
+      'This one no longer works. If that wasn\'t you, take it back with a code or a linked device; the old code then stops at once.';
+
+  @override
+  String get pairingUnknownTitle => 'The server no longer knows this device';
+
+  @override
+  String get pairingUnknownBody =>
+      'Start as a new device. You can then restore one you had.';
+
+  @override
+  String get pairingTakeBack => 'Take back and change code';
+
+  @override
+  String get pairingTakeBackBody =>
+      'The old device\'s access ends at once and its code changes.';
+
+  @override
+  String get pairingStartOver => 'Start as a new device';
+
+  @override
+  String get pairingPendingTitle => 'Waiting for the server';
+
+  @override
+  String get pairingPendingBody =>
+      'The server has yet to confirm this change. It finishes on its own; nothing needs repeating.';
+
+  @override
+  String get pairingPendingLink => 'Linking';
+
+  @override
+  String get pairingPendingLeave => 'Leaving these devices';
+
+  @override
+  String get pairingPendingRemove => 'Removing a device';
+
+  @override
+  String get pairingPendingRestore => 'Restoring this device';
+
+  @override
+  String get pairingCheckStatus => 'Check status';
+
+  @override
+  String get pairingNotCaughtUp =>
+      'Done. This app is still catching up and will try again.';
+
+  @override
+  String get pairingConfirmTitle => 'Confirm';
+
+  @override
+  String get pairingLinkQuestion => 'Link to these devices?';
+
+  @override
+  String get pairingAlreadyMember => 'Already linked to these devices';
+
+  @override
+  String get pairingLinkBody =>
+      'They can use services hosted here, and this device can use theirs.';
+
+  @override
+  String get pairingLink => 'Link';
+
+  @override
+  String get pairingLinked => 'Linked';
+
+  @override
+  String get pairingOwnsCode => 'Owns this code';
+
+  @override
+  String get pairingListSeparator => ', ';
+
+  @override
+  String pairingLeaveTitle(int count) {
+    return 'Leave your $count current devices?';
+  }
+
+  @override
+  String pairingLeaveBody(String names, String target) {
+    return 'This device leaves $names and links to $target. Sessions and settings here stay, and the two groups do not merge. Every POCOX installation on this device moves with it.';
+  }
+
+  @override
+  String get pairingLeaveAndLink => 'Leave and link';
+
+  @override
+  String pairingSignOutTitle(String login) {
+    return 'Sign out of @$login?';
+  }
+
+  @override
+  String pairingSignOutBody(String target) {
+    return 'This device links to $target. That account\'s devices stop seeing what it hosts. The session is set aside, so you can switch back in Settings.';
+  }
+
+  @override
+  String get pairingSignOutAndLink => 'Sign out and link';
+
+  @override
+  String get pairingRelayTitle => 'Stop using this relay?';
+
+  @override
+  String pairingRelayBody(String target) {
+    return 'This device links to $target. The relay address and key are kept, so you can switch back in Settings.';
+  }
+
+  @override
+  String get pairingRelayAndLink => 'Stop and link';
+
+  @override
+  String get pairingRestoreQuestion => 'Used POCOX on this device before?';
+
+  @override
+  String get pairingAsk => 'Ask a linked device';
+
+  @override
+  String get pairingAsNew => 'Continue as a new device';
+
+  @override
+  String get pairingWhichDevice => 'Which one is this device?';
+
+  @override
+  String get pairingAddAsNew => 'Add as a new device';
+
+  @override
+  String get pairingRestoreThis => 'Restore this device';
+
+  @override
+  String pairingActiveTodayTitle(String name) {
+    return '$name was active today';
+  }
+
+  @override
+  String get pairingActiveTodayBody =>
+      'Restoring it here stops it there. Restore anyway?';
+
+  @override
+  String get pairingRestoreYes => 'Restore';
+
+  @override
+  String get pairingRestored => 'This device was restored';
+
+  @override
+  String get pairingWaitingTitle => 'Waiting for a linked device';
+
+  @override
+  String get pairingWaitingInfo =>
+      'On a linked device, open Settings › Account and allow the request showing this same check number. Nothing changes until you confirm here.';
+
+  @override
+  String get pairingCheckNumber => 'Check number';
+
+  @override
+  String get pairingRestoreDenied =>
+      'The request was denied. This device continues as new.';
+
+  @override
+  String get pairingRestoreExpired =>
+      'The request expired. Ask again, or use a code.';
+
+  @override
+  String get pairingConfirmRestore => 'Confirm restore';
+
+  @override
+  String get pairingYourDevices => 'Are these your devices?';
+
+  @override
+  String get pairingNotMine => 'Not mine, continue as new';
+
+  @override
+  String get pairingSameDevice => 'Same device';
+
+  @override
+  String get pairingScanTitle => 'Scan pairing code';
+
+  @override
+  String get pairingScanHint => 'Point at the QR code on the other device';
+
+  @override
+  String get pairingScanNotOurs => 'That is not a pairing code';
+
+  @override
+  String get pairingByHand => 'Enter it by hand';
+
+  @override
+  String get pairingCameraDenied =>
+      'Camera access is off. Allow it in Settings, or enter the code by hand.';
+
+  @override
+  String get pairingCameraFailed =>
+      'The camera is not available. Enter the code by hand.';
+
+  @override
+  String get pairingMyDevices => 'My devices';
+
+  @override
+  String get pairingAddDevice => 'Add device';
+
+  @override
+  String get pairingThisDevice => 'This device';
+
+  @override
+  String get pairingNotSetUp => 'Not set up';
+
+  @override
+  String get pairingToday => 'Today';
+
+  @override
+  String get pairingYesterday => 'Yesterday';
+
+  @override
+  String pairingDaysAgo(int days) {
+    return '$days days ago';
+  }
+
+  @override
+  String get pairingNoPeers => 'No other devices linked';
+
+  @override
+  String pairingLinkedCount(int count) {
+    return '$count devices linked';
+  }
+
+  @override
+  String pairingAsking(String number) {
+    return 'Asking to restore · check number $number';
+  }
+
+  @override
+  String get pairingDeny => 'Deny';
+
+  @override
+  String get pairingAllow => 'Allow';
+
+  @override
+  String get pairingAllowed =>
+      'Allowed. Nothing changes until that device confirms.';
+
+  @override
+  String get pairingDenied => 'Denied';
+
+  @override
+  String get pairingMore => 'More';
+
+  @override
+  String get pairingRename => 'Rename';
+
+  @override
+  String get pairingDeviceName => 'Name';
+
+  @override
+  String pairingRemoveTitle(String name) {
+    return 'Remove $name?';
+  }
+
+  @override
+  String get pairingRemoveBody =>
+      'It can\'t make new connections, and other devices are not affected. A direct connection already open lasts until either end closes it. Its sessions and settings stay on it.';
+
+  @override
+  String pairingRemoved(String name) {
+    return '$name was removed';
+  }
+
+  @override
+  String get pairingCodeSection => 'Pairing code';
+
+  @override
+  String get pairingPaused => 'Paused';
+
+  @override
+  String get pairingAllowLinking => 'Allow linking with this code';
+
+  @override
+  String get pairingAllowLinkingInfo =>
+      'Takes effect at once. Linked devices are not affected.';
+
+  @override
+  String get pairingChangeCode => 'Change code';
+
+  @override
+  String get pairingChangeCodeInfo =>
+      'The old code stops working at once. Linked devices are not affected. You can change it again after 24 hours.';
+
+  @override
+  String pairingAvailableIn(int hours) {
+    return 'Available in $hours h';
+  }
+
+  @override
+  String get pairingChange => 'Change';
+
+  @override
+  String get pairingRotateTitle => 'Change this device\'s code?';
+
+  @override
+  String get pairingRotateBody =>
+      'The old code stops working at once. Linked devices are not affected. You can change it again after 24 hours.';
+
+  @override
+  String get pairingRotateYes => 'Change';
+
+  @override
+  String get pairingRotated => 'The code was changed';
+
+  @override
+  String get pairingLinking => 'Linking';
+
+  @override
+  String get pairingLinkAnother => 'Link to another device';
+
+  @override
+  String get pairingLinkInstead => 'Link to other devices instead';
+
+  @override
+  String get pairingToGitHub => 'Switch to GitHub';
+
+  @override
+  String pairingBackToGitHub(String login) {
+    return 'Back to GitHub (@$login)';
+  }
+
+  @override
+  String get pairingToGitHubTitle => 'Switch to GitHub?';
+
+  @override
+  String pairingBackToGitHubTitle(String login) {
+    return 'Back to @$login?';
+  }
+
+  @override
+  String get pairingToGitHubBody =>
+      'This installation stops using this device\'s pairing identity. Its devices stay linked, and you can come back with Use a pairing code.';
+
+  @override
+  String get pairingToGitHubYes => 'Sign in with GitHub';
+
+  @override
+  String get pairingBackToGitHubYes => 'Switch back';
+
+  @override
+  String get pairingLeaveGroup => 'Leave these devices';
+
+  @override
+  String pairingLeaveGroupTitle(int count) {
+    return 'Leave your $count linked devices?';
+  }
+
+  @override
+  String get pairingLeaveGroupBody =>
+      'This device continues on its own with its own code. Every POCOX installation on it moves with it. Sessions and settings here stay.';
+
+  @override
+  String get pairingLeaveYes => 'Leave';
+
+  @override
+  String get pairingErrUnknownCode =>
+      'That code is not right. Check it and try again.';
+
+  @override
+  String get pairingErrRetired =>
+      'This code no longer works. Check the latest one on that device.';
+
+  @override
+  String get pairingErrPaused =>
+      'That device has paused linking. Turn it on there first.';
+
+  @override
+  String get pairingErrOwnCode =>
+      'This is this device\'s own code. Enter another device\'s.';
+
+  @override
+  String pairingErrTooMany(int minutes) {
+    return 'Too many attempts. Try again in $minutes minutes.';
+  }
+
+  @override
+  String get pairingErrStale =>
+      'Those devices just changed. Review them again.';
+
+  @override
+  String get pairingErrAlreadyLinked =>
+      'This device is already linked to those devices.';
+
+  @override
+  String get pairingErrGroupFull =>
+      'That group has no room for another device.';
+
+  @override
+  String get pairingErrPending => 'A change to this device is still under way.';
+
+  @override
+  String get pairingErrUpgrade =>
+      'Update POCOX to use pairing codes with this server.';
+
+  @override
+  String get pairingErrRelay =>
+      'The server\'s relay is not reachable right now. Try again shortly.';
+
+  @override
+  String get pairingErrNotActivated =>
+      'This device is not set up yet. Continue on it first.';
+
+  @override
+  String get pairingErrNotFound =>
+      'No linked device was found to ask. Use a code from one of them instead.';
+
+  @override
+  String get pairingErrSlotsFull =>
+      'That device already has requests waiting. Use a code instead.';
+
+  @override
+  String get pairingErrNoDevice =>
+      'This device has no pairing identity here yet.';
+
+  @override
+  String get pairingErrUnreachable =>
+      'Cannot reach the server. Your entry is kept.';
 }
